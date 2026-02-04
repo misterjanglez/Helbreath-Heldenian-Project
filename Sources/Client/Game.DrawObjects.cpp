@@ -568,12 +568,8 @@ void CGame::DrawObjects(short sPivotX, short sPivotY, short sDivX, short sDivY, 
 
 					if (m_entityState.m_wObjectID == m_pPlayer->m_sPlayerObjectID)
 					{
-						if (m_bIsObserverMode == false)
-						{
-							int camX = (indexX - VIEW_CENTER_TILE_X()) * 32 + static_cast<int>(m_pMapData->m_pData[dX][dY].m_motion.fCurrentOffsetX) - 16;
-							int camY = (indexY - VIEW_CENTER_TILE_Y()) * 32 + static_cast<int>(m_pMapData->m_pData[dX][dY].m_motion.fCurrentOffsetY) - 16;
-							m_Camera.SetDestination(camX, camY);
-						}
+						// Camera is now updated in on_render() before drawing, so we don't need to update it here
+						// This ensures viewport and entity position use the same motion offset
 						m_rcPlayerRect = m_rcBodyRect;
 						bIsPlayerDrawed = true;
 					}

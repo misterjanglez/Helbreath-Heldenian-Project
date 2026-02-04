@@ -367,6 +367,31 @@ void Screen_OnGame::on_render()
         }
     }
 
+    // Snap camera to player position BEFORE drawing to eliminate character vibration
+    // This ensures viewport and entity position use the same motion offset
+    if (!m_pGame->m_bIsObserverMode)
+    {
+        int playerDX = m_pGame->m_pPlayer->m_sPlayerX - m_pGame->m_pMapData->m_sPivotX;
+        int playerDY = m_pGame->m_pPlayer->m_sPlayerY - m_pGame->m_pMapData->m_sPivotY;
+        if (playerDX >= 0 && playerDX < MAPDATASIZEX && playerDY >= 0 && playerDY < MAPDATASIZEY)
+        {
+            auto& motion = m_pGame->m_pMapData->m_pData[playerDX][playerDY].m_motion;
+            int camX = (m_pGame->m_pPlayer->m_sPlayerX - VIEW_CENTER_TILE_X()) * 32
+                     + static_cast<int>(motion.fCurrentOffsetX) - 16;
+            int camY = (m_pGame->m_pPlayer->m_sPlayerY - VIEW_CENTER_TILE_Y()) * 32
+                     + static_cast<int>(motion.fCurrentOffsetY) - 16;
+            m_pGame->m_Camera.SnapTo(camX, camY);
+
+            // Recalculate viewport to match snapped camera
+            int sVal = m_pGame->m_Camera.GetX() - (m_sPivotX * 32);
+            m_sDivX = sVal / 32;
+            m_sModX = sVal % 32;
+            sVal = m_pGame->m_Camera.GetY() - (m_sPivotY * 32);
+            m_sDivY = sVal / 32;
+            m_sModY = sVal % 32;
+        }
+    }
+
     // Main scene rendering
     FrameTiming::BeginProfile(ProfileStage::DrawBackground);
     m_pGame->DrawBackground(m_sDivX, m_sModX, m_sDivY, m_sModY);

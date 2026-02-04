@@ -49,9 +49,10 @@ struct EntityMotion {
     // Pixel Offsets (from current tile center)
     // Start: offset where entity came FROM
     // Target: always (0, 0) - the tile center
+    // Using floats to support seamless tile transitions with non-integer offsets
     //-------------------------------------------------------------------------
-    int16_t sStartOffsetX = 0;
-    int16_t sStartOffsetY = 0;
+    float fStartOffsetX = 0.0f;
+    float fStartOffsetY = 0.0f;
 
     //-------------------------------------------------------------------------
     // Calculated Output (updated each frame) - floats for smooth interpolation
@@ -75,6 +76,11 @@ struct EntityMotion {
     // currentTime: current game time in milliseconds
     // duration: time to complete movement in milliseconds
     void StartMove(int8_t direction, uint32_t currentTime, uint32_t duration);
+
+    // Start movement with a custom initial offset (for seamless tile transitions)
+    // This allows continuing from where a previous motion left off
+    // offsetX, offsetY: The starting offset (can be outside normal [-32, 0] range for seamless transitions)
+    void StartMoveWithOffset(int8_t direction, uint32_t currentTime, uint32_t duration, float offsetX, float offsetY);
 
     // Queue a follow-up move (called when move arrives while still interpolating)
     void QueueMove(int8_t direction, uint32_t duration);

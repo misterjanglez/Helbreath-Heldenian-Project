@@ -1056,6 +1056,11 @@ bool __fastcall CMapData::bSetOwner(uint16_t wObjectID, int sX, int sY, int sTyp
 	uint16_t wOriginalObjectID = wObjectID;
 	PlayerStatus localStatus = status;
 	PlayerAppearance localAppearance = appearance;
+	// Track old motion offset for seamless tile transitions during continuous movement
+	float fOldMotionOffsetX = 0.0f;
+	float fOldMotionOffsetY = 0.0f;
+	int8_t cOldMotionDir = 0;
+	bool bHadOldMotion = false;
 
 	if ((m_sPivotX == -1) || (m_sPivotY == -1)) return false;
 	std::memset(cTmpName, 0, sizeof(cTmpName));
@@ -1188,6 +1193,14 @@ bool __fastcall CMapData::bSetOwner(uint16_t wObjectID, int sX, int sY, int sTyp
 				iEffectType = m_pData[iX][iY].m_iEffectType;
 				iEffectFrame = m_pData[iX][iY].m_iEffectFrame;
 				iEffectTotalFrame = m_pData[iX][iY].m_iEffectTotalFrame;
+
+				// Capture old motion offset and direction for seamless continuous movement
+				if (m_pData[iX][iY].m_motion.bIsMoving) {
+					fOldMotionOffsetX = m_pData[iX][iY].m_motion.fCurrentOffsetX;
+					fOldMotionOffsetY = m_pData[iX][iY].m_motion.fCurrentOffsetY;
+					cOldMotionDir = m_pData[iX][iY].m_motion.cDirection;
+					bHadOldMotion = true;
+				}
 
 				m_pData[iX][iY].m_wObjectID = 0; //-1; v1.41
 				m_pData[iX][iY].m_iChatMsg = 0; // v1.4
@@ -1630,6 +1643,22 @@ EXIT_SEARCH_LOOP:;
 				{
 					// Entity still interpolating previous tile — queue this move
 					m_pData[dX][dY].m_motion.QueueMove(cDir, duration);
+				}
+				else if (bHadOldMotion && cOldMotionDir == cDir)
+				{
+					// Seamless tile transition: only when continuing in the SAME direction
+					// When transitioning from old tile at offset (e.g., -1.6) to new tile,
+					// the new offset should be: oldOffset + stdStart
+					// This maintains visual continuity across tile boundaries
+					int16_t stdStartX, stdStartY;
+					EntityMotion::GetDirectionStartOffset(cDir, stdStartX, stdStartY);
+
+					// Calculate the continuous offset for the new tile
+					// newOffset = oldOffset + stdStart (since stdStart is negative, this extends the range)
+					float newOffsetX = fOldMotionOffsetX + static_cast<float>(stdStartX);
+					float newOffsetY = fOldMotionOffsetY + static_cast<float>(stdStartY);
+
+					m_pData[dX][dY].m_motion.StartMoveWithOffset(cDir, dwTime, duration, newOffsetX, newOffsetY);
 				}
 				else
 				{

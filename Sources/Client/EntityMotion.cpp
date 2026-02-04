@@ -4,6 +4,8 @@
 
 #include "EntityMotion.h"
 #include "ActionID.h"
+#include <cmath>
+#include <algorithm>
 
 //=============================================================================
 // StartMove - Begin movement interpolation in a direction
@@ -18,11 +20,49 @@ void EntityMotion::StartMove(int8_t direction, uint32_t currentTime, uint32_t du
 
     // Get starting offset based on direction
     // Entity is moving TO this tile FROM the neighboring tile
-    GetDirectionStartOffset(direction, sStartOffsetX, sStartOffsetY);
+    int16_t startX, startY;
+    GetDirectionStartOffset(direction, startX, startY);
+    fStartOffsetX = static_cast<float>(startX);
+    fStartOffsetY = static_cast<float>(startY);
 
-    // Initial position is at the start offset (convert to float)
-    fCurrentOffsetX = static_cast<float>(sStartOffsetX);
-    fCurrentOffsetY = static_cast<float>(sStartOffsetY);
+    // Initial position is at the start offset
+    fCurrentOffsetX = fStartOffsetX;
+    fCurrentOffsetY = fStartOffsetY;
+}
+
+//=============================================================================
+// StartMoveWithOffset - Begin movement with custom initial offset
+// Used for seamless tile transitions during continuous movement
+// The starting offset can be outside normal [-32, 0] range to ensure visual continuity
+//=============================================================================
+void EntityMotion::StartMoveWithOffset(int8_t direction, uint32_t currentTime, uint32_t duration, float offsetX, float offsetY)
+{
+    cDirection = direction;
+    dwStartTime = currentTime;
+    bIsMoving = true;
+
+    // Use custom start offsets (allows values like -33.6 for seamless transitions)
+    fStartOffsetX = offsetX;
+    fStartOffsetY = offsetY;
+
+    // Adjust duration proportionally to the extra distance
+    // If covering 33.6 pixels instead of 32, take proportionally longer
+    float normalDist = 32.0f;
+    float actualDistX = std::abs(offsetX);
+    float actualDistY = std::abs(offsetY);
+    float actualDist = std::max(actualDistX, actualDistY);
+    if (actualDist > 0.0f && actualDist != normalDist) {
+        float scale = actualDist / normalDist;
+        dwDuration = static_cast<uint32_t>(duration * scale);
+    } else {
+        dwDuration = duration;
+    }
+
+    fProgress = 0.0f;
+
+    // Initial position at the custom offset
+    fCurrentOffsetX = offsetX;
+    fCurrentOffsetY = offsetY;
 }
 
 //=============================================================================
@@ -81,8 +121,8 @@ void EntityMotion::Update(uint32_t currentTime)
     // Formula: current = start * (1 - progress)
     // Keep as float for smooth sub-pixel interpolation
     float invProgress = 1.0f - fProgress;
-    fCurrentOffsetX = static_cast<float>(sStartOffsetX) * invProgress;
-    fCurrentOffsetY = static_cast<float>(sStartOffsetY) * invProgress;
+    fCurrentOffsetX = fStartOffsetX * invProgress;
+    fCurrentOffsetY = fStartOffsetY * invProgress;
 }
 
 //=============================================================================
@@ -104,8 +144,8 @@ void EntityMotion::Bump()
     fProgress = 0.0f;
     fCurrentOffsetX = 0.0f;
     fCurrentOffsetY = 0.0f;
-    sStartOffsetX = 0;
-    sStartOffsetY = 0;
+    fStartOffsetX = 0.0f;
+    fStartOffsetY = 0.0f;
     bHasPending = false;
 }
 
@@ -119,8 +159,8 @@ void EntityMotion::Reset()
     fProgress = 0.0f;
     dwStartTime = 0;
     dwDuration = 0;
-    sStartOffsetX = 0;
-    sStartOffsetY = 0;
+    fStartOffsetX = 0.0f;
+    fStartOffsetY = 0.0f;
     fCurrentOffsetX = 0.0f;
     fCurrentOffsetY = 0.0f;
     bHasPending = false;
