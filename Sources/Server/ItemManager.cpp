@@ -2340,6 +2340,26 @@ void ItemManager::use_item_handler(int client_h, short item_index, short dX, sho
 					}
 				}
 
+				// Unequip all non-hero equipped items (except neck, rings, angels)
+				// so the client refreshes their sprites with the new gender.
+				// Hero items are already swapped above. Accessories have no gender sprites.
+				for (int i = 0; i < hb::shared::limits::MaxItems; i++)
+				{
+					if (client->m_item_list[i] == nullptr) continue;
+					if (client->m_is_item_equipped[i] == false) continue;
+
+					// Skip hero items (already handled by swap above)
+					int id = client->m_item_list[i]->m_id_num;
+					if (id >= gendered_first && id <= gendered_last) continue;
+
+					// Skip accessories: neck, rings, angel pendants
+					EquipPos pos = client->m_item_list[i]->get_equip_pos();
+					if (pos == EquipPos::Neck || pos == EquipPos::RightFinger || pos == EquipPos::LeftFinger) continue;
+
+					release_item_handler(client_h, static_cast<short>(i), false);
+					m_game->send_notify_msg(0, client_h, Notify::ItemReleased, static_cast<int>(pos), i, 0, 0);
+				}
+
 				break;
 			}
 			}
