@@ -9,6 +9,7 @@
 #include "SharedCalculations.h"
 #include <format>
 #include <string>
+#include "IInput.h"
 
 using namespace hb::shared::net;
 using namespace hb::shared::item;
@@ -112,7 +113,7 @@ static EquipPos FindHoverSlot(CGame* game, const EquipSlotLayout* slots, int slo
 		CItem* cfg = game->get_item_config(game->m_item_list[itemIdx]->m_id_num);
 		if (cfg == nullptr) continue;
 
-		auto draw = game->get_item_draw(cfg->m_display_id, item_atlas::equip, cfg->sprite_is_female());
+		auto draw = game->get_item_draw(cfg->m_display_id, item_atlas::equip, is_female);
 		if (check_item_collision(draw.sprite,
 			sX + slots[i].offsetX, sY + slots[i].offsetY, draw.frame, mouse_x, mouse_y, item_hit_margin))
 		{
@@ -134,13 +135,13 @@ void DialogBox_Character::draw_equipped_item(hb::shared::item::EquipPos equipPos
 	if (cfg == nullptr) return;
 
 	char item_color = item->m_item_color;
-	bool disabled = m_game->m_is_item_disabled[itemIdx];
+	bool disabled = inventory_manager::get().is_locked(itemIdx);
 
 	// Select color array based on item type (weapons use different colors)
 	const hb::shared::render::Color* colors = useWeaponColors ? GameColors::Weapons : GameColors::Items;
 
 	bool is_female = (spriteOffset == 40);
-	auto equip_draw = m_game->get_item_draw(cfg->m_display_id, item_atlas::equip, cfg->sprite_is_female());
+	auto equip_draw = m_game->get_item_draw(cfg->m_display_id, item_atlas::equip, is_female);
 	auto sprite = equip_draw.sprite;
 	int16_t frame = equip_draw.frame;
 
@@ -218,7 +219,7 @@ char DialogBox_Character::find_equip_item_at_point(short mouse_x, short mouse_y,
 		if (cfg == nullptr) continue;
 
 		bool is_female = (spriteOffset == 40);
-		auto draw = m_game->get_item_draw(cfg->m_display_id, item_atlas::equip, cfg->sprite_is_female());
+		auto draw = m_game->get_item_draw(cfg->m_display_id, item_atlas::equip, is_female);
 		if (check_item_collision(draw.sprite,
 			sX + slots[i].offsetX, sY + slots[i].offsetY, draw.frame, mouse_x, mouse_y, item_hit_margin))
 		{
@@ -229,11 +230,13 @@ char DialogBox_Character::find_equip_item_at_point(short mouse_x, short mouse_y,
 	return -1;
 }
 
-void DialogBox_Character::on_draw(short mouse_x, short mouse_y, short z, char lb)
+void DialogBox_Character::on_draw()
 {
+	short mouse_x = static_cast<short>(hb::shared::input::get_mouse_x());
+	short mouse_y = static_cast<short>(hb::shared::input::get_mouse_y());
 	if (!m_game->ensure_item_configs_loaded()) return;
-	short sX = Info().m_x;
-	short sY = Info().m_y;
+	short sX = m_x;
+	short sY = m_y;
 	char collison = -1;
 	const bool dialogTrans = config_manager::get().is_dialog_transparency_enabled();
 
@@ -418,27 +421,24 @@ void DialogBox_Character::draw_female_character(short sX, short sY, short mouse_
 
 }
 
-bool DialogBox_Character::on_click(short mouse_x, short mouse_y)
+bool DialogBox_Character::on_click()
 {
-	short sX = Info().m_x;
-	short sY = Info().m_y;
-
 	// Quest button
-	if ((mouse_x >= sX + 15) && (mouse_x <= sX + 15 + ui_layout::btn_size_x) && (mouse_y >= sY + 340) && (mouse_y <= sY + 340 + ui_layout::btn_size_y)) {
+	if (mouse_in(btn_quest)) {
 		enable_dialog_box(DialogBoxId::Quest, 1, 0, 0);
 		disable_this_dialog();
 		play_sound_effect('E', 14, 5);
 		return true;
 	}
 	// Party button
-	if ((mouse_x >= sX + 98) && (mouse_x <= sX + 98 + ui_layout::btn_size_x) && (mouse_y >= sY + 340) && (mouse_y <= sY + 340 + ui_layout::btn_size_y)) {
+	if (mouse_in(btn_party)) {
 		enable_dialog_box(DialogBoxId::Party, 0, 0, 0);
 		disable_this_dialog();
 		play_sound_effect('E', 14, 5);
 		return true;
 	}
 	// LevelUp button
-	if ((mouse_x >= sX + 180) && (mouse_x <= sX + 180 + ui_layout::btn_size_x) && (mouse_y >= sY + 340) && (mouse_y <= sY + 340 + ui_layout::btn_size_y)) {
+	if (mouse_in(btn_levelup)) {
 		enable_dialog_box(DialogBoxId::LevelUpSetting, 0, 0, 0);
 		disable_this_dialog();
 		play_sound_effect('E', 14, 5);
@@ -448,13 +448,15 @@ bool DialogBox_Character::on_click(short mouse_x, short mouse_y)
 	return false;
 }
 
-bool DialogBox_Character::on_double_click(short mouse_x, short mouse_y)
+bool DialogBox_Character::on_double_click()
 {
+	short mouse_x = static_cast<short>(hb::shared::input::get_mouse_x());
+	short mouse_y = static_cast<short>(hb::shared::input::get_mouse_y());
 	if (m_game->m_dialog_box_manager.is_enabled(DialogBoxId::ItemDropExternal))
 		return false;
 
-	short sX = Info().m_x;
-	short sY = Info().m_y;
+	short sX = m_x;
+	short sY = m_y;
 
 	// Build equipment position status array
 	char equip_poi_status[DEF_MAXITEMEQUIPPOS];
@@ -480,12 +482,12 @@ bool DialogBox_Character::on_double_click(short mouse_x, short mouse_y)
 	// Check if at repair shop
 	if (m_game->m_dialog_box_manager.is_enabled(DialogBoxId::SaleMenu) &&
 		!m_game->m_dialog_box_manager.is_enabled(DialogBoxId::SellOrRepair) &&
-		m_game->m_dialog_box_manager.Info(DialogBoxId::GiveItem).m_v3 == 24)
+		m_game->m_dialog_box_manager.m_give_item.action_type == 24)
 	{
 		send_command(MsgId::CommandCommon, CommonType::ReqRepairItem, 0, item_id,
-			m_game->m_dialog_box_manager.Info(DialogBoxId::GiveItem).m_v3, 0,
+			m_game->m_dialog_box_manager.m_give_item.action_type, 0,
 			cfg->m_name,
-			m_game->m_dialog_box_manager.Info(DialogBoxId::GiveItem).m_v4);
+			m_game->m_dialog_box_manager.m_give_item.object_id);
 	}
 	else
 	{
@@ -530,13 +532,15 @@ bool DialogBox_Character::on_double_click(short mouse_x, short mouse_y)
 	return true;
 }
 
-PressResult DialogBox_Character::on_press(short mouse_x, short mouse_y)
+PressResult DialogBox_Character::on_press()
 {
+	short mouse_x = static_cast<short>(hb::shared::input::get_mouse_x());
+	short mouse_y = static_cast<short>(hb::shared::input::get_mouse_y());
 	if (m_game->m_dialog_box_manager.is_enabled(DialogBoxId::ItemDropExternal))
 		return PressResult::Normal;
 
-	short sX = Info().m_x;
-	short sY = Info().m_y;
+	short sX = m_x;
+	short sY = m_y;
 
 	char equip_poi_status[DEF_MAXITEMEQUIPPOS];
 	build_equip_status_array(equip_poi_status);
@@ -551,7 +555,7 @@ PressResult DialogBox_Character::on_press(short mouse_x, short mouse_y)
 	return PressResult::Normal;
 }
 
-bool DialogBox_Character::on_item_drop(short mouse_x, short mouse_y)
+bool DialogBox_Character::on_item_drop()
 {
 	inventory_manager::get().equip_item(static_cast<char>(CursorTarget::get_selected_id()));
 	return true;

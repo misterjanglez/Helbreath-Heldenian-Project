@@ -24,9 +24,9 @@ public:
 	~DialogBox_SysMenu() override = default;
 
 	void on_update() override;
-	void on_draw(short mouse_x, short mouse_y, short z, char lb) override;
-	bool on_click(short mouse_x, short mouse_y) override;
-	PressResult on_press(short mouse_x, short mouse_y) override;
+	void on_draw() override;
+	bool on_click() override;
+	PressResult on_press() override;
 
 	// Resolution management
 	static const Resolution s_Resolutions[];
@@ -38,24 +38,24 @@ public:
 
 private:
 	// Tab drawing
-	void draw_tabs(short sX, short sY, short mouse_x, short mouse_y);
+	void draw_tabs(short sX, short sY);
 	void draw_tab_content(short sX, short sY, short mouse_x, short mouse_y, char lb);
 
 	// Individual tab content
-	void draw_general_tab(short sX, short sY, short mouse_x, short mouse_y);
-	void draw_graphics_tab(short sX, short sY, short mouse_x, short mouse_y);
+	void draw_general_tab(short sX, short sY);
+	void draw_graphics_tab(short sX, short sY);
 	void draw_audio_tab(short sX, short sY, short mouse_x, short mouse_y, char lb);
-	void draw_system_tab(short sX, short sY, short mouse_x, short mouse_y);
+	void draw_system_tab(short sX, short sY);
 
 	// Click handlers for each tab
-	bool on_click_general(short sX, short sY, short mouse_x, short mouse_y);
-	bool on_click_graphics(short sX, short sY, short mouse_x, short mouse_y);
-	bool on_click_audio(short sX, short sY, short mouse_x, short mouse_y);
-	bool on_click_system(short sX, short sY, short mouse_x, short mouse_y);
+	bool on_click_general(short sX, short sY);
+	bool on_click_graphics(short sX, short sY);
+	bool on_click_audio(short sX, short sY);
+	bool on_click_system(short sX, short sY);
 
 	// Helper to draw On/Off toggle
-	void draw_toggle(int x, int y, bool enabled, short mouse_x, short mouse_y);
-	bool is_in_toggle_area(int x, int y, short mouse_x, short mouse_y);
+	void draw_toggle(int x, int y, bool enabled);
+	bool is_in_toggle_area(int x, int y);
 
 	int m_iActiveTab;
 

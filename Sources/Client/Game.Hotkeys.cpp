@@ -5,6 +5,10 @@
 #include "AudioManager.h"
 #include "ConfigManager.h"
 #include "HotkeyManager.h"
+#include "DialogBox_ChatHistory.h"
+#include "DialogBox_GuildMenu.h"
+#include "DialogBox_ItemDropAmount.h"
+#include "InventoryManager.h"
 #include "lan_eng.h"
 #include <format>
 #include <string>
@@ -186,8 +190,8 @@ void CGame::hotkey_whisper_target()
 
 	char lb, rb;
 	short sX, sY, mouse_x, mouse_y, z;
-	sX = m_dialog_box_manager.Info(DialogBoxId::ChatHistory).m_x;
-	sY = m_dialog_box_manager.Info(DialogBoxId::ChatHistory).m_y;
+	sX = m_dialog_box_manager.get_dialog_box(DialogBoxId::ChatHistory)->m_x;
+	sY = m_dialog_box_manager.get_dialog_box(DialogBoxId::ChatHistory)->m_y;
 	mouse_x = static_cast<short>(hb::shared::input::get_mouse_x());
 
 	mouse_y = static_cast<short>(hb::shared::input::get_mouse_y());
@@ -201,10 +205,10 @@ void CGame::hotkey_whisper_target()
 	{
 		char buff[64];
 		int i = (139 - mouse_y + sY) / 13;
-		int msg_idx = i + m_dialog_box_manager.Info(DialogBoxId::ChatHistory).m_view;
+		int msg_idx = i + m_dialog_box_manager.get_dialog_as<DialogBox_ChatHistory>(DialogBoxId::ChatHistory)->m_scroll_position;
 		CMsg* chat_msg = ChatManager::get().get_message(msg_idx);
 		if (chat_msg == nullptr) return;
-		if (chat_msg->m_pMsg[0] == ' ') { i++; chat_msg = ChatManager::get().get_message(i + m_dialog_box_manager.Info(DialogBoxId::ChatHistory).m_view); }
+		if (chat_msg->m_pMsg[0] == ' ') { i++; chat_msg = ChatManager::get().get_message(i + m_dialog_box_manager.get_dialog_as<DialogBox_ChatHistory>(DialogBoxId::ChatHistory)->m_scroll_position); }
 		if (chat_msg == nullptr) return;
 		std::snprintf(buff, sizeof(buff), "%s", chat_msg->m_pMsg);
 		char* sep = std::strchr(buff, ':');
@@ -243,13 +247,13 @@ void CGame::hotkey_simple_use_health_potion()
 	}
 	for (i = 0; i < hb::shared::limits::MaxItems; i++)
 	{
-		if ((m_item_list[i] != 0) && (m_is_item_disabled[i] != true))
+		if ((m_item_list[i] != 0) && (!inventory_manager::get().is_locked(i)))
 		{
 			CItem* cfg = get_item_config(m_item_list[i]->m_id_num);
 			if (cfg && cfg->get_item_type() == ItemType::Consume && cfg->m_item_effect_type == hb::shared::item::to_int(hb::shared::item::ItemEffectType::HP))
 			{
 				send_command(MsgId::CommandCommon, CommonType::ReqUseItem, 0, i, 0, 0, 0);
-				m_is_item_disabled[i] = true;
+				inventory_manager::get().lock_item(i);
 				m_item_using_status = true;
 				return;
 			}
@@ -274,13 +278,13 @@ void CGame::hotkey_simple_use_mana_potion()
 
 	for (i = 0; i < hb::shared::limits::MaxItems; i++)
 	{
-		if ((m_item_list[i] != 0) && (m_is_item_disabled[i] != true))
+		if ((m_item_list[i] != 0) && (!inventory_manager::get().is_locked(i)))
 		{
 			CItem* cfg = get_item_config(m_item_list[i]->m_id_num);
 			if (cfg && cfg->get_item_type() == ItemType::Consume && cfg->m_item_effect_type == hb::shared::item::to_int(hb::shared::item::ItemEffectType::MP))
 			{
 				send_command(MsgId::CommandCommon, CommonType::ReqUseItem, 0, i, 0, 0, 0);
-				m_is_item_disabled[i] = true;
+				inventory_manager::get().lock_item(i);
 				m_item_using_status = true;
 				return;
 			}
@@ -290,8 +294,8 @@ void CGame::hotkey_simple_use_mana_potion()
 
 void CGame::hotkey_simple_load_backup_chat()
 {
-	if (((m_dialog_box_manager.is_enabled(DialogBoxId::GuildMenu) == true) && (m_dialog_box_manager.Info(DialogBoxId::GuildMenu).m_mode == 1) && (m_dialog_box_manager.get_top_dialog_box_index() == DialogBoxId::GuildMenu)) ||
-		((m_dialog_box_manager.is_enabled(DialogBoxId::ItemDropExternal) == true) && (m_dialog_box_manager.Info(DialogBoxId::ItemDropExternal).m_mode == 1) && (m_dialog_box_manager.get_top_dialog_box_index() == DialogBoxId::ItemDropExternal)))
+	if (((m_dialog_box_manager.is_enabled(DialogBoxId::GuildMenu) == true) && (m_dialog_box_manager.get_dialog_as<DialogBox_GuildMenu>(DialogBoxId::GuildMenu)->m_mode == DialogBox_GuildMenu::mode::create_guild) && (m_dialog_box_manager.get_top_id() == DialogBoxId::GuildMenu)) ||
+		((m_dialog_box_manager.is_enabled(DialogBoxId::ItemDropExternal) == true) && (m_dialog_box_manager.get_dialog_as<DialogBox_ItemDropAmount>(DialogBoxId::ItemDropExternal)->m_mode == DialogBox_ItemDropAmount::mode::input) && (m_dialog_box_manager.get_top_id() == DialogBoxId::ItemDropExternal)))
 	{
 		return;
 	}

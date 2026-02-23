@@ -150,9 +150,6 @@
     <ClInclude Include="DialogBoxIDs.h">
       <Filter>DialogBox</Filter>
     </ClInclude>
-    <ClInclude Include="DialogBoxInfo.h">
-      <Filter>DialogBox</Filter>
-    </ClInclude>
     <ClInclude Include="DialogBoxManager.h">
       <Filter>DialogBox</Filter>
     </ClInclude>

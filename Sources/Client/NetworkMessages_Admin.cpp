@@ -44,14 +44,14 @@ void HandleServerShutdown(CGame* game, char* data)
 	if (!game->m_dialog_box_manager.is_enabled(DialogBoxId::Noticement))
 		game->m_dialog_box_manager.enable_dialog_box(DialogBoxId::Noticement, pkt->mode, pkt->seconds, 0);
 
-	game->m_dialog_box_manager.Info(DialogBoxId::Noticement).m_mode = pkt->mode;
-	game->m_dialog_box_manager.Info(DialogBoxId::Noticement).m_v1 = pkt->seconds;
-
 	// Pass shutdown info to the dialog (seconds + custom message)
-	auto* dlg = static_cast<DialogBox_Noticement*>(
-		game->m_dialog_box_manager.get_dialog_box(DialogBoxId::Noticement));
+	auto* dlg = game->m_dialog_box_manager.get_dialog_as<DialogBox_Noticement>(DialogBoxId::Noticement);
 	if (dlg != nullptr)
+	{
+		dlg->m_mode = pkt->mode;
+		dlg->m_countdown_seconds = pkt->seconds;
 		dlg->set_shutdown_info(pkt->seconds, pkt->message);
+	}
 
 	game->play_game_sound('E', 27, 0);
 }

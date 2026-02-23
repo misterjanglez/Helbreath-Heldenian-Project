@@ -6,6 +6,7 @@
 #include "Packet/SharedPackets.h"
 #include "lan_eng.h"
 #include "DialogBoxIDs.h"
+#include "DialogBox_Fishing.h"
 #include <cstdio>
 #include <cstring>
 
@@ -17,7 +18,8 @@ void fishing_manager::handle_fish_chance(char* data)
 		data, sizeof(hb::net::PacketNotifyFishChance));
 	if (!pkt) return;
 	fish_chance = pkt->chance;
-	m_game->m_dialog_box_manager.Info(DialogBoxId::Fishing).m_v1 = fish_chance;
+	auto* fish_dlg = m_game->m_dialog_box_manager.get_dialog_as<DialogBox_Fishing>(DialogBoxId::Fishing);
+	if (fish_dlg) fish_dlg->m_catch_chance = fish_chance;
 }
 
 void fishing_manager::handle_event_fish_mode(char* data)
@@ -36,8 +38,7 @@ void fishing_manager::handle_event_fish_mode(char* data)
 	memcpy(name, pkt->name, sizeof(pkt->name));
 
 	m_game->m_dialog_box_manager.enable_dialog_box(DialogBoxId::Fishing, 0, 0, price, name);
-	m_game->m_dialog_box_manager.Info(DialogBoxId::Fishing).m_v3 = 0; // unused (was sprite)
-	m_game->m_dialog_box_manager.Info(DialogBoxId::Fishing).m_v4 = 0; // unused (was sprite_frame)
+	// m_v3/m_v4 were unused sprite fields — removed
 
 	m_game->add_event_list(NOTIFYMSG_EVENTFISHMODE1, 10);
 }

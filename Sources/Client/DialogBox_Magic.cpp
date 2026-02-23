@@ -14,15 +14,25 @@
 using namespace hb::shared::item;
 using namespace hb::client::sprite_id;
 
+bool DialogBox_Magic::on_enable(int type, int64_t v1, int v2, const char* string)
+{
+	if (v1 >= 0 && v1 <= 9)
+		m_circle_view = static_cast<short>(v1);
+	return true;
+}
+
 DialogBox_Magic::DialogBox_Magic(CGame* game)
 	: IDialogBox(DialogBoxId::Magic, game)
 {
-	set_can_close_on_right_click(true);
+	m_can_close_on_right_click = true;
 	set_default_rect(497 , 57 , 258, 328);
 }
 
-void DialogBox_Magic::on_draw(short mouse_x, short mouse_y, short z, char lb)
+void DialogBox_Magic::on_draw()
 {
+	short mouse_x = static_cast<short>(hb::shared::input::get_mouse_x());
+	short mouse_y = static_cast<short>(hb::shared::input::get_mouse_y());
+	short z = static_cast<short>(hb::shared::input::get_mouse_wheel_delta());
 	if (!m_game->ensure_magic_configs_loaded()) return;
 	short sX, sY;
 	int c_pivot, i, yloc, magic_circle, mana_cost;
@@ -35,20 +45,20 @@ void DialogBox_Magic::on_draw(short mouse_x, short mouse_y, short z, char lb)
 	short level_magic;
 	uint32_t time = m_game->m_cur_time;
 
-	sX = Info().m_x;
-	sY = Info().m_y;
+	sX = m_x;
+	sY = m_y;
 
 	draw_new_dialog_box(InterfaceNdGame1, sX, sY, 1, false, dialogTrans);
 	draw_new_dialog_box(InterfaceNdText, sX, sY, 7, false, dialogTrans);
 
 	// Handle scroll wheel input
-	if (m_game->m_dialog_box_manager.get_top_dialog_box_index() == DialogBoxId::Magic && z != 0)
+	if (m_game->m_dialog_box_manager.get_top_id() == DialogBoxId::Magic && z != 0)
 	{
-		if (z > 0) Info().m_view--;
-		if (z < 0) Info().m_view++;
+		if (z > 0) m_circle_view--;
+		if (z < 0) m_circle_view++;
 	}
-	if (Info().m_view < 0) Info().m_view = 9;
-	if (Info().m_view > 9) Info().m_view = 0;
+	if (m_circle_view < 0) m_circle_view = 9;
+	if (m_circle_view > 9) m_circle_view = 0;
 
 	// Circle title
 	static constexpr const char* kMagicCircleNames[] = {
@@ -57,11 +67,11 @@ void DialogBox_Magic::on_draw(short mouse_x, short mouse_y, short z, char lb)
 		DRAW_DIALOGBOX_MAGIC7, DRAW_DIALOGBOX_MAGIC8, DRAW_DIALOGBOX_MAGIC9,
 		DRAW_DIALOGBOX_MAGIC10
 	};
-	const char* circle_name = kMagicCircleNames[Info().m_view];
+	const char* circle_name = kMagicCircleNames[m_circle_view];
 	put_aligned_string(sX + 3, sX + 256, sY + 50, circle_name);
 	put_aligned_string(sX + 4, sX + 257, sY + 50, circle_name);
 
-	c_pivot = Info().m_view * 10;
+	c_pivot = m_circle_view * 10;
 	yloc = 0;
 	for (i = 0; i < 9; i++)
 	{
@@ -109,7 +119,7 @@ void DialogBox_Magic::on_draw(short mouse_x, short mouse_y, short z, char lb)
 	m_game->m_sprite[InterfaceSprFonts]->draw(sX + 30, sY + 250, 19);
 
 	// Circle selector highlight
-	switch (Info().m_view) {
+	switch (m_circle_view) {
 	case 0: m_game->m_sprite[InterfaceSprFonts]->draw(sX + 30, sY + 250, 20); break;
 	case 1: m_game->m_sprite[InterfaceSprFonts]->draw(sX + 43, sY + 250, 21); break;
 	case 2: m_game->m_sprite[InterfaceSprFonts]->draw(sX + 61, sY + 250, 22); break;
@@ -123,7 +133,7 @@ void DialogBox_Magic::on_draw(short mouse_x, short mouse_y, short z, char lb)
 	}
 
 	// Calculate magic probability
-	magic_circle = Info().m_view + 1;
+	magic_circle = m_circle_view + 1;
 
 	static int _tmp_iMCProb[] = { 0, 300, 250, 200, 150, 100, 80, 70, 60, 50, 40 };
 	static int _tmp_iMLevelPenalty[] = { 0,   5,   5,   8,   8,  10, 14, 28, 32, 36, 40 };
@@ -194,20 +204,22 @@ void DialogBox_Magic::on_draw(short mouse_x, short mouse_y, short z, char lb)
 	put_aligned_string(sX + 1, sX + 257, sY + 267, cTxt_str.c_str());
 
 	// Alchemy button
-	if ((mouse_x >= sX + ui_layout::right_btn_x) && (mouse_x <= sX + ui_layout::right_btn_x + ui_layout::btn_size_x) && (mouse_y >= sY + 285) && (mouse_y <= sY + 285 + ui_layout::btn_size_y))
+	if (mouse_in(btn_alchemy))
 		draw_new_dialog_box(InterfaceNdButton, sX + ui_layout::right_btn_x, sY + 285, 49, false, dialogTrans);
 	else
 		draw_new_dialog_box(InterfaceNdButton, sX + ui_layout::right_btn_x, sY + 285, 48, false, dialogTrans);
 }
 
-bool DialogBox_Magic::on_click(short mouse_x, short mouse_y)
+bool DialogBox_Magic::on_click()
 {
+	short mouse_x = static_cast<short>(hb::shared::input::get_mouse_x());
+	short mouse_y = static_cast<short>(hb::shared::input::get_mouse_y());
 	int i, c_pivot, yloc;
 	short sX, sY;
 
-	sX = Info().m_x;
-	sY = Info().m_y;
-	c_pivot = Info().m_view * 10;
+	sX = m_x;
+	sY = m_y;
+	c_pivot = m_circle_view * 10;
 	yloc = 0;
 	for (i = 0; i < 9; i++)
 	{
@@ -222,28 +234,18 @@ bool DialogBox_Magic::on_click(short mouse_x, short mouse_y)
 			yloc += 18;
 		}
 	}
-	if ((mouse_x >= sX + 16) && (mouse_x <= sX + 38) && (mouse_y >= sY + 240) && (mouse_y <= sY + 268))
-		Info().m_view = 0;
-	if ((mouse_x >= sX + 39) && (mouse_x <= sX + 56) && (mouse_y >= sY + 240) && (mouse_y <= sY + 268))
-		Info().m_view = 1;
-	if ((mouse_x >= sX + 57) && (mouse_x <= sX + 81) && (mouse_y >= sY + 240) && (mouse_y <= sY + 268))
-		Info().m_view = 2;
-	if ((mouse_x >= sX + 82) && (mouse_x <= sX + 101) && (mouse_y >= sY + 240) && (mouse_y <= sY + 268))
-		Info().m_view = 3;
-	if ((mouse_x >= sX + 102) && (mouse_x <= sX + 116) && (mouse_y >= sY + 240) && (mouse_y <= sY + 268))
-		Info().m_view = 4;
-	if ((mouse_x >= sX + 117) && (mouse_x <= sX + 137) && (mouse_y >= sY + 240) && (mouse_y <= sY + 268))
-		Info().m_view = 5;
-	if ((mouse_x >= sX + 138) && (mouse_x <= sX + 165) && (mouse_y >= sY + 240) && (mouse_y <= sY + 268))
-		Info().m_view = 6;
-	if ((mouse_x >= sX + 166) && (mouse_x <= sX + 197) && (mouse_y >= sY + 240) && (mouse_y <= sY + 268))
-		Info().m_view = 7;
-	if ((mouse_x >= sX + 198) && (mouse_x <= sX + 217) && (mouse_y >= sY + 240) && (mouse_y <= sY + 268))
-		Info().m_view = 8;
-	if ((mouse_x >= sX + 218) && (mouse_x <= sX + 239) && (mouse_y >= sY + 240) && (mouse_y <= sY + 268))
-		Info().m_view = 9;
+	if (mouse_in(circle_0)) m_circle_view = 0;
+	if (mouse_in(circle_1)) m_circle_view = 1;
+	if (mouse_in(circle_2)) m_circle_view = 2;
+	if (mouse_in(circle_3)) m_circle_view = 3;
+	if (mouse_in(circle_4)) m_circle_view = 4;
+	if (mouse_in(circle_5)) m_circle_view = 5;
+	if (mouse_in(circle_6)) m_circle_view = 6;
+	if (mouse_in(circle_7)) m_circle_view = 7;
+	if (mouse_in(circle_8)) m_circle_view = 8;
+	if (mouse_in(circle_9)) m_circle_view = 9;
 
-	if ((mouse_x >= sX + ui_layout::right_btn_x) && (mouse_x <= sX + ui_layout::right_btn_x + ui_layout::btn_size_x) && (mouse_y >= sY + 285) && (mouse_y <= sY + 285 + ui_layout::btn_size_y))
+	if (mouse_in(btn_alchemy))
 	{
 		if (m_game->m_player->m_skill_mastery[12] == 0) add_event_list(BDLBBOX_DOUBLE_CLICK_INVENTORY16, 10);
 		else

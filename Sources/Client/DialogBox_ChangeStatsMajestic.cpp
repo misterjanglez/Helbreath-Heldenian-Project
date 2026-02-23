@@ -6,6 +6,7 @@
 #include "NetMessages.h"
 #include <format>
 #include <string>
+#include "IInput.h"
 
 using namespace hb::shared::net;
 using namespace hb::client::sprite_id;
@@ -53,11 +54,13 @@ void DialogBox_ChangeStatsMajestic::draw_stat_row(short sX, short sY, int y_offs
 		m_game->m_sprite[InterfaceNdGame4]->draw(sX + 210, sY + arrow_y_offset, 6);
 }
 
-void DialogBox_ChangeStatsMajestic::on_draw(short mouse_x, short mouse_y, short z, char lb)
+void DialogBox_ChangeStatsMajestic::on_draw()
 {
-	short sX = Info().m_x;
-	short sY = Info().m_y;
-	short size_x = Info().m_size_x;
+	short mouse_x = static_cast<short>(hb::shared::input::get_mouse_x());
+	short mouse_y = static_cast<short>(hb::shared::input::get_mouse_y());
+	short sX = m_x;
+	short sY = m_y;
+	short size_x = m_size_x;
 	std::string txt;
 
 	draw_new_dialog_box(InterfaceNdGame2, sX, sY, 0);
@@ -111,24 +114,26 @@ void DialogBox_ChangeStatsMajestic::on_draw(short mouse_x, short mouse_y, short 
 		can_afford && (m_game->m_player->m_charisma + m_game->m_player->m_lu_char - POINTS_PER_MAJESTIC >= MIN_STAT_VALUE));
 
 	// Cancel button (left)
-	if ((mouse_x >= sX + ui_layout::left_btn_x) && (mouse_x <= sX + ui_layout::left_btn_x + ui_layout::btn_size_x) && (mouse_y > sY + ui_layout::btn_y) && (mouse_y < sY + ui_layout::btn_y + ui_layout::btn_size_y))
+	if (mouse_in(btn_cancel))
 		draw_new_dialog_box(InterfaceNdButton, sX + ui_layout::left_btn_x, sY + ui_layout::btn_y, 17);
 	else draw_new_dialog_box(InterfaceNdButton, sX + ui_layout::left_btn_x, sY + ui_layout::btn_y, 16);
 
 	// Confirm button (right) — show as active only when there are pending changes
 	if (pending_cost > 0)
 	{
-		if ((mouse_x >= sX + ui_layout::right_btn_x) && (mouse_x <= sX + ui_layout::right_btn_x + ui_layout::btn_size_x) && (mouse_y > sY + ui_layout::btn_y) && (mouse_y < sY + ui_layout::btn_y + ui_layout::btn_size_y))
+		if (mouse_in(btn_confirm))
 			draw_new_dialog_box(InterfaceNdButton, sX + ui_layout::right_btn_x, sY + ui_layout::btn_y, 1);
 		else
 			draw_new_dialog_box(InterfaceNdButton, sX + ui_layout::right_btn_x, sY + ui_layout::btn_y, 0);
 	}
 }
 
-bool DialogBox_ChangeStatsMajestic::on_click(short mouse_x, short mouse_y)
+bool DialogBox_ChangeStatsMajestic::on_click()
 {
-	short sX = Info().m_x;
-	short sY = Info().m_y;
+	short mouse_x = static_cast<short>(hb::shared::input::get_mouse_x());
+	short mouse_y = static_cast<short>(hb::shared::input::get_mouse_y());
+	short sX = m_x;
+	short sY = m_y;
 
 	int pending_cost = GetPendingMajesticCost(m_game);
 	int remaining = m_game->m_gizon_item_upgrade_left - pending_cost;
@@ -174,8 +179,7 @@ bool DialogBox_ChangeStatsMajestic::on_click(short mouse_x, short mouse_y)
 
 	// Confirm button (right) — send all pending reductions to server
 	// Don't close the dialog here; the success/failure handler will close it after applying changes
-	if ((mouse_x >= sX + ui_layout::right_btn_x) && (mouse_x <= sX + ui_layout::right_btn_x + ui_layout::btn_size_x) &&
-		(mouse_y > sY + ui_layout::btn_y) && (mouse_y < sY + ui_layout::btn_y + ui_layout::btn_size_y))
+	if (mouse_in(btn_confirm))
 	{
 		if (pending_cost > 0)
 		{
@@ -185,8 +189,7 @@ bool DialogBox_ChangeStatsMajestic::on_click(short mouse_x, short mouse_y)
 	}
 
 	// Cancel button (left) — discard changes and close
-	if ((mouse_x >= sX + ui_layout::left_btn_x) && (mouse_x <= sX + ui_layout::left_btn_x + ui_layout::btn_size_x) &&
-		(mouse_y > sY + ui_layout::btn_y) && (mouse_y < sY + ui_layout::btn_y + ui_layout::btn_size_y))
+	if (mouse_in(btn_cancel))
 	{
 		m_game->m_player->m_lu_str = m_game->m_player->m_lu_vit = m_game->m_player->m_lu_dex = 0;
 		m_game->m_player->m_lu_int = m_game->m_player->m_lu_mag = m_game->m_player->m_lu_char = 0;
@@ -195,4 +198,28 @@ bool DialogBox_ChangeStatsMajestic::on_click(short mouse_x, short mouse_y)
 	}
 
 	return false;
+}
+
+bool DialogBox_ChangeStatsMajestic::on_enable(int type, int64_t v1, int v2, const char* string)
+{
+	if (is_enabled()) return true;
+	auto* luDlg = get_dialog_box(DialogBoxId::LevelUpSetting);
+	if (luDlg) { m_x = luDlg->m_x + 10; m_y = luDlg->m_y + 10; }
+	m_mode = 0;
+	m_view = 0;
+	m_game->m_player->m_lu_str = m_game->m_player->m_lu_vit = m_game->m_player->m_lu_dex = 0;
+	m_game->m_player->m_lu_int = m_game->m_player->m_lu_mag = m_game->m_player->m_lu_char = 0;
+	m_game->m_skill_using_status = false;
+	return true;
+}
+
+bool DialogBox_ChangeStatsMajestic::on_disable()
+{
+	m_game->m_player->m_lu_str = 0;
+	m_game->m_player->m_lu_vit = 0;
+	m_game->m_player->m_lu_dex = 0;
+	m_game->m_player->m_lu_int = 0;
+	m_game->m_player->m_lu_mag = 0;
+	m_game->m_player->m_lu_char = 0;
+	return true;
 }

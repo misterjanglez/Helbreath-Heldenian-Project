@@ -7,6 +7,7 @@
 #include "ISprite.h"
 #include <format>
 #include <string>
+#include "IInput.h"
 using namespace hb::client::sprite_id;
 
 DialogBox_Noticement::DialogBox_Noticement(CGame* game)
@@ -22,7 +23,7 @@ void DialogBox_Noticement::set_shutdown_info(uint16_t seconds, const char* messa
 		m_custom_message = message;
 }
 
-void DialogBox_Noticement::on_draw(short mouse_x, short mouse_y, short z, char lb)
+void DialogBox_Noticement::on_draw()
 {
 	// Center the dialog on screen (same method as Connecting overlay)
 	auto rect = m_game->m_sprite[InterfaceNdGame4]->GetFrameRect(2);
@@ -31,10 +32,10 @@ void DialogBox_Noticement::on_draw(short mouse_x, short mouse_y, short z, char l
 	short size_x = static_cast<short>(rect.width);
 
 	// Update stored position for click handling
-	Info().m_x = sX;
-	Info().m_y = sY;
-	Info().m_size_x = size_x;
-	Info().m_size_y = static_cast<short>(rect.height);
+	m_x = sX;
+	m_y = sY;
+	m_size_x = size_x;
+	m_size_y = static_cast<short>(rect.height);
 
 	draw_new_dialog_box(InterfaceNdGame4, sX, sY, 2);
 
@@ -65,7 +66,7 @@ void DialogBox_Noticement::on_draw(short mouse_x, short mouse_y, short z, char l
 
 	// Custom message or default warning (word-wrapped)
 	int msg_y = sY + 52;
-	int msg_height = Info().m_size_y - 52 - 40; // Leave room for OK button
+	int msg_height = m_size_y - 52 - 40; // Leave room for OK button
 
 	if (!m_custom_message.empty())
 	{
@@ -79,19 +80,16 @@ void DialogBox_Noticement::on_draw(short mouse_x, short mouse_y, short z, char l
 	}
 
 	// OK button
-	if ((mouse_x >= sX + 210) && (mouse_x <= sX + 210 + ui_layout::btn_size_x) && (mouse_y > sY + 127) && (mouse_y < sY + 127 + ui_layout::btn_size_y))
+	if (mouse_in(btn_ok))
 		draw_new_dialog_box(InterfaceNdButton, sX + 210, sY + 127, 1);
 	else
 		draw_new_dialog_box(InterfaceNdButton, sX + 210, sY + 127, 0);
 }
 
-bool DialogBox_Noticement::on_click(short mouse_x, short mouse_y)
+bool DialogBox_Noticement::on_click()
 {
-	short sX = Info().m_x;
-	short sY = Info().m_y;
-
 	// OK button
-	if ((mouse_x >= sX + 210) && (mouse_x <= sX + 210 + ui_layout::btn_size_x) && (mouse_y > sY + 127) && (mouse_y < sY + 127 + ui_layout::btn_size_y))
+	if (mouse_in(btn_ok))
 	{
 		play_sound_effect('E', 14, 5);
 		disable_this_dialog();
@@ -99,4 +97,13 @@ bool DialogBox_Noticement::on_click(short mouse_x, short mouse_y)
 	}
 
 	return false;
+}
+
+bool DialogBox_Noticement::on_enable(int type, int64_t v1, int v2, const char* string)
+{
+	if (is_enabled()) return true;
+	m_mode = type;
+	m_countdown_seconds = static_cast<int>(v1);
+	m_param = v2;
+	return true;
 }

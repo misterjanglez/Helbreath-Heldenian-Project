@@ -6,6 +6,10 @@
 #include "Packet/SharedPackets.h"
 #include "lan_eng.h"
 #include "DialogBoxIDs.h"
+#include "DialogBox_Bank.h"
+#include "DialogBox_ItemUpgrade.h"
+#include "DialogBox_SellOrRepair.h"
+#include "DialogBox_Exchange.h"
 #include <cstdio>
 #include <cstring>
 #include <cmath>
@@ -85,7 +89,7 @@ namespace NetworkMessageHandlers {
 				game->m_item_list[i]->m_x = nX;
 				game->m_item_list[i]->m_y = nY;
 				game->send_command(MsgId::RequestSetItemPos, 0, i, nX, nY, 0, 0);
-				game->m_is_item_disabled[i] = false;
+				inventory_manager::get().unlock_item(i);
 				game->m_is_item_equipped[i] = false;
 				game->m_item_list[i]->m_cur_life_span = cur_life_span;
 				game->m_item_list[i]->m_item_color = item_color;
@@ -149,7 +153,7 @@ namespace NetworkMessageHandlers {
 				if ((game->m_item_list[i] != 0) && (game->m_item_list[i]->m_id_num == item_id))
 				{
 					game->m_item_list[i]->m_count += count;
-					game->m_is_item_disabled[i] = false;
+					inventory_manager::get().unlock_item(i);
 					return;
 				}
 		}
@@ -179,7 +183,7 @@ namespace NetworkMessageHandlers {
 				game->m_item_list[i]->m_x = nX;
 				game->m_item_list[i]->m_y = nY;
 				game->send_command(MsgId::RequestSetItemPos, 0, i, nX, nY, 0, 0);
-				game->m_is_item_disabled[i] = false;
+				inventory_manager::get().unlock_item(i);
 				game->m_is_item_equipped[i] = false;
 				game->m_item_list[i]->m_cur_life_span = cur_life_span;
 				game->m_item_list[i]->m_item_color = item_color;
@@ -247,7 +251,7 @@ namespace NetworkMessageHandlers {
 					game->m_item_list[i]->m_x = nX;
 					game->m_item_list[i]->m_y = nY;
 					game->send_command(MsgId::RequestSetItemPos, 0, i, nX, nY, 0, 0);
-					game->m_is_item_disabled[i] = false;
+					inventory_manager::get().unlock_item(i);
 					game->m_is_item_equipped[i] = false;
 					game->m_item_list[i]->m_cur_life_span = cur_life_span;
 					game->m_item_list[i]->m_max_life_span = max_life_span;
@@ -341,7 +345,7 @@ namespace NetworkMessageHandlers {
 		if (game->m_item_list[item_index] != 0)
 		{
 			game->m_item_list[item_index]->m_count = count;
-			if (is_item_use_response == true) game->m_is_item_disabled[item_index] = false;
+			if (is_item_use_response == true) inventory_manager::get().unlock_item(item_index);
 		}
 	}
 
@@ -509,7 +513,7 @@ namespace NetworkMessageHandlers {
 		life = pkt->life;
 
 		game->m_item_list[item_id]->m_cur_life_span = static_cast<uint16_t>(life);
-		game->m_is_item_disabled[item_id] = false;
+		inventory_manager::get().unlock_item(item_id);
 		auto itemInfo5 = item_name_formatter::get().format(game->m_item_list[item_id].get());
 
 		txt = std::format(NOTIFYMSG_ITEMREPAIRED1, itemInfo5.name.c_str());
@@ -531,7 +535,8 @@ namespace NetworkMessageHandlers {
 		v4 = pkt->v4;
 		memcpy(name, pkt->item_name, sizeof(pkt->item_name));
 		game->m_dialog_box_manager.enable_dialog_box(DialogBoxId::SellOrRepair, 2, v1, v2);
-		game->m_dialog_box_manager.Info(DialogBoxId::SellOrRepair).m_v3 = v3;
+		if (auto* dlg = game->m_dialog_box_manager.get_dialog_as<DialogBox_SellOrRepair>(DialogBoxId::SellOrRepair))
+			dlg->m_secondary_price = v3;
 	}
 
 	void HandleRepairAllPrices(CGame* game, char* data)
@@ -572,8 +577,11 @@ namespace NetworkMessageHandlers {
 		v4 = pkt->v4;
 		memcpy(name, pkt->item_name, sizeof(pkt->item_name));
 		game->m_dialog_box_manager.enable_dialog_box(DialogBoxId::SellOrRepair, 1, v1, v2);
-		game->m_dialog_box_manager.Info(DialogBoxId::SellOrRepair).m_v3 = v3;
-		game->m_dialog_box_manager.Info(DialogBoxId::SellOrRepair).m_v4 = v4;
+		if (auto* dlg = game->m_dialog_box_manager.get_dialog_as<DialogBox_SellOrRepair>(DialogBoxId::SellOrRepair))
+		{
+			dlg->m_secondary_price = v3;
+			dlg->m_item_count = v4;
+		}
 	}
 
 	void HandleCannotRepairItem(CGame* game, char* data)
@@ -587,7 +595,7 @@ namespace NetworkMessageHandlers {
 		const auto v1 = pkt->item_index;
 		const auto v2 = pkt->reason;
 		if (v1 < 0 || v1 >= hb::shared::limits::MaxItems) return;
-		if (!game->m_item_list[v1]) { game->m_is_item_disabled[v1] = false; return; }
+		if (!game->m_item_list[v1]) { inventory_manager::get().unlock_item(v1); return; }
 		auto itemInfo6 = item_name_formatter::get().format(game->m_item_list[v1].get());
 
 		switch (v2) {
@@ -600,7 +608,7 @@ namespace NetworkMessageHandlers {
 			game->add_event_list(txt.c_str(), 10);
 			break;
 		}
-		game->m_is_item_disabled[v1] = false;
+		inventory_manager::get().unlock_item(v1);
 	}
 
 	void HandleCannotSellItem(CGame* game, char* data)
@@ -614,7 +622,7 @@ namespace NetworkMessageHandlers {
 		const auto v1 = pkt->item_index;
 		const auto v2 = pkt->reason;
 		if (v1 < 0 || v1 >= hb::shared::limits::MaxItems) return;
-		if (!game->m_item_list[v1]) { game->m_is_item_disabled[v1] = false; return; }
+		if (!game->m_item_list[v1]) { inventory_manager::get().unlock_item(v1); return; }
 
 		auto itemInfo7 = item_name_formatter::get().format(game->m_item_list[v1].get());
 
@@ -640,7 +648,7 @@ namespace NetworkMessageHandlers {
 			game->add_event_list(NOTIFYMSG_CANNOT_SELL_ITEM6, 10);
 			break;
 		}
-		game->m_is_item_disabled[v1] = false;
+		inventory_manager::get().unlock_item(v1);
 	}
 
 	void HandleCannotGiveItem(CGame* game, char* data)
@@ -755,10 +763,11 @@ namespace NetworkMessageHandlers {
 		attribute = pkt->attribute;
 		item_id = pkt->item_id;
 
+		auto* exDlg = game->m_dialog_box_manager.get_dialog_as<DialogBox_Exchange>(DialogBoxId::Exchange);
 		if (dir >= 1000)  // Set the item I want to exchange
 		{
 			i = 0;
-			while (game->m_dialog_box_exchange_info[i].v1 != -1)
+			while (exDlg->m_slots[i].v1 != -1)
 			{
 				i++;
 				if (i >= 4) return; // Error situation
@@ -767,23 +776,23 @@ namespace NetworkMessageHandlers {
 		else // Set the item he proposes me.
 		{
 			i = 4;
-			while (game->m_dialog_box_exchange_info[i].v1 != -1)
+			while (exDlg->m_slots[i].v1 != -1)
 			{
 				i++;
 				if (i >= 8) return; // Error situation
 			}
 		}
-		game->m_dialog_box_exchange_info[i].v1 = 0; // occupied marker (was sprite)
-		game->m_dialog_box_exchange_info[i].v2 = 0; // unused (was sprite_frame)
-		game->m_dialog_box_exchange_info[i].v3 = amount;
-		game->m_dialog_box_exchange_info[i].v4 = color;
-		game->m_dialog_box_exchange_info[i].v5 = static_cast<int>(cur_life);
-		game->m_dialog_box_exchange_info[i].v6 = static_cast<int>(max_life);
-		game->m_dialog_box_exchange_info[i].v7 = static_cast<int>(performance);
-		game->m_dialog_box_exchange_info[i].str1.assign(item_name, strnlen(item_name, hb::shared::limits::ItemNameLen));
-		game->m_dialog_box_exchange_info[i].str2.assign(char_name, strnlen(char_name, hb::shared::limits::CharNameLen));
-		game->m_dialog_box_exchange_info[i].dw_v1 = attribute;
-		game->m_dialog_box_exchange_info[i].item_id = item_id;
+		exDlg->m_slots[i].v1 = 0; // occupied marker (was sprite)
+		exDlg->m_slots[i].v2 = 0; // unused (was sprite_frame)
+		exDlg->m_slots[i].v3 = amount;
+		exDlg->m_slots[i].v4 = color;
+		exDlg->m_slots[i].v5 = static_cast<int>(cur_life);
+		exDlg->m_slots[i].v6 = static_cast<int>(max_life);
+		exDlg->m_slots[i].v7 = static_cast<int>(performance);
+		exDlg->m_slots[i].str1.assign(item_name, strnlen(item_name, hb::shared::limits::ItemNameLen));
+		exDlg->m_slots[i].str2.assign(char_name, strnlen(char_name, hb::shared::limits::CharNameLen));
+		exDlg->m_slots[i].dw_v1 = attribute;
+		exDlg->m_slots[i].item_id = item_id;
 	}
 
 	void HandleOpenExchangeWindow(CGame* game, char* data)
@@ -809,19 +818,20 @@ namespace NetworkMessageHandlers {
 		item_id = pkt->item_id;
 
 		game->m_dialog_box_manager.enable_dialog_box(DialogBoxId::Exchange, 1, 0, 0, 0);
+		auto* exDlg = game->m_dialog_box_manager.get_dialog_as<DialogBox_Exchange>(DialogBoxId::Exchange);
 		// initialize all exchange slots
 		for (int j = 0; j < 8; j++)
 		{
-			game->m_dialog_box_exchange_info[j].v1 = -1;
-			game->m_dialog_box_exchange_info[j].v2 = -1;
-			game->m_dialog_box_exchange_info[j].v3 = -1;
-			game->m_dialog_box_exchange_info[j].v4 = -1;
-			game->m_dialog_box_exchange_info[j].v5 = -1;
-			game->m_dialog_box_exchange_info[j].v6 = -1;
-			game->m_dialog_box_exchange_info[j].v7 = -1;
-			game->m_dialog_box_exchange_info[j].item_id = -1;
-			game->m_dialog_box_exchange_info[j].inv_slot = -1;
-			game->m_dialog_box_exchange_info[j].dw_v1 = 0;
+			exDlg->m_slots[j].v1 = -1;
+			exDlg->m_slots[j].v2 = -1;
+			exDlg->m_slots[j].v3 = -1;
+			exDlg->m_slots[j].v4 = -1;
+			exDlg->m_slots[j].v5 = -1;
+			exDlg->m_slots[j].v6 = -1;
+			exDlg->m_slots[j].v7 = -1;
+			exDlg->m_slots[j].item_id = -1;
+			exDlg->m_slots[j].inv_slot = -1;
+			exDlg->m_slots[j].dw_v1 = 0;
 		}
 		int i;
 		if (dir >= 1000)  // Set the item I want to exchange
@@ -830,25 +840,25 @@ namespace NetworkMessageHandlers {
 			int inv_idx = dir - 1000;
 			if (inv_idx >= 0 && inv_idx < hb::shared::limits::MaxItems)
 			{
-				game->m_is_item_disabled[inv_idx] = true;
-				game->m_dialog_box_exchange_info[i].inv_slot = inv_idx;
+				inventory_manager::get().lock_item(inv_idx);
+				exDlg->m_slots[i].inv_slot = inv_idx;
 			}
 		}
 		else // Set the item he proposes me.
 		{
 			i = 4;
 		}
-		game->m_dialog_box_exchange_info[i].v1 = 0; // occupied marker (was sprite)
-		game->m_dialog_box_exchange_info[i].v2 = 0; // unused (was sprite_frame)
-		game->m_dialog_box_exchange_info[i].v3 = amount;
-		game->m_dialog_box_exchange_info[i].v4 = color;
-		game->m_dialog_box_exchange_info[i].v5 = static_cast<int>(cur_life);
-		game->m_dialog_box_exchange_info[i].v6 = static_cast<int>(max_life);
-		game->m_dialog_box_exchange_info[i].v7 = static_cast<int>(performance);
-		game->m_dialog_box_exchange_info[i].str1.assign(item_name, strnlen(item_name, hb::shared::limits::ItemNameLen));
-		game->m_dialog_box_exchange_info[i].str2.assign(char_name, strnlen(char_name, hb::shared::limits::CharNameLen));
-		game->m_dialog_box_exchange_info[i].dw_v1 = attribute;
-		game->m_dialog_box_exchange_info[i].item_id = item_id;
+		exDlg->m_slots[i].v1 = 0; // occupied marker (was sprite)
+		exDlg->m_slots[i].v2 = 0; // unused (was sprite_frame)
+		exDlg->m_slots[i].v3 = amount;
+		exDlg->m_slots[i].v4 = color;
+		exDlg->m_slots[i].v5 = static_cast<int>(cur_life);
+		exDlg->m_slots[i].v6 = static_cast<int>(max_life);
+		exDlg->m_slots[i].v7 = static_cast<int>(performance);
+		exDlg->m_slots[i].str1.assign(item_name, strnlen(item_name, hb::shared::limits::ItemNameLen));
+		exDlg->m_slots[i].str2.assign(char_name, strnlen(char_name, hb::shared::limits::CharNameLen));
+		exDlg->m_slots[i].dw_v1 = attribute;
+		exDlg->m_slots[i].item_id = item_id;
 	}
 
 	void HandleCurLifeSpan(CGame* game, char* data)
@@ -876,7 +886,7 @@ namespace NetworkMessageHandlers {
 			data, sizeof(hb::net::PacketNotifyNotEnoughGold));
 		if (!pkt) return;
 		if (pkt->item_index >= 0 && pkt->item_index < hb::shared::limits::MaxItems) {
-			game->m_is_item_disabled[pkt->item_index] = false;
+			inventory_manager::get().unlock_item(pkt->item_index);
 		}
 	}
 
@@ -885,7 +895,7 @@ namespace NetworkMessageHandlers {
 		game->add_event_list(NOTIFY_MSG_HANDLER65, 10);
 		game->add_event_list(NOTIFY_MSG_HANDLER66, 10);
 		// Bank dialog Box
-		game->m_dialog_box_manager.Info(DialogBoxId::Bank).m_mode = 0;
+		game->m_dialog_box_manager.get_dialog_as<DialogBox_Bank>(DialogBoxId::Bank)->m_mode = DialogBox_Bank::mode::list;
 	}
 
 	void HandleItemAttributeChange(CGame* game, char* data)
@@ -909,7 +919,7 @@ namespace NetworkMessageHandlers {
 		{
 			if (game->m_dialog_box_manager.is_enabled(DialogBoxId::ItemUpgrade) == true)
 			{
-				game->m_dialog_box_manager.Info(DialogBoxId::ItemUpgrade).m_mode = 4;// Failed
+				game->m_dialog_box_manager.get_dialog_as<DialogBox_ItemUpgrade>(DialogBoxId::ItemUpgrade)->m_mode = DialogBox_ItemUpgrade::mode::failed;
 			}
 			game->play_game_sound('E', 24, 5);
 		}
@@ -917,7 +927,7 @@ namespace NetworkMessageHandlers {
 		{
 			if (game->m_dialog_box_manager.is_enabled(DialogBoxId::ItemUpgrade) == true)
 			{
-				game->m_dialog_box_manager.Info(DialogBoxId::ItemUpgrade).m_mode = 3; // Success
+				game->m_dialog_box_manager.get_dialog_as<DialogBox_ItemUpgrade>(DialogBoxId::ItemUpgrade)->m_mode = DialogBox_ItemUpgrade::mode::success;
 			}
 			game->play_game_sound('E', 23, 5);
 			switch (game->m_player->m_player_type) {
@@ -946,13 +956,13 @@ namespace NetworkMessageHandlers {
 		game->play_game_sound('E', 24, 5);
 		switch (v1) {
 		case 1:
-			game->m_dialog_box_manager.Info(DialogBoxId::ItemUpgrade).m_mode = 8; // Failed
+			game->m_dialog_box_manager.get_dialog_as<DialogBox_ItemUpgrade>(DialogBoxId::ItemUpgrade)->m_mode = DialogBox_ItemUpgrade::mode::max_upgrade;
 			break;
 		case 2:
-			game->m_dialog_box_manager.Info(DialogBoxId::ItemUpgrade).m_mode = 9; // Failed
+			game->m_dialog_box_manager.get_dialog_as<DialogBox_ItemUpgrade>(DialogBoxId::ItemUpgrade)->m_mode = DialogBox_ItemUpgrade::mode::cannot_upgrade;
 			break;
 		case 3:
-			game->m_dialog_box_manager.Info(DialogBoxId::ItemUpgrade).m_mode = 10; // Failed
+			game->m_dialog_box_manager.get_dialog_as<DialogBox_ItemUpgrade>(DialogBoxId::ItemUpgrade)->m_mode = DialogBox_ItemUpgrade::mode::no_points;
 			break;
 		}
 	}
@@ -987,7 +997,7 @@ namespace NetworkMessageHandlers {
 		
 		if (game->m_dialog_box_manager.is_enabled(DialogBoxId::ItemUpgrade) == true)
 		{
-			game->m_dialog_box_manager.Info(DialogBoxId::ItemUpgrade).m_mode = 3; // success
+			game->m_dialog_box_manager.get_dialog_as<DialogBox_ItemUpgrade>(DialogBoxId::ItemUpgrade)->m_mode = DialogBox_ItemUpgrade::mode::success;
 		}
 		game->play_game_sound('E', 23, 5);
 		switch (game->m_player->m_player_type) {

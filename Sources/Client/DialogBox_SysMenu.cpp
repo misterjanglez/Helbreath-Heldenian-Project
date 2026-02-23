@@ -130,17 +130,21 @@ void DialogBox_SysMenu::on_update()
 	}
 }
 
-void DialogBox_SysMenu::on_draw(short mouse_x, short mouse_y, short z, char lb)
+void DialogBox_SysMenu::on_draw()
 {
-	short sX = Info().m_x;
-	short sY = Info().m_y;
+	short mouse_x = static_cast<short>(hb::shared::input::get_mouse_x());
+	short mouse_y = static_cast<short>(hb::shared::input::get_mouse_y());
+	short z = static_cast<short>(hb::shared::input::get_mouse_wheel_delta());
+	char lb = hb::shared::input::is_mouse_button_down(hb::shared::input::MouseButton::Left) ? 1 : 0;
+	short sX = m_x;
+	short sY = m_y;
 
 	// draw dialog background
 	draw_new_dialog_box(InterfaceNdGame1, sX, sY, 0);
 	draw_new_dialog_box(InterfaceNdText, sX, sY, 6);
 
 	// Handle mouse scroll over dialog to cycle tabs
-	if (m_game->m_dialog_box_manager.get_top_dialog_box_index() == DialogBoxId::SystemMenu && z != 0)
+	if (m_game->m_dialog_box_manager.get_top_id() == DialogBoxId::SystemMenu && z != 0)
 	{
 		if (z > 0)
 			m_iActiveTab = (m_iActiveTab - 1 + TAB_COUNT) % TAB_COUNT;
@@ -148,7 +152,7 @@ void DialogBox_SysMenu::on_draw(short mouse_x, short mouse_y, short z, char lb)
 			m_iActiveTab = (m_iActiveTab + 1) % TAB_COUNT;
 	}
 
-	draw_tabs(sX, sY, mouse_x, mouse_y);
+	draw_tabs(sX, sY);
 	draw_tab_content(sX, sY, mouse_x, mouse_y, lb);
 
 	// save slider values to config_manager when drag ends (mouse released)
@@ -179,12 +183,14 @@ void DialogBox_SysMenu::on_draw(short mouse_x, short mouse_y, short z, char lb)
 		s_bDraggingAmbientSlider = false;
 		s_bDraggingUISlider = false;
 		s_bDraggingMusicSlider = false;
-		Info().m_is_scroll_selected = false;
+		m_is_scroll_selected = false;
 	}
 }
 
-void DialogBox_SysMenu::draw_tabs(short sX, short sY, short mouse_x, short mouse_y)
+void DialogBox_SysMenu::draw_tabs(short sX, short sY)
 {
+	short mouse_x = static_cast<short>(hb::shared::input::get_mouse_x());
+	short mouse_y = static_cast<short>(hb::shared::input::get_mouse_y());
 	hb::shared::sprite::SpriteRect button_rect = m_game->m_sprite[InterfaceNdButton]->GetFrameRect(70);
 	int btnY = sY + 33;
 
@@ -211,22 +217,24 @@ void DialogBox_SysMenu::draw_tab_content(short sX, short sY, short mouse_x, shor
 	switch (m_iActiveTab)
 	{
 	case TAB_GENERAL:
-		draw_general_tab(sX, sY, mouse_x, mouse_y);
+		draw_general_tab(sX, sY);
 		break;
 	case TAB_GRAPHICS:
-		draw_graphics_tab(sX, sY, mouse_x, mouse_y);
+		draw_graphics_tab(sX, sY);
 		break;
 	case TAB_AUDIO:
 		draw_audio_tab(sX, sY, mouse_x, mouse_y, lb);
 		break;
 	case TAB_SYSTEM:
-		draw_system_tab(sX, sY, mouse_x, mouse_y);
+		draw_system_tab(sX, sY);
 		break;
 	}
 }
 
-void DialogBox_SysMenu::draw_toggle(int x, int y, bool enabled, short mouse_x, short mouse_y)
+void DialogBox_SysMenu::draw_toggle(int x, int y, bool enabled)
 {
+	short mouse_x = static_cast<short>(hb::shared::input::get_mouse_x());
+	short mouse_y = static_cast<short>(hb::shared::input::get_mouse_y());
 	// draw toggle background box at y-2
 	const int boxY = y - 2;
 	draw_new_dialog_box(InterfaceNdButton, x, boxY, 79);
@@ -246,8 +254,10 @@ void DialogBox_SysMenu::draw_toggle(int x, int y, bool enabled, short mouse_x, s
 	put_string(textX, textY, text, color);
 }
 
-bool DialogBox_SysMenu::is_in_toggle_area(int x, int y, short mouse_x, short mouse_y)
+bool DialogBox_SysMenu::is_in_toggle_area(int x, int y)
 {
+	short mouse_x = static_cast<short>(hb::shared::input::get_mouse_x());
+	short mouse_y = static_cast<short>(hb::shared::input::get_mouse_y());
 	const int boxWidth = m_bFrameSizesInitialized ? m_iSmallBoxWidth : 36;
 	const int boxHeight = m_bFrameSizesInitialized ? m_iSmallBoxHeight : 16;
 	return (mouse_x >= x && mouse_x <= x + boxWidth && mouse_y >= y - 2 && mouse_y <= y - 2 + boxHeight);
@@ -256,8 +266,10 @@ bool DialogBox_SysMenu::is_in_toggle_area(int x, int y, short mouse_x, short mou
 // =============================================================================
 // GENERAL TAB
 // =============================================================================
-void DialogBox_SysMenu::draw_general_tab(short sX, short sY, short mouse_x, short mouse_y)
+void DialogBox_SysMenu::draw_general_tab(short sX, short sY)
 {
+	short mouse_x = static_cast<short>(hb::shared::input::get_mouse_x());
+	short mouse_y = static_cast<short>(hb::shared::input::get_mouse_y());
 	const int contentX = sX + CONTENT_X;
 	const int contentY = sY + CONTENT_Y;
 	const int contentBottom = contentY + CONTENT_HEIGHT;
@@ -316,8 +328,10 @@ void DialogBox_SysMenu::draw_general_tab(short sX, short sY, short mouse_x, shor
 // =============================================================================
 // GRAPHICS TAB
 // =============================================================================
-void DialogBox_SysMenu::draw_graphics_tab(short sX, short sY, short mouse_x, short mouse_y)
+void DialogBox_SysMenu::draw_graphics_tab(short sX, short sY)
 {
+	short mouse_x = static_cast<short>(hb::shared::input::get_mouse_x());
+	short mouse_y = static_cast<short>(hb::shared::input::get_mouse_y());
 	const int contentX = sX + CONTENT_X;
 	const int contentY = sY + CONTENT_Y;
 	const int contentRight = contentX + CONTENT_WIDTH;
@@ -406,7 +420,7 @@ void DialogBox_SysMenu::draw_graphics_tab(short sX, short sY, short mouse_x, sho
 	// --- VSync ---
 	put_string(labelX, lineY, "VSync:", GameColors::UILabel);
 	put_string(labelX + 1, lineY, "VSync:", GameColors::UILabel);
-	draw_toggle(smallBoxX, lineY, config_manager::get().is_vsync_enabled(), mouse_x, mouse_y);
+	draw_toggle(smallBoxX, lineY, config_manager::get().is_vsync_enabled());
 
 	lineY += 18;
 
@@ -444,21 +458,21 @@ void DialogBox_SysMenu::draw_graphics_tab(short sX, short sY, short mouse_x, sho
 	// --- Dialog Transparency ---
 	put_string(labelX, lineY, "Transparency:", GameColors::UILabel);
 	put_string(labelX + 1, lineY, "Transparency:", GameColors::UILabel);
-	draw_toggle(smallBoxX, lineY, config_manager::get().is_dialog_transparency_enabled(), mouse_x, mouse_y);
+	draw_toggle(smallBoxX, lineY, config_manager::get().is_dialog_transparency_enabled());
 
 	lineY += 18;
 
 	// --- Show FPS ---
 	put_string(labelX, lineY, "Show FPS:", GameColors::UILabel);
 	put_string(labelX + 1, lineY, "Show FPS:", GameColors::UILabel);
-	draw_toggle(smallBoxX, lineY, config_manager::get().is_show_fps_enabled(), mouse_x, mouse_y);
+	draw_toggle(smallBoxX, lineY, config_manager::get().is_show_fps_enabled());
 
 	lineY += 18;
 
 	// --- Show Latency ---
 	put_string(labelX, lineY, "Show Latency:", GameColors::UILabel);
 	put_string(labelX + 1, lineY, "Show Latency:", GameColors::UILabel);
-	draw_toggle(smallBoxX, lineY, config_manager::get().is_show_latency_enabled(), mouse_x, mouse_y);
+	draw_toggle(smallBoxX, lineY, config_manager::get().is_show_latency_enabled());
 
 	lineY += 18;
 
@@ -466,14 +480,14 @@ void DialogBox_SysMenu::draw_graphics_tab(short sX, short sY, short mouse_x, sho
 	// Tile Grid (simple dark lines) - DEBUG ONLY
 	put_string(labelX, lineY, "Tile Grid:", GameColors::UILabel);
 	put_string(labelX + 1, lineY, "Tile Grid:", GameColors::UILabel);
-	draw_toggle(smallBoxX, lineY, config_manager::get().is_tile_grid_enabled(), mouse_x, mouse_y);
+	draw_toggle(smallBoxX, lineY, config_manager::get().is_tile_grid_enabled());
 
 	lineY += 18;
 
 	// Patching Grid (debug with zone colors) - DEBUG ONLY
 	put_string(labelX, lineY, "Patching Grid:", GameColors::UILabel);
 	put_string(labelX + 1, lineY, "Patching Grid:", GameColors::UILabel);
-	draw_toggle(smallBoxX, lineY, config_manager::get().is_patching_grid_enabled(), mouse_x, mouse_y);
+	draw_toggle(smallBoxX, lineY, config_manager::get().is_patching_grid_enabled());
 
 	lineY += 18;
 #endif
@@ -564,7 +578,7 @@ void DialogBox_SysMenu::draw_audio_tab(short sX, short sY, short mouse_x, short 
 	put_string(labelX + 1, lineY, "Master:", GameColors::UILabel);
 
 	if (available)
-		draw_toggle(toggleX, lineY, audio_manager::get().is_master_enabled(), mouse_x, mouse_y);
+		draw_toggle(toggleX, lineY, audio_manager::get().is_master_enabled());
 	else
 		put_string(toggleX, lineY, DRAW_DIALOGBOX_SYSMENU_DISABLED, GameColors::UIDisabled);
 
@@ -587,7 +601,7 @@ void DialogBox_SysMenu::draw_audio_tab(short sX, short sY, short mouse_x, short 
 	put_string(labelX + 1, lineY, "Effects:", GameColors::UILabel);
 
 	if (available)
-		draw_toggle(toggleX, lineY, audio_manager::get().is_sound_enabled(), mouse_x, mouse_y);
+		draw_toggle(toggleX, lineY, audio_manager::get().is_sound_enabled());
 	else
 		put_string(toggleX, lineY, DRAW_DIALOGBOX_SYSMENU_DISABLED, GameColors::UIDisabled);
 
@@ -610,7 +624,7 @@ void DialogBox_SysMenu::draw_audio_tab(short sX, short sY, short mouse_x, short 
 	put_string(labelX + 1, lineY, "Ambient:", GameColors::UILabel);
 
 	if (available)
-		draw_toggle(toggleX, lineY, audio_manager::get().is_ambient_enabled(), mouse_x, mouse_y);
+		draw_toggle(toggleX, lineY, audio_manager::get().is_ambient_enabled());
 	else
 		put_string(toggleX, lineY, DRAW_DIALOGBOX_SYSMENU_DISABLED, GameColors::UIDisabled);
 
@@ -633,7 +647,7 @@ void DialogBox_SysMenu::draw_audio_tab(short sX, short sY, short mouse_x, short 
 	put_string(labelX + 1, lineY, "UI:", GameColors::UILabel);
 
 	if (available)
-		draw_toggle(toggleX, lineY, audio_manager::get().is_ui_enabled(), mouse_x, mouse_y);
+		draw_toggle(toggleX, lineY, audio_manager::get().is_ui_enabled());
 	else
 		put_string(toggleX, lineY, DRAW_DIALOGBOX_SYSMENU_DISABLED, GameColors::UIDisabled);
 
@@ -656,7 +670,7 @@ void DialogBox_SysMenu::draw_audio_tab(short sX, short sY, short mouse_x, short 
 	put_string(labelX + 1, lineY, DRAW_DIALOGBOX_SYSMENU_MUSIC, GameColors::UILabel);
 
 	if (available)
-		draw_toggle(toggleX, lineY, audio_manager::get().is_music_enabled(), mouse_x, mouse_y);
+		draw_toggle(toggleX, lineY, audio_manager::get().is_music_enabled());
 	else
 		put_string(toggleX, lineY, DRAW_DIALOGBOX_SYSMENU_DISABLED, GameColors::UIDisabled);
 
@@ -676,8 +690,10 @@ void DialogBox_SysMenu::draw_audio_tab(short sX, short sY, short mouse_x, short 
 // =============================================================================
 // SYSTEM TAB
 // =============================================================================
-void DialogBox_SysMenu::draw_system_tab(short sX, short sY, short mouse_x, short mouse_y)
+void DialogBox_SysMenu::draw_system_tab(short sX, short sY)
 {
+	short mouse_x = static_cast<short>(hb::shared::input::get_mouse_x());
+	short mouse_y = static_cast<short>(hb::shared::input::get_mouse_y());
 	const int contentX = sX + CONTENT_X;
 	const int contentY = sY + CONTENT_Y;
 	int lineY = contentY + 5;
@@ -687,58 +703,60 @@ void DialogBox_SysMenu::draw_system_tab(short sX, short sY, short mouse_x, short
 	// Whisper toggle
 	put_string(labelX, lineY, DRAW_DIALOGBOX_SYSMENU_WHISPER, GameColors::UILabel);
 	put_string(labelX + 1, lineY, DRAW_DIALOGBOX_SYSMENU_WHISPER, GameColors::UILabel);
-	draw_toggle(valueX, lineY, ChatManager::get().is_whisper_enabled(), mouse_x, mouse_y);
+	draw_toggle(valueX, lineY, ChatManager::get().is_whisper_enabled());
 
 	lineY += 20;
 
 	// Shout toggle
 	put_string(labelX, lineY, DRAW_DIALOGBOX_SYSMENU_SHOUT, GameColors::UILabel);
 	put_string(labelX + 1, lineY, DRAW_DIALOGBOX_SYSMENU_SHOUT, GameColors::UILabel);
-	draw_toggle(valueX, lineY, ChatManager::get().is_shout_enabled(), mouse_x, mouse_y);
+	draw_toggle(valueX, lineY, ChatManager::get().is_shout_enabled());
 
 	lineY += 20;
 
 	// Running Mode toggle
 	put_string(labelX, lineY, "Running Mode:", GameColors::UILabel);
 	put_string(labelX + 1, lineY, "Running Mode:", GameColors::UILabel);
-	draw_toggle(valueX, lineY, config_manager::get().is_running_mode_enabled(), mouse_x, mouse_y);
+	draw_toggle(valueX, lineY, config_manager::get().is_running_mode_enabled());
 
 	lineY += 20;
 
 	// Capture Mouse toggle
 	put_string(labelX, lineY, "Capture Mouse:", GameColors::UILabel);
 	put_string(labelX + 1, lineY, "Capture Mouse:", GameColors::UILabel);
-	draw_toggle(valueX, lineY, config_manager::get().is_mouse_capture_enabled(), mouse_x, mouse_y);
+	draw_toggle(valueX, lineY, config_manager::get().is_mouse_capture_enabled());
 
 	lineY += 20;
 
 	// Guide Map toggle
 	put_string(labelX, lineY, DRAW_DIALOGBOX_SYSMENU_GUIDEMAP, GameColors::UILabel);
 	put_string(labelX + 1, lineY, DRAW_DIALOGBOX_SYSMENU_GUIDEMAP, GameColors::UILabel);
-	draw_toggle(valueX, lineY, m_game->m_dialog_box_manager.is_enabled(DialogBoxId::GuideMap), mouse_x, mouse_y);
+	draw_toggle(valueX, lineY, m_game->m_dialog_box_manager.is_enabled(DialogBoxId::GuideMap));
 
 	lineY += 20;
 
 	// Reduced Motion toggle
 	put_string(labelX, lineY, "Reduced Motion:", GameColors::UILabel);
 	put_string(labelX + 1, lineY, "Reduced Motion:", GameColors::UILabel);
-	draw_toggle(valueX, lineY, config_manager::get().is_reduced_motion_enabled(), mouse_x, mouse_y);
+	draw_toggle(valueX, lineY, config_manager::get().is_reduced_motion_enabled());
 
 	lineY += 20;
 
 	// Toggle to Chat toggle
 	put_string(labelX, lineY, "Toggle to Chat:", GameColors::UILabel);
 	put_string(labelX + 1, lineY, "Toggle to Chat:", GameColors::UILabel);
-	draw_toggle(valueX, lineY, config_manager::get().is_toggle_to_chat_enabled(), mouse_x, mouse_y);
+	draw_toggle(valueX, lineY, config_manager::get().is_toggle_to_chat_enabled());
 }
 
 // =============================================================================
 // CLICK HANDLERS
 // =============================================================================
-bool DialogBox_SysMenu::on_click(short mouse_x, short mouse_y)
+bool DialogBox_SysMenu::on_click()
 {
-	short sX = Info().m_x;
-	short sY = Info().m_y;
+	short mouse_x = static_cast<short>(hb::shared::input::get_mouse_x());
+	short mouse_y = static_cast<short>(hb::shared::input::get_mouse_y());
+	short sX = m_x;
+	short sY = m_y;
 
 	// Check tab button clicks
 	hb::shared::sprite::SpriteRect button_rect = m_game->m_sprite[InterfaceNdButton]->GetFrameRect(70);
@@ -759,26 +777,28 @@ bool DialogBox_SysMenu::on_click(short mouse_x, short mouse_y)
 	switch (m_iActiveTab)
 	{
 	case TAB_GENERAL:
-		return on_click_general(sX, sY, mouse_x, mouse_y);
+		return on_click_general(sX, sY);
 	case TAB_GRAPHICS:
-		return on_click_graphics(sX, sY, mouse_x, mouse_y);
+		return on_click_graphics(sX, sY);
 	case TAB_AUDIO:
-		return on_click_audio(sX, sY, mouse_x, mouse_y);
+		return on_click_audio(sX, sY);
 	case TAB_SYSTEM:
-		return on_click_system(sX, sY, mouse_x, mouse_y);
+		return on_click_system(sX, sY);
 	}
 
 	return false;
 }
 
-PressResult DialogBox_SysMenu::on_press(short mouse_x, short mouse_y)
+PressResult DialogBox_SysMenu::on_press()
 {
+	short mouse_x = static_cast<short>(hb::shared::input::get_mouse_x());
+	short mouse_y = static_cast<short>(hb::shared::input::get_mouse_y());
 	// Only claim scroll for Audio tab slider areas
 	if (m_iActiveTab != TAB_AUDIO)
 		return PressResult::Normal;
 
-	short sX = Info().m_x;
-	short sY = Info().m_y;
+	short sX = m_x;
+	short sY = m_y;
 	const int contentX = sX + CONTENT_X;
 	const int contentY = sY + CONTENT_Y;
 	const int sliderX = contentX + 110;
@@ -790,7 +810,7 @@ PressResult DialogBox_SysMenu::on_press(short mouse_x, short mouse_y)
 			(mouse_y >= sliderY - 5) && (mouse_y <= sliderY + 15))
 		{
 			dragFlag = true;
-			Info().m_is_scroll_selected = true;
+			m_is_scroll_selected = true;
 			return true;
 		}
 		return false;
@@ -819,8 +839,10 @@ PressResult DialogBox_SysMenu::on_press(short mouse_x, short mouse_y)
 	return PressResult::Normal;
 }
 
-bool DialogBox_SysMenu::on_click_general(short sX, short sY, short mouse_x, short mouse_y)
+bool DialogBox_SysMenu::on_click_general(short sX, short sY)
 {
+	short mouse_x = static_cast<short>(hb::shared::input::get_mouse_x());
+	short mouse_y = static_cast<short>(hb::shared::input::get_mouse_y());
 	const int contentY = sY + CONTENT_Y;
 	const int contentBottom = contentY + CONTENT_HEIGHT;
 	int buttonY = contentBottom - 30;
@@ -865,8 +887,10 @@ bool DialogBox_SysMenu::on_click_general(short sX, short sY, short mouse_x, shor
 	return false;
 }
 
-bool DialogBox_SysMenu::on_click_graphics(short sX, short sY, short mouse_x, short mouse_y)
+bool DialogBox_SysMenu::on_click_graphics(short sX, short sY)
 {
+	short mouse_x = static_cast<short>(hb::shared::input::get_mouse_x());
+	short mouse_y = static_cast<short>(hb::shared::input::get_mouse_y());
 	const int contentX = sX + CONTENT_X;
 	const int contentY = sY + CONTENT_Y;
 	int lineY = contentY + 5;
@@ -921,7 +945,7 @@ bool DialogBox_SysMenu::on_click_graphics(short sX, short sY, short mouse_x, sho
 	lineY += 18;
 
 	// --- VSync toggle ---
-	if (is_in_toggle_area(smallBoxX, lineY, mouse_x, mouse_y)) {
+	if (is_in_toggle_area(smallBoxX, lineY)) {
 		bool enabled = config_manager::get().is_vsync_enabled();
 		config_manager::get().set_vsync_enabled(!enabled);
 		hb::shared::render::Window::get()->set_vsync_enabled(!enabled);
@@ -956,7 +980,7 @@ bool DialogBox_SysMenu::on_click_graphics(short sX, short sY, short mouse_x, sho
 	lineY += 18;
 
 	// --- Dialog Transparency toggle ---
-	if (is_in_toggle_area(smallBoxX, lineY, mouse_x, mouse_y)) {
+	if (is_in_toggle_area(smallBoxX, lineY)) {
 		bool enabled = config_manager::get().is_dialog_transparency_enabled();
 		config_manager::get().set_dialog_transparency_enabled(!enabled);
 		play_sound_effect('E', 14, 5);
@@ -966,7 +990,7 @@ bool DialogBox_SysMenu::on_click_graphics(short sX, short sY, short mouse_x, sho
 	lineY += 18;
 
 	// --- Show FPS toggle ---
-	if (is_in_toggle_area(smallBoxX, lineY, mouse_x, mouse_y)) {
+	if (is_in_toggle_area(smallBoxX, lineY)) {
 		bool enabled = config_manager::get().is_show_fps_enabled();
 		config_manager::get().set_show_fps_enabled(!enabled);
 		play_sound_effect('E', 14, 5);
@@ -976,7 +1000,7 @@ bool DialogBox_SysMenu::on_click_graphics(short sX, short sY, short mouse_x, sho
 	lineY += 18;
 
 	// --- Show Latency toggle ---
-	if (is_in_toggle_area(smallBoxX, lineY, mouse_x, mouse_y)) {
+	if (is_in_toggle_area(smallBoxX, lineY)) {
 		bool enabled = config_manager::get().is_show_latency_enabled();
 		config_manager::get().set_show_latency_enabled(!enabled);
 		play_sound_effect('E', 14, 5);
@@ -987,7 +1011,7 @@ bool DialogBox_SysMenu::on_click_graphics(short sX, short sY, short mouse_x, sho
 
 #ifdef _DEBUG
 	// Tile Grid toggle - DEBUG ONLY
-	if (is_in_toggle_area(smallBoxX, lineY, mouse_x, mouse_y)) {
+	if (is_in_toggle_area(smallBoxX, lineY)) {
 		bool enabled = config_manager::get().is_tile_grid_enabled();
 		config_manager::get().set_tile_grid_enabled(!enabled);
 		play_sound_effect('E', 14, 5);
@@ -997,7 +1021,7 @@ bool DialogBox_SysMenu::on_click_graphics(short sX, short sY, short mouse_x, sho
 	lineY += 18;
 
 	// Patching Grid toggle - DEBUG ONLY
-	if (is_in_toggle_area(smallBoxX, lineY, mouse_x, mouse_y)) {
+	if (is_in_toggle_area(smallBoxX, lineY)) {
 		bool enabled = config_manager::get().is_patching_grid_enabled();
 		config_manager::get().set_patching_grid_enabled(!enabled);
 		play_sound_effect('E', 14, 5);
@@ -1047,7 +1071,7 @@ bool DialogBox_SysMenu::on_click_graphics(short sX, short sY, short mouse_x, sho
 	return false;
 }
 
-bool DialogBox_SysMenu::on_click_audio(short sX, short sY, short mouse_x, short mouse_y)
+bool DialogBox_SysMenu::on_click_audio(short sX, short sY)
 {
 	const int contentX = sX + CONTENT_X;
 	const int contentY = sY + CONTENT_Y;
@@ -1058,7 +1082,7 @@ bool DialogBox_SysMenu::on_click_audio(short sX, short sY, short mouse_x, short 
 
 	// Master toggle (lineY = contentY + 8)
 	int lineY = contentY + 8;
-	if (is_in_toggle_area(toggleX, lineY, mouse_x, mouse_y)) {
+	if (is_in_toggle_area(toggleX, lineY)) {
 		bool enabled = audio_manager::get().is_master_enabled();
 		audio_manager::get().set_master_enabled(!enabled);
 		config_manager::get().set_master_enabled(!enabled);
@@ -1069,7 +1093,7 @@ bool DialogBox_SysMenu::on_click_audio(short sX, short sY, short mouse_x, short 
 
 	// Effects toggle (lineY = contentY + 52)
 	lineY = contentY + 52;
-	if (is_in_toggle_area(toggleX, lineY, mouse_x, mouse_y)) {
+	if (is_in_toggle_area(toggleX, lineY)) {
 		bool enabled = audio_manager::get().is_sound_enabled();
 		audio_manager::get().set_sound_enabled(!enabled);
 		config_manager::get().set_sound_enabled(!enabled);
@@ -1080,7 +1104,7 @@ bool DialogBox_SysMenu::on_click_audio(short sX, short sY, short mouse_x, short 
 
 	// Ambient toggle (lineY = contentY + 92)
 	lineY = contentY + 92;
-	if (is_in_toggle_area(toggleX, lineY, mouse_x, mouse_y)) {
+	if (is_in_toggle_area(toggleX, lineY)) {
 		bool enabled = audio_manager::get().is_ambient_enabled();
 		audio_manager::get().set_ambient_enabled(!enabled);
 		config_manager::get().set_ambient_enabled(!enabled);
@@ -1091,7 +1115,7 @@ bool DialogBox_SysMenu::on_click_audio(short sX, short sY, short mouse_x, short 
 
 	// UI toggle (lineY = contentY + 132)
 	lineY = contentY + 132;
-	if (is_in_toggle_area(toggleX, lineY, mouse_x, mouse_y)) {
+	if (is_in_toggle_area(toggleX, lineY)) {
 		bool enabled = audio_manager::get().is_ui_enabled();
 		audio_manager::get().set_ui_enabled(!enabled);
 		config_manager::get().set_ui_enabled(!enabled);
@@ -1102,7 +1126,7 @@ bool DialogBox_SysMenu::on_click_audio(short sX, short sY, short mouse_x, short 
 
 	// Music toggle (lineY = contentY + 172)
 	lineY = contentY + 172;
-	if (is_in_toggle_area(toggleX, lineY, mouse_x, mouse_y)) {
+	if (is_in_toggle_area(toggleX, lineY)) {
 		if (audio_manager::get().is_music_enabled()) {
 			audio_manager::get().set_music_enabled(false);
 			config_manager::get().set_music_enabled(false);
@@ -1121,7 +1145,7 @@ bool DialogBox_SysMenu::on_click_audio(short sX, short sY, short mouse_x, short 
 	return false;
 }
 
-bool DialogBox_SysMenu::on_click_system(short sX, short sY, short mouse_x, short mouse_y)
+bool DialogBox_SysMenu::on_click_system(short sX, short sY)
 {
 	const int contentX = sX + CONTENT_X;
 	const int contentY = sY + CONTENT_Y;
@@ -1129,7 +1153,7 @@ bool DialogBox_SysMenu::on_click_system(short sX, short sY, short mouse_x, short
 	const int valueX = contentX + 140;
 
 	// Whisper toggle
-	if (is_in_toggle_area(valueX, lineY, mouse_x, mouse_y)) {
+	if (is_in_toggle_area(valueX, lineY)) {
 		if (ChatManager::get().is_whisper_enabled()) {
 			ChatManager::get().set_whisper_enabled(false);
 			add_event_list(BCHECK_LOCAL_CHAT_COMMAND7, 10);
@@ -1145,7 +1169,7 @@ bool DialogBox_SysMenu::on_click_system(short sX, short sY, short mouse_x, short
 	lineY += 20;
 
 	// Shout toggle
-	if (is_in_toggle_area(valueX, lineY, mouse_x, mouse_y)) {
+	if (is_in_toggle_area(valueX, lineY)) {
 		if (ChatManager::get().is_shout_enabled()) {
 			ChatManager::get().set_shout_enabled(false);
 			add_event_list(BCHECK_LOCAL_CHAT_COMMAND9, 10);
@@ -1161,7 +1185,7 @@ bool DialogBox_SysMenu::on_click_system(short sX, short sY, short mouse_x, short
 	lineY += 20;
 
 	// Running Mode toggle
-	if (is_in_toggle_area(valueX, lineY, mouse_x, mouse_y)) {
+	if (is_in_toggle_area(valueX, lineY)) {
 		bool enabled = config_manager::get().is_running_mode_enabled();
 		config_manager::get().set_running_mode_enabled(!enabled);
 		play_sound_effect('E', 14, 5);
@@ -1171,7 +1195,7 @@ bool DialogBox_SysMenu::on_click_system(short sX, short sY, short mouse_x, short
 	lineY += 20;
 
 	// Capture Mouse toggle
-	if (is_in_toggle_area(valueX, lineY, mouse_x, mouse_y)) {
+	if (is_in_toggle_area(valueX, lineY)) {
 		bool enabled = config_manager::get().is_mouse_capture_enabled();
 		config_manager::get().set_mouse_capture_enabled(!enabled);
 		hb::shared::render::Window::get()->set_mouse_capture_enabled(!enabled);
@@ -1182,7 +1206,7 @@ bool DialogBox_SysMenu::on_click_system(short sX, short sY, short mouse_x, short
 	lineY += 20;
 
 	// Guide Map toggle
-	if (is_in_toggle_area(valueX, lineY, mouse_x, mouse_y)) {
+	if (is_in_toggle_area(valueX, lineY)) {
 		if (m_game->m_dialog_box_manager.is_enabled(DialogBoxId::GuideMap))
 			disable_dialog_box(DialogBoxId::GuideMap);
 		else
@@ -1194,7 +1218,7 @@ bool DialogBox_SysMenu::on_click_system(short sX, short sY, short mouse_x, short
 	lineY += 20;
 
 	// Reduced Motion toggle
-	if (is_in_toggle_area(valueX, lineY, mouse_x, mouse_y)) {
+	if (is_in_toggle_area(valueX, lineY)) {
 		bool enabled = config_manager::get().is_reduced_motion_enabled();
 		config_manager::get().set_reduced_motion_enabled(!enabled);
 		play_sound_effect('E', 14, 5);
@@ -1204,7 +1228,7 @@ bool DialogBox_SysMenu::on_click_system(short sX, short sY, short mouse_x, short
 	lineY += 20;
 
 	// Toggle to Chat toggle
-	if (is_in_toggle_area(valueX, lineY, mouse_x, mouse_y)) {
+	if (is_in_toggle_area(valueX, lineY)) {
 		bool enabled = config_manager::get().is_toggle_to_chat_enabled();
 		config_manager::get().set_toggle_to_chat_enabled(!enabled);
 		play_sound_effect('E', 14, 5);

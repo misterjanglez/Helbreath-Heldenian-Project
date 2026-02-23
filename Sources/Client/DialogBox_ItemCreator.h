@@ -13,13 +13,14 @@ public:
 	DialogBox_ItemCreator(CGame* game);
 	~DialogBox_ItemCreator() override = default;
 
-	void on_draw(short mouse_x, short mouse_y, short z, char lb) override;
-	bool on_click(short mouse_x, short mouse_y) override;
-	void on_disable() override;
+	void on_draw() override;
+	bool on_click() override;
+	bool on_disable() override;
 
 	void receive_search_results(const hb::net::PacketNotifyTesterItemSearchResult* pkt);
 	void on_enter_pressed();
 
+	bool on_enable(int type, int64_t v1, int v2, const char* string) override;
 private:
 	enum class item_category { none, weapon, armor, magic_weapon };
 
@@ -77,8 +78,8 @@ private:
 
 	void draw_search_page(short sX, short sY, short size_x, short mouse_x, short mouse_y, short z);
 	void draw_configure_page(short sX, short sY, short size_x, short mouse_x, short mouse_y, short z);
-	bool on_click_search(short sX, short sY, short size_x, short mouse_x, short mouse_y);
-	bool on_click_configure(short sX, short sY, short size_x, short mouse_x, short mouse_y);
+	bool on_click_search(short sX, short sY, short size_x);
+	bool on_click_configure(short sX, short sY, short size_x);
 
 	// UI helpers
 	void draw_dropdown_field(int x, int y, int w, const char* text, bool is_open, bool is_hover);

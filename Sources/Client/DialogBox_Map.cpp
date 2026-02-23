@@ -14,18 +14,19 @@ DialogBox_Map::DialogBox_Map(CGame* game)
 	set_default_rect(496 , 88 , 270, 346);
 }
 
-void DialogBox_Map::on_enable(int type, int v1, int v2, char* string)
+bool DialogBox_Map::on_enable(int type, int64_t v1, int v2, const char* string)
 {
-	Info().m_v1 = v1;
-	Info().m_v2 = v2;
-	Info().m_size_x = 290;
-	Info().m_size_y = 290;
+	m_map_zone = static_cast<int>(v1);
+	m_map_id = v2;
+	m_size_x = 290;
+	m_size_y = 290;
+	return true;
 }
 
-void DialogBox_Map::on_draw(short mouse_x, short mouse_y, short z, char lb)
+void DialogBox_Map::on_draw()
 {
-	short sX = Info().m_x;
-	short sY = Info().m_y;
+	short sX = m_x;
+	short sY = m_y;
 	const bool dialogTrans = config_manager::get().is_dialog_transparency_enabled();
 	uint32_t time = m_game->m_cur_time;
 	double v1, v2, v3;
@@ -34,9 +35,9 @@ void DialogBox_Map::on_draw(short mouse_x, short mouse_y, short z, char lb)
 	size_x = 0;
 	size_y = 0;
 
-	switch (Info().m_v1) {
+	switch (m_map_zone) {
 	case 1:
-		switch (Info().m_v2) {
+		switch (m_map_id) {
 		case 0: // aresden
 			if (dialogTrans)
 				m_game->m_sprite[InterfaceNewMaps1]->draw(sX, sY, 0, hb::shared::sprite::DrawParams::alpha_blend(0.25f));
@@ -157,7 +158,7 @@ void DialogBox_Map::on_draw(short mouse_x, short mouse_y, short z, char lb)
 	}
 }
 
-bool DialogBox_Map::on_click(short mouse_x, short mouse_y)
+bool DialogBox_Map::on_click()
 {
 	// Map dialog has no click handling - it just displays
 	return false;

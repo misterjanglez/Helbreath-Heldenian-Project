@@ -5,6 +5,7 @@
 #include "GlobalDef.h"
 #include "lan_eng.h"
 #include <format>
+#include "IInput.h"
 
 
 using namespace hb::shared::action;
@@ -103,7 +104,7 @@ void DialogBox_GuideMap::draw_location_tooltip(short mouse_x, short mouse_y, sho
 {
 	std::string G_cTxt;
 	short shX, shY;
-	short size_y = Info().m_size_y;
+	short size_y = m_size_y;
 
 	if (config_manager::get().is_zoom_map_enabled())
 	{
@@ -182,14 +183,17 @@ void DialogBox_GuideMap::draw_location_tooltip(short mouse_x, short mouse_y, sho
 	put_string(mouse_x - 10, mouse_y - 13, G_cTxt.c_str(), GameColors::UIPaleYellow);
 }
 
-void DialogBox_GuideMap::on_draw(short mouse_x, short mouse_y, short z, char lb)
+void DialogBox_GuideMap::on_draw()
 {
+	short mouse_x = static_cast<short>(hb::shared::input::get_mouse_x());
+	short mouse_y = static_cast<short>(hb::shared::input::get_mouse_y());
+	char lb = hb::shared::input::is_mouse_button_down(hb::shared::input::MouseButton::Left) ? 1 : 0;
 	if (m_game->m_map_index < 0) return;
 
-	short sX = Info().m_x;
-	short sY = Info().m_y;
-	short size_x = Info().m_size_x;
-	short size_y = Info().m_size_y;
+	short sX = m_x;
+	short sY = m_y;
+	short size_x = m_size_x;
+	short size_y = m_size_y;
 
 	// clamp position
 	if (sX < 20) sX = 0;
@@ -222,20 +226,22 @@ void DialogBox_GuideMap::on_draw(short mouse_x, short mouse_y, short z, char lb)
 	}
 }
 
-bool DialogBox_GuideMap::on_click(short mouse_x, short mouse_y)
+bool DialogBox_GuideMap::on_click()
 {
 	return false;
 }
 
-bool DialogBox_GuideMap::on_double_click(short mouse_x, short mouse_y)
+bool DialogBox_GuideMap::on_double_click()
 {
+	short mouse_x = static_cast<short>(hb::shared::input::get_mouse_x());
+	short mouse_y = static_cast<short>(hb::shared::input::get_mouse_y());
 	if (CursorTarget::get_cursor_frame() != 0) return false;
 	if (m_game->m_map_index < 0) return false;
 
-	short sX = Info().m_x;
-	short sY = Info().m_y;
-	short size_x = Info().m_size_x;
-	short size_y = Info().m_size_y;
+	short sX = m_x;
+	short sY = m_y;
+	short size_x = m_size_x;
+	short size_y = m_size_y;
 
 	// clamp position (same as on_draw)
 	if (sX < 20) sX = 0;

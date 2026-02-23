@@ -3,6 +3,8 @@
 
 #include "GuildManager.h"
 #include "Game.h"
+#include "DialogBox_GuildMenu.h"
+#include "DialogBox_GuildOperation.h"
 #include "Packet/SharedPackets.h"
 #include "lan_eng.h"
 #include <cstdio>
@@ -56,11 +58,11 @@ void guild_manager::handle_create_new_guild_response(char* data)
 	switch (header->msg_type) {
 	case MsgType::Confirm:
 		m_game->m_player->m_guild_rank = 0;
-		m_game->m_dialog_box_manager.Info(DialogBoxId::GuildMenu).m_mode = 3;
+		m_game->m_dialog_box_manager.get_dialog_as<DialogBox_GuildMenu>(DialogBoxId::GuildMenu)->m_mode = DialogBox_GuildMenu::mode::guild_created;
 		break;
 	case MsgType::Reject:
 		m_game->m_player->m_guild_rank = -1;
-		m_game->m_dialog_box_manager.Info(DialogBoxId::GuildMenu).m_mode = 4;
+		m_game->m_dialog_box_manager.get_dialog_as<DialogBox_GuildMenu>(DialogBoxId::GuildMenu)->m_mode = DialogBox_GuildMenu::mode::create_failed;
 		break;
 	}
 }
@@ -73,10 +75,10 @@ void guild_manager::handle_disband_guild_response(char* data)
 	switch (header->msg_type) {
 	case MsgType::Confirm:
 		m_game->m_player->m_guild_rank = -1;
-		m_game->m_dialog_box_manager.Info(DialogBoxId::GuildMenu).m_mode = 7;
+		m_game->m_dialog_box_manager.get_dialog_as<DialogBox_GuildMenu>(DialogBoxId::GuildMenu)->m_mode = DialogBox_GuildMenu::mode::disband_success;
 		break;
 	case MsgType::Reject:
-		m_game->m_dialog_box_manager.Info(DialogBoxId::GuildMenu).m_mode = 8;
+		m_game->m_dialog_box_manager.get_dialog_as<DialogBox_GuildMenu>(DialogBoxId::GuildMenu)->m_mode = DialogBox_GuildMenu::mode::disband_failed;
 		break;
 	}
 }
@@ -91,7 +93,7 @@ void guild_manager::handle_guild_disbanded(char* data)
 	memcpy(location, pkt->location, sizeof(pkt->location));
 	CMisc::replace_string(name, '_', ' ');
 	m_game->m_dialog_box_manager.enable_dialog_box(DialogBoxId::GuildOperation, 0, 0, 0);
-	m_game->put_guild_operation_list(name, 7);
+	m_game->m_dialog_box_manager.get_dialog_as<DialogBox_GuildOperation>(DialogBoxId::GuildOperation)->put(name,7);
 	m_game->m_player->m_guild_rank = -1;
 	m_game->m_location.assign(location, strnlen(location, hb::shared::limits::MapNameLen));
 	update_location_flags(m_game, m_game->m_location.c_str());
@@ -157,7 +159,7 @@ void guild_manager::handle_join_guild_approve(char* data)
 	m_game->m_player->m_guild_name = name;
 	m_game->m_player->m_guild_rank = rank;
 	m_game->m_dialog_box_manager.enable_dialog_box(DialogBoxId::GuildOperation, 0, 0, 0);
-	m_game->put_guild_operation_list(name, 3);
+	m_game->m_dialog_box_manager.get_dialog_as<DialogBox_GuildOperation>(DialogBoxId::GuildOperation)->put(name,3);
 }
 
 void guild_manager::handle_join_guild_reject(char* data)
@@ -168,7 +170,7 @@ void guild_manager::handle_join_guild_reject(char* data)
 	if (!pkt) return;
 	memcpy(name, pkt->guild_name, sizeof(pkt->guild_name));
 	m_game->m_dialog_box_manager.enable_dialog_box(DialogBoxId::GuildOperation, 0, 0, 0);
-	m_game->put_guild_operation_list(name, 4);
+	m_game->m_dialog_box_manager.get_dialog_as<DialogBox_GuildOperation>(DialogBoxId::GuildOperation)->put(name,4);
 }
 
 void guild_manager::handle_dismiss_guild_approve(char* data)
@@ -183,7 +185,7 @@ void guild_manager::handle_dismiss_guild_approve(char* data)
 	m_game->m_location.assign(location, strnlen(location, hb::shared::limits::MapNameLen));
 	update_location_flags(m_game, m_game->m_location.c_str());
 	m_game->m_dialog_box_manager.enable_dialog_box(DialogBoxId::GuildOperation, 0, 0, 0);
-	m_game->put_guild_operation_list(name, 5);
+	m_game->m_dialog_box_manager.get_dialog_as<DialogBox_GuildOperation>(DialogBoxId::GuildOperation)->put(name,5);
 }
 
 void guild_manager::handle_dismiss_guild_reject(char* data)
@@ -194,7 +196,7 @@ void guild_manager::handle_dismiss_guild_reject(char* data)
 	if (!pkt) return;
 	memcpy(name, pkt->guild_name, sizeof(pkt->guild_name));
 	m_game->m_dialog_box_manager.enable_dialog_box(DialogBoxId::GuildOperation, 0, 0, 0);
-	m_game->put_guild_operation_list(name, 6);
+	m_game->m_dialog_box_manager.get_dialog_as<DialogBox_GuildOperation>(DialogBoxId::GuildOperation)->put(name,6);
 }
 
 void guild_manager::handle_query_join_guild_permission(char* data)
@@ -205,7 +207,7 @@ void guild_manager::handle_query_join_guild_permission(char* data)
 	if (!pkt) return;
 	memcpy(name, pkt->name, sizeof(pkt->name));
 	m_game->m_dialog_box_manager.enable_dialog_box(DialogBoxId::GuildOperation, 0, 0, 0);
-	m_game->put_guild_operation_list(name, 1);
+	m_game->m_dialog_box_manager.get_dialog_as<DialogBox_GuildOperation>(DialogBoxId::GuildOperation)->put(name,1);
 }
 
 void guild_manager::handle_query_dismiss_guild_permission(char* data)
@@ -216,7 +218,7 @@ void guild_manager::handle_query_dismiss_guild_permission(char* data)
 	if (!pkt) return;
 	memcpy(name, pkt->name, sizeof(pkt->name));
 	m_game->m_dialog_box_manager.enable_dialog_box(DialogBoxId::GuildOperation, 0, 0, 0);
-	m_game->put_guild_operation_list(name, 2);
+	m_game->m_dialog_box_manager.get_dialog_as<DialogBox_GuildOperation>(DialogBoxId::GuildOperation)->put(name,2);
 }
 
 void guild_manager::handle_req_guild_name_answer(char* data)

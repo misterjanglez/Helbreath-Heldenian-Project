@@ -126,7 +126,7 @@ public:
 	void draw_new_dialog_box(char type, int sX, int sY, int frame, bool is_no_color_key = false, bool is_trans = false);
 	void add_map_status_info(const char* data, bool is_last_data);
 	void request_map_status(const char* map_name, int mode);
-	void draw_dialog_boxs(short mouse_x, short mouse_y, short mouse_z, char left_button);
+	// draw_dialog_boxs REMOVED — use m_dialog_box_manager.draw_all()
 	std::string format_comma_number(uint64_t value);
 
 	void response_panning_handler(char * data);
@@ -168,16 +168,14 @@ public:
 	void request_teleport_and_wait_data();
 	void point_command_handler(int indexX, int indexY, char item_id = -1);
 	void add_event_list(const char* txt, char color = 0, bool dup_allow = true);
-	void shift_guild_operation_list();
-	void put_guild_operation_list(char * name, char op_mode);
+	// shift_guild_operation_list / put_guild_operation_list REMOVED — use DialogBox_GuildOperation
 	void disband_guild_response_handler(char * data);
 	void init_player_characteristics(char * data);
 	void create_new_guild_response_handler(char * data);
 	void init_game_settings();
 	void common_event_handler(char * data);
-	int get_top_dialog_box_index();
-	void disable_dialog_box(int box_id);
-	void enable_dialog_box(int box_id, int type, int v1, int v2, char * string = 0);
+	// get_top_dialog_box_index, enable_dialog_box, disable_dialog_box REMOVED
+	// — use m_dialog_box_manager.get_top_id(), enable_dialog_box(), disable_dialog_box()
 	void init_item_list(char * packet_data);
 	hb::shared::sprite::BoundRect draw_object_on_dead(int indexX, int indexY, int sX, int sY, bool trans, uint32_t time);
 	hb::shared::sprite::BoundRect draw_object_on_dying(int indexX, int indexY, int sX, int sY, bool trans, uint32_t time);
@@ -282,22 +280,7 @@ public:
 	crafting_manager m_crafting_manager;
 	quest_manager m_quest_manager;
 	guild_manager m_guild_manager;
-	struct {
-		int   v1, v2, v3, v4, v5, v6, v7, item_id;
-		int   inv_slot;  // local inventory slot index for m_is_item_disabled tracking
-		uint32_t dw_v1;
-		std::string str1;
-		std::string str2;
-	} m_dialog_box_exchange_info[8];
-	struct {
-		int index;
-		int amount;
-	} m_sell_item_list[game_limits::max_sell_list];
 
-	struct {
-		std::string name;
-		char op_mode;
-	} m_guild_op_list[100];
 
 	struct {
 		bool is_quest_completed;
@@ -307,19 +290,10 @@ public:
 	} m_quest;
 
 	struct {
-		char status;
-		std::string name;
-	} m_party_member[hb::shared::limits::MaxPartyMembers];
-
-	struct {
 		short x, y;
 		char type;
 		char side;
 	} m_crusade_structure_info[hb::shared::limits::MaxCrusadeStructures];
-
-	struct {
-		std::string name;
-	} m_party_member_name_list[hb::shared::limits::MaxPartyMembers+1];
 
 	// v2.171 2002-6-14
 	struct {

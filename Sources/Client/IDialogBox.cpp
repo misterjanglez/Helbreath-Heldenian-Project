@@ -2,6 +2,7 @@
 #include "Game.h"
 #include "GameFonts.h"
 #include "TextLibExt.h"
+#include "IInput.h"
 
 IDialogBox::IDialogBox(DialogBoxId::Type id, CGame* game)
 	: m_game(game)
@@ -9,19 +10,12 @@ IDialogBox::IDialogBox(DialogBoxId::Type id, CGame* game)
 {
 }
 
-DialogBoxInfo& IDialogBox::Info()
+bool IDialogBox::mouse_in(const ui_rect& r) const
 {
-	return m_game->m_dialog_box_manager.Info(m_id);
-}
-
-const DialogBoxInfo& IDialogBox::Info() const
-{
-	return m_game->m_dialog_box_manager.Info(m_id);
-}
-
-bool IDialogBox::is_enabled() const
-{
-	return m_game->m_dialog_box_manager.is_enabled(m_id);
+	int mx = hb::shared::input::get_mouse_x();
+	int my = hb::shared::input::get_mouse_y();
+	return mx >= m_x + r.x && mx < m_x + r.x + r.w
+		&& my >= m_y + r.y && my < m_y + r.y + r.h;
 }
 
 void IDialogBox::draw_new_dialog_box(char type, int sX, int sY, int frame, bool is_no_color_key, bool is_trans)
@@ -57,14 +51,13 @@ bool IDialogBox::send_command(uint32_t msg_id, uint16_t command, char dir, int v
 
 void IDialogBox::set_default_rect(short sX, short sY, short size_x, short size_y)
 {
-	auto& info = Info();
-	info.m_x = sX;
-	info.m_y = sY;
-	info.m_size_x = size_x;
-	info.m_size_y = size_y;
+	m_x = sX;
+	m_y = sY;
+	m_size_x = size_x;
+	m_size_y = size_y;
 }
 
-void IDialogBox::enable_dialog_box(DialogBoxId::Type id, int type, int64_t v1, int v2, char* string)
+void IDialogBox::enable_dialog_box(DialogBoxId::Type id, int type, int64_t v1, int v2, const char* string)
 {
 	m_game->m_dialog_box_manager.enable_dialog_box(id, type, v1, v2, string);
 }
@@ -79,17 +72,7 @@ void IDialogBox::disable_this_dialog()
 	m_game->m_dialog_box_manager.disable_dialog_box(m_id);
 }
 
-void IDialogBox::set_can_close_on_right_click(bool can_close)
-{
-	Info().m_can_close_on_right_click = can_close;
-}
-
 IDialogBox* IDialogBox::get_dialog_box(DialogBoxId::Type id)
 {
 	return m_game->m_dialog_box_manager.get_dialog_box(id);
-}
-
-DialogBoxInfo& IDialogBox::info_of(DialogBoxId::Type id)
-{
-	return m_game->m_dialog_box_manager.Info(id);
 }

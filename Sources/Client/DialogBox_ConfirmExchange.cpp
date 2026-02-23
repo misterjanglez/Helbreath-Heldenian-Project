@@ -1,5 +1,7 @@
-﻿#include "DialogBox_ConfirmExchange.h"
+#include "DialogBox_ConfirmExchange.h"
+#include "DialogBox_Exchange.h"
 #include "Game.h"
+#include "IInput.h"
 
 using namespace hb::shared::net;
 using namespace hb::client::sprite_id;
@@ -9,65 +11,65 @@ DialogBox_ConfirmExchange::DialogBox_ConfirmExchange(CGame* game)
 	set_default_rect(285 , 200 , 270, 105);
 }
 
-void DialogBox_ConfirmExchange::on_draw(short mouse_x, short mouse_y, short z, char lb)
+void DialogBox_ConfirmExchange::on_draw()
 {
-	short sX = Info().m_x;
-	short sY = Info().m_y;
+	short sX = m_x;
+	short sY = m_y;
 
 	draw_new_dialog_box(InterfaceNdGame1, sX, sY, 2);
 
-	switch (Info().m_mode)
+	switch (m_mode)
 	{
-	case 1: // Question
+	case mode::question:
 		put_string(sX + 35, sY + 30, "Do you really want to exchange?", GameColors::UIMagicBlue);
 		put_string(sX + 36, sY + 30, "Do you really want to exchange?", GameColors::UIMagicBlue);
 
 		// Yes button
-		if ((mouse_x >= sX + 30) && (mouse_x <= sX + 30 + ui_layout::btn_size_x) && (mouse_y >= sY + 55) && (mouse_y <= sY + 55 + ui_layout::btn_size_y))
+		if (mouse_in(btn_yes))
 			draw_new_dialog_box(InterfaceNdButton, sX + 30, sY + 55, 19);
 		else
 			draw_new_dialog_box(InterfaceNdButton, sX + 30, sY + 55, 18);
 
 		// No button
-		if ((mouse_x >= sX + 170) && (mouse_x <= sX + 170 + ui_layout::btn_size_x) && (mouse_y >= sY + 55) && (mouse_y <= sY + 55 + ui_layout::btn_size_y))
+		if (mouse_in(btn_no))
 			draw_new_dialog_box(InterfaceNdButton, sX + 170, sY + 55, 3);
 		else
 			draw_new_dialog_box(InterfaceNdButton, sX + 170, sY + 55, 2);
 		break;
 
-	case 2: // Waiting for response
+	case mode::waiting:
 		put_string(sX + 45, sY + 36, "Waiting for response...", GameColors::UIMagicBlue);
 		put_string(sX + 46, sY + 36, "Waiting for response...", GameColors::UIMagicBlue);
 		break;
 	}
 }
 
-bool DialogBox_ConfirmExchange::on_click(short mouse_x, short mouse_y)
+bool DialogBox_ConfirmExchange::on_click()
 {
-	short sX = Info().m_x;
-	short sY = Info().m_y;
+	short sX = m_x;
+	short sY = m_y;
 
-	switch (Info().m_mode)
+	switch (m_mode)
 	{
-	case 1: // Not yet confirmed the exchange
+	case mode::question:
 		// Yes button
-		if ((mouse_x >= sX + 30) && (mouse_x <= sX + 30 + ui_layout::btn_size_x) && (mouse_y >= sY + 55) && (mouse_y <= sY + 55 + ui_layout::btn_size_y))
+		if (mouse_in(btn_yes))
 		{
-			if ((m_game->m_dialog_box_exchange_info[0].v1 != -1) && (m_game->m_dialog_box_exchange_info[4].v1 != -1))
+			if ((get_dialog_box_as<DialogBox_Exchange>(DialogBoxId::Exchange)->m_slots[0].v1 != -1) && (get_dialog_box_as<DialogBox_Exchange>(DialogBoxId::Exchange)->m_slots[4].v1 != -1))
 			{
 				send_command(MsgId::CommandCommon, CommonType::confirm_exchange_item, 0,
-					m_game->m_dialog_box_exchange_info[0].v1,  // ItemID
-					m_game->m_dialog_box_exchange_info[0].v3,  // Amount
+					get_dialog_box_as<DialogBox_Exchange>(DialogBoxId::Exchange)->m_slots[0].v1,  // ItemID
+					get_dialog_box_as<DialogBox_Exchange>(DialogBoxId::Exchange)->m_slots[0].v3,  // Amount
 					0, 0);
 				play_sound_effect('E', 14, 5);
-				m_game->m_dialog_box_manager.Info(DialogBoxId::Exchange).m_mode = 2;
-				Info().m_mode = 2;
+				get_dialog_box_as<DialogBox_Exchange>(DialogBoxId::Exchange)->m_mode = DialogBox_Exchange::mode::confirmed;
+				m_mode = mode::waiting;
 			}
 			return true;
 		}
 
 		// No button
-		if ((mouse_x >= sX + 170) && (mouse_x <= sX + 170 + ui_layout::btn_size_x) && (mouse_y >= sY + 55) && (mouse_y <= sY + 55 + ui_layout::btn_size_y))
+		if (mouse_in(btn_no))
 		{
 			disable_this_dialog();
 			disable_dialog_box(DialogBoxId::Exchange);
@@ -78,7 +80,7 @@ bool DialogBox_ConfirmExchange::on_click(short mouse_x, short mouse_y)
 		}
 		break;
 
-	case 2: // Waiting for other side to confirm
+	case mode::waiting:
 		break;
 	}
 

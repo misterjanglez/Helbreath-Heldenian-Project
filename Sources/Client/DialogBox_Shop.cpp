@@ -20,17 +20,21 @@ DialogBox_Shop::DialogBox_Shop(CGame* game)
     set_default_rect(70 , 50 , 258, 339);
 }
 
-void DialogBox_Shop::on_draw(short mouse_x, short mouse_y, short z, char lb)
+void DialogBox_Shop::on_draw()
 {
-    short sX = m_game->m_dialog_box_manager.Info(DialogBoxId::SaleMenu).m_x;
-    short sY = m_game->m_dialog_box_manager.Info(DialogBoxId::SaleMenu).m_y;
+	short mouse_x = static_cast<short>(hb::shared::input::get_mouse_x());
+	short mouse_y = static_cast<short>(hb::shared::input::get_mouse_y());
+	short z = static_cast<short>(hb::shared::input::get_mouse_wheel_delta());
+	char lb = hb::shared::input::is_mouse_button_down(hb::shared::input::MouseButton::Left) ? 1 : 0;
+    short sX = m_x;
+    short sY = m_y;
 
     m_game->draw_new_dialog_box(InterfaceNdGame2, sX, sY, 2);
     m_game->draw_new_dialog_box(InterfaceNdText, sX, sY, 11);
 
-    switch (m_game->m_dialog_box_manager.Info(DialogBoxId::SaleMenu).m_mode) {
+    switch (m_mode) {
     case 0:
-        draw_item_list(sX, sY, mouse_x, mouse_y, z, lb);
+        draw_item_list(sX, sY);
         break;
     default:
         draw_item_details(sX, sY, mouse_x, mouse_y, z);
@@ -38,8 +42,12 @@ void DialogBox_Shop::on_draw(short mouse_x, short mouse_y, short z, char lb)
     }
 }
 
-void DialogBox_Shop::draw_item_list(short sX, short sY, short mouse_x, short mouse_y, short z, char lb)
+void DialogBox_Shop::draw_item_list(short sX, short sY)
 {
+	short mouse_x = static_cast<short>(hb::shared::input::get_mouse_x());
+	short mouse_y = static_cast<short>(hb::shared::input::get_mouse_y());
+	short z = static_cast<short>(hb::shared::input::get_mouse_wheel_delta());
+	char lb = hb::shared::input::is_mouse_button_down(hb::shared::input::MouseButton::Left) ? 1 : 0;
     int total_lines = 0;
     int pointer_loc;
     double d1, d2, d3;
@@ -51,7 +59,7 @@ void DialogBox_Shop::draw_item_list(short sX, short sY, short mouse_x, short mou
         if (shop_manager::get().get_item_list()[i] != 0) total_lines++;
 
     if (total_lines > 13) {
-        d1 = static_cast<double>(m_game->m_dialog_box_manager.Info(DialogBoxId::SaleMenu).m_view);
+        d1 = static_cast<double>(m_scroll_offset);
         d2 = static_cast<double>(total_lines - 13);
         d3 = (274.0f * d1) / d2;
         pointer_loc = static_cast<int>(d3);
@@ -61,26 +69,26 @@ void DialogBox_Shop::draw_item_list(short sX, short sY, short mouse_x, short mou
     else pointer_loc = 0;
 
     if (lb != 0 && total_lines > 13) {
-        if ((m_game->m_dialog_box_manager.get_top_dialog_box_index() == DialogBoxId::SaleMenu)) {
+        if ((m_game->m_dialog_box_manager.get_top_id() == DialogBoxId::SaleMenu)) {
             if ((mouse_x >= sX + 235) && (mouse_x <= sX + 260) && (mouse_y >= sY + 10) && (mouse_y <= sY + 330)) {
                 d1 = static_cast<double>(mouse_y - (sY + 35));
                 d2 = static_cast<double>(total_lines - 13);
                 d3 = (d1 * d2) / 274.0f;
-                m_game->m_dialog_box_manager.Info(DialogBoxId::SaleMenu).m_view = static_cast<int>(d3 + 0.5);
+                m_scroll_offset = static_cast<int>(d3 + 0.5);
             }
         }
     }
-    else m_game->m_dialog_box_manager.Info(DialogBoxId::SaleMenu).m_is_scroll_selected = false;
+    else m_is_scroll_selected = false;
 
-    if (m_game->m_dialog_box_manager.get_top_dialog_box_index() == DialogBoxId::SaleMenu && z != 0) {
-        m_game->m_dialog_box_manager.Info(DialogBoxId::SaleMenu).m_view = m_game->m_dialog_box_manager.Info(DialogBoxId::SaleMenu).m_view - z / 60;
+    if (m_game->m_dialog_box_manager.get_top_id() == DialogBoxId::SaleMenu && z != 0) {
+        m_scroll_offset = m_scroll_offset - z / 60;
 
     }
 
-    if (total_lines > 13 && m_game->m_dialog_box_manager.Info(DialogBoxId::SaleMenu).m_view > total_lines - 13)
-        m_game->m_dialog_box_manager.Info(DialogBoxId::SaleMenu).m_view = total_lines - 13;
-    if (m_game->m_dialog_box_manager.Info(DialogBoxId::SaleMenu).m_view < 0 || total_lines < 13)
-        m_game->m_dialog_box_manager.Info(DialogBoxId::SaleMenu).m_view = 0;
+    if (total_lines > 13 && m_scroll_offset > total_lines - 13)
+        m_scroll_offset = total_lines - 13;
+    if (m_scroll_offset < 0 || total_lines < 13)
+        m_scroll_offset = 0;
 
     hb::shared::text::draw_text_aligned(GameFont::Default, sX + 22, sY + 45, (sX + 165) - (sX + 22), 15, DRAW_DIALOGBOX_SHOP1, hb::shared::text::TextStyle::from_color(GameColors::UIBlack), hb::shared::text::Align::TopCenter); // "ITEM"
     hb::shared::text::draw_text_aligned(GameFont::Default, sX + 23, sY + 45, (sX + 166) - (sX + 23), 15, DRAW_DIALOGBOX_SHOP1, hb::shared::text::TextStyle::from_color(GameColors::UIBlack), hb::shared::text::Align::TopCenter);
@@ -89,9 +97,9 @@ void DialogBox_Shop::draw_item_list(short sX, short sY, short mouse_x, short mou
 
     // draw item names
     for (int i = 0; i < 13; i++)
-        if (((i + m_game->m_dialog_box_manager.Info(DialogBoxId::SaleMenu).m_view) < game_limits::max_menu_items) &&
-            (shop_manager::get().get_item_list()[i + m_game->m_dialog_box_manager.Info(DialogBoxId::SaleMenu).m_view] != 0)) {
-            auto itemInfo = item_name_formatter::get().format(shop_manager::get().get_item_list()[i + m_game->m_dialog_box_manager.Info(DialogBoxId::SaleMenu).m_view].get());
+        if (((i + m_scroll_offset) < game_limits::max_menu_items) &&
+            (shop_manager::get().get_item_list()[i + m_scroll_offset] != 0)) {
+            auto itemInfo = item_name_formatter::get().format(shop_manager::get().get_item_list()[i + m_scroll_offset].get());
             if ((mouse_x >= sX + 20) && (mouse_x <= sX + 220) && (mouse_y >= sY + i * 18 + 65) && (mouse_y <= sY + i * 18 + 79)) {
                 hb::shared::text::draw_text_aligned(GameFont::Default, sX + 10, sY + i * 18 + 65, (sX + 190) - (sX + 10), 15, itemInfo.name.c_str(), hb::shared::text::TextStyle::from_color(GameColors::UIWhite), hb::shared::text::Align::TopCenter);
             }
@@ -100,19 +108,19 @@ void DialogBox_Shop::draw_item_list(short sX, short sY, short mouse_x, short mou
 
     // draw prices
     for (int i = 0; i < 13; i++)
-        if (((i + m_game->m_dialog_box_manager.Info(DialogBoxId::SaleMenu).m_view) < game_limits::max_menu_items) &&
-            (shop_manager::get().get_item_list()[i + m_game->m_dialog_box_manager.Info(DialogBoxId::SaleMenu).m_view] != 0)) {
+        if (((i + m_scroll_offset) < game_limits::max_menu_items) &&
+            (shop_manager::get().get_item_list()[i + m_scroll_offset] != 0)) {
             discount_ratio = ((m_game->m_player->m_charisma - 10) / 4);
             tmp1 = static_cast<double>(discount_ratio);
             tmp2 = tmp1 / 100.0f;
-            tmp1 = static_cast<double>(shop_manager::get().get_item_list()[i + m_game->m_dialog_box_manager.Info(DialogBoxId::SaleMenu).m_view]->m_price);
+            tmp1 = static_cast<double>(shop_manager::get().get_item_list()[i + m_scroll_offset]->m_price);
             tmp3 = tmp1 * tmp2;
             discount_cost = static_cast<int>(tmp3);
-            cost = static_cast<int>(shop_manager::get().get_item_list()[i + m_game->m_dialog_box_manager.Info(DialogBoxId::SaleMenu).m_view]->m_price * ((100 + m_game->m_discount) / 100.));
+            cost = static_cast<int>(shop_manager::get().get_item_list()[i + m_scroll_offset]->m_price * ((100 + m_game->m_discount) / 100.));
             cost = cost - discount_cost;
 
-            if (cost < static_cast<int>(shop_manager::get().get_item_list()[i + m_game->m_dialog_box_manager.Info(DialogBoxId::SaleMenu).m_view]->m_price / 2))
-                cost = static_cast<int>(shop_manager::get().get_item_list()[i + m_game->m_dialog_box_manager.Info(DialogBoxId::SaleMenu).m_view]->m_price / 2) - 1;
+            if (cost < static_cast<int>(shop_manager::get().get_item_list()[i + m_scroll_offset]->m_price / 2))
+                cost = static_cast<int>(shop_manager::get().get_item_list()[i + m_scroll_offset]->m_price / 2) - 1;
 
             std::snprintf(temp, sizeof(temp), "%6d", cost);
             if ((mouse_x >= sX + 20) && (mouse_x <= sX + 220) && (mouse_y >= sY + i * 18 + 65) && (mouse_y <= sY + i * 18 + 79))
@@ -141,7 +149,7 @@ int DialogBox_Shop::calculate_discounted_price(int item_index)
 void DialogBox_Shop::draw_item_details(short sX, short sY, short mouse_x, short mouse_y, short z)
 {
     uint32_t time = m_game->m_cur_time;
-    int item_index = m_game->m_dialog_box_manager.Info(DialogBoxId::SaleMenu).m_mode - 1;
+    int item_index = m_mode - 1;
     bool flag_stat_low = false;
     bool flag_red_shown = false;
 
@@ -192,11 +200,11 @@ void DialogBox_Shop::draw_item_details(short sX, short sY, short mouse_x, short 
     draw_quantity_selector(sX, sY, mouse_x, mouse_y, z);
 
     // draw buttons
-    if ((mouse_x >= sX + ui_layout::left_btn_x) && (mouse_x <= sX + ui_layout::left_btn_x + ui_layout::btn_size_x) && (mouse_y >= sY + ui_layout::btn_y) && (mouse_y <= sY + ui_layout::btn_y + ui_layout::btn_size_y))
+    if (mouse_in(btn_buy))
         m_game->draw_new_dialog_box(InterfaceNdButton, sX + ui_layout::left_btn_x, sY + ui_layout::btn_y, 31);
     else m_game->draw_new_dialog_box(InterfaceNdButton, sX + ui_layout::left_btn_x, sY + ui_layout::btn_y, 30);
 
-    if ((mouse_x >= sX + ui_layout::right_btn_x) && (mouse_x <= sX + ui_layout::right_btn_x + ui_layout::btn_size_x) && (mouse_y >= sY + ui_layout::btn_y) && (mouse_y <= sY + ui_layout::btn_y + ui_layout::btn_size_y))
+    if (mouse_in(btn_cancel))
         m_game->draw_new_dialog_box(InterfaceNdButton, sX + ui_layout::right_btn_x, sY + ui_layout::btn_y, 17);
     else m_game->draw_new_dialog_box(InterfaceNdButton, sX + ui_layout::right_btn_x, sY + ui_layout::btn_y, 16);
 }
@@ -391,29 +399,29 @@ void DialogBox_Shop::draw_quantity_selector(short sX, short sY, short mouse_x, s
     hb::shared::text::draw_text(GameFont::Default, sX + 123 - 35, sY + 237 - 10, DRAW_DIALOGBOX_SHOP27, hb::shared::text::TextStyle::from_color(GameColors::UILabel)); // "Quantity:"
     hb::shared::text::draw_text(GameFont::Default, sX + 124 - 35, sY + 237 - 10, DRAW_DIALOGBOX_SHOP27, hb::shared::text::TextStyle::from_color(GameColors::UILabel));
 
-    if (m_game->m_dialog_box_manager.get_top_dialog_box_index() == DialogBoxId::SaleMenu && z != 0) {
-        m_game->m_dialog_box_manager.Info(DialogBoxId::SaleMenu).m_v3 = m_game->m_dialog_box_manager.Info(DialogBoxId::SaleMenu).m_v3 + z / 60;
+    if (m_game->m_dialog_box_manager.get_top_id() == DialogBoxId::SaleMenu && z != 0) {
+        m_quantity = m_quantity + z / 60;
 
     }
 
-    if (m_game->m_dialog_box_manager.Info(DialogBoxId::SaleMenu).m_v3 > (50 - inventory_manager::get().get_total_item_count()))
-        m_game->m_dialog_box_manager.Info(DialogBoxId::SaleMenu).m_v3 = (50 - inventory_manager::get().get_total_item_count());
-    if (m_game->m_dialog_box_manager.Info(DialogBoxId::SaleMenu).m_v3 < 1)
-        m_game->m_dialog_box_manager.Info(DialogBoxId::SaleMenu).m_v3 = 1;
+    if (m_quantity > (50 - inventory_manager::get().get_total_item_count()))
+        m_quantity = (50 - inventory_manager::get().get_total_item_count());
+    if (m_quantity < 1)
+        m_quantity = 1;
 
-    if (m_game->m_dialog_box_manager.Info(DialogBoxId::SaleMenu).m_v3 >= 10) {
-        std::snprintf(temp, sizeof(temp), "%d", m_game->m_dialog_box_manager.Info(DialogBoxId::SaleMenu).m_v3);
+    if (m_quantity >= 10) {
+        std::snprintf(temp, sizeof(temp), "%d", m_quantity);
         temp[1] = 0;
         hb::shared::text::draw_text(GameFont::Default, sX - 35 + 186, sY - 10 + 237, temp, hb::shared::text::TextStyle::from_color(GameColors::UILabel));
         hb::shared::text::draw_text(GameFont::Default, sX - 35 + 187, sY - 10 + 237, temp, hb::shared::text::TextStyle::from_color(GameColors::UILabel));
-        std::snprintf(temp, sizeof(temp), "%d", m_game->m_dialog_box_manager.Info(DialogBoxId::SaleMenu).m_v3);
+        std::snprintf(temp, sizeof(temp), "%d", m_quantity);
         hb::shared::text::draw_text(GameFont::Default, sX - 35 + 200, sY - 10 + 237, (temp + 1), hb::shared::text::TextStyle::from_color(GameColors::UILabel));
         hb::shared::text::draw_text(GameFont::Default, sX - 35 + 201, sY - 10 + 237, (temp + 1), hb::shared::text::TextStyle::from_color(GameColors::UILabel));
     }
     else {
         hb::shared::text::draw_text(GameFont::Default, sX - 35 + 186, sY - 10 + 237, "0", hb::shared::text::TextStyle::from_color(GameColors::UILabel));
         hb::shared::text::draw_text(GameFont::Default, sX - 35 + 187, sY - 10 + 237, "0", hb::shared::text::TextStyle::from_color(GameColors::UILabel));
-        std::snprintf(temp, sizeof(temp), "%d", m_game->m_dialog_box_manager.Info(DialogBoxId::SaleMenu).m_v3);
+        std::snprintf(temp, sizeof(temp), "%d", m_quantity);
         hb::shared::text::draw_text(GameFont::Default, sX - 35 + 200, sY - 10 + 237, (temp), hb::shared::text::TextStyle::from_color(GameColors::UILabel));
         hb::shared::text::draw_text(GameFont::Default, sX - 35 + 201, sY - 10 + 237, (temp), hb::shared::text::TextStyle::from_color(GameColors::UILabel));
     }
@@ -421,22 +429,26 @@ void DialogBox_Shop::draw_quantity_selector(short sX, short sY, short mouse_x, s
     m_game->m_sprite[InterfaceNdGame2]->draw(sX + 170, sY + 244, 20);
 }
 
-bool DialogBox_Shop::on_click(short mouse_x, short mouse_y)
+bool DialogBox_Shop::on_click()
 {
-    short sX = m_game->m_dialog_box_manager.Info(DialogBoxId::SaleMenu).m_x;
-    short sY = m_game->m_dialog_box_manager.Info(DialogBoxId::SaleMenu).m_y;
+	short mouse_x = static_cast<short>(hb::shared::input::get_mouse_x());
+	short mouse_y = static_cast<short>(hb::shared::input::get_mouse_y());
+    short sX = m_x;
+    short sY = m_y;
 
-    switch (m_game->m_dialog_box_manager.Info(DialogBoxId::SaleMenu).m_mode) {
+    switch (m_mode) {
     case 0:
-        return on_click_item_list(sX, sY, mouse_x, mouse_y);
+        return on_click_item_list(sX, sY);
     default:
-        return on_click_item_details(sX, sY, mouse_x, mouse_y);
+        return on_click_item_details(sX, sY);
     }
     return false;
 }
 
-bool DialogBox_Shop::on_click_item_list(short sX, short sY, short mouse_x, short mouse_y)
+bool DialogBox_Shop::on_click_item_list(short sX, short sY)
 {
+	short mouse_x = static_cast<short>(hb::shared::input::get_mouse_x());
+	short mouse_y = static_cast<short>(hb::shared::input::get_mouse_y());
     for (int i = 0; i < 13; i++)
         if ((mouse_x >= sX + 20) && (mouse_x <= sX + 220) && (mouse_y >= sY + i * 18 + 65) && (mouse_y <= sY + i * 18 + 79)) {
             if (inventory_manager::get().get_total_item_count() >= 50) {
@@ -445,72 +457,72 @@ bool DialogBox_Shop::on_click_item_list(short sX, short sY, short mouse_x, short
             }
 
             m_game->play_game_sound('E', 14, 5);
-            if (shop_manager::get().get_item_list()[m_game->m_dialog_box_manager.Info(DialogBoxId::SaleMenu).m_view + i] != 0)
-                m_game->m_dialog_box_manager.Info(DialogBoxId::SaleMenu).m_mode = m_game->m_dialog_box_manager.Info(DialogBoxId::SaleMenu).m_view + i + 1;
+            if (shop_manager::get().get_item_list()[m_scroll_offset + i] != 0)
+                m_mode = m_scroll_offset + i + 1;
             return true;
         }
     return false;
 }
 
-bool DialogBox_Shop::on_click_item_details(short sX, short sY, short mouse_x, short mouse_y)
+bool DialogBox_Shop::on_click_item_details(short sX, short sY)
 {
     char temp[hb::shared::limits::ItemNameLen];
 
     // +10 quantity button
-    if ((mouse_x >= sX + 145) && (mouse_x <= sX + 162) && (mouse_y >= sY + 209) && (mouse_y <= sY + 230)) {
-        m_game->m_dialog_box_manager.Info(DialogBoxId::SaleMenu).m_v3 += 10;
-        if (m_game->m_dialog_box_manager.Info(DialogBoxId::SaleMenu).m_v3 >= (50 - inventory_manager::get().get_total_item_count()))
-            m_game->m_dialog_box_manager.Info(DialogBoxId::SaleMenu).m_v3 = (50 - inventory_manager::get().get_total_item_count());
+    if (mouse_in(btn_qty_up_10)) {
+        m_quantity += 10;
+        if (m_quantity >= (50 - inventory_manager::get().get_total_item_count()))
+            m_quantity = (50 - inventory_manager::get().get_total_item_count());
         return true;
     }
 
     // -10 quantity button
-    if ((mouse_x >= sX + 145) && (mouse_x <= sX + 162) && (mouse_y >= sY + 234) && (mouse_y <= sY + 251)) {
-        m_game->m_dialog_box_manager.Info(DialogBoxId::SaleMenu).m_v3 -= 10;
-        if (m_game->m_dialog_box_manager.Info(DialogBoxId::SaleMenu).m_v3 <= 1)
-            m_game->m_dialog_box_manager.Info(DialogBoxId::SaleMenu).m_v3 = 1;
+    if (mouse_in(btn_qty_down_10)) {
+        m_quantity -= 10;
+        if (m_quantity <= 1)
+            m_quantity = 1;
         return true;
     }
 
     // +1 quantity button
-    if ((mouse_x >= sX + 163) && (mouse_x <= sX + 180) && (mouse_y >= sY + 209) && (mouse_y <= sY + 230)) {
-        m_game->m_dialog_box_manager.Info(DialogBoxId::SaleMenu).m_v3++;
-        if (m_game->m_dialog_box_manager.Info(DialogBoxId::SaleMenu).m_v3 >= (50 - inventory_manager::get().get_total_item_count()))
-            m_game->m_dialog_box_manager.Info(DialogBoxId::SaleMenu).m_v3 = (50 - inventory_manager::get().get_total_item_count());
+    if (mouse_in(btn_qty_up_1)) {
+        m_quantity++;
+        if (m_quantity >= (50 - inventory_manager::get().get_total_item_count()))
+            m_quantity = (50 - inventory_manager::get().get_total_item_count());
         return true;
     }
 
     // -1 quantity button
-    if ((mouse_x >= sX + 163) && (mouse_x <= sX + 180) && (mouse_y >= sY + 234) && (mouse_y <= sY + 251)) {
-        m_game->m_dialog_box_manager.Info(DialogBoxId::SaleMenu).m_v3--;
-        if (m_game->m_dialog_box_manager.Info(DialogBoxId::SaleMenu).m_v3 <= 1)
-            m_game->m_dialog_box_manager.Info(DialogBoxId::SaleMenu).m_v3 = 1;
+    if (mouse_in(btn_qty_down_1)) {
+        m_quantity--;
+        if (m_quantity <= 1)
+            m_quantity = 1;
         return true;
     }
 
     // Purchase button
-    if ((mouse_x >= sX + 30) && (mouse_x <= sX + 30 + ui_layout::btn_size_x) && (mouse_y >= sY + ui_layout::btn_y) && (mouse_y <= sY + ui_layout::btn_y + ui_layout::btn_size_y)) {
-        if ((50 - inventory_manager::get().get_total_item_count()) < m_game->m_dialog_box_manager.Info(DialogBoxId::SaleMenu).m_v3) {
+    if (mouse_in(btn_buy)) {
+        if ((50 - inventory_manager::get().get_total_item_count()) < m_quantity) {
             m_game->add_event_list(DLGBOX_CLICK_SHOP1, 10);//"ou cannot buy anything because your bag is full."
         }
         else {
             std::memset(temp, 0, sizeof(temp));
-            CItem* shop_item = shop_manager::get().get_item_list()[m_game->m_dialog_box_manager.Info(DialogBoxId::SaleMenu).m_mode - 1].get();
+            CItem* shop_item = shop_manager::get().get_item_list()[m_mode - 1].get();
             std::snprintf(temp, sizeof(temp), "%s", shop_item->m_name);
             // Send item ID in v2 for reliable item lookup on server
             int item_id = shop_item->m_id_num;
-            m_game->send_command(MsgId::CommandCommon, CommonType::ReqPurchaseItem, 0, m_game->m_dialog_box_manager.Info(DialogBoxId::SaleMenu).m_v3, item_id, 0, temp);
+            m_game->send_command(MsgId::CommandCommon, CommonType::ReqPurchaseItem, 0, m_quantity, item_id, 0, temp);
         }
-        m_game->m_dialog_box_manager.Info(DialogBoxId::SaleMenu).m_mode = 0;
-        m_game->m_dialog_box_manager.Info(DialogBoxId::SaleMenu).m_v3 = 1;
+        m_mode = 0;
+        m_quantity = 1;
         m_game->play_game_sound('E', 14, 5);
         return true;
     }
 
     // Cancel button
-    if ((mouse_x >= sX + 154) && (mouse_x <= sX + 154 + ui_layout::btn_size_x) && (mouse_y >= sY + ui_layout::btn_y) && (mouse_y <= sY + ui_layout::btn_y + ui_layout::btn_size_y)) {
-        m_game->m_dialog_box_manager.Info(DialogBoxId::SaleMenu).m_mode = 0;
-        m_game->m_dialog_box_manager.Info(DialogBoxId::SaleMenu).m_v3 = 1;
+    if (mouse_in(btn_cancel)) {
+        m_mode = 0;
+        m_quantity = 1;
         m_game->play_game_sound('E', 14, 5);
         return true;
     }
@@ -518,15 +530,12 @@ bool DialogBox_Shop::on_click_item_details(short sX, short sY, short mouse_x, sh
     return false;
 }
 
-PressResult DialogBox_Shop::on_press(short mouse_x, short mouse_y)
+PressResult DialogBox_Shop::on_press()
 {
-    short sX = Info().m_x;
-    short sY = Info().m_y;
-
     // Only claim scroll in item list mode (mode == 0)
-    if (Info().m_mode == 0)
+    if (m_mode == 0)
     {
-        if ((mouse_x >= sX + 240) && (mouse_x <= sX + 260) && (mouse_y >= sY + 20) && (mouse_y <= sY + 330))
+        if (mouse_in(area_scroll))
         {
             return PressResult::ScrollClaimed;
         }
@@ -535,3 +544,35 @@ PressResult DialogBox_Shop::on_press(short mouse_x, short mouse_y)
     return PressResult::Normal;
 }
 
+bool DialogBox_Shop::on_enable(int type, int64_t v1, int v2, const char* string)
+{
+	if (is_enabled()) return true;
+	switch (type) {
+	case 0:
+		break;
+	default:
+		if (shop_manager::get().has_items()) {
+			m_npc_id = type;
+			m_mode = 0;
+			m_scroll_offset = 0;
+			m_items_loaded = true;
+			m_quantity = 1;
+		} else {
+			shop_manager::get().set_pending_npc_config_id(type);
+			shop_manager::get().request_shop_menu(type);
+		}
+		break;
+	}
+	return true;
+}
+
+bool DialogBox_Shop::on_disable()
+{
+	shop_manager::get().clear_items();
+	auto& give = m_game->m_dialog_box_manager.m_give_item;
+	give.action_type = 0;
+	give.object_id = 0;
+	give.target_x = 0;
+	give.target_y = 0;
+	return true;
+}

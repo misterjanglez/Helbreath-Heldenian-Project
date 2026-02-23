@@ -1,4 +1,4 @@
-﻿#include "DialogBox_Commander.h"
+#include "DialogBox_Commander.h"
 #include "Game.h"
 #include "TeleportManager.h"
 #include "lan_eng.h"
@@ -9,6 +9,7 @@
 #include "GameFonts.h"
 #include "TextLibExt.h"
 #include <format>
+#include "IInput.h"
 
 using namespace hb::shared::net;
 using namespace hb::client::sprite_id;
@@ -16,7 +17,7 @@ DialogBox_Commander::DialogBox_Commander(CGame* game)
 	: IDialogBox(DialogBoxId::CrusadeCommander, game)
 {
 	set_default_rect(20 , 20 , 310, 386);
-	set_can_close_on_right_click(false);
+	m_can_close_on_right_click = false;
 }
 
 void DialogBox_Commander::on_update()
@@ -30,20 +31,22 @@ void DialogBox_Commander::on_update()
 	}
 }
 
-void DialogBox_Commander::on_draw(short mouse_x, short mouse_y, short z, char lb)
+void DialogBox_Commander::on_draw()
 {
+	short mouse_x = static_cast<short>(hb::shared::input::get_mouse_x());
+	short mouse_y = static_cast<short>(hb::shared::input::get_mouse_y());
 	short sX, sY, size_x, size_y, MapSzX, MapSzY;
 	double v1, v2, v3;
 	int i, tX, tY;
-	sX = Info().m_x;
-	sY = Info().m_y;
-	size_x = Info().m_size_x;
+	sX = m_x;
+	sY = m_y;
+	size_x = m_size_x;
 
 	draw_new_dialog_box(InterfaceNdCrusade, sX, sY - 5, 0, false, config_manager::get().is_dialog_transparency_enabled());
 	draw_new_dialog_box(InterfaceNdText, sX, sY, 15, false, config_manager::get().is_dialog_transparency_enabled());
 
-	switch (Info().m_mode) {
-	case 0: // Main dlg
+	switch (m_mode) {
+	case mode::main:
 		m_game->m_sprite[InterfaceNdCrusade]->draw(sX + 20, sY + 340, 3);
 		m_game->m_sprite[InterfaceNdCrusade]->draw(sX + 20 + 50, sY + 340, 1);
 		m_game->m_sprite[InterfaceNdCrusade]->draw(sX + 20 + 100, sY + 340, 2);
@@ -51,27 +54,27 @@ void DialogBox_Commander::on_draw(short mouse_x, short mouse_y, short z, char lb
 		m_game->m_sprite[InterfaceNdCrusade]->draw(sX + 20 + 150 + 74, sY + 340, 4);
 		put_aligned_string(sX, sX + size_x, sY + 37, DRAW_DIALOGBOX_COMMANDER1);
 
-		if ((mouse_x >= sX + 20) && (mouse_x <= sX + 20 + 46) && (mouse_y >= sY + 340) && (mouse_y <= sY + 340 + 52))
+		if (mouse_in(btn_set_tp))
 		{
 			m_game->m_sprite[InterfaceNdCrusade]->draw(sX + 20, sY + 340, 17);
 			hb::shared::text::draw_text(GameFont::Default, mouse_x + 20, mouse_y + 35, DRAW_DIALOGBOX_COMMANDER2, hb::shared::text::TextStyle::with_shadow(GameColors::UIWhite));
 		}
-		else if ((mouse_x >= sX + 20 + 50) && (mouse_x <= sX + 20 + 46 + 50) && (mouse_y >= sY + 340) && (mouse_y <= sY + 340 + 52))
+		else if (mouse_in(btn_use_tp))
 		{
 			m_game->m_sprite[InterfaceNdCrusade]->draw(sX + 20 + 50, sY + 340, 15);
 			hb::shared::text::draw_text(GameFont::Default, mouse_x + 20, mouse_y + 35, DRAW_DIALOGBOX_COMMANDER3, hb::shared::text::TextStyle::with_shadow(GameColors::UIWhite));
 		}
-		else if ((mouse_x >= sX + 20 + 100) && (mouse_x <= sX + 20 + 46 + 100) && (mouse_y >= sY + 340) && (mouse_y <= sY + 340 + 52))
+		else if (mouse_in(btn_summon))
 		{
 			m_game->m_sprite[InterfaceNdCrusade]->draw(sX + 20 + 100, sY + 340, 16);
 			hb::shared::text::draw_text(GameFont::Default, mouse_x + 20, mouse_y + 35, DRAW_DIALOGBOX_COMMANDER4, hb::shared::text::TextStyle::with_shadow(GameColors::UIWhite));
 		}
-		else if ((mouse_x >= sX + 20 + 150) && (mouse_x <= sX + 20 + 46 + 150) && (mouse_y >= sY + 340) && (mouse_y <= sY + 340 + 52))
+		else if (mouse_in(btn_set_construct))
 		{
 			m_game->m_sprite[InterfaceNdCrusade]->draw(sX + 20 + 150, sY + 340, 24);
 			hb::shared::text::draw_text(GameFont::Default, mouse_x + 20, mouse_y + 35, DRAW_DIALOGBOX_COMMANDER5, hb::shared::text::TextStyle::with_shadow(GameColors::UIWhite));
 		}
-		else if ((mouse_x >= sX + 20 + 150 + 74) && (mouse_x <= sX + 20 + 46 + 150 + 74) && (mouse_y >= sY + 340) && (mouse_y <= sY + 340 + 52))
+		else if (mouse_in(btn_help))
 		{
 			m_game->m_sprite[InterfaceNdCrusade]->draw(sX + 20 + 150 + 74, sY + 340, 18);
 			hb::shared::text::draw_text(GameFont::Default, mouse_x + 20, mouse_y + 35, DRAW_DIALOGBOX_COMMANDER6, hb::shared::text::TextStyle::with_shadow(GameColors::UIWhite));
@@ -79,46 +82,46 @@ void DialogBox_Commander::on_draw(short mouse_x, short mouse_y, short z, char lb
 		draw_new_dialog_box(InterfaceNdCrusade, sX, sY, 21, false, config_manager::get().is_dialog_transparency_enabled());
 		break;
 
-	case 1: // Set TP
+	case mode::set_tp:
 		m_game->m_sprite[InterfaceNdCrusade]->draw(sX + 20 + 100 + 74, sY + 340, 20);
 		m_game->m_sprite[InterfaceNdCrusade]->draw(sX + 20 + 150 + 74, sY + 340, 4);
 		put_aligned_string(sX, sX + size_x, sY + 40, DRAW_DIALOGBOX_COMMANDER7);
 
-		if ((mouse_x >= sX + 20 + 150 + 74 - 50) && (mouse_x <= sX + 20 + 46 + 150 + 74 - 50) && (mouse_y >= sY + 340) && (mouse_y <= sY + 340 + 52))
+		if (mouse_in(btn_back))
 		{
 			m_game->m_sprite[InterfaceNdCrusade]->draw(sX + 20 + 100 + 74, sY + 340, 19);
 			hb::shared::text::draw_text(GameFont::Default, mouse_x + 20, mouse_y + 35, DRAW_DIALOGBOX_COMMANDER8, hb::shared::text::TextStyle::with_shadow(GameColors::UIWhite));
 		}
-		else if ((mouse_x >= sX + 20 + 150 + 74) && (mouse_x <= sX + 20 + 46 + 150 + 74) && (mouse_y >= sY + 340) && (mouse_y <= sY + 340 + 52))
+		else if (mouse_in(btn_help))
 		{
 			m_game->m_sprite[InterfaceNdCrusade]->draw(sX + 20 + 150 + 74, sY + 340, 18);
 			hb::shared::text::draw_text(GameFont::Default, mouse_x + 20, mouse_y + 35, DRAW_DIALOGBOX_COMMANDER9, hb::shared::text::TextStyle::with_shadow(GameColors::UIWhite));
 		}
 		draw_new_dialog_box(InterfaceNdCrusade, sX, sY, 21, false, config_manager::get().is_dialog_transparency_enabled());
 
-		if ((mouse_x >= sX + 15) && (mouse_x <= sX + 15 + 278) && (mouse_y >= sY + 60) && (mouse_y <= sY + 60 + 272))
+		if (mouse_in(area_map))
 		{
 			draw_new_dialog_box(InterfaceNdCrusade, mouse_x, mouse_y, 42, false, true);
 		}
 		break;
 
-	case 2: // Use TP
+	case mode::use_tp:
 		m_game->m_sprite[InterfaceNdCrusade]->draw(sX + 20 + 50, sY + 340, 1);
 		m_game->m_sprite[InterfaceNdCrusade]->draw(sX + 20 + 100 + 74, sY + 340, 20);
 		m_game->m_sprite[InterfaceNdCrusade]->draw(sX + 20 + 150 + 74, sY + 340, 4);
 		put_aligned_string(sX, sX + size_x, sY + 40, DRAW_DIALOGBOX_COMMANDER10);
 
-		if ((mouse_x >= sX + 20 + 50) && (mouse_x <= sX + 20 + 46 + 50) && (mouse_y >= sY + 340) && (mouse_y <= sY + 340 + 52))
+		if (mouse_in(btn_use_tp))
 		{
 			m_game->m_sprite[InterfaceNdCrusade]->draw(sX + 20 + 50, sY + 340, 15);
 			hb::shared::text::draw_text(GameFont::Default, mouse_x + 20, mouse_y + 35, DRAW_DIALOGBOX_COMMANDER11, hb::shared::text::TextStyle::with_shadow(GameColors::UIWhite));
 		}
-		else if ((mouse_x >= sX + 20 + 150 + 74 - 50) && (mouse_x <= sX + 20 + 46 + 150 + 74 - 50) && (mouse_y >= sY + 340) && (mouse_y <= sY + 340 + 52))
+		else if (mouse_in(btn_back))
 		{
 			m_game->m_sprite[InterfaceNdCrusade]->draw(sX + 20 + 100 + 74, sY + 340, 19);
 			hb::shared::text::draw_text(GameFont::Default, mouse_x + 20, mouse_y + 35, DRAW_DIALOGBOX_COMMANDER12, hb::shared::text::TextStyle::with_shadow(GameColors::UIWhite));
 		}
-		else if ((mouse_x >= sX + 20 + 150 + 74) && (mouse_x <= sX + 20 + 46 + 150 + 74) && (mouse_y >= sY + 340) && (mouse_y <= sY + 340 + 52))
+		else if (mouse_in(btn_help))
 		{
 			m_game->m_sprite[InterfaceNdCrusade]->draw(sX + 20 + 150 + 74, sY + 340, 18);
 			hb::shared::text::draw_text(GameFont::Default, mouse_x + 20, mouse_y + 35, DRAW_DIALOGBOX_COMMANDER13, hb::shared::text::TextStyle::with_shadow(GameColors::UIWhite));
@@ -126,7 +129,7 @@ void DialogBox_Commander::on_draw(short mouse_x, short mouse_y, short z, char lb
 		draw_new_dialog_box(InterfaceNdCrusade, sX, sY, 21, false, config_manager::get().is_dialog_transparency_enabled());
 		break;
 
-	case 3: { // Choose summon
+	case mode::summon: {
 		if ((m_game->m_player->m_citizen == true) && (m_game->m_player->m_aresden == true))
 		{
 			m_game->m_sprite[InterfaceNdCrusade]->draw(sX + 20, sY + 220, 6);
@@ -151,7 +154,7 @@ void DialogBox_Commander::on_draw(short mouse_x, short mouse_y, short z, char lb
 
 		if ((m_game->m_player->m_citizen == true) && (m_game->m_player->m_aresden == true))
 		{
-			if ((mouse_x >= sX + 20) && (mouse_x <= sX + 20 + 46) && (mouse_y >= sY + 220) && (mouse_y <= sY + 220 + 50))
+			if (mouse_in(btn_unit_1))
 			{
 				if (m_game->m_player->m_construction_point >= 3000)
 				{
@@ -160,7 +163,7 @@ void DialogBox_Commander::on_draw(short mouse_x, short mouse_y, short z, char lb
 				hb::shared::text::draw_text(GameFont::Default, mouse_x + 20, mouse_y + 35, DRAW_DIALOGBOX_COMMANDER16, hb::shared::text::TextStyle::with_shadow(GameColors::UIWhite));
 				hb::shared::text::draw_text(GameFont::Default, mouse_x + 20, mouse_y + 50, DRAW_DIALOGBOX_COMMANDER17, hb::shared::text::TextStyle::with_shadow(GameColors::UIWhite));
 			}
-			else if ((mouse_x >= sX + 20 + 50) && (mouse_x <= sX + 20 + 50 + 45) && (mouse_y >= sY + 220) && (mouse_y <= sY + 220 + 50))
+			else if (mouse_in(btn_unit_2))
 			{
 				if (m_game->m_player->m_construction_point >= 2000)
 				{
@@ -169,7 +172,7 @@ void DialogBox_Commander::on_draw(short mouse_x, short mouse_y, short z, char lb
 				hb::shared::text::draw_text(GameFont::Default, mouse_x + 20, mouse_y + 35, DRAW_DIALOGBOX_COMMANDER18, hb::shared::text::TextStyle::with_shadow(GameColors::UIWhite));
 				hb::shared::text::draw_text(GameFont::Default, mouse_x + 20, mouse_y + 50, DRAW_DIALOGBOX_COMMANDER19, hb::shared::text::TextStyle::with_shadow(GameColors::UIWhite));
 			}
-			else if ((mouse_x >= sX + 20 + 100) && (mouse_x <= sX + 20 + 100 + 45) && (mouse_y >= sY + 220) && (mouse_y <= sY + 220 + 50))
+			else if (mouse_in(btn_unit_3))
 			{
 				if (m_game->m_player->m_construction_point >= 1000)
 				{
@@ -178,7 +181,7 @@ void DialogBox_Commander::on_draw(short mouse_x, short mouse_y, short z, char lb
 				hb::shared::text::draw_text(GameFont::Default, mouse_x + 20, mouse_y + 35, DRAW_DIALOGBOX_COMMANDER20, hb::shared::text::TextStyle::with_shadow(GameColors::UIWhite));
 				hb::shared::text::draw_text(GameFont::Default, mouse_x + 20, mouse_y + 50, DRAW_DIALOGBOX_COMMANDER21, hb::shared::text::TextStyle::with_shadow(GameColors::UIWhite));
 			}
-			else if ((mouse_x >= sX + 20 + 150) && (mouse_x <= sX + 20 + 150 + 45) && (mouse_y >= sY + 220) && (mouse_y <= sY + 220 + 50))
+			else if (mouse_in(btn_unit_4))
 			{
 				if (m_game->m_player->m_construction_point >= 5000)
 				{
@@ -187,20 +190,20 @@ void DialogBox_Commander::on_draw(short mouse_x, short mouse_y, short z, char lb
 				hb::shared::text::draw_text(GameFont::Default, mouse_x + 20, mouse_y + 35, DRAW_DIALOGBOX_COMMANDER22, hb::shared::text::TextStyle::with_shadow(GameColors::UIWhite));
 				hb::shared::text::draw_text(GameFont::Default, mouse_x + 20, mouse_y + 50, DRAW_DIALOGBOX_COMMANDER23, hb::shared::text::TextStyle::with_shadow(GameColors::UIWhite));
 			}
-			else if ((mouse_x >= sX + 20) && (mouse_x <= sX + 380) && (mouse_y > sY + 140) && (mouse_y < sY + 160))
+			else if (mouse_in(link_faction_1))
 			{
 				hb::shared::text::draw_text(GameFont::Default, mouse_x + 20, mouse_y + 35, DRAW_DIALOGBOX_COMMANDER24, hb::shared::text::TextStyle::with_shadow(GameColors::UIWhite));
 			}
-			else if ((mouse_x >= sX + 20) && (mouse_x <= sX + 380) && (mouse_y > sY + 160) && (mouse_y < sY + 175))
+			else if (mouse_in(link_faction_2))
 			{
 				hb::shared::text::draw_text(GameFont::Default, mouse_x + 20, mouse_y + 35, DRAW_DIALOGBOX_COMMANDER25, hb::shared::text::TextStyle::with_shadow(GameColors::UIWhite));
 			}
-			else if ((mouse_x >= sX + 20 + 150 + 74 - 50) && (mouse_x <= sX + 20 + 46 + 150 + 74 - 50) && (mouse_y >= sY + 340) && (mouse_y <= sY + 340 + 52))
+			else if (mouse_in(btn_back))
 			{
 				m_game->m_sprite[InterfaceNdCrusade]->draw(sX + 20 + 100 + 74, sY + 340, 19);
 				hb::shared::text::draw_text(GameFont::Default, mouse_x + 20, mouse_y + 35, DRAW_DIALOGBOX_COMMANDER26, hb::shared::text::TextStyle::with_shadow(GameColors::UIWhite));
 			}
-			else if ((mouse_x >= sX + 20 + 150 + 74) && (mouse_x <= sX + 20 + 46 + 150 + 74) && (mouse_y >= sY + 340) && (mouse_y <= sY + 340 + 52))
+			else if (mouse_in(btn_help))
 			{
 				m_game->m_sprite[InterfaceNdCrusade]->draw(sX + 20 + 150 + 74, sY + 340, 18);
 				hb::shared::text::draw_text(GameFont::Default, mouse_x + 20, mouse_y + 35, DRAW_DIALOGBOX_COMMANDER27, hb::shared::text::TextStyle::with_shadow(GameColors::UIWhite));
@@ -208,7 +211,7 @@ void DialogBox_Commander::on_draw(short mouse_x, short mouse_y, short z, char lb
 		}
 		else if ((m_game->m_player->m_citizen == true) && (m_game->m_player->m_aresden == false))
 		{
-			if ((mouse_x >= sX + 20) && (mouse_x <= sX + 20 + 46) && (mouse_y >= sY + 220) && (mouse_y <= sY + 220 + 50))
+			if (mouse_in(btn_unit_1))
 			{
 				if (m_game->m_player->m_construction_point >= 3000)
 				{
@@ -217,7 +220,7 @@ void DialogBox_Commander::on_draw(short mouse_x, short mouse_y, short z, char lb
 				hb::shared::text::draw_text(GameFont::Default, mouse_x + 20, mouse_y + 35, DRAW_DIALOGBOX_COMMANDER28, hb::shared::text::TextStyle::with_shadow(GameColors::UIWhite));
 				hb::shared::text::draw_text(GameFont::Default, mouse_x + 20, mouse_y + 50, DRAW_DIALOGBOX_COMMANDER29, hb::shared::text::TextStyle::with_shadow(GameColors::UIWhite));
 			}
-			else if ((mouse_x >= sX + 20 + 50) && (mouse_x <= sX + 20 + 50 + 45) && (mouse_y >= sY + 220) && (mouse_y <= sY + 220 + 50))
+			else if (mouse_in(btn_unit_2))
 			{
 				if (m_game->m_player->m_construction_point >= 2000)
 				{
@@ -226,7 +229,7 @@ void DialogBox_Commander::on_draw(short mouse_x, short mouse_y, short z, char lb
 				hb::shared::text::draw_text(GameFont::Default, mouse_x + 20, mouse_y + 35, DRAW_DIALOGBOX_COMMANDER30, hb::shared::text::TextStyle::with_shadow(GameColors::UIWhite));
 				hb::shared::text::draw_text(GameFont::Default, mouse_x + 20, mouse_y + 50, DRAW_DIALOGBOX_COMMANDER31, hb::shared::text::TextStyle::with_shadow(GameColors::UIWhite));
 			}
-			else if ((mouse_x >= sX + 20 + 100) && (mouse_x <= sX + 20 + 100 + 45) && (mouse_y >= sY + 220) && (mouse_y <= sY + 220 + 50))
+			else if (mouse_in(btn_unit_3))
 			{
 				if (m_game->m_player->m_construction_point >= 1000)
 				{
@@ -235,7 +238,7 @@ void DialogBox_Commander::on_draw(short mouse_x, short mouse_y, short z, char lb
 				hb::shared::text::draw_text(GameFont::Default, mouse_x + 20, mouse_y + 35, DRAW_DIALOGBOX_COMMANDER32, hb::shared::text::TextStyle::with_shadow(GameColors::UIWhite));
 				hb::shared::text::draw_text(GameFont::Default, mouse_x + 20, mouse_y + 50, DRAW_DIALOGBOX_COMMANDER33, hb::shared::text::TextStyle::with_shadow(GameColors::UIWhite));
 			}
-			else if ((mouse_x >= sX + 20 + 150) && (mouse_x <= sX + 20 + 150 + 45) && (mouse_y >= sY + 220) && (mouse_y <= sY + 220 + 50))
+			else if (mouse_in(btn_unit_4))
 			{
 				if (m_game->m_player->m_construction_point >= 5000)
 				{
@@ -244,20 +247,20 @@ void DialogBox_Commander::on_draw(short mouse_x, short mouse_y, short z, char lb
 				hb::shared::text::draw_text(GameFont::Default, mouse_x + 20, mouse_y + 35, DRAW_DIALOGBOX_COMMANDER34, hb::shared::text::TextStyle::with_shadow(GameColors::UIWhite));
 				hb::shared::text::draw_text(GameFont::Default, mouse_x + 20, mouse_y + 50, DRAW_DIALOGBOX_COMMANDER35, hb::shared::text::TextStyle::with_shadow(GameColors::UIWhite));
 			}
-			else if ((mouse_x >= sX + 20) && (mouse_x <= sX + 380) && (mouse_y > sY + 140) && (mouse_y < sY + 160))
+			else if (mouse_in(link_faction_1))
 			{
 				hb::shared::text::draw_text(GameFont::Default, mouse_x + 20, mouse_y + 35, DRAW_DIALOGBOX_COMMANDER36, hb::shared::text::TextStyle::with_shadow(GameColors::UIWhite));
 			}
-			else if ((mouse_x >= sX + 20) && (mouse_x <= sX + 380) && (mouse_y > sY + 160) && (mouse_y < sY + 175))
+			else if (mouse_in(link_faction_2))
 			{
 				hb::shared::text::draw_text(GameFont::Default, mouse_x + 20, mouse_y + 35, DRAW_DIALOGBOX_COMMANDER37, hb::shared::text::TextStyle::with_shadow(GameColors::UIWhite));
 			}
-			else if ((mouse_x >= sX + 20 + 150 + 74 - 50) && (mouse_x <= sX + 20 + 46 + 150 + 74 - 50) && (mouse_y >= sY + 340) && (mouse_y <= sY + 340 + 52))
+			else if (mouse_in(btn_back))
 			{
 				m_game->m_sprite[InterfaceNdCrusade]->draw(sX + 20 + 100 + 74, sY + 340, 19);
 				hb::shared::text::draw_text(GameFont::Default, mouse_x + 20, mouse_y + 35, DRAW_DIALOGBOX_COMMANDER38, hb::shared::text::TextStyle::with_shadow(GameColors::UIWhite));
 			}
-			else if ((mouse_x >= sX + 20 + 150 + 74) && (mouse_x <= sX + 20 + 46 + 150 + 74) && (mouse_y >= sY + 340) && (mouse_y <= sY + 340 + 52))
+			else if (mouse_in(btn_help))
 			{
 				m_game->m_sprite[InterfaceNdCrusade]->draw(sX + 20 + 150 + 74, sY + 340, 18);
 				hb::shared::text::draw_text(GameFont::Default, mouse_x + 20, mouse_y + 35, DRAW_DIALOGBOX_COMMANDER39, hb::shared::text::TextStyle::with_shadow(GameColors::UIWhite));
@@ -267,7 +270,7 @@ void DialogBox_Commander::on_draw(short mouse_x, short mouse_y, short z, char lb
 		put_aligned_string(sX, sX + 323, sY + 95, DRAW_DIALOGBOX_COMMANDER41);
 		put_aligned_string(sX, sX + 323, sY + 110, DRAW_DIALOGBOX_COMMANDER42);
 
-		switch (Info().m_v1) {
+		switch (m_selected_faction) {
 		case 0:
 			put_aligned_string(sX, sX + 323, sY + 140, DRAW_DIALOGBOX_COMMANDER43, GameColors::UIWhite);
 			put_aligned_string(sX, sX + 323, sY + 160, DRAW_DIALOGBOX_COMMANDER44, GameColors::UIMagicBlue);
@@ -280,23 +283,23 @@ void DialogBox_Commander::on_draw(short mouse_x, short mouse_y, short z, char lb
 		break;
 	}
 
-	case 4: // Set Construction point
+	case mode::set_construct:
 		m_game->m_sprite[InterfaceNdCrusade]->draw(sX + 20 + 100 + 74, sY + 340, 20);
 		m_game->m_sprite[InterfaceNdCrusade]->draw(sX + 20 + 150 + 74, sY + 340, 4);
 		put_aligned_string(sX, sX + size_x, sY + 40, DRAW_DIALOGBOX_COMMANDER47);
 
-		if ((mouse_x >= sX + 20 + 150 + 74 - 50) && (mouse_x <= sX + 20 + 46 + 150 + 74 - 50) && (mouse_y >= sY + 340) && (mouse_y <= sY + 340 + 52))
+		if (mouse_in(btn_back))
 		{
 			m_game->m_sprite[InterfaceNdCrusade]->draw(sX + 20 + 100 + 74, sY + 340, 19);
 			hb::shared::text::draw_text(GameFont::Default, mouse_x + 20, mouse_y + 35, DRAW_DIALOGBOX_COMMANDER48, hb::shared::text::TextStyle::with_shadow(GameColors::UIWhite));
 		}
-		else if ((mouse_x >= sX + 20 + 150 + 74) && (mouse_x <= sX + 20 + 46 + 150 + 74) && (mouse_y >= sY + 340) && (mouse_y <= sY + 340 + 52))
+		else if (mouse_in(btn_help))
 		{
 			m_game->m_sprite[InterfaceNdCrusade]->draw(sX + 20 + 150 + 74, sY + 340, 18);
 			hb::shared::text::draw_text(GameFont::Default, mouse_x + 20, mouse_y + 35, DRAW_DIALOGBOX_COMMANDER49, hb::shared::text::TextStyle::with_shadow(GameColors::UIWhite));
 		}
 		draw_new_dialog_box(InterfaceNdCrusade, sX, sY, 21);
-		if ((mouse_x >= sX + 15) && (mouse_x <= sX + 15 + 278) && (mouse_y >= sY + 60) && (mouse_y <= sY + 60 + 272))
+		if (mouse_in(area_map))
 		{
 			draw_new_dialog_box(InterfaceNdCrusade, mouse_x, mouse_y, 41, false, true);
 		}
@@ -304,11 +307,11 @@ void DialogBox_Commander::on_draw(short mouse_x, short mouse_y, short z, char lb
 	}
 
 	// draw map structures and positions
-	switch (Info().m_mode) {
-	case 0:
-	case 1:
-	case 2:
-	case 4:
+	switch (m_mode) {
+	case mode::main:
+	case mode::set_tp:
+	case mode::use_tp:
+	case mode::set_construct:
 		size_x = 0;
 		size_y = 0;
 		MapSzX = 0;
@@ -373,7 +376,7 @@ void DialogBox_Commander::on_draw(short mouse_x, short mouse_y, short z, char lb
 				tY = static_cast<int>(v3);
 				draw_new_dialog_box(InterfaceNdCrusade, sX + tX + 15, sY + tY + 60, 42, false, true);
 			}
-			if ((Info().m_mode != 2) && (m_game->m_player->m_construct_loc_x != -1))
+			if ((m_mode != mode::use_tp) && (m_game->m_player->m_construct_loc_x != -1))
 			{
 				v1 = static_cast<double>(MapSzX);
 				v2 = static_cast<double>(m_game->m_player->m_construct_loc_x);
@@ -398,9 +401,9 @@ void DialogBox_Commander::on_draw(short mouse_x, short mouse_y, short z, char lb
 				draw_new_dialog_box(InterfaceNdCrusade, sX + tX + 15, sY + tY + 60, 43);
 			}
 		}
-		if (Info().m_mode != 3 && size_x > 0 && size_y > 0)
+		if (m_mode != mode::summon && size_x > 0 && size_y > 0)
 		{
-			if ((mouse_x >= sX + 15) && (mouse_x <= sX + 15 + 278) && (mouse_y >= sY + 60) && (mouse_y <= sY + 60 + 272))
+			if (mouse_in(area_map))
 			{
 				v1 = static_cast<double>(mouse_x - (sX + 15));
 				v2 = static_cast<double>(MapSzX);
@@ -422,24 +425,26 @@ void DialogBox_Commander::on_draw(short mouse_x, short mouse_y, short z, char lb
 	}
 }
 
-bool DialogBox_Commander::on_click(short mouse_x, short mouse_y)
+bool DialogBox_Commander::on_click()
 {
+	short mouse_x = static_cast<short>(hb::shared::input::get_mouse_x());
+	short mouse_y = static_cast<short>(hb::shared::input::get_mouse_y());
 	short sX, sY, tX, tY;
 	double d1, d2, d3;
 
 	if (m_game->m_is_crusade_mode == false) return false;
 
-	sX = Info().m_x;
-	sY = Info().m_y;
+	sX = m_x;
+	sY = m_y;
 
-	switch (Info().m_mode) {
-	case 0: // Main
-		if ((mouse_x >= sX + 20) && (mouse_x <= sX + 20 + 46) && (mouse_y >= sY + 340) && (mouse_y <= sY + 340 + 52))
+	switch (m_mode) {
+	case mode::main:
+		if (mouse_in(btn_set_tp))
 		{
-			Info().m_mode = 1;
+			m_mode = mode::set_tp;
 			play_sound_effect('E', 14, 5);
 		}
-		else if ((mouse_x >= sX + 20 + 50) && (mouse_x <= sX + 20 + 46 + 50) && (mouse_y >= sY + 340) && (mouse_y <= sY + 340 + 52))
+		else if (mouse_in(btn_use_tp))
 		{
 			if (teleport_manager::get().get_loc_x() == -1)
 			{
@@ -451,22 +456,22 @@ bool DialogBox_Commander::on_click(short mouse_x, short mouse_y)
 			}
 			else
 			{
-				Info().m_mode = 2;
+				m_mode = mode::use_tp;
 				play_sound_effect('E', 14, 5);
 			}
 		}
-		else if ((mouse_x >= sX + 20 + 100) && (mouse_x <= sX + 20 + 46 + 100) && (mouse_y >= sY + 340) && (mouse_y <= sY + 340 + 52))
+		else if (mouse_in(btn_summon))
 		{
-			Info().m_mode = 3;
-			Info().m_v1 = 0;
+			m_mode = mode::summon;
+			m_selected_faction = 0;
 			play_sound_effect('E', 14, 5);
 		}
-		else if ((mouse_x >= sX + 20 + 150) && (mouse_x <= sX + 20 + 46 + 150) && (mouse_y >= sY + 340) && (mouse_y <= sY + 340 + 52))
+		else if (mouse_in(btn_set_construct))
 		{
-			Info().m_mode = 4;
+			m_mode = mode::set_construct;
 			play_sound_effect('E', 14, 5);
 		}
-		else if ((mouse_x >= sX + 20 + 150 + 74) && (mouse_x <= sX + 20 + 46 + 150 + 74) && (mouse_y >= sY + 340) && (mouse_y <= sY + 340 + 52))
+		else if (mouse_in(btn_help))
 		{
 			disable_dialog_box(DialogBoxId::Text);
 			enable_dialog_box(DialogBoxId::Text, 808, 0, 0);
@@ -474,8 +479,8 @@ bool DialogBox_Commander::on_click(short mouse_x, short mouse_y)
 		}
 		break;
 
-	case 1: // Set TP
-		if ((mouse_x >= sX + 15) && (mouse_x <= sX + 15 + 278) && (mouse_y >= sY + 60) && (mouse_y <= sY + 60 + 272))
+	case mode::set_tp:
+		if (mouse_in(area_map))
 		{
 			d1 = static_cast<double>(mouse_x - (sX + 15));
 			d2 = static_cast<double>(524.0f);
@@ -490,16 +495,16 @@ bool DialogBox_Commander::on_click(short mouse_x, short mouse_y)
 			if (tX > 494) tX = 494;
 			if (tY > 494) tY = 494;
 			send_command(MsgId::CommandCommon, CommonType::SetGuildTeleportLoc, 0, tX, tY, 0, "middleland");
-			Info().m_mode = 0;
+			m_mode = mode::main;
 			play_sound_effect('E', 14, 5);
 			m_game->request_map_status("middleland", 1);
 		}
-		if ((mouse_x >= sX + 20 + 150 + 74 - 50) && (mouse_x <= sX + 20 + 46 + 150 + 74 - 50) && (mouse_y >= sY + 340) && (mouse_y <= sY + 340 + 52))
+		if (mouse_in(btn_back))
 		{
-			Info().m_mode = 0;
+			m_mode = mode::main;
 			play_sound_effect('E', 14, 5);
 		}
-		if ((mouse_x >= sX + 20 + 150 + 74) && (mouse_x <= sX + 20 + 46 + 150 + 74) && (mouse_y >= sY + 340) && (mouse_y <= sY + 340 + 52))
+		if (mouse_in(btn_help))
 		{
 			disable_dialog_box(DialogBoxId::Text);
 			enable_dialog_box(DialogBoxId::Text, 809, 0, 0);
@@ -507,19 +512,19 @@ bool DialogBox_Commander::on_click(short mouse_x, short mouse_y)
 		}
 		break;
 
-	case 2: // Use TP
-		if ((mouse_x >= sX + 20 + 50) && (mouse_x <= sX + 20 + 46 + 50) && (mouse_y >= sY + 340) && (mouse_y <= sY + 340 + 52))
+	case mode::use_tp:
+		if (mouse_in(btn_use_tp))
 		{
 			send_command(MsgId::CommandCommon, CommonType::GuildTeleport, 0, 0, 0, 0, 0);
 			disable_dialog_box(DialogBoxId::CrusadeCommander);
 			play_sound_effect('E', 14, 5);
 		}
-		if ((mouse_x >= sX + 20 + 150 + 74 - 50) && (mouse_x <= sX + 20 + 46 + 150 + 74 - 50) && (mouse_y >= sY + 340) && (mouse_y <= sY + 340 + 52))
+		if (mouse_in(btn_back))
 		{
-			Info().m_mode = 0;
+			m_mode = mode::main;
 			play_sound_effect('E', 14, 5);
 		}
-		if ((mouse_x >= sX + 20 + 150 + 74) && (mouse_x <= sX + 20 + 46 + 150 + 74) && (mouse_y >= sY + 340) && (mouse_y <= sY + 340 + 52))
+		if (mouse_in(btn_help))
 		{
 			disable_dialog_box(DialogBoxId::Text);
 			enable_dialog_box(DialogBoxId::Text, 810, 0, 0);
@@ -527,41 +532,41 @@ bool DialogBox_Commander::on_click(short mouse_x, short mouse_y)
 		}
 		break;
 
-	case 3: // Summon Unit
+	case mode::summon:
 		if (m_game->m_player->m_aresden == true)
 		{
-			if ((mouse_x >= sX + 20) && (mouse_x <= sX + 20 + 46) && (mouse_y >= sY + 220) && (mouse_y <= sY + 220 + 50))
+			if (mouse_in(btn_unit_1))
 			{
 				if (m_game->m_player->m_construction_point >= 3000)
 				{
-					send_command(MsgId::CommandCommon, CommonType::SummonWarUnit, 0, 47, 1, Info().m_v1, 0);
+					send_command(MsgId::CommandCommon, CommonType::SummonWarUnit, 0, 47, 1, m_selected_faction, 0);
 					play_sound_effect('E', 14, 5);
 					disable_dialog_box(DialogBoxId::CrusadeCommander);
 				}
 			}
-			if ((mouse_x >= sX + 20 + 50) && (mouse_x <= sX + 20 + 50 + 45) && (mouse_y >= sY + 220) && (mouse_y <= sY + 220 + 50))
+			if (mouse_in(btn_unit_2))
 			{
 				if (m_game->m_player->m_construction_point >= 2000)
 				{
-					send_command(MsgId::CommandCommon, CommonType::SummonWarUnit, 0, 46, 1, Info().m_v1, 0);
+					send_command(MsgId::CommandCommon, CommonType::SummonWarUnit, 0, 46, 1, m_selected_faction, 0);
 					play_sound_effect('E', 14, 5);
 					disable_dialog_box(DialogBoxId::CrusadeCommander);
 				}
 			}
-			if ((mouse_x >= sX + 20 + 100) && (mouse_x <= sX + 20 + 100 + 45) && (mouse_y >= sY + 220) && (mouse_y <= sY + 220 + 50))
+			if (mouse_in(btn_unit_3))
 			{
 				if (m_game->m_player->m_construction_point >= 1000)
 				{
-					send_command(MsgId::CommandCommon, CommonType::SummonWarUnit, 0, 43, 1, Info().m_v1, 0);
+					send_command(MsgId::CommandCommon, CommonType::SummonWarUnit, 0, 43, 1, m_selected_faction, 0);
 					play_sound_effect('E', 14, 5);
 					disable_dialog_box(DialogBoxId::CrusadeCommander);
 				}
 			}
-			if ((mouse_x >= sX + 20 + 150) && (mouse_x <= sX + 20 + 150 + 45) && (mouse_y >= sY + 220) && (mouse_y <= sY + 220 + 50))
+			if (mouse_in(btn_unit_4))
 			{
 				if (m_game->m_player->m_construction_point >= 1500)
 				{
-					send_command(MsgId::CommandCommon, CommonType::SummonWarUnit, 0, 51, 1, Info().m_v1, 0);
+					send_command(MsgId::CommandCommon, CommonType::SummonWarUnit, 0, 51, 1, m_selected_faction, 0);
 					play_sound_effect('E', 14, 5);
 					disable_dialog_box(DialogBoxId::CrusadeCommander);
 				}
@@ -569,59 +574,59 @@ bool DialogBox_Commander::on_click(short mouse_x, short mouse_y)
 		}
 		else if (m_game->m_player->m_aresden == false)
 		{
-			if ((mouse_x >= sX + 20) && (mouse_x <= sX + 20 + 46) && (mouse_y >= sY + 220) && (mouse_y <= sY + 220 + 50))
+			if (mouse_in(btn_unit_1))
 			{
 				if (m_game->m_player->m_construction_point >= 3000)
 				{
-					send_command(MsgId::CommandCommon, CommonType::SummonWarUnit, 0, 45, 1, Info().m_v1, 0);
+					send_command(MsgId::CommandCommon, CommonType::SummonWarUnit, 0, 45, 1, m_selected_faction, 0);
 					play_sound_effect('E', 14, 5);
 					disable_dialog_box(DialogBoxId::CrusadeCommander);
 				}
 			}
-			if ((mouse_x >= sX + 20 + 50) && (mouse_x <= sX + 20 + 50 + 45) && (mouse_y >= sY + 220) && (mouse_y <= sY + 220 + 50))
+			if (mouse_in(btn_unit_2))
 			{
 				if (m_game->m_player->m_construction_point >= 2000)
 				{
-					send_command(MsgId::CommandCommon, CommonType::SummonWarUnit, 0, 44, 1, Info().m_v1, 0);
+					send_command(MsgId::CommandCommon, CommonType::SummonWarUnit, 0, 44, 1, m_selected_faction, 0);
 					play_sound_effect('E', 14, 5);
 					disable_dialog_box(DialogBoxId::CrusadeCommander);
 				}
 			}
-			if ((mouse_x >= sX + 20 + 100) && (mouse_x <= sX + 20 + 100 + 45) && (mouse_y >= sY + 220) && (mouse_y <= sY + 220 + 50))
+			if (mouse_in(btn_unit_3))
 			{
 				if (m_game->m_player->m_construction_point >= 1000)
 				{
-					send_command(MsgId::CommandCommon, CommonType::SummonWarUnit, 0, 43, 1, Info().m_v1, 0);
+					send_command(MsgId::CommandCommon, CommonType::SummonWarUnit, 0, 43, 1, m_selected_faction, 0);
 					play_sound_effect('E', 14, 5);
 					disable_dialog_box(DialogBoxId::CrusadeCommander);
 				}
 			}
-			if ((mouse_x >= sX + 20 + 150) && (mouse_x <= sX + 20 + 150 + 45) && (mouse_y >= sY + 220) && (mouse_y <= sY + 220 + 50))
+			if (mouse_in(btn_unit_4))
 			{
 				if (m_game->m_player->m_construction_point >= 1500)
 				{
-					send_command(MsgId::CommandCommon, CommonType::SummonWarUnit, 0, 51, 1, Info().m_v1, 0);
+					send_command(MsgId::CommandCommon, CommonType::SummonWarUnit, 0, 51, 1, m_selected_faction, 0);
 					play_sound_effect('E', 14, 5);
 					disable_dialog_box(DialogBoxId::CrusadeCommander);
 				}
 			}
 		}
-		if ((mouse_x >= sX + 20) && (mouse_x <= sX + 380) && (mouse_y > sY + 140) && (mouse_y < sY + 160))
+		if (mouse_in(link_faction_1))
 		{
-			Info().m_v1 = 0;
+			m_selected_faction = 0;
 			play_sound_effect('E', 14, 5);
 		}
-		if ((mouse_x >= sX + 20) && (mouse_x <= sX + 380) && (mouse_y > sY + 160) && (mouse_y < sY + 175))
+		if (mouse_in(link_faction_2))
 		{
-			Info().m_v1 = 1;
+			m_selected_faction = 1;
 			play_sound_effect('E', 14, 5);
 		}
-		if ((mouse_x >= sX + 20 + 150 + 74 - 50) && (mouse_x <= sX + 20 + 46 + 150 + 74 - 50) && (mouse_y >= sY + 340) && (mouse_y <= sY + 340 + 52))
+		if (mouse_in(btn_back))
 		{
-			Info().m_mode = 0;
+			m_mode = mode::main;
 			play_sound_effect('E', 14, 5);
 		}
-		if ((mouse_x >= sX + 20 + 150 + 74) && (mouse_x <= sX + 20 + 46 + 150 + 74) && (mouse_y >= sY + 340) && (mouse_y <= sY + 340 + 52))
+		if (mouse_in(btn_help))
 		{
 			disable_dialog_box(DialogBoxId::Text);
 			enable_dialog_box(DialogBoxId::Text, 811, 0, 0);
@@ -629,8 +634,8 @@ bool DialogBox_Commander::on_click(short mouse_x, short mouse_y)
 		}
 		break;
 
-	case 4: // Set constr
-		if ((mouse_x >= sX + 15) && (mouse_x <= sX + 15 + 278) && (mouse_y >= sY + 60) && (mouse_y <= sY + 60 + 272))
+	case mode::set_construct:
+		if (mouse_in(area_map))
 		{
 			d1 = static_cast<double>(mouse_x - (sX + 15));
 			d2 = static_cast<double>(524.0);
@@ -645,16 +650,16 @@ bool DialogBox_Commander::on_click(short mouse_x, short mouse_y)
 			if (tX > 494) tX = 494;
 			if (tY > 494) tY = 494;
 			send_command(MsgId::CommandCommon, CommonType::SetGuildConstructLoc, 0, tX, tY, 0, "middleland");
-			Info().m_mode = 0;
+			m_mode = mode::main;
 			play_sound_effect('E', 14, 5);
 			m_game->request_map_status("middleland", 1);
 		}
-		if ((mouse_x >= sX + 20 + 150 + 74 - 50) && (mouse_x <= sX + 20 + 46 + 150 + 74 - 50) && (mouse_y >= sY + 340) && (mouse_y <= sY + 340 + 52))
+		if (mouse_in(btn_back))
 		{
-			Info().m_mode = 0;
+			m_mode = mode::main;
 			play_sound_effect('E', 14, 5);
 		}
-		if ((mouse_x >= sX + 20 + 150 + 74) && (mouse_x <= sX + 20 + 46 + 150 + 74) && (mouse_y >= sY + 340) && (mouse_y <= sY + 340 + 52))
+		if (mouse_in(btn_help))
 		{
 			disable_dialog_box(DialogBoxId::Text);
 			enable_dialog_box(DialogBoxId::Text, 812, 0, 0);

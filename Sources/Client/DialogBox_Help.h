@@ -7,8 +7,8 @@ public:
 	DialogBox_Help(CGame* game);
 	~DialogBox_Help() override = default;
 
-	void on_draw(short mouse_x, short mouse_y, short z, char lb) override;
-	bool on_click(short mouse_x, short mouse_y) override;
+	void on_draw() override;
+	bool on_click() override;
 
 private:
 	bool is_mouse_over_item(short mouse_x, short mouse_y, short sX, short sY, int item);

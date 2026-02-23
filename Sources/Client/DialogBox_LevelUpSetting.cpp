@@ -3,6 +3,7 @@
 #include "lan_eng.h"
 #include <format>
 #include <string>
+#include "IInput.h"
 
 using namespace hb::shared::net;
 using namespace hb::client::sprite_id;
@@ -10,7 +11,7 @@ DialogBox_LevelUpSetting::DialogBox_LevelUpSetting(CGame* game)
 	: IDialogBox(DialogBoxId::LevelUpSetting, game)
 {
 	set_default_rect(0 , 0 , 258, 339);
-	set_can_close_on_right_click(false);
+	m_can_close_on_right_click = false;
 }
 
 void DialogBox_LevelUpSetting::draw_stat_row(short sX, short sY, int y_offset, const char* label,
@@ -44,11 +45,13 @@ void DialogBox_LevelUpSetting::draw_stat_row(short sX, short sY, int y_offset, c
 		m_game->m_sprite[InterfaceNdGame4]->draw(sX + 210, sY + arrow_y_offset, 6);
 }
 
-void DialogBox_LevelUpSetting::on_draw(short mouse_x, short mouse_y, short z, char lb)
+void DialogBox_LevelUpSetting::on_draw()
 {
-	short sX = Info().m_x;
-	short sY = Info().m_y;
-	short size_x = Info().m_size_x;
+	short mouse_x = static_cast<short>(hb::shared::input::get_mouse_x());
+	short mouse_y = static_cast<short>(hb::shared::input::get_mouse_y());
+	short sX = m_x;
+	short sY = m_y;
+	short size_x = m_size_x;
 	uint32_t time = m_game->m_cur_time;
 	std::string txt;
 
@@ -168,10 +171,12 @@ bool DialogBox_LevelUpSetting::handle_stat_click(short mouse_x, short mouse_y, s
 	return false;
 }
 
-bool DialogBox_LevelUpSetting::on_click(short mouse_x, short mouse_y)
+bool DialogBox_LevelUpSetting::on_click()
 {
-	short sX = Info().m_x;
-	short sY = Info().m_y;
+	short mouse_x = static_cast<short>(hb::shared::input::get_mouse_x());
+	short mouse_y = static_cast<short>(hb::shared::input::get_mouse_y());
+	short sX = m_x;
+	short sY = m_y;
 
 	// Strength +/-
 	if (handle_stat_click(mouse_x, mouse_y, sX, sY, 127, m_game->m_player->m_str, m_game->m_player->m_lu_str))
@@ -201,7 +206,7 @@ bool DialogBox_LevelUpSetting::on_click(short mouse_x, short mouse_y)
 	if ((mouse_x >= sX + ui_layout::right_btn_x) && (mouse_x <= sX + ui_layout::right_btn_x + ui_layout::btn_size_x) &&
 	    (mouse_y > sY + ui_layout::btn_y) && (mouse_y < sY + ui_layout::btn_y + ui_layout::btn_size_y))
 	{
-		if (Info().m_v1 != m_game->m_player->m_lu_point)
+		if (m_initial_lu_points != m_game->m_player->m_lu_point)
 			send_command(MsgId::LevelUpSettings, 0, 0, 0, 0, 0, 0);
 		disable_this_dialog();
 		play_sound_effect('E', 14, 5);
@@ -223,4 +228,13 @@ bool DialogBox_LevelUpSetting::on_click(short mouse_x, short mouse_y)
 	}
 
 	return false;
+}
+
+bool DialogBox_LevelUpSetting::on_enable(int type, int64_t v1, int v2, const char* string)
+{
+	if (is_enabled()) return true;
+	auto* charDlg = get_dialog_box(DialogBoxId::CharacterInfo);
+	if (charDlg) { m_x = charDlg->m_x + 20; m_y = charDlg->m_y + 20; }
+	m_initial_lu_points = m_game->m_player->m_lu_point;
+	return true;
 }

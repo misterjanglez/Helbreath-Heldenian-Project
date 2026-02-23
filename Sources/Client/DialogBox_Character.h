@@ -16,12 +16,13 @@ public:
 	DialogBox_Character(CGame* game);
 	~DialogBox_Character() override = default;
 
-	void on_draw(short mouse_x, short mouse_y, short z, char lb) override;
-	bool on_click(short mouse_x, short mouse_y) override;
-	bool on_double_click(short mouse_x, short mouse_y) override;
-	PressResult on_press(short mouse_x, short mouse_y) override;
-	bool on_item_drop(short mouse_x, short mouse_y) override;
+	void on_draw() override;
+	bool on_click() override;
+	bool on_double_click() override;
+	PressResult on_press() override;
+	bool on_item_drop() override;
 
+	bool cancels_text_input_on_enable() const override { return false; }
 private:
 	// Helper methods
 	void draw_stat(int x1, int x2, int y, int baseStat, int angelicBonus);
@@ -38,4 +39,8 @@ private:
 	void build_equip_status_array(char (&equip_poi_status)[hb::shared::item::DEF_MAXITEMEQUIPPOS]) const;
 	char find_equip_item_at_point(short mouse_x, short mouse_y, short sX, short sY,
 		const char* equip_poi_status) const;
+
+	static constexpr ui_rect btn_quest{15, 340, 75, 21};
+	static constexpr ui_rect btn_party{98, 340, 75, 21};
+	static constexpr ui_rect btn_levelup{180, 340, 75, 21};
 };

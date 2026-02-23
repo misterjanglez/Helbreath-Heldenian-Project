@@ -1,5 +1,6 @@
 #include "DialogBox_Inventory.h"
 #include "CursorTarget.h"
+#include "DialogBox_Manufacture.h"
 #include "Game.h"
 #include "InventoryManager.h"
 #include "ItemNameFormatter.h"
@@ -44,7 +45,7 @@ static bool check_item_collision(auto&& sprite, int sprite_x, int sprite_y,
 DialogBox_Inventory::DialogBox_Inventory(CGame* game)
 	: IDialogBox(DialogBoxId::Inventory, game)
 {
-	set_can_close_on_right_click(true);
+	m_can_close_on_right_click = true;
 	set_default_rect(540 , 210 , 225, 185);
 }
 
@@ -55,7 +56,7 @@ void DialogBox_Inventory::draw_inventory_item(CItem* item, int itemIdx, int base
 	if (cfg == nullptr) return;
 
 	char item_color = item->m_item_color;
-	bool disabled = m_game->m_is_item_disabled[itemIdx];
+	bool disabled = inventory_manager::get().is_locked(itemIdx);
 	bool is_weapon = (cfg->get_equip_pos() == EquipPos::LeftHand) ||
 	                 (cfg->get_equip_pos() == EquipPos::RightHand) ||
 	                 (cfg->get_equip_pos() == EquipPos::TwoHand);
@@ -100,11 +101,13 @@ void DialogBox_Inventory::draw_inventory_item(CItem* item, int itemIdx, int base
 	}
 }
 
-void DialogBox_Inventory::on_draw(short mouse_x, short mouse_y, short z, char lb)
+void DialogBox_Inventory::on_draw()
 {
+	short mouse_x = static_cast<short>(hb::shared::input::get_mouse_x());
+	short mouse_y = static_cast<short>(hb::shared::input::get_mouse_y());
 	if (!m_game->ensure_item_configs_loaded()) return;
-	short sX = Info().m_x;
-	short sY = Info().m_y;
+	short sX = m_x;
+	short sY = m_y;
 
 	draw_new_dialog_box(InterfaceNdInventory, sX, sY, 0);
 
@@ -146,10 +149,12 @@ void DialogBox_Inventory::on_draw(short mouse_x, short mouse_y, short z, char lb
 	}
 }
 
-bool DialogBox_Inventory::on_click(short mouse_x, short mouse_y)
+bool DialogBox_Inventory::on_click()
 {
-	short sX = Info().m_x;
-	short sY = Info().m_y;
+	short mouse_x = static_cast<short>(hb::shared::input::get_mouse_x());
+	short mouse_y = static_cast<short>(hb::shared::input::get_mouse_y());
+	short sX = m_x;
+	short sY = m_y;
 
 	// Item Upgrade button
 	if ((mouse_x >= sX + BTN_UPGRADE_X1) && (mouse_x <= sX + BTN_UPGRADE_X2) &&
@@ -207,8 +212,10 @@ bool DialogBox_Inventory::on_click(short mouse_x, short mouse_y)
 	return false;
 }
 
-bool DialogBox_Inventory::on_double_click(short mouse_x, short mouse_y)
+bool DialogBox_Inventory::on_double_click()
 {
+	short mouse_x = static_cast<short>(hb::shared::input::get_mouse_x());
+	short mouse_y = static_cast<short>(hb::shared::input::get_mouse_y());
 	if (m_game->m_item_using_status)
 	{
 		add_event_list(BDLBBOX_DOUBLE_CLICK_INVENTORY1, 10);
@@ -230,14 +237,14 @@ bool DialogBox_Inventory::on_double_click(short mouse_x, short mouse_y)
 	// Check if at repair shop
 	if (m_game->m_dialog_box_manager.is_enabled(DialogBoxId::SaleMenu) &&
 		!m_game->m_dialog_box_manager.is_enabled(DialogBoxId::SellOrRepair) &&
-		m_game->m_dialog_box_manager.Info(DialogBoxId::GiveItem).m_v3 == 24)
+		m_game->m_dialog_box_manager.m_give_item.action_type == 24)
 	{
 		if (cfg->get_equip_pos() != EquipPos::None)
 		{
 			send_command(MsgId::CommandCommon, CommonType::ReqRepairItem, 0, item_id,
-				m_game->m_dialog_box_manager.Info(DialogBoxId::GiveItem).m_v3, 0,
+				m_game->m_dialog_box_manager.m_give_item.action_type, 0,
 				cfg->m_name,
-				m_game->m_dialog_box_manager.Info(DialogBoxId::GiveItem).m_v4);
+				m_game->m_dialog_box_manager.m_give_item.object_id);
 			return true;
 		}
 	}
@@ -245,19 +252,19 @@ bool DialogBox_Inventory::on_double_click(short mouse_x, short mouse_y)
 	// Bank dialog - drop item there
 	if (m_game->m_dialog_box_manager.is_enabled(DialogBoxId::Bank))
 	{
-		m_game->m_dialog_box_manager.get_dialog_box(DialogBoxId::Bank)->on_item_drop(mouse_x, mouse_y);
+		m_game->m_dialog_box_manager.get_dialog_box(DialogBoxId::Bank)->on_item_drop();
 		return true;
 	}
 	// Sell list dialog
 	else if (m_game->m_dialog_box_manager.is_enabled(DialogBoxId::SellList))
 	{
-		m_game->m_dialog_box_manager.get_dialog_box(DialogBoxId::SellList)->on_item_drop(mouse_x, mouse_y);
+		m_game->m_dialog_box_manager.get_dialog_box(DialogBoxId::SellList)->on_item_drop();
 		return true;
 	}
 	// Item upgrade dialog
 	else if (m_game->m_dialog_box_manager.is_enabled(DialogBoxId::ItemUpgrade))
 	{
-		m_game->m_dialog_box_manager.get_dialog_box(DialogBoxId::ItemUpgrade)->on_item_drop(mouse_x, mouse_y);
+		m_game->m_dialog_box_manager.get_dialog_box(DialogBoxId::ItemUpgrade)->on_item_drop();
 		return true;
 	}
 
@@ -286,7 +293,7 @@ bool DialogBox_Inventory::on_double_click(short mouse_x, short mouse_y)
 		if (cfg->get_item_type() == ItemType::UseDeplete ||
 			cfg->get_item_type() == ItemType::Eat)
 		{
-			m_game->m_is_item_disabled[item_id] = true;
+			inventory_manager::get().lock_item(item_id);
 			m_game->m_item_using_status = true;
 		}
 	}
@@ -404,30 +411,32 @@ bool DialogBox_Inventory::on_double_click(short mouse_x, short mouse_y)
 	// If alchemy/manufacture/crafting dialog is open, drop item there
 	if (m_game->m_dialog_box_manager.is_enabled(DialogBoxId::Manufacture))
 	{
-		char mode = m_game->m_dialog_box_manager.Info(DialogBoxId::Manufacture).m_mode;
-		if (mode == 1 || mode == 4 || mode == 7)
-			m_game->m_dialog_box_manager.get_dialog_box(DialogBoxId::Manufacture)->on_item_drop(mouse_x, mouse_y);
+		auto mfg_mode = m_game->m_dialog_box_manager.get_dialog_as<DialogBox_Manufacture>(DialogBoxId::Manufacture)->m_mode;
+		if (mfg_mode == DialogBox_Manufacture::mode::alchemy_waiting || mfg_mode == DialogBox_Manufacture::mode::manufacture_waiting || mfg_mode == DialogBox_Manufacture::mode::crafting_waiting)
+			m_game->m_dialog_box_manager.get_dialog_box(DialogBoxId::Manufacture)->on_item_drop();
 	}
 
 	// Auto-equip equipment items
 	if (cfg->get_item_type() == ItemType::Equip)
 	{
 		CursorTarget::set_selection(SelectedObjectType::Item, static_cast<short>(item_id), 0, 0);
-		m_game->m_dialog_box_manager.get_dialog_box(DialogBoxId::CharacterInfo)->on_item_drop(mouse_x, mouse_y);
+		m_game->m_dialog_box_manager.get_dialog_box(DialogBoxId::CharacterInfo)->on_item_drop();
 		CursorTarget::clear_selection();
 	}
 
 	return true;
 }
 
-PressResult DialogBox_Inventory::on_press(short mouse_x, short mouse_y)
+PressResult DialogBox_Inventory::on_press()
 {
+	short mouse_x = static_cast<short>(hb::shared::input::get_mouse_x());
+	short mouse_y = static_cast<short>(hb::shared::input::get_mouse_y());
 	// Don't allow item selection if certain dialogs are open
 	if (m_game->m_dialog_box_manager.is_enabled(DialogBoxId::ItemDropExternal)) return PressResult::Normal;
 	if (m_game->m_dialog_box_manager.is_enabled(DialogBoxId::ItemDropConfirm)) return PressResult::Normal;
 
-	short sX = Info().m_x;
-	short sY = Info().m_y;
+	short sX = m_x;
+	short sY = m_y;
 
 	// Check items in reverse order (topmost first)
 	for (int i = 0; i < hb::shared::limits::MaxItems; i++)
@@ -442,7 +451,7 @@ PressResult DialogBox_Inventory::on_press(short mouse_x, short mouse_y)
 		if (cfg == nullptr) continue;
 
 		// Skip disabled or equipped items
-		if (m_game->m_is_item_disabled[item_id]) continue;
+		if (inventory_manager::get().is_locked(item_id)) continue;
 		if (m_game->m_is_item_equipped[item_id]) continue;
 
 		// Calculate item bounds using atlas
@@ -494,8 +503,10 @@ PressResult DialogBox_Inventory::on_press(short mouse_x, short mouse_y)
 	return PressResult::Normal;
 }
 
-bool DialogBox_Inventory::on_item_drop(short mouse_x, short mouse_y)
+bool DialogBox_Inventory::on_item_drop()
 {
+	short mouse_x = static_cast<short>(hb::shared::input::get_mouse_x());
+	short mouse_y = static_cast<short>(hb::shared::input::get_mouse_y());
 	if (m_game->m_player->m_Controller.get_command() < 0) return false;
 
 	int selected_id = CursorTarget::get_selected_id();
@@ -508,11 +519,11 @@ bool DialogBox_Inventory::on_item_drop(short mouse_x, short mouse_y)
 		add_event_list(BITEMDROP_INVENTORY1, 10);
 		return false;
 	}
-	if (m_game->m_is_item_disabled[selected_id]) return false;
+	if (inventory_manager::get().is_locked(selected_id)) return false;
 
 	// Calculate new position in inventory grid
-	short sX = Info().m_x;
-	short sY = Info().m_y;
+	short sX = m_x;
+	short sY = m_y;
 	short dX = mouse_x - sX - ITEM_OFFSET_X - CursorTarget::get_drag_dist_x();
 	short dY = mouse_y - sY - ITEM_OFFSET_Y - CursorTarget::get_drag_dist_y();
 

@@ -2,6 +2,7 @@
 // Extracted from NetworkMessages_Crafting.cpp (Phase B2).
 
 #include "CraftingManager.h"
+#include "DialogBox_Manufacture.h"
 #include "Game.h"
 #include "ObjectIDRange.h"
 #include "Packet/SharedPackets.h"
@@ -75,12 +76,12 @@ void crafting_manager::handle_build_item_success(char* data)
 	if (hb::shared::object_id::is_player_id(v1))
 	{
 		m_game->m_dialog_box_manager.enable_dialog_box(DialogBoxId::Manufacture, 6, 1, v1, 0);
-		m_game->m_dialog_box_manager.Info(DialogBoxId::Manufacture).m_v1 = v2;
+		m_game->m_dialog_box_manager.get_dialog_as<DialogBox_Manufacture>(DialogBoxId::Manufacture)->m_slot_1 = v2;
 	}
 	else
 	{
 		m_game->m_dialog_box_manager.enable_dialog_box(DialogBoxId::Manufacture, 6, 1, -1 * (v1 - 10000), 0);
-		m_game->m_dialog_box_manager.Info(DialogBoxId::Manufacture).m_v1 = v2;
+		m_game->m_dialog_box_manager.get_dialog_as<DialogBox_Manufacture>(DialogBoxId::Manufacture)->m_slot_1 = v2;
 	}
 	m_game->add_event_list(NOTIFY_MSG_HANDLER42, 10);
 	m_game->play_game_sound('E', 23, 5);

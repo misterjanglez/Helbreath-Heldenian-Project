@@ -10,6 +10,7 @@
 #include <algorithm>
 #include <format>
 #include <cstring>
+#include "IInput.h"
 
 using namespace hb::shared::net;
 using namespace hb::client::sprite_id;
@@ -31,7 +32,7 @@ DialogBox_TesterMenu::DialogBox_TesterMenu(CGame* game)
 	: IDialogBox(DialogBoxId::TesterMenu, game)
 {
 	set_default_rect(0, 0, 258, 339);
-	set_can_close_on_right_click(true);
+	m_can_close_on_right_click = true;
 }
 
 int DialogBox_TesterMenu::get_hovered_row(short sX, short sY, short mouse_x, short mouse_y, int count, int scroll) const
@@ -48,8 +49,10 @@ int DialogBox_TesterMenu::get_hovered_row(short sX, short sY, short mouse_x, sho
 	return -1;
 }
 
-void DialogBox_TesterMenu::draw_main_menu(short sX, short sY, short size_x, short mouse_x, short mouse_y)
+void DialogBox_TesterMenu::draw_main_menu(short sX, short sY, short size_x)
 {
+	short mouse_x = static_cast<short>(hb::shared::input::get_mouse_x());
+	short mouse_y = static_cast<short>(hb::shared::input::get_mouse_y());
 	// Title
 	hb::shared::text::draw_text_aligned(GameFont::Bitmap1,
 		sX, sY + 8, size_x, 15,
@@ -78,8 +81,10 @@ void DialogBox_TesterMenu::draw_main_menu(short sX, short sY, short size_x, shor
 		draw_new_dialog_box(InterfaceNdButton, sX + ui_layout::right_btn_x, sY + ui_layout::btn_y, 0);
 }
 
-void DialogBox_TesterMenu::draw_level_picker(short sX, short sY, short size_x, short mouse_x, short mouse_y)
+void DialogBox_TesterMenu::draw_level_picker(short sX, short sY, short size_x)
 {
+	short mouse_x = static_cast<short>(hb::shared::input::get_mouse_x());
+	short mouse_y = static_cast<short>(hb::shared::input::get_mouse_y());
 	// Title
 	hb::shared::text::draw_text_aligned(GameFont::Bitmap1,
 		sX, sY + 8, size_x, 15,
@@ -136,8 +141,10 @@ void DialogBox_TesterMenu::draw_level_picker(short sX, short sY, short size_x, s
 		hb::shared::text::Align::TopCenter);
 }
 
-void DialogBox_TesterMenu::draw_teleport_page(short sX, short sY, short size_x, short mouse_x, short mouse_y)
+void DialogBox_TesterMenu::draw_teleport_page(short sX, short sY, short size_x)
 {
+	short mouse_x = static_cast<short>(hb::shared::input::get_mouse_x());
+	short mouse_y = static_cast<short>(hb::shared::input::get_mouse_y());
 	// Title
 	hb::shared::text::draw_text_aligned(GameFont::Bitmap1,
 		sX, sY + 8, size_x, 15,
@@ -198,20 +205,23 @@ void DialogBox_TesterMenu::draw_teleport_page(short sX, short sY, short size_x, 
 		hb::shared::text::Align::TopCenter);
 }
 
-void DialogBox_TesterMenu::on_draw(short mouse_x, short mouse_y, short z, char lb)
+void DialogBox_TesterMenu::on_draw()
 {
-	short sX = Info().m_x;
-	short sY = Info().m_y;
-	short size_x = Info().m_size_x;
+	short mouse_x = static_cast<short>(hb::shared::input::get_mouse_x());
+	short mouse_y = static_cast<short>(hb::shared::input::get_mouse_y());
+	short z = static_cast<short>(hb::shared::input::get_mouse_wheel_delta());
+	short sX = m_x;
+	short sY = m_y;
+	short size_x = m_size_x;
 
 	draw_new_dialog_box(InterfaceNdGame2, sX, sY, 0);
 
 	if (m_page == 0)
-		draw_main_menu(sX, sY, size_x, mouse_x, mouse_y);
+		draw_main_menu(sX, sY, size_x);
 	else if (m_page == 1)
-		draw_level_picker(sX, sY, size_x, mouse_x, mouse_y);
+		draw_level_picker(sX, sY, size_x);
 	else
-		draw_teleport_page(sX, sY, size_x, mouse_x, mouse_y);
+		draw_teleport_page(sX, sY, size_x);
 
 	// Mouse wheel scroll for teleport page
 	if (m_page == 2 && z != 0 && m_map_count > visible_map_rows)
@@ -223,8 +233,10 @@ void DialogBox_TesterMenu::on_draw(short mouse_x, short mouse_y, short z, char l
 	}
 }
 
-bool DialogBox_TesterMenu::on_click_main_menu(short sX, short sY, short mouse_x, short mouse_y)
+bool DialogBox_TesterMenu::on_click_main_menu(short sX, short sY)
 {
+	short mouse_x = static_cast<short>(hb::shared::input::get_mouse_x());
+	short mouse_y = static_cast<short>(hb::shared::input::get_mouse_y());
 	int row = get_hovered_row(sX, sY, mouse_x, mouse_y, action_count);
 	if (row >= 0)
 	{
@@ -268,9 +280,11 @@ bool DialogBox_TesterMenu::on_click_main_menu(short sX, short sY, short mouse_x,
 	return false;
 }
 
-bool DialogBox_TesterMenu::on_click_level_picker(short sX, short sY, short mouse_x, short mouse_y)
+bool DialogBox_TesterMenu::on_click_level_picker(short sX, short sY)
 {
-	short size_x = Info().m_size_x;
+	short mouse_x = static_cast<short>(hb::shared::input::get_mouse_x());
+	short mouse_y = static_cast<short>(hb::shared::input::get_mouse_y());
+	short size_x = m_size_x;
 
 	constexpr int btn_w = 40;
 	constexpr int btn_gap = 8;
@@ -312,9 +326,11 @@ bool DialogBox_TesterMenu::on_click_level_picker(short sX, short sY, short mouse
 	return false;
 }
 
-bool DialogBox_TesterMenu::on_click_teleport(short sX, short sY, short mouse_x, short mouse_y)
+bool DialogBox_TesterMenu::on_click_teleport(short sX, short sY)
 {
-	short size_x = Info().m_size_x;
+	short mouse_x = static_cast<short>(hb::shared::input::get_mouse_x());
+	short mouse_y = static_cast<short>(hb::shared::input::get_mouse_y());
+	short size_x = m_size_x;
 
 	if (m_map_count > 0)
 	{
@@ -341,17 +357,19 @@ bool DialogBox_TesterMenu::on_click_teleport(short sX, short sY, short mouse_x, 
 	return false;
 }
 
-bool DialogBox_TesterMenu::on_click(short mouse_x, short mouse_y)
+bool DialogBox_TesterMenu::on_click()
 {
-	short sX = Info().m_x;
-	short sY = Info().m_y;
+	short mouse_x = static_cast<short>(hb::shared::input::get_mouse_x());
+	short mouse_y = static_cast<short>(hb::shared::input::get_mouse_y());
+	short sX = m_x;
+	short sY = m_y;
 
 	if (m_page == 0)
-		return on_click_main_menu(sX, sY, mouse_x, mouse_y);
+		return on_click_main_menu(sX, sY);
 	else if (m_page == 1)
-		return on_click_level_picker(sX, sY, mouse_x, mouse_y);
+		return on_click_level_picker(sX, sY);
 	else
-		return on_click_teleport(sX, sY, mouse_x, mouse_y);
+		return on_click_teleport(sX, sY);
 }
 
 void DialogBox_TesterMenu::receive_map_list(const hb::net::PacketNotifyTesterMapListResult* pkt)
@@ -359,5 +377,17 @@ void DialogBox_TesterMenu::receive_map_list(const hb::net::PacketNotifyTesterMap
 	m_map_count = std::clamp(static_cast<int>(pkt->count), 0, 100);
 	std::memcpy(m_maps, pkt->entries, sizeof(m_maps));
 	m_map_scroll = 0;
+}
+
+bool DialogBox_TesterMenu::on_enable(int type, int64_t v1, int v2, const char* string)
+{
+	if (is_enabled()) return true;
+	int tester_x = LOGICAL_WIDTH() - 258 - 10;
+	int tester_y = LOGICAL_HEIGHT() - 339 - ICON_PANEL_HEIGHT() - 10;
+	if (m_game->m_dialog_box_manager.is_enabled(DialogBoxId::LevelUpSetting))
+		tester_y -= 30;
+	m_x = tester_x;
+	m_y = tester_y;
+	return true;
 }
 #endif // TESTER_ONLY

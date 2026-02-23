@@ -1,4 +1,5 @@
 ﻿#include "BuildItemManager.h"
+#include "DialogBox_Manufacture.h"
 #include "Game.h"
 #include <fstream>
 #include <string>
@@ -245,17 +246,19 @@ bool build_item_manager::validate_current_recipe()
 	char temp_name[hb::shared::limits::ItemNameLen];
 	bool item_flag[7];
 
-	index = m_game->m_dialog_box_manager.Info(DialogBoxId::Manufacture).m_str[0];
+	auto* mfg = m_game->m_dialog_box_manager.get_dialog_as<DialogBox_Manufacture>(DialogBoxId::Manufacture);
+	if (!mfg) return false;
+	index = mfg->m_progress;
 	if (index < 0 || index >= hb::shared::limits::MaxBuildItems) return false;
 
 	if (m_display_recipes[index] == 0) return false;
 
-	item_index[1] = m_game->m_dialog_box_manager.Info(DialogBoxId::Manufacture).m_v1;
-	item_index[2] = m_game->m_dialog_box_manager.Info(DialogBoxId::Manufacture).m_v2;
-	item_index[3] = m_game->m_dialog_box_manager.Info(DialogBoxId::Manufacture).m_v3;
-	item_index[4] = m_game->m_dialog_box_manager.Info(DialogBoxId::Manufacture).m_v4;
-	item_index[5] = m_game->m_dialog_box_manager.Info(DialogBoxId::Manufacture).m_v5;
-	item_index[6] = m_game->m_dialog_box_manager.Info(DialogBoxId::Manufacture).m_v6;
+	item_index[1] = mfg->m_slot_1;
+	item_index[2] = mfg->m_slot_2;
+	item_index[3] = mfg->m_slot_3;
+	item_index[4] = mfg->m_slot_4;
+	item_index[5] = mfg->m_slot_5;
+	item_index[6] = mfg->m_slot_6;
 
 	for (i = 1; i <= 6; i++)
 		if (item_index[i] != -1)

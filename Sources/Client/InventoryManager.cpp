@@ -133,7 +133,7 @@ void inventory_manager::erase_item(int item_id)
 	// ItemList
 	m_game->m_item_list[item_id].reset();
 	m_game->m_is_item_equipped[item_id] = false;
-	m_game->m_is_item_disabled[item_id] = false;
+	unlock_item(item_id);
 }
 
 bool inventory_manager::check_item_operation_enabled(int item_id)
@@ -142,7 +142,7 @@ bool inventory_manager::check_item_operation_enabled(int item_id)
 	if (m_game->m_item_list[item_id] == 0) return false;
 	if (m_game->m_player->m_Controller.get_command() < 0) return false;
 	if (teleport_manager::get().is_requested()) return false;
-	if (m_game->m_is_item_disabled[item_id] == true) return false;
+	if (is_locked(item_id)) return false;
 
 	if ((m_game->m_item_list[item_id]->m_id_num == 867) && (m_game->m_using_slate == true)) // Ancient Tablet
 	{
@@ -155,43 +155,7 @@ bool inventory_manager::check_item_operation_enabled(int item_id)
 		return false;
 	}
 
-	if (m_game->m_dialog_box_manager.is_enabled(DialogBoxId::ItemDropExternal) == true)
-	{
-		m_game->add_event_list(BCHECK_ITEM_OPERATION_ENABLE1, 10);
-		return false;
-	}
-
-	if (m_game->m_dialog_box_manager.is_enabled(DialogBoxId::NpcActionQuery) == true)
-	{
-		m_game->add_event_list(BCHECK_ITEM_OPERATION_ENABLE1, 10);
-		return false;
-	}
-
-	if (m_game->m_dialog_box_manager.is_enabled(DialogBoxId::SellOrRepair) == true)
-	{
-		m_game->add_event_list(BCHECK_ITEM_OPERATION_ENABLE1, 10);
-		return false;
-	}
-
-	if (m_game->m_dialog_box_manager.is_enabled(DialogBoxId::Manufacture) == true)
-	{
-		m_game->add_event_list(BCHECK_ITEM_OPERATION_ENABLE1, 10);
-		return false;
-	}
-
-	if (m_game->m_dialog_box_manager.is_enabled(DialogBoxId::Exchange) == true)
-	{
-		m_game->add_event_list(BCHECK_ITEM_OPERATION_ENABLE1, 10);
-		return false;
-	}
-
-	if (m_game->m_dialog_box_manager.is_enabled(DialogBoxId::SellList) == true)
-	{
-		m_game->add_event_list(BCHECK_ITEM_OPERATION_ENABLE1, 10);
-		return false;
-	}
-
-	if (m_game->m_dialog_box_manager.is_enabled(DialogBoxId::ItemDropConfirm) == true)
+	if (m_game->m_dialog_box_manager.is_blocking_operation_active())
 	{
 		m_game->add_event_list(BCHECK_ITEM_OPERATION_ENABLE1, 10);
 		return false;
@@ -346,4 +310,28 @@ void inventory_manager::equip_item(int item_id)
 		else
 			m_game->play_game_sound('E', 28, 0);
 	}
+}
+
+void inventory_manager::lock_item(int slot)
+{
+	if (slot >= 0 && slot < hb::shared::limits::MaxItems)
+		m_game->m_is_item_disabled[slot] = true;
+}
+
+void inventory_manager::unlock_item(int slot)
+{
+	if (slot >= 0 && slot < hb::shared::limits::MaxItems)
+		m_game->m_is_item_disabled[slot] = false;
+}
+
+bool inventory_manager::is_locked(int slot) const
+{
+	if (slot >= 0 && slot < hb::shared::limits::MaxItems)
+		return m_game->m_is_item_disabled[slot];
+	return false;
+}
+
+void inventory_manager::unlock_all()
+{
+	m_game->m_is_item_disabled.fill(false);
 }

@@ -1,6 +1,7 @@
 ﻿#include "Game.h"
 #include "NetworkMessageManager.h"
 #include "Packet/SharedPackets.h"
+#include "DialogBox_Skill.h"
 #include "lan_eng.h"
 #include <cstdio>
 #include <cstring>
@@ -17,7 +18,8 @@ namespace NetworkMessageHandlers {
 		if (!pkt) return;
 		skill_index = static_cast<short>(pkt->skill_index);
 		game->m_down_skill_index = skill_index;
-		game->m_dialog_box_manager.Info(DialogBoxId::Skill).m_flag = false;
+		auto* skill_dlg = game->m_dialog_box_manager.get_dialog_as<DialogBox_Skill>(DialogBoxId::Skill);
+		if (skill_dlg) skill_dlg->m_is_down_skill_pending = false;
 	}
 
 	void HandleMagicStudyFail(CGame* game, char* data)

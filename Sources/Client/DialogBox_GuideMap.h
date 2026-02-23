@@ -8,9 +8,9 @@ public:
 	~DialogBox_GuideMap() override = default;
 
 	void on_update() override;
-	void on_draw(short mouse_x, short mouse_y, short z, char lb) override;
-	bool on_click(short mouse_x, short mouse_y) override;
-	bool on_double_click(short mouse_x, short mouse_y) override;
+	void on_draw() override;
+	bool on_click() override;
+	bool on_double_click() override;
 
 private:
 	void draw_border(short sX, short sY);

@@ -3,6 +3,7 @@
 #include "Packet/SharedPackets.h"
 #include "lan_eng.h"
 #include "DialogBoxIDs.h"
+#include "DialogBox_Bank.h"
 #include <cstring>
 #include <cstdio>
 #include <format>
@@ -62,7 +63,10 @@ namespace NetworkMessageHandlers {
 			else txt = std::format(NOTIFYMSG_ITEMTOBANK2, count, str1.c_str());
 
 			if (game->m_dialog_box_manager.is_enabled(DialogBoxId::Bank) == true)
-				game->m_dialog_box_manager.Info(DialogBoxId::Bank).m_view = hb::shared::limits::MaxBankItems - 12;
+				{
+				auto* bank_dlg = game->m_dialog_box_manager.get_dialog_as<DialogBox_Bank>(DialogBoxId::Bank);
+				if (bank_dlg) bank_dlg->m_scroll_offset = hb::shared::limits::MaxBankItems - 12;
+			}
 			game->add_event_list(txt.c_str(), 10);
 		}
 		else if (pkt->is_new == 0)

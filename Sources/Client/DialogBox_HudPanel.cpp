@@ -4,6 +4,8 @@
 #include "SharedCalculations.h"
 #include "GameFonts.h"
 #include "TextLibExt.h"
+#include "IInput.h"
+#include "CombatSystem.h"
 #include <algorithm>
 #include <cstdlib>
 #include <format>
@@ -25,11 +27,13 @@ DialogBox_HudPanel::DialogBox_HudPanel(CGame* game)
 	: IDialogBox(DialogBoxId::HudPanel, game)
 {
 	set_default_rect(0, LOGICAL_HEIGHT() - ICON_PANEL_HEIGHT(), ICON_PANEL_WIDTH(), ICON_PANEL_HEIGHT());
-	set_can_close_on_right_click(false);
+	m_can_close_on_right_click = false;
 }
 
-bool DialogBox_HudPanel::is_in_button(short mouse_x, short mouse_y, int x1, int x2) const
+bool DialogBox_HudPanel::is_in_button(int x1, int x2) const
 {
+	short mouse_x = static_cast<short>(hb::shared::input::get_mouse_x());
+	short mouse_y = static_cast<short>(hb::shared::input::get_mouse_y());
 	return (mouse_x > x1) && (mouse_x < x2) && (mouse_y > BTN_Y1()) && (mouse_y < BTN_Y2());
 }
 
@@ -105,8 +109,10 @@ void DialogBox_HudPanel::draw_gauge_bars()
 
 }
 
-void DialogBox_HudPanel::draw_status_icons(short mouse_x, short mouse_y)
+void DialogBox_HudPanel::draw_status_icons()
 {
+	short mouse_x = static_cast<short>(hb::shared::input::get_mouse_x());
+	short mouse_y = static_cast<short>(hb::shared::input::get_mouse_y());
 	uint32_t time = m_game->m_cur_time;
 	auto sprite = m_game->m_sprite[InterfaceNdIconPanel];
 
@@ -146,7 +152,7 @@ void DialogBox_HudPanel::draw_status_icons(short mouse_x, short mouse_y)
 	}
 
 	// Combat mode button hover
-	if (is_in_button(mouse_x, mouse_y, BTN_COMBAT_X1(), BTN_COMBAT_X2()))
+	if (is_in_button(BTN_COMBAT_X1(), BTN_COMBAT_X2()))
 	{
 		sprite->draw(BTN_COMBAT_X1(), BTN_Y1(), 16);
 		const char* tooltip = m_game->m_player->m_is_combat_mode
@@ -158,7 +164,7 @@ void DialogBox_HudPanel::draw_status_icons(short mouse_x, short mouse_y)
 	// Crusade icon
 	if (m_game->m_is_crusade_mode && m_game->m_player->m_crusade_duty != 0)
 	{
-		bool hover = is_in_button(mouse_x, mouse_y, BTN_CRUSADE_X1(), BTN_CRUSADE_X2());
+		bool hover = is_in_button(BTN_CRUSADE_X1(), BTN_CRUSADE_X2());
 		if (m_game->m_player->m_aresden)
 			sprite->draw(BTN_CRUSADE_X1() + (hover ? 1 : 0), BTN_Y1(), hover ? 1 : 2);
 		else
@@ -190,8 +196,11 @@ void DialogBox_HudPanel::draw_status_icons(short mouse_x, short mouse_y)
 	put_aligned_string(MAP_MSG_X1(), MAP_MSG_X2(), MAP_MSG_Y(), infoBuf.c_str(), GameColors::UIPaleYellow);
 }
 
-void DialogBox_HudPanel::draw_icon_buttons(short mouse_x, short mouse_y)
+void DialogBox_HudPanel::draw_icon_buttons()
 {
+	short mouse_x = static_cast<short>(hb::shared::input::get_mouse_x());
+	short mouse_y = static_cast<short>(hb::shared::input::get_mouse_y());
+
 	if (mouse_y <= BTN_Y1() || mouse_y >= BTN_Y2()) return;
 
 	uint32_t time = m_game->m_cur_time;
@@ -212,22 +221,49 @@ void DialogBox_HudPanel::draw_icon_buttons(short mouse_x, short mouse_y)
 	}
 }
 
-void DialogBox_HudPanel::on_draw(short mouse_x, short mouse_y, short z, char lb)
+void DialogBox_HudPanel::draw_super_attack_overlay()
 {
-	short panelY = Info().m_y;
+	if (m_game->m_player->m_super_attack_left <= 0) return;
 
-	// draw main HUD background centered (at xOffset, which is 0 for 640x480, 80 for 800x600)
-	m_game->m_sprite[InterfaceNdIconPanel]->draw(0, panelY, 14);
+	int iconX = COMBAT_ICON_X();
+	int iconY = COMBAT_ICON_Y();
+	int btnX = BTN_COMBAT_X1();
+	int btnY = BTN_Y1();
+	int btnW = 42;
+	int btnH = 41;
 
-	draw_gauge_bars();
-	draw_status_icons(mouse_x, mouse_y);
-	draw_icon_buttons(mouse_x, mouse_y);
+	bool mastered = (m_game->m_player->m_skill_mastery[combat_system::get().get_weapon_skill_type()] == 100);
+
+	// draw additive overlay sprite at combat icon position only when ALT is held
+	if (hb::shared::input::is_alt_down() && mastered)
+		m_game->m_sprite[InterfaceNdIconPanel]->draw(iconX, iconY, 3, hb::shared::sprite::DrawParams::additive(0.7f));
+
+	// draw super attack count text at bottom-right of combat button area
+	std::string txt = std::format("{}", m_game->m_player->m_super_attack_left);
+	if (mastered)
+		hb::shared::text::draw_text_aligned(GameFont::Bitmap1, btnX, btnY, btnW, btnH, txt.c_str(), hb::shared::text::TextStyle::with_integrated_shadow(hb::shared::render::Color(255, 255, 255)), hb::shared::text::Align::BottomRight);
+	else
+		hb::shared::text::draw_text_aligned(GameFont::Bitmap1, btnX, btnY, btnW, btnH, txt.c_str(), hb::shared::text::TextStyle::with_highlight(GameColors::BmpBtnActive), hb::shared::text::Align::BottomRight);
 }
 
-bool DialogBox_HudPanel::on_click(short mouse_x, short mouse_y)
+void DialogBox_HudPanel::on_draw()
 {
+	// draw main HUD background centered (at xOffset, which is 0 for 640x480, 80 for 800x600)
+	m_game->m_sprite[InterfaceNdIconPanel]->draw(0, m_y, 14);
+
+	draw_gauge_bars();
+	draw_status_icons();
+	draw_icon_buttons();
+	draw_super_attack_overlay();
+}
+
+bool DialogBox_HudPanel::on_click()
+{
+	short mouse_x = static_cast<short>(hb::shared::input::get_mouse_x());
+	short mouse_y = static_cast<short>(hb::shared::input::get_mouse_y());
+
 	// Crusade button
-	if (is_in_button(mouse_x, mouse_y, BTN_CRUSADE_X1(), BTN_CRUSADE_X2()))
+	if (is_in_button(BTN_CRUSADE_X1(), BTN_CRUSADE_X2()))
 	{
 		if (!m_game->m_is_crusade_mode) return false;
 		switch (m_game->m_player->m_crusade_duty)
@@ -242,7 +278,7 @@ bool DialogBox_HudPanel::on_click(short mouse_x, short mouse_y)
 	}
 
 	// Combat mode toggle
-	if (is_in_button(mouse_x, mouse_y, BTN_COMBAT_X1(), BTN_COMBAT_X2()))
+	if (is_in_button(BTN_COMBAT_X1(), BTN_COMBAT_X2()))
 	{
 		m_game->send_command(MsgId::CommandCommon, CommonType::ToggleCombatMode, 0, 0, 0, 0, 0);
 		m_game->play_game_sound('E', 14, 5);
@@ -255,7 +291,7 @@ bool DialogBox_HudPanel::on_click(short mouse_x, short mouse_y)
 	{
 		const auto& btn = TOGGLE_BUTTONS[i];
 		// Add X offset for wider resolutions
-		if (is_in_button(mouse_x, mouse_y, btn.x1 + xOffset, btn.x2 + xOffset))
+		if (is_in_button(btn.x1 + xOffset, btn.x2 + xOffset))
 		{
 			toggle_dialog_with_sound(btn.dialogId);
 			return true;
@@ -265,7 +301,7 @@ bool DialogBox_HudPanel::on_click(short mouse_x, short mouse_y)
 	return false;
 }
 
-bool DialogBox_HudPanel::on_item_drop(short mouse_x, short mouse_y)
+bool DialogBox_HudPanel::on_item_drop()
 {
 	// Placeholder — no item drop behavior on HUD panel at this time
 	return false;

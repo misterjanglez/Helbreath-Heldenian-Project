@@ -1,8 +1,9 @@
-﻿#include "DialogBox_Party.h"
+#include "DialogBox_Party.h"
 #include "Game.h"
 #include "lan_eng.h"
 #include <format>
 #include <string>
+#include "IInput.h"
 
 using namespace hb::shared::net;
 using namespace hb::client::sprite_id;
@@ -10,22 +11,22 @@ DialogBox_Party::DialogBox_Party(CGame* game)
 	: IDialogBox(DialogBoxId::Party, game)
 {
 	set_default_rect(0 , 0 , 258, 339);
-	set_can_close_on_right_click(false);
+	m_can_close_on_right_click = false;
 }
 
-void DialogBox_Party::on_draw(short mouse_x, short mouse_y, short z, char lb)
+void DialogBox_Party::on_draw()
 {
-	short sX = Info().m_x;
-	short sY = Info().m_y;
-	short size_x = Info().m_size_x;
+	short sX = m_x;
+	short sY = m_y;
+	short size_x = m_size_x;
 
 	m_game->draw_new_dialog_box(InterfaceNdGame2, sX, sY, 0);
 	m_game->draw_new_dialog_box(InterfaceNdText, sX, sY, 3);
 
-	switch (Info().m_mode) {
-	case 0:
+	switch (m_mode) {
+	case mode::main_menu:
 		if (m_game->m_party_status == 0) {
-			if ((mouse_x > sX + 80) && (mouse_x < sX + 195) && (mouse_y > sY + 80) && (mouse_y < sY + 100))
+			if (mouse_in(link_create))
 				put_aligned_string(sX, sX + size_x, sY + 85, DRAW_DIALOGBOX_PARTY1, GameColors::UIWhite);
 			else
 				put_aligned_string(sX, sX + size_x, sY + 85, DRAW_DIALOGBOX_PARTY1, GameColors::UIMagicBlue);
@@ -35,7 +36,7 @@ void DialogBox_Party::on_draw(short mouse_x, short mouse_y, short z, char lb)
 		}
 
 		if (m_game->m_party_status != 0) {
-			if ((mouse_x > sX + 80) && (mouse_x < sX + 195) && (mouse_y > sY + 100) && (mouse_y < sY + 120))
+			if (mouse_in(link_leave))
 				put_aligned_string(sX, sX + size_x, sY + 105, DRAW_DIALOGBOX_PARTY4, GameColors::UIWhite);
 			else
 				put_aligned_string(sX, sX + size_x, sY + 105, DRAW_DIALOGBOX_PARTY4, GameColors::UIMagicBlue);
@@ -45,7 +46,7 @@ void DialogBox_Party::on_draw(short mouse_x, short mouse_y, short z, char lb)
 		}
 
 		if (m_game->m_party_status != 0) {
-			if ((mouse_x > sX + 80) && (mouse_x < sX + 195) && (mouse_y > sY + 120) && (mouse_y < sY + 140))
+			if (mouse_in(link_members))
 				put_aligned_string(sX, sX + size_x, sY + 125, DRAW_DIALOGBOX_PARTY7, GameColors::UIWhite);
 			else
 				put_aligned_string(sX, sX + size_x, sY + 125, DRAW_DIALOGBOX_PARTY7, GameColors::UIMagicBlue);
@@ -68,15 +69,15 @@ void DialogBox_Party::on_draw(short mouse_x, short mouse_y, short z, char lb)
 			break;
 		}
 
-		if ((mouse_x >= sX + ui_layout::right_btn_x) && (mouse_x <= sX + ui_layout::right_btn_x + ui_layout::btn_size_x) && (mouse_y > sY + ui_layout::btn_y) && (mouse_y < sY + ui_layout::btn_y + ui_layout::btn_size_y))
+		if (mouse_in(btn_right))
 			m_game->draw_new_dialog_box(InterfaceNdButton, sX + ui_layout::right_btn_x, sY + ui_layout::btn_y, 1);
 		else
 			m_game->draw_new_dialog_box(InterfaceNdButton, sX + ui_layout::right_btn_x, sY + ui_layout::btn_y, 0);
 		break;
 
-	case 1: {
+	case mode::invited: {
 		std::string partyBuf;
-		partyBuf = std::format(DRAW_DIALOGBOX_PARTY16, Info().m_str);
+		partyBuf = std::format(DRAW_DIALOGBOX_PARTY16, m_leader_name);
 		put_aligned_string(sX, sX + size_x, sY + 95, partyBuf.c_str());
 		put_aligned_string(sX, sX + size_x, sY + 110, DRAW_DIALOGBOX_PARTY17);
 		put_aligned_string(sX, sX + size_x, sY + 125, DRAW_DIALOGBOX_PARTY18);
@@ -84,90 +85,90 @@ void DialogBox_Party::on_draw(short mouse_x, short mouse_y, short z, char lb)
 		put_aligned_string(sX, sX + size_x, sY + 155, DRAW_DIALOGBOX_PARTY20);
 		put_aligned_string(sX, sX + size_x, sY + 175, DRAW_DIALOGBOX_PARTY21);
 
-		if ((mouse_x >= sX + ui_layout::left_btn_x) && (mouse_x <= sX + ui_layout::left_btn_x + ui_layout::btn_size_x) && (mouse_y >= sY + ui_layout::btn_y) && (mouse_y <= sY + ui_layout::btn_y + ui_layout::btn_size_y))
+		if (mouse_in(btn_left))
 			m_game->draw_new_dialog_box(InterfaceNdButton, sX + ui_layout::left_btn_x, sY + ui_layout::btn_y, 19);
 		else
 			m_game->draw_new_dialog_box(InterfaceNdButton, sX + ui_layout::left_btn_x, sY + ui_layout::btn_y, 18);
 
-		if ((mouse_x >= sX + ui_layout::right_btn_x) && (mouse_x <= sX + ui_layout::right_btn_x + ui_layout::btn_size_x) && (mouse_y >= sY + ui_layout::btn_y) && (mouse_y <= sY + ui_layout::btn_y + ui_layout::btn_size_y))
+		if (mouse_in(btn_right))
 			m_game->draw_new_dialog_box(InterfaceNdButton, sX + ui_layout::right_btn_x, sY + ui_layout::btn_y, 3);
 		else
 			m_game->draw_new_dialog_box(InterfaceNdButton, sX + ui_layout::right_btn_x, sY + ui_layout::btn_y, 2);
 		break;
 	}
 
-	case 2:
+	case mode::pointing:
 		put_aligned_string(sX, sX + size_x, sY + 95, DRAW_DIALOGBOX_PARTY22);
 		put_aligned_string(sX, sX + size_x, sY + 110, DRAW_DIALOGBOX_PARTY23);
 		put_aligned_string(sX, sX + size_x, sY + 125, DRAW_DIALOGBOX_PARTY24);
 		put_aligned_string(sX, sX + size_x, sY + 140, DRAW_DIALOGBOX_PARTY25);
 
-		if ((mouse_x >= sX + ui_layout::right_btn_x) && (mouse_x <= sX + ui_layout::right_btn_x + ui_layout::btn_size_x) && (mouse_y > sY + ui_layout::btn_y) && (mouse_y < sY + ui_layout::btn_y + ui_layout::btn_size_y))
+		if (mouse_in(btn_right))
 			m_game->draw_new_dialog_box(InterfaceNdButton, sX + ui_layout::right_btn_x, sY + ui_layout::btn_y, 17);
 		else
 			m_game->draw_new_dialog_box(InterfaceNdButton, sX + ui_layout::right_btn_x, sY + ui_layout::btn_y, 16);
 		break;
 
-	case 3: {
+	case mode::join_requested: {
 		std::string partyBuf;
-		partyBuf = std::format(DRAW_DIALOGBOX_PARTY26, Info().m_str);
+		partyBuf = std::format(DRAW_DIALOGBOX_PARTY26, m_leader_name);
 		put_aligned_string(sX, sX + size_x, sY + 95, partyBuf.c_str());
 		put_aligned_string(sX, sX + size_x, sY + 110, DRAW_DIALOGBOX_PARTY27);
 		put_aligned_string(sX, sX + size_x, sY + 125, DRAW_DIALOGBOX_PARTY28);
 		put_aligned_string(sX, sX + size_x, sY + 140, DRAW_DIALOGBOX_PARTY29);
 		put_aligned_string(sX, sX + size_x, sY + 155, DRAW_DIALOGBOX_PARTY30);
 
-		if ((mouse_x >= sX + ui_layout::right_btn_x) && (mouse_x <= sX + ui_layout::right_btn_x + ui_layout::btn_size_x) && (mouse_y > sY + ui_layout::btn_y) && (mouse_y < sY + ui_layout::btn_y + ui_layout::btn_size_y))
+		if (mouse_in(btn_right))
 			m_game->draw_new_dialog_box(InterfaceNdButton, sX + ui_layout::right_btn_x, sY + ui_layout::btn_y, 17);
 		else
 			m_game->draw_new_dialog_box(InterfaceNdButton, sX + ui_layout::right_btn_x, sY + ui_layout::btn_y, 16);
 		break;
 	}
 
-	case 4: {
+	case mode::member_list: {
 		put_aligned_string(sX, sX + size_x, sY + 95, DRAW_DIALOGBOX_PARTY31);
 		put_aligned_string(sX, sX + size_x, sY + 110, DRAW_DIALOGBOX_PARTY32);
 
 		int nth = 0;
 		for (int i = 0; i <= hb::shared::limits::MaxPartyMembers; i++) {
-			if (m_game->m_party_member_name_list[i].name.size() != 0) {
-				put_aligned_string(sX + 17, sX + 270, sY + 140 + 15 * nth, m_game->m_party_member_name_list[i].name.c_str());
+			if (m_name_list[i].name.size() != 0) {
+				put_aligned_string(sX + 17, sX + 270, sY + 140 + 15 * nth, m_name_list[i].name.c_str(), GameColors::UILabel);
 				nth++;
 			}
 		}
 
-		if ((mouse_x >= sX + ui_layout::right_btn_x) && (mouse_x <= sX + ui_layout::right_btn_x + ui_layout::btn_size_x) && (mouse_y > sY + ui_layout::btn_y) && (mouse_y < sY + ui_layout::btn_y + ui_layout::btn_size_y))
+		if (mouse_in(btn_right))
 			m_game->draw_new_dialog_box(InterfaceNdButton, sX + ui_layout::right_btn_x, sY + ui_layout::btn_y, 1);
 		else
 			m_game->draw_new_dialog_box(InterfaceNdButton, sX + ui_layout::right_btn_x, sY + ui_layout::btn_y, 0);
 		break;
 	}
 
-	case 5:
+	case mode::leaving:
 		put_aligned_string(sX, sX + size_x, sY + 95, DRAW_DIALOGBOX_PARTY33);
 		put_aligned_string(sX, sX + size_x, sY + 110, DRAW_DIALOGBOX_PARTY34);
 		break;
 
-	case 6:
+	case mode::withdrawn:
 		put_aligned_string(sX, sX + size_x, sY + 95, DRAW_DIALOGBOX_PARTY35);
-		if ((mouse_x >= sX + ui_layout::right_btn_x) && (mouse_x <= sX + ui_layout::right_btn_x + ui_layout::btn_size_x) && (mouse_y > sY + ui_layout::btn_y) && (mouse_y < sY + ui_layout::btn_y + ui_layout::btn_size_y))
+		if (mouse_in(btn_right))
 			m_game->draw_new_dialog_box(InterfaceNdButton, sX + ui_layout::right_btn_x, sY + ui_layout::btn_y, 1);
 		else
 			m_game->draw_new_dialog_box(InterfaceNdButton, sX + ui_layout::right_btn_x, sY + ui_layout::btn_y, 0);
 		break;
 
-	case 7:
+	case mode::party_full:
 		put_aligned_string(sX, sX + size_x, sY + 95, DRAW_DIALOGBOX_PARTY36);
 		put_aligned_string(sX, sX + size_x, sY + 110, DRAW_DIALOGBOX_PARTY37);
 		put_aligned_string(sX, sX + size_x, sY + 125, DRAW_DIALOGBOX_PARTY38);
 		put_aligned_string(sX, sX + size_x, sY + 140, DRAW_DIALOGBOX_PARTY39);
-		if ((mouse_x >= sX + ui_layout::right_btn_x) && (mouse_x <= sX + ui_layout::right_btn_x + ui_layout::btn_size_x) && (mouse_y > sY + ui_layout::btn_y) && (mouse_y < sY + ui_layout::btn_y + ui_layout::btn_size_y))
+		if (mouse_in(btn_right))
 			m_game->draw_new_dialog_box(InterfaceNdButton, sX + ui_layout::right_btn_x, sY + ui_layout::btn_y, 1);
 		else
 			m_game->draw_new_dialog_box(InterfaceNdButton, sX + ui_layout::right_btn_x, sY + ui_layout::btn_y, 0);
 		break;
 
-	case 8:
+	case mode::failed:
 		put_aligned_string(sX, sX + size_x, sY + 95, DRAW_DIALOGBOX_PARTY40);
 		put_aligned_string(sX, sX + size_x, sY + 110, DRAW_DIALOGBOX_PARTY41);
 		put_aligned_string(sX, sX + size_x, sY + 125, DRAW_DIALOGBOX_PARTY42);
@@ -175,13 +176,13 @@ void DialogBox_Party::on_draw(short mouse_x, short mouse_y, short z, char lb)
 		put_aligned_string(sX, sX + size_x, sY + 155, DRAW_DIALOGBOX_PARTY44);
 		put_aligned_string(sX, sX + size_x, sY + 170, DRAW_DIALOGBOX_PARTY45);
 
-		if ((mouse_x >= sX + ui_layout::right_btn_x) && (mouse_x <= sX + ui_layout::right_btn_x + ui_layout::btn_size_x) && (mouse_y > sY + ui_layout::btn_y) && (mouse_y < sY + ui_layout::btn_y + ui_layout::btn_size_y))
+		if (mouse_in(btn_right))
 			m_game->draw_new_dialog_box(InterfaceNdButton, sX + ui_layout::right_btn_x, sY + ui_layout::btn_y, 1);
 		else
 			m_game->draw_new_dialog_box(InterfaceNdButton, sX + ui_layout::right_btn_x, sY + ui_layout::btn_y, 0);
 		break;
 
-	case 9:
+	case mode::already_in_party:
 		put_aligned_string(sX, sX + size_x, sY + 95, DRAW_DIALOGBOX_PARTY46);
 		put_aligned_string(sX, sX + size_x, sY + 110, DRAW_DIALOGBOX_PARTY47);
 		put_aligned_string(sX, sX + size_x, sY + 125, DRAW_DIALOGBOX_PARTY48);
@@ -189,30 +190,30 @@ void DialogBox_Party::on_draw(short mouse_x, short mouse_y, short z, char lb)
 		put_aligned_string(sX, sX + size_x, sY + 155, DRAW_DIALOGBOX_PARTY50);
 		put_aligned_string(sX, sX + size_x, sY + 170, DRAW_DIALOGBOX_PARTY51);
 
-		if ((mouse_x >= sX + ui_layout::right_btn_x) && (mouse_x <= sX + ui_layout::right_btn_x + ui_layout::btn_size_x) && (mouse_y > sY + ui_layout::btn_y) && (mouse_y < sY + ui_layout::btn_y + ui_layout::btn_size_y))
+		if (mouse_in(btn_right))
 			m_game->draw_new_dialog_box(InterfaceNdButton, sX + ui_layout::right_btn_x, sY + ui_layout::btn_y, 1);
 		else
 			m_game->draw_new_dialog_box(InterfaceNdButton, sX + ui_layout::right_btn_x, sY + ui_layout::btn_y, 0);
 		break;
 
-	case 10:
+	case mode::disbanded:
 		put_aligned_string(sX, sX + size_x, sY + 95, DRAW_DIALOGBOX_PARTY52);
 		put_aligned_string(sX, sX + size_x, sY + 110, DRAW_DIALOGBOX_PARTY53);
 		put_aligned_string(sX, sX + size_x, sY + 125, DRAW_DIALOGBOX_PARTY54);
-		if ((mouse_x >= sX + ui_layout::right_btn_x) && (mouse_x <= sX + ui_layout::right_btn_x + ui_layout::btn_size_x) && (mouse_y > sY + ui_layout::btn_y) && (mouse_y < sY + ui_layout::btn_y + ui_layout::btn_size_y))
+		if (mouse_in(btn_right))
 			m_game->draw_new_dialog_box(InterfaceNdButton, sX + ui_layout::right_btn_x, sY + ui_layout::btn_y, 1);
 		else
 			m_game->draw_new_dialog_box(InterfaceNdButton, sX + ui_layout::right_btn_x, sY + ui_layout::btn_y, 0);
 		break;
 
-	case 11:
+	case mode::confirm_leave:
 		put_aligned_string(sX, sX + size_x, sY + 95, DRAW_DIALOGBOX_PARTY55);
-		if ((mouse_x >= sX + ui_layout::left_btn_x) && (mouse_x <= sX + ui_layout::left_btn_x + ui_layout::btn_size_x) && (mouse_y >= sY + ui_layout::btn_y) && (mouse_y <= sY + ui_layout::btn_y + ui_layout::btn_size_y))
+		if (mouse_in(btn_left))
 			m_game->draw_new_dialog_box(InterfaceNdButton, sX + ui_layout::left_btn_x, sY + ui_layout::btn_y, 19);
 		else
 			m_game->draw_new_dialog_box(InterfaceNdButton, sX + ui_layout::left_btn_x, sY + ui_layout::btn_y, 18);
 
-		if ((mouse_x >= sX + ui_layout::right_btn_x) && (mouse_x <= sX + ui_layout::right_btn_x + ui_layout::btn_size_x) && (mouse_y >= sY + ui_layout::btn_y) && (mouse_y <= sY + ui_layout::btn_y + ui_layout::btn_size_y))
+		if (mouse_in(btn_right))
 			m_game->draw_new_dialog_box(InterfaceNdButton, sX + ui_layout::right_btn_x, sY + ui_layout::btn_y, 3);
 		else
 			m_game->draw_new_dialog_box(InterfaceNdButton, sX + ui_layout::right_btn_x, sY + ui_layout::btn_y, 2);
@@ -220,16 +221,13 @@ void DialogBox_Party::on_draw(short mouse_x, short mouse_y, short z, char lb)
 	}
 }
 
-bool DialogBox_Party::on_click(short mouse_x, short mouse_y)
+bool DialogBox_Party::on_click()
 {
-	short sX = Info().m_x;
-	short sY = Info().m_y;
-
-	switch (Info().m_mode) {
-	case 0:
+	switch (m_mode) {
+	case mode::main_menu:
 		if (m_game->m_party_status == 0) {
-			if ((mouse_x > sX + 80) && (mouse_x < sX + 195) && (mouse_y > sY + 80) && (mouse_y < sY + 100)) {
-				Info().m_mode = 2;
+			if (mouse_in(link_create)) {
+				m_mode = mode::pointing;
 				m_game->m_is_get_pointing_mode = true;
 				m_game->m_point_command_type = 200;
 				play_sound_effect('E', 14, 5);
@@ -238,90 +236,160 @@ bool DialogBox_Party::on_click(short mouse_x, short mouse_y)
 		}
 
 		if (m_game->m_party_status != 0) {
-			if ((mouse_x > sX + 80) && (mouse_x < sX + 195) && (mouse_y > sY + 100) && (mouse_y < sY + 120)) {
-				Info().m_mode = 11;
+			if (mouse_in(link_leave)) {
+				m_mode = mode::confirm_leave;
 				play_sound_effect('E', 14, 5);
 				return true;
 			}
 		}
 
 		if (m_game->m_party_status != 0) {
-			if ((mouse_x > sX + 80) && (mouse_x < sX + 195) && (mouse_y > sY + 120) && (mouse_y < sY + 140)) {
+			if (mouse_in(link_members)) {
 				send_command(MsgId::CommandCommon, CommonType::RequestJoinParty, 0, 2, 0, 0, m_game->m_mc_name.c_str());
-				Info().m_mode = 4;
+				m_mode = mode::member_list;
 				play_sound_effect('E', 14, 5);
 				return true;
 			}
 		}
 
-		if ((mouse_x >= sX + ui_layout::right_btn_x) && (mouse_x <= sX + ui_layout::right_btn_x + ui_layout::btn_size_x) && (mouse_y > sY + ui_layout::btn_y) && (mouse_y < sY + ui_layout::btn_y + ui_layout::btn_size_y)) {
+		if (mouse_in(btn_right)) {
 			m_game->m_dialog_box_manager.disable_dialog_box(DialogBoxId::Party);
 			return true;
 		}
 		break;
 
-	case 1:
-		if ((mouse_x >= sX + ui_layout::left_btn_x) && (mouse_x <= sX + ui_layout::left_btn_x + ui_layout::btn_size_x) && (mouse_y >= sY + ui_layout::btn_y) && (mouse_y <= sY + ui_layout::btn_y + ui_layout::btn_size_y)) {
-			send_command(MsgId::CommandCommon, CommonType::RequestAcceptJoinParty, 0, 1, 0, 0, Info().m_str);
+	case mode::invited:
+		if (mouse_in(btn_left)) {
+			send_command(MsgId::CommandCommon, CommonType::RequestAcceptJoinParty, 0, 1, 0, 0, m_leader_name);
 			m_game->m_dialog_box_manager.disable_dialog_box(DialogBoxId::Party);
 			play_sound_effect('E', 14, 5);
 			return true;
 		}
 
-		if ((mouse_x >= sX + ui_layout::right_btn_x) && (mouse_x <= sX + ui_layout::right_btn_x + ui_layout::btn_size_x) && (mouse_y >= sY + ui_layout::btn_y) && (mouse_y <= sY + ui_layout::btn_y + ui_layout::btn_size_y)) {
-			send_command(MsgId::CommandCommon, CommonType::RequestAcceptJoinParty, 0, 0, 0, 0, Info().m_str);
-			m_game->m_dialog_box_manager.disable_dialog_box(DialogBoxId::Party);
-			play_sound_effect('E', 14, 5);
-			return true;
-		}
-		break;
-
-	case 2:
-		if ((mouse_x >= sX + ui_layout::right_btn_x) && (mouse_x <= sX + ui_layout::right_btn_x + ui_layout::btn_size_x) && (mouse_y > sY + ui_layout::btn_y) && (mouse_y < sY + ui_layout::btn_y + ui_layout::btn_size_y)) {
-			Info().m_mode = 0;
-			play_sound_effect('E', 14, 5);
-			return true;
-		}
-		break;
-
-	case 3:
-		if ((mouse_x >= sX + ui_layout::right_btn_x) && (mouse_x <= sX + ui_layout::right_btn_x + ui_layout::btn_size_x) && (mouse_y > sY + ui_layout::btn_y) && (mouse_y < sY + ui_layout::btn_y + ui_layout::btn_size_y)) {
-			Info().m_mode = 0;
-			send_command(MsgId::CommandCommon, CommonType::RequestAcceptJoinParty, 0, 2, 0, 0, Info().m_str);
+		if (mouse_in(btn_right)) {
+			send_command(MsgId::CommandCommon, CommonType::RequestAcceptJoinParty, 0, 0, 0, 0, m_leader_name);
 			m_game->m_dialog_box_manager.disable_dialog_box(DialogBoxId::Party);
 			play_sound_effect('E', 14, 5);
 			return true;
 		}
 		break;
 
-	case 4:
-	case 6:
-	case 7:
-	case 8:
-	case 9:
-	case 10:
-		if ((mouse_x >= sX + ui_layout::right_btn_x) && (mouse_x <= sX + ui_layout::right_btn_x + ui_layout::btn_size_x) && (mouse_y > sY + ui_layout::btn_y) && (mouse_y < sY + ui_layout::btn_y + ui_layout::btn_size_y)) {
-			Info().m_mode = 0;
+	case mode::pointing:
+		if (mouse_in(btn_right)) {
+			m_mode = mode::main_menu;
 			play_sound_effect('E', 14, 5);
 			return true;
 		}
 		break;
 
-	case 11:
-		if ((mouse_x >= sX + ui_layout::left_btn_x) && (mouse_x <= sX + ui_layout::left_btn_x + ui_layout::btn_size_x) && (mouse_y >= sY + ui_layout::btn_y) && (mouse_y <= sY + ui_layout::btn_y + ui_layout::btn_size_y)) {
+	case mode::join_requested:
+		if (mouse_in(btn_right)) {
+			m_mode = mode::main_menu;
+			send_command(MsgId::CommandCommon, CommonType::RequestAcceptJoinParty, 0, 2, 0, 0, m_leader_name);
+			m_game->m_dialog_box_manager.disable_dialog_box(DialogBoxId::Party);
+			play_sound_effect('E', 14, 5);
+			return true;
+		}
+		break;
+
+	case mode::member_list:
+	case mode::withdrawn:
+	case mode::party_full:
+	case mode::failed:
+	case mode::already_in_party:
+	case mode::disbanded:
+		if (mouse_in(btn_right)) {
+			m_mode = mode::main_menu;
+			play_sound_effect('E', 14, 5);
+			return true;
+		}
+		break;
+
+	case mode::confirm_leave:
+		if (mouse_in(btn_left)) {
 			send_command(MsgId::CommandCommon, CommonType::RequestJoinParty, 0, 0, 0, 0, m_game->m_mc_name.c_str());
-			Info().m_mode = 5;
+			m_mode = mode::leaving;
 			play_sound_effect('E', 14, 5);
 			return true;
 		}
 
-		if ((mouse_x >= sX + ui_layout::right_btn_x) && (mouse_x <= sX + ui_layout::right_btn_x + ui_layout::btn_size_x) && (mouse_y >= sY + ui_layout::btn_y) && (mouse_y <= sY + ui_layout::btn_y + ui_layout::btn_size_y)) {
-			Info().m_mode = 0;
+		if (mouse_in(btn_right)) {
+			m_mode = mode::main_menu;
 			play_sound_effect('E', 14, 5);
 			return true;
 		}
+		break;
+
+	default:
 		break;
 	}
 
+	return false;
+}
+
+bool DialogBox_Party::on_enable(int type, int64_t v1, int v2, const char* string)
+{
+	if (is_enabled()) return true;
+	m_mode = static_cast<mode>(type);
+	auto* charDlg = get_dialog_box(DialogBoxId::CharacterInfo);
+	if (charDlg) { m_x = charDlg->m_x + 20; m_y = charDlg->m_y + 20; }
+	return true;
+}
+
+void DialogBox_Party::reset_members()
+{
+	for (int i = 0; i < hb::shared::limits::MaxPartyMembers; i++)
+		m_members[i].status = 0;
+}
+
+bool DialogBox_Party::add_member_name(const char* name)
+{
+	for (int i = 0; i < hb::shared::limits::MaxPartyMembers; i++)
+	{
+		if (m_name_list[i].name.empty())
+		{
+			m_name_list[i].name.assign(name, strnlen(name, hb::shared::limits::CharNameLen));
+			return true;
+		}
+	}
+	return false;
+}
+
+void DialogBox_Party::set_name_list(int count, const char* data, int name_len)
+{
+	clear_name_list();
+	for (int i = 0; i < count && i < hb::shared::limits::MaxPartyMembers; i++)
+	{
+		m_name_list[i].name.assign(data, strnlen(data, name_len));
+		data += name_len;
+	}
+}
+
+bool DialogBox_Party::remove_member_name(const char* name)
+{
+	for (int i = 0; i < hb::shared::limits::MaxPartyMembers; i++)
+	{
+		if (m_name_list[i].name == name)
+		{
+			m_name_list[i].name.clear();
+			return true;
+		}
+	}
+	return false;
+}
+
+void DialogBox_Party::clear_name_list()
+{
+	for (int i = 0; i <= hb::shared::limits::MaxPartyMembers; i++)
+		m_name_list[i].name.clear();
+}
+
+bool DialogBox_Party::is_party_member(const std::string& name) const
+{
+	for (int i = 0; i < hb::shared::limits::MaxPartyMembers; i++)
+	{
+		if (m_name_list[i].name == name)
+			return true;
+	}
 	return false;
 }

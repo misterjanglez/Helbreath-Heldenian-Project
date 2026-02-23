@@ -1,9 +1,11 @@
 #pragma once
 
-#include "DialogBoxInfo.h"
 #include "DialogBoxIDs.h"
 #include "CommonTypes.h"
 #include <cstdint>
+
+// Simple rect for dialog-relative hit-testing
+struct ui_rect { int x, y, w, h; };
 
 class CGame;
 class DialogBoxManager;
@@ -22,28 +24,39 @@ public:
 	IDialogBox(DialogBoxId::Type id, CGame* game);
 	virtual ~IDialogBox() = default;
 
-	// Core virtual methods - must be implemented by derived classes
-	virtual void on_draw(short mouse_x, short mouse_y, short z, char lb) = 0;
-	virtual bool on_click(short mouse_x, short mouse_y) = 0;
+	// --- Core virtual methods (no mouse params — use hb::shared::input) ---
+	virtual void on_draw() = 0;
+	virtual bool on_click() = 0;
 
 	// Optional virtual methods - override as needed
 	virtual void on_update() {}  // Called once per frame for enabled dialogs
-	virtual bool on_double_click(short mouse_x, short mouse_y) { return false; }
+	virtual bool on_double_click() { return false; }
 
 	// Called on mouse button down within dialog bounds
-	virtual PressResult on_press(short mouse_x, short mouse_y) { return PressResult::Normal; }
+	virtual PressResult on_press() { return PressResult::Normal; }
 
-	virtual bool on_item_drop(short mouse_x, short mouse_y) { return false; }  // Item dropped on dialog
-	virtual void on_enable(int type, int v1, int v2, char* string) {}
-	virtual void on_disable() {}
+	virtual bool on_item_drop() { return false; }  // Item dropped on dialog
+	virtual bool on_enable(int type, int64_t v1, int v2, const char* string) { return true; }
+	virtual bool on_disable() { return true; }
 
-	// Accessors
+	// --- Behavioral flags (override in subclasses) ---
+	virtual bool is_draggable() const { return true; }
+	virtual bool cancels_text_input_on_enable() const { return true; }
+
+	// --- Common state ---
 	DialogBoxId::Type get_id() const { return m_id; }
-	DialogBoxInfo& Info();
-	const DialogBoxInfo& Info() const;
-	bool is_enabled() const;
+	bool is_enabled() const { return m_enabled; }
+	void set_enabled(bool enabled) { m_enabled = enabled; }
+
+	short m_x = 0, m_y = 0;
+	short m_size_x = 0, m_size_y = 0;
+	bool m_is_scroll_selected = false;
+	bool m_can_close_on_right_click = true;
 
 protected:
+	// Returns true if mouse cursor is inside the rect (relative to dialog position)
+	bool mouse_in(const ui_rect& r) const;
+
 	// Helper methods - delegate to CGame
 	void draw_new_dialog_box(char type, int sX, int sY, int frame, bool is_no_color_key = false, bool is_trans = false);
 	void put_string(int iX, int iY, const char* string, const hb::shared::render::Color& color);
@@ -54,18 +67,19 @@ protected:
 	void set_default_rect(short sX, short sY, short size_x, short size_y);
 
 	// Dialog management helpers
-	void enable_dialog_box(DialogBoxId::Type id, int type = 0, int64_t v1 = 0, int v2 = 0, char* string = nullptr);
+	void enable_dialog_box(DialogBoxId::Type id, int type = 0, int64_t v1 = 0, int v2 = 0, const char* string = nullptr);
 	void disable_dialog_box(DialogBoxId::Type id);
 	void disable_this_dialog();
-	void set_can_close_on_right_click(bool can_close);
 
 	// Inter-dialog communication
 	IDialogBox* get_dialog_box(DialogBoxId::Type id);
-	DialogBoxInfo& info_of(DialogBoxId::Type id);
 	template<typename T>
 	T* get_dialog_box_as(DialogBoxId::Type id) { return static_cast<T*>(get_dialog_box(id)); }
 
 	// Direct access to game - use m_game->member for all game state
 	CGame* m_game;
 	DialogBoxId::Type m_id;
+
+private:
+	bool m_enabled = false;
 };

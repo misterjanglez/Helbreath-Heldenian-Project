@@ -3,6 +3,7 @@
 #include "lan_eng.h"
 #include <format>
 #include <string>
+#include "IInput.h"
 using namespace hb::client::sprite_id;
 
 DialogBox_Quest::DialogBox_Quest(CGame* game)
@@ -11,11 +12,11 @@ DialogBox_Quest::DialogBox_Quest(CGame* game)
 	set_default_rect(0 , 0 , 258, 339);
 }
 
-void DialogBox_Quest::on_draw(short mouse_x, short mouse_y, short z, char lb)
+void DialogBox_Quest::on_draw()
 {
-	short sX = Info().m_x;
-	short sY = Info().m_y;
-	short size_x = Info().m_size_x;
+	short sX = m_x;
+	short sY = m_y;
+	short size_x = m_size_x;
 	std::string txt;
 
 	char temp[21];
@@ -23,8 +24,8 @@ void DialogBox_Quest::on_draw(short mouse_x, short mouse_y, short z, char lb)
 	m_game->draw_new_dialog_box(InterfaceNdGame2, sX, sY, 2);
 	m_game->draw_new_dialog_box(InterfaceNdText, sX, sY, 4);
 
-	switch (Info().m_mode) {
-	case 1:
+	switch (m_mode) {
+	case mode::details:
 		switch (m_game->m_quest.quest_type) {
 		case 0:
 			put_aligned_string(sX, sX + size_x, sY + 50 + 115 - 30, DRAW_DIALOGBOX_QUEST1, GameColors::UILabel);
@@ -119,27 +120,33 @@ void DialogBox_Quest::on_draw(short mouse_x, short mouse_y, short z, char lb)
 		}
 		break;
 
-	case 2:
+	case mode::unavailable:
 		put_aligned_string(sX, sX + size_x, sY + 50 + 115 - 30, DRAW_DIALOGBOX_QUEST35, GameColors::UILabel);
 		break;
 	}
 
-	if ((mouse_x >= sX + ui_layout::right_btn_x) && (mouse_x <= sX + ui_layout::right_btn_x + ui_layout::btn_size_x) && (mouse_y > sY + ui_layout::btn_y) && (mouse_y < sY + ui_layout::btn_y + ui_layout::btn_size_y))
+	if (mouse_in(btn_ok))
 		m_game->draw_new_dialog_box(InterfaceNdButton, sX + ui_layout::right_btn_x, sY + ui_layout::btn_y, 1);
 	else
 		m_game->draw_new_dialog_box(InterfaceNdButton, sX + ui_layout::right_btn_x, sY + ui_layout::btn_y, 0);
 }
 
-bool DialogBox_Quest::on_click(short mouse_x, short mouse_y)
+bool DialogBox_Quest::on_click()
 {
-	short sX = Info().m_x;
-	short sY = Info().m_y;
-
-	if ((mouse_x >= sX + ui_layout::right_btn_x) && (mouse_x <= sX + ui_layout::right_btn_x + ui_layout::btn_size_x) && (mouse_y > sY + ui_layout::btn_y) && (mouse_y < sY + ui_layout::btn_y + ui_layout::btn_size_y)) {
+	if (mouse_in(btn_ok)) {
 		m_game->m_dialog_box_manager.disable_dialog_box(DialogBoxId::Quest);
 		play_sound_effect('E', 14, 5);
 		return true;
 	}
 
 	return false;
+}
+
+bool DialogBox_Quest::on_enable(int type, int64_t v1, int v2, const char* string)
+{
+	if (is_enabled()) return true;
+	m_mode = static_cast<mode>(type);
+	auto* charDlg = get_dialog_box(DialogBoxId::CharacterInfo);
+	if (charDlg) { m_x = charDlg->m_x + 20; m_y = charDlg->m_y + 20; }
+	return true;
 }

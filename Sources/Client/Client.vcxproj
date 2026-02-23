@@ -270,7 +270,6 @@
     <ClInclude Include="CommonTypes.h" />
     <ClInclude Include="Effect.h" />
     <ClInclude Include="DialogBoxIDs.h" />
-    <ClInclude Include="DialogBoxInfo.h" />
     <ClInclude Include="DialogBoxManager.h" />
     <ClInclude Include="IDialogBox.h" />
     <ClInclude Include="DialogBox_WarningMsg.h" />

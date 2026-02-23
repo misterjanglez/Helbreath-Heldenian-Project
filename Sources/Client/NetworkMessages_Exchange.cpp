@@ -1,8 +1,10 @@
 #include "Game.h"
+#include "InventoryManager.h"
 #include "NetworkMessageManager.h"
 #include "Packet/SharedPackets.h"
 #include "lan_eng.h"
 #include "DialogBoxIDs.h"
+#include "DialogBox_Exchange.h"
 #include <cstring>
 #include <cstdio>
 
@@ -25,11 +27,12 @@ namespace NetworkMessageHandlers {
 		// Explicitly clear item disabled flags before disabling dialogs.
 		// disable_dialog_box(Exchange) also clears these, but if exchange info
 		// was partially cleared by item removal, flags could get stuck.
+		auto* exDlg = game->m_dialog_box_manager.get_dialog_as<DialogBox_Exchange>(DialogBoxId::Exchange);
 		for (int i = 0; i < 4; i++)
 		{
-			int slot = game->m_dialog_box_exchange_info[i].inv_slot;
+			int slot = exDlg->m_slots[i].inv_slot;
 			if (slot >= 0 && slot < hb::shared::limits::MaxItems)
-				game->m_is_item_disabled[slot] = false;
+				inventory_manager::get().unlock_item(slot);
 		}
 
 		//Snoopy: MultiTrade

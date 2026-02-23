@@ -1,6 +1,7 @@
 ﻿#include "DialogBox_ItemUpgrade.h"
 #include "CursorTarget.h"
 #include "Game.h"
+#include "InventoryManager.h"
 #include "ItemNameFormatter.h"
 #include "ItemSpriteMetadata.h"
 #include "lan_eng.h"
@@ -8,6 +9,7 @@
 #include "TextLibExt.h"
 #include <format>
 #include <string>
+#include "IInput.h"
 
 using namespace hb::shared::net;
 using namespace hb::shared::item;
@@ -17,49 +19,29 @@ DialogBox_ItemUpgrade::DialogBox_ItemUpgrade(CGame* game)
 	: IDialogBox(DialogBoxId::ItemUpgrade, game)
 {
 	set_default_rect(60 , 50 , 258, 339);
-	set_can_close_on_right_click(false);
+	m_can_close_on_right_click = false;
 }
 
-void DialogBox_ItemUpgrade::on_draw(short mouse_x, short mouse_y, short z, char lb)
+void DialogBox_ItemUpgrade::on_draw()
 {
     if (!m_game->ensure_item_configs_loaded()) return;
-    int sX = m_game->m_dialog_box_manager.Info(DialogBoxId::ItemUpgrade).m_x;
-    int sY = m_game->m_dialog_box_manager.Info(DialogBoxId::ItemUpgrade).m_y;
+    int sX = m_x;
+    int sY = m_y;
 
     m_game->draw_new_dialog_box(InterfaceNdGame2, sX, sY, 0);
     m_game->draw_new_dialog_box(InterfaceNdText, sX, sY, 5); // Item Upgrade Text
 
-    switch (m_game->m_dialog_box_manager.Info(DialogBoxId::ItemUpgrade).m_mode) {
-    case 1:
-        DrawMode1_GizonUpgrade(sX, sY, mouse_x, mouse_y);
-        break;
-    case 2:
-        DrawMode2_InProgress(sX, sY);
-        break;
-    case 3:
-        DrawMode3_Success(sX, sY, mouse_x, mouse_y);
-        break;
-    case 4:
-        DrawMode4_Failed(sX, sY, mouse_x, mouse_y);
-        break;
-    case 5:
-        DrawMode5_SelectUpgradeType(sX, sY, mouse_x, mouse_y);
-        break;
-    case 6:
-        DrawMode6_StoneUpgrade(sX, sY, mouse_x, mouse_y);
-        break;
-    case 7:
-        DrawMode7_ItemLost(sX, sY, mouse_x, mouse_y);
-        break;
-    case 8:
-        DrawMode8_MaxUpgrade(sX, sY, mouse_x, mouse_y);
-        break;
-    case 9:
-        DrawMode9_CannotUpgrade(sX, sY, mouse_x, mouse_y);
-        break;
-    case 10:
-        DrawMode10_NoPoints(sX, sY, mouse_x, mouse_y);
-        break;
+    switch (m_mode) {
+    case mode::gizon_upgrade:        DrawMode1_GizonUpgrade(sX, sY); break;
+    case mode::in_progress:          DrawMode2_InProgress(sX, sY); break;
+    case mode::success:              DrawMode3_Success(sX, sY); break;
+    case mode::failed:               DrawMode4_Failed(sX, sY); break;
+    case mode::select_upgrade_type:  DrawMode5_SelectUpgradeType(sX, sY); break;
+    case mode::stone_upgrade:        DrawMode6_StoneUpgrade(sX, sY); break;
+    case mode::item_lost:            DrawMode7_ItemLost(sX, sY); break;
+    case mode::max_upgrade:          DrawMode8_MaxUpgrade(sX, sY); break;
+    case mode::cannot_upgrade:       DrawMode9_CannotUpgrade(sX, sY); break;
+    case mode::no_points:            DrawMode10_NoPoints(sX, sY); break;
     }
 }
 
@@ -125,10 +107,12 @@ void DialogBox_ItemUpgrade::draw_item_preview(int sX, int sY, int item_index)
     hb::shared::text::draw_text_aligned(GameFont::Default, sX + 24, sY + 260 + 20, (sX + 248) - (sX + 24), 15, extra.c_str(), hb::shared::text::TextStyle::from_color(GameColors::UIBlack), hb::shared::text::Align::TopCenter);
 }
 
-void DialogBox_ItemUpgrade::DrawMode1_GizonUpgrade(int sX, int sY, int mouse_x, int mouse_y)
+void DialogBox_ItemUpgrade::DrawMode1_GizonUpgrade(int sX, int sY)
 {
+    short mouse_x = static_cast<short>(hb::shared::input::get_mouse_x());
+    short mouse_y = static_cast<short>(hb::shared::input::get_mouse_y());
     uint32_t time = m_game->m_cur_time;
-    int item_index = m_game->m_dialog_box_manager.Info(DialogBoxId::ItemUpgrade).m_v1;
+    int item_index = m_selected_item_index;
     std::string txt;
 
     m_game->draw_new_dialog_box(InterfaceNdGame3, sX, sY, 3);
@@ -175,8 +159,10 @@ void DialogBox_ItemUpgrade::DrawMode1_GizonUpgrade(int sX, int sY, int mouse_x, 
 
 void DialogBox_ItemUpgrade::DrawMode2_InProgress(int sX, int sY)
 {
+    short mouse_x = static_cast<short>(hb::shared::input::get_mouse_x());
+    short mouse_y = static_cast<short>(hb::shared::input::get_mouse_y());
     uint32_t time = m_game->m_cur_time;
-    int item_index = m_game->m_dialog_box_manager.Info(DialogBoxId::ItemUpgrade).m_v1;
+    int item_index = m_selected_item_index;
 
     hb::shared::text::draw_text_aligned(GameFont::Default, sX + 24, sY + 55 + 30 + 282 - 117 - 170, (sX + 248) - (sX + 24), 15, DRAW_DIALOGBOX_ITEMUPGRADE5, hb::shared::text::TextStyle::from_color(GameColors::UIBlack), hb::shared::text::Align::TopCenter);
     hb::shared::text::draw_text_aligned(GameFont::Default, sX + 24, sY + 55 + 45 + 282 - 117 - 170, (sX + 248) - (sX + 24), 15, DRAW_DIALOGBOX_ITEMUPGRADE6, hb::shared::text::TextStyle::from_color(GameColors::UIBlack), hb::shared::text::Align::TopCenter);
@@ -219,17 +205,19 @@ void DialogBox_ItemUpgrade::DrawMode2_InProgress(int sX, int sY)
     }
 
     // Send upgrade command after 4 seconds
-    if (((time - m_game->m_dialog_box_manager.Info(DialogBoxId::ItemUpgrade).m_dw_v1) / 1000 > 4)
-        && (m_game->m_dialog_box_manager.Info(DialogBoxId::ItemUpgrade).m_dw_v1 != 0))
+    if (((time - m_upgrade_start_time) / 1000 > 4)
+        && (m_upgrade_start_time != 0))
     {
-        m_game->m_dialog_box_manager.Info(DialogBoxId::ItemUpgrade).m_dw_v1 = 0;
+        m_upgrade_start_time = 0;
         m_game->send_command(MsgId::CommandCommon, CommonType::UpgradeItem, 0, item_index, 0, 0, 0);
     }
 }
 
-void DialogBox_ItemUpgrade::DrawMode3_Success(int sX, int sY, int mouse_x, int mouse_y)
+void DialogBox_ItemUpgrade::DrawMode3_Success(int sX, int sY)
 {
-    int item_index = m_game->m_dialog_box_manager.Info(DialogBoxId::ItemUpgrade).m_v1;
+    short mouse_x = static_cast<short>(hb::shared::input::get_mouse_x());
+    short mouse_y = static_cast<short>(hb::shared::input::get_mouse_y());
+    int item_index = m_selected_item_index;
 
     hb::shared::text::draw_text_aligned(GameFont::Default, sX + 24, sY + 55 + 30 + 282 - 117 - 170, (sX + 248) - (sX + 24), 15, DRAW_DIALOGBOX_ITEMUPGRADE7, hb::shared::text::TextStyle::from_color(GameColors::UIBlack), hb::shared::text::Align::TopCenter);
     hb::shared::text::draw_text_aligned(GameFont::Default, sX + 24, sY + 55 + 45 + 282 - 117 - 170, (sX + 248) - (sX + 24), 15, DRAW_DIALOGBOX_ITEMUPGRADE8, hb::shared::text::TextStyle::from_color(GameColors::UIBlack), hb::shared::text::Align::TopCenter);
@@ -247,9 +235,11 @@ void DialogBox_ItemUpgrade::DrawMode3_Success(int sX, int sY, int mouse_x, int m
         m_game->draw_new_dialog_box(InterfaceNdButton, sX + ui_layout::right_btn_x, sY + ui_layout::btn_y, 0);
 }
 
-void DialogBox_ItemUpgrade::DrawMode4_Failed(int sX, int sY, int mouse_x, int mouse_y)
+void DialogBox_ItemUpgrade::DrawMode4_Failed(int sX, int sY)
 {
-    int item_index = m_game->m_dialog_box_manager.Info(DialogBoxId::ItemUpgrade).m_v1;
+    short mouse_x = static_cast<short>(hb::shared::input::get_mouse_x());
+    short mouse_y = static_cast<short>(hb::shared::input::get_mouse_y());
+    int item_index = m_selected_item_index;
 
     hb::shared::text::draw_text_aligned(GameFont::Default, sX + 24, sY + 55 + 30 + 282 - 117 - 170, (sX + 248) - (sX + 24), 15, DRAW_DIALOGBOX_ITEMUPGRADE9, hb::shared::text::TextStyle::from_color(GameColors::UIBlack), hb::shared::text::Align::TopCenter);
 
@@ -257,7 +247,7 @@ void DialogBox_ItemUpgrade::DrawMode4_Failed(int sX, int sY, int mouse_x, int mo
     if ((item_index != -1) && (m_game->m_item_list[item_index] == 0))
     {
         m_game->play_game_sound('E', 24, 0, 0);
-        m_game->m_dialog_box_manager.Info(DialogBoxId::ItemUpgrade).m_mode = 7;
+        m_mode = mode::item_lost;
         return;
     }
 
@@ -274,12 +264,14 @@ void DialogBox_ItemUpgrade::DrawMode4_Failed(int sX, int sY, int mouse_x, int mo
         m_game->draw_new_dialog_box(InterfaceNdButton, sX + ui_layout::right_btn_x, sY + ui_layout::btn_y, 0);
 }
 
-void DialogBox_ItemUpgrade::DrawMode5_SelectUpgradeType(int sX, int sY, int mouse_x, int mouse_y)
+void DialogBox_ItemUpgrade::DrawMode5_SelectUpgradeType(int sX, int sY)
 {
+    short mouse_x = static_cast<short>(hb::shared::input::get_mouse_x());
+    short mouse_y = static_cast<short>(hb::shared::input::get_mouse_y());
     hb::shared::text::draw_text_aligned(GameFont::Default, sX + 24, sY + 20 + 45, (sX + 248) - (sX + 24), 15, DRAW_DIALOGBOX_ITEMUPGRADE13, hb::shared::text::TextStyle::from_color(GameColors::UIBlack), hb::shared::text::Align::TopCenter);
 
     // Normal item upgrade option
-    if ((mouse_x > sX + 24) && (mouse_x < sX + 248) && (mouse_y > sY + 100) && (mouse_y < sY + 115))
+    if (mouse_in(link_normal_upgrade))
     {
         hb::shared::text::draw_text_aligned(GameFont::Default, sX + 24, sY + 100, (sX + 248) - (sX + 24), 15, DRAW_DIALOGBOX_ITEMUPGRADE14, hb::shared::text::TextStyle::from_color(GameColors::UIWhite), hb::shared::text::Align::TopCenter);
         hb::shared::text::draw_text_aligned(GameFont::Default, sX + 24, sY + 150, (sX + 248) - (sX + 24), 15, DRAW_DIALOGBOX_ITEMUPGRADE16, hb::shared::text::TextStyle::from_color(GameColors::UIBlack), hb::shared::text::Align::TopCenter);
@@ -295,7 +287,7 @@ void DialogBox_ItemUpgrade::DrawMode5_SelectUpgradeType(int sX, int sY, int mous
         hb::shared::text::draw_text_aligned(GameFont::Default, sX + 24, sY + 100, (sX + 248) - (sX + 24), 15, DRAW_DIALOGBOX_ITEMUPGRADE14, hb::shared::text::TextStyle::from_color(GameColors::UIMagicBlue), hb::shared::text::Align::TopCenter);
 
     // Majestic item upgrade option
-    if ((mouse_x > sX + 24) && (mouse_x < sX + 248) && (mouse_y > sY + 120) && (mouse_y < sY + 135))
+    if (mouse_in(link_majestic_upgrade))
     {
         hb::shared::text::draw_text_aligned(GameFont::Default, sX + 24, sY + 120, (sX + 248) - (sX + 24), 15, DRAW_DIALOGBOX_ITEMUPGRADE15, hb::shared::text::TextStyle::from_color(GameColors::UIWhite), hb::shared::text::Align::TopCenter);
         hb::shared::text::draw_text_aligned(GameFont::Default, sX + 24, sY + 150, (sX + 248) - (sX + 24), 15, DRAW_DIALOGBOX_ITEMUPGRADE22, hb::shared::text::TextStyle::from_color(GameColors::UIBlack), hb::shared::text::Align::TopCenter);
@@ -315,11 +307,13 @@ void DialogBox_ItemUpgrade::DrawMode5_SelectUpgradeType(int sX, int sY, int mous
         m_game->draw_new_dialog_box(InterfaceNdButton, sX + ui_layout::right_btn_x, sY + ui_layout::btn_y, 16);
 }
 
-void DialogBox_ItemUpgrade::DrawMode6_StoneUpgrade(int sX, int sY, int mouse_x, int mouse_y)
+void DialogBox_ItemUpgrade::DrawMode6_StoneUpgrade(int sX, int sY)
 {
-    int item_index = m_game->m_dialog_box_manager.Info(DialogBoxId::ItemUpgrade).m_v1;
-    int so_x = m_game->m_dialog_box_manager.Info(DialogBoxId::ItemUpgrade).m_v2;
-    int so_m = m_game->m_dialog_box_manager.Info(DialogBoxId::ItemUpgrade).m_v3;
+    short mouse_x = static_cast<short>(hb::shared::input::get_mouse_x());
+    short mouse_y = static_cast<short>(hb::shared::input::get_mouse_y());
+    int item_index = m_selected_item_index;
+    int so_x = m_stone_xelima_count;
+    int so_m = m_stone_merien_count;
     std::string txt;
 
     m_game->draw_new_dialog_box(InterfaceNdGame3, sX, sY, 3);
@@ -367,8 +361,10 @@ void DialogBox_ItemUpgrade::DrawMode6_StoneUpgrade(int sX, int sY, int mouse_x, 
         m_game->draw_new_dialog_box(InterfaceNdButton, sX + ui_layout::right_btn_x, sY + ui_layout::btn_y, 16);
 }
 
-void DialogBox_ItemUpgrade::DrawMode7_ItemLost(int sX, int sY, int mouse_x, int mouse_y)
+void DialogBox_ItemUpgrade::DrawMode7_ItemLost(int sX, int sY)
 {
+    short mouse_x = static_cast<short>(hb::shared::input::get_mouse_x());
+    short mouse_y = static_cast<short>(hb::shared::input::get_mouse_y());
     hb::shared::text::draw_text_aligned(GameFont::Default, sX + 24, sY + 20 + 130, (sX + 248) - (sX + 24), 15, DRAW_DIALOGBOX_ITEMUPGRADE36, hb::shared::text::TextStyle::from_color(GameColors::UIBlack), hb::shared::text::Align::TopCenter);
     hb::shared::text::draw_text_aligned(GameFont::Default, sX + 24, sY + 20 + 145, (sX + 248) - (sX + 24), 15, DRAW_DIALOGBOX_ITEMUPGRADE37, hb::shared::text::TextStyle::from_color(GameColors::UIBlack), hb::shared::text::Align::TopCenter);
 
@@ -379,8 +375,10 @@ void DialogBox_ItemUpgrade::DrawMode7_ItemLost(int sX, int sY, int mouse_x, int 
         m_game->draw_new_dialog_box(InterfaceNdButton, sX + ui_layout::right_btn_x, sY + ui_layout::btn_y, 0);
 }
 
-void DialogBox_ItemUpgrade::DrawMode8_MaxUpgrade(int sX, int sY, int mouse_x, int mouse_y)
+void DialogBox_ItemUpgrade::DrawMode8_MaxUpgrade(int sX, int sY)
 {
+    short mouse_x = static_cast<short>(hb::shared::input::get_mouse_x());
+    short mouse_y = static_cast<short>(hb::shared::input::get_mouse_y());
     hb::shared::text::draw_text_aligned(GameFont::Default, sX + 24, sY + 20 + 130, (sX + 248) - (sX + 24), 15, DRAW_DIALOGBOX_ITEMUPGRADE38, hb::shared::text::TextStyle::from_color(GameColors::UIBlack), hb::shared::text::Align::TopCenter);
 
     // OK button
@@ -390,8 +388,10 @@ void DialogBox_ItemUpgrade::DrawMode8_MaxUpgrade(int sX, int sY, int mouse_x, in
         m_game->draw_new_dialog_box(InterfaceNdButton, sX + ui_layout::right_btn_x, sY + ui_layout::btn_y, 0);
 }
 
-void DialogBox_ItemUpgrade::DrawMode9_CannotUpgrade(int sX, int sY, int mouse_x, int mouse_y)
+void DialogBox_ItemUpgrade::DrawMode9_CannotUpgrade(int sX, int sY)
 {
+    short mouse_x = static_cast<short>(hb::shared::input::get_mouse_x());
+    short mouse_y = static_cast<short>(hb::shared::input::get_mouse_y());
     hb::shared::text::draw_text_aligned(GameFont::Default, sX + 24, sY + 20 + 130, (sX + 248) - (sX + 24), 15, DRAW_DIALOGBOX_ITEMUPGRADE39, hb::shared::text::TextStyle::from_color(GameColors::UIBlack), hb::shared::text::Align::TopCenter);
 
     // OK button
@@ -401,8 +401,10 @@ void DialogBox_ItemUpgrade::DrawMode9_CannotUpgrade(int sX, int sY, int mouse_x,
         m_game->draw_new_dialog_box(InterfaceNdButton, sX + ui_layout::right_btn_x, sY + ui_layout::btn_y, 0);
 }
 
-void DialogBox_ItemUpgrade::DrawMode10_NoPoints(int sX, int sY, int mouse_x, int mouse_y)
+void DialogBox_ItemUpgrade::DrawMode10_NoPoints(int sX, int sY)
 {
+    short mouse_x = static_cast<short>(hb::shared::input::get_mouse_x());
+    short mouse_y = static_cast<short>(hb::shared::input::get_mouse_y());
     hb::shared::text::draw_text_aligned(GameFont::Default, sX + 24, sY + 20 + 130, (sX + 248) - (sX + 24), 15, DRAW_DIALOGBOX_ITEMUPGRADE40, hb::shared::text::TextStyle::from_color(GameColors::UIBlack), hb::shared::text::Align::TopCenter);
 
     // OK button
@@ -412,14 +414,16 @@ void DialogBox_ItemUpgrade::DrawMode10_NoPoints(int sX, int sY, int mouse_x, int
         m_game->draw_new_dialog_box(InterfaceNdButton, sX + ui_layout::right_btn_x, sY + ui_layout::btn_y, 0);
 }
 
-bool DialogBox_ItemUpgrade::on_click(short mouse_x, short mouse_y)
+bool DialogBox_ItemUpgrade::on_click()
 {
-    short sX = m_game->m_dialog_box_manager.Info(DialogBoxId::ItemUpgrade).m_x;
-    short sY = m_game->m_dialog_box_manager.Info(DialogBoxId::ItemUpgrade).m_y;
-    int item_index = m_game->m_dialog_box_manager.Info(DialogBoxId::ItemUpgrade).m_v1;
+	short mouse_x = static_cast<short>(hb::shared::input::get_mouse_x());
+	short mouse_y = static_cast<short>(hb::shared::input::get_mouse_y());
+    short sX = m_x;
+    short sY = m_y;
+    int item_index = m_selected_item_index;
 
-    switch (m_game->m_dialog_box_manager.Info(DialogBoxId::ItemUpgrade).m_mode) {
-    case 1: // Gizon upgrade
+    switch (m_mode) {
+    case mode::gizon_upgrade:
         if ((item_index != -1) && (mouse_x >= sX + ui_layout::left_btn_x) && (mouse_x <= sX + ui_layout::left_btn_x + ui_layout::btn_size_x)
             && (mouse_y >= sY + ui_layout::btn_y) && (mouse_y <= sY + ui_layout::btn_y + ui_layout::btn_size_y))
         {
@@ -428,8 +432,8 @@ bool DialogBox_ItemUpgrade::on_click(short mouse_x, short mouse_y)
 
             m_game->play_game_sound('E', 14, 5);
             m_game->play_game_sound('E', 44, 0);
-            m_game->m_dialog_box_manager.Info(DialogBoxId::ItemUpgrade).m_mode = 2;
-            m_game->m_dialog_box_manager.Info(DialogBoxId::ItemUpgrade).m_dw_v1 = m_game->m_cur_time;
+            m_mode = mode::in_progress;
+            m_upgrade_start_time = m_game->m_cur_time;
             return true;
         }
         if ((mouse_x >= sX + ui_layout::right_btn_x) && (mouse_x <= sX + ui_layout::right_btn_x + ui_layout::btn_size_x)
@@ -441,13 +445,13 @@ bool DialogBox_ItemUpgrade::on_click(short mouse_x, short mouse_y)
         }
         break;
 
-    case 3:  // Success
-    case 4:  // Failed
-    case 7:  // Item lost
-    case 8:  // Max upgrade
-    case 9:  // Cannot upgrade
-    case 10: // No points
-    case 12: // Need stone
+    case mode::success:
+    case mode::failed:
+    case mode::item_lost:
+    case mode::max_upgrade:
+    case mode::cannot_upgrade:
+    case mode::no_points:
+    case mode::need_stone:
         if ((mouse_x >= sX + ui_layout::right_btn_x) && (mouse_x <= sX + ui_layout::right_btn_x + ui_layout::btn_size_x)
             && (mouse_y > sY + ui_layout::btn_y) && (mouse_y < sY + ui_layout::btn_y + ui_layout::btn_size_y))
         {
@@ -457,9 +461,9 @@ bool DialogBox_ItemUpgrade::on_click(short mouse_x, short mouse_y)
         }
         break;
 
-    case 5: // Main menu - select upgrade type
+    case mode::select_upgrade_type:
         // Normal item upgrade (Stone)
-        if ((mouse_x > sX + 24) && (mouse_x < sX + 248) && (mouse_y > sY + 100) && (mouse_y < sY + 115))
+        if (mouse_in(link_normal_upgrade))
         {
             m_game->play_game_sound('E', 14, 5);
             int so_x = 0, so_m = 0;
@@ -474,9 +478,9 @@ bool DialogBox_ItemUpgrade::on_click(short mouse_x, short mouse_y)
 
             if ((so_x > 0) || (so_m > 0))
             {
-                m_game->m_dialog_box_manager.Info(DialogBoxId::ItemUpgrade).m_mode = 6;
-                m_game->m_dialog_box_manager.Info(DialogBoxId::ItemUpgrade).m_v2 = so_x;
-                m_game->m_dialog_box_manager.Info(DialogBoxId::ItemUpgrade).m_v3 = so_m;
+                m_mode = mode::stone_upgrade;
+                m_stone_xelima_count = so_x;
+                m_stone_merien_count = so_m;
             }
             else
             {
@@ -486,12 +490,12 @@ bool DialogBox_ItemUpgrade::on_click(short mouse_x, short mouse_y)
             return true;
         }
         // Majestic item upgrade (Gizon)
-        if ((mouse_x > sX + 24) && (mouse_x < sX + 248) && (mouse_y > sY + 120) && (mouse_y < sY + 135))
+        if (mouse_in(link_majestic_upgrade))
         {
             m_game->play_game_sound('E', 14, 5);
             if (m_game->m_gizon_item_upgrade_left > 0)
             {
-                m_game->m_dialog_box_manager.Info(DialogBoxId::ItemUpgrade).m_mode = 1;
+                m_mode = mode::gizon_upgrade;
             }
             else
             {
@@ -510,14 +514,14 @@ bool DialogBox_ItemUpgrade::on_click(short mouse_x, short mouse_y)
         }
         break;
 
-    case 6: // Stone upgrade
+    case mode::stone_upgrade:
         if ((item_index != -1) && (mouse_x >= sX + ui_layout::left_btn_x) && (mouse_x <= sX + ui_layout::left_btn_x + ui_layout::btn_size_x)
             && (mouse_y >= sY + ui_layout::btn_y) && (mouse_y <= sY + ui_layout::btn_y + ui_layout::btn_size_y))
         {
             m_game->play_game_sound('E', 14, 5);
             m_game->play_game_sound('E', 44, 0);
-            m_game->m_dialog_box_manager.Info(DialogBoxId::ItemUpgrade).m_mode = 2;
-            m_game->m_dialog_box_manager.Info(DialogBoxId::ItemUpgrade).m_dw_v1 = m_game->m_cur_time;
+            m_mode = mode::in_progress;
+            m_upgrade_start_time = m_game->m_cur_time;
             return true;
         }
         if ((mouse_x >= sX + ui_layout::right_btn_x) && (mouse_x <= sX + ui_layout::right_btn_x + ui_layout::btn_size_x)
@@ -533,32 +537,46 @@ bool DialogBox_ItemUpgrade::on_click(short mouse_x, short mouse_y)
     return false;
 }
 
-bool DialogBox_ItemUpgrade::on_item_drop(short mouse_x, short mouse_y)
+bool DialogBox_ItemUpgrade::on_item_drop()
 {
 	int item_id = CursorTarget::get_selected_id();
 	if (item_id < 0 || item_id >= hb::shared::limits::MaxItems) return false;
-	if (m_game->m_is_item_disabled[item_id]) return false;
+	if (inventory_manager::get().is_locked(item_id)) return false;
 	if (m_game->m_player->m_Controller.get_command() < 0) return false;
 	CItem* cfg = m_game->get_item_config(m_game->m_item_list[item_id]->m_id_num);
 	if (!cfg || cfg->get_equip_pos() == EquipPos::None) return false;
 
-	switch (Info().m_mode) {
-	case 1:
-		if (Info().m_v1 >= 0 && Info().m_v1 < hb::shared::limits::MaxItems)
-			m_game->m_is_item_disabled[Info().m_v1] = false;
-		Info().m_v1 = item_id;
-		m_game->m_is_item_disabled[item_id] = true;
+	switch (m_mode) {
+	case mode::gizon_upgrade:
+		inventory_manager::get().unlock_item(m_selected_item_index);
+		m_selected_item_index = item_id;
+		inventory_manager::get().lock_item(item_id);
 		m_game->play_game_sound('E', 29, 0);
 		break;
 
-	case 6:
-		if (Info().m_v1 >= 0 && Info().m_v1 < hb::shared::limits::MaxItems)
-			m_game->m_is_item_disabled[Info().m_v1] = false;
-		Info().m_v1 = item_id;
-		m_game->m_is_item_disabled[item_id] = true;
+	case mode::stone_upgrade:
+		inventory_manager::get().unlock_item(m_selected_item_index);
+		m_selected_item_index = item_id;
+		inventory_manager::get().lock_item(item_id);
 		m_game->play_game_sound('E', 29, 0);
 		break;
 	}
 
+	return true;
+}
+
+bool DialogBox_ItemUpgrade::on_enable(int type, int64_t v1, int v2, const char* string)
+{
+	if (is_enabled()) return true;
+	m_mode = static_cast<mode>(type);
+	m_selected_item_index = -1;
+	m_upgrade_start_time = 0;
+	return true;
+}
+
+bool DialogBox_ItemUpgrade::on_disable()
+{
+	{ int idx = m_selected_item_index;
+	inventory_manager::get().unlock_item(idx); }
 	return true;
 }

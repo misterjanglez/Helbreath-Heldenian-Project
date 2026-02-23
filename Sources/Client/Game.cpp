@@ -13,6 +13,19 @@
 #include "Log.h"
 #include "ClientLogChannels.h"
 #include "ItemSpriteMetadata.h"
+#include "DialogBox_CityHallMenu.h"
+#include "DialogBox_NpcTalk.h"
+#include "DialogBox_Skill.h"
+#include "DialogBox_Bank.h"
+#include "DialogBox_Magic.h"
+#include "DialogBox_GuildMenu.h"
+#include "DialogBox_GuildOperation.h"
+#include "DialogBox_SellList.h"
+#include "DialogBox_Party.h"
+#include "DialogBox_ItemDropAmount.h"
+#include "DialogBox_Slates.h"
+#include "DialogBox_NpcActionQuery.h"
+#include "DialogBox_Manufacture.h"
 
 #include <algorithm>
 #include <charconv>
@@ -216,7 +229,6 @@ CGame::CGame(hb::shared::types::NativeInstance native_instance, int icon_resourc
 
 	// All pointer arrays (std::array<std::unique_ptr<T>, N>) default to nullptr
 	// Dialog box order initialization
-	for (int i = 0; i < 61; i++) m_dialog_box_manager.set_order_at(i, 0);
 
 	// Previous cursor status tracking removed
 	CursorTarget::reset_selection_click_time();
@@ -286,8 +298,6 @@ bool CGame::on_initialize()
 
 	m_player->m_player_type = 2;
 	m_player->m_Controller.set_player_turn(0);
-	m_dialog_box_manager.set_order_at(60, DialogBoxId::HudPanel);
-	m_dialog_box_manager.set_order_at(59, DialogBoxId::HudPanel);
 
 	m_menu_dir = direction::southeast;
 	m_menu_dir_cnt = 0;
@@ -876,9 +886,12 @@ bool CGame::send_command(uint32_t message_id, uint16_t command, char direction, 
 		hb::net::PacketRequestSellItemList req{};
 		req.header.msg_id = message_id;
 		req.header.msg_type = 0;
-		for (int i = 0; i < game_limits::max_sell_list; i++) {
-			req.entries[i].index = static_cast<uint8_t>(m_sell_item_list[i].index);
-			req.entries[i].amount = m_sell_item_list[i].amount;
+		{
+			auto* sellDlg = m_dialog_box_manager.get_dialog_as<DialogBox_SellList>(DialogBoxId::SellList);
+			for (int i = 0; i < game_limits::max_sell_list; i++) {
+				req.entries[i].index = static_cast<uint8_t>(sellDlg->get_entry(i).index);
+				req.entries[i].amount = sellDlg->get_entry(i).amount;
+			}
 		}
 		result = m_g_sock->send_msg(reinterpret_cast<char*>(&req), sizeof(req), key);
 	}
@@ -1101,12 +1114,12 @@ bool CGame::send_command(uint32_t message_id, uint16_t command, char direction, 
 				if (name_len > sizeof(req.name)) name_len = sizeof(req.name);
 				std::memcpy(req.name, text, name_len);
 			}
-			req.item_ids[0] = static_cast<uint8_t>(m_dialog_box_manager.Info(DialogBoxId::Manufacture).m_v1);
-			req.item_ids[1] = static_cast<uint8_t>(m_dialog_box_manager.Info(DialogBoxId::Manufacture).m_v2);
-			req.item_ids[2] = static_cast<uint8_t>(m_dialog_box_manager.Info(DialogBoxId::Manufacture).m_v3);
-			req.item_ids[3] = static_cast<uint8_t>(m_dialog_box_manager.Info(DialogBoxId::Manufacture).m_v4);
-			req.item_ids[4] = static_cast<uint8_t>(m_dialog_box_manager.Info(DialogBoxId::Manufacture).m_v5);
-			req.item_ids[5] = static_cast<uint8_t>(m_dialog_box_manager.Info(DialogBoxId::Manufacture).m_v6);
+			req.item_ids[0] = static_cast<uint8_t>(m_dialog_box_manager.get_dialog_as<DialogBox_Manufacture>(DialogBoxId::Manufacture)->m_slot_1);
+			req.item_ids[1] = static_cast<uint8_t>(m_dialog_box_manager.get_dialog_as<DialogBox_Manufacture>(DialogBoxId::Manufacture)->m_slot_2);
+			req.item_ids[2] = static_cast<uint8_t>(m_dialog_box_manager.get_dialog_as<DialogBox_Manufacture>(DialogBoxId::Manufacture)->m_slot_3);
+			req.item_ids[3] = static_cast<uint8_t>(m_dialog_box_manager.get_dialog_as<DialogBox_Manufacture>(DialogBoxId::Manufacture)->m_slot_4);
+			req.item_ids[4] = static_cast<uint8_t>(m_dialog_box_manager.get_dialog_as<DialogBox_Manufacture>(DialogBoxId::Manufacture)->m_slot_5);
+			req.item_ids[5] = static_cast<uint8_t>(m_dialog_box_manager.get_dialog_as<DialogBox_Manufacture>(DialogBoxId::Manufacture)->m_slot_6);
 			result = m_g_sock->send_msg(reinterpret_cast<char*>(&req), sizeof(req));
 		}
 		break;
@@ -1119,12 +1132,12 @@ bool CGame::send_command(uint32_t message_id, uint16_t command, char direction, 
 			req.base.x = m_player->m_player_x;
 			req.base.y = m_player->m_player_y;
 			req.base.dir = static_cast<uint8_t>(direction);
-			req.item_ids[0] = static_cast<uint8_t>(m_dialog_box_manager.Info(DialogBoxId::Manufacture).m_v1);
-			req.item_ids[1] = static_cast<uint8_t>(m_dialog_box_manager.Info(DialogBoxId::Manufacture).m_v2);
-			req.item_ids[2] = static_cast<uint8_t>(m_dialog_box_manager.Info(DialogBoxId::Manufacture).m_v3);
-			req.item_ids[3] = static_cast<uint8_t>(m_dialog_box_manager.Info(DialogBoxId::Manufacture).m_v4);
-			req.item_ids[4] = static_cast<uint8_t>(m_dialog_box_manager.Info(DialogBoxId::Manufacture).m_v5);
-			req.item_ids[5] = static_cast<uint8_t>(m_dialog_box_manager.Info(DialogBoxId::Manufacture).m_v6);
+			req.item_ids[0] = static_cast<uint8_t>(m_dialog_box_manager.get_dialog_as<DialogBox_Manufacture>(DialogBoxId::Manufacture)->m_slot_1);
+			req.item_ids[1] = static_cast<uint8_t>(m_dialog_box_manager.get_dialog_as<DialogBox_Manufacture>(DialogBoxId::Manufacture)->m_slot_2);
+			req.item_ids[2] = static_cast<uint8_t>(m_dialog_box_manager.get_dialog_as<DialogBox_Manufacture>(DialogBoxId::Manufacture)->m_slot_3);
+			req.item_ids[3] = static_cast<uint8_t>(m_dialog_box_manager.get_dialog_as<DialogBox_Manufacture>(DialogBoxId::Manufacture)->m_slot_4);
+			req.item_ids[4] = static_cast<uint8_t>(m_dialog_box_manager.get_dialog_as<DialogBox_Manufacture>(DialogBoxId::Manufacture)->m_slot_5);
+			req.item_ids[5] = static_cast<uint8_t>(m_dialog_box_manager.get_dialog_as<DialogBox_Manufacture>(DialogBoxId::Manufacture)->m_slot_6);
 			req.padding = 0;
 			result = m_g_sock->send_msg(reinterpret_cast<char*>(&req), sizeof(req));
 		}
@@ -1140,12 +1153,12 @@ bool CGame::send_command(uint32_t message_id, uint16_t command, char direction, 
 			req.base.y = m_player->m_player_y;
 			req.base.dir = static_cast<uint8_t>(direction);
 			std::memset(req.name, ' ', sizeof(req.name));
-			req.item_ids[0] = static_cast<uint8_t>(m_dialog_box_manager.Info(DialogBoxId::Manufacture).m_v1);
-			req.item_ids[1] = static_cast<uint8_t>(m_dialog_box_manager.Info(DialogBoxId::Manufacture).m_v2);
-			req.item_ids[2] = static_cast<uint8_t>(m_dialog_box_manager.Info(DialogBoxId::Manufacture).m_v3);
-			req.item_ids[3] = static_cast<uint8_t>(m_dialog_box_manager.Info(DialogBoxId::Manufacture).m_v4);
-			req.item_ids[4] = static_cast<uint8_t>(m_dialog_box_manager.Info(DialogBoxId::Manufacture).m_v5);
-			req.item_ids[5] = static_cast<uint8_t>(m_dialog_box_manager.Info(DialogBoxId::Manufacture).m_v6);
+			req.item_ids[0] = static_cast<uint8_t>(m_dialog_box_manager.get_dialog_as<DialogBox_Manufacture>(DialogBoxId::Manufacture)->m_slot_1);
+			req.item_ids[1] = static_cast<uint8_t>(m_dialog_box_manager.get_dialog_as<DialogBox_Manufacture>(DialogBoxId::Manufacture)->m_slot_2);
+			req.item_ids[2] = static_cast<uint8_t>(m_dialog_box_manager.get_dialog_as<DialogBox_Manufacture>(DialogBoxId::Manufacture)->m_slot_3);
+			req.item_ids[3] = static_cast<uint8_t>(m_dialog_box_manager.get_dialog_as<DialogBox_Manufacture>(DialogBoxId::Manufacture)->m_slot_4);
+			req.item_ids[4] = static_cast<uint8_t>(m_dialog_box_manager.get_dialog_as<DialogBox_Manufacture>(DialogBoxId::Manufacture)->m_slot_5);
+			req.item_ids[5] = static_cast<uint8_t>(m_dialog_box_manager.get_dialog_as<DialogBox_Manufacture>(DialogBoxId::Manufacture)->m_slot_6);
 			result = m_g_sock->send_msg(reinterpret_cast<char*>(&req), sizeof(req));
 		}
 		break;
@@ -1159,12 +1172,13 @@ bool CGame::send_command(uint32_t message_id, uint16_t command, char direction, 
 			req.base.x = m_player->m_player_x;
 			req.base.y = m_player->m_player_y;
 			req.base.dir = static_cast<uint8_t>(direction);
-			req.item_ids[0] = static_cast<uint8_t>(m_dialog_box_manager.Info(DialogBoxId::Slates).m_v1);
-			req.item_ids[1] = static_cast<uint8_t>(m_dialog_box_manager.Info(DialogBoxId::Slates).m_v2);
-			req.item_ids[2] = static_cast<uint8_t>(m_dialog_box_manager.Info(DialogBoxId::Slates).m_v3);
-			req.item_ids[3] = static_cast<uint8_t>(m_dialog_box_manager.Info(DialogBoxId::Slates).m_v4);
-			req.item_ids[4] = static_cast<uint8_t>(m_dialog_box_manager.Info(DialogBoxId::Slates).m_v5);
-			req.item_ids[5] = static_cast<uint8_t>(m_dialog_box_manager.Info(DialogBoxId::Slates).m_v6);
+			auto* slates = m_dialog_box_manager.get_dialog_as<DialogBox_Slates>(DialogBoxId::Slates);
+			req.item_ids[0] = static_cast<uint8_t>(slates->m_slot_ul);
+			req.item_ids[1] = static_cast<uint8_t>(slates->m_slot_ll);
+			req.item_ids[2] = static_cast<uint8_t>(slates->m_slot_ur);
+			req.item_ids[3] = static_cast<uint8_t>(slates->m_slot_lr);
+			req.item_ids[4] = static_cast<uint8_t>(slates->m_slot_extra1);
+			req.item_ids[5] = static_cast<uint8_t>(slates->m_slot_extra2);
 			req.padding = 0;
 			result = m_g_sock->send_msg(reinterpret_cast<char*>(&req), sizeof(req));
 		}
@@ -2095,30 +2109,29 @@ void CGame::item_drop_external_screen(char item_id, short mouse_x, short mouse_y
 			if (cfg && ((cfg->get_item_type() == ItemType::Consume) || (cfg->get_item_type() == ItemType::Arrow))
 				&& (m_item_list[item_id]->m_count > 1))
 			{
-				m_dialog_box_manager.Info(DialogBoxId::ItemDropExternal).m_x = mouse_x - 140;
-				m_dialog_box_manager.Info(DialogBoxId::ItemDropExternal).m_y = mouse_y - 70;
-				if (m_dialog_box_manager.Info(DialogBoxId::ItemDropExternal).m_y < 0) m_dialog_box_manager.Info(DialogBoxId::ItemDropExternal).m_y = 0;
-				if (hb::shared::owner::can_receive_items(owner_type))
+				m_dialog_box_manager.get_dialog_box(DialogBoxId::ItemDropExternal)->m_x = mouse_x - 140;
+				m_dialog_box_manager.get_dialog_box(DialogBoxId::ItemDropExternal)->m_y = mouse_y - 70;
+				if (m_dialog_box_manager.get_dialog_box(DialogBoxId::ItemDropExternal)->m_y < 0) m_dialog_box_manager.get_dialog_box(DialogBoxId::ItemDropExternal)->m_y = 0;
+				auto* dropDlg = m_dialog_box_manager.get_dialog_as<DialogBox_ItemDropAmount>(DialogBoxId::ItemDropExternal);
+				if (hb::shared::owner::can_receive_items(owner_type) && dropDlg)
 				{
-					m_dialog_box_manager.Info(DialogBoxId::ItemDropExternal).m_v1 = m_mcx;
-					m_dialog_box_manager.Info(DialogBoxId::ItemDropExternal).m_v2 = m_mcy;
-					m_dialog_box_manager.Info(DialogBoxId::ItemDropExternal).m_v3 = owner_type;
-					m_dialog_box_manager.Info(DialogBoxId::ItemDropExternal).m_v4 = m_comm_object_id;
-					std::memset(m_dialog_box_manager.Info(DialogBoxId::ItemDropExternal).m_str, 0, sizeof(m_dialog_box_manager.Info(DialogBoxId::ItemDropExternal).m_str));
+					dropDlg->m_drop_x = m_mcx;
+					dropDlg->m_drop_y = m_mcy;
+					dropDlg->m_drop_target_type = owner_type;
+					dropDlg->m_drop_target_id = m_comm_object_id;
+					std::memset(dropDlg->m_target_name, 0, sizeof(dropDlg->m_target_name));
 					if (owner_type < 10)
-						std::snprintf(m_dialog_box_manager.Info(DialogBoxId::ItemDropExternal).m_str, sizeof(m_dialog_box_manager.Info(DialogBoxId::ItemDropExternal).m_str), "%s", name.c_str());
+						std::snprintf(dropDlg->m_target_name, sizeof(dropDlg->m_target_name), "%s", name.c_str());
 					else
-					{
-						std::snprintf(m_dialog_box_manager.Info(DialogBoxId::ItemDropExternal).m_str, sizeof(m_dialog_box_manager.Info(DialogBoxId::ItemDropExternal).m_str), "%s", get_npc_config_name_by_id(npc_config_id));
-					}
+						std::snprintf(dropDlg->m_target_name, sizeof(dropDlg->m_target_name), "%s", get_npc_config_name_by_id(npc_config_id));
 				}
-				else
+				else if (dropDlg)
 				{
-					m_dialog_box_manager.Info(DialogBoxId::ItemDropExternal).m_v1 = 0;
-					m_dialog_box_manager.Info(DialogBoxId::ItemDropExternal).m_v2 = 0;
-					m_dialog_box_manager.Info(DialogBoxId::ItemDropExternal).m_v3 = 0;
-					m_dialog_box_manager.Info(DialogBoxId::ItemDropExternal).m_v4 = 0;
-					std::memset(m_dialog_box_manager.Info(DialogBoxId::ItemDropExternal).m_str, 0, sizeof(m_dialog_box_manager.Info(DialogBoxId::ItemDropExternal).m_str));
+					dropDlg->m_drop_x = 0;
+					dropDlg->m_drop_y = 0;
+					dropDlg->m_drop_target_type = 0;
+					dropDlg->m_drop_target_id = 0;
+					std::memset(dropDlg->m_target_name, 0, sizeof(dropDlg->m_target_name));
 				}
 				m_dialog_box_manager.enable_dialog_box(DialogBoxId::ItemDropExternal, item_id, static_cast<int64_t>(m_item_list[item_id]->m_count), 0);
 			}
@@ -2131,78 +2144,53 @@ void CGame::item_drop_external_screen(char item_id, short mouse_x, short mouse_y
 				case 4:
 				case 5:
 				case 6:
-					m_dialog_box_manager.enable_dialog_box(DialogBoxId::NpcActionQuery, 1, item_id, owner_type);
-					m_dialog_box_manager.Info(DialogBoxId::NpcActionQuery).m_v3 = 1;
-					m_dialog_box_manager.Info(DialogBoxId::NpcActionQuery).m_v4 = m_comm_object_id;
-					m_dialog_box_manager.Info(DialogBoxId::NpcActionQuery).m_v5 = m_mcx;
-					m_dialog_box_manager.Info(DialogBoxId::NpcActionQuery).m_v6 = m_mcy;
-
+					{	auto* npcDlg = m_dialog_box_manager.get_dialog_as<DialogBox_NpcActionQuery>(DialogBoxId::NpcActionQuery);
+					npcDlg->enable_with_target(1, item_id, owner_type, 1, m_comm_object_id, m_mcx, m_mcy, name.c_str());
 					dialog_x = mouse_x - 117;
 					dialog_y = mouse_y - 50;
 					if (dialog_x < 0) dialog_x = 0;
 					if ((dialog_x + 235) > LOGICAL_MAX_X()) dialog_x = LOGICAL_MAX_X() - 235;
 					if (dialog_y < 0) dialog_y = 0;
 					if ((dialog_y + 100) > LOGICAL_MAX_Y()) dialog_y = LOGICAL_MAX_Y() - 100;
-					m_dialog_box_manager.Info(DialogBoxId::NpcActionQuery).m_x = dialog_x;
-					m_dialog_box_manager.Info(DialogBoxId::NpcActionQuery).m_y = dialog_y;
-
-					std::snprintf(m_dialog_box_manager.Info(DialogBoxId::NpcActionQuery).m_str, sizeof(m_dialog_box_manager.Info(DialogBoxId::NpcActionQuery).m_str), "%s", name.c_str());
-					//send_command(MsgId::CommandCommon, CommonType::GiveItemToChar, item_id, 1, m_mcx, m_mcy, m_item_list[item_id]->m_name); //v1.4
-					break;
+					npcDlg->m_x = dialog_x;
+					npcDlg->m_y = dialog_y;
+				}	break;
 
 				case hb::shared::owner::Howard: // Howard
-					m_dialog_box_manager.enable_dialog_box(DialogBoxId::NpcActionQuery, 3, item_id, owner_type);
-					m_dialog_box_manager.Info(DialogBoxId::NpcActionQuery).m_v3 = 1;
-					m_dialog_box_manager.Info(DialogBoxId::NpcActionQuery).m_v4 = m_comm_object_id; // v1.4
-					m_dialog_box_manager.Info(DialogBoxId::NpcActionQuery).m_v5 = m_mcx;
-					m_dialog_box_manager.Info(DialogBoxId::NpcActionQuery).m_v6 = m_mcy;
-
+				{	auto* npcDlg = m_dialog_box_manager.get_dialog_as<DialogBox_NpcActionQuery>(DialogBoxId::NpcActionQuery);
+					npcDlg->enable_with_target(3, item_id, owner_type, 1, m_comm_object_id, m_mcx, m_mcy, get_npc_config_name_by_id(npc_config_id));
 					dialog_x = mouse_x - 117;
 					dialog_y = mouse_y - 50;
 					if (dialog_x < 0) dialog_x = 0;
 					if ((dialog_x + 235) > LOGICAL_MAX_X()) dialog_x = LOGICAL_MAX_X() - 235;
 					if (dialog_y < 0) dialog_y = 0;
 					if ((dialog_y + 100) > LOGICAL_MAX_Y()) dialog_y = LOGICAL_MAX_Y() - 100;
-					m_dialog_box_manager.Info(DialogBoxId::NpcActionQuery).m_x = dialog_x;
-					m_dialog_box_manager.Info(DialogBoxId::NpcActionQuery).m_y = dialog_y;
-
-					std::snprintf(m_dialog_box_manager.Info(DialogBoxId::NpcActionQuery).m_str, hb::shared::limits::NpcNameLen, "%s", get_npc_config_name_by_id(npc_config_id));
-					break;
+					npcDlg->m_x = dialog_x;
+					npcDlg->m_y = dialog_y;
+				}	break;
 
 				case hb::shared::owner::ShopKeeper: // ShopKeeper-W
 				case hb::shared::owner::Tom: // Tom
-					m_dialog_box_manager.enable_dialog_box(DialogBoxId::NpcActionQuery, 2, item_id, owner_type);
-					m_dialog_box_manager.Info(DialogBoxId::NpcActionQuery).m_v3 = 1;
-					m_dialog_box_manager.Info(DialogBoxId::NpcActionQuery).m_v4 = m_comm_object_id; // v1.4
-					m_dialog_box_manager.Info(DialogBoxId::NpcActionQuery).m_v5 = m_mcx;
-					m_dialog_box_manager.Info(DialogBoxId::NpcActionQuery).m_v6 = m_mcy;
-
+				{	auto* npcDlg = m_dialog_box_manager.get_dialog_as<DialogBox_NpcActionQuery>(DialogBoxId::NpcActionQuery);
+					npcDlg->enable_with_target(2, item_id, owner_type, 1, m_comm_object_id, m_mcx, m_mcy, get_npc_config_name_by_id(npc_config_id));
 					dialog_x = mouse_x - 117;
 					dialog_y = mouse_y - 50;
 					if (dialog_x < 0) dialog_x = 0;
 					if ((dialog_x + 235) > LOGICAL_MAX_X()) dialog_x = LOGICAL_MAX_X() - 235;
 					if (dialog_y < 0) dialog_y = 0;
 					if ((dialog_y + 100) > LOGICAL_MAX_Y()) dialog_y = LOGICAL_MAX_Y() - 100;
-					m_dialog_box_manager.Info(DialogBoxId::NpcActionQuery).m_x = dialog_x;
-					m_dialog_box_manager.Info(DialogBoxId::NpcActionQuery).m_y = dialog_y;
-
-					std::snprintf(m_dialog_box_manager.Info(DialogBoxId::NpcActionQuery).m_str, hb::shared::limits::NpcNameLen, "%s", get_npc_config_name_by_id(npc_config_id));
-					break;
+					npcDlg->m_x = dialog_x;
+					npcDlg->m_y = dialog_y;
+				}	break;
 
 				default:
 					if (cfg)
 					{
 						if (item_drop_history(m_item_list[item_id]->m_id_num))
 						{
-							m_dialog_box_manager.Info(DialogBoxId::ItemDropConfirm).m_x = mouse_x - 140;
-							m_dialog_box_manager.Info(DialogBoxId::ItemDropConfirm).m_y = mouse_y - 70;
-							if (m_dialog_box_manager.Info(DialogBoxId::ItemDropConfirm).m_y < 0) m_dialog_box_manager.Info(DialogBoxId::ItemDropConfirm).m_y = 0;
-							m_dialog_box_manager.Info(DialogBoxId::ItemDropConfirm).m_v1 = 0;
-							m_dialog_box_manager.Info(DialogBoxId::ItemDropConfirm).m_v2 = 0;
-							m_dialog_box_manager.Info(DialogBoxId::ItemDropConfirm).m_v3 = 1;
-							m_dialog_box_manager.Info(DialogBoxId::ItemDropConfirm).m_v4 = 0;
-							m_dialog_box_manager.Info(DialogBoxId::ItemDropConfirm).m_v5 = item_id;
-							std::memset(m_dialog_box_manager.Info(DialogBoxId::ItemDropConfirm).m_str, 0, sizeof(m_dialog_box_manager.Info(DialogBoxId::ItemDropConfirm).m_str));
+							m_dialog_box_manager.get_dialog_box(DialogBoxId::ItemDropConfirm)->m_x = mouse_x - 140;
+							m_dialog_box_manager.get_dialog_box(DialogBoxId::ItemDropConfirm)->m_y = mouse_y - 70;
+							if (m_dialog_box_manager.get_dialog_box(DialogBoxId::ItemDropConfirm)->m_y < 0) m_dialog_box_manager.get_dialog_box(DialogBoxId::ItemDropConfirm)->m_y = 0;
 							m_dialog_box_manager.enable_dialog_box(DialogBoxId::ItemDropConfirm, item_id, static_cast<int64_t>(m_item_list[item_id]->m_count), 0);
 						}
 						else
@@ -2213,7 +2201,7 @@ void CGame::item_drop_external_screen(char item_id, short mouse_x, short mouse_y
 					break;
 				}
 			}
-			m_is_item_disabled[item_id] = true;
+			inventory_manager::get().lock_item(item_id);
 		}
 	}
 	else
@@ -2222,29 +2210,26 @@ void CGame::item_drop_external_screen(char item_id, short mouse_x, short mouse_y
 		if (cfg2 && ((cfg2->get_item_type() == ItemType::Consume) || (cfg2->get_item_type() == ItemType::Arrow))
 			&& (m_item_list[item_id]->m_count > 1))
 		{
-			m_dialog_box_manager.Info(DialogBoxId::ItemDropExternal).m_x = mouse_x - 140;
-			m_dialog_box_manager.Info(DialogBoxId::ItemDropExternal).m_y = mouse_y - 70;
-			if (m_dialog_box_manager.Info(DialogBoxId::ItemDropExternal).m_y < 0)		m_dialog_box_manager.Info(DialogBoxId::ItemDropExternal).m_y = 0;
-			m_dialog_box_manager.Info(DialogBoxId::ItemDropExternal).m_v1 = 0;
-			m_dialog_box_manager.Info(DialogBoxId::ItemDropExternal).m_v2 = 0;
-			m_dialog_box_manager.Info(DialogBoxId::ItemDropExternal).m_v3 = 0;
-			m_dialog_box_manager.Info(DialogBoxId::ItemDropExternal).m_v4 = 0;
-			std::memset(m_dialog_box_manager.Info(DialogBoxId::ItemDropExternal).m_str, 0, sizeof(m_dialog_box_manager.Info(DialogBoxId::ItemDropExternal).m_str));
+			m_dialog_box_manager.get_dialog_box(DialogBoxId::ItemDropExternal)->m_x = mouse_x - 140;
+			m_dialog_box_manager.get_dialog_box(DialogBoxId::ItemDropExternal)->m_y = mouse_y - 70;
+			if (m_dialog_box_manager.get_dialog_box(DialogBoxId::ItemDropExternal)->m_y < 0)		m_dialog_box_manager.get_dialog_box(DialogBoxId::ItemDropExternal)->m_y = 0;
+			if (auto* dropDlg2 = m_dialog_box_manager.get_dialog_as<DialogBox_ItemDropAmount>(DialogBoxId::ItemDropExternal))
+			{
+				dropDlg2->m_drop_x = 0;
+				dropDlg2->m_drop_y = 0;
+				dropDlg2->m_drop_target_type = 0;
+				dropDlg2->m_drop_target_id = 0;
+				std::memset(dropDlg2->m_target_name, 0, sizeof(dropDlg2->m_target_name));
+			}
 			m_dialog_box_manager.enable_dialog_box(DialogBoxId::ItemDropExternal, item_id, static_cast<int64_t>(m_item_list[item_id]->m_count), 0);
 		}
 		else
 		{
 			if (item_drop_history(m_item_list[item_id]->m_id_num))
 			{
-				m_dialog_box_manager.Info(DialogBoxId::ItemDropConfirm).m_x = mouse_x - 140;
-				m_dialog_box_manager.Info(DialogBoxId::ItemDropConfirm).m_y = mouse_y - 70;
-				if (m_dialog_box_manager.Info(DialogBoxId::ItemDropConfirm).m_y < 0)	m_dialog_box_manager.Info(DialogBoxId::ItemDropConfirm).m_y = 0;
-				m_dialog_box_manager.Info(DialogBoxId::ItemDropConfirm).m_v1 = 0;
-				m_dialog_box_manager.Info(DialogBoxId::ItemDropConfirm).m_v2 = 0;
-				m_dialog_box_manager.Info(DialogBoxId::ItemDropConfirm).m_v3 = 1;
-				m_dialog_box_manager.Info(DialogBoxId::ItemDropConfirm).m_v4 = 0;
-				m_dialog_box_manager.Info(DialogBoxId::ItemDropConfirm).m_v5 = item_id;
-				std::memset(m_dialog_box_manager.Info(DialogBoxId::ItemDropConfirm).m_str, 0, sizeof(m_dialog_box_manager.Info(DialogBoxId::ItemDropConfirm).m_str));
+				m_dialog_box_manager.get_dialog_box(DialogBoxId::ItemDropConfirm)->m_x = mouse_x - 140;
+				m_dialog_box_manager.get_dialog_box(DialogBoxId::ItemDropConfirm)->m_y = mouse_y - 70;
+				if (m_dialog_box_manager.get_dialog_box(DialogBoxId::ItemDropConfirm)->m_y < 0)	m_dialog_box_manager.get_dialog_box(DialogBoxId::ItemDropConfirm)->m_y = 0;
 				m_dialog_box_manager.enable_dialog_box(DialogBoxId::ItemDropConfirm, item_id, static_cast<int64_t>(m_item_list[item_id]->m_count), 0);
 			}
 			else
@@ -2252,7 +2237,7 @@ void CGame::item_drop_external_screen(char item_id, short mouse_x, short mouse_y
 				if (cfg2) send_command(MsgId::CommandCommon, CommonType::ItemDrop, 0, item_id, 1, 0, cfg2->m_name);
 			}
 		}
-		m_is_item_disabled[item_id] = true;
+		inventory_manager::get().lock_item(item_id);
 	}
 }
 
@@ -2350,7 +2335,7 @@ void CGame::init_game_settings()
 
 
 	m_down_skill_index = -1;
-	m_dialog_box_manager.Info(DialogBoxId::Skill).m_flag = false;
+	m_dialog_box_manager.get_dialog_as<DialogBox_Skill>(DialogBoxId::Skill)->m_is_down_skill_pending = false;
 
 	m_player->m_is_confusion = false;
 
@@ -2375,18 +2360,7 @@ void CGame::init_game_settings()
 		m_guild_name_cache[i].ref_time = 0;
 		m_guild_name_cache[i].guild_rank = -1;
 	}
-	//Snoopy: 61
-	for (int i = 0; i < 61; i++)
-		m_dialog_box_manager.set_enabled(i, false);
-
-	// Clear all z-order slots then place HudPanel in the two reserved slots.
-	// Must clear 0-60 (not just 0-57) to prevent stale HudPanel entries from
-	// accumulating in slot 58 across map changes.
-	for (int i = 0; i < 61; i++)
-		m_dialog_box_manager.set_order_at(i, 0);
-	m_dialog_box_manager.set_order_at(60, DialogBoxId::HudPanel);
-	m_dialog_box_manager.set_order_at(59, DialogBoxId::HudPanel);
-	m_dialog_box_manager.set_enabled(DialogBoxId::HudPanel, true);
+	m_dialog_box_manager.reset_all_for_map_change();
 
 	if (m_effect_manager) m_effect_manager->clear_all_effects();
 
@@ -2399,27 +2373,14 @@ void CGame::init_game_settings()
 
 	m_player->m_guild_rank = -1;
 
-	for (int i = 0; i < 100; i++) {
-		m_guild_op_list[i].op_mode = 0;
-	}
-
-
-
-	for (int i = 0; i < 41; i++) {
-		m_dialog_box_manager.Info(i).m_flag = false;
-		m_dialog_box_manager.Info(i).m_view = 0;
-		m_dialog_box_manager.Info(i).m_is_scroll_selected = false;
-	}
+	m_dialog_box_manager.get_dialog_as<DialogBox_GuildOperation>(DialogBoxId::GuildOperation)->reset();
 
 	for (int i = 0; i < hb::shared::limits::MaxItems; i++)
 		if (m_item_list[i] != 0) {
 			m_item_list[i].reset();
 		}
 
-	for (int i = 0; i < game_limits::max_sell_list; i++) {
-		m_sell_item_list[i].index = -1;
-		m_sell_item_list[i].amount = 0;
-	}
+	m_dialog_box_manager.get_dialog_as<DialogBox_SellList>(DialogBoxId::SellList)->reset();
 
 	for (int i = 0; i < hb::shared::limits::MaxBankItems; i++)
 		if (m_bank_list[i] != 0) {
@@ -2443,9 +2404,7 @@ void CGame::init_game_settings()
 			m_agree_msg_text_list[i].reset();
 	}
 
-	for (int i = 0; i < hb::shared::limits::MaxPartyMembers; i++) {
-		m_party_member[i].status = 0;
-	}
+	m_dialog_box_manager.get_dialog_as<DialogBox_Party>(DialogBoxId::Party)->reset_members();
 
 	m_player->m_lu_point = 0;
 	m_player->m_lu_str = m_player->m_lu_vit = m_player->m_lu_dex = m_player->m_lu_int = m_player->m_lu_mag = m_player->m_lu_char = 0;
@@ -2514,11 +2473,11 @@ void CGame::create_new_guild_response_handler(char* data)
 	switch (header->msg_type) {
 	case MsgType::Confirm:
 		m_player->m_guild_rank = 0;
-		m_dialog_box_manager.Info(DialogBoxId::GuildMenu).m_mode = 3;
+		m_dialog_box_manager.get_dialog_as<DialogBox_GuildMenu>(DialogBoxId::GuildMenu)->m_mode = DialogBox_GuildMenu::mode::guild_created;
 		break;
 	case MsgType::Reject:
 		m_player->m_guild_rank = -1;
-		m_dialog_box_manager.Info(DialogBoxId::GuildMenu).m_mode = 4;
+		m_dialog_box_manager.get_dialog_as<DialogBox_GuildMenu>(DialogBoxId::GuildMenu)->m_mode = DialogBox_GuildMenu::mode::create_failed;
 		break;
 	}
 }
@@ -2609,49 +2568,17 @@ void CGame::disband_guild_response_handler(char* data)
 	switch (header->msg_type) {
 	case MsgType::Confirm:
 		m_player->m_guild_rank = -1;
-		m_dialog_box_manager.Info(DialogBoxId::GuildMenu).m_mode = 7;
+		m_dialog_box_manager.get_dialog_as<DialogBox_GuildMenu>(DialogBoxId::GuildMenu)->m_mode = DialogBox_GuildMenu::mode::disband_success;
 		break;
 	case MsgType::Reject:
-		m_dialog_box_manager.Info(DialogBoxId::GuildMenu).m_mode = 8;
+		m_dialog_box_manager.get_dialog_as<DialogBox_GuildMenu>(DialogBoxId::GuildMenu)->m_mode = DialogBox_GuildMenu::mode::disband_failed;
 		break;
 	}
 }
 
-void CGame::put_guild_operation_list(char* name, char op_mode)
-{
-	int i;
-	for (i = 0; i < 100; i++)
-		if (m_guild_op_list[i].op_mode == 0)
-		{
-			m_guild_op_list[i].op_mode = op_mode;
-			m_guild_op_list[i].name.assign(name, strnlen(name, 20));
-			return;
-		}
-}
+// put_guild_operation_list / shift_guild_operation_list REMOVED — use DialogBox_GuildOperation::put/shift
 
-void CGame::shift_guild_operation_list()
-{
-	int i;
-	m_guild_op_list[0].op_mode = 0;
-
-	for (i = 1; i < 100; i++)
-		if ((m_guild_op_list[i - 1].op_mode == 0) && (m_guild_op_list[i].op_mode != 0)) {
-			m_guild_op_list[i - 1].op_mode = m_guild_op_list[i].op_mode;
-			m_guild_op_list[i - 1].name = m_guild_op_list[i].name;
-
-			m_guild_op_list[i].op_mode = 0;
-		}
-}
-
-void CGame::enable_dialog_box(int box_id, int type, int v1, int v2, char* string)
-{
-	m_dialog_box_manager.enable_dialog_box(box_id, type, v1, v2, string);
-}
-
-void CGame::disable_dialog_box(int box_id)
-{
-	m_dialog_box_manager.disable_dialog_box(box_id);
-}
+// enable_dialog_box / disable_dialog_box wrappers REMOVED — callers use m_dialog_box_manager directly
 
 void CGame::add_event_list(const char* txt, char color, bool dup_allow)
 {
@@ -3534,8 +3461,7 @@ void CGame::init_item_list(char* packet_data)
 	for (int i = 0; i < DEF_MAXITEMEQUIPPOS; i++)
 		m_item_equipment_status[i] = -1;
 
-	for (int i = 0; i < hb::shared::limits::MaxItems; i++)
-		m_is_item_disabled[i] = false;
+	inventory_manager::get().unlock_all();
 
 	const auto* header = hb::net::PacketCast<hb::net::PacketResponseItemListHeader>(
 		packet_data, sizeof(hb::net::PacketResponseItemListHeader));
@@ -3636,232 +3562,8 @@ void CGame::init_item_list(char* packet_data)
 	for (int i = 0; i < hb::shared::limits::MaxSkillType; i++) if (m_player->m_skill_mastery[i] != 0) nSkills++;
 }
 
-void CGame::draw_dialog_boxs(short mouse_x, short mouse_y, short mouse_z, char left_button)
-{
-	if (m_is_observer_mode == true) return;
-	// Note: Dialogs that handle scroll should read hb::shared::input::get_mouse_wheel_delta() and clear it after processing
-	//Snoopy: 41->61
-	bool icon_panel_drawn = false;
-	for (int i = 0; i < 61; i++)
-		if (m_dialog_box_manager.order_at(i) != 0)
-		{
-			switch (m_dialog_box_manager.order_at(i)) {
-			case DialogBoxId::CharacterInfo:
-				if (auto* dlg = m_dialog_box_manager.get_dialog_box(DialogBoxId::CharacterInfo))
-					dlg->on_draw(mouse_x, mouse_y, mouse_z, left_button);
-				break;
-			case DialogBoxId::Inventory:
-				if (auto* dlg = m_dialog_box_manager.get_dialog_box(DialogBoxId::Inventory))
-					dlg->on_draw(mouse_x, mouse_y, mouse_z, left_button);
-				break;
-			case DialogBoxId::Magic:
-				if (auto* dlg = m_dialog_box_manager.get_dialog_box(DialogBoxId::Magic))
-					dlg->on_draw(mouse_x, mouse_y, mouse_z, left_button);
-				break;
-			case DialogBoxId::ItemDropConfirm:
-				if (auto* dlg = m_dialog_box_manager.get_dialog_box(DialogBoxId::ItemDropConfirm))
-					dlg->on_draw(mouse_x, mouse_y, mouse_z, left_button);
-				break;
-			case DialogBoxId::WarningBattleArea:
-				if (auto* dlg = m_dialog_box_manager.get_dialog_box(DialogBoxId::WarningBattleArea))
-					dlg->on_draw(mouse_x, mouse_y, mouse_z, left_button);
-				break;
-			case DialogBoxId::GuildMenu:
-				if (auto* dlg = m_dialog_box_manager.get_dialog_box(DialogBoxId::GuildMenu))
-					dlg->on_draw(mouse_x, mouse_y, mouse_z, left_button);
-				break;
-			case DialogBoxId::GuildOperation:
-				if (auto* dlg = m_dialog_box_manager.get_dialog_box(DialogBoxId::GuildOperation))
-					dlg->on_draw(mouse_x, mouse_y, mouse_z, left_button);
-				break;
-			case DialogBoxId::GuideMap:
-				if (auto* dlg = m_dialog_box_manager.get_dialog_box(DialogBoxId::GuideMap))
-					dlg->on_draw(mouse_x, mouse_y, mouse_z, left_button);
-				break;
-			case DialogBoxId::ChatHistory:
-				if (auto* dlg = m_dialog_box_manager.get_dialog_box(DialogBoxId::ChatHistory))
-					dlg->on_draw(mouse_x, mouse_y, mouse_z, left_button);
-				break;
-			case DialogBoxId::SaleMenu:
-				if (auto* dlg = m_dialog_box_manager.get_dialog_box(DialogBoxId::SaleMenu))
-					dlg->on_draw(mouse_x, mouse_y, mouse_z, left_button);
-				break;
-			case DialogBoxId::LevelUpSetting:
-				if (auto* dlg = m_dialog_box_manager.get_dialog_box(DialogBoxId::LevelUpSetting))
-					dlg->on_draw(mouse_x, mouse_y, mouse_z, left_button);
-				break;
-			case DialogBoxId::CityHallMenu:
-				if (auto* dlg = m_dialog_box_manager.get_dialog_box(DialogBoxId::CityHallMenu))
-					dlg->on_draw(mouse_x, mouse_y, mouse_z, left_button);
-				break;
-			case DialogBoxId::Bank:
-				if (auto* dlg = m_dialog_box_manager.get_dialog_box(DialogBoxId::Bank))
-					dlg->on_draw(mouse_x, mouse_y, mouse_z, left_button);
-				break;
-			case DialogBoxId::Skill:
-				if (auto* dlg = m_dialog_box_manager.get_dialog_box(DialogBoxId::Skill))
-					dlg->on_draw(mouse_x, mouse_y, mouse_z, left_button);
-				break;
-			case DialogBoxId::MagicShop:
-				if (auto* dlg = m_dialog_box_manager.get_dialog_box(DialogBoxId::MagicShop))
-					dlg->on_draw(mouse_x, mouse_y, mouse_z, left_button);
-				break;
-			case DialogBoxId::ItemDropExternal:
-				if (auto* dlg = m_dialog_box_manager.get_dialog_box(DialogBoxId::ItemDropExternal))
-					dlg->on_draw(mouse_x, mouse_y, mouse_z, left_button);
-				break;
-			case DialogBoxId::Text:
-				if (auto* dlg = m_dialog_box_manager.get_dialog_box(DialogBoxId::Text))
-					dlg->on_draw(mouse_x, mouse_y, mouse_z, left_button);
-				break;
-			case DialogBoxId::SystemMenu:
-				if (auto* dlg = m_dialog_box_manager.get_dialog_box(DialogBoxId::SystemMenu))
-					dlg->on_draw(mouse_x, mouse_y, mouse_z, left_button);
-				break;
-			case DialogBoxId::NpcActionQuery:
-				if (auto* dlg = m_dialog_box_manager.get_dialog_box(DialogBoxId::NpcActionQuery))
-					dlg->on_draw(mouse_x, mouse_y, mouse_z, left_button);
-				break;
-			case DialogBoxId::NpcTalk:
-				if (auto* dlg = m_dialog_box_manager.get_dialog_box(DialogBoxId::NpcTalk))
-					dlg->on_draw(mouse_x, mouse_y, mouse_z, left_button);
-				break;
-			case DialogBoxId::Map:
-				if (auto* dlg = m_dialog_box_manager.get_dialog_box(DialogBoxId::Map))
-					dlg->on_draw(mouse_x, mouse_y, mouse_z, left_button);
-				break;
-			case DialogBoxId::SellOrRepair:
-				if (auto* dlg = m_dialog_box_manager.get_dialog_box(DialogBoxId::SellOrRepair))
-					dlg->on_draw(mouse_x, mouse_y, mouse_z, left_button);
-				break;
-			case DialogBoxId::Fishing:
-				if (auto* dlg = m_dialog_box_manager.get_dialog_box(DialogBoxId::Fishing))
-					dlg->on_draw(mouse_x, mouse_y, mouse_z, left_button);
-				break;
-			case DialogBoxId::Noticement:
-				if (auto* dlg = m_dialog_box_manager.get_dialog_box(DialogBoxId::Noticement))
-					dlg->on_draw(mouse_x, mouse_y, mouse_z, left_button);
-				break;
-			case DialogBoxId::Manufacture:
-				if (auto* dlg = m_dialog_box_manager.get_dialog_box(DialogBoxId::Manufacture))
-					dlg->on_draw(mouse_x, mouse_y, mouse_z, left_button);
-				break;
-			case DialogBoxId::Exchange:
-				if (auto* dlg = m_dialog_box_manager.get_dialog_box(DialogBoxId::Exchange))
-					dlg->on_draw(mouse_x, mouse_y, mouse_z, left_button);
-				break;
-			case DialogBoxId::Quest:
-				if (auto* dlg = m_dialog_box_manager.get_dialog_box(DialogBoxId::Quest))
-					dlg->on_draw(mouse_x, mouse_y, mouse_z, left_button);
-				break;
-			case DialogBoxId::HudPanel:
-				if (auto* dlg = m_dialog_box_manager.get_dialog_box(DialogBoxId::HudPanel))
-					dlg->on_draw(mouse_x, mouse_y, mouse_z, left_button);
-				icon_panel_drawn = true;
-				break;
-			case DialogBoxId::SellList:
-				if (auto* dlg = m_dialog_box_manager.get_dialog_box(DialogBoxId::SellList))
-					dlg->on_draw(mouse_x, mouse_y, mouse_z, left_button);
-				break;
-			case DialogBoxId::Party:
-				if (auto* dlg = m_dialog_box_manager.get_dialog_box(DialogBoxId::Party))
-					dlg->on_draw(mouse_x, mouse_y, mouse_z, left_button);
-				break;
-			case DialogBoxId::CrusadeJob:
-				if (auto* dlg = m_dialog_box_manager.get_dialog_box(DialogBoxId::CrusadeJob))
-					dlg->on_draw(mouse_x, mouse_y, mouse_z, left_button);
-				break;
-			case DialogBoxId::ItemUpgrade:
-				if (auto* dlg = m_dialog_box_manager.get_dialog_box(DialogBoxId::ItemUpgrade))
-					dlg->on_draw(mouse_x, mouse_y, mouse_z, left_button);
-				break;
-			case DialogBoxId::Help:
-				if (auto* dlg = m_dialog_box_manager.get_dialog_box(DialogBoxId::Help))
-					dlg->on_draw(mouse_x, mouse_y, mouse_z, left_button);
-				break;
-			case DialogBoxId::CrusadeCommander:
-				if (auto* dlg = m_dialog_box_manager.get_dialog_box(DialogBoxId::CrusadeCommander))
-					dlg->on_draw(mouse_x, mouse_y, mouse_z, left_button);
-				break;
-			case DialogBoxId::CrusadeConstructor:
-				if (auto* dlg = m_dialog_box_manager.get_dialog_box(DialogBoxId::CrusadeConstructor))
-					dlg->on_draw(mouse_x, mouse_y, mouse_z, left_button);
-				break;
-			case DialogBoxId::CrusadeSoldier:
-				if (auto* dlg = m_dialog_box_manager.get_dialog_box(DialogBoxId::CrusadeSoldier))
-					dlg->on_draw(mouse_x, mouse_y, mouse_z, left_button);
-				break;
-			case DialogBoxId::Slates:
-				if (auto* dlg = m_dialog_box_manager.get_dialog_box(DialogBoxId::Slates))
-					dlg->on_draw(mouse_x, mouse_y, mouse_z, left_button);
-				break;
-			case DialogBoxId::ConfirmExchange:	//Snoopy: Confirmation Exchange
-				if (auto* dlg = m_dialog_box_manager.get_dialog_box(DialogBoxId::ConfirmExchange))
-					dlg->on_draw(mouse_x, mouse_y, mouse_z, left_button);
-				break;
-			case DialogBoxId::ChangeStatsMajestic:
-				if (auto* dlg = m_dialog_box_manager.get_dialog_box(DialogBoxId::ChangeStatsMajestic))
-					dlg->on_draw(mouse_x, mouse_y, mouse_z, left_button);
-				break;
-			case DialogBoxId::Resurrect: // Snoopy: Resurection?
-				if (auto* dlg = m_dialog_box_manager.get_dialog_box(DialogBoxId::Resurrect))
-					dlg->on_draw(mouse_x, mouse_y, mouse_z, left_button);
-				break;
-			case DialogBoxId::GuildHallMenu: // Gail
-				if (auto* dlg = m_dialog_box_manager.get_dialog_box(DialogBoxId::GuildHallMenu))
-					dlg->on_draw(mouse_x, mouse_y, mouse_z, left_button);
-				break;
-			case DialogBoxId::RepairAll: //50Cent - Repair All
-				if (auto* dlg = m_dialog_box_manager.get_dialog_box(DialogBoxId::RepairAll))
-					dlg->on_draw(mouse_x, mouse_y, mouse_z, left_button);
-				break;
-
-#ifdef TESTER_ONLY
-			// TESTER MENU — dialog draw cases (tester builds only)
-			case DialogBoxId::TesterMenu:
-				if (auto* dlg = m_dialog_box_manager.get_dialog_box(DialogBoxId::TesterMenu))
-					dlg->on_draw(mouse_x, mouse_y, mouse_z, left_button);
-				break;
-			case DialogBoxId::ItemCreator:
-				if (auto* dlg = m_dialog_box_manager.get_dialog_box(DialogBoxId::ItemCreator))
-					dlg->on_draw(mouse_x, mouse_y, mouse_z, left_button);
-				break;
-#endif // TESTER_ONLY
-			}
-		}
-	if (icon_panel_drawn == false)
-	{
-		if (auto* dlg = m_dialog_box_manager.get_dialog_box(DialogBoxId::HudPanel))
-			dlg->on_draw(mouse_x, mouse_y, mouse_z, left_button);
-	}
-	if (m_player->m_super_attack_left > 0)
-	{
-		std::string G_cTxt;
-		int resx = (LOGICAL_WIDTH() - 640) / 2;
-		int resy = LOGICAL_HEIGHT() - 480;
-		// Combat icon position (same as HudPanel's COMBAT_ICON_X/Y)
-		int iconX = 368 + resx;
-		int iconY = 440 + resy;
-		// Combat button area for text alignment
-		int btnX = 362 + resx;
-		int btnY = 434 + resy;
-		int btnW = 42;
-		int btnH = 41;
-
-		bool mastered = (m_player->m_skill_mastery[combat_system::get().get_weapon_skill_type()] == 100);
-
-		// draw additive overlay sprite at combat icon position only when ALT is held
-		if (hb::shared::input::is_alt_down() && mastered)
-			m_sprite[InterfaceNdIconPanel]->draw(iconX, iconY, 3, hb::shared::sprite::DrawParams::additive(0.7f));
-
-		// draw super attack count text at bottom-right of combat button area
-		G_cTxt = std::format("{}", m_player->m_super_attack_left);
-		if (mastered)
-			hb::shared::text::draw_text_aligned(GameFont::Bitmap1, btnX, btnY, btnW, btnH, G_cTxt.c_str(), hb::shared::text::TextStyle::with_integrated_shadow(hb::shared::render::Color(255, 255, 255)), hb::shared::text::Align::BottomRight);
-		else
-			hb::shared::text::draw_text_aligned(GameFont::Bitmap1, btnX, btnY, btnW, btnH, G_cTxt.c_str(), hb::shared::text::TextStyle::with_highlight(GameColors::BmpBtnActive), hb::shared::text::Align::BottomRight);
-	}
-}
+// draw_dialog_boxs REMOVED — rendering moved to DialogBoxManager::draw_all()
+// Super attack overlay moved to DialogBox_HudPanel::draw_super_attack_overlay()
 
 void CGame::draw_character_body(short sX, short sY, short type)
 {
@@ -3884,21 +3586,7 @@ void CGame::draw_character_body(short sX, short sY, short type)
 	}
 }
 
-int CGame::get_top_dialog_box_index()
-{
-	// Skip HudPanel — it occupies reserved slots 59/60 but the compact
-	// operation in enable/disable_dialog_box can shift it into 0-58.
-	// Without this filter, get_top returns HudPanel instead of the real
-	// topmost dialog, breaking scroll checks in Magic/Skill/etc.
-	for (int i = 58; i >= 0; i--)
-	{
-		uint8_t id = m_dialog_box_manager.order_at(i);
-		if (id != 0 && id != DialogBoxId::HudPanel)
-			return id;
-	}
-
-	return 0;
-}
+// get_top_dialog_box_index REMOVED — use m_dialog_box_manager.get_top_id()
 
 
 void CGame::load_text_dlg_contents(int type)
@@ -4325,9 +4013,7 @@ void CGame::crusade_war_result(int winner_side)
 		}
 	}
 	m_dialog_box_manager.enable_dialog_box(DialogBoxId::Text, 0, 0, 0);
-	m_dialog_box_manager.disable_dialog_box(DialogBoxId::CrusadeCommander);
-	m_dialog_box_manager.disable_dialog_box(DialogBoxId::CrusadeConstructor);
-	m_dialog_box_manager.disable_dialog_box(DialogBoxId::CrusadeSoldier);
+	m_dialog_box_manager.disable_crusade_dialogs();
 }
 
 
@@ -4343,11 +4029,11 @@ void CGame::civil_right_admission_handler(char* data)
 
 	switch (result) {
 	case 0:
-		m_dialog_box_manager.Info(DialogBoxId::CityHallMenu).m_mode = 4;
+		m_dialog_box_manager.get_dialog_as<DialogBox_CityHallMenu>(DialogBoxId::CityHallMenu)->m_mode = DialogBox_CityHallMenu::mode::citizenship_failed;
 		break;
 
 	case 1:
-		m_dialog_box_manager.Info(DialogBoxId::CityHallMenu).m_mode = 3;
+		m_dialog_box_manager.get_dialog_as<DialogBox_CityHallMenu>(DialogBoxId::CityHallMenu)->m_mode = DialogBox_CityHallMenu::mode::citizenship_success;
 		const auto* pkt = hb::net::PacketCast<hb::net::PacketResponseCivilRight>(
 			data, sizeof(hb::net::PacketResponseCivilRight));
 		if (!pkt) return;
@@ -4739,8 +4425,8 @@ void CGame::noticement_handler(char* data)
 			if (!file) return;
 			file << pkt->text;
 		}
-		m_dialog_box_manager.Info(DialogBoxId::Text).m_x = 20;
-		m_dialog_box_manager.Info(DialogBoxId::Text).m_y = 65;
+		m_dialog_box_manager.get_dialog_box(DialogBoxId::Text)->m_x = 20;
+		m_dialog_box_manager.get_dialog_box(DialogBoxId::Text)->m_y = 65;
 		m_dialog_box_manager.enable_dialog_box(DialogBoxId::Text, 1000, 0, 0);
 		break;
 	}
@@ -4983,16 +4669,16 @@ void CGame::handle_key_down(KeyCode _key)
 		{
 			// Ctrl+0-9 for magic views
 			switch (_key) {
-			case KeyCode::Num0: m_dialog_box_manager.enable_dialog_box(DialogBoxId::Magic, 0, 0, 0); m_dialog_box_manager.Info(DialogBoxId::Magic).m_view = 9; break;
-			case KeyCode::Num1: m_dialog_box_manager.enable_dialog_box(DialogBoxId::Magic, 0, 0, 0); m_dialog_box_manager.Info(DialogBoxId::Magic).m_view = 0; break;
-			case KeyCode::Num2: m_dialog_box_manager.enable_dialog_box(DialogBoxId::Magic, 0, 0, 0); m_dialog_box_manager.Info(DialogBoxId::Magic).m_view = 1; break;
-			case KeyCode::Num3: m_dialog_box_manager.enable_dialog_box(DialogBoxId::Magic, 0, 0, 0); m_dialog_box_manager.Info(DialogBoxId::Magic).m_view = 2; break;
-			case KeyCode::Num4: m_dialog_box_manager.enable_dialog_box(DialogBoxId::Magic, 0, 0, 0); m_dialog_box_manager.Info(DialogBoxId::Magic).m_view = 3; break;
-			case KeyCode::Num5: m_dialog_box_manager.enable_dialog_box(DialogBoxId::Magic, 0, 0, 0); m_dialog_box_manager.Info(DialogBoxId::Magic).m_view = 4; break;
-			case KeyCode::Num6: m_dialog_box_manager.enable_dialog_box(DialogBoxId::Magic, 0, 0, 0); m_dialog_box_manager.Info(DialogBoxId::Magic).m_view = 5; break;
-			case KeyCode::Num7: m_dialog_box_manager.enable_dialog_box(DialogBoxId::Magic, 0, 0, 0); m_dialog_box_manager.Info(DialogBoxId::Magic).m_view = 6; break;
-			case KeyCode::Num8: m_dialog_box_manager.enable_dialog_box(DialogBoxId::Magic, 0, 0, 0); m_dialog_box_manager.Info(DialogBoxId::Magic).m_view = 7; break;
-			case KeyCode::Num9: m_dialog_box_manager.enable_dialog_box(DialogBoxId::Magic, 0, 0, 0); m_dialog_box_manager.Info(DialogBoxId::Magic).m_view = 8; break;
+			case KeyCode::Num0: m_dialog_box_manager.enable_dialog_box(DialogBoxId::Magic, 0, 9, 0); break;
+			case KeyCode::Num1: m_dialog_box_manager.enable_dialog_box(DialogBoxId::Magic, 0, 0, 0); break;
+			case KeyCode::Num2: m_dialog_box_manager.enable_dialog_box(DialogBoxId::Magic, 0, 1, 0); break;
+			case KeyCode::Num3: m_dialog_box_manager.enable_dialog_box(DialogBoxId::Magic, 0, 2, 0); break;
+			case KeyCode::Num4: m_dialog_box_manager.enable_dialog_box(DialogBoxId::Magic, 0, 3, 0); break;
+			case KeyCode::Num5: m_dialog_box_manager.enable_dialog_box(DialogBoxId::Magic, 0, 4, 0); break;
+			case KeyCode::Num6: m_dialog_box_manager.enable_dialog_box(DialogBoxId::Magic, 0, 5, 0); break;
+			case KeyCode::Num7: m_dialog_box_manager.enable_dialog_box(DialogBoxId::Magic, 0, 6, 0); break;
+			case KeyCode::Num8: m_dialog_box_manager.enable_dialog_box(DialogBoxId::Magic, 0, 7, 0); break;
+			case KeyCode::Num9: m_dialog_box_manager.enable_dialog_box(DialogBoxId::Magic, 0, 8, 0); break;
 			default: break;
 			}
 		}
@@ -5014,7 +4700,7 @@ void CGame::reserve_fightzone_response_handler(char* data)
 	switch (pkt->header.msg_type) {
 	case MsgType::Confirm:
 		add_event_list(RESERVE_FIGHTZONE_RESPONSE_HANDLER1, 10);
-		m_dialog_box_manager.Info(DialogBoxId::GuildMenu).m_mode = 14;
+		m_dialog_box_manager.get_dialog_as<DialogBox_GuildMenu>(DialogBoxId::GuildMenu)->m_mode = DialogBox_GuildMenu::mode::fightzone_reserved;
 		m_fightzone_number = m_fightzone_number_temp;
 		break;
 
@@ -5023,19 +4709,19 @@ void CGame::reserve_fightzone_response_handler(char* data)
 		m_fightzone_number_temp = 0;
 
 		if (pkt->result == 0) {
-			m_dialog_box_manager.Info(DialogBoxId::GuildMenu).m_mode = 15;
+			m_dialog_box_manager.get_dialog_as<DialogBox_GuildMenu>(DialogBoxId::GuildMenu)->m_mode = DialogBox_GuildMenu::mode::fightzone_won;
 		}
 		else if (pkt->result == -1) {
-			m_dialog_box_manager.Info(DialogBoxId::GuildMenu).m_mode = 16;
+			m_dialog_box_manager.get_dialog_as<DialogBox_GuildMenu>(DialogBoxId::GuildMenu)->m_mode = DialogBox_GuildMenu::mode::fightzone_lost;
 		}
 		else if (pkt->result == -2) {
-			m_dialog_box_manager.Info(DialogBoxId::GuildMenu).m_mode = 17;
+			m_dialog_box_manager.get_dialog_as<DialogBox_GuildMenu>(DialogBoxId::GuildMenu)->m_mode = DialogBox_GuildMenu::mode::fightzone_draw;
 		}
 		else if (pkt->result == -3) {
-			m_dialog_box_manager.Info(DialogBoxId::GuildMenu).m_mode = 21;
+			m_dialog_box_manager.get_dialog_as<DialogBox_GuildMenu>(DialogBoxId::GuildMenu)->m_mode = DialogBox_GuildMenu::mode::fightzone_denied;
 		}
 		else if (pkt->result == -4) {
-			m_dialog_box_manager.Info(DialogBoxId::GuildMenu).m_mode = 22;
+			m_dialog_box_manager.get_dialog_as<DialogBox_GuildMenu>(DialogBoxId::GuildMenu)->m_mode = DialogBox_GuildMenu::mode::fightzone_canceled;
 		}
 		break;
 	}
@@ -5104,7 +4790,7 @@ void CGame::retrieve_item_handler(char* data)
 						break;
 					}
 				m_is_item_equipped[item_index] = false;
-				m_is_item_disabled[item_index] = false;
+				inventory_manager::get().unlock_item(item_index);
 			}
 			// Compact bank list
 			for (j = 0; j <= hb::shared::limits::MaxBankItems - 2; j++)
@@ -5116,7 +4802,7 @@ void CGame::retrieve_item_handler(char* data)
 			}
 		}
 	}
-	m_dialog_box_manager.Info(DialogBoxId::Bank).m_mode = 0;
+	m_dialog_box_manager.get_dialog_as<DialogBox_Bank>(DialogBoxId::Bank)->m_mode = DialogBox_Bank::mode::list;
 }
 
 void CGame::draw_npc_name(short screen_x, short screen_y, short owner_type, const hb::shared::entity::PlayerStatus& status, short npc_config_id)
@@ -5259,14 +4945,8 @@ void CGame::draw_object_name(short screen_x, short screen_y, const char* name, c
 		}
 		if (m_party_status != 0)
 		{
-			for (int i = 0; i < hb::shared::limits::MaxPartyMembers; i++)
-			{
-				if (m_party_member_name_list[i].name == name)
-				{
-					text += BGET_NPC_NAME23; // ", Party Member"
-					break;
-				}
-			}
+			if (m_dialog_box_manager.get_dialog_as<DialogBox_Party>(DialogBoxId::Party)->is_party_member(name))
+				text += BGET_NPC_NAME23; // ", Party Member"
 		}
 	}
 	else text = "?????";
@@ -5806,8 +5486,7 @@ void CGame::clear_skill_using_status()
 	if (m_skill_using_status == true)
 	{
 		add_event_list(CLEAR_SKILL_USING_STATUS1, 10);//"
-		m_dialog_box_manager.disable_dialog_box(DialogBoxId::Fishing);
-		m_dialog_box_manager.disable_dialog_box(DialogBoxId::Manufacture);
+		m_dialog_box_manager.disable_crafting_dialogs();
 		if ((m_player->m_player_type >= 1) && (m_player->m_player_type <= 6)/* && (!m_player->m_playerAppearance.is_walking)*/) {
 			m_player->m_Controller.set_command(Type::stop);
 			m_player->m_Controller.set_destination(m_player->m_player_x, m_player->m_player_y);
@@ -5848,7 +5527,7 @@ void CGame::npc_talk_handler(char* packet_data)
 
 	if ((npc_type >= 1) && (npc_type <= 100))
 	{
-		index = m_dialog_box_manager.Info(DialogBoxId::NpcTalk).m_v1;
+		index = m_dialog_box_manager.get_dialog_as<DialogBox_NpcTalk>(DialogBoxId::NpcTalk)->m_text_line_count;
 		m_msg_text_list2[index] = std::make_unique<CMsg>(0, "  ", 0);
 		index++;
 		question_type = 0;
@@ -6006,15 +5685,15 @@ void CGame::point_command_handler(int indexX, int indexY, char item_id)
 	{
 		if ((m_mc_name.size() == 0) || (m_mc_name == m_player->m_player_name) || (m_mc_name[0] == '_'))
 		{
-			m_dialog_box_manager.Info(DialogBoxId::Party).m_mode = 0;
+			m_dialog_box_manager.get_dialog_as<DialogBox_Party>(DialogBoxId::Party)->m_mode = DialogBox_Party::mode::main_menu;
 			play_game_sound('E', 14, 5);
 			add_event_list(POINT_COMMAND_HANDLER1, 10);
 		}
 		else
 		{
-			m_dialog_box_manager.Info(DialogBoxId::Party).m_mode = 3;
+			m_dialog_box_manager.get_dialog_as<DialogBox_Party>(DialogBoxId::Party)->m_mode = DialogBox_Party::mode::join_requested;
 			play_game_sound('E', 14, 5);
-			std::snprintf(m_dialog_box_manager.Info(DialogBoxId::Party).m_str, sizeof(m_dialog_box_manager.Info(DialogBoxId::Party).m_str), "%s", m_mc_name.c_str());
+			std::snprintf(m_dialog_box_manager.get_dialog_as<DialogBox_Party>(DialogBoxId::Party)->m_leader_name, sizeof(DialogBox_Party::m_leader_name), "%s", m_mc_name.c_str());
 			send_command(MsgId::CommandCommon, CommonType::RequestJoinParty, 0, 1, 0, 0, m_mc_name.c_str());
 			return;
 		}
@@ -6286,7 +5965,7 @@ void CGame::command_processor(short mouse_x, short mouse_y, short tile_x, short 
 				return;
 			}
 
-			result = m_dialog_box_manager.handle_mouse_down(mouse_x, mouse_y);
+			result = m_dialog_box_manager.handle_mouse_down();
 			if (result == 1)
 			{
 				CursorTarget::set_cursor_status(CursorStatus::Selected);
@@ -6305,7 +5984,7 @@ void CGame::command_processor(short mouse_x, short mouse_y, short tile_x, short 
 		}
 		else if (right_button != 0)
 		{
-			if (m_dialog_box_manager.handle_right_click(mouse_x, mouse_y, current_time)) return;
+			if (m_dialog_box_manager.handle_right_click(current_time)) return;
 		}
 		break;
 	case CursorStatus::Pressed:
@@ -6328,21 +6007,21 @@ void CGame::command_processor(short mouse_x, short mouse_y, short tile_x, short 
 					&& (abs(mouse_y - CursorTarget::get_selection_click_y()) <= input_config::double_click_tolerance))
 				{
 					CursorTarget::reset_selection_click_time(); // reset to prevent triple-click
-					double_click_consumed = m_dialog_box_manager.handle_double_click(mouse_x, mouse_y);
+					double_click_consumed = m_dialog_box_manager.handle_double_click();
 				}
 				else // Click
 				{
-					m_dialog_box_manager.handle_click(mouse_x, mouse_y);
+					m_dialog_box_manager.handle_click();
 				}
 			}
 			else
 			{
-				m_dialog_box_manager.handle_click(mouse_x, mouse_y);
+				m_dialog_box_manager.handle_click();
 			}
 			CursorTarget::record_selection_click(mouse_x, mouse_y, current_time);
 			if (!double_click_consumed && CursorTarget::GetSelectedType() == SelectedObjectType::Item)
 			{
-				if (!m_dialog_box_manager.handle_dragging_item_release(mouse_x, mouse_y))
+				if (!m_dialog_box_manager.handle_dragging_item_release())
 				{
 					item_drop_external_screen(static_cast<char>(CursorTarget::get_selected_id()), mouse_x, mouse_y);
 				}
@@ -6365,17 +6044,17 @@ void CGame::command_processor(short mouse_x, short mouse_y, short tile_x, short 
 				}
 
 				if ((CursorTarget::GetSelectedType() == SelectedObjectType::DialogBox) &&
-					(CursorTarget::get_selected_id() == 7) && (m_dialog_box_manager.Info(DialogBoxId::GuildMenu).m_mode == 1))
+					(CursorTarget::get_selected_id() == 7) && (m_dialog_box_manager.get_dialog_as<DialogBox_GuildMenu>(DialogBoxId::GuildMenu)->m_mode == DialogBox_GuildMenu::mode::create_guild))
 				{
 					text_input_manager::get().end_input();
-					m_dialog_box_manager.Info(DialogBoxId::GuildMenu).m_mode = 20;
+					m_dialog_box_manager.get_dialog_as<DialogBox_GuildMenu>(DialogBoxId::GuildMenu)->m_mode = DialogBox_GuildMenu::mode::confirm_cancel;
 				}
 				// Query Drop Item Amount
 				if ((CursorTarget::GetSelectedType() == SelectedObjectType::DialogBox) &&
-					(CursorTarget::get_selected_id() == 17) && (m_dialog_box_manager.Info(DialogBoxId::ItemDropExternal).m_mode == 1))
+					(CursorTarget::get_selected_id() == 17) && (m_dialog_box_manager.get_dialog_as<DialogBox_ItemDropAmount>(DialogBoxId::ItemDropExternal)->m_mode == DialogBox_ItemDropAmount::mode::input))
 				{
 					text_input_manager::get().end_input();
-					m_dialog_box_manager.Info(DialogBoxId::ItemDropExternal).m_mode = 20;
+					m_dialog_box_manager.get_dialog_as<DialogBox_ItemDropAmount>(DialogBoxId::ItemDropExternal)->m_mode = DialogBox_ItemDropAmount::mode::selected;
 				}
 				return;
 			}
@@ -6392,8 +6071,11 @@ void CGame::command_processor(short mouse_x, short mouse_y, short tile_x, short 
 				// HudPanel is fixed and cannot be moved
 				if (CursorTarget::get_selected_id() != DialogBoxId::HudPanel)
 				{
-					m_dialog_box_manager.Info(CursorTarget::get_selected_id()).m_x = mouse_x - CursorTarget::get_drag_dist_x();
-					m_dialog_box_manager.Info(CursorTarget::get_selected_id()).m_y = mouse_y - CursorTarget::get_drag_dist_y();
+					auto* drag_dlg = m_dialog_box_manager.get_dialog_box(CursorTarget::get_selected_id());
+					if (drag_dlg) {
+						drag_dlg->m_x = mouse_x - CursorTarget::get_drag_dist_x();
+						drag_dlg->m_y = mouse_y - CursorTarget::get_drag_dist_y();
+					}
 				}
 			}
 			CursorTarget::set_prev_position(mouse_x, mouse_y);
@@ -6406,21 +6088,21 @@ void CGame::command_processor(short mouse_x, short mouse_y, short tile_x, short 
 			switch (CursorTarget::GetSelectedType()) {
 			case SelectedObjectType::DialogBox:
 				if ((CursorTarget::GetSelectedType() == SelectedObjectType::DialogBox) &&
-					(CursorTarget::get_selected_id() == 7) && (m_dialog_box_manager.Info(DialogBoxId::GuildMenu).m_mode == 20))
+					(CursorTarget::get_selected_id() == 7) && (m_dialog_box_manager.get_dialog_as<DialogBox_GuildMenu>(DialogBoxId::GuildMenu)->m_mode == DialogBox_GuildMenu::mode::confirm_cancel))
 				{
-					dialog_x = m_dialog_box_manager.Info(DialogBoxId::GuildMenu).m_x;
-					dialog_y = m_dialog_box_manager.Info(DialogBoxId::GuildMenu).m_y;
+					dialog_x = m_dialog_box_manager.get_dialog_box(DialogBoxId::GuildMenu)->m_x;
+					dialog_y = m_dialog_box_manager.get_dialog_box(DialogBoxId::GuildMenu)->m_y;
 					text_input_manager::get().start_input(dialog_x + 75, dialog_y + 140, 21, m_player->m_guild_name);
-					m_dialog_box_manager.Info(DialogBoxId::GuildMenu).m_mode = 1;
+					m_dialog_box_manager.get_dialog_as<DialogBox_GuildMenu>(DialogBoxId::GuildMenu)->m_mode = DialogBox_GuildMenu::mode::create_guild;
 				}
 
 				if ((CursorTarget::GetSelectedType() == SelectedObjectType::DialogBox) &&
-					(CursorTarget::get_selected_id() == 17) && (m_dialog_box_manager.Info(DialogBoxId::ItemDropExternal).m_mode == 20))
+					(CursorTarget::get_selected_id() == 17) && (m_dialog_box_manager.get_dialog_as<DialogBox_ItemDropAmount>(DialogBoxId::ItemDropExternal)->m_mode == DialogBox_ItemDropAmount::mode::selected))
 				{	// Query Drop Item Amount
-					dialog_x = m_dialog_box_manager.Info(DialogBoxId::ItemDropExternal).m_x;
-					dialog_y = m_dialog_box_manager.Info(DialogBoxId::ItemDropExternal).m_y;
+					dialog_x = m_dialog_box_manager.get_dialog_box(DialogBoxId::ItemDropExternal)->m_x;
+					dialog_y = m_dialog_box_manager.get_dialog_box(DialogBoxId::ItemDropExternal)->m_y;
 					text_input_manager::get().start_input(dialog_x + 40, dialog_y + 57, AmountStringMaxLen, m_amount_string);
-					m_dialog_box_manager.Info(DialogBoxId::ItemDropExternal).m_mode = 1;
+					m_dialog_box_manager.get_dialog_as<DialogBox_ItemDropAmount>(DialogBoxId::ItemDropExternal)->m_mode = DialogBox_ItemDropAmount::mode::input;
 				}
 
 				if (CursorTarget::get_selected_id() == 9)
@@ -6428,20 +6110,20 @@ void CGame::command_processor(short mouse_x, short mouse_y, short tile_x, short 
 					{
 						if (mouse_x < LOGICAL_WIDTH() / 2)
 						{
-							m_dialog_box_manager.Info(DialogBoxId::GuideMap).m_x = 0;
+							m_dialog_box_manager.get_dialog_box(DialogBoxId::GuideMap)->m_x = 0;
 						}
 						else
 						{
-							m_dialog_box_manager.Info(DialogBoxId::GuideMap).m_x = LOGICAL_MAX_X() - m_dialog_box_manager.Info(DialogBoxId::GuideMap).m_size_x;
+							m_dialog_box_manager.get_dialog_box(DialogBoxId::GuideMap)->m_x = LOGICAL_MAX_X() - m_dialog_box_manager.get_dialog_box(DialogBoxId::GuideMap)->m_size_x;
 						}
 
 						if (mouse_y < LOGICAL_HEIGHT() / 2)
 						{
-							m_dialog_box_manager.Info(DialogBoxId::GuideMap).m_y = 0;
+							m_dialog_box_manager.get_dialog_box(DialogBoxId::GuideMap)->m_y = 0;
 						}
 						else
 						{
-							m_dialog_box_manager.Info(DialogBoxId::GuideMap).m_y = (LOGICAL_HEIGHT() - ICON_PANEL_HEIGHT()) - m_dialog_box_manager.Info(DialogBoxId::GuideMap).m_size_y;
+							m_dialog_box_manager.get_dialog_box(DialogBoxId::GuideMap)->m_y = (LOGICAL_HEIGHT() - ICON_PANEL_HEIGHT()) - m_dialog_box_manager.get_dialog_box(DialogBoxId::GuideMap)->m_size_y;
 						}
 					}
 				}
@@ -6450,7 +6132,7 @@ void CGame::command_processor(short mouse_x, short mouse_y, short tile_x, short 
 				break;
 
 			case SelectedObjectType::Item:
-				if (!m_dialog_box_manager.handle_dragging_item_release(mouse_x, mouse_y))
+				if (!m_dialog_box_manager.handle_dragging_item_release())
 				{
 					item_drop_external_screen(static_cast<char>(CursorTarget::get_selected_id()), mouse_x, mouse_y);
 				}
@@ -6890,111 +6572,104 @@ bool CGame::process_left_click(short mouse_x, short mouse_y, short tile_x, short
 					{
 						switch (object_type) { 	// CLEROTH - NPC TALK
 						case hb::shared::owner::ShopKeeper: // ShopKeeper-W�
-							m_dialog_box_manager.enable_dialog_box(DialogBoxId::NpcActionQuery, 5, 11, npc_config_id);
+						{	auto* npcDlg = m_dialog_box_manager.get_dialog_as<DialogBox_NpcActionQuery>(DialogBoxId::NpcActionQuery);
+							npcDlg->enable_with_target(5, 11, npc_config_id, 15, 0, 0, 0, get_npc_config_name_by_id(npc_config_id));
 							dialog_x = mouse_x - 117;
 							dialog_y = mouse_y - 50;
 							if (dialog_x < 0) dialog_x = 0;
 							if ((dialog_x + 235) > LOGICAL_MAX_X()) dialog_x = LOGICAL_MAX_X() - 235;
 							if (dialog_y < 0) dialog_y = 0;
 							if ((dialog_y + 100) > LOGICAL_MAX_Y()) dialog_y = LOGICAL_MAX_Y() - 100;
-							m_dialog_box_manager.Info(DialogBoxId::NpcActionQuery).m_x = dialog_x;
-							m_dialog_box_manager.Info(DialogBoxId::NpcActionQuery).m_y = dialog_y;
-							m_dialog_box_manager.Info(DialogBoxId::NpcActionQuery).m_v3 = 15;
-							std::snprintf(m_dialog_box_manager.Info(DialogBoxId::NpcActionQuery).m_str, sizeof(m_dialog_box_manager.Info(DialogBoxId::NpcActionQuery).m_str), "%s", get_npc_config_name_by_id(npc_config_id));
-							break;
+							npcDlg->m_x = dialog_x;
+							npcDlg->m_y = dialog_y;
+						}	break;
 
 						case hb::shared::owner::Gandalf: // Gandlf
-							m_dialog_box_manager.enable_dialog_box(DialogBoxId::NpcActionQuery, 0, 16, 0);
+						{	auto* npcDlg = m_dialog_box_manager.get_dialog_as<DialogBox_NpcActionQuery>(DialogBoxId::NpcActionQuery);
+							npcDlg->enable_with_target(0, 16, 0, 19, 0, 0, 0, get_npc_config_name_by_id(npc_config_id));
 							dialog_x = mouse_x - 117;
 							dialog_y = mouse_y - 50;
 							if (dialog_x < 0) dialog_x = 0;
 							if ((dialog_x + 235) > LOGICAL_MAX_X()) dialog_x = LOGICAL_MAX_X() - 235;
 							if (dialog_y < 0) dialog_y = 0;
 							if ((dialog_y + 100) > LOGICAL_MAX_Y()) dialog_y = LOGICAL_MAX_Y() - 100;
-							m_dialog_box_manager.Info(DialogBoxId::NpcActionQuery).m_x = dialog_x;
-							m_dialog_box_manager.Info(DialogBoxId::NpcActionQuery).m_y = dialog_y;
-							m_dialog_box_manager.Info(DialogBoxId::NpcActionQuery).m_v3 = 19;
-							std::snprintf(m_dialog_box_manager.Info(DialogBoxId::NpcActionQuery).m_str, sizeof(m_dialog_box_manager.Info(DialogBoxId::NpcActionQuery).m_str), "%s", get_npc_config_name_by_id(npc_config_id));
-							break;
+							npcDlg->m_x = dialog_x;
+							npcDlg->m_y = dialog_y;
+						}	break;
 
 						case hb::shared::owner::Howard: // Howard
-							m_dialog_box_manager.enable_dialog_box(DialogBoxId::NpcActionQuery, 0, 14, 0);
+						{	auto* npcDlg = m_dialog_box_manager.get_dialog_as<DialogBox_NpcActionQuery>(DialogBoxId::NpcActionQuery);
+							npcDlg->enable_with_target(0, 14, 0, 20, 0, 0, 0, get_npc_config_name_by_id(npc_config_id));
 							dialog_x = mouse_x - 117;
 							dialog_y = mouse_y - 50;
 							if (dialog_x < 0) dialog_x = 0;
 							if ((dialog_x + 235) > LOGICAL_MAX_X()) dialog_x = LOGICAL_MAX_X() - 235;
 							if (dialog_y < 0) dialog_y = 0;
 							if ((dialog_y + 100) > LOGICAL_MAX_Y()) dialog_y = LOGICAL_MAX_Y() - 100;
-							m_dialog_box_manager.Info(DialogBoxId::NpcActionQuery).m_x = dialog_x;
-							m_dialog_box_manager.Info(DialogBoxId::NpcActionQuery).m_y = dialog_y;
-							m_dialog_box_manager.Info(DialogBoxId::NpcActionQuery).m_v3 = 20;
-							std::snprintf(m_dialog_box_manager.Info(DialogBoxId::NpcActionQuery).m_str, sizeof(m_dialog_box_manager.Info(DialogBoxId::NpcActionQuery).m_str), "%s", get_npc_config_name_by_id(npc_config_id));
-							m_dialog_box_manager.Info(DialogBoxId::GiveItem).m_v3 = 20;
-							m_dialog_box_manager.Info(DialogBoxId::GiveItem).m_v4 = m_comm_object_id;
-							m_dialog_box_manager.Info(DialogBoxId::GiveItem).m_v5 = m_mcx;
-							m_dialog_box_manager.Info(DialogBoxId::GiveItem).m_v6 = m_mcy;
-							break;
+							npcDlg->m_x = dialog_x;
+							npcDlg->m_y = dialog_y;
+							m_dialog_box_manager.m_give_item.action_type = 20;
+							m_dialog_box_manager.m_give_item.object_id = m_comm_object_id;
+							m_dialog_box_manager.m_give_item.target_x = m_mcx;
+							m_dialog_box_manager.m_give_item.target_y = m_mcy;
+						}	break;
 
 						case hb::shared::owner::Tom: // Tom
-							m_dialog_box_manager.enable_dialog_box(DialogBoxId::NpcActionQuery, 5, 11, npc_config_id);
+						{	auto* npcDlg = m_dialog_box_manager.get_dialog_as<DialogBox_NpcActionQuery>(DialogBoxId::NpcActionQuery);
+							npcDlg->enable_with_target(5, 11, npc_config_id, 24, 0, 0, 0, get_npc_config_name_by_id(npc_config_id));
 							dialog_x = mouse_x - 117;
 							dialog_y = mouse_y - 50;
 							if (dialog_x < 0) dialog_x = 0;
 							if ((dialog_x + 235) > LOGICAL_MAX_X()) dialog_x = LOGICAL_MAX_X() - 235;
 							if (dialog_y < 0) dialog_y = 0;
 							if ((dialog_y + 100) > LOGICAL_MAX_Y()) dialog_y = LOGICAL_MAX_Y() - 100;
-							m_dialog_box_manager.Info(DialogBoxId::NpcActionQuery).m_x = dialog_x;
-							m_dialog_box_manager.Info(DialogBoxId::NpcActionQuery).m_y = dialog_y;
-							m_dialog_box_manager.Info(DialogBoxId::NpcActionQuery).m_v3 = 24;
-							std::snprintf(m_dialog_box_manager.Info(DialogBoxId::NpcActionQuery).m_str, sizeof(m_dialog_box_manager.Info(DialogBoxId::NpcActionQuery).m_str), "%s", get_npc_config_name_by_id(npc_config_id));
-							m_dialog_box_manager.Info(DialogBoxId::GiveItem).m_v3 = 24;
-							m_dialog_box_manager.Info(DialogBoxId::GiveItem).m_v4 = m_comm_object_id;
-							m_dialog_box_manager.Info(DialogBoxId::GiveItem).m_v5 = m_mcx;
-							m_dialog_box_manager.Info(DialogBoxId::GiveItem).m_v6 = m_mcy;
-							break;
+							npcDlg->m_x = dialog_x;
+							npcDlg->m_y = dialog_y;
+							m_dialog_box_manager.m_give_item.action_type = 24;
+							m_dialog_box_manager.m_give_item.object_id = m_comm_object_id;
+							m_dialog_box_manager.m_give_item.target_x = m_mcx;
+							m_dialog_box_manager.m_give_item.target_y = m_mcy;
+						}	break;
 
 						case hb::shared::owner::William: // William
-							m_dialog_box_manager.enable_dialog_box(DialogBoxId::NpcActionQuery, 0, 13, 0);
+						{	auto* npcDlg = m_dialog_box_manager.get_dialog_as<DialogBox_NpcActionQuery>(DialogBoxId::NpcActionQuery);
+							npcDlg->enable_with_target(0, 13, 0, 25, 0, 0, 0, get_npc_config_name_by_id(npc_config_id));
 							dialog_x = mouse_x - 117;
 							dialog_y = mouse_y - 50;
 							if (dialog_x < 0) dialog_x = 0;
 							if ((dialog_x + 235) > LOGICAL_MAX_X()) dialog_x = LOGICAL_MAX_X() - 235;
 							if (dialog_y < 0) dialog_y = 0;
 							if ((dialog_y + 100) > LOGICAL_MAX_Y()) dialog_y = LOGICAL_MAX_Y() - 100;
-							m_dialog_box_manager.Info(DialogBoxId::NpcActionQuery).m_x = dialog_x;
-							m_dialog_box_manager.Info(DialogBoxId::NpcActionQuery).m_y = dialog_y;
-							m_dialog_box_manager.Info(DialogBoxId::NpcActionQuery).m_v3 = 25;
-							std::snprintf(m_dialog_box_manager.Info(DialogBoxId::NpcActionQuery).m_str, sizeof(m_dialog_box_manager.Info(DialogBoxId::NpcActionQuery).m_str), "%s", get_npc_config_name_by_id(npc_config_id));
-							break;
+							npcDlg->m_x = dialog_x;
+							npcDlg->m_y = dialog_y;
+						}	break;
 
 						case hb::shared::owner::Kennedy: // Kennedy
-							m_dialog_box_manager.enable_dialog_box(DialogBoxId::NpcActionQuery, 0, 7, 0);
+						{	auto* npcDlg = m_dialog_box_manager.get_dialog_as<DialogBox_NpcActionQuery>(DialogBoxId::NpcActionQuery);
+							npcDlg->enable_with_target(0, 7, 0, 26, 0, 0, 0, get_npc_config_name_by_id(npc_config_id));
 							dialog_x = mouse_x - 117;
 							dialog_y = mouse_y - 50;
 							if (dialog_x < 0) dialog_x = 0;
 							if ((dialog_x + 235) > LOGICAL_MAX_X()) dialog_x = LOGICAL_MAX_X() - 235;
 							if (dialog_y < 0) dialog_y = 0;
 							if ((dialog_y + 100) > LOGICAL_MAX_Y()) dialog_y = LOGICAL_MAX_Y() - 100;
-							m_dialog_box_manager.Info(DialogBoxId::NpcActionQuery).m_x = dialog_x;
-							m_dialog_box_manager.Info(DialogBoxId::NpcActionQuery).m_y = dialog_y;
-							m_dialog_box_manager.Info(DialogBoxId::NpcActionQuery).m_v3 = 26;
-							std::snprintf(m_dialog_box_manager.Info(DialogBoxId::NpcActionQuery).m_str, sizeof(m_dialog_box_manager.Info(DialogBoxId::NpcActionQuery).m_str), "%s", get_npc_config_name_by_id(npc_config_id));
-							break;
+							npcDlg->m_x = dialog_x;
+							npcDlg->m_y = dialog_y;
+						}	break;
 
 						case hb::shared::owner::Guard: // Guard
 							if (!IsHostile(object_status.relationship) && (!m_player->m_is_combat_mode))
 							{
-								m_dialog_box_manager.enable_dialog_box(DialogBoxId::NpcActionQuery, 4, 0, 0);
+								auto* npcDlg = m_dialog_box_manager.get_dialog_as<DialogBox_NpcActionQuery>(DialogBoxId::NpcActionQuery);
+								npcDlg->enable_with_target(4, 0, 0, 21, 0, 0, 0, get_npc_config_name_by_id(npc_config_id));
 								dialog_x = mouse_x - 117;
 								dialog_y = mouse_y - 50;
 								if (dialog_x < 0) dialog_x = 0;
 								if ((dialog_x + 235) > LOGICAL_MAX_X()) dialog_x = LOGICAL_MAX_X() - 235;
 								if (dialog_y < 0) dialog_y = 0;
 								if ((dialog_y + 100) > LOGICAL_MAX_Y()) dialog_y = LOGICAL_MAX_Y() - 100;
-								m_dialog_box_manager.Info(DialogBoxId::NpcActionQuery).m_x = dialog_x;
-								m_dialog_box_manager.Info(DialogBoxId::NpcActionQuery).m_y = dialog_y;
-								m_dialog_box_manager.Info(DialogBoxId::NpcActionQuery).m_v3 = 21;
-								std::snprintf(m_dialog_box_manager.Info(DialogBoxId::NpcActionQuery).m_str, sizeof(m_dialog_box_manager.Info(DialogBoxId::NpcActionQuery).m_str), "%s", get_npc_config_name_by_id(npc_config_id));
+								npcDlg->m_x = dialog_x;
+								npcDlg->m_y = dialog_y;
 							}
 							break;
 						case hb::shared::owner::McGaffin: // McGaffin
@@ -7002,50 +6677,47 @@ bool CGame::process_left_click(short mouse_x, short mouse_y, short tile_x, short
 						case hb::shared::owner::Devlin: // Devlin
 							if (!m_player->m_is_combat_mode)
 							{
-								m_dialog_box_manager.enable_dialog_box(DialogBoxId::NpcActionQuery, 4, 0, 0);
+								auto* npcDlg = m_dialog_box_manager.get_dialog_as<DialogBox_NpcActionQuery>(DialogBoxId::NpcActionQuery);
+								npcDlg->enable_with_target(4, 0, 0, object_type, 0, 0, 0, get_npc_config_name_by_id(npc_config_id));
 								dialog_x = mouse_x - 117;
 								dialog_y = mouse_y - 50;
 								if (dialog_x < 0) dialog_x = 0;
 								if ((dialog_x + 235) > LOGICAL_MAX_X()) dialog_x = LOGICAL_MAX_X() - 235;
 								if (dialog_y < 0) dialog_y = 0;
 								if ((dialog_y + 100) > LOGICAL_MAX_Y()) dialog_y = LOGICAL_MAX_Y() - 100;
-								m_dialog_box_manager.Info(DialogBoxId::NpcActionQuery).m_x = dialog_x;
-								m_dialog_box_manager.Info(DialogBoxId::NpcActionQuery).m_y = dialog_y;
-								m_dialog_box_manager.Info(DialogBoxId::NpcActionQuery).m_v3 = object_type;
-								std::snprintf(m_dialog_box_manager.Info(DialogBoxId::NpcActionQuery).m_str, sizeof(m_dialog_box_manager.Info(DialogBoxId::NpcActionQuery).m_str), "%s", get_npc_config_name_by_id(npc_config_id));
+								npcDlg->m_x = dialog_x;
+								npcDlg->m_y = dialog_y;
 							}
 							break;
 
 						case hb::shared::owner::Unicorn: // Unicorn
 							if (!m_player->m_is_combat_mode)
 							{
-								m_dialog_box_manager.enable_dialog_box(DialogBoxId::NpcActionQuery, 4, 0, 0);
+								auto* npcDlg = m_dialog_box_manager.get_dialog_as<DialogBox_NpcActionQuery>(DialogBoxId::NpcActionQuery);
+								npcDlg->enable_with_target(4, 0, 0, 32, 0, 0, 0, get_npc_config_name_by_id(npc_config_id));
 								dialog_x = mouse_x - 117;
 								dialog_y = mouse_y - 50;
 								if (dialog_x < 0) dialog_x = 0;
 								if ((dialog_x + 235) > LOGICAL_MAX_X()) dialog_x = LOGICAL_MAX_X() - 235;
 								if (dialog_y < 0) dialog_y = 0;
 								if ((dialog_y + 100) > LOGICAL_MAX_Y()) dialog_y = LOGICAL_MAX_Y() - 100;
-								m_dialog_box_manager.Info(DialogBoxId::NpcActionQuery).m_x = dialog_x;
-								m_dialog_box_manager.Info(DialogBoxId::NpcActionQuery).m_y = dialog_y;
-								m_dialog_box_manager.Info(DialogBoxId::NpcActionQuery).m_v3 = 32;
-								std::snprintf(m_dialog_box_manager.Info(DialogBoxId::NpcActionQuery).m_str, sizeof(m_dialog_box_manager.Info(DialogBoxId::NpcActionQuery).m_str), "%s", get_npc_config_name_by_id(npc_config_id));
+								npcDlg->m_x = dialog_x;
+								npcDlg->m_y = dialog_y;
 							}
 							break;
 
 						case hb::shared::owner::Gail: // Snoopy: Gail
-							m_dialog_box_manager.enable_dialog_box(DialogBoxId::NpcActionQuery, 6, 0, 0);
+						{	auto* npcDlg = m_dialog_box_manager.get_dialog_as<DialogBox_NpcActionQuery>(DialogBoxId::NpcActionQuery);
+							npcDlg->enable_with_target(6, 0, 0, 90, 0, 0, 0, get_npc_config_name_by_id(npc_config_id));
 							dialog_x = mouse_x - 117;
 							dialog_y = mouse_y - 50;
 							if (dialog_x < 0) dialog_x = 0;
 							if ((dialog_x + 235) > LOGICAL_MAX_X()) dialog_x = LOGICAL_MAX_X() - 235;
 							if (dialog_y < 0) dialog_y = 0;
 							if ((dialog_y + 100) > LOGICAL_MAX_Y()) dialog_y = LOGICAL_MAX_Y() - 100;
-							m_dialog_box_manager.Info(DialogBoxId::NpcActionQuery).m_x = dialog_x;
-							m_dialog_box_manager.Info(DialogBoxId::NpcActionQuery).m_y = dialog_y;
-							m_dialog_box_manager.Info(DialogBoxId::NpcActionQuery).m_v3 = 90;
-							std::snprintf(m_dialog_box_manager.Info(DialogBoxId::NpcActionQuery).m_str, sizeof(m_dialog_box_manager.Info(DialogBoxId::NpcActionQuery).m_str), "%s", get_npc_config_name_by_id(npc_config_id));
-							break;
+							npcDlg->m_x = dialog_x;
+							npcDlg->m_y = dialog_y;
+						}	break;
 
 						default: // Other mobs
 							if (!IsHostile(object_status.relationship)) break;
@@ -7814,20 +7486,7 @@ void CGame::init_data_response_handler(char* packet_data)
 	m_monster_id = 0;
 	m_monster_event_time = 0;
 
-	m_dialog_box_manager.disable_dialog_box(DialogBoxId::GuildMenu);
-	m_dialog_box_manager.disable_dialog_box(DialogBoxId::SaleMenu);
-	m_dialog_box_manager.disable_dialog_box(DialogBoxId::CityHallMenu);
-	m_dialog_box_manager.disable_dialog_box(DialogBoxId::Bank);
-	m_dialog_box_manager.disable_dialog_box(DialogBoxId::MagicShop);
-	m_dialog_box_manager.disable_dialog_box(DialogBoxId::Map);
-	m_dialog_box_manager.disable_dialog_box(DialogBoxId::NpcActionQuery);
-	m_dialog_box_manager.disable_dialog_box(DialogBoxId::NpcTalk);
-	m_dialog_box_manager.disable_dialog_box(DialogBoxId::SellOrRepair);
-	m_dialog_box_manager.disable_dialog_box(DialogBoxId::GuildHallMenu); // Gail's diag
-	m_dialog_box_manager.disable_dialog_box(DialogBoxId::ItemUpgrade);
-	m_dialog_box_manager.disable_dialog_box(DialogBoxId::Manufacture);
-	m_dialog_box_manager.disable_dialog_box(DialogBoxId::Exchange);
-	m_dialog_box_manager.disable_dialog_box(DialogBoxId::Slates);
+	m_dialog_box_manager.disable_npc_dialogs();
 
 	m_player->m_Controller.set_command(Type::stop);
 	m_player->m_Controller.reset_command_count();
@@ -7884,13 +7543,13 @@ void CGame::init_data_response_handler(char* packet_data)
 	m_map_message = mapMsgBuf;
 	if (m_map_index < 0)
 	{
-		m_dialog_box_manager.Info(DialogBoxId::GuideMap).m_size_x = -1;
-		m_dialog_box_manager.Info(DialogBoxId::GuideMap).m_size_y = -1;
+		m_dialog_box_manager.get_dialog_box(DialogBoxId::GuideMap)->m_size_x = -1;
+		m_dialog_box_manager.get_dialog_box(DialogBoxId::GuideMap)->m_size_y = -1;
 	}
 	else
 	{
-		m_dialog_box_manager.Info(DialogBoxId::GuideMap).m_size_x = 128;
-		m_dialog_box_manager.Info(DialogBoxId::GuideMap).m_size_y = 128;
+		m_dialog_box_manager.get_dialog_box(DialogBoxId::GuideMap)->m_size_x = 128;
+		m_dialog_box_manager.get_dialog_box(DialogBoxId::GuideMap)->m_size_y = 128;
 	}
 
 	prev_location = m_cur_location;
@@ -7970,8 +7629,8 @@ void CGame::init_data_response_handler(char* packet_data)
 	text = std::format(INITDATA_RESPONSE_HANDLER1, m_map_message);
 	add_event_list(text.c_str(), 10);
 
-	m_dialog_box_manager.Info(DialogBoxId::WarningBattleArea).m_x = 150;
-	m_dialog_box_manager.Info(DialogBoxId::WarningBattleArea).m_y = 130;
+	m_dialog_box_manager.get_dialog_box(DialogBoxId::WarningBattleArea)->m_x = 150;
+	m_dialog_box_manager.get_dialog_box(DialogBoxId::WarningBattleArea)->m_y = 130;
 
 	if ((m_cur_location.starts_with("middleland"))
 		|| (m_cur_location.starts_with("dglv2"))
@@ -8689,9 +8348,7 @@ void CGame::show_heldenian_victory(short side)
 	for (int i = 9; i < 18; i++)
 		m_msg_text_list[i] = std::make_unique<CMsg>(0, " ", 0);
 	m_dialog_box_manager.enable_dialog_box(DialogBoxId::Text, 0, 0, 0);
-	m_dialog_box_manager.disable_dialog_box(DialogBoxId::CrusadeCommander);
-	m_dialog_box_manager.disable_dialog_box(DialogBoxId::CrusadeConstructor);
-	m_dialog_box_manager.disable_dialog_box(DialogBoxId::CrusadeSoldier);
+	m_dialog_box_manager.disable_crusade_dialogs();
 }
 
 /*********************************************************************************************************************

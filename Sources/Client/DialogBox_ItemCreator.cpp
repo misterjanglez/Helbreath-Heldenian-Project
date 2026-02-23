@@ -13,6 +13,7 @@
 #include <algorithm>
 #include <format>
 #include <cstring>
+#include "IInput.h"
 
 using namespace hb::shared::net;
 using namespace hb::client::sprite_id;
@@ -84,15 +85,16 @@ DialogBox_ItemCreator::DialogBox_ItemCreator(CGame* game)
 	: IDialogBox(DialogBoxId::ItemCreator, game)
 {
 	set_default_rect(0, 0, 258, 339);
-	set_can_close_on_right_click(true);
+	m_can_close_on_right_click = true;
 }
 
-void DialogBox_ItemCreator::on_disable()
+bool DialogBox_ItemCreator::on_disable()
 {
 	text_input_manager::get().end_input();
 	m_initial_load = false;
 	m_last_sent_search.clear();
 	m_open_dropdown = dropdown_id::none;
+	return true;
 }
 
 DialogBox_ItemCreator::item_category DialogBox_ItemCreator::classify_item(int16_t effect_type)
@@ -291,7 +293,7 @@ void DialogBox_ItemCreator::draw_search_page(short sX, short sY, short size_x, s
 	}
 
 	// Mouse wheel
-	if (m_game->m_dialog_box_manager.get_top_dialog_box_index() == DialogBoxId::ItemCreator && z != 0)
+	if (m_game->m_dialog_box_manager.get_top_id() == DialogBoxId::ItemCreator && z != 0)
 	{
 		m_scroll_offset -= z / 60;
 		int max_scroll = std::max(0, m_result_count - layout::list_rows);
@@ -487,7 +489,7 @@ void DialogBox_ItemCreator::draw_configure_page(short sX, short sY, short size_x
 	if (m_open_dropdown != dropdown_id::none)
 	{
 		// Mouse wheel scrolls the open dropdown list
-		if (m_game->m_dialog_box_manager.get_top_dialog_box_index() == DialogBoxId::ItemCreator && z != 0)
+		if (m_game->m_dialog_box_manager.get_top_id() == DialogBoxId::ItemCreator && z != 0)
 		{
 			int total = get_open_dropdown_count();
 			if (total > dropdown_max_vis)
@@ -594,11 +596,14 @@ void DialogBox_ItemCreator::draw_configure_page(short sX, short sY, short size_x
 	}
 }
 
-void DialogBox_ItemCreator::on_draw(short mouse_x, short mouse_y, short z, char lb)
+void DialogBox_ItemCreator::on_draw()
 {
-	short sX = Info().m_x;
-	short sY = Info().m_y;
-	short size_x = Info().m_size_x;
+	short mouse_x = static_cast<short>(hb::shared::input::get_mouse_x());
+	short mouse_y = static_cast<short>(hb::shared::input::get_mouse_y());
+	short z = static_cast<short>(hb::shared::input::get_mouse_wheel_delta());
+	short sX = m_x;
+	short sY = m_y;
+	short size_x = m_size_x;
 
 	draw_new_dialog_box(InterfaceNdGame2, sX, sY, 0);
 
@@ -612,8 +617,10 @@ void DialogBox_ItemCreator::on_draw(short mouse_x, short mouse_y, short z, char 
 // CLICK HANDLERS
 // ---------------------------------------------------------------------------
 
-bool DialogBox_ItemCreator::on_click_search(short sX, short sY, short size_x, short mouse_x, short mouse_y)
+bool DialogBox_ItemCreator::on_click_search(short sX, short sY, short size_x)
 {
+	short mouse_x = static_cast<short>(hb::shared::input::get_mouse_x());
+	short mouse_y = static_cast<short>(hb::shared::input::get_mouse_y());
 	// Results list — clicking goes directly to configure
 	for (int i = 0; i < layout::list_rows && (i + m_scroll_offset) < m_result_count; i++)
 	{
@@ -650,8 +657,10 @@ bool DialogBox_ItemCreator::on_click_search(short sX, short sY, short size_x, sh
 	return false;
 }
 
-bool DialogBox_ItemCreator::on_click_configure(short sX, short sY, short size_x, short mouse_x, short mouse_y)
+bool DialogBox_ItemCreator::on_click_configure(short sX, short sY, short size_x)
 {
+	short mouse_x = static_cast<short>(hb::shared::input::get_mouse_x());
+	short mouse_y = static_cast<short>(hb::shared::input::get_mouse_y());
 	int lx = sX + layout::col_left_x1;
 	int rx = sX + layout::col_right_x1;
 
@@ -847,15 +856,27 @@ bool DialogBox_ItemCreator::on_click_configure(short sX, short sY, short size_x,
 	return false;
 }
 
-bool DialogBox_ItemCreator::on_click(short mouse_x, short mouse_y)
+bool DialogBox_ItemCreator::on_click()
 {
-	short sX = Info().m_x;
-	short sY = Info().m_y;
-	short size_x = Info().m_size_x;
+	short mouse_x = static_cast<short>(hb::shared::input::get_mouse_x());
+	short mouse_y = static_cast<short>(hb::shared::input::get_mouse_y());
+	short sX = m_x;
+	short sY = m_y;
+	short size_x = m_size_x;
 
 	if (m_page == 0)
-		return on_click_search(sX, sY, size_x, mouse_x, mouse_y);
+		return on_click_search(sX, sY, size_x);
 	else
-		return on_click_configure(sX, sY, size_x, mouse_x, mouse_y);
+		return on_click_configure(sX, sY, size_x);
+}
+
+bool DialogBox_ItemCreator::on_enable(int type, int64_t v1, int v2, const char* string)
+{
+	if (is_enabled()) return true;
+	int ic_x = LOGICAL_WIDTH() - 258 * 2 - 20;
+	int ic_y = LOGICAL_HEIGHT() - 339 - ICON_PANEL_HEIGHT() - 10;
+	m_x = ic_x;
+	m_y = ic_y;
+	return true;
 }
 #endif // TESTER_ONLY
