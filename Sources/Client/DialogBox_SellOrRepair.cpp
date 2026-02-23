@@ -58,8 +58,7 @@ void DialogBox_SellOrRepair::on_draw()
 		}
 
 		auto itemInfo = item_name_formatter::get().format(m_game->m_item_list[item_id].get());
-		if (m_item_count == 1) txt = itemInfo.name.c_str();
-		else txt = std::format(DRAW_DIALOGBOX_SELLOR_REPAIR_ITEM1, m_item_count, itemInfo.name.c_str());
+		txt = itemInfo.name;
 
 		if (itemInfo.is_special)
 		{

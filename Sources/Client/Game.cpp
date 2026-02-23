@@ -2158,6 +2158,11 @@ void CGame::item_drop_external_screen(char item_id, short mouse_x, short mouse_y
 					npcDlg->m_y = dialog_y;
 				}	break;
 
+				case hb::shared::owner::Kennedy:
+					if (cfg)
+						send_command(MsgId::CommandCommon, CommonType::GiveItemToChar, item_id, 1, m_mcx, m_mcy, cfg->m_name, m_comm_object_id);
+					break;
+
 				case hb::shared::owner::Howard: // Howard
 				{	auto* npcDlg = m_dialog_box_manager.get_dialog_as<DialogBox_NpcActionQuery>(DialogBoxId::NpcActionQuery);
 					npcDlg->enable_with_target(3, item_id, owner_type, 1, m_comm_object_id, m_mcx, m_mcy, get_npc_config_name_by_id(npc_config_id));
@@ -2300,6 +2305,8 @@ void CGame::clear_guild_name_list()
 	for (int i = 0; i < game_limits::max_guild_names; i++) {
 		m_guild_name_cache[i].ref_time = 0;
 		m_guild_name_cache[i].guild_rank = -1;
+		m_guild_name_cache[i].char_name.clear();
+		m_guild_name_cache[i].guild_name.clear();
 	}
 }
 
@@ -2552,6 +2559,7 @@ void CGame::init_player_characteristics(char* data)
 	m_player->m_guild_name.assign(pkt->guild_name, strnlen(pkt->guild_name, sizeof(pkt->guild_name)));
 
 	if (m_player->m_guild_name == "NONE")
+		m_player->m_guild_name.clear();
 
 	std::replace(m_player->m_guild_name.begin(), m_player->m_guild_name.end(), '_', ' ');
 	m_player->m_guild_rank = pkt->guild_rank;
@@ -5004,20 +5012,14 @@ void CGame::draw_object_name(short screen_x, short screen_y, const char* name, c
 						{
 							guild_text = std::format(DEF_MSG_GUILDMASTER, m_guild_name_cache[guild_index].guild_name);//
 							hb::shared::text::draw_text(GameFont::Default, screen_x, screen_y + 14, guild_text.c_str(), hb::shared::text::TextStyle::with_shadow(GameColors::InfoGrayLight));
-							m_guild_name_cache[guild_index].ref_time = m_cur_time;
 							y_offset = 14;
 						}
 						else if (m_guild_name_cache[guild_index].guild_rank > 0)
 						{
 							guild_text = std::format(DEF_MSG_GUILDSMAN, m_guild_name_cache[guild_index].guild_name);//"
 							hb::shared::text::draw_text(GameFont::Default, screen_x, screen_y + 14, guild_text.c_str(), hb::shared::text::TextStyle::with_shadow(GameColors::InfoGrayLight));
-							m_guild_name_cache[guild_index].ref_time = m_cur_time;
 							y_offset = 14;
 						}
-					}
-					else
-					{
-						m_guild_name_cache[guild_index].ref_time = 0;
 					}
 				}
 			}
@@ -5065,7 +5067,15 @@ bool CGame::find_guild_name(const char* name, int* ipIndex)
 	{
 		if (memcmp(m_guild_name_cache[i].char_name.c_str(), name, 10) == 0)
 		{
-			m_guild_name_cache[i].ref_time = m_cur_time;
+			// Expire cached entries after 15 seconds to detect guild changes
+			if (m_cur_time - m_guild_name_cache[i].ref_time > 15000)
+			{
+				m_guild_name_cache[i].guild_rank = -1;
+				m_guild_name_cache[i].guild_name.clear();
+				m_guild_name_cache[i].ref_time = m_cur_time;
+				*ipIndex = i;
+				return false;
+			}
 			*ipIndex = i;
 			return true;
 		}
