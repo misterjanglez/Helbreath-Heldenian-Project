@@ -14,7 +14,7 @@
 #define VER_SERVER_MAJOR         0
 #define VER_SERVER_MINOR         1
 #define VER_SERVER_PATCH         18
-#define VER_SERVER_BUILD         123
-#define VER_SERVER_FILEVERSION   0,1,18,123
+#define VER_SERVER_BUILD         124
+#define VER_SERVER_FILEVERSION   0,1,18,124
 #define VER_SERVER_DISPLAY       "0.1.18-alpha"
-#define VER_SERVER_FULL          "0.1.18-alpha+build.123"
+#define VER_SERVER_FULL          "0.1.18-alpha+build.124"

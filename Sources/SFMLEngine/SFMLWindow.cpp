@@ -31,6 +31,7 @@ SFMLWindow::SFMLWindow()
     , m_mouse_capture_enabled(false)
     , m_vsync(false)
     , m_fps_limit(0)
+    , m_background_fps_limit(0)
     , m_windowed_width(0)
     , m_windowed_height(0)
     , m_nativeInstance{}
@@ -418,6 +419,10 @@ void SFMLWindow::set_framerate_limit(int limit)
     // don't let an FPS limit override it. The saved m_fps_limit will be
     // applied when VSync is turned off (see set_vsync_enabled).
     if (m_vsync) return;
+    // If window is inactive and background throttling is enabled, keep the
+    // background rate active — the user's new limit is stored in m_fps_limit
+    // and will be applied when focus returns.
+    if (!m_active && m_background_fps_limit > 0) return;
     // Forward to renderer for engine-owned frame limiting
     hb::shared::render::IRenderer* renderer = hb::shared::render::Renderer::get();
     if (renderer)
@@ -427,6 +432,16 @@ void SFMLWindow::set_framerate_limit(int limit)
 int SFMLWindow::get_framerate_limit() const
 {
     return m_fps_limit;
+}
+
+void SFMLWindow::set_background_fps_limit(int limit)
+{
+    m_background_fps_limit = (limit > 0) ? limit : 0;
+}
+
+int SFMLWindow::get_background_fps_limit() const
+{
+    return m_background_fps_limit;
 }
 
 void SFMLWindow::set_vsync_enabled(bool enabled)
@@ -554,6 +569,20 @@ bool SFMLWindow::process_messages()
             // Re-grab mouse cursor if capture is enabled
             apply_cursor_grab();
             update_cursor_clip();
+            // Restore the user's configured FPS limit
+            if (m_background_fps_limit > 0)
+            {
+                auto* sfml_renderer = static_cast<SFMLRenderer*>(
+                    hb::shared::render::Renderer::get());
+                if (sfml_renderer)
+                {
+                    if (m_vsync)
+                        sfml_renderer->SetFramerateLimit(
+                            hb::platform::get_monitor_refresh_rate());
+                    else
+                        sfml_renderer->SetFramerateLimit(m_fps_limit);
+                }
+            }
             if (m_event_handler)
                 m_event_handler->on_activate(true);
         }
@@ -564,6 +593,14 @@ bool SFMLWindow::process_messages()
 #ifdef _WIN32
             ClipCursor(nullptr);
 #endif
+            // Throttle rendering to save CPU/GPU while window is not focused
+            if (m_background_fps_limit > 0)
+            {
+                auto* sfml_renderer = static_cast<SFMLRenderer*>(
+                    hb::shared::render::Renderer::get());
+                if (sfml_renderer)
+                    sfml_renderer->SetFramerateLimit(m_background_fps_limit);
+            }
             if (m_event_handler)
                 m_event_handler->on_activate(false);
         }
@@ -687,6 +724,19 @@ void SFMLWindow::wait_for_message()
             m_active = true;
             (void)m_renderWindow.setActive(true);
             apply_cursor_grab();
+            if (m_background_fps_limit > 0)
+            {
+                auto* sfml_renderer = static_cast<SFMLRenderer*>(
+                    hb::shared::render::Renderer::get());
+                if (sfml_renderer)
+                {
+                    if (m_vsync)
+                        sfml_renderer->SetFramerateLimit(
+                            hb::platform::get_monitor_refresh_rate());
+                    else
+                        sfml_renderer->SetFramerateLimit(m_fps_limit);
+                }
+            }
             if (m_event_handler)
                 m_event_handler->on_activate(true);
         }
@@ -694,6 +744,13 @@ void SFMLWindow::wait_for_message()
         if (const auto* focusLost = event->getIf<sf::Event::FocusLost>())
         {
             m_active = false;
+            if (m_background_fps_limit > 0)
+            {
+                auto* sfml_renderer = static_cast<SFMLRenderer*>(
+                    hb::shared::render::Renderer::get());
+                if (sfml_renderer)
+                    sfml_renderer->SetFramerateLimit(m_background_fps_limit);
+            }
             if (m_event_handler)
                 m_event_handler->on_activate(false);
         }

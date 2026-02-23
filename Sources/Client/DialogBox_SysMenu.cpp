@@ -476,6 +476,13 @@ void DialogBox_SysMenu::draw_graphics_tab(short sX, short sY)
 
 	lineY += 18;
 
+	// --- Background FPS Throttle ---
+	put_string(labelX, lineY, "Power Saving:", GameColors::UILabel);
+	put_string(labelX + 1, lineY, "Power Saving:", GameColors::UILabel);
+	draw_toggle(smallBoxX, lineY, config_manager::get().is_background_fps_throttle_enabled());
+
+	lineY += 18;
+
 #ifdef _DEBUG
 	// Tile Grid (simple dark lines) - DEBUG ONLY
 	put_string(labelX, lineY, "Tile Grid:", GameColors::UILabel);
@@ -1003,6 +1010,17 @@ bool DialogBox_SysMenu::on_click_graphics(short sX, short sY)
 	if (is_in_toggle_area(smallBoxX, lineY)) {
 		bool enabled = config_manager::get().is_show_latency_enabled();
 		config_manager::get().set_show_latency_enabled(!enabled);
+		play_sound_effect('E', 14, 5);
+		return true;
+	}
+
+	lineY += 18;
+
+	// --- Background FPS Throttle toggle ---
+	if (is_in_toggle_area(smallBoxX, lineY)) {
+		bool enabled = config_manager::get().is_background_fps_throttle_enabled();
+		config_manager::get().set_background_fps_throttle_enabled(!enabled);
+		hb::shared::render::Window::get()->set_background_fps_limit(enabled ? 0 : 5);
 		play_sound_effect('E', 14, 5);
 		return true;
 	}

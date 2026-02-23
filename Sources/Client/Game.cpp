@@ -355,6 +355,8 @@ bool CGame::on_start()
 	hb::shared::render::Window::get()->set_vsync_enabled(config_manager::get().is_vsync_enabled());
 	hb::shared::render::Window::get()->set_framerate_limit(config_manager::get().get_fps_limit());
 	hb::shared::render::Window::get()->set_fullscreen_stretch(config_manager::get().is_fullscreen_stretch_enabled());
+	hb::shared::render::Window::get()->set_background_fps_limit(
+		config_manager::get().is_background_fps_throttle_enabled() ? 5 : 0);
 	if (hb::shared::render::Renderer::get())
 		hb::shared::render::Renderer::get()->set_fullscreen_stretch(config_manager::get().is_fullscreen_stretch_enabled());
 

@@ -1,0 +1,97 @@
+Phase 1 Dialog Signature Migration
+APPLIED
+============================================================
+
+Files changed: 88
+
+  DialogBox_Bank.cpp: transformed
+  DialogBox_Bank.h: transformed
+  DialogBox_ChangeStatsMajestic.cpp: transformed
+  DialogBox_ChangeStatsMajestic.h: transformed
+  DialogBox_Character.cpp: transformed
+  DialogBox_Character.h: transformed
+  DialogBox_ChatHistory.cpp: transformed
+  DialogBox_ChatHistory.h: transformed
+  DialogBox_CityHallMenu.cpp: transformed
+  DialogBox_CityHallMenu.h: transformed
+  DialogBox_Commander.cpp: transformed
+  DialogBox_Commander.h: transformed
+  DialogBox_ConfirmExchange.cpp: transformed
+  DialogBox_ConfirmExchange.h: transformed
+  DialogBox_Constructor.cpp: transformed
+  DialogBox_Constructor.h: transformed
+  DialogBox_CrusadeJob.cpp: transformed
+  DialogBox_CrusadeJob.h: transformed
+  DialogBox_Exchange.cpp: transformed
+  DialogBox_Exchange.h: transformed
+  DialogBox_Fishing.cpp: transformed
+  DialogBox_Fishing.h: transformed
+  DialogBox_GuideMap.cpp: transformed
+  DialogBox_GuideMap.h: transformed
+  DialogBox_GuildHallMenu.cpp: transformed
+  DialogBox_GuildHallMenu.h: transformed
+  DialogBox_GuildMenu.cpp: transformed
+  DialogBox_GuildMenu.h: transformed
+  DialogBox_GuildOperation.cpp: transformed
+  DialogBox_GuildOperation.h: transformed
+  DialogBox_Help.cpp: transformed
+  DialogBox_Help.h: transformed
+  DialogBox_Inventory.cpp: transformed
+  DialogBox_Inventory.h: transformed
+  DialogBox_ItemCreator.cpp: transformed
+  DialogBox_ItemCreator.h: transformed
+  DialogBox_ItemDrop.cpp: transformed
+  DialogBox_ItemDrop.h: transformed
+  DialogBox_ItemDropAmount.cpp: transformed
+  DialogBox_ItemDropAmount.h: transformed
+  DialogBox_ItemUpgrade.cpp: transformed
+  DialogBox_ItemUpgrade.h: transformed
+  DialogBox_LevelUpSetting.cpp: transformed
+  DialogBox_LevelUpSetting.h: transformed
+  DialogBox_Magic.cpp: transformed
+  DialogBox_Magic.h: transformed
+  DialogBox_MagicShop.cpp: transformed
+  DialogBox_MagicShop.h: transformed
+  DialogBox_Manufacture.cpp: transformed
+  DialogBox_Manufacture.h: transformed
+  DialogBox_Map.cpp: transformed
+  DialogBox_Map.h: transformed
+  DialogBox_Noticement.cpp: transformed
+  DialogBox_Noticement.h: transformed
+  DialogBox_NpcActionQuery.cpp: transformed
+  DialogBox_NpcActionQuery.h: transformed
+  DialogBox_NpcTalk.cpp: transformed
+  DialogBox_NpcTalk.h: transformed
+  DialogBox_Party.cpp: transformed
+  DialogBox_Party.h: transformed
+  DialogBox_Quest.cpp: transformed
+  DialogBox_Quest.h: transformed
+  DialogBox_RepairAll.cpp: transformed
+  DialogBox_RepairAll.h: transformed
+  DialogBox_Resurrect.cpp: transformed
+  DialogBox_Resurrect.h: transformed
+  DialogBox_SellList.cpp: transformed
+  DialogBox_SellList.h: transformed
+  DialogBox_SellOrRepair.cpp: transformed
+  DialogBox_SellOrRepair.h: transformed
+  DialogBox_Shop.cpp: transformed
+  DialogBox_Shop.h: transformed
+  DialogBox_Skill.cpp: transformed
+  DialogBox_Skill.h: transformed
+  DialogBox_Slates.cpp: transformed
+  DialogBox_Slates.h: transformed
+  DialogBox_Soldier.cpp: transformed
+  DialogBox_Soldier.h: transformed
+  DialogBox_SysMenu.cpp: transformed
+  DialogBox_SysMenu.h: transformed
+  DialogBox_TesterMenu.cpp: transformed
+  DialogBox_TesterMenu.h: transformed
+  DialogBox_Text.cpp: transformed
+  DialogBox_Text.h: transformed
+  DialogBox_WarningMsg.cpp: transformed
+  DialogBox_WarningMsg.h: transformed
+  Screen_OnGame.cpp: get_top_id update
+  Game.Hotkeys.cpp: get_top_id update
+
+============================================================
+Found 86 dialog files to process

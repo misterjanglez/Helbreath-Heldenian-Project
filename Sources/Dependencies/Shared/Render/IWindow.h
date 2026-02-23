@@ -65,6 +65,12 @@ public:
     virtual void set_vsync_enabled(bool enabled) = 0;
     virtual bool is_vsync_enabled() const = 0;
 
+    // Background FPS: when set (> 0), the window automatically throttles to
+    // this rate on focus loss and restores the user's limit on focus gain.
+    // Set to 0 to disable background throttling (default).
+    virtual void set_background_fps_limit(int limit) = 0;
+    virtual int get_background_fps_limit() const = 0;
+
     // ============== Scaling ==============
     virtual void set_fullscreen_stretch(bool stretch) = 0;
     virtual bool is_fullscreen_stretch() const = 0;

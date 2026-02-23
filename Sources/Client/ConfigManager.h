@@ -102,6 +102,10 @@ public:
 	int get_fps_limit() const { return m_fps_limit; }
 	void set_fps_limit(int limit);
 
+	// Background FPS throttle: reduce rendering when window loses focus
+	bool is_background_fps_throttle_enabled() const { return m_background_fps_throttle; }
+	void set_background_fps_throttle_enabled(bool enabled);
+
 	// Fullscreen stretch (false = letterbox, true = stretch to fill)
 	bool is_fullscreen_stretch_enabled() const { return m_fullscreen_stretch; }
 	void set_fullscreen_stretch_enabled(bool enabled);
@@ -163,6 +167,7 @@ private:
 	bool m_borderless;
 	bool m_vsync;
 	int m_fps_limit;
+	bool m_background_fps_throttle;
 	bool m_fullscreen_stretch;
 	bool m_tile_grid;
 	bool m_patching_grid;

@@ -87,6 +87,7 @@ void config_manager::set_defaults()
 	m_borderless = true;
 	m_vsync = false;
 	m_fps_limit = 60;
+	m_background_fps_throttle = true;
 	m_fullscreen_stretch = false;
 	m_tile_grid = false;     // Simple tile grid off by default
 	m_patching_grid = false; // Patching debug grid off by default
@@ -254,6 +255,10 @@ bool config_manager::load(const char* filename)
 				m_fps_limit = display["fpsLimit"].get<int>();
 				if (m_fps_limit < 0) m_fps_limit = 0;
 			}
+			if (display.contains("backgroundFpsThrottle"))
+			{
+				m_background_fps_throttle = display["backgroundFpsThrottle"].get<bool>();
+			}
 			if (display.contains("fullscreenStretch"))
 			{
 				m_fullscreen_stretch = display["fullscreenStretch"].get<bool>();
@@ -346,6 +351,7 @@ bool config_manager::save(const char* filename)
 	j["display"]["patchingGrid"] = m_patching_grid;
 	j["display"]["vsync"] = m_vsync;
 	j["display"]["fpsLimit"] = m_fps_limit;
+	j["display"]["backgroundFpsThrottle"] = m_background_fps_throttle;
 	j["display"]["fullscreenStretch"] = m_fullscreen_stretch;
 	j["display"]["reducedMotion"] = m_reduced_motion;
 	j["display"]["toggleToChat"] = m_toggle_to_chat;
@@ -663,6 +669,16 @@ void config_manager::set_fps_limit(int limit)
 	if (m_fps_limit != limit)
 	{
 		m_fps_limit = limit;
+		m_dirty = true;
+		save();
+	}
+}
+
+void config_manager::set_background_fps_throttle_enabled(bool enabled)
+{
+	if (m_background_fps_throttle != enabled)
+	{
+		m_background_fps_throttle = enabled;
 		m_dirty = true;
 		save();
 	}
