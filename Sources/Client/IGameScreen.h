@@ -68,6 +68,11 @@ public:
     // false to fall through to default handling. Optional — not all screens need this.
     virtual bool on_net_response(uint16_t response_type, char* data) { return false; }
 
+    // Called when a game server message arrives in game_recv_msg_handler.
+    // Return true if this screen handled the message (stops further processing),
+    // false to fall through to default handling. Optional — not all screens need this.
+    virtual bool on_game_msg(uint32_t msg_id, uint16_t msg_type, char* data, uint32_t msg_size) { return false; }
+
 protected:
     // ============== Helper Methods (delegate to CGame) ==============
     // These provide convenient access to common CGame functionality

@@ -3,6 +3,8 @@
 #include "DialogBox_ItemDropAmount.h"
 #include "CursorTarget.h"
 #include "Game.h"
+#include "PacketSendHelpers.h"
+
 #include "InventoryManager.h"
 #include "ItemNameFormatter.h"
 #include "ItemSpriteMetadata.h"
@@ -212,7 +214,7 @@ bool DialogBox_Exchange::on_click()
 			// Cancel button
 			m_game->get_dialog_box_manager().disable_dialog_box(DialogBoxId::Exchange);
 			m_game->get_dialog_box_manager().disable_dialog_box(DialogBoxId::Map);
-			send_command(MsgId::CommandCommon, CommonType::cancel_exchange_item, 0, 0, 0, 0, 0);
+			send_game_packet(hb::net::make_common_command(CommonType::cancel_exchange_item, player().m_player_x, player().m_player_y));
 			play_sound_effect('E', 14, 5);
 			return true;
 		}
@@ -267,7 +269,12 @@ bool DialogBox_Exchange::on_item_drop()
 		// Single item - add directly
 		m_slots[slot].inv_slot = item_id;
 		inventory_manager::get().lock_item(item_id);
-		send_command(MsgId::CommandCommon, CommonType::set_exchange_item, 0, item_id, 1, 0, 0);
+		{
+			auto pkt = hb::net::make_common_command(CommonType::set_exchange_item, player().m_player_x, player().m_player_y);
+			pkt.v1 = item_id;
+			pkt.v2 = 1;
+			send_game_packet(pkt);
+		}
 	}
 
 	return true;

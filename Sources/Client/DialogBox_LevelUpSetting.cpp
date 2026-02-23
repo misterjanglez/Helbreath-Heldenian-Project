@@ -4,6 +4,7 @@
 #include <format>
 #include <string>
 #include "IInput.h"
+#include "Packet/SharedPackets.h"
 
 using namespace hb::shared::net;
 using namespace hb::client::sprite_id;
@@ -207,7 +208,18 @@ bool DialogBox_LevelUpSetting::on_click()
 	    (mouse_y > sY + ui_layout::btn_y) && (mouse_y < sY + ui_layout::btn_y + ui_layout::btn_size_y))
 	{
 		if (m_initial_lu_points != player().m_lu_point)
-			send_command(MsgId::LevelUpSettings, 0, 0, 0, 0, 0, 0);
+			{
+		hb::net::PacketRequestLevelUpSettings req{};
+		req.header.msg_id = MsgId::LevelUpSettings;
+		req.header.msg_type = 0;
+		req.str = player().m_lu_str;
+		req.vit = player().m_lu_vit;
+		req.dex = player().m_lu_dex;
+		req.intel = player().m_lu_int;
+		req.mag = player().m_lu_mag;
+		req.chr = player().m_lu_char;
+		send_game_packet(req);
+	}
 		disable_this_dialog();
 		play_sound_effect('E', 14, 5);
 		return true;

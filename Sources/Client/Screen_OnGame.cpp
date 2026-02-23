@@ -43,6 +43,9 @@
 #include <algorithm>
 #include <charconv>
 #include <climits>
+#include "Packet/SharedPackets.h"
+#include "PacketSendHelpers.h"
+
 
 
 using namespace hb::shared::net;
@@ -98,6 +101,8 @@ void Screen_OnGame::on_initialize()
     m_dialog_box_manager->get_dialog_as<DialogBox_Party>(DialogBoxId::Party)->reset_members();
     m_dialog_box_manager->enable_dialog_box(DialogBoxId::GuideMap, 0, 0, 0);
 
+    m_network_message_manager = std::make_unique<NetworkMessageManager>(m_game);
+
     m_guild_manager.set_game(m_game);
     m_guild_manager.clear_name_cache();
 
@@ -120,6 +125,7 @@ void Screen_OnGame::on_uninitialize()
 {
     text_input_manager::get().end_input();
     audio_manager::get().stop_music();
+    m_network_message_manager.reset();
     m_dialog_box_manager.reset();
     m_game->m_player = nullptr;
 }
@@ -170,7 +176,17 @@ void Screen_OnGame::on_update()
             text_input_manager::get().end_input();
             if (m_game->m_player->m_guild_name.empty()) return;
             if (m_game->m_player->m_guild_name != "NONE") {
-                m_game->send_command(MsgId::request_create_new_guild, MsgType::Confirm, 0, 0, 0, 0, 0);
+                {
+			hb::net::PacketRequestGuildAction req{};
+			req.header.msg_id = MsgId::request_create_new_guild;
+			req.header.msg_type = MsgType::Confirm;
+			std::snprintf(req.player, sizeof(req.player), "%s", m_game->m_player->m_player_name.c_str());
+			std::snprintf(req.account, sizeof(req.account), "%s", m_game->m_account_name.c_str());
+			std::snprintf(req.password, sizeof(req.password), "%s", m_game->m_account_password.c_str());
+			std::snprintf(req.guild, sizeof(req.guild), "%s", m_game->m_player->m_guild_name.c_str());
+			CMisc::replace_string(req.guild, ' ', '_');
+			m_game->send_game_packet(req);
+		}
                 m_game->get_dialog_box_manager().get_dialog_as<DialogBox_GuildMenu>(DialogBoxId::GuildMenu)->m_mode = DialogBox_GuildMenu::mode::creating;
             }
         }
@@ -260,7 +276,12 @@ void Screen_OnGame::on_update()
                                 else if (m_game->get_dialog_box_manager().get_dialog_as<DialogBox_Exchange>(DialogBoxId::Exchange)->m_slots[3].v1 == -1) m_game->get_dialog_box_manager().get_dialog_as<DialogBox_Exchange>(DialogBoxId::Exchange)->m_slots[3].inv_slot = ex_item;
                                 else return;
                                 inventory_manager::get().lock_item(ex_item);
-                                m_game->send_command(MsgId::CommandCommon, CommonType::set_exchange_item, 0, ex_item, amount, 0, 0);
+                                {
+                                	auto pkt = hb::net::make_common_command(CommonType::set_exchange_item, m_game->m_player->m_player_x, m_game->m_player->m_player_y);
+                                	pkt.v1 = ex_item;
+                                	pkt.v2 = amount;
+                                	m_game->send_game_packet(pkt);
+                                }
                                 break;
                             }
                             case 1001:
@@ -277,13 +298,30 @@ void Screen_OnGame::on_update()
                                 if (inventory_manager::get().get_bank_item_count() >= (m_game->m_max_bank_items - 1)) m_game->add_event_list(DLGBOX_CLICK_NPCACTION_QUERY9, 10);
                                 else {
                                     CItem* cfg = m_game->get_item_config(m_game->m_player->m_item_list[m_game->get_dialog_box_manager().m_give_item.item_index]->m_id_num);
-                                    if (cfg) m_game->send_command(MsgId::CommandCommon, CommonType::GiveItemToChar, m_game->get_dialog_box_manager().m_give_item.item_index, amount, m_game->get_dialog_box_manager().m_give_item.target_x, m_game->get_dialog_box_manager().m_give_item.target_y, cfg->m_name, m_game->get_dialog_box_manager().m_give_item.object_id);
+                                    if (cfg)
+                                    {
+                                    	auto pkt = hb::net::make_common_command_str(CommonType::GiveItemToChar, m_game->m_player->m_player_x, m_game->m_player->m_player_y, m_game->get_dialog_box_manager().m_give_item.item_index);
+                                    	pkt.v1 = amount;
+                                    	pkt.v2 = m_game->get_dialog_box_manager().m_give_item.target_x;
+                                    	pkt.v3 = m_game->get_dialog_box_manager().m_give_item.target_y;
+                                    	std::snprintf(pkt.text, sizeof(pkt.text), "%s", cfg->m_name);
+                                    	pkt.v4 = m_game->get_dialog_box_manager().m_give_item.object_id;
+                                    	m_game->send_game_packet(pkt);
+                                    }
                                 }
                                 break;
                             default:
                             {
                                 CItem* cfg = m_game->get_item_config(m_game->m_player->m_item_list[m_game->get_dialog_box_manager().get_dialog_as<DialogBox_ItemDropAmount>(DialogBoxId::ItemDropExternal)->m_item_index]->m_id_num);
-                                if (cfg) m_game->send_command(MsgId::CommandCommon, CommonType::GiveItemToChar, static_cast<char>(m_game->get_dialog_box_manager().get_dialog_as<DialogBox_ItemDropAmount>(DialogBoxId::ItemDropExternal)->m_item_index), amount, m_game->get_dialog_box_manager().get_dialog_as<DialogBox_ItemDropAmount>(DialogBoxId::ItemDropExternal)->m_drop_x, m_game->get_dialog_box_manager().get_dialog_as<DialogBox_ItemDropAmount>(DialogBoxId::ItemDropExternal)->m_drop_y, cfg->m_name);
+                                if (cfg)
+                                {
+                                	auto pkt = hb::net::make_common_command_str(CommonType::GiveItemToChar, m_game->m_player->m_player_x, m_game->m_player->m_player_y, static_cast<char>(m_game->get_dialog_box_manager().get_dialog_as<DialogBox_ItemDropAmount>(DialogBoxId::ItemDropExternal)->m_item_index));
+                                	pkt.v1 = amount;
+                                	pkt.v2 = m_game->get_dialog_box_manager().get_dialog_as<DialogBox_ItemDropAmount>(DialogBoxId::ItemDropExternal)->m_drop_x;
+                                	pkt.v3 = m_game->get_dialog_box_manager().get_dialog_as<DialogBox_ItemDropAmount>(DialogBoxId::ItemDropExternal)->m_drop_y;
+                                	std::snprintf(pkt.text, sizeof(pkt.text), "%s", cfg->m_name);
+                                	m_game->send_game_packet(pkt);
+                                }
                             }
                                 break;
                             }
@@ -295,7 +333,14 @@ void Screen_OnGame::on_update()
                         if (amount <= 0) m_game->add_event_list(UPDATE_SCREEN_ONGAME8, 10);
                         else {
                             CItem* cfg = m_game->get_item_config(m_game->m_player->m_item_list[m_game->get_dialog_box_manager().get_dialog_as<DialogBox_ItemDropAmount>(DialogBoxId::ItemDropExternal)->m_item_index]->m_id_num);
-                            if (cfg) m_game->send_command(MsgId::CommandCommon, CommonType::ItemDrop, 0, m_game->get_dialog_box_manager().get_dialog_as<DialogBox_ItemDropAmount>(DialogBoxId::ItemDropExternal)->m_item_index, amount, 0, cfg->m_name);
+                            if (cfg)
+                            {
+                            	auto pkt = hb::net::make_common_command_str(CommonType::ItemDrop, m_game->m_player->m_player_x, m_game->m_player->m_player_y);
+                            	pkt.v1 = m_game->get_dialog_box_manager().get_dialog_as<DialogBox_ItemDropAmount>(DialogBoxId::ItemDropExternal)->m_item_index;
+                            	pkt.v2 = amount;
+                            	std::snprintf(pkt.text, sizeof(pkt.text), "%s", cfg->m_name);
+                            	m_game->send_game_packet(pkt);
+                            }
                             inventory_manager::get().lock_item(m_game->get_dialog_box_manager().get_dialog_as<DialogBox_ItemDropAmount>(DialogBoxId::ItemDropExternal)->m_item_index);
                         }
                     }
@@ -341,7 +386,7 @@ void Screen_OnGame::on_update()
                             m_game->add_event_list(BCHECK_LOCAL_CHAT_COMMAND9, 10);
                         }
                         else {
-                            m_game->send_command(MsgId::CommandChatMsg, 0, 0, 0, 0, 0, G_cTxt.c_str());
+                            m_game->send_chat_message(G_cTxt.c_str());
                         }
                     }
                 }
@@ -390,7 +435,12 @@ void Screen_OnGame::on_update()
     }
     if (m_game->m_restart_count == 0) {
         m_game->m_restart_count = -1;
-        m_game->send_command(MsgId::RequestRestart, 0, 0, 0, 0, 0, 0);
+        {
+			hb::net::PacketRequestHeaderOnly req{};
+			req.header.msg_id = MsgId::RequestRestart;
+			req.header.msg_type = 0;
+			m_game->send_game_packet(req);
+		}
         return;
     }
 
@@ -1034,7 +1084,15 @@ void Screen_OnGame::item_drop_external_screen(char item_id, short mouse_x, short
 
                 case hb::shared::owner::Kennedy:
                     if (cfg)
-                        m_game->send_command(MsgId::CommandCommon, CommonType::GiveItemToChar, item_id, 1, m_game->m_mcx, m_game->m_mcy, cfg->m_name, m_game->m_comm_object_id);
+                        {
+                        	auto pkt = hb::net::make_common_command_str(CommonType::GiveItemToChar, m_game->m_player->m_player_x, m_game->m_player->m_player_y, item_id);
+                        	pkt.v1 = 1;
+                        	pkt.v2 = m_game->m_mcx;
+                        	pkt.v3 = m_game->m_mcy;
+                        	std::snprintf(pkt.text, sizeof(pkt.text), "%s", cfg->m_name);
+                        	pkt.v4 = m_game->m_comm_object_id;
+                        	m_game->send_game_packet(pkt);
+                        }
                     break;
 
                 case hb::shared::owner::Howard: // Howard
@@ -1078,7 +1136,13 @@ void Screen_OnGame::item_drop_external_screen(char item_id, short mouse_x, short
                         }
                         else
                         {
-                            m_game->send_command(MsgId::CommandCommon, CommonType::ItemDrop, 0, item_id, 1, 0, cfg->m_name);
+                            {
+                            	auto pkt = hb::net::make_common_command_str(CommonType::ItemDrop, m_game->m_player->m_player_x, m_game->m_player->m_player_y);
+                            	pkt.v1 = item_id;
+                            	pkt.v2 = 1;
+                            	std::snprintf(pkt.text, sizeof(pkt.text), "%s", cfg->m_name);
+                            	m_game->send_game_packet(pkt);
+                            }
                         }
                     }
                     break;
@@ -1117,7 +1181,14 @@ void Screen_OnGame::item_drop_external_screen(char item_id, short mouse_x, short
             }
             else
             {
-                if (cfg2) m_game->send_command(MsgId::CommandCommon, CommonType::ItemDrop, 0, item_id, 1, 0, cfg2->m_name);
+                if (cfg2)
+                {
+                	auto pkt = hb::net::make_common_command_str(CommonType::ItemDrop, m_game->m_player->m_player_x, m_game->m_player->m_player_y);
+                	pkt.v1 = item_id;
+                	pkt.v2 = 1;
+                	std::snprintf(pkt.text, sizeof(pkt.text), "%s", cfg2->m_name);
+                	m_game->send_game_packet(pkt);
+                }
             }
         }
         inventory_manager::get().lock_item(item_id);

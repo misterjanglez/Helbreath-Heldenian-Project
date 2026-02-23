@@ -1,6 +1,8 @@
 ﻿#include "DialogBox_ItemUpgrade.h"
 #include "CursorTarget.h"
 #include "Game.h"
+#include "PacketSendHelpers.h"
+
 #include "InventoryManager.h"
 #include "ItemNameFormatter.h"
 #include "ItemSpriteMetadata.h"
@@ -209,7 +211,11 @@ void DialogBox_ItemUpgrade::DrawMode2_InProgress(int sX, int sY)
         && (m_upgrade_start_time != 0))
     {
         m_upgrade_start_time = 0;
-        m_game->send_command(MsgId::CommandCommon, CommonType::UpgradeItem, 0, item_index, 0, 0, 0);
+        {
+        	auto pkt = hb::net::make_common_command(CommonType::UpgradeItem, m_game->m_player->m_player_x, m_game->m_player->m_player_y);
+        	pkt.v1 = item_index;
+        	m_game->send_game_packet(pkt);
+        }
     }
 }
 

@@ -1,5 +1,7 @@
 #include "DialogBox_MagicShop.h"
 #include "Game.h"
+#include "PacketSendHelpers.h"
+
 #include "IInput.h"
 #include "Misc.h"
 #include "lan_eng.h"
@@ -164,8 +166,11 @@ bool DialogBox_MagicShop::handle_spell_click(short sX, short sY)
 			{
 				if (player().m_magic_mastery[c_pivot + i] == 0)
 				{
-					m_game->send_command(MsgId::CommandCommon, CommonType::ReqStudyMagic, 0, 0, 0, 0,
-						m_game->m_magic_cfg_list[c_pivot + i]->m_name.c_str());
+					{
+						auto pkt = hb::net::make_common_command_str(CommonType::ReqStudyMagic, m_game->m_player->m_player_x, m_game->m_player->m_player_y);
+						std::snprintf(pkt.text, sizeof(pkt.text), "%s", m_game->m_magic_cfg_list[c_pivot + i]->m_name.c_str());
+						m_game->send_game_packet(pkt);
+					}
 					m_game->play_game_sound('E', 14, 5);
 				}
 				return true;

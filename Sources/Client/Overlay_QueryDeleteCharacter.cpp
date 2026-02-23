@@ -12,6 +12,7 @@
 #include "TextLibExt.h"
 #include "GameFonts.h"
 #include "InputStateHelper.h"
+#include "Packet/SharedPackets.h"
 
 using namespace hb::shared::net;
 using namespace hb::client::sprite_id;
@@ -38,13 +39,21 @@ void Overlay_QueryDeleteCharacter::on_initialize()
     auto* btn_yes = m_controls.add<cc::button>(BTN_YES, cc::rect{dlgX + 38, dlgY + 119, ui_layout::btn_size_x, ui_layout::btn_size_y});
     btn_yes->set_click_sound([this] { m_game->play_game_sound('E', 14, 5); });
     btn_yes->set_on_click([this](int) {
+        // Build delete character packet for deferred send after connection establishes
+        hb::net::DeleteCharacterRequest req{};
+        req.header.msg_id = MsgId::RequestDeleteCharacter;
+        req.header.msg_type = static_cast<uint16_t>(m_game->m_enter_game_type);
+        std::snprintf(req.character_name, sizeof(req.character_name), "%s", m_game->m_char_list[m_game->m_enter_game_type - 1]->m_name.c_str());
+        std::snprintf(req.account_name, sizeof(req.account_name), "%s", m_game->m_account_name.c_str());
+        std::snprintf(req.password, sizeof(req.password), "%s", m_game->m_account_password.c_str());
+        std::snprintf(req.world_name, sizeof(req.world_name), "%s", m_game->m_world_server_name.c_str());
+        m_game->set_pending_login_packet(req);
+
         m_game->m_l_sock = std::make_unique<hb::shared::net::ASIOSocket>(m_game->m_io_pool->get_context(), game_limits::socket_block_limit);
         m_game->m_l_sock->connect(m_game->m_log_server_addr.c_str(), m_game->m_log_server_port);
         m_game->m_l_sock->init_buffer_size(hb::shared::limits::MsgBufferSize);
 
-        m_game->m_connect_mode = MsgId::RequestDeleteCharacter;
         std::snprintf(m_game->m_msg, sizeof(m_game->m_msg), "%s", "33");
-
         m_game->change_game_mode(GameMode::Connecting);
     });
     btn_yes->set_render_handler([this](const cc::control& c) {

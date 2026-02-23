@@ -7,6 +7,7 @@
 #include <format>
 #include <string>
 #include "IInput.h"
+#include "Packet/SharedPackets.h"
 
 using namespace hb::shared::net;
 using namespace hb::client::sprite_id;
@@ -183,7 +184,18 @@ bool DialogBox_ChangeStatsMajestic::on_click()
 	{
 		if (pending_cost > 0)
 		{
-			send_command(MsgId::StateChangePoint, 0, 0, 0, 0, 0, 0);
+			{
+		hb::net::PacketRequestStateChange req{};
+		req.header.msg_id = MsgId::StateChangePoint;
+		req.header.msg_type = 0;
+		req.str = static_cast<int16_t>(-player().m_lu_str);
+		req.vit = static_cast<int16_t>(-player().m_lu_vit);
+		req.dex = static_cast<int16_t>(-player().m_lu_dex);
+		req.intel = static_cast<int16_t>(-player().m_lu_int);
+		req.mag = static_cast<int16_t>(-player().m_lu_mag);
+		req.chr = static_cast<int16_t>(-player().m_lu_char);
+		send_game_packet(req);
+	}
 			play_sound_effect('E', 14, 5);
 		}
 	}

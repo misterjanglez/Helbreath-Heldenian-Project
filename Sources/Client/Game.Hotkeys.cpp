@@ -1,4 +1,6 @@
 #include "Game.h"
+#include "PacketSendHelpers.h"
+
 #include "TextInputManager.h"
 #include "MagicCastingSystem.h"
 #include "ChatManager.h"
@@ -214,13 +216,13 @@ void CGame::hotkey_whisper_target()
 		char* sep = std::strchr(buff, ':');
 		if (sep) *sep = '\0';
 		tempid = std::format("/to {}", buff);
-		send_command(MsgId::CommandChatMsg, 0, 0, 0, 0, 0, tempid.c_str());
+		send_chat_message(tempid.c_str());
 	}
 	else if (m_entity_state.is_player() && (m_entity_state.m_name[0] != '\0') && (m_ilusion_owner_h == 0)
 		&& ((m_is_crusade_mode == false) || !IsHostile(m_entity_state.m_status.relationship)))
 	{
 		tempid = std::format("/to {}", m_entity_state.m_name.data());
-		send_command(MsgId::CommandChatMsg, 0, 0, 0, 0, 0, tempid.c_str());
+		send_chat_message(tempid.c_str());
 	}
 	else
 	{
@@ -252,7 +254,11 @@ void CGame::hotkey_simple_use_health_potion()
 			CItem* cfg = get_item_config(m_player->m_item_list[i]->m_id_num);
 			if (cfg && cfg->get_item_type() == ItemType::Consume && cfg->m_item_effect_type == hb::shared::item::to_int(hb::shared::item::ItemEffectType::HP))
 			{
-				send_command(MsgId::CommandCommon, CommonType::ReqUseItem, 0, i, 0, 0, 0);
+				{
+					auto pkt = hb::net::make_common_command(CommonType::ReqUseItem, m_player->m_player_x, m_player->m_player_y);
+					pkt.v1 = i;
+					send_game_packet(pkt);
+				}
 				inventory_manager::get().lock_item(i);
 				m_item_using_status = true;
 				return;
@@ -283,7 +289,11 @@ void CGame::hotkey_simple_use_mana_potion()
 			CItem* cfg = get_item_config(m_player->m_item_list[i]->m_id_num);
 			if (cfg && cfg->get_item_type() == ItemType::Consume && cfg->m_item_effect_type == hb::shared::item::to_int(hb::shared::item::ItemEffectType::MP))
 			{
-				send_command(MsgId::CommandCommon, CommonType::ReqUseItem, 0, i, 0, 0, 0);
+				{
+					auto pkt = hb::net::make_common_command(CommonType::ReqUseItem, m_player->m_player_x, m_player->m_player_y);
+					pkt.v1 = i;
+					send_game_packet(pkt);
+				}
 				inventory_manager::get().lock_item(i);
 				m_item_using_status = true;
 				return;
@@ -435,14 +445,14 @@ void CGame::hotkey_simple_tab_toggle_combat()
 			m_cur_focus++;
 			if (m_cur_focus > m_max_focus) m_cur_focus = 1;
 		}
-		send_command(MsgId::CommandCommon, CommonType::ToggleCombatMode, 0, 0, 0, 0, 0);
+		send_game_packet(hb::net::make_common_command(CommonType::ToggleCombatMode, m_player->m_player_x, m_player->m_player_y));
 	}
 }
 
 void CGame::hotkey_simple_toggle_safe_attack()
 {
 	if (GameModeManager::get_mode() == GameMode::MainGame) {
-		send_command(MsgId::CommandCommon, CommonType::ToggleSafeAttackMode, 0, 0, 0, 0, 0);
+		send_game_packet(hb::net::make_common_command(CommonType::ToggleSafeAttackMode, m_player->m_player_x, m_player->m_player_y));
 	}
 }
 
@@ -487,7 +497,7 @@ void CGame::hotkey_simple_special_ability()
 	if (m_player->m_is_special_ability_enabled == true)
 	{
 		if (m_player->m_special_ability_type != 0) {
-			send_command(MsgId::CommandCommon, CommonType::RequestActivateSpecAbility, 0, 0, 0, 0, 0);
+			send_game_packet(hb::net::make_common_command(CommonType::RequestActivateSpecAbility, m_player->m_player_x, m_player->m_player_y));
 			m_player->m_is_special_ability_enabled = false;
 		}
 		else add_event_list(ON_KEY_UP26, 10);

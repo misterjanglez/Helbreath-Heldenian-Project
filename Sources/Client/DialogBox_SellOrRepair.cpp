@@ -7,6 +7,8 @@
 #include "SpriteID.h"
 #include "lan_eng.h"
 #include "NetMessages.h"
+#include "PacketSendHelpers.h"
+
 #include <format>
 #include <string>
 #include "IInput.h"
@@ -167,7 +169,15 @@ bool DialogBox_SellOrRepair::on_click()
 		CItem* cfg = m_game->get_item_config(player().m_item_list[m_item_index]->m_id_num);
 		if (mouse_in(btn_confirm)) {
 			// Sell
-			if (cfg) m_game->send_command(MsgId::CommandCommon, CommonType::ReqSellItemConfirm, 0, m_item_index, m_item_count, m_secondary_price, cfg->m_name);
+			if (cfg)
+			{
+				auto pkt = hb::net::make_common_command_str(CommonType::ReqSellItemConfirm, m_game->m_player->m_player_x, m_game->m_player->m_player_y);
+				pkt.v1 = m_item_index;
+				pkt.v2 = m_item_count;
+				pkt.v3 = m_secondary_price;
+				std::snprintf(pkt.text, sizeof(pkt.text), "%s", cfg->m_name);
+				m_game->send_game_packet(pkt);
+			}
 			m_mode = mode::sell_pending;
 			return true;
 		}
@@ -185,7 +195,13 @@ bool DialogBox_SellOrRepair::on_click()
 		CItem* cfg = m_game->get_item_config(player().m_item_list[m_item_index]->m_id_num);
 		if (mouse_in(btn_confirm)) {
 			// Repair
-			if (cfg) m_game->send_command(MsgId::CommandCommon, CommonType::ReqRepairItemConfirm, 0, m_item_index, 0, 0, cfg->m_name);
+			if (cfg)
+			{
+				auto pkt = hb::net::make_common_command_str(CommonType::ReqRepairItemConfirm, m_game->m_player->m_player_x, m_game->m_player->m_player_y);
+				pkt.v1 = m_item_index;
+				std::snprintf(pkt.text, sizeof(pkt.text), "%s", cfg->m_name);
+				m_game->send_game_packet(pkt);
+			}
 			m_mode = mode::repair_pending;
 			return true;
 		}

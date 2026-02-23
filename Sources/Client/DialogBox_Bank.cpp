@@ -10,6 +10,9 @@
 #include "lan_eng.h"
 #include <format>
 #include "TextInputManager.h"
+#include "Packet/SharedPackets.h"
+#include "PacketSendHelpers.h"
+
 
 using namespace hb::shared::net;
 using namespace hb::shared::item;
@@ -224,7 +227,13 @@ bool DialogBox_Bank::on_click()
 						add_event_list(DLGBOX_CLICK_BANK1, 10);
 						return true;
 					}
-					send_command(MsgId::RequestRetrieveItem, 0, 0, itemIndex, 0, 0, 0);
+					{
+			hb::net::PacketRequestRetrieveItem req{};
+			req.header.msg_id = MsgId::RequestRetrieveItem;
+			req.header.msg_type = MsgType::Confirm;
+			req.item_slot = static_cast<uint8_t>(itemIndex);
+			send_game_packet(req);
+		}
 					m_mode = mode::waiting;
 					play_sound_effect('E', 14, 5);
 				}
@@ -319,8 +328,15 @@ bool DialogBox_Bank::on_item_drop()
 		}
 		else
 		{
-			send_command(MsgId::CommandCommon, CommonType::GiveItemToChar, give.item_index, 1,
-				give.target_x, give.target_y, cfg->m_name, give.object_id);
+			{
+				auto pkt = hb::net::make_common_command_str(CommonType::GiveItemToChar, player().m_player_x, player().m_player_y, give.item_index);
+				pkt.v1 = 1;
+				pkt.v2 = give.target_x;
+				pkt.v3 = give.target_y;
+				std::snprintf(pkt.text, sizeof(pkt.text), "%s", cfg->m_name);
+				pkt.v4 = give.object_id;
+				send_game_packet(pkt);
+			}
 		}
 	}
 

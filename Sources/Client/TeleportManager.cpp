@@ -4,6 +4,7 @@
 #include "Packet/PacketResponse.h"
 #include "Packet/PacketHelpers.h"
 #include "lan_eng.h"
+#include "Packet/SharedPackets.h"
 
 using namespace hb::shared::net;
 using namespace hb::client::net;
@@ -43,7 +44,12 @@ void teleport_manager::request_auth(short player_x, short player_y)
 
 	m_rejected_x = player_x;
 	m_rejected_y = player_y;
-	m_game->send_command(MsgId::RequestTeleportAuth, 0, 0, 0, 0, 0, 0);
+	{
+		hb::net::PacketRequestHeaderOnly req{};
+		req.header.msg_id = MsgId::RequestTeleportAuth;
+		req.header.msg_type = 0;
+		m_game->send_game_packet(req);
+	}
 	m_is_requested = true;
 	m_state = teleport_state::awaiting_auth;
 	m_fade_alpha = 0.0f;
@@ -100,7 +106,13 @@ void teleport_manager::update()
 		if (m_fade_alpha >= 1.0f) {
 			m_fade_alpha = 1.0f;
 			// Screen is fully black — send the actual teleport request
-			m_game->send_command(MsgId::RequestTeleport, 0, 0, 0, 0, 0, 0);
+			{
+		hb::net::PacketRequestHeaderOnly req{};
+		req.header.msg_id = MsgId::RequestTeleport;
+		req.header.msg_type = MsgType::Confirm;
+		m_game->send_game_packet(req, false);
+	}
+	teleport_manager::get().set_requested(true);
 			m_game->change_game_mode(GameMode::WaitingInitData);
 			m_state = teleport_state::awaiting_data;
 		}

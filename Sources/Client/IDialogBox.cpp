@@ -46,9 +46,9 @@ void IDialogBox::add_event_list(const char* txt, char color, bool dup_allow)
 	m_game->add_event_list(txt, color, dup_allow);
 }
 
-bool IDialogBox::send_command(uint32_t msg_id, uint16_t command, char dir, int v1, int v2, int v3, const char* string, int v4)
+bool IDialogBox::send_game_packet_impl(const hb::net::packet_base& pkt, size_t size, bool encrypt)
 {
-	return m_game->send_command(msg_id, command, dir, v1, v2, v3, string, v4);
+	return m_game->send_game_packet_impl(pkt, size, encrypt);
 }
 
 void IDialogBox::set_default_rect(short sX, short sY, short size_x, short size_y)

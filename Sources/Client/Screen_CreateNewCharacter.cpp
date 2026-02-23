@@ -18,7 +18,10 @@
 #include "textbox.h"
 #include "toggle_button.h"
 #include "IRenderer.h"
+#include "Packet/SharedPackets.h"
+#include "CharInfo.h"
 #include <format>
+#include <memory>
 
 using namespace hb::shared::net;
 using namespace hb::shared::action;
@@ -328,12 +331,77 @@ void Screen_CreateNewCharacter::submit_create_character()
     if (!CMisc::check_valid_name(name.c_str())) return;
 
     m_game->m_new_char.player_name = name.c_str();
+
+    // Build create character packet for deferred send after connection establishes
+    hb::net::CreateCharacterRequest req{};
+    req.header.msg_id = MsgId::RequestCreateNewCharacter;
+    req.header.msg_type = 0;
+    std::snprintf(req.character_name, sizeof(req.character_name), "%s", m_game->m_new_char.player_name.c_str());
+    std::snprintf(req.account_name, sizeof(req.account_name), "%s", m_game->m_account_name.c_str());
+    std::snprintf(req.password, sizeof(req.password), "%s", m_game->m_account_password.c_str());
+    std::snprintf(req.world_name, sizeof(req.world_name), "%s", m_game->m_world_server_name.c_str());
+    req.gender = static_cast<uint8_t>(m_game->m_new_char.gender);
+    req.skin = static_cast<uint8_t>(m_game->m_new_char.skin_col);
+    req.hairstyle = static_cast<uint8_t>(m_game->m_new_char.hair_style);
+    req.haircolor = static_cast<uint8_t>(m_game->m_new_char.hair_col);
+    req.underware = static_cast<uint8_t>(m_game->m_new_char.under_col);
+    req.str = static_cast<uint8_t>(m_game->m_new_char.stat_str);
+    req.vit = static_cast<uint8_t>(m_game->m_new_char.stat_vit);
+    req.dex = static_cast<uint8_t>(m_game->m_new_char.stat_dex);
+    req.intl = static_cast<uint8_t>(m_game->m_new_char.stat_int);
+    req.mag = static_cast<uint8_t>(m_game->m_new_char.stat_mag);
+    req.chr = static_cast<uint8_t>(m_game->m_new_char.stat_chr);
+    m_game->set_pending_login_packet(req);
+
     m_game->m_l_sock = std::make_unique<hb::shared::net::ASIOSocket>(m_game->m_io_pool->get_context(), game_limits::socket_block_limit);
     m_game->m_l_sock->connect(m_game->m_log_server_addr.c_str(), m_game->m_log_server_port);
     m_game->m_l_sock->init_buffer_size(hb::shared::limits::MsgBufferSize);
     m_game->change_game_mode(GameMode::Connecting);
-    m_game->m_connect_mode = MsgId::RequestCreateNewCharacter;
     std::snprintf(m_game->m_msg, sizeof(m_game->m_msg), "%s", "22");
+}
+
+bool Screen_CreateNewCharacter::on_net_response(uint16_t response_type, char* data)
+{
+    switch (response_type) {
+    case LogResMsg::NewCharacterCreated:
+    {
+        const auto* list = hb::net::PacketCast<hb::net::PacketLogNewCharacterCreatedHeader>(
+            data, sizeof(hb::net::PacketLogNewCharacterCreatedHeader));
+        if (!list) return true;
+
+        m_game->m_total_char = std::min(static_cast<int>(list->total_chars), 4);
+        for (int i = 0; i < 4; i++)
+            if (m_game->m_char_list[i] != 0) m_game->m_char_list[i].reset();
+
+        const auto* entries = reinterpret_cast<const hb::net::PacketLogCharacterEntry*>(
+            data + sizeof(hb::net::PacketLogNewCharacterCreatedHeader));
+        for (int i = 0; i < m_game->m_total_char; i++) {
+            const auto& entry = entries[i];
+            m_game->m_char_list[i] = std::make_unique<CCharInfo>();
+            m_game->m_char_list[i]->m_name.assign(entry.name, strnlen(entry.name, sizeof(entry.name)));
+            m_game->m_char_list[i]->m_appearance = entry.appearance;
+            m_game->m_char_list[i]->m_sex = entry.sex;
+            m_game->m_char_list[i]->m_skin_color = entry.skin;
+            m_game->m_char_list[i]->m_level = entry.level;
+            m_game->m_char_list[i]->m_exp = entry.exp;
+            m_game->m_char_list[i]->m_map_name.assign(entry.map_name, strnlen(entry.map_name, sizeof(entry.map_name)));
+        }
+        std::snprintf(m_game->m_msg, sizeof(m_game->m_msg), "%s", "47");
+        m_game->change_game_mode(GameMode::LogResMsg);
+        return true;
+    }
+
+    case LogResMsg::NewCharacterFailed:
+        std::snprintf(m_game->m_msg, sizeof(m_game->m_msg), "%s", "28");
+        m_game->change_game_mode(GameMode::LogResMsg);
+        return true;
+
+    case LogResMsg::AlreadyExistingCharacter:
+        std::snprintf(m_game->m_msg, sizeof(m_game->m_msg), "%s", "29");
+        m_game->change_game_mode(GameMode::LogResMsg);
+        return true;
+    }
+    return false;
 }
 
 void Screen_CreateNewCharacter::on_render()

@@ -183,7 +183,6 @@ void Overlay_ChangePassword::handle_submit()
     m_game->m_l_sock->connect(m_game->m_log_server_addr.c_str(), m_game->m_log_server_port);
     m_game->m_l_sock->init_buffer_size(hb::shared::limits::MsgBufferSize);
 
-    m_game->m_connect_mode = MsgId::RequestChangePassword;
     std::snprintf(m_game->m_msg, sizeof(m_game->m_msg), "%s", "41");
 
     m_game->change_game_mode(GameMode::Connecting);

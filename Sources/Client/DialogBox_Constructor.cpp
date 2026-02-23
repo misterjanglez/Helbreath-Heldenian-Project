@@ -7,6 +7,8 @@
 #include "SpriteID.h"
 #include "ConfigManager.h"
 #include "NetMessages.h"
+#include "PacketSendHelpers.h"
+
 #include "GameFonts.h"
 #include "TextLibExt.h"
 #include <format>
@@ -307,25 +309,49 @@ bool DialogBox_Constructor::on_click()
 	case mode::select_building:
 		if (mouse_in(btn_building_1))
 		{
-			send_command(MsgId::CommandCommon, CommonType::SummonWarUnit, 0, 38, 1, m_game->get_dialog_box_manager().get_dialog_as<DialogBox_Commander>(DialogBoxId::CrusadeCommander)->m_selected_faction, 0);
+			{
+				auto pkt = hb::net::make_common_command(CommonType::SummonWarUnit, player().m_player_x, player().m_player_y);
+				pkt.v1 = 38;
+				pkt.v2 = 1;
+				pkt.v3 = m_game->get_dialog_box_manager().get_dialog_as<DialogBox_Commander>(DialogBoxId::CrusadeCommander)->m_selected_faction;
+				send_game_packet(pkt);
+			}
 			play_sound_effect('E', 14, 5);
 			disable_dialog_box(DialogBoxId::CrusadeConstructor);
 		}
 		if (mouse_in(btn_building_2))
 		{
-			send_command(MsgId::CommandCommon, CommonType::SummonWarUnit, 0, 39, 1, m_game->get_dialog_box_manager().get_dialog_as<DialogBox_Commander>(DialogBoxId::CrusadeCommander)->m_selected_faction, 0);
+			{
+				auto pkt = hb::net::make_common_command(CommonType::SummonWarUnit, player().m_player_x, player().m_player_y);
+				pkt.v1 = 39;
+				pkt.v2 = 1;
+				pkt.v3 = m_game->get_dialog_box_manager().get_dialog_as<DialogBox_Commander>(DialogBoxId::CrusadeCommander)->m_selected_faction;
+				send_game_packet(pkt);
+			}
 			play_sound_effect('E', 14, 5);
 			disable_dialog_box(DialogBoxId::CrusadeConstructor);
 		}
 		if (mouse_in(btn_building_3))
 		{
-			send_command(MsgId::CommandCommon, CommonType::SummonWarUnit, 0, 36, 1, m_game->get_dialog_box_manager().get_dialog_as<DialogBox_Commander>(DialogBoxId::CrusadeCommander)->m_selected_faction, 0);
+			{
+				auto pkt = hb::net::make_common_command(CommonType::SummonWarUnit, player().m_player_x, player().m_player_y);
+				pkt.v1 = 36;
+				pkt.v2 = 1;
+				pkt.v3 = m_game->get_dialog_box_manager().get_dialog_as<DialogBox_Commander>(DialogBoxId::CrusadeCommander)->m_selected_faction;
+				send_game_packet(pkt);
+			}
 			play_sound_effect('E', 14, 5);
 			disable_dialog_box(DialogBoxId::CrusadeConstructor);
 		}
 		if (mouse_in(btn_building_4))
 		{
-			send_command(MsgId::CommandCommon, CommonType::SummonWarUnit, 0, 37, 1, m_game->get_dialog_box_manager().get_dialog_as<DialogBox_Commander>(DialogBoxId::CrusadeCommander)->m_selected_faction, 0);
+			{
+				auto pkt = hb::net::make_common_command(CommonType::SummonWarUnit, player().m_player_x, player().m_player_y);
+				pkt.v1 = 37;
+				pkt.v2 = 1;
+				pkt.v3 = m_game->get_dialog_box_manager().get_dialog_as<DialogBox_Commander>(DialogBoxId::CrusadeCommander)->m_selected_faction;
+				send_game_packet(pkt);
+			}
 			play_sound_effect('E', 14, 5);
 			disable_dialog_box(DialogBoxId::CrusadeConstructor);
 		}
@@ -346,7 +372,7 @@ bool DialogBox_Constructor::on_click()
 	case mode::teleport:
 		if (mouse_in(btn_set_tp))
 		{
-			send_command(MsgId::CommandCommon, CommonType::GuildTeleport, 0, 0, 0, 0, 0);
+			send_game_packet(hb::net::make_common_command(CommonType::GuildTeleport, player().m_player_x, player().m_player_y));
 			disable_dialog_box(DialogBoxId::CrusadeConstructor);
 			play_sound_effect('E', 14, 5);
 		}

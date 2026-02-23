@@ -3,6 +3,7 @@
 //////////////////////////////////////////////////////////////////////
 
 #include "Screen_SelectCharacter.h"
+#include "Screen_OnGame.h"
 #include "Game.h"
 #include "WeatherManager.h"
 #include "GameModeManager.h"
@@ -16,6 +17,8 @@
 #include "TextLibExt.h"
 #include "button.h"
 #include "IRenderer.h"
+#include "Packet/SharedPackets.h"
+#include "CharInfo.h"
 #include <format>
 #include <string>
 
@@ -212,15 +215,126 @@ bool Screen_SelectCharacter::enter_game()
 
     m_game->m_sprite[InterfaceNdLogin]->Unload();
     m_game->m_sprite[InterfaceNdMainMenu]->Unload();
+    m_game->m_enter_game_type = EnterGameMsg::New;
+    m_game->m_map_name = m_game->m_char_list[slot_index]->m_map_name;
+
+    // Build enter game packet for deferred send after connection establishes
+    hb::net::EnterGameRequestFull req{};
+    req.header.msg_id = MsgId::request_enter_game;
+    req.header.msg_type = static_cast<uint16_t>(m_game->m_enter_game_type);
+    std::snprintf(req.character_name, sizeof(req.character_name), "%s", m_game->m_selected_char_name.c_str());
+    std::snprintf(req.map_name, sizeof(req.map_name), "%s", m_game->m_map_name.c_str());
+    std::snprintf(req.account_name, sizeof(req.account_name), "%s", m_game->m_account_name.c_str());
+    std::snprintf(req.password, sizeof(req.password), "%s", m_game->m_account_password.c_str());
+    req.level = m_game->m_selected_char_level;
+    std::snprintf(req.world_name, sizeof(req.world_name), "%s", m_game->m_world_server_name.c_str());
+    req.version_major = hb::version::compatibility::major;
+    req.version_minor = hb::version::compatibility::minor;
+    req.version_patch = hb::version::compatibility::patch;
+    m_game->set_pending_login_packet(req);
+
     m_game->m_l_sock = std::make_unique<hb::shared::net::ASIOSocket>(m_game->m_io_pool->get_context(), game_limits::socket_block_limit);
     m_game->m_l_sock->connect(m_game->m_log_server_addr.c_str(), m_game->m_log_server_port);
     m_game->m_l_sock->init_buffer_size(hb::shared::limits::MsgBufferSize);
     m_game->change_game_mode(GameMode::Connecting);
-    m_game->m_connect_mode = MsgId::request_enter_game;
-    m_game->m_enter_game_type = EnterGameMsg::New;
     std::snprintf(m_game->m_msg, sizeof(m_game->m_msg), "%s", "33");
-    m_game->m_map_name = m_game->m_char_list[slot_index]->m_map_name;
     return true;
+}
+
+bool Screen_SelectCharacter::on_net_response(uint16_t response_type, char* data)
+{
+    switch (response_type) {
+    case LogResMsg::CharacterDeleted:
+    {
+        const auto* list = hb::net::PacketCast<hb::net::PacketLogCharacterListHeader>(
+            data, sizeof(hb::net::PacketLogCharacterListHeader));
+        if (!list) return true;
+        m_game->m_total_char = std::min(static_cast<int>(list->total_chars), 4);
+        for (int i = 0; i < 4; i++)
+            if (m_game->m_char_list[i] != 0)
+                m_game->m_char_list[i].reset();
+
+        const auto* entries = reinterpret_cast<const hb::net::PacketLogCharacterEntry*>(
+            data + sizeof(hb::net::PacketLogCharacterListHeader));
+        for (int i = 0; i < m_game->m_total_char; i++) {
+            const auto& entry = entries[i];
+            m_game->m_char_list[i] = std::make_unique<CCharInfo>();
+            m_game->m_char_list[i]->m_name.assign(entry.name, strnlen(entry.name, sizeof(entry.name)));
+            m_game->m_char_list[i]->m_appearance = entry.appearance;
+            m_game->m_char_list[i]->m_sex = entry.sex;
+            m_game->m_char_list[i]->m_skin_color = entry.skin;
+            m_game->m_char_list[i]->m_level = entry.level;
+            m_game->m_char_list[i]->m_exp = entry.exp;
+            m_game->m_char_list[i]->m_map_name.assign(entry.map_name, strnlen(entry.map_name, sizeof(entry.map_name)));
+        }
+        std::snprintf(m_game->m_msg, sizeof(m_game->m_msg), "%s", "3A");
+        m_game->change_game_mode(GameMode::LogResMsg);
+        return true;
+    }
+
+    case EnterGameRes::Playing:
+        m_game->change_game_mode(GameMode::QueryForceLogin);
+        return true;
+
+    case EnterGameRes::Confirm:
+    {
+        const auto* pkt = hb::net::PacketCast<hb::net::PacketLogEnterGameConfirm>(
+            data, sizeof(hb::net::PacketLogEnterGameConfirm));
+        if (!pkt) return true;
+        m_game->m_game_server_name.assign(pkt->game_server_name, strnlen(pkt->game_server_name, sizeof(pkt->game_server_name)));
+        GameModeManager::set_screen<Screen_OnGame>();
+        return true;
+    }
+
+    case EnterGameRes::Reject:
+    {
+        const auto* pkt = hb::net::PacketCast<hb::net::PacketLogResponseCode>(data, sizeof(hb::net::PacketLogResponseCode));
+        if (!pkt) return true;
+        std::memset(m_game->m_msg, 0, sizeof(m_game->m_msg));
+        switch (pkt->code) {
+        case 1: std::snprintf(m_game->m_msg, sizeof(m_game->m_msg), "%s", "3E"); break;
+        case 2: std::snprintf(m_game->m_msg, sizeof(m_game->m_msg), "%s", "3F"); break;
+        case 3: std::snprintf(m_game->m_msg, sizeof(m_game->m_msg), "%s", "33"); break;
+        case 4: std::snprintf(m_game->m_msg, sizeof(m_game->m_msg), "%s", "3D"); break;
+        case 5: std::snprintf(m_game->m_msg, sizeof(m_game->m_msg), "%s", "3G"); break;
+        case 6: std::snprintf(m_game->m_msg, sizeof(m_game->m_msg), "%s", "3Z"); break;
+        case 7: std::snprintf(m_game->m_msg, sizeof(m_game->m_msg), "%s", "3J"); break;
+        }
+        m_game->change_game_mode(GameMode::LogResMsg);
+        return true;
+    }
+
+    case EnterGameRes::ForceDisconn:
+        std::snprintf(m_game->m_msg, sizeof(m_game->m_msg), "%s", "3X");
+        m_game->change_game_mode(GameMode::LogResMsg);
+        return true;
+
+    case LogResMsg::NotExistingCharacter:
+        std::snprintf(m_game->m_msg, sizeof(m_game->m_msg), "%s", "Not existing character!");
+        m_game->change_game_mode(GameMode::Msg);
+        return true;
+
+    case LogResMsg::PasswordChangeSuccess:
+        std::snprintf(m_game->m_msg, sizeof(m_game->m_msg), "%s", "6B");
+        m_game->change_game_mode(GameMode::LogResMsg);
+        return true;
+
+    case LogResMsg::PasswordChangeFail:
+        std::snprintf(m_game->m_msg, sizeof(m_game->m_msg), "%s", "6C");
+        m_game->change_game_mode(GameMode::LogResMsg);
+        return true;
+
+    case LogResMsg::PasswordMismatch:
+        std::snprintf(m_game->m_msg, sizeof(m_game->m_msg), "%s", "11");
+        m_game->change_game_mode(GameMode::LogResMsg);
+        return true;
+
+    case LogResMsg::ForceChangePassword:
+        std::snprintf(m_game->m_msg, sizeof(m_game->m_msg), "%s", "6M");
+        m_game->change_game_mode(GameMode::LogResMsg);
+        return true;
+    }
+    return false;
 }
 
 void Screen_SelectCharacter::on_render()

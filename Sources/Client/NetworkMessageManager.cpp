@@ -491,19 +491,5 @@ bool NetworkMessageManager::process_message(uint32_t msg_id, char* data, uint32_
 		return false;
 	}
 
-	switch (msg_id)
-	{
-	case MsgId::ResponseCreateNewGuild:
-		NetworkMessageHandlers::handle_create_new_guild_response(m_game, data);
-		return true;
-
-	case MsgId::ResponseDisbandGuild:
-		NetworkMessageHandlers::handle_disband_guild_response(m_game, data);
-		return true;
-
-	default:
-		break;
-	}
-
 	return false;
 }

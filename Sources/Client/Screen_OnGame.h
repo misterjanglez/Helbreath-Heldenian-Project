@@ -9,6 +9,7 @@
 #include "IGameScreen.h"
 #include "GuildManager.h"
 #include "DialogBoxManager.h"
+#include "NetworkMessageManager.h"
 #include <cstdint>
 #include <memory>
 
@@ -27,6 +28,10 @@ public:
     void on_update() override;
     void on_render() override;
     bool on_text_input(uint32_t codepoint) override;
+    bool on_game_msg(uint32_t msg_id, uint16_t msg_type, char* data, uint32_t msg_size) override;
+
+    void handle_create_new_guild_response(char* data);
+    void handle_disband_guild_response(char* data);
 
     void item_drop_external_screen(char item_id, short mouse_x, short mouse_y);
     guild_manager& get_guild_manager() { return m_guild_manager; }
@@ -61,6 +66,7 @@ private:
     uint32_t m_dwLastBubbleTime = 0;
     guild_manager m_guild_manager;
     std::unique_ptr<DialogBoxManager> m_dialog_box_manager;
+    std::unique_ptr<NetworkMessageManager> m_network_message_manager;
 
     static std::unique_ptr<CPlayer> s_player;
 };

@@ -11,7 +11,7 @@
 namespace hb {
 namespace net {
 	HB_PACK_BEGIN
-	struct HB_PACKED PacketRequestInitDataEx {
+	struct HB_PACKED PacketRequestInitDataEx : packet_base {
 		PacketHeader header;
 		char player[hb::shared::limits::CharNameLen];
 		char account[hb::shared::limits::AccountNameLen];

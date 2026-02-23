@@ -2,6 +2,8 @@
 #include "DialogBox_Party.h"
 #include "NetworkMessageManager.h"
 #include "Packet/SharedPackets.h"
+#include "PacketSendHelpers.h"
+
 #include "lan_eng.h"
 #include "DialogBoxIDs.h"
 #include <cstring>
@@ -50,7 +52,12 @@ void HandleParty(CGame* game, char* data)
 			game->m_total_party_member = 0;
 			game->get_dialog_box_manager().enable_dialog_box(DialogBoxId::Party, 0, 0, 0);
 			game->get_dialog_box_manager().get_dialog_as<DialogBox_Party>(DialogBoxId::Party)->m_mode = DialogBox_Party::mode::failed;
-			game->send_command(MsgId::CommandCommon, CommonType::RequestJoinParty, 0, 2, 0, 0, game->m_mc_name.c_str());
+			{
+				auto pkt = hb::net::make_common_command_str(CommonType::RequestJoinParty, game->m_player->m_player_x, game->m_player->m_player_y);
+				pkt.v1 = 2;
+				std::snprintf(pkt.text, sizeof(pkt.text), "%s", game->m_mc_name.c_str());
+				game->send_game_packet(pkt);
+			}
 			break;
 		}
 		break;

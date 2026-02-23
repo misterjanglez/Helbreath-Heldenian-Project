@@ -1,5 +1,7 @@
 ﻿#include "DialogBox_Fishing.h"
 #include "Game.h"
+#include "PacketSendHelpers.h"
+
 #include "ItemNameFormatter.h"
 #include "ItemSpriteMetadata.h"
 #include "GameFonts.h"
@@ -66,7 +68,7 @@ bool DialogBox_Fishing::on_click()
 	case 0:
 		if (mouse_in(btn_try_now))
 		{
-			m_game->send_command(MsgId::CommandCommon, CommonType::ReqGetFishThisTime, 0, 0, 0, 0, 0);
+			m_game->send_game_packet(hb::net::make_common_command(CommonType::ReqGetFishThisTime, m_game->m_player->m_player_x, m_game->m_player->m_player_y));
 			m_game->add_event_list(DLGBOX_CLICK_FISH1, 10);
 			disable_dialog_box(DialogBoxId::Fishing);
 			m_game->play_game_sound('E', 14, 5);

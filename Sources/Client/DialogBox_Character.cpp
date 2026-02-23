@@ -2,6 +2,8 @@
 #include "ConfigManager.h"
 #include "CursorTarget.h"
 #include "Game.h"
+#include "PacketSendHelpers.h"
+
 #include "InventoryManager.h"
 #include "ItemNameFormatter.h"
 #include "ItemSpriteMetadata.h"
@@ -484,10 +486,14 @@ bool DialogBox_Character::on_double_click()
 		!m_game->get_dialog_box_manager().is_enabled(DialogBoxId::SellOrRepair) &&
 		m_game->get_dialog_box_manager().m_give_item.action_type == 24)
 	{
-		send_command(MsgId::CommandCommon, CommonType::ReqRepairItem, 0, item_id,
-			m_game->get_dialog_box_manager().m_give_item.action_type, 0,
-			cfg->m_name,
-			m_game->get_dialog_box_manager().m_give_item.object_id);
+		{
+			auto pkt = hb::net::make_common_command_str(CommonType::ReqRepairItem, player().m_player_x, player().m_player_y);
+			pkt.v1 = item_id;
+			pkt.v2 = m_game->get_dialog_box_manager().m_give_item.action_type;
+			std::snprintf(pkt.text, sizeof(pkt.text), "%s", cfg->m_name);
+			pkt.v4 = m_game->get_dialog_box_manager().m_give_item.object_id;
+			send_game_packet(pkt);
+		}
 	}
 	else
 	{
@@ -522,7 +528,11 @@ bool DialogBox_Character::on_double_click()
 					player().m_angelic_mag = 0;
 			}
 
-			send_command(MsgId::CommandCommon, CommonType::ReleaseItem, 0, item_id, 0, 0, 0);
+			{
+				auto pkt = hb::net::make_common_command(CommonType::ReleaseItem, player().m_player_x, player().m_player_y);
+				pkt.v1 = item_id;
+				send_game_packet(pkt);
+			}
 			m_game->m_is_item_equipped[item_id] = false;
 			m_game->m_item_equipment_status[cfg->m_equip_pos] = -1;
 			CursorTarget::clear_selection();

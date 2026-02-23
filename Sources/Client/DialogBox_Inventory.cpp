@@ -11,6 +11,9 @@
 #include "TextLibExt.h"
 #include <format>
 #include <string>
+#include "Packet/SharedPackets.h"
+#include "PacketSendHelpers.h"
+
 
 using namespace hb::shared::net;
 using namespace hb::shared::item;
@@ -241,10 +244,14 @@ bool DialogBox_Inventory::on_double_click()
 	{
 		if (cfg->get_equip_pos() != EquipPos::None)
 		{
-			send_command(MsgId::CommandCommon, CommonType::ReqRepairItem, 0, item_id,
-				m_game->get_dialog_box_manager().m_give_item.action_type, 0,
-				cfg->m_name,
-				m_game->get_dialog_box_manager().m_give_item.object_id);
+			{
+				auto pkt = hb::net::make_common_command_str(CommonType::ReqRepairItem, player().m_player_x, player().m_player_y);
+				pkt.v1 = item_id;
+				pkt.v2 = m_game->get_dialog_box_manager().m_give_item.action_type;
+				std::snprintf(pkt.text, sizeof(pkt.text), "%s", cfg->m_name);
+				pkt.v4 = m_game->get_dialog_box_manager().m_give_item.object_id;
+				send_game_packet(pkt);
+			}
 			return true;
 		}
 	}
@@ -288,7 +295,11 @@ bool DialogBox_Inventory::on_double_click()
 			}
 		}
 
-		send_command(MsgId::CommandCommon, CommonType::ReqUseItem, 0, item_id, 0, 0, 0);
+		{
+			auto pkt = hb::net::make_common_command(CommonType::ReqUseItem, player().m_player_x, player().m_player_y);
+			pkt.v1 = item_id;
+			send_game_packet(pkt);
+		}
 
 		if (cfg->get_item_type() == ItemType::UseDeplete ||
 			cfg->get_item_type() == ItemType::Eat)
@@ -549,14 +560,30 @@ bool DialogBox_Inventory::on_item_drop()
 				{
 					player().m_item_list[item_id]->m_x = dX;
 					player().m_item_list[item_id]->m_y = dY;
-					send_command(MsgId::RequestSetItemPos, 0, item_id, dX, dY, 0, 0);
+					{
+				hb::net::PacketRequestSetItemPos req{};
+				req.header.msg_id = MsgId::RequestSetItemPos;
+				req.header.msg_type = 0;
+				req.dir = static_cast<uint8_t>(item_id);
+				req.x = static_cast<int16_t>(dX);
+				req.y = static_cast<int16_t>(dY);
+				send_game_packet(req, false);
+			}
 				}
 			}
 		}
 	}
 	else
 	{
-		send_command(MsgId::RequestSetItemPos, 0, selected_id, dX, dY, 0, 0);
+		{
+				hb::net::PacketRequestSetItemPos req{};
+				req.header.msg_id = MsgId::RequestSetItemPos;
+				req.header.msg_type = 0;
+				req.dir = static_cast<uint8_t>(selected_id);
+				req.x = static_cast<int16_t>(dX);
+				req.y = static_cast<int16_t>(dY);
+				send_game_packet(req, false);
+			}
 	}
 
 	// If item was equipped, unequip it
@@ -593,7 +620,11 @@ bool DialogBox_Inventory::on_item_drop()
 				player().m_angelic_mag = 0;
 		}
 
-		send_command(MsgId::CommandCommon, CommonType::ReleaseItem, 0, selected_id, 0, 0, 0);
+		{
+			auto pkt = hb::net::make_common_command(CommonType::ReleaseItem, player().m_player_x, player().m_player_y);
+			pkt.v1 = selected_id;
+			send_game_packet(pkt);
+		}
 		m_game->m_is_item_equipped[selected_id] = false;
 		m_game->m_item_equipment_status[cfg->m_equip_pos] = -1;
 	}

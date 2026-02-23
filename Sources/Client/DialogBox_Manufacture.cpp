@@ -13,6 +13,7 @@
 #include "lan_eng.h"
 #include "NetMessages.h"
 #include "IInput.h"
+#include "Packet/SharedPackets.h"
 #include <format>
 #include <string>
 
@@ -225,7 +226,21 @@ void DialogBox_Manufacture::draw_alchemy_creating(short sX, short sY)
 
 	if (m_progress >= 5)
 	{
-		m_game->send_command(MsgId::CommandCommon, CommonType::ReqCreatePortion, 0, 0, 0, 0, 0);
+		{
+			hb::net::PacketCommandCommonItems req{};
+			req.base.header.msg_id = MsgId::CommandCommon;
+			req.base.header.msg_type = CommonType::ReqCreatePortion;
+			req.base.x = player().m_player_x;
+			req.base.y = player().m_player_y;
+			req.item_ids[0] = static_cast<uint8_t>(m_slot_1);
+			req.item_ids[1] = static_cast<uint8_t>(m_slot_2);
+			req.item_ids[2] = static_cast<uint8_t>(m_slot_3);
+			req.item_ids[3] = static_cast<uint8_t>(m_slot_4);
+			req.item_ids[4] = static_cast<uint8_t>(m_slot_5);
+			req.item_ids[5] = static_cast<uint8_t>(m_slot_6);
+			req.padding = 0;
+			m_game->send_game_packet(req, false);
+		}
 		m_game->get_dialog_box_manager().disable_dialog_box(DialogBoxId::Manufacture);
 		m_game->play_game_sound('E', 42, 0);
 	}
@@ -543,7 +558,24 @@ void DialogBox_Manufacture::draw_manufacture_in_progress(short sX, short sY)
 
 	if (m_anim_frame == 4)
 	{
-		m_game->send_command(MsgId::CommandCommon, CommonType::BuildItem, 0, 0, 0, 0, build_item_manager::get().get_display_list()[m_progress]->m_name.c_str());
+		{
+			hb::net::PacketCommandCommonBuild req{};
+			req.base.header.msg_id = MsgId::CommandCommon;
+			req.base.header.msg_type = CommonType::BuildItem;
+			req.base.x = player().m_player_x;
+			req.base.y = player().m_player_y;
+			const char* name = build_item_manager::get().get_display_list()[m_progress]->m_name.c_str();
+			std::size_t name_len = std::strlen(name);
+			if (name_len > sizeof(req.name)) name_len = sizeof(req.name);
+			std::memcpy(req.name, name, name_len);
+			req.item_ids[0] = static_cast<uint8_t>(m_slot_1);
+			req.item_ids[1] = static_cast<uint8_t>(m_slot_2);
+			req.item_ids[2] = static_cast<uint8_t>(m_slot_3);
+			req.item_ids[3] = static_cast<uint8_t>(m_slot_4);
+			req.item_ids[4] = static_cast<uint8_t>(m_slot_5);
+			req.item_ids[5] = static_cast<uint8_t>(m_slot_6);
+			m_game->send_game_packet(req, false);
+		}
 		m_anim_frame++;
 	}
 }
@@ -715,7 +747,21 @@ void DialogBox_Manufacture::draw_crafting_in_progress(short sX, short sY)
 	}
 	if (m_anim_frame >= 5)
 	{
-		m_game->send_command(MsgId::CommandCommon, CommonType::CraftItem, 0, 0, 0, 0, 0);
+		{
+			hb::net::PacketCommandCommonBuild req{};
+			req.base.header.msg_id = MsgId::CommandCommon;
+			req.base.header.msg_type = CommonType::CraftItem;
+			req.base.x = player().m_player_x;
+			req.base.y = player().m_player_y;
+			std::memset(req.name, ' ', sizeof(req.name));
+			req.item_ids[0] = static_cast<uint8_t>(m_slot_1);
+			req.item_ids[1] = static_cast<uint8_t>(m_slot_2);
+			req.item_ids[2] = static_cast<uint8_t>(m_slot_3);
+			req.item_ids[3] = static_cast<uint8_t>(m_slot_4);
+			req.item_ids[4] = static_cast<uint8_t>(m_slot_5);
+			req.item_ids[5] = static_cast<uint8_t>(m_slot_6);
+			m_game->send_game_packet(req, false);
+		}
 		m_game->get_dialog_box_manager().disable_dialog_box(DialogBoxId::Manufacture);
 		m_game->play_game_sound('E', 42, 0);
 	}

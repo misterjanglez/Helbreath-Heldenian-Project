@@ -1,5 +1,7 @@
 #include "DialogBox_CrusadeJob.h"
 #include "Game.h"
+#include "PacketSendHelpers.h"
+
 #include "GameFonts.h"
 #include "GlobalDef.h"
 #include "TextLibExt.h"
@@ -124,7 +126,11 @@ bool DialogBox_CrusadeJob::on_click()
 			// Guild master - Commander option
 			if (mouse_in(link_job_1))
 			{
-				m_game->send_command(MsgId::CommandCommon, CommonType::RequestSelectCrusadeDuty, 0, 3, 0, 0, 0);
+				{
+					auto pkt = hb::net::make_common_command(CommonType::RequestSelectCrusadeDuty, m_game->m_player->m_player_x, m_game->m_player->m_player_y);
+					pkt.v1 = 3;
+					m_game->send_game_packet(pkt);
+				}
 				disable_dialog_box(DialogBoxId::CrusadeJob);
 				m_game->play_game_sound('E', 14, 5);
 				return true;
@@ -135,7 +141,11 @@ bool DialogBox_CrusadeJob::on_click()
 			// Soldier option
 			if (mouse_in(link_job_1))
 			{
-				m_game->send_command(MsgId::CommandCommon, CommonType::RequestSelectCrusadeDuty, 0, 1, 0, 0, 0);
+				{
+					auto pkt = hb::net::make_common_command(CommonType::RequestSelectCrusadeDuty, m_game->m_player->m_player_x, m_game->m_player->m_player_y);
+					pkt.v1 = 1;
+					m_game->send_game_packet(pkt);
+				}
 				disable_dialog_box(DialogBoxId::CrusadeJob);
 				m_game->play_game_sound('E', 14, 5);
 				return true;
@@ -146,7 +156,11 @@ bool DialogBox_CrusadeJob::on_click()
 			{
 				if (mouse_in(link_job_2))
 				{
-					m_game->send_command(MsgId::CommandCommon, CommonType::RequestSelectCrusadeDuty, 0, 2, 0, 0, 0);
+					{
+						auto pkt = hb::net::make_common_command(CommonType::RequestSelectCrusadeDuty, m_game->m_player->m_player_x, m_game->m_player->m_player_y);
+						pkt.v1 = 2;
+						m_game->send_game_packet(pkt);
+					}
 					disable_dialog_box(DialogBoxId::CrusadeJob);
 					m_game->play_game_sound('E', 14, 5);
 					return true;

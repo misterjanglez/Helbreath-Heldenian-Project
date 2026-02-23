@@ -5,6 +5,8 @@
 #include "GlobalDef.h"
 #include "SpriteID.h"
 #include "NetMessages.h"
+#include "PacketSendHelpers.h"
+
 #include "GameFonts.h"
 #include "TextLibExt.h"
 #include "TextInputManager.h"
@@ -288,8 +290,11 @@ void DialogBox_ItemCreator::draw_search_page(short sX, short sY, short size_x, s
 		m_initial_load = true;
 		m_last_sent_search = m_search_text;
 		m_scroll_offset = 0;
-		send_command(MsgId::CommandCommon, CommonType::TesterItemSearch,
-			0, 0, 0, 0, m_search_text.empty() ? "" : m_search_text.c_str());
+		{
+			auto pkt = hb::net::make_common_command_str(CommonType::TesterItemSearch, player().m_player_x, player().m_player_y);
+			std::snprintf(pkt.text, sizeof(pkt.text), "%s", m_search_text.empty() ? "" : m_search_text.c_str());
+			send_game_packet(pkt);
+		}
 	}
 
 	// Mouse wheel
@@ -823,8 +828,13 @@ bool DialogBox_ItemCreator::on_click_configure(short sX, short sY, short size_x)
 				static_cast<SecondaryEffectType>(secondary_type),
 				static_cast<uint8_t>(sval),
 				static_cast<uint8_t>(m_enchant_value));
-			send_command(MsgId::CommandCommon, CommonType::TesterCreateItem,
-				0, item_id, static_cast<int>(attr), m_item_count, 0);
+			{
+				auto pkt = hb::net::make_common_command(CommonType::TesterCreateItem, player().m_player_x, player().m_player_y);
+				pkt.v1 = item_id;
+				pkt.v2 = static_cast<int>(attr);
+				pkt.v3 = m_item_count;
+				send_game_packet(pkt);
+			}
 		}
 		play_sound_effect('E', 14, 5);
 		return true;

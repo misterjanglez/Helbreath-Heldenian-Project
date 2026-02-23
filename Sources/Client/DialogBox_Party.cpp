@@ -1,5 +1,7 @@
 #include "DialogBox_Party.h"
 #include "Game.h"
+#include "PacketSendHelpers.h"
+
 #include "lan_eng.h"
 #include <format>
 #include <string>
@@ -245,7 +247,12 @@ bool DialogBox_Party::on_click()
 
 		if (m_game->m_party_status != 0) {
 			if (mouse_in(link_members)) {
-				send_command(MsgId::CommandCommon, CommonType::RequestJoinParty, 0, 2, 0, 0, m_game->m_mc_name.c_str());
+				{
+					auto pkt = hb::net::make_common_command_str(CommonType::RequestJoinParty, player().m_player_x, player().m_player_y);
+					pkt.v1 = 2;
+					std::snprintf(pkt.text, sizeof(pkt.text), "%s", m_game->m_mc_name.c_str());
+					send_game_packet(pkt);
+				}
 				m_mode = mode::member_list;
 				play_sound_effect('E', 14, 5);
 				return true;
@@ -260,14 +267,23 @@ bool DialogBox_Party::on_click()
 
 	case mode::invited:
 		if (mouse_in(btn_left)) {
-			send_command(MsgId::CommandCommon, CommonType::RequestAcceptJoinParty, 0, 1, 0, 0, m_leader_name);
+			{
+				auto pkt = hb::net::make_common_command_str(CommonType::RequestAcceptJoinParty, player().m_player_x, player().m_player_y);
+				pkt.v1 = 1;
+				std::snprintf(pkt.text, sizeof(pkt.text), "%s", m_leader_name);
+				send_game_packet(pkt);
+			}
 			m_game->get_dialog_box_manager().disable_dialog_box(DialogBoxId::Party);
 			play_sound_effect('E', 14, 5);
 			return true;
 		}
 
 		if (mouse_in(btn_right)) {
-			send_command(MsgId::CommandCommon, CommonType::RequestAcceptJoinParty, 0, 0, 0, 0, m_leader_name);
+			{
+				auto pkt = hb::net::make_common_command_str(CommonType::RequestAcceptJoinParty, player().m_player_x, player().m_player_y);
+				std::snprintf(pkt.text, sizeof(pkt.text), "%s", m_leader_name);
+				send_game_packet(pkt);
+			}
 			m_game->get_dialog_box_manager().disable_dialog_box(DialogBoxId::Party);
 			play_sound_effect('E', 14, 5);
 			return true;
@@ -285,7 +301,12 @@ bool DialogBox_Party::on_click()
 	case mode::join_requested:
 		if (mouse_in(btn_right)) {
 			m_mode = mode::main_menu;
-			send_command(MsgId::CommandCommon, CommonType::RequestAcceptJoinParty, 0, 2, 0, 0, m_leader_name);
+			{
+				auto pkt = hb::net::make_common_command_str(CommonType::RequestAcceptJoinParty, player().m_player_x, player().m_player_y);
+				pkt.v1 = 2;
+				std::snprintf(pkt.text, sizeof(pkt.text), "%s", m_leader_name);
+				send_game_packet(pkt);
+			}
 			m_game->get_dialog_box_manager().disable_dialog_box(DialogBoxId::Party);
 			play_sound_effect('E', 14, 5);
 			return true;
@@ -307,7 +328,11 @@ bool DialogBox_Party::on_click()
 
 	case mode::confirm_leave:
 		if (mouse_in(btn_left)) {
-			send_command(MsgId::CommandCommon, CommonType::RequestJoinParty, 0, 0, 0, 0, m_game->m_mc_name.c_str());
+			{
+				auto pkt = hb::net::make_common_command_str(CommonType::RequestJoinParty, player().m_player_x, player().m_player_y);
+				std::snprintf(pkt.text, sizeof(pkt.text), "%s", m_game->m_mc_name.c_str());
+				send_game_packet(pkt);
+			}
 			m_mode = mode::leaving;
 			play_sound_effect('E', 14, 5);
 			return true;

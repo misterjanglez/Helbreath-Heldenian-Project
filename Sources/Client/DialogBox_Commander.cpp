@@ -6,6 +6,8 @@
 #include "SpriteID.h"
 #include "ConfigManager.h"
 #include "NetMessages.h"
+#include "PacketSendHelpers.h"
+
 #include "GameFonts.h"
 #include "TextLibExt.h"
 #include <format>
@@ -494,7 +496,13 @@ bool DialogBox_Commander::on_click()
 			if (tY < 30) tY = 30;
 			if (tX > 494) tX = 494;
 			if (tY > 494) tY = 494;
-			send_command(MsgId::CommandCommon, CommonType::SetGuildTeleportLoc, 0, tX, tY, 0, "middleland");
+			{
+				auto pkt = hb::net::make_common_command_str(CommonType::SetGuildTeleportLoc, player().m_player_x, player().m_player_y);
+				pkt.v1 = tX;
+				pkt.v2 = tY;
+				std::snprintf(pkt.text, sizeof(pkt.text), "%s", "middleland");
+				send_game_packet(pkt);
+			}
 			m_mode = mode::main;
 			play_sound_effect('E', 14, 5);
 			m_game->request_map_status("middleland", 1);
@@ -515,7 +523,7 @@ bool DialogBox_Commander::on_click()
 	case mode::use_tp:
 		if (mouse_in(btn_use_tp))
 		{
-			send_command(MsgId::CommandCommon, CommonType::GuildTeleport, 0, 0, 0, 0, 0);
+			send_game_packet(hb::net::make_common_command(CommonType::GuildTeleport, player().m_player_x, player().m_player_y));
 			disable_dialog_box(DialogBoxId::CrusadeCommander);
 			play_sound_effect('E', 14, 5);
 		}
@@ -539,7 +547,13 @@ bool DialogBox_Commander::on_click()
 			{
 				if (player().m_construction_point >= 3000)
 				{
-					send_command(MsgId::CommandCommon, CommonType::SummonWarUnit, 0, 47, 1, m_selected_faction, 0);
+					{
+						auto pkt = hb::net::make_common_command(CommonType::SummonWarUnit, player().m_player_x, player().m_player_y);
+						pkt.v1 = 47;
+						pkt.v2 = 1;
+						pkt.v3 = m_selected_faction;
+						send_game_packet(pkt);
+					}
 					play_sound_effect('E', 14, 5);
 					disable_dialog_box(DialogBoxId::CrusadeCommander);
 				}
@@ -548,7 +562,13 @@ bool DialogBox_Commander::on_click()
 			{
 				if (player().m_construction_point >= 2000)
 				{
-					send_command(MsgId::CommandCommon, CommonType::SummonWarUnit, 0, 46, 1, m_selected_faction, 0);
+					{
+						auto pkt = hb::net::make_common_command(CommonType::SummonWarUnit, player().m_player_x, player().m_player_y);
+						pkt.v1 = 46;
+						pkt.v2 = 1;
+						pkt.v3 = m_selected_faction;
+						send_game_packet(pkt);
+					}
 					play_sound_effect('E', 14, 5);
 					disable_dialog_box(DialogBoxId::CrusadeCommander);
 				}
@@ -557,7 +577,13 @@ bool DialogBox_Commander::on_click()
 			{
 				if (player().m_construction_point >= 1000)
 				{
-					send_command(MsgId::CommandCommon, CommonType::SummonWarUnit, 0, 43, 1, m_selected_faction, 0);
+					{
+						auto pkt = hb::net::make_common_command(CommonType::SummonWarUnit, player().m_player_x, player().m_player_y);
+						pkt.v1 = 43;
+						pkt.v2 = 1;
+						pkt.v3 = m_selected_faction;
+						send_game_packet(pkt);
+					}
 					play_sound_effect('E', 14, 5);
 					disable_dialog_box(DialogBoxId::CrusadeCommander);
 				}
@@ -566,7 +592,13 @@ bool DialogBox_Commander::on_click()
 			{
 				if (player().m_construction_point >= 1500)
 				{
-					send_command(MsgId::CommandCommon, CommonType::SummonWarUnit, 0, 51, 1, m_selected_faction, 0);
+					{
+						auto pkt = hb::net::make_common_command(CommonType::SummonWarUnit, player().m_player_x, player().m_player_y);
+						pkt.v1 = 51;
+						pkt.v2 = 1;
+						pkt.v3 = m_selected_faction;
+						send_game_packet(pkt);
+					}
 					play_sound_effect('E', 14, 5);
 					disable_dialog_box(DialogBoxId::CrusadeCommander);
 				}
@@ -578,7 +610,13 @@ bool DialogBox_Commander::on_click()
 			{
 				if (player().m_construction_point >= 3000)
 				{
-					send_command(MsgId::CommandCommon, CommonType::SummonWarUnit, 0, 45, 1, m_selected_faction, 0);
+					{
+						auto pkt = hb::net::make_common_command(CommonType::SummonWarUnit, player().m_player_x, player().m_player_y);
+						pkt.v1 = 45;
+						pkt.v2 = 1;
+						pkt.v3 = m_selected_faction;
+						send_game_packet(pkt);
+					}
 					play_sound_effect('E', 14, 5);
 					disable_dialog_box(DialogBoxId::CrusadeCommander);
 				}
@@ -587,7 +625,13 @@ bool DialogBox_Commander::on_click()
 			{
 				if (player().m_construction_point >= 2000)
 				{
-					send_command(MsgId::CommandCommon, CommonType::SummonWarUnit, 0, 44, 1, m_selected_faction, 0);
+					{
+						auto pkt = hb::net::make_common_command(CommonType::SummonWarUnit, player().m_player_x, player().m_player_y);
+						pkt.v1 = 44;
+						pkt.v2 = 1;
+						pkt.v3 = m_selected_faction;
+						send_game_packet(pkt);
+					}
 					play_sound_effect('E', 14, 5);
 					disable_dialog_box(DialogBoxId::CrusadeCommander);
 				}
@@ -596,7 +640,13 @@ bool DialogBox_Commander::on_click()
 			{
 				if (player().m_construction_point >= 1000)
 				{
-					send_command(MsgId::CommandCommon, CommonType::SummonWarUnit, 0, 43, 1, m_selected_faction, 0);
+					{
+						auto pkt = hb::net::make_common_command(CommonType::SummonWarUnit, player().m_player_x, player().m_player_y);
+						pkt.v1 = 43;
+						pkt.v2 = 1;
+						pkt.v3 = m_selected_faction;
+						send_game_packet(pkt);
+					}
 					play_sound_effect('E', 14, 5);
 					disable_dialog_box(DialogBoxId::CrusadeCommander);
 				}
@@ -605,7 +655,13 @@ bool DialogBox_Commander::on_click()
 			{
 				if (player().m_construction_point >= 1500)
 				{
-					send_command(MsgId::CommandCommon, CommonType::SummonWarUnit, 0, 51, 1, m_selected_faction, 0);
+					{
+						auto pkt = hb::net::make_common_command(CommonType::SummonWarUnit, player().m_player_x, player().m_player_y);
+						pkt.v1 = 51;
+						pkt.v2 = 1;
+						pkt.v3 = m_selected_faction;
+						send_game_packet(pkt);
+					}
 					play_sound_effect('E', 14, 5);
 					disable_dialog_box(DialogBoxId::CrusadeCommander);
 				}
@@ -649,7 +705,13 @@ bool DialogBox_Commander::on_click()
 			if (tY < 30) tY = 30;
 			if (tX > 494) tX = 494;
 			if (tY > 494) tY = 494;
-			send_command(MsgId::CommandCommon, CommonType::SetGuildConstructLoc, 0, tX, tY, 0, "middleland");
+			{
+				auto pkt = hb::net::make_common_command_str(CommonType::SetGuildConstructLoc, player().m_player_x, player().m_player_y);
+				pkt.v1 = tX;
+				pkt.v2 = tY;
+				std::snprintf(pkt.text, sizeof(pkt.text), "%s", "middleland");
+				send_game_packet(pkt);
+			}
 			m_mode = mode::main;
 			play_sound_effect('E', 14, 5);
 			m_game->request_map_status("middleland", 1);

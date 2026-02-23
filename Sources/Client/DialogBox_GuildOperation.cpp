@@ -1,5 +1,7 @@
 ﻿#include "DialogBox_GuildOperation.h"
 #include "Game.h"
+#include "PacketSendHelpers.h"
+
 #include "lan_eng.h"
 #include <string>
 #include "IInput.h"
@@ -157,11 +159,19 @@ bool DialogBox_GuildOperation::on_click()
 		switch (m_op_list[0].op_mode) {
 		case 1:
 			name20 = m_op_list[0].name;
-			send_command(MsgId::CommandCommon, CommonType::JoinGuildApprove, 0, 0, 0, 0, name20.c_str());
+			{
+				auto pkt = hb::net::make_common_command_str(CommonType::JoinGuildApprove, player().m_player_x, player().m_player_y);
+				std::snprintf(pkt.text, sizeof(pkt.text), "%s", name20.c_str());
+				send_game_packet(pkt);
+			}
 			break;
 		case 2:
 			name20 = m_op_list[0].name;
-			send_command(MsgId::CommandCommon, CommonType::DismissGuildApprove, 0, 0, 0, 0, name20.c_str());
+			{
+				auto pkt = hb::net::make_common_command_str(CommonType::DismissGuildApprove, player().m_player_x, player().m_player_y);
+				std::snprintf(pkt.text, sizeof(pkt.text), "%s", name20.c_str());
+				send_game_packet(pkt);
+			}
 			break;
 		}
 		shift();
@@ -177,11 +187,19 @@ bool DialogBox_GuildOperation::on_click()
 		switch (m_op_list[0].op_mode) {
 		case 1:
 			name20 = m_op_list[0].name;
-			send_command(MsgId::CommandCommon, CommonType::JoinGuildReject, 0, 0, 0, 0, name20.c_str());
+			{
+				auto pkt = hb::net::make_common_command_str(CommonType::JoinGuildReject, player().m_player_x, player().m_player_y);
+				std::snprintf(pkt.text, sizeof(pkt.text), "%s", name20.c_str());
+				send_game_packet(pkt);
+			}
 			break;
 		case 2:
 			name20 = m_op_list[0].name;
-			send_command(MsgId::CommandCommon, CommonType::DismissGuildReject, 0, 0, 0, 0, name20.c_str());
+			{
+				auto pkt = hb::net::make_common_command_str(CommonType::DismissGuildReject, player().m_player_x, player().m_player_y);
+				std::snprintf(pkt.text, sizeof(pkt.text), "%s", name20.c_str());
+				send_game_packet(pkt);
+			}
 			break;
 		}
 		shift();

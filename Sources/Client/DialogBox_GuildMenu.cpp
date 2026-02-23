@@ -7,6 +7,9 @@
 #include "TextLibExt.h"
 #include <string>
 #include "IInput.h"
+#include "Packet/SharedPackets.h"
+#include "PacketSendHelpers.h"
+
 
 using namespace hb::shared::net;
 using namespace hb::client::sprite_id;
@@ -434,7 +437,7 @@ bool DialogBox_GuildMenu::on_click_mode0(short sX, short sY)
 			m_mode = mode::fightzone_select;
 		else {
 			m_mode = mode::get_ticket_redirect;
-			send_command(MsgId::CommandCommon, CommonType::ReqGetOccupyFightZoneTicket, 0, 0, 0, 0, 0);
+			send_game_packet(hb::net::make_common_command(CommonType::ReqGetOccupyFightZoneTicket, player().m_player_x, player().m_player_y));
 		}
 		play_sound_effect('E', 14, 5);
 		return true;
@@ -451,7 +454,17 @@ bool DialogBox_GuildMenu::on_click_mode1(short sX, short sY)
 	if ((mouse_x >= sX + 30) && (mouse_x <= sX + 30 + ui_layout::btn_size_x) && (mouse_y >= sY + ui_layout::btn_y) && (mouse_y <= sY + ui_layout::btn_y + ui_layout::btn_size_y)) {
 		if (player().m_guild_name == "NONE") return false;
 		if (player().m_guild_name.empty()) return false;
-		send_command(MsgId::request_create_new_guild, MsgType::Confirm, 0, 0, 0, 0, 0);
+		{
+			hb::net::PacketRequestGuildAction req{};
+			req.header.msg_id = MsgId::request_create_new_guild;
+			req.header.msg_type = MsgType::Confirm;
+			std::snprintf(req.player, sizeof(req.player), "%s", player().m_player_name.c_str());
+			std::snprintf(req.account, sizeof(req.account), "%s", m_game->m_account_name.c_str());
+			std::snprintf(req.password, sizeof(req.password), "%s", m_game->m_account_password.c_str());
+			std::snprintf(req.guild, sizeof(req.guild), "%s", player().m_guild_name.c_str());
+			CMisc::replace_string(req.guild, ' ', '_');
+			send_game_packet(req);
+		}
 		m_mode = mode::creating;
 		text_input_manager::get().end_input();
 		play_sound_effect('E', 14, 5);
@@ -475,7 +488,17 @@ bool DialogBox_GuildMenu::on_click_mode5(short sX, short sY)
 	short mouse_y = static_cast<short>(hb::shared::input::get_mouse_y());
 	// Confirm disband
 	if ((mouse_x >= sX + 30) && (mouse_x <= sX + 30 + ui_layout::btn_size_x) && (mouse_y >= sY + ui_layout::btn_y) && (mouse_y <= sY + ui_layout::btn_y + ui_layout::btn_size_y)) {
-		send_command(MsgId::request_disband_guild, MsgType::Confirm, 0, 0, 0, 0, 0);
+		{
+			hb::net::PacketRequestGuildAction req{};
+			req.header.msg_id = MsgId::request_disband_guild;
+			req.header.msg_type = MsgType::Confirm;
+			std::snprintf(req.player, sizeof(req.player), "%s", player().m_player_name.c_str());
+			std::snprintf(req.account, sizeof(req.account), "%s", m_game->m_account_name.c_str());
+			std::snprintf(req.password, sizeof(req.password), "%s", m_game->m_account_password.c_str());
+			std::snprintf(req.guild, sizeof(req.guild), "%s", player().m_guild_name.c_str());
+			CMisc::replace_string(req.guild, ' ', '_');
+			send_game_packet(req);
+		}
 		m_mode = mode::disbanding;
 		play_sound_effect('E', 14, 5);
 		return true;
@@ -500,7 +523,13 @@ bool DialogBox_GuildMenu::on_click_mode9(short sX, short sY)
 	// Purchase admission ticket
 	if ((mouse_x >= sX + 30) && (mouse_x <= sX + 30 + ui_layout::btn_size_x) && (mouse_y >= sY + ui_layout::btn_y) && (mouse_y <= sY + ui_layout::btn_y + ui_layout::btn_size_y)) {
 		temp = "GuildAdmissionTicket";
-		send_command(MsgId::CommandCommon, CommonType::ReqPurchaseItem, 0, 1, hb::shared::item::ItemId::GuildAdmissionTicket, 0, temp.c_str());
+		{
+			auto pkt = hb::net::make_common_command_str(CommonType::ReqPurchaseItem, player().m_player_x, player().m_player_y);
+			pkt.v1 = 1;
+			pkt.v2 = hb::shared::item::ItemId::GuildAdmissionTicket;
+			std::snprintf(pkt.text, sizeof(pkt.text), "%s", temp.c_str());
+			send_game_packet(pkt);
+		}
 		m_mode = mode::main_menu;
 		play_sound_effect('E', 14, 5);
 		return true;
@@ -525,7 +554,13 @@ bool DialogBox_GuildMenu::on_click_mode11(short sX, short sY)
 	// Purchase secession ticket
 	if ((mouse_x >= sX + 30) && (mouse_x <= sX + 30 + ui_layout::btn_size_x) && (mouse_y >= sY + ui_layout::btn_y) && (mouse_y <= sY + ui_layout::btn_y + ui_layout::btn_size_y)) {
 		temp = "GuildSecessionTicket";
-		send_command(MsgId::CommandCommon, CommonType::ReqPurchaseItem, 0, 1, hb::shared::item::ItemId::GuildSecessionTicket, 0, temp.c_str());
+		{
+			auto pkt = hb::net::make_common_command_str(CommonType::ReqPurchaseItem, player().m_player_x, player().m_player_y);
+			pkt.v1 = 1;
+			pkt.v2 = hb::shared::item::ItemId::GuildSecessionTicket;
+			std::snprintf(pkt.text, sizeof(pkt.text), "%s", temp.c_str());
+			send_game_packet(pkt);
+		}
 		m_mode = mode::main_menu;
 		play_sound_effect('E', 14, 5);
 		return true;
@@ -547,7 +582,13 @@ bool DialogBox_GuildMenu::on_click_mode13(short sX, short sY)
 	short mouse_y = static_cast<short>(hb::shared::input::get_mouse_y());
 	// Fightzone 1
 	if ((mouse_x > sX + ADJX + 65) && (mouse_x < sX + ADJX + 137) && (mouse_y > sY + ADJY + 168) && (mouse_y < sY + ADJY + 185)) {
-		send_command(MsgId::RequestFightZoneReserve, 0, 0, 1, 0, 0, 0);
+		{
+				hb::net::PacketRequestFightzoneReserve req{};
+				req.header.msg_id = MsgId::RequestFightZoneReserve;
+				req.header.msg_type = 0;
+				req.fightzone = 1;
+				send_game_packet(req);
+			}
 		m_mode = mode::fightzone_waiting;
 		m_game->m_fightzone_number_temp = 1;
 		play_sound_effect('E', 14, 5);
@@ -555,7 +596,13 @@ bool DialogBox_GuildMenu::on_click_mode13(short sX, short sY)
 	}
 	// Fightzone 2
 	if ((mouse_x > sX + ADJX + 150) && (mouse_x < sX + ADJX + 222) && (mouse_y > sY + ADJY + 168) && (mouse_y < sY + ADJY + 185)) {
-		send_command(MsgId::RequestFightZoneReserve, 0, 0, 2, 0, 0, 0);
+		{
+				hb::net::PacketRequestFightzoneReserve req{};
+				req.header.msg_id = MsgId::RequestFightZoneReserve;
+				req.header.msg_type = 0;
+				req.fightzone = 2;
+				send_game_packet(req);
+			}
 		m_mode = mode::fightzone_waiting;
 		m_game->m_fightzone_number_temp = 2;
 		play_sound_effect('E', 14, 5);
@@ -563,7 +610,13 @@ bool DialogBox_GuildMenu::on_click_mode13(short sX, short sY)
 	}
 	// Fightzone 3
 	if ((mouse_x > sX + ADJX + 65) && (mouse_x < sX + ADJX + 137) && (mouse_y > sY + ADJY + 188) && (mouse_y < sY + ADJY + 205)) {
-		send_command(MsgId::RequestFightZoneReserve, 0, 0, 3, 0, 0, 0);
+		{
+				hb::net::PacketRequestFightzoneReserve req{};
+				req.header.msg_id = MsgId::RequestFightZoneReserve;
+				req.header.msg_type = 0;
+				req.fightzone = 3;
+				send_game_packet(req);
+			}
 		m_mode = mode::fightzone_waiting;
 		m_game->m_fightzone_number_temp = 3;
 		play_sound_effect('E', 14, 5);
@@ -571,7 +624,13 @@ bool DialogBox_GuildMenu::on_click_mode13(short sX, short sY)
 	}
 	// Fightzone 4
 	if ((mouse_x > sX + ADJX + 150) && (mouse_x < sX + ADJX + 222) && (mouse_y > sY + ADJY + 188) && (mouse_y < sY + ADJY + 205)) {
-		send_command(MsgId::RequestFightZoneReserve, 0, 0, 4, 0, 0, 0);
+		{
+				hb::net::PacketRequestFightzoneReserve req{};
+				req.header.msg_id = MsgId::RequestFightZoneReserve;
+				req.header.msg_type = 0;
+				req.fightzone = 4;
+				send_game_packet(req);
+			}
 		m_mode = mode::fightzone_waiting;
 		m_game->m_fightzone_number_temp = 4;
 		play_sound_effect('E', 14, 5);
@@ -579,7 +638,13 @@ bool DialogBox_GuildMenu::on_click_mode13(short sX, short sY)
 	}
 	// Fightzone 5
 	if ((mouse_x > sX + ADJX + 65) && (mouse_x < sX + ADJX + 137) && (mouse_y > sY + ADJY + 208) && (mouse_y < sY + ADJY + 225)) {
-		send_command(MsgId::RequestFightZoneReserve, 0, 0, 5, 0, 0, 0);
+		{
+				hb::net::PacketRequestFightzoneReserve req{};
+				req.header.msg_id = MsgId::RequestFightZoneReserve;
+				req.header.msg_type = 0;
+				req.fightzone = 5;
+				send_game_packet(req);
+			}
 		m_mode = mode::fightzone_waiting;
 		m_game->m_fightzone_number_temp = 5;
 		play_sound_effect('E', 14, 5);
@@ -587,7 +652,13 @@ bool DialogBox_GuildMenu::on_click_mode13(short sX, short sY)
 	}
 	// Fightzone 6
 	if ((mouse_x > sX + ADJX + 150) && (mouse_x < sX + ADJX + 222) && (mouse_y > sY + ADJY + 208) && (mouse_y < sY + ADJY + 225)) {
-		send_command(MsgId::RequestFightZoneReserve, 0, 0, 6, 0, 0, 0);
+		{
+				hb::net::PacketRequestFightzoneReserve req{};
+				req.header.msg_id = MsgId::RequestFightZoneReserve;
+				req.header.msg_type = 0;
+				req.fightzone = 6;
+				send_game_packet(req);
+			}
 		m_mode = mode::fightzone_waiting;
 		m_game->m_fightzone_number_temp = 6;
 		play_sound_effect('E', 14, 5);
@@ -595,7 +666,13 @@ bool DialogBox_GuildMenu::on_click_mode13(short sX, short sY)
 	}
 	// Fightzone 7
 	if ((mouse_x > sX + ADJX + 65) && (mouse_x < sX + ADJX + 137) && (mouse_y > sY + ADJY + 228) && (mouse_y < sY + ADJY + 245)) {
-		send_command(MsgId::RequestFightZoneReserve, 0, 0, 7, 0, 0, 0);
+		{
+				hb::net::PacketRequestFightzoneReserve req{};
+				req.header.msg_id = MsgId::RequestFightZoneReserve;
+				req.header.msg_type = 0;
+				req.fightzone = 7;
+				send_game_packet(req);
+			}
 		m_mode = mode::fightzone_waiting;
 		m_game->m_fightzone_number_temp = 7;
 		play_sound_effect('E', 14, 5);
@@ -603,7 +680,13 @@ bool DialogBox_GuildMenu::on_click_mode13(short sX, short sY)
 	}
 	// Fightzone 8
 	if ((mouse_x > sX + ADJX + 150) && (mouse_x < sX + ADJX + 222) && (mouse_y > sY + ADJY + 228) && (mouse_y < sY + ADJY + 245)) {
-		send_command(MsgId::RequestFightZoneReserve, 0, 0, 8, 0, 0, 0);
+		{
+				hb::net::PacketRequestFightzoneReserve req{};
+				req.header.msg_id = MsgId::RequestFightZoneReserve;
+				req.header.msg_type = 0;
+				req.fightzone = 8;
+				send_game_packet(req);
+			}
 		m_mode = mode::fightzone_waiting;
 		m_game->m_fightzone_number_temp = 8;
 		play_sound_effect('E', 14, 5);

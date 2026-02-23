@@ -21,6 +21,7 @@ public:
     void on_uninitialize() override;
     void on_update() override;
     void on_render() override;
+    bool on_net_response(uint16_t response_type, char* data) override;
 
 private:
     void submit_login();

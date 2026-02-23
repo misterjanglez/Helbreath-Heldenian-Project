@@ -1,6 +1,8 @@
 #include "DialogBox_ConfirmExchange.h"
 #include "DialogBox_Exchange.h"
 #include "Game.h"
+#include "PacketSendHelpers.h"
+
 #include "IInput.h"
 
 using namespace hb::shared::net;
@@ -57,10 +59,15 @@ bool DialogBox_ConfirmExchange::on_click()
 		{
 			if ((get_dialog_box_as<DialogBox_Exchange>(DialogBoxId::Exchange)->m_slots[0].v1 != -1) && (get_dialog_box_as<DialogBox_Exchange>(DialogBoxId::Exchange)->m_slots[4].v1 != -1))
 			{
-				send_command(MsgId::CommandCommon, CommonType::confirm_exchange_item, 0,
-					get_dialog_box_as<DialogBox_Exchange>(DialogBoxId::Exchange)->m_slots[0].v1,  // ItemID
-					get_dialog_box_as<DialogBox_Exchange>(DialogBoxId::Exchange)->m_slots[0].v3,  // Amount
-					0, 0);
+				{
+					auto pkt = hb::net::make_common_command(CommonType::confirm_exchange_item, player().m_player_x, player().m_player_y);
+					pkt.v1 = get_dialog_box_as<DialogBox_Exchange>(DialogBoxId::Exchange)->m_slots[0].v1;
+					pkt.v2 = // ItemID
+					get_dialog_box_as<DialogBox_Exchange>(DialogBoxId::Exchange)->m_slots[0].v3;
+					pkt.v3 = // Amount
+					0;
+					send_game_packet(pkt);
+				}
 				play_sound_effect('E', 14, 5);
 				get_dialog_box_as<DialogBox_Exchange>(DialogBoxId::Exchange)->m_mode = DialogBox_Exchange::mode::confirmed;
 				m_mode = mode::waiting;
@@ -74,7 +81,7 @@ bool DialogBox_ConfirmExchange::on_click()
 			disable_this_dialog();
 			disable_dialog_box(DialogBoxId::Exchange);
 			disable_dialog_box(DialogBoxId::Map);
-			send_command(MsgId::CommandCommon, CommonType::cancel_exchange_item, 0, 0, 0, 0, 0);
+			send_game_packet(hb::net::make_common_command(CommonType::cancel_exchange_item, player().m_player_x, player().m_player_y));
 			play_sound_effect('E', 14, 5);
 			return true;
 		}

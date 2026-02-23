@@ -9,6 +9,7 @@
 #include <format>
 #include <string>
 #include "IInput.h"
+#include "Packet/SharedPackets.h"
 
 using namespace hb::shared::net;
 using namespace hb::shared::item;
@@ -212,7 +213,16 @@ bool DialogBox_SellList::on_click()
 	if ((mouse_x >= sX + 30) && (mouse_x <= sX + 30 + ui_layout::btn_size_x) &&
 		(mouse_y >= sY + ui_layout::btn_y) && (mouse_y <= sY + ui_layout::btn_y + ui_layout::btn_size_y))
 	{
-		m_game->send_command(MsgId::RequestSellItemList, 0, 0, 0, 0, 0, 0);
+		{
+		hb::net::PacketRequestSellItemList req{};
+		req.header.msg_id = MsgId::RequestSellItemList;
+		req.header.msg_type = 0;
+		for (int i = 0; i < game_limits::max_sell_list; i++) {
+			req.entries[i].index = static_cast<uint8_t>(get_entry(i).index);
+			req.entries[i].amount = get_entry(i).amount;
+		}
+		m_game->send_game_packet(req);
+	}
 		m_game->play_game_sound('E', 14, 5);
 		disable_this_dialog();
 		return true;

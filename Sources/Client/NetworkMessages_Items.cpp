@@ -88,7 +88,15 @@ namespace NetworkMessageHandlers {
 				game->m_player->m_item_list[i]->m_count = count;
 				game->m_player->m_item_list[i]->m_x = nX;
 				game->m_player->m_item_list[i]->m_y = nY;
-				game->send_command(MsgId::RequestSetItemPos, 0, i, nX, nY, 0, 0);
+				{
+			hb::net::PacketRequestSetItemPos req{};
+			req.header.msg_id = MsgId::RequestSetItemPos;
+			req.header.msg_type = 0;
+			req.dir = static_cast<uint8_t>(i);
+			req.x = static_cast<int16_t>(nX);
+			req.y = static_cast<int16_t>(nY);
+			game->send_game_packet(req, false);
+		}
 				inventory_manager::get().unlock_item(i);
 				game->m_is_item_equipped[i] = false;
 				game->m_player->m_item_list[i]->m_cur_life_span = cur_life_span;
@@ -182,7 +190,15 @@ namespace NetworkMessageHandlers {
 				game->m_player->m_item_list[i]->m_count = count;
 				game->m_player->m_item_list[i]->m_x = nX;
 				game->m_player->m_item_list[i]->m_y = nY;
-				game->send_command(MsgId::RequestSetItemPos, 0, i, nX, nY, 0, 0);
+				{
+			hb::net::PacketRequestSetItemPos req{};
+			req.header.msg_id = MsgId::RequestSetItemPos;
+			req.header.msg_type = 0;
+			req.dir = static_cast<uint8_t>(i);
+			req.x = static_cast<int16_t>(nX);
+			req.y = static_cast<int16_t>(nY);
+			game->send_game_packet(req, false);
+		}
 				inventory_manager::get().unlock_item(i);
 				game->m_is_item_equipped[i] = false;
 				game->m_player->m_item_list[i]->m_cur_life_span = cur_life_span;
@@ -250,7 +266,15 @@ namespace NetworkMessageHandlers {
 					game->m_player->m_item_list[i]->m_count = 1;
 					game->m_player->m_item_list[i]->m_x = nX;
 					game->m_player->m_item_list[i]->m_y = nY;
-					game->send_command(MsgId::RequestSetItemPos, 0, i, nX, nY, 0, 0);
+					{
+			hb::net::PacketRequestSetItemPos req{};
+			req.header.msg_id = MsgId::RequestSetItemPos;
+			req.header.msg_type = 0;
+			req.dir = static_cast<uint8_t>(i);
+			req.x = static_cast<int16_t>(nX);
+			req.y = static_cast<int16_t>(nY);
+			game->send_game_packet(req, false);
+		}
 					inventory_manager::get().unlock_item(i);
 					game->m_is_item_equipped[i] = false;
 					game->m_player->m_item_list[i]->m_cur_life_span = cur_life_span;

@@ -10,6 +10,9 @@
 #include <format>
 #include <string>
 #include "IInput.h"
+#include "Packet/SharedPackets.h"
+#include "PacketSendHelpers.h"
+
 
 using namespace hb::shared::net;
 using namespace hb::client::net;
@@ -184,7 +187,13 @@ bool DialogBox_GuildHallMenu::on_click()
 		{
 			m_mode = mode::teleport;
 			teleport_manager::get().set_map_count(-1);
-			send_command(ClientMsgId::RequestHeldenianTpList, 0, 0, 0, 0, 0, 0);
+			{
+			hb::net::PacketRequestName20 req{};
+			req.header.msg_id = ClientMsgId::RequestHeldenianTpList;
+			req.header.msg_type = 0;
+			std::snprintf(req.name, sizeof(req.name), "%s", "Gail");
+			send_game_packet(req);
+		}
 			play_sound_effect('E', 14, 5);
 			return true;
 		}
@@ -215,7 +224,13 @@ bool DialogBox_GuildHallMenu::on_click()
 			{
 				if ((mouse_x >= sX + ui_layout::left_btn_x) && (mouse_x <= sX + ui_layout::right_btn_x + ui_layout::btn_size_x) && (mouse_y >= sY + 130 + i * 15) && (mouse_y <= sY + 144 + i * 15))
 				{
-					send_command(ClientMsgId::RequestHeldenianTp, 0, 0, teleport_manager::get().get_list()[i].index, 0, 0, 0);
+					{
+				hb::net::PacketRequestTeleportId req{};
+				req.header.msg_id = ClientMsgId::RequestHeldenianTp;
+				req.header.msg_type = 0;
+				req.teleport_id = teleport_manager::get().get_list()[i].index;
+				send_game_packet(req);
+			}
 					disable_dialog_box(DialogBoxId::GuildHallMenu);
 					return false;
 				}
@@ -227,37 +242,79 @@ bool DialogBox_GuildHallMenu::on_click()
 		if (mouse_in(link_1)
 			&& (player().m_construction_point >= 2000) && (m_game->m_is_crusade_mode == false))
 		{
-			send_command(MsgId::RequestHeldenianScroll, 875, 1, 2, 3, 4, "Gail", 5);
+			{
+				hb::net::PacketRequestHeldenianScroll req{};
+				req.header.msg_id = MsgId::RequestHeldenianScroll;
+				req.header.msg_type = 0;
+				std::snprintf(req.name, sizeof(req.name), "%s", "Gail");
+				req.item_id = 875;
+				send_game_packet(req);
+			}
 			play_sound_effect('E', 14, 5);
 		}
 		if (mouse_in(link_2)
 			&& (player().m_construction_point >= 3000) && (m_game->m_is_crusade_mode == false))
 		{
-			send_command(MsgId::RequestHeldenianScroll, 876, 0, 0, 0, 0, "Gail", 0);
+			{
+				hb::net::PacketRequestHeldenianScroll req{};
+				req.header.msg_id = MsgId::RequestHeldenianScroll;
+				req.header.msg_type = 0;
+				std::snprintf(req.name, sizeof(req.name), "%s", "Gail");
+				req.item_id = 876;
+				send_game_packet(req);
+			}
 			play_sound_effect('E', 14, 5);
 		}
 		if (mouse_in(link_3)
 			&& (player().m_construction_point >= 1500) && (m_game->m_is_crusade_mode == false))
 		{
-			send_command(MsgId::RequestHeldenianScroll, 877, 0, 0, 0, 0, "Gail", 0);
+			{
+				hb::net::PacketRequestHeldenianScroll req{};
+				req.header.msg_id = MsgId::RequestHeldenianScroll;
+				req.header.msg_type = 0;
+				std::snprintf(req.name, sizeof(req.name), "%s", "Gail");
+				req.item_id = 877;
+				send_game_packet(req);
+			}
 			play_sound_effect('E', 14, 5);
 		}
 		if (mouse_in(link_4)
 			&& (player().m_construction_point >= 3000) && (m_game->m_is_crusade_mode == false))
 		{
-			send_command(MsgId::RequestHeldenianScroll, 878, 0, 0, 0, 0, "Gail", 0);
+			{
+				hb::net::PacketRequestHeldenianScroll req{};
+				req.header.msg_id = MsgId::RequestHeldenianScroll;
+				req.header.msg_type = 0;
+				std::snprintf(req.name, sizeof(req.name), "%s", "Gail");
+				req.item_id = 878;
+				send_game_packet(req);
+			}
 			play_sound_effect('E', 14, 5);
 		}
 		if (mouse_in(link_5)
 			&& (player().m_construction_point >= 4000) && (m_game->m_is_crusade_mode == false))
 		{
-			send_command(MsgId::RequestHeldenianScroll, 879, 0, 0, 0, 0, "Gail", 0);
+			{
+				hb::net::PacketRequestHeldenianScroll req{};
+				req.header.msg_id = MsgId::RequestHeldenianScroll;
+				req.header.msg_type = 0;
+				std::snprintf(req.name, sizeof(req.name), "%s", "Gail");
+				req.item_id = 879;
+				send_game_packet(req);
+			}
 			play_sound_effect('E', 14, 5);
 		}
 		if (mouse_in(link_6)
 			&& (player().m_construction_point >= 3000) && (m_game->m_is_crusade_mode == false))
 		{
-			send_command(MsgId::RequestHeldenianScroll, 880, 0, 0, 0, 0, "Gail", 0);
+			{
+				hb::net::PacketRequestHeldenianScroll req{};
+				req.header.msg_id = MsgId::RequestHeldenianScroll;
+				req.header.msg_type = 0;
+				std::snprintf(req.name, sizeof(req.name), "%s", "Gail");
+				req.item_id = 880;
+				send_game_packet(req);
+			}
 			play_sound_effect('E', 14, 5);
 		}
 		break;
@@ -266,7 +323,7 @@ bool DialogBox_GuildHallMenu::on_click()
 		if (mouse_in(link_take_flag)
 			&& (player().m_enemy_kill_count >= 3))
 		{
-			send_command(MsgId::CommandCommon, CommonType::ReqGetOccupyFlag, 0, 0, 0, 0, 0, 0);
+			send_game_packet(hb::net::make_common_command(CommonType::ReqGetOccupyFlag, player().m_player_x, player().m_player_y));
 			play_sound_effect('E', 14, 5);
 		}
 		break;
@@ -275,25 +332,53 @@ bool DialogBox_GuildHallMenu::on_click()
 		if (mouse_in(link_angel_str)
 			&& (m_game->m_gizon_item_upgrade_left >= 5))
 		{
-			send_command(MsgId::RequestAngel, 0, 0, 1, 0, 0, "Gail", 0);
+			{
+				hb::net::PacketRequestAngel req{};
+				req.header.msg_id = MsgId::RequestAngel;
+				req.header.msg_type = 0;
+				std::snprintf(req.name, sizeof(req.name), "%s", "Gail");
+				req.angel_id = 1;
+				send_game_packet(req);
+			}
 			play_sound_effect('E', 14, 5);
 		}
 		if (mouse_in(link_angel_dex)
 			&& (m_game->m_gizon_item_upgrade_left >= 5))
 		{
-			send_command(MsgId::RequestAngel, 0, 0, 2, 0, 0, "Gail", 0);
+			{
+				hb::net::PacketRequestAngel req{};
+				req.header.msg_id = MsgId::RequestAngel;
+				req.header.msg_type = 0;
+				std::snprintf(req.name, sizeof(req.name), "%s", "Gail");
+				req.angel_id = 2;
+				send_game_packet(req);
+			}
 			play_sound_effect('E', 14, 5);
 		}
 		if (mouse_in(link_angel_int)
 			&& (m_game->m_gizon_item_upgrade_left >= 5))
 		{
-			send_command(MsgId::RequestAngel, 0, 0, 3, 0, 0, "Gail", 0);
+			{
+				hb::net::PacketRequestAngel req{};
+				req.header.msg_id = MsgId::RequestAngel;
+				req.header.msg_type = 0;
+				std::snprintf(req.name, sizeof(req.name), "%s", "Gail");
+				req.angel_id = 3;
+				send_game_packet(req);
+			}
 			play_sound_effect('E', 14, 5);
 		}
 		if (mouse_in(link_angel_mag)
 			&& (m_game->m_gizon_item_upgrade_left >= 5))
 		{
-			send_command(MsgId::RequestAngel, 0, 0, 4, 0, 0, "Gail", 0);
+			{
+				hb::net::PacketRequestAngel req{};
+				req.header.msg_id = MsgId::RequestAngel;
+				req.header.msg_type = 0;
+				std::snprintf(req.name, sizeof(req.name), "%s", "Gail");
+				req.angel_id = 4;
+				send_game_packet(req);
+			}
 			play_sound_effect('E', 14, 5);
 		}
 		break;

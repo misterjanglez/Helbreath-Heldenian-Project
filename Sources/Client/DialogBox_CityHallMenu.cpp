@@ -7,6 +7,9 @@
 #include <format>
 #include <string>
 #include "IInput.h"
+#include "Packet/SharedPackets.h"
+#include "PacketSendHelpers.h"
+
 
 using namespace hb::shared::net;
 using namespace hb::client::net;
@@ -482,7 +485,13 @@ bool DialogBox_CityHallMenu::on_click_mode0(short sX, short sY)
 	{
 		m_mode = mode::teleport_menu;
 		teleport_manager::get().set_map_count(-1);
-		m_game->send_command(ClientMsgId::RequestTeleportList, 0, 0, 0, 0, 0, 0);
+		{
+			hb::net::PacketRequestName20 req{};
+			req.header.msg_id = ClientMsgId::RequestTeleportList;
+			req.header.msg_type = 0;
+			std::snprintf(req.name, sizeof(req.name), "%s", "William");
+			m_game->send_game_packet(req);
+		}
 		m_game->play_game_sound('E', 14, 5);
 		return true;
 	}
@@ -506,7 +515,12 @@ bool DialogBox_CityHallMenu::on_click_mode1(short sX, short sY)
 	// Yes button
 	if ((mouse_x >= sX + ui_layout::left_btn_x) && (mouse_x <= sX + ui_layout::left_btn_x + ui_layout::btn_size_x) && (mouse_y >= sY + ui_layout::btn_y) && (mouse_y <= sY + ui_layout::btn_y + ui_layout::btn_size_y))
 	{
-		m_game->send_command(MsgId::RequestCivilRight, MsgType::Confirm, 0, 0, 0, 0, 0);
+		{
+			hb::net::PacketRequestHeaderOnly req{};
+			req.header.msg_id = MsgId::RequestCivilRight;
+			req.header.msg_type = MsgType::Confirm;
+			m_game->send_game_packet(req);
+		}
 		m_mode = mode::offering_citizenship;
 		m_game->play_game_sound('E', 14, 5);
 		return true;
@@ -544,7 +558,7 @@ bool DialogBox_CityHallMenu::on_click_mode5(short sX, short sY)
 	// Yes button
 	if ((mouse_x >= sX + ui_layout::left_btn_x) && (mouse_x <= sX + ui_layout::left_btn_x + ui_layout::btn_size_x) && (mouse_y >= sY + ui_layout::btn_y) && (mouse_y <= sY + ui_layout::btn_y + ui_layout::btn_size_y))
 	{
-		m_game->send_command(MsgId::CommandCommon, CommonType::ReqGetRewardMoney, 0, 0, 0, 0, 0);
+		m_game->send_game_packet(hb::net::make_common_command(CommonType::ReqGetRewardMoney, m_game->m_player->m_player_x, m_game->m_player->m_player_y));
 		m_mode = mode::main_menu;
 		m_game->play_game_sound('E', 14, 5);
 		return true;
@@ -676,7 +690,7 @@ bool DialogBox_CityHallMenu::on_click_mode8(short sX, short sY)
 	// Yes button
 	if ((mouse_x >= sX + ui_layout::left_btn_x) && (mouse_x <= sX + ui_layout::left_btn_x + ui_layout::btn_size_x) && (mouse_y >= sY + ui_layout::btn_y) && (mouse_y <= sY + ui_layout::btn_y + ui_layout::btn_size_y))
 	{
-		m_game->send_command(MsgId::CommandCommon, CommonType::RequestCancelQuest, 0, 0, 0, 0, 0);
+		m_game->send_game_packet(hb::net::make_common_command(CommonType::RequestCancelQuest, m_game->m_player->m_player_x, m_game->m_player->m_player_y));
 		m_mode = mode::main_menu;
 		m_game->play_game_sound('E', 14, 5);
 		return true;
@@ -700,7 +714,7 @@ bool DialogBox_CityHallMenu::on_click_mode9(short sX, short sY)
 	// Yes button
 	if ((mouse_x >= sX + ui_layout::left_btn_x) && (mouse_x <= sX + ui_layout::left_btn_x + ui_layout::btn_size_x) && (mouse_y >= sY + ui_layout::btn_y) && (mouse_y <= sY + ui_layout::btn_y + ui_layout::btn_size_y))
 	{
-		m_game->send_command(MsgId::CommandCommon, CommonType::RequestHuntMode, 0, 0, 0, 0, 0);
+		m_game->send_game_packet(hb::net::make_common_command(CommonType::RequestHuntMode, m_game->m_player->m_player_x, m_game->m_player->m_player_y));
 		m_mode = mode::main_menu;
 		m_game->play_game_sound('E', 14, 5);
 		return true;
@@ -727,7 +741,13 @@ bool DialogBox_CityHallMenu::on_click_mode10(short sX, short sY)
 		{
 			if ((mouse_x >= sX + ui_layout::left_btn_x) && (mouse_x <= sX + ui_layout::right_btn_x + ui_layout::btn_size_x) && (mouse_y >= sY + 130 + i * 15) && (mouse_y <= sY + 144 + i * 15))
 			{
-				m_game->send_command(ClientMsgId::RequestChargedTeleport, 0, 0, teleport_manager::get().get_list()[i].index, 0, 0, 0);
+				{
+				hb::net::PacketRequestTeleportId req{};
+				req.header.msg_id = ClientMsgId::RequestChargedTeleport;
+				req.header.msg_type = 0;
+				req.teleport_id = teleport_manager::get().get_list()[i].index;
+				m_game->send_game_packet(req);
+			}
 				m_game->get_dialog_box_manager().disable_dialog_box(DialogBoxId::CityHallMenu);
 				return true;
 			}
@@ -743,7 +763,11 @@ bool DialogBox_CityHallMenu::on_click_mode11(short sX, short sY)
 	// Yes button
 	if ((mouse_x >= sX + ui_layout::left_btn_x) && (mouse_x <= sX + ui_layout::left_btn_x + ui_layout::btn_size_x) && (mouse_y >= sY + ui_layout::btn_y) && (mouse_y <= sY + ui_layout::btn_y + ui_layout::btn_size_y))
 	{
-		m_game->send_command(MsgId::CommandCommon, CommonType::ReqGetHeroMantle, 0, m_hero_item_id, 0, 0, 0);
+		{
+			auto pkt = hb::net::make_common_command(CommonType::ReqGetHeroMantle, m_game->m_player->m_player_x, m_game->m_player->m_player_y);
+			pkt.v1 = m_hero_item_id;
+			m_game->send_game_packet(pkt);
+		}
 		m_mode = mode::main_menu;
 		m_game->play_game_sound('E', 14, 5);
 		return true;

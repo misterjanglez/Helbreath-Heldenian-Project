@@ -5,6 +5,8 @@
 #include "GlobalDef.h"
 #include "SpriteID.h"
 #include "NetMessages.h"
+#include "PacketSendHelpers.h"
+
 #include "GameFonts.h"
 #include "TextLibExt.h"
 #include <algorithm>
@@ -258,12 +260,16 @@ bool DialogBox_TesterMenu::on_click_main_menu(short sX, short sY)
 			m_page = 2;
 			m_map_scroll = 0;
 			m_map_count = 0;
-			send_command(MsgId::CommandCommon, CommonType::TesterMapList, 0, 0, 0, 0, 0);
+			send_game_packet(hb::net::make_common_command(CommonType::TesterMapList, player().m_player_x, player().m_player_y));
 			play_sound_effect('E', 14, 5);
 			return true;
 		}
 
-		send_command(MsgId::CommandCommon, CommonType::TesterAction, 0, row, 0, 0, 0);
+		{
+			auto pkt = hb::net::make_common_command(CommonType::TesterAction, player().m_player_x, player().m_player_y);
+			pkt.v1 = row;
+			send_game_packet(pkt);
+		}
 		play_sound_effect('E', 14, 5);
 		return true;
 	}
@@ -308,7 +314,12 @@ bool DialogBox_TesterMenu::on_click_level_picker(short sX, short sY)
 	int apply_y = sY + 220;
 	if (mouse_x >= apply_x && mouse_x <= apply_x + 50 && mouse_y >= apply_y && mouse_y <= apply_y + 18)
 	{
-		send_command(MsgId::CommandCommon, CommonType::TesterAction, 0, 7, m_selected_level, 0, 0);
+		{
+			auto pkt = hb::net::make_common_command(CommonType::TesterAction, player().m_player_x, player().m_player_y);
+			pkt.v1 = 7;
+			pkt.v2 = m_selected_level;
+			send_game_packet(pkt);
+		}
 		m_page = 0;
 		play_sound_effect('E', 14, 5);
 		return true;
@@ -338,7 +349,12 @@ bool DialogBox_TesterMenu::on_click_teleport(short sX, short sY)
 		int clicked = get_hovered_row(sX, sY, mouse_x, mouse_y, rows_to_show, m_map_scroll);
 		if (clicked >= 0 && clicked < m_map_count)
 		{
-			send_command(MsgId::CommandCommon, CommonType::TesterAction, 0, 9, 0, 0, m_maps[clicked].name);
+			{
+				auto pkt = hb::net::make_common_command_str(CommonType::TesterAction, player().m_player_x, player().m_player_y);
+				pkt.v1 = 9;
+				std::snprintf(pkt.text, sizeof(pkt.text), "%s", m_maps[clicked].name);
+				send_game_packet(pkt);
+			}
 			m_page = 0;
 			play_sound_effect('E', 14, 5);
 			return true;

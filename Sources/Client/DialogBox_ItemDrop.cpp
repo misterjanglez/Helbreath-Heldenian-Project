@@ -1,5 +1,7 @@
 #include "DialogBox_ItemDrop.h"
 #include "Game.h"
+#include "PacketSendHelpers.h"
+
 #include "InventoryManager.h"
 #include "ItemNameFormatter.h"
 #include "lan_eng.h"
@@ -94,13 +96,14 @@ bool DialogBox_ItemDrop::on_click()
 	{
 		m_mode = 3;
 		CItem* cfg = m_game->get_item_config(player().m_item_list[m_item_index]->m_id_num);
-		if (cfg) send_command(MsgId::CommandCommon,
-			CommonType::ItemDrop,
-			0,
-			m_item_index,
-			1,
-			0,
-			cfg->m_name);
+		if (cfg)
+		{
+			auto pkt = hb::net::make_common_command_str(CommonType::ItemDrop, player().m_player_x, player().m_player_y);
+			pkt.v1 = m_item_index;
+			pkt.v2 = 1;
+			std::snprintf(pkt.text, sizeof(pkt.text), "%s", cfg->m_name);
+			send_game_packet(pkt);
+		}
 		disable_this_dialog();
 		return true;
 	}

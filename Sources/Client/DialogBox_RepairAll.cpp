@@ -1,5 +1,7 @@
 #include "DialogBox_RepairAll.h"
 #include "Game.h"
+#include "PacketSendHelpers.h"
+
 #include "InventoryManager.h"
 #include "IInput.h"
 #include <format>
@@ -112,7 +114,7 @@ bool DialogBox_RepairAll::on_click()
 		// Repair button
 		if (mouse_in(btn_repair))
 		{
-			send_command(MsgId::CommandCommon, CommonType::ReqRepairAllConfirm, 0, 0, 0, 0, 0);
+			send_game_packet(hb::net::make_common_command(CommonType::ReqRepairAllConfirm, player().m_player_x, player().m_player_y));
 			disable_this_dialog();
 			return true;
 		}

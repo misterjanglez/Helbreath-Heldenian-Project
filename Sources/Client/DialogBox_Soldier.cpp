@@ -6,6 +6,8 @@
 #include "SpriteID.h"
 #include "ConfigManager.h"
 #include "NetMessages.h"
+#include "PacketSendHelpers.h"
+
 #include "GameFonts.h"
 #include "TextLibExt.h"
 #include <format>
@@ -225,7 +227,7 @@ bool DialogBox_Soldier::on_click()
 	case mode::teleport:
 		if (mouse_in(btn_tp_wide))
 		{
-			send_command(MsgId::CommandCommon, CommonType::GuildTeleport, 0, 0, 0, 0, 0);
+			send_game_packet(hb::net::make_common_command(CommonType::GuildTeleport, player().m_player_x, player().m_player_y));
 			disable_dialog_box(DialogBoxId::CrusadeSoldier);
 			play_sound_effect('E', 14, 5);
 		}

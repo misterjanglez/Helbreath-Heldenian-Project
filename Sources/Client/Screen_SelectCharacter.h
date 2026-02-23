@@ -9,6 +9,7 @@
 #include "IGameScreen.h"
 #include "control_collection.h"
 #include <cstdint>
+#include <memory>
 
 class Screen_SelectCharacter : public IGameScreen
 {
@@ -22,6 +23,7 @@ public:
     void on_uninitialize() override;
     void on_update() override;
     void on_render() override;
+    bool on_net_response(uint16_t response_type, char* data) override;
 
     bool enter_game();
 

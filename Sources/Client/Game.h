@@ -50,7 +50,6 @@
 #include "BuildItem.h"
 #include "DialogBoxManager.h"
 #include "EffectManager.h"
-#include "NetworkMessageManager.h"
 #include "CursorTarget.h"
 #include "Player.h"
 #include "EntityRenderState.h"
@@ -92,6 +91,8 @@ struct char_creation_data
 	int8_t stat_str = 10, stat_vit = 10, stat_dex = 10;
 	int8_t stat_int = 10, stat_mag = 10, stat_chr = 10;
 };
+
+namespace hb { namespace net { struct packet_base; } }
 
 class CGame : public hb::shared::render::application
 {
@@ -187,9 +188,7 @@ public:
 	void point_command_handler(int indexX, int indexY, char item_id = -1);
 	void add_event_list(const char* txt, char color = 0, bool dup_allow = true);
 	// shift_guild_operation_list / put_guild_operation_list REMOVED — use DialogBox_GuildOperation
-	void disband_guild_response_handler(char * data);
 	void init_player_characteristics(char * data);
-	void create_new_guild_response_handler(char * data);
 	void init_game_settings();
 	void common_event_handler(char * data);
 	// get_top_dialog_box_index, enable_dialog_box, disable_dialog_box REMOVED
@@ -225,7 +224,27 @@ public:
 	void motion_response_handler(char * packet_data);
 	void game_recv_msg_handler(uint32_t msg_size, char * data);
 	void draw_objects(short pivot_x, short pivot_y, short div_x, short div_y, short mod_x, short mod_y, short mouse_x, short mouse_y);
-	bool send_command(uint32_t message_id, uint16_t command, char direction, int value1, int value2, int value3, const char* text, int value4 = 0); // v1.4
+	// --- Packet transport API (caller constructs packet, CGame owns the wire) ---
+	bool send_game_packet_impl(const hb::net::packet_base& pkt, size_t size, bool encrypt = true);
+
+	template<typename PacketT>
+	bool send_game_packet(const PacketT& pkt, bool encrypt = true)
+	{
+		return send_game_packet_impl(pkt, sizeof(PacketT), encrypt);
+	}
+
+	bool send_game_packet_raw(const char* data, uint32_t size, bool encrypt = true);
+	bool send_chat_message(const char* text);
+
+	void set_pending_login_packet_impl(const hb::net::packet_base& pkt, size_t size);
+
+	template<typename PacketT>
+	void set_pending_login_packet(const PacketT& pkt)
+	{
+		set_pending_login_packet_impl(pkt, sizeof(PacketT));
+	}
+
+	bool check_send_result(int result);
 	void command_processor(short mouse_x, short mouse_y, short tile_x, short tile_y, char left_button, char right_button);
 	bool process_left_click(short mouse_x, short mouse_y, short tile_x, short tile_y, uint32_t current_time, uint16_t& action_type);
 	bool process_right_click(short mouse_x, short mouse_y, short tile_x, short tile_y, uint32_t current_time, uint16_t& action_type);
@@ -333,7 +352,6 @@ public:
 	std::unique_ptr<hb::shared::net::ASIOSocket> m_l_sock;
 	floating_text_manager m_floating_text;
 	std::unique_ptr<effect_manager> m_effect_manager;
-	std::unique_ptr<NetworkMessageManager> m_network_message_manager;
 	std::array<std::unique_ptr<CMagic>, hb::shared::limits::MaxMagicType> m_magic_cfg_list;
 	std::array<std::unique_ptr<CSkill>, hb::shared::limits::MaxSkillType> m_skill_cfg_list;
 	std::array<std::unique_ptr<CMsg>, game_limits::max_text_dlg_lines> m_msg_text_list;
@@ -345,7 +363,6 @@ public:
 	std::array<std::unique_ptr<CMsg>, game_limits::max_game_msgs> m_game_msg_list;
 
 
-	uint32_t m_connect_mode;
 	std::vector<char> m_pending_login_packet;
 	uint32_t m_time;
 	uint32_t m_cur_time;

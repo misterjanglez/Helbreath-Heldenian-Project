@@ -141,10 +141,24 @@ void HandleServerChange(CGame* game, char* data)
 
 	game->m_player->m_is_poisoned = false;
 
-	game->change_game_mode(GameMode::Connecting);
-	game->m_connect_mode = MsgId::request_enter_game;
-	//m_enter_game_type = EnterGameMsg::New; //Gateway
 	game->m_enter_game_type = EnterGameMsg::NewToWlsButMls;
+
+	// Build enter game packet for deferred send after connection establishes
+	hb::net::EnterGameRequestFull req{};
+	req.header.msg_id = MsgId::request_enter_game;
+	req.header.msg_type = static_cast<uint16_t>(game->m_enter_game_type);
+	std::snprintf(req.character_name, sizeof(req.character_name), "%s", game->m_selected_char_name.c_str());
+	std::snprintf(req.map_name, sizeof(req.map_name), "%s", game->m_map_name.c_str());
+	std::snprintf(req.account_name, sizeof(req.account_name), "%s", game->m_account_name.c_str());
+	std::snprintf(req.password, sizeof(req.password), "%s", game->m_account_password.c_str());
+	req.level = game->m_selected_char_level;
+	std::snprintf(req.world_name, sizeof(req.world_name), "%s", game->m_world_server_name.c_str());
+	req.version_major = hb::version::compatibility::major;
+	req.version_minor = hb::version::compatibility::minor;
+	req.version_patch = hb::version::compatibility::patch;
+	game->set_pending_login_packet(req);
+
+	game->change_game_mode(GameMode::Connecting);
 	std::snprintf(game->m_msg, sizeof(game->m_msg), "%s", "55");
 }
 

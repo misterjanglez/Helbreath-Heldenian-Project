@@ -1,5 +1,7 @@
 ﻿#include "DialogBox_NpcActionQuery.h"
 #include "Game.h"
+#include "PacketSendHelpers.h"
+
 #include "InventoryManager.h"
 #include "ItemNameFormatter.h"
 #include "GlobalDef.h"
@@ -223,31 +225,55 @@ bool DialogBox_NpcActionQuery::on_click()
 		if ((m_game->get_dialog_box_manager().is_enabled(DialogBoxId::NpcTalk) == false) && (mouse_x > sX + 125) && (mouse_x < sX + 180) && (mouse_y > sY + 55) && (mouse_y < sY + 70)) {
 			switch (m_item_index) {
 			case 7:
-				send_command(MsgId::CommandCommon, CommonType::TalkToNpc, 0, 1, 0, 0, 0);
+				{
+					auto pkt = hb::net::make_common_command(CommonType::TalkToNpc, player().m_player_x, player().m_player_y);
+					pkt.v1 = 1;
+					send_game_packet(pkt);
+				}
 				add_event_list(TALKING_TO_GUILDHALL_OFFICER, 10);
 				break;
 			case 11:
 				switch (m_owner_type) {
 				case 1:
-					send_command(MsgId::CommandCommon, CommonType::TalkToNpc, 0, 2, 0, 0, 0);
+					{
+						auto pkt = hb::net::make_common_command(CommonType::TalkToNpc, player().m_player_x, player().m_player_y);
+						pkt.v1 = 2;
+						send_game_packet(pkt);
+					}
 					add_event_list(TALKING_TO_SHOP_KEEPER, 10);
 					break;
 				case 2:
-					send_command(MsgId::CommandCommon, CommonType::TalkToNpc, 0, 3, 0, 0, 0);
+					{
+						auto pkt = hb::net::make_common_command(CommonType::TalkToNpc, player().m_player_x, player().m_player_y);
+						pkt.v1 = 3;
+						send_game_packet(pkt);
+					}
 					add_event_list(TALKING_TO_BLACKSMITH_KEEPER, 10);
 					break;
 				}
 				break;
 			case 13:
-				send_command(MsgId::CommandCommon, CommonType::TalkToNpc, 0, 4, 0, 0, 0);
+				{
+					auto pkt = hb::net::make_common_command(CommonType::TalkToNpc, player().m_player_x, player().m_player_y);
+					pkt.v1 = 4;
+					send_game_packet(pkt);
+				}
 				add_event_list(TALKING_TO_CITYHALL_OFFICER, 10);
 				break;
 			case 14:
-				send_command(MsgId::CommandCommon, CommonType::TalkToNpc, 0, 5, 0, 0, 0);
+				{
+					auto pkt = hb::net::make_common_command(CommonType::TalkToNpc, player().m_player_x, player().m_player_y);
+					pkt.v1 = 5;
+					send_game_packet(pkt);
+				}
 				add_event_list(TALKING_TO_WAREHOUSE_KEEPER, 10);
 				break;
 			case 16:
-				send_command(MsgId::CommandCommon, CommonType::TalkToNpc, 0, 6, 0, 0, 0);
+				{
+					auto pkt = hb::net::make_common_command(CommonType::TalkToNpc, player().m_player_x, player().m_player_y);
+					pkt.v1 = 6;
+					send_game_packet(pkt);
+				}
 				add_event_list(TALKING_TO_MAGICIAN, 10);
 				break;
 			}
@@ -263,7 +289,15 @@ bool DialogBox_NpcActionQuery::on_click()
 			absX = abs(m_target_x - player().m_player_x);
 			absY = abs(m_target_y - player().m_player_y);
 			if ((absX <= 4) && (absY <= 4) && cfg)
-				send_command(MsgId::CommandCommon, CommonType::GiveItemToChar, m_item_index, m_action_type, m_target_x, m_target_y, cfg->m_name, m_object_id);
+				{
+					auto pkt = hb::net::make_common_command_str(CommonType::GiveItemToChar, player().m_player_x, player().m_player_y, m_item_index);
+					pkt.v1 = m_action_type;
+					pkt.v2 = m_target_x;
+					pkt.v3 = m_target_y;
+					std::snprintf(pkt.text, sizeof(pkt.text), "%s", cfg->m_name);
+					pkt.v4 = m_object_id;
+					send_game_packet(pkt);
+				}
 			else add_event_list(DLGBOX_CLICK_NPCACTION_QUERY7, 10);
 			disable_this_dialog();
 			return true;
@@ -272,7 +306,15 @@ bool DialogBox_NpcActionQuery::on_click()
 			absX = abs(m_target_x - player().m_player_x);
 			absY = abs(m_target_y - player().m_player_y);
 			if ((absX <= 4) && (absY <= 4) && cfg)
-				send_command(MsgId::CommandCommon, CommonType::ExchangeItemToChar, m_item_index, m_action_type, m_target_x, m_target_y, cfg->m_name, m_object_id);
+				{
+					auto pkt = hb::net::make_common_command_str(CommonType::ExchangeItemToChar, player().m_player_x, player().m_player_y, m_item_index);
+					pkt.v1 = m_action_type;
+					pkt.v2 = m_target_x;
+					pkt.v3 = m_target_y;
+					std::snprintf(pkt.text, sizeof(pkt.text), "%s", cfg->m_name);
+					pkt.v4 = m_object_id;
+					send_game_packet(pkt);
+				}
 			else add_event_list(DLGBOX_CLICK_NPCACTION_QUERY8, 10);
 			disable_this_dialog();
 			return true;
@@ -291,13 +333,30 @@ bool DialogBox_NpcActionQuery::on_click()
 				disable_this_dialog();
 				return true;
 			}
-			if (cfg) send_command(MsgId::CommandCommon, CommonType::ReqSellItem, 0, m_item_index, m_owner_type, m_action_type, cfg->m_name, m_object_id);
+			if (cfg)
+			{
+				auto pkt = hb::net::make_common_command_str(CommonType::ReqSellItem, player().m_player_x, player().m_player_y);
+				pkt.v1 = m_item_index;
+				pkt.v2 = m_owner_type;
+				pkt.v3 = m_action_type;
+				std::snprintf(pkt.text, sizeof(pkt.text), "%s", cfg->m_name);
+				pkt.v4 = m_object_id;
+				send_game_packet(pkt);
+			}
 			disable_this_dialog();
 			return true;
 		}
 		else if ((mouse_x > sX + 125) && (mouse_x < sX + 180) && (mouse_y > sY + 55) && (mouse_y < sY + 70)) {
 			if (m_action_type == 1) {
-				if (cfg) send_command(MsgId::CommandCommon, CommonType::ReqRepairItem, 0, m_item_index, m_owner_type, 0, cfg->m_name, m_object_id);
+				if (cfg)
+				{
+					auto pkt = hb::net::make_common_command_str(CommonType::ReqRepairItem, player().m_player_x, player().m_player_y);
+					pkt.v1 = m_item_index;
+					pkt.v2 = m_owner_type;
+					std::snprintf(pkt.text, sizeof(pkt.text), "%s", cfg->m_name);
+					pkt.v4 = m_object_id;
+					send_game_packet(pkt);
+				}
 				disable_this_dialog();
 				return true;
 			}
@@ -315,7 +374,16 @@ bool DialogBox_NpcActionQuery::on_click()
 				if (inventory_manager::get().get_bank_item_count() >= (m_game->m_max_bank_items - 1)) {
 					add_event_list(DLGBOX_CLICK_NPCACTION_QUERY9, 10);
 				}
-				else if (cfg) send_command(MsgId::CommandCommon, CommonType::GiveItemToChar, m_item_index, m_action_type, m_target_x, m_target_y, cfg->m_name, m_object_id);
+				else if (cfg)
+				{
+					auto pkt = hb::net::make_common_command_str(CommonType::GiveItemToChar, player().m_player_x, player().m_player_y, m_item_index);
+					pkt.v1 = m_action_type;
+					pkt.v2 = m_target_x;
+					pkt.v3 = m_target_y;
+					std::snprintf(pkt.text, sizeof(pkt.text), "%s", cfg->m_name);
+					pkt.v4 = m_object_id;
+					send_game_packet(pkt);
+				}
 			}
 			else add_event_list(DLGBOX_CLICK_NPCACTION_QUERY7, 10);
 			disable_this_dialog();
@@ -328,23 +396,43 @@ bool DialogBox_NpcActionQuery::on_click()
 		if ((m_game->get_dialog_box_manager().is_enabled(DialogBoxId::NpcTalk) == false) && (mouse_x > sX + 125) && (mouse_x < sX + 180) && (mouse_y > sY + 55) && (mouse_y < sY + 70)) {
 			switch (m_action_type) {
 			case 21:
-				send_command(MsgId::CommandCommon, CommonType::TalkToNpc, 0, 21, 0, 0, 0);
+				{
+					auto pkt = hb::net::make_common_command(CommonType::TalkToNpc, player().m_player_x, player().m_player_y);
+					pkt.v1 = 21;
+					send_game_packet(pkt);
+				}
 				add_event_list(TALKING_TO_GUARD, 10);
 				break;
 			case 32:
-				send_command(MsgId::CommandCommon, CommonType::TalkToNpc, 0, 32, 0, 0, 0);
+				{
+					auto pkt = hb::net::make_common_command(CommonType::TalkToNpc, player().m_player_x, player().m_player_y);
+					pkt.v1 = 32;
+					send_game_packet(pkt);
+				}
 				add_event_list(TALKING_TO_UNICORN, 10);
 				break;
 			case 67:
-				send_command(MsgId::CommandCommon, CommonType::TalkToNpc, 0, 67, 0, 0, 0);
+				{
+					auto pkt = hb::net::make_common_command(CommonType::TalkToNpc, player().m_player_x, player().m_player_y);
+					pkt.v1 = 67;
+					send_game_packet(pkt);
+				}
 				add_event_list(TALKING_TO_MCGAFFIN, 10);
 				break;
 			case 68:
-				send_command(MsgId::CommandCommon, CommonType::TalkToNpc, 0, 68, 0, 0, 0);
+				{
+					auto pkt = hb::net::make_common_command(CommonType::TalkToNpc, player().m_player_x, player().m_player_y);
+					pkt.v1 = 68;
+					send_game_packet(pkt);
+				}
 				add_event_list(TALKING_TO_PERRY, 10);
 				break;
 			case 69:
-				send_command(MsgId::CommandCommon, CommonType::TalkToNpc, 0, 69, 0, 0, 0);
+				{
+					auto pkt = hb::net::make_common_command(CommonType::TalkToNpc, player().m_player_x, player().m_player_y);
+					pkt.v1 = 69;
+					send_game_packet(pkt);
+				}
 				add_event_list(TALKING_TO_DEVLIN, 10);
 				break;
 			}
@@ -366,31 +454,55 @@ bool DialogBox_NpcActionQuery::on_click()
 		if ((m_game->get_dialog_box_manager().is_enabled(DialogBoxId::NpcTalk) == false) && (mouse_x > sX + 155) && (mouse_x < sX + 210) && (mouse_y > sY + 55) && (mouse_y < sY + 70)) {
 			switch (m_item_index) {
 			case 7:
-				send_command(MsgId::CommandCommon, CommonType::TalkToNpc, 0, 1, 0, 0, 0);
+				{
+					auto pkt = hb::net::make_common_command(CommonType::TalkToNpc, player().m_player_x, player().m_player_y);
+					pkt.v1 = 1;
+					send_game_packet(pkt);
+				}
 				add_event_list(TALKING_TO_GUILDHALL_OFFICER, 10);
 				break;
 			case 11:
 				switch (m_owner_type) {
 				case 1:
-					send_command(MsgId::CommandCommon, CommonType::TalkToNpc, 0, 2, 0, 0, 0);
+					{
+						auto pkt = hb::net::make_common_command(CommonType::TalkToNpc, player().m_player_x, player().m_player_y);
+						pkt.v1 = 2;
+						send_game_packet(pkt);
+					}
 					add_event_list(TALKING_TO_SHOP_KEEPER, 10);
 					break;
 				case 2:
-					send_command(MsgId::CommandCommon, CommonType::TalkToNpc, 0, 3, 0, 0, 0);
+					{
+						auto pkt = hb::net::make_common_command(CommonType::TalkToNpc, player().m_player_x, player().m_player_y);
+						pkt.v1 = 3;
+						send_game_packet(pkt);
+					}
 					add_event_list(TALKING_TO_BLACKSMITH_KEEPER, 10);
 					break;
 				}
 				break;
 			case 13:
-				send_command(MsgId::CommandCommon, CommonType::TalkToNpc, 0, 4, 0, 0, 0);
+				{
+					auto pkt = hb::net::make_common_command(CommonType::TalkToNpc, player().m_player_x, player().m_player_y);
+					pkt.v1 = 4;
+					send_game_packet(pkt);
+				}
 				add_event_list(TALKING_TO_CITYHALL_OFFICER, 10);
 				break;
 			case 14:
-				send_command(MsgId::CommandCommon, CommonType::TalkToNpc, 0, 5, 0, 0, 0);
+				{
+					auto pkt = hb::net::make_common_command(CommonType::TalkToNpc, player().m_player_x, player().m_player_y);
+					pkt.v1 = 5;
+					send_game_packet(pkt);
+				}
 				add_event_list(TALKING_TO_WAREHOUSE_KEEPER, 10);
 				break;
 			case 16:
-				send_command(MsgId::CommandCommon, CommonType::TalkToNpc, 0, 6, 0, 0, 0);
+				{
+					auto pkt = hb::net::make_common_command(CommonType::TalkToNpc, player().m_player_x, player().m_player_y);
+					pkt.v1 = 6;
+					send_game_packet(pkt);
+				}
 				add_event_list(TALKING_TO_MAGICIAN, 10);
 				break;
 			}
@@ -400,7 +512,7 @@ bool DialogBox_NpcActionQuery::on_click()
 		// Repair All
 		if ((mouse_x > sX + 155) && (mouse_x < sX + 210) && (mouse_y > sY + 22) && (mouse_y < sY + 37)) {
 			if (m_action_type == 24) {
-				send_command(MsgId::CommandCommon, CommonType::ReqRepairAll, 0, 0, 0, 0, 0, 0);
+				send_game_packet(hb::net::make_common_command(CommonType::ReqRepairAll, player().m_player_x, player().m_player_y));
 				disable_this_dialog();
 				return true;
 			}

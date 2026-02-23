@@ -1,5 +1,7 @@
 #include "DialogBox_Skill.h"
 #include "Game.h"
+#include "PacketSendHelpers.h"
+
 #include "IInput.h"
 #include "Misc.h"
 #include "lan_eng.h"
@@ -159,7 +161,11 @@ bool DialogBox_Skill::on_click()
 						switch (m_game->m_skill_cfg_list[i + m_scroll_position]->m_use_method) {
 						case 0:
 						case 2:
-							send_command(MsgId::CommandCommon, CommonType::ReqUseSkill, 0, (i + m_scroll_position), 0, 0, 0);
+							{
+								auto pkt = hb::net::make_common_command(CommonType::ReqUseSkill, player().m_player_x, player().m_player_y);
+								pkt.v1 = (i + m_scroll_position);
+								send_game_packet(pkt);
+							}
 							m_game->m_skill_using_status = true;
 							disable_this_dialog();
 							play_sound_effect('E', 14, 5);
@@ -171,7 +177,11 @@ bool DialogBox_Skill::on_click()
 				{
 					if (m_is_down_skill_pending == false)
 					{
-						send_command(MsgId::CommandCommon, CommonType::ReqSetDownSkillIndex, 0, i + m_scroll_position, 0, 0, 0);
+						{
+							auto pkt = hb::net::make_common_command(CommonType::ReqSetDownSkillIndex, player().m_player_x, player().m_player_y);
+							pkt.v1 = i + m_scroll_position;
+							send_game_packet(pkt);
+						}
 						play_sound_effect('E', 14, 5);
 						m_is_down_skill_pending = true;
 						return true;

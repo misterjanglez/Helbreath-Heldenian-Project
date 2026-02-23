@@ -9,6 +9,8 @@
 #include "performance_monitor.h"
 #include "lan_eng.h"
 #include "Packet/SharedPackets.h"
+#include "PacketSendHelpers.h"
+
 #include "SharedCalculations.h"
 #include "Log.h"
 #include "ClientLogChannels.h"
@@ -212,7 +214,6 @@ CGame::CGame(hb::shared::types::NativeInstance native_instance, int icon_resourc
 
 	// initialize Managers (Networking v4) - using make_unique
 	m_effect_manager = std::make_unique<effect_manager>(this);
-	m_network_message_manager = std::make_unique<NetworkMessageManager>(this);
 	m_fishing_manager.set_game(this);
 	m_crafting_manager.set_game(this);
 	m_quest_manager.set_game(this);
@@ -766,583 +767,65 @@ void CGame::on_game_socket_event()
 }
 
 
-bool CGame::send_command(uint32_t message_id, uint16_t command, char direction, int value1, int value2, int value3, const char* text, int value4)
+bool CGame::check_send_result(int result)
 {
-	int result = 0;
-
-	if ((m_g_sock == 0) && (m_l_sock == 0)) return false;
-	uint32_t current_time = GameClock::get_time_ms();
-	uint8_t key = static_cast<uint8_t>(rand() % 255) + 1;
-
-	switch (message_id) {
-
-	case MsgId::RequestAngel:	// to Game Server
-	{
-		hb::net::PacketRequestAngel req{};
-		req.header.msg_id = message_id;
-		req.header.msg_type = 0;
-		if (text != nullptr) {
-			std::size_t name_len = std::strlen(text);
-			if (name_len >= sizeof(req.name)) name_len = sizeof(req.name) - 1;
-			std::memcpy(req.name, text, name_len);
-		}
-		req.angel_id = value1;
-		result = m_g_sock->send_msg(reinterpret_cast<char*>(&req), sizeof(req), key);
-	}
-	break;
-
-	case MsgId::RequestResurrectYes: // By snoopy
-	case MsgId::RequestResurrectNo:  // By snoopy
-	{
-		hb::net::PacketRequestHeaderOnly req{};
-		req.header.msg_id = message_id;
-		req.header.msg_type = 0;
-		result = m_g_sock->send_msg(reinterpret_cast<char*>(&req), sizeof(req), key);
-	}
-	break;
-
-	case MsgId::RequestHeldenianScroll:// By snoopy
-	{
-		hb::net::PacketRequestHeldenianScroll req{};
-		req.header.msg_id = message_id;
-		req.header.msg_type = 0;
-		if (text != nullptr) {
-			std::size_t name_len = std::strlen(text);
-			if (name_len >= sizeof(req.name)) name_len = sizeof(req.name) - 1;
-			std::memcpy(req.name, text, name_len);
-		}
-		req.item_id = command;
-		result = m_g_sock->send_msg(reinterpret_cast<char*>(&req), sizeof(req), key);
-	}
-	break;
-
-	case ClientMsgId::RequestTeleportList:
-	{
-		hb::net::PacketRequestName20 req{};
-		req.header.msg_id = message_id;
-		req.header.msg_type = 0;
-		std::snprintf(req.name, sizeof(req.name), "%s", "William");
-		result = m_g_sock->send_msg(reinterpret_cast<char*>(&req), sizeof(req), key);
-	}
-	break;
-
-	case ClientMsgId::RequestHeldenianTpList: // Snoopy: Heldenian TP
-	{
-		hb::net::PacketRequestName20 req{};
-		req.header.msg_id = message_id;
-		req.header.msg_type = 0;
-		std::snprintf(req.name, sizeof(req.name), "%s", "Gail");
-		result = m_g_sock->send_msg(reinterpret_cast<char*>(&req), sizeof(req), key);
-	}
-	break;
-
-	case ClientMsgId::RequestHeldenianTp: // Snoopy: Heldenian TP
-	case ClientMsgId::RequestChargedTeleport:
-	{
-		hb::net::PacketRequestTeleportId req{};
-		req.header.msg_id = message_id;
-		req.header.msg_type = 0;
-		req.teleport_id = value1;
-		result = m_g_sock->send_msg(reinterpret_cast<char*>(&req), sizeof(req), key);
-	}
-	break;
-
-	case MsgId::RequestSellItemList:
-	{
-		hb::net::PacketRequestSellItemList req{};
-		req.header.msg_id = message_id;
-		req.header.msg_type = 0;
-		{
-			auto* sellDlg = get_dialog_box_manager().get_dialog_as<DialogBox_SellList>(DialogBoxId::SellList);
-			for (int i = 0; i < game_limits::max_sell_list; i++) {
-				req.entries[i].index = static_cast<uint8_t>(sellDlg->get_entry(i).index);
-				req.entries[i].amount = sellDlg->get_entry(i).amount;
-			}
-		}
-		result = m_g_sock->send_msg(reinterpret_cast<char*>(&req), sizeof(req), key);
-	}
-	break;
-
-	case MsgId::RequestRestart:
-	{
-		hb::net::PacketRequestHeaderOnly req{};
-		req.header.msg_id = message_id;
-		req.header.msg_type = 0;
-		result = m_g_sock->send_msg(reinterpret_cast<char*>(&req), sizeof(req), key);
-	}
-	break;
-
-	case MsgId::RequestPanning:
-	{
-		hb::net::PacketRequestPanning req{};
-		req.header.msg_id = message_id;
-		req.header.msg_type = 0;
-		req.dir = static_cast<uint8_t>(direction);
-		result = m_g_sock->send_msg(reinterpret_cast<char*>(&req), sizeof(req), key);
-	}
-	break;
-
-
-	case ClientMsgId::GetMinimumLoadGateway:
-	case MsgId::request_login:
-		// to Log Server
-	{
-		hb::net::LoginRequest req{};
-		req.header.msg_id = message_id;
-		req.header.msg_type = 0;
-		std::snprintf(req.account_name, sizeof(req.account_name), "%s", m_account_name.c_str());
-		std::snprintf(req.password, sizeof(req.password), "%s", m_account_password.c_str());
-		std::snprintf(req.world_name, sizeof(req.world_name), "%s", m_world_server_name.c_str());
-		req.version_major = hb::version::compatibility::major;
-		req.version_minor = hb::version::compatibility::minor;
-		req.version_patch = hb::version::compatibility::patch;
-		result = m_l_sock->send_msg(reinterpret_cast<char*>(&req), sizeof(req), key);
-	}
-
-	break;
-
-	case MsgId::RequestCreateNewCharacter:
-		// to Log Server
-	{
-		hb::net::CreateCharacterRequest req{};
-		req.header.msg_id = message_id;
-		req.header.msg_type = 0;
-		std::snprintf(req.character_name, sizeof(req.character_name), "%s", m_new_char.player_name.c_str());
-		std::snprintf(req.account_name, sizeof(req.account_name), "%s", m_account_name.c_str());
-		std::snprintf(req.password, sizeof(req.password), "%s", m_account_password.c_str());
-		std::snprintf(req.world_name, sizeof(req.world_name), "%s", m_world_server_name.c_str());
-		req.gender = static_cast<uint8_t>(m_new_char.gender);
-		req.skin = static_cast<uint8_t>(m_new_char.skin_col);
-		req.hairstyle = static_cast<uint8_t>(m_new_char.hair_style);
-		req.haircolor = static_cast<uint8_t>(m_new_char.hair_col);
-		req.underware = static_cast<uint8_t>(m_new_char.under_col);
-		req.str = static_cast<uint8_t>(m_new_char.stat_str);
-		req.vit = static_cast<uint8_t>(m_new_char.stat_vit);
-		req.dex = static_cast<uint8_t>(m_new_char.stat_dex);
-		req.intl = static_cast<uint8_t>(m_new_char.stat_int);
-		req.mag = static_cast<uint8_t>(m_new_char.stat_mag);
-		req.chr = static_cast<uint8_t>(m_new_char.stat_chr);
-		result = m_l_sock->send_msg(reinterpret_cast<char*>(&req), sizeof(req), key);
-	}
-	break;
-
-	case MsgId::request_enter_game:
-		// to Log Server
-	{
-		hb::net::EnterGameRequestFull req{};
-		req.header.msg_id = message_id;
-		req.header.msg_type = static_cast<uint16_t>(m_enter_game_type);
-		std::snprintf(req.character_name, sizeof(req.character_name), "%s", m_selected_char_name.c_str());
-		std::snprintf(req.map_name, sizeof(req.map_name), "%s", m_map_name.c_str());
-		std::snprintf(req.account_name, sizeof(req.account_name), "%s", m_account_name.c_str());
-		std::snprintf(req.password, sizeof(req.password), "%s", m_account_password.c_str());
-		req.level = m_selected_char_level;
-		std::snprintf(req.world_name, sizeof(req.world_name), "%s", m_world_server_name.c_str());
-		req.version_major = hb::version::compatibility::major;
-		req.version_minor = hb::version::compatibility::minor;
-		req.version_patch = hb::version::compatibility::patch;
-		result = m_l_sock->send_msg(reinterpret_cast<char*>(&req), sizeof(req), key);
-	}
-	break;
-
-	case MsgId::RequestDeleteCharacter:
-		// to Log Server
-	{
-		hb::net::DeleteCharacterRequest req{};
-		req.header.msg_id = message_id;
-		req.header.msg_type = static_cast<uint16_t>(m_enter_game_type);
-		std::snprintf(req.character_name, sizeof(req.character_name), "%s", m_char_list[m_enter_game_type - 1]->m_name.c_str());
-		std::snprintf(req.account_name, sizeof(req.account_name), "%s", m_account_name.c_str());
-		std::snprintf(req.password, sizeof(req.password), "%s", m_account_password.c_str());
-		std::snprintf(req.world_name, sizeof(req.world_name), "%s", m_world_server_name.c_str());
-		result = m_l_sock->send_msg(reinterpret_cast<char*>(&req), sizeof(req), key);
-	}
-	break;
-
-	case MsgId::RequestSetItemPos:
-		// to Game Server
-	{
-		hb::net::PacketRequestSetItemPos req{};
-		req.header.msg_id = message_id;
-		req.header.msg_type = 0;
-		req.dir = static_cast<uint8_t>(direction);
-		req.x = static_cast<int16_t>(value1);
-		req.y = static_cast<int16_t>(value2);
-		result = m_g_sock->send_msg(reinterpret_cast<char*>(&req), sizeof(req));
-	}
-	break;
-
-	case MsgId::CommandCheckConnection:
-	{
-		hb::net::PacketCommandCheckConnection req{};
-		req.header.msg_id = message_id;
-		req.header.msg_type = 0;
-		req.time_ms = current_time;
-		req.client_major = static_cast<uint8_t>(hb::version::client::major);
-		req.client_minor = static_cast<uint8_t>(hb::version::client::minor);
-		req.client_patch = static_cast<uint8_t>(hb::version::client::patch);
-		req.client_build = static_cast<uint16_t>(hb::version::client::build_number);
-		result = m_g_sock->send_msg(reinterpret_cast<char*>(&req), sizeof(req), key);
-	}
-
-	break;
-
-	case MsgId::RequestInitData:
-	{
-		hb::net::PacketRequestInitDataEx req{};
-		req.header.msg_id = message_id;
-		req.header.msg_type = 0;
-		std::snprintf(req.player, sizeof(req.player), "%s", m_selected_char_name.c_str());
-		std::snprintf(req.account, sizeof(req.account), "%s", m_account_name.c_str());
-		std::snprintf(req.password, sizeof(req.password), "%s", m_account_password.c_str());
-		req.is_observer = static_cast<uint8_t>(m_is_observer_mode);
-		std::snprintf(req.server, sizeof(req.server), "%s", m_game_server_name.c_str());
-		req.padding = 0;
-		std::snprintf(req.itemConfigHash, sizeof(req.itemConfigHash), "%s",
-			LocalCacheManager::get().get_hash(ConfigCacheType::Items).c_str());
-		std::snprintf(req.magicConfigHash, sizeof(req.magicConfigHash), "%s",
-			LocalCacheManager::get().get_hash(ConfigCacheType::Magic).c_str());
-		std::snprintf(req.skillConfigHash, sizeof(req.skillConfigHash), "%s",
-			LocalCacheManager::get().get_hash(ConfigCacheType::Skills).c_str());
-		std::snprintf(req.npcConfigHash, sizeof(req.npcConfigHash), "%s",
-			LocalCacheManager::get().get_hash(ConfigCacheType::Npcs).c_str());
-		std::snprintf(req.mapConfigHash, sizeof(req.mapConfigHash), "%s",
-			LocalCacheManager::get().get_hash(ConfigCacheType::Maps).c_str());
-		result = m_g_sock->send_msg(reinterpret_cast<char*>(&req), sizeof(req), key);
-	}
-	break;
-
-	case MsgId::RequestInitPlayer:
-	{
-		hb::net::PacketRequestInitPlayer req{};
-		req.header.msg_id = message_id;
-		req.header.msg_type = 0;
-		std::snprintf(req.player, sizeof(req.player), "%s", m_selected_char_name.c_str());
-		std::snprintf(req.account, sizeof(req.account), "%s", m_account_name.c_str());
-		std::snprintf(req.password, sizeof(req.password), "%s", m_account_password.c_str());
-		req.is_observer = static_cast<uint8_t>(m_is_observer_mode);
-		std::snprintf(req.server, sizeof(req.server), "%s", m_game_server_name.c_str());
-		req.padding = 0;
-		result = m_g_sock->send_msg(reinterpret_cast<char*>(&req), sizeof(req), key);
-	}
-	break;
-	case MsgId::LevelUpSettings:
-	{
-		hb::net::PacketRequestLevelUpSettings req{};
-		req.header.msg_id = message_id;
-		req.header.msg_type = 0;
-		req.str = m_player->m_lu_str;
-		req.vit = m_player->m_lu_vit;
-		req.dex = m_player->m_lu_dex;
-		req.intel = m_player->m_lu_int;
-		req.mag = m_player->m_lu_mag;
-		req.chr = m_player->m_lu_char;
-		result = m_g_sock->send_msg(reinterpret_cast<char*>(&req), sizeof(req), key);
-	}
-	break;
-
-	case MsgId::CommandChatMsg:
-		if (teleport_manager::get().is_requested()) return false;
-		if (text == 0) return false;
-
-		// to Game Server
-		{
-			hb::net::PacketCommandChatMsgHeader req{};
-			req.header.msg_id = message_id;
-			req.header.msg_type = 0;
-			req.x = m_player->m_player_x;
-			req.y = m_player->m_player_y;
-			std::snprintf(req.name, sizeof(req.name), "%s", m_player->m_player_name.c_str());
-			req.chat_type = static_cast<uint8_t>(value1);
-			if (check_local_chat_command(text) == true) return false;
-			std::size_t text_len = std::strlen(text);
-			char message[300]{};
-			std::memset(message, 0, sizeof(message));
-			std::memcpy(message, &req, sizeof(req));
-			std::memcpy(message + sizeof(req), text, text_len + 1);
-			result = m_g_sock->send_msg(message, static_cast<int>(sizeof(req) + text_len + 1));
-		}
-		break;
-
-	case MsgId::CommandCommon:
-		if (teleport_manager::get().is_requested()) return false;
-		switch (command) {
-		case CommonType::BuildItem:
-		{
-			hb::net::PacketCommandCommonBuild req{};
-			req.base.header.msg_id = message_id;
-			req.base.header.msg_type = command;
-			req.base.x = m_player->m_player_x;
-			req.base.y = m_player->m_player_y;
-			req.base.dir = static_cast<uint8_t>(direction);
-			if (text != 0) {
-				std::size_t name_len = std::strlen(text);
-				if (name_len > sizeof(req.name)) name_len = sizeof(req.name);
-				std::memcpy(req.name, text, name_len);
-			}
-			req.item_ids[0] = static_cast<uint8_t>(get_dialog_box_manager().get_dialog_as<DialogBox_Manufacture>(DialogBoxId::Manufacture)->m_slot_1);
-			req.item_ids[1] = static_cast<uint8_t>(get_dialog_box_manager().get_dialog_as<DialogBox_Manufacture>(DialogBoxId::Manufacture)->m_slot_2);
-			req.item_ids[2] = static_cast<uint8_t>(get_dialog_box_manager().get_dialog_as<DialogBox_Manufacture>(DialogBoxId::Manufacture)->m_slot_3);
-			req.item_ids[3] = static_cast<uint8_t>(get_dialog_box_manager().get_dialog_as<DialogBox_Manufacture>(DialogBoxId::Manufacture)->m_slot_4);
-			req.item_ids[4] = static_cast<uint8_t>(get_dialog_box_manager().get_dialog_as<DialogBox_Manufacture>(DialogBoxId::Manufacture)->m_slot_5);
-			req.item_ids[5] = static_cast<uint8_t>(get_dialog_box_manager().get_dialog_as<DialogBox_Manufacture>(DialogBoxId::Manufacture)->m_slot_6);
-			result = m_g_sock->send_msg(reinterpret_cast<char*>(&req), sizeof(req));
-		}
-		break;
-
-		case CommonType::ReqCreatePortion:
-		{
-			hb::net::PacketCommandCommonItems req{};
-			req.base.header.msg_id = message_id;
-			req.base.header.msg_type = command;
-			req.base.x = m_player->m_player_x;
-			req.base.y = m_player->m_player_y;
-			req.base.dir = static_cast<uint8_t>(direction);
-			req.item_ids[0] = static_cast<uint8_t>(get_dialog_box_manager().get_dialog_as<DialogBox_Manufacture>(DialogBoxId::Manufacture)->m_slot_1);
-			req.item_ids[1] = static_cast<uint8_t>(get_dialog_box_manager().get_dialog_as<DialogBox_Manufacture>(DialogBoxId::Manufacture)->m_slot_2);
-			req.item_ids[2] = static_cast<uint8_t>(get_dialog_box_manager().get_dialog_as<DialogBox_Manufacture>(DialogBoxId::Manufacture)->m_slot_3);
-			req.item_ids[3] = static_cast<uint8_t>(get_dialog_box_manager().get_dialog_as<DialogBox_Manufacture>(DialogBoxId::Manufacture)->m_slot_4);
-			req.item_ids[4] = static_cast<uint8_t>(get_dialog_box_manager().get_dialog_as<DialogBox_Manufacture>(DialogBoxId::Manufacture)->m_slot_5);
-			req.item_ids[5] = static_cast<uint8_t>(get_dialog_box_manager().get_dialog_as<DialogBox_Manufacture>(DialogBoxId::Manufacture)->m_slot_6);
-			req.padding = 0;
-			result = m_g_sock->send_msg(reinterpret_cast<char*>(&req), sizeof(req));
-		}
-		break;
-
-		//Crafting
-		case CommonType::CraftItem:
-		{
-			hb::net::PacketCommandCommonBuild req{};
-			req.base.header.msg_id = message_id;
-			req.base.header.msg_type = command;
-			req.base.x = m_player->m_player_x;
-			req.base.y = m_player->m_player_y;
-			req.base.dir = static_cast<uint8_t>(direction);
-			std::memset(req.name, ' ', sizeof(req.name));
-			req.item_ids[0] = static_cast<uint8_t>(get_dialog_box_manager().get_dialog_as<DialogBox_Manufacture>(DialogBoxId::Manufacture)->m_slot_1);
-			req.item_ids[1] = static_cast<uint8_t>(get_dialog_box_manager().get_dialog_as<DialogBox_Manufacture>(DialogBoxId::Manufacture)->m_slot_2);
-			req.item_ids[2] = static_cast<uint8_t>(get_dialog_box_manager().get_dialog_as<DialogBox_Manufacture>(DialogBoxId::Manufacture)->m_slot_3);
-			req.item_ids[3] = static_cast<uint8_t>(get_dialog_box_manager().get_dialog_as<DialogBox_Manufacture>(DialogBoxId::Manufacture)->m_slot_4);
-			req.item_ids[4] = static_cast<uint8_t>(get_dialog_box_manager().get_dialog_as<DialogBox_Manufacture>(DialogBoxId::Manufacture)->m_slot_5);
-			req.item_ids[5] = static_cast<uint8_t>(get_dialog_box_manager().get_dialog_as<DialogBox_Manufacture>(DialogBoxId::Manufacture)->m_slot_6);
-			result = m_g_sock->send_msg(reinterpret_cast<char*>(&req), sizeof(req));
-		}
-		break;
-
-		// Create Slate Request - Diuuude
-		case CommonType::ReqCreateSlate:
-		{
-			hb::net::PacketCommandCommonItems req{};
-			req.base.header.msg_id = message_id;
-			req.base.header.msg_type = command;
-			req.base.x = m_player->m_player_x;
-			req.base.y = m_player->m_player_y;
-			req.base.dir = static_cast<uint8_t>(direction);
-			auto* slates = get_dialog_box_manager().get_dialog_as<DialogBox_Slates>(DialogBoxId::Slates);
-			req.item_ids[0] = static_cast<uint8_t>(slates->m_slot_ul);
-			req.item_ids[1] = static_cast<uint8_t>(slates->m_slot_ll);
-			req.item_ids[2] = static_cast<uint8_t>(slates->m_slot_ur);
-			req.item_ids[3] = static_cast<uint8_t>(slates->m_slot_lr);
-			req.item_ids[4] = static_cast<uint8_t>(slates->m_slot_extra1);
-			req.item_ids[5] = static_cast<uint8_t>(slates->m_slot_extra2);
-			req.padding = 0;
-			result = m_g_sock->send_msg(reinterpret_cast<char*>(&req), sizeof(req));
-		}
-		break;
-
-		// Magic spell casting - uses time_ms field to carry target object ID for auto-aim
-		case CommonType::Magic:
-		{
-			hb::net::PacketCommandCommonWithTime req{};
-			req.base.header.msg_id = message_id;
-			req.base.header.msg_type = command;
-			req.base.x = m_player->m_player_x;
-			req.base.y = m_player->m_player_y;
-			req.base.dir = static_cast<uint8_t>(direction);
-			req.v1 = value1;  // target X
-			req.v2 = value2;  // target Y
-			req.v3 = value3;  // magic type (100-199)
-			req.time_ms = static_cast<uint32_t>(value4);  // target object ID (0 = tile-based, >0 = entity tracking)
-			result = m_g_sock->send_msg(reinterpret_cast<char*>(&req), sizeof(req));
-		}
-		break;
-
-		default:
-			if (text == 0)
-			{
-				hb::net::PacketCommandCommonWithTime req{};
-				req.base.header.msg_id = message_id;
-				req.base.header.msg_type = command;
-				req.base.x = m_player->m_player_x;
-				req.base.y = m_player->m_player_y;
-				req.base.dir = static_cast<uint8_t>(direction);
-				req.v1 = value1;
-				req.v2 = value2;
-				req.v3 = value3;
-				req.time_ms = current_time;
-				result = m_g_sock->send_msg(reinterpret_cast<char*>(&req), sizeof(req));
-			}
-			else
-			{
-				hb::net::PacketCommandCommonWithString req{};
-				req.base.header.msg_id = message_id;
-				req.base.header.msg_type = command;
-				req.base.x = m_player->m_player_x;
-				req.base.y = m_player->m_player_y;
-				req.base.dir = static_cast<uint8_t>(direction);
-				req.v1 = value1;
-				req.v2 = value2;
-				req.v3 = value3;
-				std::memset(req.text, 0, sizeof(req.text));
-				std::size_t text_len = std::strlen(text);
-				if (text_len > sizeof(req.text)) text_len = sizeof(req.text);
-				std::memcpy(req.text, text, text_len);
-				req.v4 = value4;
-				result = m_g_sock->send_msg(reinterpret_cast<char*>(&req), sizeof(req));
-			}
-			break;
-		}
-
-		break;
-
-	case MsgId::request_create_new_guild:
-	case MsgId::request_disband_guild:
-		// to Game Server
-	{
-		hb::net::PacketRequestGuildAction req{};
-		req.header.msg_id = message_id;
-		req.header.msg_type = MsgType::Confirm;
-		std::snprintf(req.player, sizeof(req.player), "%s", m_player->m_player_name.c_str());
-		std::snprintf(req.account, sizeof(req.account), "%s", m_account_name.c_str());
-		std::snprintf(req.password, sizeof(req.password), "%s", m_account_password.c_str());
-		std::snprintf(req.guild, sizeof(req.guild), "%s", m_player->m_guild_name.c_str());
-		CMisc::replace_string(req.guild, ' ', '_');
-		result = m_g_sock->send_msg(reinterpret_cast<char*>(&req), sizeof(req), key);
-	}
-	break;
-
-	case MsgId::RequestTeleport:
-	{
-		hb::net::PacketRequestHeaderOnly req{};
-		req.header.msg_id = message_id;
-		req.header.msg_type = MsgType::Confirm;
-		result = m_g_sock->send_msg(reinterpret_cast<char*>(&req), sizeof(req));
-	}
-
-	teleport_manager::get().set_requested(true);
-	break;
-
-	case MsgId::RequestTeleportAuth:
-	{
-		hb::net::PacketRequestHeaderOnly req{};
-		req.header.msg_id = message_id;
-		req.header.msg_type = 0;
-		result = m_g_sock->send_msg(reinterpret_cast<char*>(&req), sizeof(req));
-	}
-	break;
-
-	case MsgId::RequestCivilRight:
-	{
-		hb::net::PacketRequestHeaderOnly req{};
-		req.header.msg_id = message_id;
-		req.header.msg_type = MsgType::Confirm;
-		result = m_g_sock->send_msg(reinterpret_cast<char*>(&req), sizeof(req));
-	}
-	break;
-
-	case MsgId::RequestRetrieveItem:
-	{
-		hb::net::PacketRequestRetrieveItem req{};
-		req.header.msg_id = message_id;
-		req.header.msg_type = MsgType::Confirm;
-		req.item_slot = static_cast<uint8_t>(value1);
-		result = m_g_sock->send_msg(reinterpret_cast<char*>(&req), sizeof(req));
-	}
-	break;
-
-	case MsgId::RequestNoticement:
-	{
-		hb::net::PacketRequestNoticement req{};
-		req.header.msg_id = message_id;
-		req.header.msg_type = 0;
-		req.value = value1;
-		result = m_g_sock->send_msg(reinterpret_cast<char*>(&req), sizeof(req), key);
-	}
-	break;
-
-	case  MsgId::RequestFightZoneReserve:
-	{
-		hb::net::PacketRequestFightzoneReserve req{};
-		req.header.msg_id = message_id;
-		req.header.msg_type = 0;
-		req.fightzone = value1;
-		result = m_g_sock->send_msg(reinterpret_cast<char*>(&req), sizeof(req));
-	}
-	break;
-
-	case MsgId::StateChangePoint:
-	{
-		hb::net::PacketRequestStateChange req{};
-		req.header.msg_id = message_id;
-		req.header.msg_type = 0;
-		req.str = static_cast<int16_t>(-m_player->m_lu_str);
-		req.vit = static_cast<int16_t>(-m_player->m_lu_vit);
-		req.dex = static_cast<int16_t>(-m_player->m_lu_dex);
-		req.intel = static_cast<int16_t>(-m_player->m_lu_int);
-		req.mag = static_cast<int16_t>(-m_player->m_lu_mag);
-		req.chr = static_cast<int16_t>(-m_player->m_lu_char);
-		result = m_g_sock->send_msg(reinterpret_cast<char*>(&req), sizeof(req));
-	}
-	break;
-
-	default:
-		if (teleport_manager::get().is_requested()) return false;
-		if ((command == Type::Attack) || (command == Type::AttackMove))
-		{
-			hb::net::PacketCommandMotionAttack req{};
-			req.base.header.msg_id = message_id;
-			req.base.header.msg_type = command;
-			req.base.x = m_player->m_player_x;
-			req.base.y = m_player->m_player_y;
-			req.base.dir = static_cast<uint8_t>(direction);
-			req.base.dx = static_cast<int16_t>(value1);
-			req.base.dy = static_cast<int16_t>(value2);
-			req.base.type = static_cast<int16_t>(value3);
-			req.target_id = static_cast<uint16_t>(value4);
-			req.time_ms = current_time;
-			result = m_g_sock->send_msg(reinterpret_cast<char*>(&req), sizeof(req));
-		}
-		else
-		{
-			hb::net::PacketCommandMotionSimple req{};
-			req.base.header.msg_id = message_id;
-			req.base.header.msg_type = command;
-			req.base.x = m_player->m_player_x;
-			req.base.y = m_player->m_player_y;
-			req.base.dir = static_cast<uint8_t>(direction);
-			req.base.dx = static_cast<int16_t>(value1);
-			req.base.dy = static_cast<int16_t>(value2);
-			req.base.type = static_cast<int16_t>(value3);
-			req.time_ms = current_time;
-			result = m_g_sock->send_msg(reinterpret_cast<char*>(&req), sizeof(req)); //v2.171
-		}
-		m_player->m_Controller.increment_command_count();
-		break;
-	}
 	switch (result) {
 	case sock::Event::SocketClosed:
 	case sock::Event::SocketError:
 	case sock::Event::QueueFull:
 		change_game_mode(GameMode::ConnectionLost);
 		m_g_sock.reset();
-		break;
+		return false;
 
 	case sock::Event::CriticalError:
 		m_g_sock.reset();
 		hb::shared::render::Window::close();
-		break;
+		return false;
 	}
 	return true;
+}
+
+bool CGame::send_game_packet_impl(const hb::net::packet_base& pkt, size_t size, bool encrypt)
+{
+	if (!m_g_sock) return false;
+	uint8_t key = encrypt ? (static_cast<uint8_t>(rand() % 255) + 1) : 0;
+	int result = m_g_sock->send_msg(const_cast<char*>(reinterpret_cast<const char*>(&pkt)), static_cast<uint32_t>(size), key);
+	return check_send_result(result);
+}
+
+bool CGame::send_game_packet_raw(const char* data, uint32_t size, bool encrypt)
+{
+	if (!m_g_sock) return false;
+	uint8_t key = encrypt ? (static_cast<uint8_t>(rand() % 255) + 1) : 0;
+	int result = m_g_sock->send_msg(const_cast<char*>(data), size, key);
+	return check_send_result(result);
+}
+
+bool CGame::send_chat_message(const char* text)
+{
+	if (teleport_manager::get().is_requested()) return false;
+	if (!text) return false;
+	if (check_local_chat_command(text)) return false;
+
+	hb::net::PacketCommandChatMsgHeader req{};
+	req.header.msg_id = MsgId::CommandChatMsg;
+	req.header.msg_type = 0;
+	req.x = m_player->m_player_x;
+	req.y = m_player->m_player_y;
+	std::snprintf(req.name, sizeof(req.name), "%s", m_player->m_player_name.c_str());
+	req.chat_type = 0;
+
+	std::size_t text_len = std::strlen(text);
+	char message[300]{};
+	std::memcpy(message, &req, sizeof(req));
+	std::memcpy(message + sizeof(req), text, text_len + 1);
+	return send_game_packet_raw(message, static_cast<uint32_t>(sizeof(req) + text_len + 1));
+}
+
+void CGame::set_pending_login_packet_impl(const hb::net::packet_base& pkt, size_t size)
+{
+	const char* p = reinterpret_cast<const char*>(&pkt);
+	m_pending_login_packet.assign(p, p + size);
 }
 
 
@@ -1658,6 +1141,11 @@ void CGame::game_recv_msg_handler(uint32_t msg_size, char* data)
 	m_last_net_msg_id = header->msg_id;
 	m_last_net_msg_time = GameClock::get_time_ms();
 	m_last_net_msg_size = msg_size;
+
+	IGameScreen* screen = GameModeManager::get_active_screen();
+	if (screen && screen->on_game_msg(header->msg_id, header->msg_type, data, msg_size))
+		return;
+
 	switch (header->msg_id) {
 	case MSGID_RESPONSE_CONFIGCACHESTATUS:
 	{
@@ -1858,95 +1346,12 @@ void CGame::game_recv_msg_handler(uint32_t msg_size, char* data)
 		m_config_retry[4] = ConfigRetryLevel::None;
 		check_configs_ready_and_enter_game();
 		break;
-	case ClientMsgId::ResponseChargedTeleport:
-		teleport_manager::get().handle_charged_teleport(data);
-		break;
-
-	case ClientMsgId::ResponseTeleportList:
-		teleport_manager::get().handle_teleport_list(data);
-		break;
-
-	case ClientMsgId::ResponseHeldenianTpList: // Snoopy Heldenian TP
-		teleport_manager::get().handle_heldenian_teleport_list(data);
-		break;
-
-	case MsgId::ResponseNoticement:
-		noticement_handler(data);
-		break;
-
-	case MsgId::DynamicObject:
-		dynamic_object_handler(data);
-		break;
-
 	case MsgId::ResponseInitPlayer:
 		init_player_response_handler(data);
 		break;
 
 	case MsgId::ResponseInitData:
 		init_data_response_handler(data);
-		break;
-
-	case MsgId::ResponseMotion:
-		motion_response_handler(data);
-		break;
-
-	case MsgId::EventCommon:
-		common_event_handler(data);
-		break;
-
-	case MsgId::EventMotion:
-		motion_event_handler(data);
-		break;
-
-	case MsgId::EventLog:
-		log_event_handler(data);
-		break;
-
-	case MsgId::CommandChatMsg:
-		chat_msg_handler(data);
-		break;
-
-	case MsgId::PlayerItemListContents:
-		init_item_list(data);
-		break;
-
-	case MsgId::Notify:
-		if (m_network_message_manager) {
-
-			m_network_message_manager->process_message(MsgId::Notify, data, msg_size);
-		}
-		break;
-
-	case MsgId::ResponseCreateNewGuild:
-		create_new_guild_response_handler(data);
-		break;
-
-	case MsgId::ResponseDisbandGuild:
-		disband_guild_response_handler(data);
-		break;
-
-	case MsgId::PlayerCharacterContents:
-		init_player_characteristics(data);
-		break;
-
-	case MsgId::ResponseCivilRight:
-		civil_right_admission_handler(data);
-		break;
-
-	case MsgId::ResponseRetrieveItem:
-		retrieve_item_handler(data);
-		break;
-
-	case MsgId::ResponsePanning:
-		response_panning_handler(data);
-		break;
-
-	case MsgId::ResponseFightZoneReserve:
-		reserve_fightzone_response_handler(data);
-		break;
-
-	case MSGID_RESPONSE_SHOP_CONTENTS:
-		shop_manager::get().handle_response(data);
 		break;
 
 	case MsgId::CommandCheckConnection:
@@ -1971,29 +1376,21 @@ void CGame::connection_establish_handler(char where)
 
 	switch (where) {
 	case static_cast<int>(ServerType::Game):
-		send_command(MsgId::RequestInitPlayer, 0, 0, 0, 0, 0, 0);
+	{
+		hb::net::PacketRequestInitPlayer req{};
+		req.header.msg_id = MsgId::RequestInitPlayer;
+		req.header.msg_type = 0;
+		std::snprintf(req.player, sizeof(req.player), "%s", m_selected_char_name.c_str());
+		std::snprintf(req.account, sizeof(req.account), "%s", m_account_name.c_str());
+		std::snprintf(req.password, sizeof(req.password), "%s", m_account_password.c_str());
+		req.is_observer = static_cast<uint8_t>(m_is_observer_mode);
+		std::snprintf(req.server, sizeof(req.server), "%s", m_game_server_name.c_str());
+		req.padding = 0;
+		send_game_packet(req);
 		break;
+	}
 
 	case static_cast<int>(ServerType::Log):
-		switch (m_connect_mode) {
-		case MsgId::request_login:
-			send_command(MsgId::request_login, 0, 0, 0, 0, 0, 0);
-			break;
-		case MsgId::RequestCreateNewCharacter:
-			send_command(MsgId::RequestCreateNewCharacter, 0, 0, 0, 0, 0, 0);
-			break;
-		case MsgId::request_enter_game:
-			send_command(MsgId::request_enter_game, 0, 0, 0, 0, 0, 0);
-			break;
-		case MsgId::RequestDeleteCharacter:
-			send_command(MsgId::RequestDeleteCharacter, 0, 0, 0, 0, 0, 0);
-			break;
-		case MsgId::RequestInputKeyCode:
-			send_command(MsgId::RequestInputKeyCode, 0, 0, 0, 0, 0, 0);
-			break;
-		}
-
-		// Send any pending packet built directly by a screen/overlay
 		if (!m_pending_login_packet.empty()) {
 			char key = static_cast<char>(rand() % 255) + 1;
 			m_l_sock->send_msg(m_pending_login_packet.data(), static_cast<uint32_t>(m_pending_login_packet.size()), key);
@@ -2010,8 +1407,27 @@ void CGame::init_player_response_handler(char* data)
 	if (!header) return;
 	switch (header->msg_type) {
 	case MsgType::Confirm:
-		send_command(MsgId::RequestInitData, 0, 0, 0, 0, 0, 0);
+	{
+		hb::net::PacketRequestInitDataEx req{};
+		req.header.msg_id = MsgId::RequestInitData;
+		std::snprintf(req.player, sizeof(req.player), "%s", m_selected_char_name.c_str());
+		std::snprintf(req.account, sizeof(req.account), "%s", m_account_name.c_str());
+		std::snprintf(req.password, sizeof(req.password), "%s", m_account_password.c_str());
+		req.is_observer = static_cast<uint8_t>(m_is_observer_mode);
+		std::snprintf(req.server, sizeof(req.server), "%s", m_game_server_name.c_str());
+		std::snprintf(req.itemConfigHash, sizeof(req.itemConfigHash), "%s",
+			LocalCacheManager::get().get_hash(ConfigCacheType::Items).c_str());
+		std::snprintf(req.magicConfigHash, sizeof(req.magicConfigHash), "%s",
+			LocalCacheManager::get().get_hash(ConfigCacheType::Magic).c_str());
+		std::snprintf(req.skillConfigHash, sizeof(req.skillConfigHash), "%s",
+			LocalCacheManager::get().get_hash(ConfigCacheType::Skills).c_str());
+		std::snprintf(req.npcConfigHash, sizeof(req.npcConfigHash), "%s",
+			LocalCacheManager::get().get_hash(ConfigCacheType::Npcs).c_str());
+		std::snprintf(req.mapConfigHash, sizeof(req.mapConfigHash), "%s",
+			LocalCacheManager::get().get_hash(ConfigCacheType::Maps).c_str());
+		send_game_packet(req);
 		change_game_mode(GameMode::WaitingInitData);
+	}
 		break;
 
 	case MsgType::Reject:
@@ -2036,7 +1452,16 @@ void CGame::on_timer()
 		{
 			m_check_connection_time = time;
 			if ((m_g_sock != 0) && (m_g_sock->m_is_available == true))
-				send_command(MsgId::CommandCheckConnection, MsgType::Confirm, 0, 0, 0, 0, 0);
+			{
+				hb::net::PacketCommandCheckConnection pkt{};
+				pkt.header.msg_id = MsgId::CommandCheckConnection;
+				pkt.time_ms = GameClock::get_time_ms();
+				pkt.client_major = static_cast<uint8_t>(hb::version::client::major);
+				pkt.client_minor = static_cast<uint8_t>(hb::version::client::minor);
+				pkt.client_patch = static_cast<uint8_t>(hb::version::client::patch);
+				pkt.client_build = static_cast<uint16_t>(hb::version::client::build_number);
+				send_game_packet(pkt);
+			}
 		}
 	}
 
@@ -2223,22 +1648,7 @@ void CGame::init_game_settings()
 	m_gizon_item_upgrade_left = 0;
 }
 
-void CGame::create_new_guild_response_handler(char* data)
-{
-	const auto* header = hb::net::PacketCast<hb::net::PacketHeader>(
-		data, sizeof(hb::net::PacketHeader));
-	if (!header) return;
-	switch (header->msg_type) {
-	case MsgType::Confirm:
-		m_player->m_guild_rank = 0;
-		get_dialog_box_manager().get_dialog_as<DialogBox_GuildMenu>(DialogBoxId::GuildMenu)->m_mode = DialogBox_GuildMenu::mode::guild_created;
-		break;
-	case MsgType::Reject:
-		m_player->m_guild_rank = -1;
-		get_dialog_box_manager().get_dialog_as<DialogBox_GuildMenu>(DialogBoxId::GuildMenu)->m_mode = DialogBox_GuildMenu::mode::create_failed;
-		break;
-	}
-}
+// create_new_guild_response_handler MOVED to Screen_OnGame.Network.cpp
 
 void CGame::init_player_characteristics(char* data)
 {
@@ -2319,21 +1729,7 @@ void CGame::init_player_characteristics(char* data)
 	m_max_bank_items = pkt->max_bank_items;
 }
 
-void CGame::disband_guild_response_handler(char* data)
-{
-	const auto* header = hb::net::PacketCast<hb::net::PacketHeader>(
-		data, sizeof(hb::net::PacketHeader));
-	if (!header) return;
-	switch (header->msg_type) {
-	case MsgType::Confirm:
-		m_player->m_guild_rank = -1;
-		get_dialog_box_manager().get_dialog_as<DialogBox_GuildMenu>(DialogBoxId::GuildMenu)->m_mode = DialogBox_GuildMenu::mode::disband_success;
-		break;
-	case MsgType::Reject:
-		get_dialog_box_manager().get_dialog_as<DialogBox_GuildMenu>(DialogBoxId::GuildMenu)->m_mode = DialogBox_GuildMenu::mode::disband_failed;
-		break;
-	}
-}
+// disband_guild_response_handler MOVED to Screen_OnGame.Network.cpp
 
 // put_guild_operation_list / shift_guild_operation_list REMOVED — use DialogBox_GuildOperation::put/shift
 
@@ -2638,277 +2034,18 @@ void CGame::on_log_socket_event()
 
 void CGame::log_response_handler(char* packet_data)
 {
-	uint16_t response = 0;
-	char char_name[12]{};
-
 	const auto* header = hb::net::PacketCast<hb::net::PacketHeader>(packet_data, sizeof(hb::net::PacketHeader));
 	if (!header) return;
-	response = header->msg_type;
+	uint16_t response = header->msg_type;
 
-	// Route to the active screen first — if it handles the response, we're done.
+	// Route to the active screen — all log responses are handled by screens
 	IGameScreen* screen = GameModeManager::get_active_screen();
 	if (screen && screen->on_net_response(response, packet_data)) {
+		m_l_sock.reset();
 		return;
 	}
 
-	switch (response) {
-	case LogResMsg::CharacterDeleted:
-	{
-		const auto* list = hb::net::PacketCast<hb::net::PacketLogCharacterListHeader>(
-			packet_data, sizeof(hb::net::PacketLogCharacterListHeader));
-		if (!list) return;
-		m_total_char = std::min(static_cast<int>(list->total_chars), 4);
-		for (int i = 0; i < 4; i++)
-			if (m_char_list[i] != 0)
-			{
-				m_char_list[i].reset();
-			}
-
-		const auto* entries = reinterpret_cast<const hb::net::PacketLogCharacterEntry*>(
-			packet_data + sizeof(hb::net::PacketLogCharacterListHeader));
-		for (int i = 0; i < m_total_char; i++) {
-			const auto& entry = entries[i];
-			m_char_list[i] = std::make_unique<CCharInfo>();
-			m_char_list[i]->m_name.assign(entry.name, strnlen(entry.name, sizeof(entry.name)));
-			m_char_list[i]->m_appearance = entry.appearance;
-			m_char_list[i]->m_sex = entry.sex;
-			m_char_list[i]->m_skin_color = entry.skin;
-			m_char_list[i]->m_level = entry.level;
-			m_char_list[i]->m_exp = entry.exp;
-
-			m_char_list[i]->m_map_name.assign(entry.map_name, strnlen(entry.map_name, sizeof(entry.map_name)));
-		}
-		std::snprintf(m_msg, sizeof(m_msg), "%s", "3A");
-		change_game_mode(GameMode::LogResMsg);
-	}
-	break;
-
-	case LogResMsg::Confirm:
-	{
-		const auto* list = hb::net::PacketCast<hb::net::PacketLogCharacterListHeader>(
-			packet_data, sizeof(hb::net::PacketLogCharacterListHeader));
-		if (!list) return;
-		m_accnt_year = 0;
-		m_accnt_month = 0;
-		m_accnt_day = 0;
-		m_ip_year = 0;
-		m_ip_month = 0;
-		m_ip_day = 0;
-		m_total_char = std::min(static_cast<int>(list->total_chars), 4);
-		for (int i = 0; i < 4; i++)
-			if (m_char_list[i] != 0)
-			{
-				m_char_list[i].reset();
-			}
-
-		const auto* entries = reinterpret_cast<const hb::net::PacketLogCharacterEntry*>(
-			packet_data + sizeof(hb::net::PacketLogCharacterListHeader));
-		for (int i = 0; i < m_total_char; i++)
-		{
-			const auto& entry = entries[i];
-			m_char_list[i] = std::make_unique<CCharInfo>();
-			m_char_list[i]->m_name.assign(entry.name, strnlen(entry.name, sizeof(entry.name)));
-			m_char_list[i]->m_appearance = entry.appearance;
-			m_char_list[i]->m_sex = entry.sex;
-			m_char_list[i]->m_skin_color = entry.skin;
-			m_char_list[i]->m_level = entry.level;
-			m_char_list[i]->m_exp = entry.exp;
-
-			m_char_list[i]->m_map_name.assign(entry.map_name, strnlen(entry.map_name, sizeof(entry.map_name)));
-		}
-		change_game_mode(GameMode::SelectCharacter);
-	}
-	break;
-
-	case LogResMsg::Reject:
-	{
-		const auto* pkt = hb::net::PacketCast<hb::net::PacketLogResponseReject>(packet_data, sizeof(hb::net::PacketLogResponseReject));
-		if (!pkt) return;
-		m_block_year = pkt->block_year;
-		m_block_month = pkt->block_month;
-		m_block_day = pkt->block_day;
-
-		std::snprintf(m_msg, sizeof(m_msg), "%s", "7H");
-		change_game_mode(GameMode::LogResMsg);
-	}
-	break;
-
-	case LogResMsg::NotEnoughPoint:
-		std::snprintf(m_msg, sizeof(m_msg), "%s", "7I");
-		change_game_mode(GameMode::LogResMsg);
-		break;
-
-	case LogResMsg::AccountLocked:
-		std::snprintf(m_msg, sizeof(m_msg), "%s", "7K");
-		change_game_mode(GameMode::LogResMsg);
-		break;
-
-	case LogResMsg::ServiceNotAvailable:
-		std::snprintf(m_msg, sizeof(m_msg), "%s", "7L");
-		change_game_mode(GameMode::LogResMsg);
-		break;
-
-	case LogResMsg::PasswordChangeSuccess:
-		std::snprintf(m_msg, sizeof(m_msg), "%s", "6B");
-		change_game_mode(GameMode::LogResMsg);
-		break;
-
-	case LogResMsg::PasswordChangeFail:
-		std::snprintf(m_msg, sizeof(m_msg), "%s", "6C");
-		change_game_mode(GameMode::LogResMsg);
-		break;
-
-	case LogResMsg::PasswordMismatch:
-		std::snprintf(m_msg, sizeof(m_msg), "%s", "11");
-		change_game_mode(GameMode::LogResMsg);
-		break;
-
-	case LogResMsg::NotExistingAccount:
-		std::snprintf(m_msg, sizeof(m_msg), "%s", "12");
-		change_game_mode(GameMode::LogResMsg);
-		break;
-
-	case LogResMsg::NewAccountCreated:
-		std::snprintf(m_msg, sizeof(m_msg), "%s", "54");
-		change_game_mode(GameMode::LogResMsg);
-		break;
-
-	case LogResMsg::NewAccountFailed:
-		std::snprintf(m_msg, sizeof(m_msg), "%s", "05");
-		change_game_mode(GameMode::LogResMsg);
-		break;
-
-	case LogResMsg::AlreadyExistingAccount:
-		std::snprintf(m_msg, sizeof(m_msg), "%s", "06");
-		change_game_mode(GameMode::LogResMsg);
-		break;
-
-	case LogResMsg::NotExistingCharacter:
-		std::snprintf(m_msg, sizeof(m_msg), "%s", "Not existing character!");
-		change_game_mode(GameMode::Msg);
-		break;
-
-	case LogResMsg::NewCharacterCreated:
-	{
-		const auto* list = hb::net::PacketCast<hb::net::PacketLogNewCharacterCreatedHeader>(
-			packet_data, sizeof(hb::net::PacketLogNewCharacterCreatedHeader));
-		if (!list) return;
-		memcpy(char_name, list->character_name, sizeof(list->character_name));
-
-		m_total_char = std::min(static_cast<int>(list->total_chars), 4);
-		for (int i = 0; i < 4; i++)
-			if (m_char_list[i] != 0) m_char_list[i].reset();
-
-		const auto* entries = reinterpret_cast<const hb::net::PacketLogCharacterEntry*>(
-			packet_data + sizeof(hb::net::PacketLogNewCharacterCreatedHeader));
-		for (int i = 0; i < m_total_char; i++) {
-			const auto& entry = entries[i];
-			m_char_list[i] = std::make_unique<CCharInfo>();
-			m_char_list[i]->m_name.assign(entry.name, strnlen(entry.name, sizeof(entry.name)));
-			m_char_list[i]->m_appearance = entry.appearance;
-			m_char_list[i]->m_sex = entry.sex;
-			m_char_list[i]->m_skin_color = entry.skin;
-			m_char_list[i]->m_level = entry.level;
-			m_char_list[i]->m_exp = entry.exp;
-
-			m_char_list[i]->m_map_name.assign(entry.map_name, strnlen(entry.map_name, sizeof(entry.map_name)));
-		}
-		std::snprintf(m_msg, sizeof(m_msg), "%s", "47");
-		change_game_mode(GameMode::LogResMsg);
-	}
-	break;
-
-	case LogResMsg::NewCharacterFailed:
-		std::snprintf(m_msg, sizeof(m_msg), "%s", "28");
-		change_game_mode(GameMode::LogResMsg);
-		break;
-
-	case LogResMsg::AlreadyExistingCharacter:
-		std::snprintf(m_msg, sizeof(m_msg), "%s", "29");
-		change_game_mode(GameMode::LogResMsg);
-		break;
-
-	case EnterGameRes::Playing:
-		change_game_mode(GameMode::QueryForceLogin);
-		break;
-
-	case EnterGameRes::Confirm:
-	{
-		const auto* pkt = hb::net::PacketCast<hb::net::PacketLogEnterGameConfirm>(
-			packet_data, sizeof(hb::net::PacketLogEnterGameConfirm));
-		if (!pkt) return;
-		m_game_server_name.assign(pkt->game_server_name, strnlen(pkt->game_server_name, sizeof(pkt->game_server_name)));
-
-		// Transition to gameplay screen. Screen_OnGame::on_initialize() creates the
-		// player and dialog boxes, then connects to the game server. This ensures
-		// the player exists before any game server messages arrive.
-		GameModeManager::set_screen<Screen_OnGame>();
-	}
-	break;
-
-	case EnterGameRes::Reject:
-	{
-		const auto* pkt = hb::net::PacketCast<hb::net::PacketLogResponseCode>(packet_data, sizeof(hb::net::PacketLogResponseCode));
-		if (!pkt) return;
-		std::memset(m_msg, 0, sizeof(m_msg));
-		switch (pkt->code) {
-		case 1:	std::snprintf(m_msg, sizeof(m_msg), "%s", "3E"); break;
-		case 2:	std::snprintf(m_msg, sizeof(m_msg), "%s", "3F"); break;
-		case 3:	std::snprintf(m_msg, sizeof(m_msg), "%s", "33"); break;
-		case 4: std::snprintf(m_msg, sizeof(m_msg), "%s", "3D"); break;
-		case 5: std::snprintf(m_msg, sizeof(m_msg), "%s", "3G"); break;
-		case 6: std::snprintf(m_msg, sizeof(m_msg), "%s", "3Z"); break;
-		case 7: std::snprintf(m_msg, sizeof(m_msg), "%s", "3J"); break;
-		}
-		change_game_mode(GameMode::LogResMsg);
-	}
-	break;
-
-	case EnterGameRes::ForceDisconn:
-		std::snprintf(m_msg, sizeof(m_msg), "%s", "3X");
-		change_game_mode(GameMode::LogResMsg);
-		break;
-
-	case LogResMsg::NotExistingWorldServer:
-		std::snprintf(m_msg, sizeof(m_msg), "%s", "1Y");
-		change_game_mode(GameMode::LogResMsg);
-		break;
-
-	case LogResMsg::InputKeyCode:
-	{
-		const auto* pkt = hb::net::PacketCast<hb::net::PacketLogResponseCode>(packet_data, sizeof(hb::net::PacketLogResponseCode));
-		if (!pkt) return;
-		std::memset(m_msg, 0, sizeof(m_msg));
-		switch (pkt->code) {
-		case 1:	std::snprintf(m_msg, sizeof(m_msg), "%s", "8U"); break; //MainMenu, Keycode registration success
-		case 2:	std::snprintf(m_msg, sizeof(m_msg), "%s", "82"); break; //MainMenu, Not existing Account
-		case 3:	std::snprintf(m_msg, sizeof(m_msg), "%s", "81"); break; //MainMenu, Password wrong
-		case 4: std::snprintf(m_msg, sizeof(m_msg), "%s", "8V"); break; //MainMenu, Invalid Keycode
-		case 5: std::snprintf(m_msg, sizeof(m_msg), "%s", "8W"); break; //MainMenu, Already Used Keycode
-		}
-		change_game_mode(GameMode::LogResMsg);
-	}
-	break;
-
-	case LogResMsg::ForceChangePassword:
-		std::snprintf(m_msg, sizeof(m_msg), "%s", "6M");
-		change_game_mode(GameMode::LogResMsg);
-		break;
-
-	case LogResMsg::InvalidKoreanSsn:
-		std::snprintf(m_msg, sizeof(m_msg), "%s", "1a");
-		change_game_mode(GameMode::LogResMsg);
-		break;
-
-	case LogResMsg::LessThenFifteen:
-		std::snprintf(m_msg, sizeof(m_msg), "%s", "1b");
-		change_game_mode(GameMode::LogResMsg);
-		break;
-
-	case LogResMsg::VersionMismatch:
-		change_game_mode(GameMode::VersionNotMatch);
-		break;
-	}
+	hb::logger::warn("Unhandled log response {} — no active screen claimed it", response);
 	m_l_sock.reset();
 }
 
@@ -3435,7 +2572,12 @@ void CGame::load_game_msg_text_contents()
 
 void CGame::request_map_status(const char* map_name, int mode)
 {
-	send_command(MsgId::CommandCommon, CommonType::RequestMapStatus, 0, mode, 0, 0, map_name);
+	{
+		auto pkt = hb::net::make_common_command_str(CommonType::RequestMapStatus, m_player->m_player_x, m_player->m_player_y);
+		pkt.v1 = mode;
+		std::snprintf(pkt.text, sizeof(pkt.text), "%s", map_name);
+		send_game_packet(pkt);
+	}
 }
 
 void CGame::add_map_status_info(const char* data, bool is_last_data)
@@ -4550,7 +3692,15 @@ void CGame::retrieve_item_handler(char* data)
 				m_player->m_item_list[item_index] = std::move(m_player->m_bank_list[bank_item_index]);
 				m_player->m_item_list[item_index]->m_x = nX;
 				m_player->m_item_list[item_index]->m_y = nY;
-				send_command(MsgId::RequestSetItemPos, 0, item_index, nX, nY, 0, 0);
+				{
+			hb::net::PacketRequestSetItemPos req{};
+			req.header.msg_id = MsgId::RequestSetItemPos;
+			req.header.msg_type = 0;
+			req.dir = static_cast<uint8_t>(item_index);
+			req.x = static_cast<int16_t>(nX);
+			req.y = static_cast<int16_t>(nY);
+			send_game_packet(req, false);
+		}
 
 				for (j = 0; j < hb::shared::limits::MaxItems; j++)
 					if (m_item_order[j] == -1)
@@ -4786,7 +3936,13 @@ void CGame::draw_object_name(short screen_x, short screen_y, const char* name, c
 						}
 					}
 				}
-				else send_command(MsgId::CommandCommon, CommonType::ReqGuildName, 0, m_entity_state.m_object_id, guild_index, 0, 0);
+				else
+				{
+					auto pkt = hb::net::make_common_command(CommonType::ReqGuildName, m_player->m_player_x, m_player->m_player_y);
+					pkt.v1 = m_entity_state.m_object_id;
+					pkt.v2 = guild_index;
+					send_game_packet(pkt);
+				}
 			}
 		}
 	}
@@ -5410,11 +4566,30 @@ void CGame::point_command_handler(int indexX, int indexY, char item_id)
 		{
 			targetObjectID = focused.m_object_id;
 		}
-		send_command(MsgId::CommandCommon, CommonType::Magic, 0, indexX, indexY, m_point_command_type, nullptr, targetObjectID);
+		{
+			hb::net::PacketCommandCommonWithTime req{};
+			req.base.header.msg_id = MsgId::CommandCommon;
+			req.base.header.msg_type = CommonType::Magic;
+			req.base.x = m_player->m_player_x;
+			req.base.y = m_player->m_player_y;
+			req.v1 = indexX;
+			req.v2 = indexY;
+			req.v3 = m_point_command_type;
+			req.time_ms = static_cast<uint32_t>(targetObjectID);
+			send_game_packet(req, false);
+		}
 	}
 	else if ((m_point_command_type >= 0) && (m_point_command_type < 50))
 	{
-		send_command(MsgId::CommandCommon, CommonType::ReqUseItem, 0, m_point_command_type, indexX, indexY, temp, item_id); // v1.4
+		{
+			auto pkt = hb::net::make_common_command_str(CommonType::ReqUseItem, m_player->m_player_x, m_player->m_player_y);
+			pkt.v1 = m_point_command_type;
+			pkt.v2 = indexX;
+			pkt.v3 = indexY;
+			std::snprintf(pkt.text, sizeof(pkt.text), "%s", temp);
+			pkt.v4 = item_id;
+			send_game_packet(pkt);
+		}
 
 		CItem* cfg_pt = get_item_config(m_player->m_item_list[m_point_command_type]->m_id_num);
 		if (cfg_pt && cfg_pt->get_item_type() == ItemType::UseSkill)
@@ -5433,7 +4608,12 @@ void CGame::point_command_handler(int indexX, int indexY, char item_id)
 			get_dialog_box_manager().get_dialog_as<DialogBox_Party>(DialogBoxId::Party)->m_mode = DialogBox_Party::mode::join_requested;
 			play_game_sound('E', 14, 5);
 			std::snprintf(get_dialog_box_manager().get_dialog_as<DialogBox_Party>(DialogBoxId::Party)->m_leader_name, sizeof(DialogBox_Party::m_leader_name), "%s", m_mc_name.c_str());
-			send_command(MsgId::CommandCommon, CommonType::RequestJoinParty, 0, 1, 0, 0, m_mc_name.c_str());
+			{
+				auto pkt = hb::net::make_common_command_str(CommonType::RequestJoinParty, m_player->m_player_x, m_player->m_player_y);
+				pkt.v1 = 1;
+				std::snprintf(pkt.text, sizeof(pkt.text), "%s", m_mc_name.c_str());
+				send_game_packet(pkt);
+			}
 			return;
 		}
 	}
@@ -5633,21 +4813,21 @@ void CGame::command_processor(short mouse_x, short mouse_y, short tile_x, short 
 	if ((m_is_observer_commanded == false) && (m_is_observer_mode == true))
 	{
 		if ((mouse_x == 0) && (mouse_y == 0) && (m_Camera.get_destination_x() > 32 * VIEW_TILE_WIDTH()) && (m_Camera.get_destination_y() > 32 * VIEW_TILE_HEIGHT()))
-			send_command(MsgId::RequestPanning, 0, 8, 0, 0, 0, 0);
+			send_game_packet(hb::net::make_panning_request(8));
 		else if ((mouse_x == LOGICAL_MAX_X()) && (mouse_y == 0) && (m_Camera.get_destination_x() < 32 * m_map_data->m_map_size_x - 32 * VIEW_TILE_WIDTH()) && (m_Camera.get_destination_y() > 32 * VIEW_TILE_HEIGHT()))
-			send_command(MsgId::RequestPanning, 0, 2, 0, 0, 0, 0);
+			send_game_packet(hb::net::make_panning_request(2));
 		else if ((mouse_x == LOGICAL_MAX_X()) && (mouse_y == LOGICAL_MAX_Y()) && (m_Camera.get_destination_x() < 32 * m_map_data->m_map_size_x - 32 * VIEW_TILE_WIDTH()) && (m_Camera.get_destination_y() < 32 * m_map_data->m_map_size_y - 32 * VIEW_TILE_HEIGHT()))
-			send_command(MsgId::RequestPanning, 0, 4, 0, 0, 0, 0);
+			send_game_packet(hb::net::make_panning_request(4));
 		else if ((mouse_x == 0) && (mouse_y == LOGICAL_MAX_Y()))
-			send_command(MsgId::RequestPanning, 0, 6, 0, 0, 0, 0);
+			send_game_packet(hb::net::make_panning_request(6));
 		else if ((mouse_x == 0) && (m_Camera.get_destination_x() > 32 * VIEW_TILE_WIDTH()))
-			send_command(MsgId::RequestPanning, 0, 7, 0, 0, 0, 0);
+			send_game_packet(hb::net::make_panning_request(7));
 		else if ((mouse_x == LOGICAL_MAX_X()) && (m_Camera.get_destination_x() < 32 * m_map_data->m_map_size_x - 32 * VIEW_TILE_WIDTH()))
-			send_command(MsgId::RequestPanning, 0, 3, 0, 0, 0, 0);
+			send_game_packet(hb::net::make_panning_request(3));
 		else if ((mouse_y == 0) && (m_Camera.get_destination_y() > 32 * VIEW_TILE_HEIGHT()))
-			send_command(MsgId::RequestPanning, 0, 1, 0, 0, 0, 0);
+			send_game_packet(hb::net::make_panning_request(1));
 		else if ((mouse_y == LOGICAL_MAX_Y()) && (m_Camera.get_destination_y() < 32 * m_map_data->m_map_size_y - 32 * VIEW_TILE_HEIGHT()))
-			send_command(MsgId::RequestPanning, 0, 5, 0, 0, 0, 0);
+			send_game_packet(hb::net::make_panning_request(5));
 		else return;
 
 		m_is_observer_commanded = true;
@@ -5946,7 +5126,8 @@ void CGame::command_processor(short mouse_x, short mouse_y, short tile_x, short 
 			if (move_dir != 0 && m_player->m_player_dir != move_dir)
 			{
 				m_player->m_player_dir = move_dir;
-				send_command(MsgId::CommandMotion, Type::stop, move_dir, 0, 0, 0, 0);
+				send_game_packet(hb::net::make_motion(Type::stop, m_player->m_player_x, m_player->m_player_y, move_dir));
+				m_player->m_Controller.increment_command_count();
 				m_map_data->set_owner(m_player->m_player_object_id, m_player->m_player_x, m_player->m_player_y,
 					m_player->m_player_type, move_dir, m_player->m_playerAppearance,
 					m_player->m_playerStatus, m_player->m_player_name, Type::stop, 0, 0, 0, 0, 10);
@@ -6876,7 +6057,8 @@ bool CGame::process_right_click(short mouse_x, short mouse_y, short tile_x, shor
 			if (m_player->m_player_dir == move_dir) return true;
 			clear_skill_using_status();
 			m_player->m_player_dir = move_dir;
-			send_command(MsgId::CommandMotion, Type::stop, m_player->m_player_dir, 0, 0, 0, 0);
+			send_game_packet(hb::net::make_motion(Type::stop, m_player->m_player_x, m_player->m_player_y, m_player->m_player_dir));
+			m_player->m_Controller.increment_command_count();
 
 			m_map_data->set_owner(m_player->m_player_object_id, m_player->m_player_x, m_player->m_player_y, m_player->m_player_type, m_player->m_player_dir,
 				m_player->m_playerAppearance,
@@ -6977,7 +6159,8 @@ void CGame::process_motion_commands(uint16_t action_type)
 				if (pending_dir != 0)
 				{
 					m_player->m_player_dir = pending_dir;
-					send_command(MsgId::CommandMotion, Type::stop, pending_dir, 0, 0, 0, 0);
+					send_game_packet(hb::net::make_motion(Type::stop, m_player->m_player_x, m_player->m_player_y, pending_dir));
+					m_player->m_Controller.increment_command_count();
 					m_map_data->set_owner(m_player->m_player_object_id, m_player->m_player_x, m_player->m_player_y,
 						m_player->m_player_type, pending_dir, m_player->m_playerAppearance,
 						m_player->m_playerStatus, m_player->m_player_name, Type::stop, 0, 0, 0, 0, 10);
@@ -7018,7 +6201,8 @@ void CGame::process_motion_commands(uint16_t action_type)
 					}
 
 					m_player->m_player_dir = move_dir;
-					send_command(MsgId::CommandMotion, m_player->m_Controller.get_command(), move_dir, 0, 0, 0, 0);
+					send_game_packet(hb::net::make_motion(m_player->m_Controller.get_command(), m_player->m_player_x, m_player->m_player_y, move_dir));
+					m_player->m_Controller.increment_command_count();
 					switch (move_dir) {
 					case direction::north:	m_player->m_player_y--; break;
 					case direction::northeast:	m_player->m_player_y--; m_player->m_player_x++;	break;
@@ -7073,7 +6257,8 @@ void CGame::process_motion_commands(uint16_t action_type)
 				}
 				m_player->m_player_dir = move_dir;
 				m_last_attack_target_id = m_comm_object_id;
-				send_command(MsgId::CommandMotion, Type::Attack, move_dir, m_player->m_Controller.get_destination_x(), m_player->m_Controller.get_destination_y(), action_type, 0, m_comm_object_id);
+				send_game_packet(hb::net::make_motion_attack(Type::Attack, m_player->m_player_x, m_player->m_player_y, move_dir, static_cast<int16_t>(m_player->m_Controller.get_destination_x()), static_cast<int16_t>(m_player->m_Controller.get_destination_y()), static_cast<int16_t>(action_type), static_cast<uint16_t>(m_comm_object_id)));
+				m_player->m_Controller.increment_command_count();
 				m_map_data->set_owner(m_player->m_player_object_id, m_player->m_player_x, m_player->m_player_y, m_player->m_player_type, m_player->m_player_dir,
 					m_player->m_playerAppearance,
 					m_player->m_playerStatus, m_player->m_player_name,
@@ -7123,7 +6308,8 @@ void CGame::process_motion_commands(uint16_t action_type)
 
 					m_player->m_player_dir = move_dir;
 					m_last_attack_target_id = m_comm_object_id;
-					send_command(MsgId::CommandMotion, Type::AttackMove, move_dir, m_player->m_Controller.get_destination_x(), m_player->m_Controller.get_destination_y(), action_type, 0, m_comm_object_id);
+					send_game_packet(hb::net::make_motion_attack(Type::AttackMove, m_player->m_player_x, m_player->m_player_y, move_dir, static_cast<int16_t>(m_player->m_Controller.get_destination_x()), static_cast<int16_t>(m_player->m_Controller.get_destination_y()), static_cast<int16_t>(action_type), static_cast<uint16_t>(m_comm_object_id)));
+					m_player->m_Controller.increment_command_count();
 					switch (move_dir) {
 					case direction::north:	m_player->m_player_y--; break;
 					case direction::northeast:	m_player->m_player_y--; m_player->m_player_x++;	break;
@@ -7167,7 +6353,8 @@ void CGame::process_motion_commands(uint16_t action_type)
 				add_event_list(DLGBOX_CLICK_SYSMENU2, 10);
 			}
 
-			send_command(MsgId::CommandMotion, Type::GetItem, m_player->m_player_dir, 0, 0, 0, 0);
+			send_game_packet(hb::net::make_motion(Type::GetItem, m_player->m_player_x, m_player->m_player_y, m_player->m_player_dir));
+			m_player->m_Controller.increment_command_count();
 			m_map_data->set_owner(m_player->m_player_object_id, m_player->m_player_x, m_player->m_player_y, m_player->m_player_type, m_player->m_player_dir,
 				m_player->m_playerAppearance,
 				m_player->m_playerStatus, m_player->m_player_name,
@@ -7184,7 +6371,8 @@ void CGame::process_motion_commands(uint16_t action_type)
 				add_event_list(DLGBOX_CLICK_SYSMENU2, 10);
 			}
 
-			send_command(MsgId::CommandMotion, Type::Magic, m_player->m_player_dir, m_casting_magic_type, 0, 0, 0);
+			send_game_packet(hb::net::make_motion(Type::Magic, m_player->m_player_x, m_player->m_player_y, m_player->m_player_dir, static_cast<int16_t>(m_casting_magic_type)));
+			m_player->m_Controller.increment_command_count();
 			m_map_data->set_owner(m_player->m_player_object_id, m_player->m_player_x, m_player->m_player_y, m_player->m_player_type, m_player->m_player_dir,
 				m_player->m_playerAppearance,
 				m_player->m_playerStatus, m_player->m_player_name,
@@ -7406,7 +6594,12 @@ void CGame::init_data_response_handler(char* packet_data)
 		std::error_code ec;
 		auto sz = std::filesystem::file_size("contents/contents1000.txt", ec);
 		file_size = ec ? 0 : static_cast<uint32_t>(sz);
-		send_command(MsgId::RequestNoticement, 0, 0, static_cast<int>(file_size), 0, 0, 0);
+		{
+			hb::net::PacketRequestNoticement pkt{};
+			pkt.header.msg_id = MsgId::RequestNoticement;
+			pkt.value = static_cast<int>(file_size);
+			send_game_packet(pkt);
+		}
 	}
 }
 

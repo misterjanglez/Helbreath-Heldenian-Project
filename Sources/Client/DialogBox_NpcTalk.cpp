@@ -4,6 +4,8 @@
 #include "TextLibExt.h"
 #include "IInput.h"
 #include "NetMessages.h"
+#include "PacketSendHelpers.h"
+
 
 
 using namespace hb::shared::net;
@@ -144,7 +146,7 @@ bool DialogBox_NpcTalk::on_click()
 		if (mouse_in(btn_left))
 		{
 			// Accept
-			m_game->send_command(MsgId::CommandCommon, CommonType::QuestAccepted, 0, 0, 0, 0, 0);
+			m_game->send_game_packet(hb::net::make_common_command(CommonType::QuestAccepted, m_game->m_player->m_player_x, m_game->m_player->m_player_y));
 			m_game->get_dialog_box_manager().disable_dialog_box(DialogBoxId::NpcTalk);
 			m_game->play_game_sound('E', 14, 5);
 			return true;
@@ -196,7 +198,7 @@ bool DialogBox_NpcTalk::on_disable()
 {
 	if (m_dialog_id == 500)
 	{
-		m_game->send_command(MsgId::CommandCommon, CommonType::GetMagicAbility, 0, 0, 0, 0, 0);
+		m_game->send_game_packet(hb::net::make_common_command(CommonType::GetMagicAbility, m_game->m_player->m_player_x, m_game->m_player->m_player_y));
 	}
 	return true;
 }

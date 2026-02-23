@@ -141,6 +141,9 @@
     <ClInclude Include="CommonTypes.h">
       <Filter>Core</Filter>
     </ClInclude>
+    <ClInclude Include="PacketSendHelpers.h">
+      <Filter>Network</Filter>
+    </ClInclude>
     <ClInclude Include="ConfigManager.h">
       <Filter>Managers</Filter>
     </ClInclude>
@@ -1059,6 +1062,9 @@
       <Filter>Screens</Filter>
     </ClCompile>
     <ClCompile Include="Screen_OnGame.cpp">
+      <Filter>Screens</Filter>
+    </ClCompile>
+    <ClCompile Include="Screen_OnGame.Network.cpp">
       <Filter>Screens</Filter>
     </ClCompile>
     <ClCompile Include="Screen_Quit.cpp">

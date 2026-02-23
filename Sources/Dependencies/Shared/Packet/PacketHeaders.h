@@ -6,6 +6,11 @@
 
 namespace hb {
 namespace net {
+
+	// Empty base for all sendable packet structs.
+	// Enables type-safe transport API without void* while preserving packed layout (EBO).
+	struct packet_base {};
+
 	HB_PACK_BEGIN
 	struct HB_PACKED PacketHeader
 	{

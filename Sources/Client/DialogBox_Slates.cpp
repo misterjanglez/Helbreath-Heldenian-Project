@@ -11,6 +11,7 @@
 #include <format>
 #include <string>
 #include "IInput.h"
+#include "Packet/SharedPackets.h"
 
 using namespace hb::shared::net;
 using namespace hb::shared::item;
@@ -85,7 +86,21 @@ void DialogBox_Slates::on_draw()
 		}
 		if (m_anim_amplitude >= 5)
 		{
-			send_command(MsgId::CommandCommon, CommonType::ReqCreateSlate, 0, m_slot_ul, m_slot_ll, m_slot_ur, 0, m_slot_lr);
+			{
+				hb::net::PacketCommandCommonItems req{};
+				req.base.header.msg_id = MsgId::CommandCommon;
+				req.base.header.msg_type = CommonType::ReqCreateSlate;
+				req.base.x = player().m_player_x;
+				req.base.y = player().m_player_y;
+				req.item_ids[0] = static_cast<uint8_t>(m_slot_ul);
+				req.item_ids[1] = static_cast<uint8_t>(m_slot_ll);
+				req.item_ids[2] = static_cast<uint8_t>(m_slot_ur);
+				req.item_ids[3] = static_cast<uint8_t>(m_slot_lr);
+				req.item_ids[4] = static_cast<uint8_t>(m_slot_extra1);
+				req.item_ids[5] = static_cast<uint8_t>(m_slot_extra2);
+				req.padding = 0;
+				send_game_packet(req, false);
+			}
 			disable_dialog_box(DialogBoxId::Slates);
 		}
 		break;

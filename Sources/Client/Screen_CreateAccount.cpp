@@ -174,7 +174,6 @@ void Screen_CreateAccount::submit_create_account()
     m_game->m_l_sock->init_buffer_size(hb::shared::limits::MsgBufferSize);
 
     m_game->change_game_mode(GameMode::Connecting);
-    m_game->m_connect_mode = MsgId::RequestCreateNewAccount;
     std::snprintf(m_game->m_msg, sizeof(m_game->m_msg), "%s", "01");
 }
 
@@ -182,19 +181,16 @@ bool Screen_CreateAccount::on_net_response(uint16_t response_type, char* data)
 {
     switch (response_type) {
     case LogResMsg::NewAccountCreated:
-        m_game->m_l_sock.reset();
         std::snprintf(m_game->m_msg, sizeof(m_game->m_msg), "%s", "54");
         m_game->change_game_mode(GameMode::LogResMsg);
         return true;
 
     case LogResMsg::NewAccountFailed:
-        m_game->m_l_sock.reset();
         std::snprintf(m_game->m_msg, sizeof(m_game->m_msg), "%s", "05");
         m_game->change_game_mode(GameMode::LogResMsg);
         return true;
 
     case LogResMsg::AlreadyExistingAccount:
-        m_game->m_l_sock.reset();
         std::snprintf(m_game->m_msg, sizeof(m_game->m_msg), "%s", "06");
         m_game->change_game_mode(GameMode::LogResMsg);
         return true;

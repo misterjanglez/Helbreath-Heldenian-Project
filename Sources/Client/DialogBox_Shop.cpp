@@ -1,5 +1,7 @@
 ﻿#include "DialogBox_Shop.h"
 #include "Game.h"
+#include "PacketSendHelpers.h"
+
 #include "ShopManager.h"
 #include "InventoryManager.h"
 #include "ItemNameFormatter.h"
@@ -511,7 +513,13 @@ bool DialogBox_Shop::on_click_item_details(short sX, short sY)
             std::snprintf(temp, sizeof(temp), "%s", shop_item->m_name);
             // Send item ID in v2 for reliable item lookup on server
             int item_id = shop_item->m_id_num;
-            m_game->send_command(MsgId::CommandCommon, CommonType::ReqPurchaseItem, 0, m_quantity, item_id, 0, temp);
+            {
+            	auto pkt = hb::net::make_common_command_str(CommonType::ReqPurchaseItem, m_game->m_player->m_player_x, m_game->m_player->m_player_y);
+            	pkt.v1 = m_quantity;
+            	pkt.v2 = item_id;
+            	std::snprintf(pkt.text, sizeof(pkt.text), "%s", temp);
+            	m_game->send_game_packet(pkt);
+            }
         }
         m_mode = 0;
         m_quantity = 1;

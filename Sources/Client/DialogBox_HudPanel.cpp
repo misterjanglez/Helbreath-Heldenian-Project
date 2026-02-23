@@ -1,5 +1,7 @@
 #include "DialogBox_HudPanel.h"
 #include "Game.h"
+#include "PacketSendHelpers.h"
+
 #include "GlobalDef.h"
 #include "SharedCalculations.h"
 #include "GameFonts.h"
@@ -280,7 +282,7 @@ bool DialogBox_HudPanel::on_click()
 	// Combat mode toggle
 	if (is_in_button(BTN_COMBAT_X1(), BTN_COMBAT_X2()))
 	{
-		m_game->send_command(MsgId::CommandCommon, CommonType::ToggleCombatMode, 0, 0, 0, 0, 0);
+		m_game->send_game_packet(hb::net::make_common_command(CommonType::ToggleCombatMode, m_game->m_player->m_player_x, m_game->m_player->m_player_y));
 		m_game->play_game_sound('E', 14, 5);
 		return true;
 	}

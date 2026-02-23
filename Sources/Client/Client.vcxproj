@@ -268,6 +268,7 @@
     <ClInclude Include="BuildItem.h" />
     <ClInclude Include="CharInfo.h" />
     <ClInclude Include="CommonTypes.h" />
+    <ClInclude Include="PacketSendHelpers.h" />
     <ClInclude Include="Effect.h" />
     <ClInclude Include="DialogBoxIDs.h" />
     <ClInclude Include="DialogBoxManager.h" />
@@ -524,6 +525,7 @@
     <ClCompile Include="GameModeManager.cpp" />
     <ClCompile Include="IGameScreen.cpp" />
     <ClCompile Include="Screen_OnGame.cpp" />
+    <ClCompile Include="Screen_OnGame.Network.cpp" />
     <ClCompile Include="SpellAoE.cpp" />
     <ClCompile Include="Screen_MainMenu.cpp" />
     <ClCompile Include="Screen_Login.cpp" />

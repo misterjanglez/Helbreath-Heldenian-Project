@@ -1,6 +1,7 @@
 #include "DialogBox_Resurrect.h"
 #include "Game.h"
 #include "IInput.h"
+#include "Packet/SharedPackets.h"
 
 using namespace hb::shared::net;
 using namespace hb::client::sprite_id;
@@ -38,7 +39,12 @@ bool DialogBox_Resurrect::on_click()
 	// Yes button
 	if (mouse_in(btn_yes))
 	{
-		send_command(MsgId::RequestResurrectYes, 0, 0, 0, 0, 0, nullptr, 0);
+		{
+			hb::net::PacketRequestHeaderOnly req{};
+			req.header.msg_id = MsgId::RequestResurrectYes;
+			req.header.msg_type = 0;
+			send_game_packet(req);
+		}
 		disable_this_dialog();
 		return true;
 	}
@@ -46,7 +52,12 @@ bool DialogBox_Resurrect::on_click()
 	// No button
 	if (mouse_in(btn_no))
 	{
-		send_command(MsgId::RequestResurrectNo, 0, 0, 0, 0, 0, nullptr, 0);
+		{
+			hb::net::PacketRequestHeaderOnly req{};
+			req.header.msg_id = MsgId::RequestResurrectNo;
+			req.header.msg_type = 0;
+			send_game_packet(req);
+		}
 		disable_this_dialog();
 		return true;
 	}

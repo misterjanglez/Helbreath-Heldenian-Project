@@ -4,6 +4,8 @@
 #include "ItemNameFormatter.h"
 #include "lan_eng.h"
 #include "NetMessages.h"
+#include "PacketSendHelpers.h"
+
 #include <algorithm>
 #include <climits>
 #include <format>
@@ -251,7 +253,11 @@ void inventory_manager::equip_item(int item_id)
 		}
 	}
 
-	m_game->send_command(MsgId::CommandCommon, CommonType::equip_item, 0, item_id, 0, 0, 0);
+	{
+		auto pkt = hb::net::make_common_command(CommonType::equip_item, m_game->m_player->m_player_x, m_game->m_player->m_player_y);
+		pkt.v1 = item_id;
+		m_game->send_game_packet(pkt);
+	}
 	m_game->m_recent_short_cut = item_id;
 	unequip_slot(cfg->m_equip_pos);
 	switch (cfg->get_equip_pos()) {

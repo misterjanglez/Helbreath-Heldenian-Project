@@ -10,6 +10,7 @@ struct ui_rect { int x, y, w, h; };
 class CGame;
 class CPlayer;
 class DialogBoxManager;
+namespace hb { namespace net { struct packet_base; } }
 
 // Result of on_press - determines how the click is handled
 enum class PressResult
@@ -67,7 +68,13 @@ protected:
 	void put_aligned_string(int x1, int x2, int iY, const char* string, const hb::shared::render::Color& color = GameColors::UIBlack);
 	void play_sound_effect(char type, int num, int dist, long lPan = 0);
 	void add_event_list(const char* txt, char color = 0, bool dup_allow = true);
-	bool send_command(uint32_t msg_id, uint16_t command, char dir, int v1, int v2, int v3, const char* string, int v4 = 0);
+	bool send_game_packet_impl(const hb::net::packet_base& pkt, size_t size, bool encrypt = true);
+
+	template<typename PacketT>
+	bool send_game_packet(const PacketT& pkt, bool encrypt = true)
+	{
+		return send_game_packet_impl(pkt, sizeof(PacketT), encrypt);
+	}
 	void set_default_rect(short sX, short sY, short size_x, short size_y);
 
 	// Dialog management helpers
