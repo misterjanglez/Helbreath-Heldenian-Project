@@ -242,14 +242,14 @@ bool DialogBox_TesterMenu::on_click_main_menu(short sX, short sY)
 	{
 		if (row == 7) // Set level
 		{
-			m_selected_level = m_game->m_player->m_level;
+			m_selected_level = player().m_level;
 			m_page = 1;
 			play_sound_effect('E', 14, 5);
 			return true;
 		}
 		if (row == 8) // Create item
 		{
-			m_game->m_dialog_box_manager.enable_dialog_box(DialogBoxId::ItemCreator, 0, 0, 0);
+			m_game->get_dialog_box_manager().enable_dialog_box(DialogBoxId::ItemCreator, 0, 0, 0);
 			play_sound_effect('E', 14, 5);
 			return true;
 		}
@@ -384,7 +384,7 @@ bool DialogBox_TesterMenu::on_enable(int type, int64_t v1, int v2, const char* s
 	if (is_enabled()) return true;
 	int tester_x = LOGICAL_WIDTH() - 258 - 10;
 	int tester_y = LOGICAL_HEIGHT() - 339 - ICON_PANEL_HEIGHT() - 10;
-	if (m_game->m_dialog_box_manager.is_enabled(DialogBoxId::LevelUpSetting))
+	if (m_game->get_dialog_box_manager().is_enabled(DialogBoxId::LevelUpSetting))
 		tester_y -= 30;
 	m_x = tester_x;
 	m_y = tester_y;

@@ -46,6 +46,6 @@ namespace NetworkMessageHandlers {
 		w1 = pkt->map_id;
 		w2 = pkt->map_type;
 		if (w2 == 0) game->add_event_list(NOTIFYMSG_SHOW_MAP1, 10);
-		else game->m_dialog_box_manager.enable_dialog_box(DialogBoxId::Map, 0, w1, w2 - 1);
+		else game->get_dialog_box_manager().enable_dialog_box(DialogBoxId::Map, 0, w1, w2 - 1);
 	}
 } // namespace NetworkMessageHandlers

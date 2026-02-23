@@ -27,7 +27,7 @@ void DialogBox_MagicShop::on_draw()
 	m_game->draw_new_dialog_box(InterfaceNdText, sX, sY, 14);
 
 	// Mouse wheel scrolling - read and consume input directly
-	if (m_game->m_dialog_box_manager.get_top_id() == DialogBoxId::MagicShop)
+	if (m_game->get_dialog_box_manager().get_top_id() == DialogBoxId::MagicShop)
 	{
 		short wheel_delta = hb::shared::input::get_mouse_wheel_delta();
 		if (wheel_delta != 0)
@@ -75,7 +75,7 @@ void DialogBox_MagicShop::draw_spell_list(short sX, short sY)
 			std::snprintf(txt, sizeof(txt), "%s", m_game->m_magic_cfg_list[c_pivot + i]->m_name.c_str());
 			CMisc::replace_string(txt, '-', ' ');
 
-			if (m_game->m_player->m_magic_mastery[c_pivot + i] != 0)
+			if (player().m_magic_mastery[c_pivot + i] != 0)
 			{
 				// Already mastered - purple color
 				hb::shared::text::draw_text(GameFont::Bitmap1, sX + 24, sY + 70 + yloc, txt, hb::shared::text::TextStyle::with_highlight(GameColors::UIMagicPurple));
@@ -162,7 +162,7 @@ bool DialogBox_MagicShop::handle_spell_click(short sX, short sY)
 			if ((mouse_x >= sX + adj_x + 44) && (mouse_x <= sX + adj_x + 135 + 44) &&
 				(mouse_y >= sY + adj_y + 70 + yloc + 35) && (mouse_y <= sY + adj_y + 70 + 14 + yloc + 35))
 			{
-				if (m_game->m_player->m_magic_mastery[c_pivot + i] == 0)
+				if (player().m_magic_mastery[c_pivot + i] == 0)
 				{
 					m_game->send_command(MsgId::CommandCommon, CommonType::ReqStudyMagic, 0, 0, 0, 0,
 						m_game->m_magic_cfg_list[c_pivot + i]->m_name.c_str());
@@ -227,7 +227,7 @@ void DialogBox_MagicShop::handle_page_click(short sX, short sY)
 bool DialogBox_MagicShop::on_enable(int type, int64_t v1, int v2, const char* string)
 {
 	if (is_enabled()) return true;
-	if (m_game->m_player->m_skill_mastery[4] == 0) {
+	if (player().m_skill_mastery[4] == 0) {
 		enable_dialog_box(DialogBoxId::NpcTalk, 0, 480, 0);
 		return false;
 	}

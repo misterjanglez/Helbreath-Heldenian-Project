@@ -7,7 +7,12 @@
 #pragma once
 
 #include "IGameScreen.h"
+#include "GuildManager.h"
+#include "DialogBoxManager.h"
 #include <cstdint>
+#include <memory>
+
+class CPlayer;
 
 class Screen_OnGame : public IGameScreen
 {
@@ -24,6 +29,13 @@ public:
     bool on_text_input(uint32_t codepoint) override;
 
     void item_drop_external_screen(char item_id, short mouse_x, short mouse_y);
+    guild_manager& get_guild_manager() { return m_guild_manager; }
+    DialogBoxManager& get_dialog_box_manager() { return *m_dialog_box_manager; }
+
+    // Player lifecycle — static because there's only ever one player
+    static void create_player();
+    static void destroy_player();
+    static CPlayer* get_player() { return s_player.get(); }
 
 private:
     void render_item_tooltip();
@@ -47,4 +59,8 @@ private:
     short m_pivot_y = 0;
     uint32_t m_dwPrevChatTime = 0;
     uint32_t m_dwLastBubbleTime = 0;
+    guild_manager m_guild_manager;
+    std::unique_ptr<DialogBoxManager> m_dialog_box_manager;
+
+    static std::unique_ptr<CPlayer> s_player;
 };

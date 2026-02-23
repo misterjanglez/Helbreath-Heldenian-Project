@@ -37,17 +37,17 @@ void Screen_CreateNewCharacter::on_initialize()
     GameModeManager::set_current_mode(GameMode::CreateNewCharacter);
 
     // Initialize character creation defaults
-    m_game->m_player->m_gender = rand() % 2 + 1;
-    m_game->m_player->m_skin_col = rand() % 3 + 1;
-    m_game->m_player->m_hair_style = rand() % 8;
-    m_game->m_player->m_hair_col = rand() % 16;
-    m_game->m_player->m_under_col = rand() % 8;
-    m_game->m_player->m_stat_mod_str = 10;
-    m_game->m_player->m_stat_mod_vit = 10;
-    m_game->m_player->m_stat_mod_dex = 10;
-    m_game->m_player->m_stat_mod_int = 10;
-    m_game->m_player->m_stat_mod_mag = 10;
-    m_game->m_player->m_stat_mod_chr = 10;
+    m_game->m_new_char.gender = rand() % 2 + 1;
+    m_game->m_new_char.skin_col = rand() % 3 + 1;
+    m_game->m_new_char.hair_style = rand() % 8;
+    m_game->m_new_char.hair_col = rand() % 16;
+    m_game->m_new_char.under_col = rand() % 8;
+    m_game->m_new_char.stat_str = 10;
+    m_game->m_new_char.stat_vit = 10;
+    m_game->m_new_char.stat_dex = 10;
+    m_game->m_new_char.stat_int = 10;
+    m_game->m_new_char.stat_mag = 10;
+    m_game->m_new_char.stat_chr = 10;
 
     m_iNewCharPoint = 10;
     m_bNewCharFlag = false;
@@ -84,9 +84,9 @@ void Screen_CreateNewCharacter::on_initialize()
         cc::rect{236 + OX, 156 + OY, 44, 13}, cc::rect{0, 0, 21, 13}, cc::rect{23, 0, 21, 13});
     tog_gender->set_click_sound([this] { m_game->play_game_sound('E', 14, 5); });
     tog_gender->set_on_change([this](int, int delta) {
-        m_game->m_player->m_gender += delta;
-        if (m_game->m_player->m_gender < 1) m_game->m_player->m_gender = 2;
-        if (m_game->m_player->m_gender > 2) m_game->m_player->m_gender = 1;
+        m_game->m_new_char.gender += delta;
+        if (m_game->m_new_char.gender < 1) m_game->m_new_char.gender = 2;
+        if (m_game->m_new_char.gender > 2) m_game->m_new_char.gender = 1;
     });
 
     // Skin color: 1-3 wrap
@@ -94,9 +94,9 @@ void Screen_CreateNewCharacter::on_initialize()
         cc::rect{236 + OX, 171 + OY, 44, 13}, cc::rect{0, 0, 21, 13}, cc::rect{23, 0, 21, 13});
     tog_skin->set_click_sound([this] { m_game->play_game_sound('E', 14, 5); });
     tog_skin->set_on_change([this](int, int delta) {
-        m_game->m_player->m_skin_col += delta;
-        if (m_game->m_player->m_skin_col < 1) m_game->m_player->m_skin_col = 3;
-        if (m_game->m_player->m_skin_col > 3) m_game->m_player->m_skin_col = 1;
+        m_game->m_new_char.skin_col += delta;
+        if (m_game->m_new_char.skin_col < 1) m_game->m_new_char.skin_col = 3;
+        if (m_game->m_new_char.skin_col > 3) m_game->m_new_char.skin_col = 1;
     });
 
     // Hair style: 0-7 wrap
@@ -104,9 +104,9 @@ void Screen_CreateNewCharacter::on_initialize()
         cc::rect{236 + OX, 186 + OY, 44, 13}, cc::rect{0, 0, 21, 13}, cc::rect{23, 0, 21, 13});
     tog_hair_style->set_click_sound([this] { m_game->play_game_sound('E', 14, 5); });
     tog_hair_style->set_on_change([this](int, int delta) {
-        m_game->m_player->m_hair_style += delta;
-        if (m_game->m_player->m_hair_style < 0) m_game->m_player->m_hair_style = 7;
-        if (m_game->m_player->m_hair_style > 7) m_game->m_player->m_hair_style = 0;
+        m_game->m_new_char.hair_style += delta;
+        if (m_game->m_new_char.hair_style < 0) m_game->m_new_char.hair_style = 7;
+        if (m_game->m_new_char.hair_style > 7) m_game->m_new_char.hair_style = 0;
     });
 
     // Hair color: 0-15 wrap
@@ -114,9 +114,9 @@ void Screen_CreateNewCharacter::on_initialize()
         cc::rect{236 + OX, 201 + OY, 44, 13}, cc::rect{0, 0, 21, 13}, cc::rect{23, 0, 21, 13});
     tog_hair_color->set_click_sound([this] { m_game->play_game_sound('E', 14, 5); });
     tog_hair_color->set_on_change([this](int, int delta) {
-        m_game->m_player->m_hair_col += delta;
-        if (m_game->m_player->m_hair_col < 0) m_game->m_player->m_hair_col = 15;
-        if (m_game->m_player->m_hair_col > 15) m_game->m_player->m_hair_col = 0;
+        m_game->m_new_char.hair_col += delta;
+        if (m_game->m_new_char.hair_col < 0) m_game->m_new_char.hair_col = 15;
+        if (m_game->m_new_char.hair_col > 15) m_game->m_new_char.hair_col = 0;
     });
 
     // Underwear color: 0-7 wrap
@@ -124,9 +124,9 @@ void Screen_CreateNewCharacter::on_initialize()
         cc::rect{236 + OX, 216 + OY, 44, 13}, cc::rect{0, 0, 21, 13}, cc::rect{23, 0, 21, 13});
     tog_underwear->set_click_sound([this] { m_game->play_game_sound('E', 14, 5); });
     tog_underwear->set_on_change([this](int, int delta) {
-        m_game->m_player->m_under_col += delta;
-        if (m_game->m_player->m_under_col < 0) m_game->m_player->m_under_col = 7;
-        if (m_game->m_player->m_under_col > 7) m_game->m_player->m_under_col = 0;
+        m_game->m_new_char.under_col += delta;
+        if (m_game->m_new_char.under_col < 0) m_game->m_new_char.under_col = 7;
+        if (m_game->m_new_char.under_col > 7) m_game->m_new_char.under_col = 0;
     });
 
     // === Stat toggles (NOT in focus order) ===
@@ -146,7 +146,7 @@ void Screen_CreateNewCharacter::on_initialize()
         };
     };
 
-    auto* p = m_game->m_player.get();
+    auto& nc = m_game->m_new_char;
 
     auto make_stat_toggle = [&](int id, int y, int8_t& stat) {
         auto* tog = m_controls.add<cc::toggle_button>(id, cc::rect{236 + OX, y + OY, 44, 13},
@@ -154,12 +154,12 @@ void Screen_CreateNewCharacter::on_initialize()
         tog->set_click_sound([this] { m_game->play_game_sound('E', 14, 5); });
         tog->set_on_change(make_stat_handler(stat));
     };
-    make_stat_toggle(TOG_STR, 276, p->m_stat_mod_str);
-    make_stat_toggle(TOG_VIT, 291, p->m_stat_mod_vit);
-    make_stat_toggle(TOG_DEX, 306, p->m_stat_mod_dex);
-    make_stat_toggle(TOG_INT, 321, p->m_stat_mod_int);
-    make_stat_toggle(TOG_MAG, 336, p->m_stat_mod_mag);
-    make_stat_toggle(TOG_CHR, 351, p->m_stat_mod_chr);
+    make_stat_toggle(TOG_STR, 276, nc.stat_str);
+    make_stat_toggle(TOG_VIT, 291, nc.stat_vit);
+    make_stat_toggle(TOG_DEX, 306, nc.stat_dex);
+    make_stat_toggle(TOG_INT, 321, nc.stat_int);
+    make_stat_toggle(TOG_MAG, 336, nc.stat_mag);
+    make_stat_toggle(TOG_CHR, 351, nc.stat_chr);
 
     // === Action buttons ===
     // Create button
@@ -193,15 +193,15 @@ void Screen_CreateNewCharacter::on_initialize()
     btn_warrior->set_click_sound([this] { m_game->play_game_sound('E', 14, 5); });
     btn_warrior->set_on_click([this](int) {
         if (m_prev_focused != BTN_WARRIOR) return;
-        m_game->m_player->m_stat_mod_str = 14;
-        m_game->m_player->m_stat_mod_vit = 12;
-        m_game->m_player->m_stat_mod_dex = 14;
-        m_game->m_player->m_stat_mod_int = 10;
-        m_game->m_player->m_stat_mod_mag = 10;
-        m_game->m_player->m_stat_mod_chr = 10;
-        m_iNewCharPoint = 70 - (m_game->m_player->m_stat_mod_str + m_game->m_player->m_stat_mod_vit
-            + m_game->m_player->m_stat_mod_dex + m_game->m_player->m_stat_mod_int
-            + m_game->m_player->m_stat_mod_mag + m_game->m_player->m_stat_mod_chr);
+        m_game->m_new_char.stat_str = 14;
+        m_game->m_new_char.stat_vit = 12;
+        m_game->m_new_char.stat_dex = 14;
+        m_game->m_new_char.stat_int = 10;
+        m_game->m_new_char.stat_mag = 10;
+        m_game->m_new_char.stat_chr = 10;
+        m_iNewCharPoint = 70 - (m_game->m_new_char.stat_str + m_game->m_new_char.stat_vit
+            + m_game->m_new_char.stat_dex + m_game->m_new_char.stat_int
+            + m_game->m_new_char.stat_mag + m_game->m_new_char.stat_chr);
         m_selected_class = BTN_WARRIOR;
     });
     btn_warrior->set_render_handler([this](const cc::control& c) {
@@ -215,15 +215,15 @@ void Screen_CreateNewCharacter::on_initialize()
     btn_mage->set_click_sound([this] { m_game->play_game_sound('E', 14, 5); });
     btn_mage->set_on_click([this](int) {
         if (m_prev_focused != BTN_MAGE) return;
-        m_game->m_player->m_stat_mod_str = 10;
-        m_game->m_player->m_stat_mod_vit = 12;
-        m_game->m_player->m_stat_mod_dex = 10;
-        m_game->m_player->m_stat_mod_int = 14;
-        m_game->m_player->m_stat_mod_mag = 14;
-        m_game->m_player->m_stat_mod_chr = 10;
-        m_iNewCharPoint = 70 - (m_game->m_player->m_stat_mod_str + m_game->m_player->m_stat_mod_vit
-            + m_game->m_player->m_stat_mod_dex + m_game->m_player->m_stat_mod_int
-            + m_game->m_player->m_stat_mod_mag + m_game->m_player->m_stat_mod_chr);
+        m_game->m_new_char.stat_str = 10;
+        m_game->m_new_char.stat_vit = 12;
+        m_game->m_new_char.stat_dex = 10;
+        m_game->m_new_char.stat_int = 14;
+        m_game->m_new_char.stat_mag = 14;
+        m_game->m_new_char.stat_chr = 10;
+        m_iNewCharPoint = 70 - (m_game->m_new_char.stat_str + m_game->m_new_char.stat_vit
+            + m_game->m_new_char.stat_dex + m_game->m_new_char.stat_int
+            + m_game->m_new_char.stat_mag + m_game->m_new_char.stat_chr);
         m_selected_class = BTN_MAGE;
     });
     btn_mage->set_render_handler([this](const cc::control& c) {
@@ -237,15 +237,15 @@ void Screen_CreateNewCharacter::on_initialize()
     btn_priest->set_click_sound([this] { m_game->play_game_sound('E', 14, 5); });
     btn_priest->set_on_click([this](int) {
         if (m_prev_focused != BTN_MASTER) return;
-        m_game->m_player->m_stat_mod_str = 14;
-        m_game->m_player->m_stat_mod_vit = 10;
-        m_game->m_player->m_stat_mod_dex = 10;
-        m_game->m_player->m_stat_mod_int = 10;
-        m_game->m_player->m_stat_mod_mag = 12;
-        m_game->m_player->m_stat_mod_chr = 14;
-        m_iNewCharPoint = 70 - (m_game->m_player->m_stat_mod_str + m_game->m_player->m_stat_mod_vit
-            + m_game->m_player->m_stat_mod_dex + m_game->m_player->m_stat_mod_int
-            + m_game->m_player->m_stat_mod_mag + m_game->m_player->m_stat_mod_chr);
+        m_game->m_new_char.stat_str = 14;
+        m_game->m_new_char.stat_vit = 10;
+        m_game->m_new_char.stat_dex = 10;
+        m_game->m_new_char.stat_int = 10;
+        m_game->m_new_char.stat_mag = 12;
+        m_game->m_new_char.stat_chr = 14;
+        m_iNewCharPoint = 70 - (m_game->m_new_char.stat_str + m_game->m_new_char.stat_vit
+            + m_game->m_new_char.stat_dex + m_game->m_new_char.stat_int
+            + m_game->m_new_char.stat_mag + m_game->m_new_char.stat_chr);
         m_selected_class = BTN_MASTER;
     });
     btn_priest->set_render_handler([this](const cc::control& c) {
@@ -327,7 +327,7 @@ void Screen_CreateNewCharacter::submit_create_character()
     const std::string& name = tb->text();
     if (!CMisc::check_valid_name(name.c_str())) return;
 
-    m_game->m_player->m_player_name = name.c_str();
+    m_game->m_new_char.player_name = name.c_str();
     m_game->m_l_sock = std::make_unique<hb::shared::net::ASIOSocket>(m_game->m_io_pool->get_context(), game_limits::socket_block_limit);
     m_game->m_l_sock->connect(m_game->m_log_server_addr.c_str(), m_game->m_log_server_port);
     m_game->m_l_sock->init_buffer_size(hb::shared::limits::MsgBufferSize);
@@ -363,35 +363,35 @@ void Screen_CreateNewCharacter::on_render()
     // === Stat values ===
     int row = 0;
     std::string txt;
-    txt = std::format("{}", m_game->m_player->m_stat_mod_str);
+    txt = std::format("{}", m_game->m_new_char.stat_str);
     hb::shared::text::draw_text(GameFont::Default, 204 + OX, 277 + OY + 16 * row++, txt.c_str(), hb::shared::text::TextStyle::from_color(GameColors::UILabel));
-    txt = std::format("{}", m_game->m_player->m_stat_mod_vit);
+    txt = std::format("{}", m_game->m_new_char.stat_vit);
     hb::shared::text::draw_text(GameFont::Default, 204 + OX, 277 + OY + 16 * row++, txt.c_str(), hb::shared::text::TextStyle::from_color(GameColors::UILabel));
-    txt = std::format("{}", m_game->m_player->m_stat_mod_dex);
+    txt = std::format("{}", m_game->m_new_char.stat_dex);
     hb::shared::text::draw_text(GameFont::Default, 204 + OX, 277 + OY + 16 * row++, txt.c_str(), hb::shared::text::TextStyle::from_color(GameColors::UILabel));
-    txt = std::format("{}", m_game->m_player->m_stat_mod_int);
+    txt = std::format("{}", m_game->m_new_char.stat_int);
     hb::shared::text::draw_text(GameFont::Default, 204 + OX, 277 + OY + 16 * row++, txt.c_str(), hb::shared::text::TextStyle::from_color(GameColors::UILabel));
-    txt = std::format("{}", m_game->m_player->m_stat_mod_mag);
+    txt = std::format("{}", m_game->m_new_char.stat_mag);
     hb::shared::text::draw_text(GameFont::Default, 204 + OX, 277 + OY + 16 * row++, txt.c_str(), hb::shared::text::TextStyle::from_color(GameColors::UILabel));
-    txt = std::format("{}", m_game->m_player->m_stat_mod_chr);
+    txt = std::format("{}", m_game->m_new_char.stat_chr);
     hb::shared::text::draw_text(GameFont::Default, 204 + OX, 277 + OY + 16 * row++, txt.c_str(), hb::shared::text::TextStyle::from_color(GameColors::UILabel));
 
     // === Controls (textbox text/cursor + action button highlights) ===
     m_controls.render();
 
     // === Character preview ===
-    switch (m_game->m_player->m_gender) {
+    switch (m_game->m_new_char.gender) {
     case 1: m_game->m_entity_state.m_owner_type = hb::shared::owner::MaleFirst; break;
     case 2: m_game->m_entity_state.m_owner_type = hb::shared::owner::FemaleFirst; break;
     }
-    m_game->m_entity_state.m_owner_type += m_game->m_player->m_skin_col - 1;
+    m_game->m_entity_state.m_owner_type += m_game->m_new_char.skin_col - 1;
     m_game->m_entity_state.m_dir = m_game->m_menu_dir;
     m_game->m_entity_state.m_appearance.clear();
-    m_game->m_entity_state.m_appearance.underwear_type = m_game->m_player->m_under_col;
-    m_game->m_entity_state.m_appearance.hair_style = m_game->m_player->m_hair_style;
-    m_game->m_entity_state.m_appearance.hair_color = m_game->m_player->m_hair_col;
+    m_game->m_entity_state.m_appearance.underwear_type = m_game->m_new_char.under_col;
+    m_game->m_entity_state.m_appearance.hair_style = m_game->m_new_char.hair_style;
+    m_game->m_entity_state.m_appearance.hair_color = m_game->m_new_char.hair_col;
     m_game->m_entity_state.m_name.fill('\0');
-    std::snprintf(m_game->m_entity_state.m_name.data(), m_game->m_entity_state.m_name.size(), "%s", m_game->m_player->m_player_name.c_str());
+    std::snprintf(m_game->m_entity_state.m_name.data(), m_game->m_entity_state.m_name.size(), "%s", m_game->m_new_char.player_name.c_str());
     m_game->m_entity_state.m_action = Type::Move;
     m_game->m_entity_state.m_frame = m_game->m_menu_frame;
 
@@ -401,13 +401,13 @@ void Screen_CreateNewCharacter::on_render()
     // === Derived stats ===
     row = 0;
     hb::shared::text::draw_text(GameFont::Default, 445 + OX, 192 + OY, DEF_MSG_HITPOINT, hb::shared::text::TextStyle::from_color(GameColors::UIBlack));
-    txt = std::format("{}", m_game->m_player->m_stat_mod_vit * 3 + 2 + m_game->m_player->m_stat_mod_str / 2);
+    txt = std::format("{}", m_game->m_new_char.stat_vit * 3 + 2 + m_game->m_new_char.stat_str / 2);
     hb::shared::text::draw_text(GameFont::Default, 550 + OX, 192 + OY + 16 * row++, txt.c_str(), hb::shared::text::TextStyle::from_color(GameColors::UILabel));
     hb::shared::text::draw_text(GameFont::Default, 445 + OX, 208 + OY, DEF_MSG_MANAPOINT, hb::shared::text::TextStyle::from_color(GameColors::UIBlack));
-    txt = std::format("{}", m_game->m_player->m_stat_mod_mag * 2 + 2 + m_game->m_player->m_stat_mod_int / 2);
+    txt = std::format("{}", m_game->m_new_char.stat_mag * 2 + 2 + m_game->m_new_char.stat_int / 2);
     hb::shared::text::draw_text(GameFont::Default, 550 + OX, 192 + OY + 16 * row++, txt.c_str(), hb::shared::text::TextStyle::from_color(GameColors::UILabel));
     hb::shared::text::draw_text(GameFont::Default, 445 + OX, 224 + OY, DEF_MSG_STAMINARPOINT, hb::shared::text::TextStyle::from_color(GameColors::UIBlack));
-    txt = std::format("{}", m_game->m_player->m_stat_mod_str * 2 + 2);
+    txt = std::format("{}", m_game->m_new_char.stat_str * 2 + 2);
     hb::shared::text::draw_text(GameFont::Default, 550 + OX, 192 + OY + 16 * row++, txt.c_str(), hb::shared::text::TextStyle::from_color(GameColors::UILabel));
 
     m_game->draw_version();

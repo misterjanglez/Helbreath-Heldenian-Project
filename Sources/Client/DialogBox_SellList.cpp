@@ -53,7 +53,7 @@ void DialogBox_SellList::draw_item_list(short sX, short sY, short size_x, short 
 		if (m_items[i].index != -1)
 		{
 			int item_index = m_items[i].index;
-			auto itemInfo = item_name_formatter::get().format(m_game->m_item_list[item_index].get());
+			auto itemInfo = item_name_formatter::get().format(player().m_item_list[item_index].get());
 			auto effect = itemInfo.effect_text();
 			auto extra = itemInfo.extra_text();
 
@@ -183,7 +183,7 @@ bool DialogBox_SellList::on_click()
 	{
 		if ((mouse_x > sX + 25) && (mouse_x < sX + 250) && (mouse_y >= sY + 55 + i * 15) && (mouse_y <= sY + 55 + 14 + i * 15))
 		{
-			if (m_game->m_item_list[m_items[i].index] != 0)
+			if (player().m_item_list[m_items[i].index] != 0)
 			{
 				// Re-enable the item
 				inventory_manager::get().unlock_item(m_items[i].index);
@@ -236,9 +236,9 @@ bool DialogBox_SellList::on_item_drop()
 	short mouse_y = static_cast<short>(hb::shared::input::get_mouse_y());
 	int item_id = CursorTarget::get_selected_id();
 	if (item_id < 0 || item_id >= hb::shared::limits::MaxItems) return false;
-	if (m_game->m_item_list[item_id] == nullptr) return false;
+	if (player().m_item_list[item_id] == nullptr) return false;
 	if (inventory_manager::get().is_locked(item_id)) return false;
-	if (m_game->m_player->m_Controller.get_command() < 0) return false;
+	if (player().m_Controller.get_command() < 0) return false;
 
 	// Check if item is already in sell list
 	for (int i = 0; i < game_limits::max_sell_list; i++)
@@ -251,40 +251,40 @@ bool DialogBox_SellList::on_item_drop()
 	}
 
 	// Can't sell gold or arrows
-	if (m_game->m_item_list[item_id]->m_id_num == hb::shared::item::ItemId::Gold ||
-		m_game->m_item_list[item_id]->m_id_num == hb::shared::item::ItemId::Arrow)
+	if (player().m_item_list[item_id]->m_id_num == hb::shared::item::ItemId::Gold ||
+		player().m_item_list[item_id]->m_id_num == hb::shared::item::ItemId::Arrow)
 	{
-		auto msg = std::format(NOTIFYMSG_CANNOT_SELL_ITEM3, m_game->m_item_list[item_id]->m_name);
+		auto msg = std::format(NOTIFYMSG_CANNOT_SELL_ITEM3, player().m_item_list[item_id]->m_name);
 		add_event_list(msg.c_str(), 10);
 		return false;
 	}
 
 	// Can't sell broken items
-	if (m_game->m_item_list[item_id]->m_cur_life_span == 0)
+	if (player().m_item_list[item_id]->m_cur_life_span == 0)
 	{
 		std::string G_cTxt;
-		auto itemInfo2 = item_name_formatter::get().format(m_game->m_item_list[item_id].get());
+		auto itemInfo2 = item_name_formatter::get().format(player().m_item_list[item_id].get());
 		G_cTxt = std::format(NOTIFYMSG_CANNOT_SELL_ITEM2, itemInfo2.name.c_str());
 		add_event_list(G_cTxt.c_str(), 10);
 		return false;
 	}
 
 	// Stackable items - open quantity dialog
-	CItem* cfg = m_game->get_item_config(m_game->m_item_list[item_id]->m_id_num);
+	CItem* cfg = m_game->get_item_config(player().m_item_list[item_id]->m_id_num);
 	if (cfg && ((cfg->get_item_type() == ItemType::Consume) ||
 		(cfg->get_item_type() == ItemType::Arrow)) &&
-		(m_game->m_item_list[item_id]->m_count > 1))
+		(player().m_item_list[item_id]->m_count > 1))
 	{
-		auto* dropDlg = m_game->m_dialog_box_manager.get_dialog_as<DialogBox_ItemDropAmount>(DialogBoxId::ItemDropExternal);
+		auto* dropDlg = m_game->get_dialog_box_manager().get_dialog_as<DialogBox_ItemDropAmount>(DialogBoxId::ItemDropExternal);
 		dropDlg->m_x = mouse_x - 140;
 		dropDlg->m_y = mouse_y - 70;
 		if (dropDlg->m_y < 0) dropDlg->m_y = 0;
-		dropDlg->m_drop_x = m_game->m_player->m_player_x + 1;
-		dropDlg->m_drop_y = m_game->m_player->m_player_y + 1;
+		dropDlg->m_drop_x = player().m_player_x + 1;
+		dropDlg->m_drop_y = player().m_player_y + 1;
 		dropDlg->m_drop_target_type = 1001;
 		dropDlg->m_drop_target_id = item_id;
 		std::memset(dropDlg->m_target_name, 0, sizeof(dropDlg->m_target_name));
-		m_game->m_dialog_box_manager.enable_dialog_box(DialogBoxId::ItemDropExternal, item_id, static_cast<int64_t>(m_game->m_item_list[item_id]->m_count), 0);
+		m_game->get_dialog_box_manager().enable_dialog_box(DialogBoxId::ItemDropExternal, item_id, static_cast<int64_t>(player().m_item_list[item_id]->m_count), 0);
 		inventory_manager::get().lock_item(item_id);
 	}
 	else

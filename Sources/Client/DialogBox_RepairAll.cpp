@@ -31,7 +31,7 @@ void DialogBox_RepairAll::on_draw()
 	{
 		if ((i + m_scroll_offset) < m_game->totalItemRepair)
 		{
-			CItem* cfg = m_game->get_item_config(m_game->m_item_list[m_game->m_repair_all[i + m_scroll_offset].index]->m_id_num);
+			CItem* cfg = m_game->get_item_config(player().m_item_list[m_game->m_repair_all[i + m_scroll_offset].index]->m_id_num);
 			txt = std::format("{} - Cost: {}", cfg ? cfg->m_name : "Unknown", m_game->m_repair_all[i + m_scroll_offset].price);
 
 			put_string(sX + 30, sY + 45 + i * 15, txt.c_str(), GameColors::UIBlack);
@@ -61,7 +61,7 @@ void DialogBox_RepairAll::on_draw()
 	// Mouse wheel scrolling
 	if (total_lines > 15)
 	{
-		if (m_game->m_dialog_box_manager.get_top_id() == DialogBoxId::RepairAll && z != 0)
+		if (m_game->get_dialog_box_manager().get_top_id() == DialogBoxId::RepairAll && z != 0)
 		{
 			if (z > 0) m_scroll_offset--;
 			if (z < 0) m_scroll_offset++;

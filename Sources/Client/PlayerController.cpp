@@ -19,8 +19,8 @@ void CPlayerController::reset()
 	m_command_available = true;
 	m_command_time = 0;
 	m_command_count = 0;
-	m_prev_move_x = 0;
-	m_prev_move_y = 0;
+	m_prev_move_x = -1;
+	m_prev_move_y = -1;
 	m_is_prev_move_blocked = false;
 	m_player_turn = 0;
 	m_pending_stop_dir = direction{};

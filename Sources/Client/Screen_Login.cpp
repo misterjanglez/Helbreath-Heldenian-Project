@@ -114,8 +114,8 @@ void Screen_Login::submit_login()
 
     if (!tb_name->is_valid() || !tb_pass->is_valid()) return;
 
-    m_game->m_player->m_account_name = tb_name->text().c_str();
-    m_game->m_player->m_account_password = tb_pass->text().c_str();
+    m_game->m_account_name = tb_name->text().c_str();
+    m_game->m_account_password = tb_pass->text().c_str();
 
     m_game->m_l_sock = std::make_unique<hb::shared::net::ASIOSocket>(
         m_game->m_io_pool->get_context(), game_limits::socket_block_limit);

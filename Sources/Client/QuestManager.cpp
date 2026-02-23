@@ -66,8 +66,8 @@ void quest_manager::handle_quest_reward(char* data)
 		m_game->m_quest.range = 0;
 		m_game->m_quest.current_count = 0;
 		m_game->m_quest.is_quest_completed = false;
-		m_game->m_dialog_box_manager.enable_dialog_box(DialogBoxId::NpcTalk, 0, who + 110, 0);
-		index = m_game->m_dialog_box_manager.get_dialog_as<DialogBox_NpcTalk>(DialogBoxId::NpcTalk)->m_text_line_count;
+		m_game->get_dialog_box_manager().enable_dialog_box(DialogBoxId::NpcTalk, 0, who + 110, 0);
+		index = m_game->get_dialog_box_manager().get_dialog_as<DialogBox_NpcTalk>(DialogBoxId::NpcTalk)->m_text_line_count;
 		if (index < 0 || index + 3 >= game_limits::max_text_dlg_lines) return;
 		m_game->m_msg_text_list2[index] = std::make_unique<CMsg>(0, "  ", 0);
 		index++;
@@ -91,14 +91,14 @@ void quest_manager::handle_quest_reward(char* data)
 		m_game->m_msg_text_list2[index] = std::make_unique<CMsg>(0, "  ", 0);
 		index++;
 	}
-	else m_game->m_dialog_box_manager.enable_dialog_box(DialogBoxId::NpcTalk, 0, who + 120, 0);
+	else m_game->get_dialog_box_manager().enable_dialog_box(DialogBoxId::NpcTalk, 0, who + 120, 0);
 }
 
 void quest_manager::handle_quest_completed(char* data)
 {
 	m_game->m_quest.is_quest_completed = true;
-	m_game->m_dialog_box_manager.disable_dialog_box(DialogBoxId::Quest);
-	m_game->m_dialog_box_manager.enable_dialog_box(DialogBoxId::Quest, 1, 0, 0);
+	m_game->get_dialog_box_manager().disable_dialog_box(DialogBoxId::Quest);
+	m_game->get_dialog_box_manager().enable_dialog_box(DialogBoxId::Quest, 1, 0, 0);
 	switch (m_game->m_player->m_player_type) {
 	case 1:
 	case 2:
@@ -118,6 +118,6 @@ void quest_manager::handle_quest_completed(char* data)
 void quest_manager::handle_quest_aborted(char* data)
 {
 	m_game->m_quest.quest_type = 0;
-	m_game->m_dialog_box_manager.disable_dialog_box(DialogBoxId::Quest);
-	m_game->m_dialog_box_manager.enable_dialog_box(DialogBoxId::Quest, 2, 0, 0);
+	m_game->get_dialog_box_manager().disable_dialog_box(DialogBoxId::Quest);
+	m_game->get_dialog_box_manager().enable_dialog_box(DialogBoxId::Quest, 2, 0, 0);
 }

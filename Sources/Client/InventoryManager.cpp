@@ -56,21 +56,21 @@ int inventory_manager::calc_total_weight()
 	int64_t weight = 0, temp;
 	cnt = 0;
 	for (i = 0; i < hb::shared::limits::MaxItems; i++)
-		if (m_game->m_item_list[i] != 0)
+		if (m_game->m_player->m_item_list[i] != 0)
 		{
-			CItem* cfg = m_game->get_item_config(m_game->m_item_list[i]->m_id_num);
+			CItem* cfg = m_game->get_item_config(m_game->m_player->m_item_list[i]->m_id_num);
 			if (cfg && ((cfg->get_item_type() == ItemType::Consume)
 				|| (cfg->get_item_type() == ItemType::Arrow)))
 			{
-				int lp = m_game->m_item_list[i]->get_light_percent();
+				int lp = m_game->m_player->m_item_list[i]->get_light_percent();
 				int item_w = (lp > 0) ? cfg->m_weight * (100 - lp) / 100 : cfg->m_weight;
-				temp = static_cast<int64_t>(item_w) * static_cast<int64_t>(m_game->m_item_list[i]->m_count);
-				if (m_game->m_item_list[i]->m_id_num == hb::shared::item::ItemId::Gold) temp = temp / 20;
+				temp = static_cast<int64_t>(item_w) * static_cast<int64_t>(m_game->m_player->m_item_list[i]->m_count);
+				if (m_game->m_player->m_item_list[i]->m_id_num == hb::shared::item::ItemId::Gold) temp = temp / 20;
 				weight += temp;
 			}
 			else if (cfg)
 			{
-				int lp = m_game->m_item_list[i]->get_light_percent();
+				int lp = m_game->m_player->m_item_list[i]->get_light_percent();
 				weight += (lp > 0) ? cfg->m_weight * (100 - lp) / 100 : cfg->m_weight;
 			}
 			cnt++;
@@ -84,7 +84,7 @@ int inventory_manager::get_total_item_count()
 	int i, cnt;
 	cnt = 0;
 	for (i = 0; i < hb::shared::limits::MaxItems; i++)
-		if (m_game->m_item_list[i] != 0) cnt++;
+		if (m_game->m_player->m_item_list[i] != 0) cnt++;
 	return cnt;
 }
 
@@ -94,7 +94,7 @@ int inventory_manager::get_bank_item_count()
 
 	cnt = 0;
 	for (i = 0; i < hb::shared::limits::MaxBankItems; i++)
-		if (m_game->m_bank_list[i] != 0) cnt++;
+		if (m_game->m_player->m_bank_list[i] != 0) cnt++;
 
 	return cnt;
 }
@@ -108,7 +108,7 @@ void inventory_manager::erase_item(int item_id)
 		if (m_game->m_short_cut[i] == item_id)
 		{
 			std::string G_cTxt;
-			auto itemInfo = item_name_formatter::get().format(m_game->m_item_list[item_id].get());
+			auto itemInfo = item_name_formatter::get().format(m_game->m_player->m_item_list[item_id].get());
 			auto effect = itemInfo.effect_text();
 			auto extra = itemInfo.extra_text();
 			if (i < 3) G_cTxt = std::format(ERASE_ITEM, itemInfo.name.c_str(), effect.c_str(), extra.c_str(), i + 1);
@@ -131,7 +131,7 @@ void inventory_manager::erase_item(int item_id)
 			m_game->m_item_order[i] = -1;
 		}
 	// ItemList
-	m_game->m_item_list[item_id].reset();
+	m_game->m_player->m_item_list[item_id].reset();
 	m_game->m_is_item_equipped[item_id] = false;
 	unlock_item(item_id);
 }
@@ -139,12 +139,12 @@ void inventory_manager::erase_item(int item_id)
 bool inventory_manager::check_item_operation_enabled(int item_id)
 {
 	if (item_id < 0 || item_id >= hb::shared::limits::MaxItems) return false;
-	if (m_game->m_item_list[item_id] == 0) return false;
+	if (m_game->m_player->m_item_list[item_id] == 0) return false;
 	if (m_game->m_player->m_Controller.get_command() < 0) return false;
 	if (teleport_manager::get().is_requested()) return false;
 	if (is_locked(item_id)) return false;
 
-	if ((m_game->m_item_list[item_id]->m_id_num == 867) && (m_game->m_using_slate == true)) // Ancient Tablet
+	if ((m_game->m_player->m_item_list[item_id]->m_id_num == 867) && (m_game->m_using_slate == true)) // Ancient Tablet
 	{
 		if ((m_game->m_map_index == 35) || (m_game->m_map_index == 36) || (m_game->m_map_index == 37))
 		{
@@ -155,7 +155,7 @@ bool inventory_manager::check_item_operation_enabled(int item_id)
 		return false;
 	}
 
-	if (m_game->m_dialog_box_manager.is_blocking_operation_active())
+	if (m_game->get_dialog_box_manager().is_blocking_operation_active())
 	{
 		m_game->add_event_list(BCHECK_ITEM_OPERATION_ENABLE1, 10);
 		return false;
@@ -170,22 +170,22 @@ void inventory_manager::unequip_slot(int equip_pos)
 	std::string G_cTxt;
 	if (m_game->m_item_equipment_status[equip_pos] < 0) return;
 	// Remove Angelic Stats
-	CItem* cfg_eq = m_game->get_item_config(m_game->m_item_list[m_game->m_item_equipment_status[equip_pos]]->m_id_num);
+	CItem* cfg_eq = m_game->get_item_config(m_game->m_player->m_item_list[m_game->m_item_equipment_status[equip_pos]]->m_id_num);
 	if ((equip_pos >= 11)
 		&& (cfg_eq && cfg_eq->get_item_type() == ItemType::Equip))
 	{
 		short item_id = m_game->m_item_equipment_status[equip_pos];
-		if (m_game->m_item_list[item_id]->m_id_num == hb::shared::item::ItemId::AngelicPandentSTR)
+		if (m_game->m_player->m_item_list[item_id]->m_id_num == hb::shared::item::ItemId::AngelicPandentSTR)
 			m_game->m_player->m_angelic_str = 0;
-		else if (m_game->m_item_list[item_id]->m_id_num == hb::shared::item::ItemId::AngelicPandentDEX)
+		else if (m_game->m_player->m_item_list[item_id]->m_id_num == hb::shared::item::ItemId::AngelicPandentDEX)
 			m_game->m_player->m_angelic_dex = 0;
-		else if (m_game->m_item_list[item_id]->m_id_num == hb::shared::item::ItemId::AngelicPandentINT)
+		else if (m_game->m_player->m_item_list[item_id]->m_id_num == hb::shared::item::ItemId::AngelicPandentINT)
 			m_game->m_player->m_angelic_int = 0;
-		else if (m_game->m_item_list[item_id]->m_id_num == hb::shared::item::ItemId::AngelicPandentMAG)
+		else if (m_game->m_player->m_item_list[item_id]->m_id_num == hb::shared::item::ItemId::AngelicPandentMAG)
 			m_game->m_player->m_angelic_mag = 0;
 	}
 
-	auto itemInfo2 = item_name_formatter::get().format(m_game->m_item_list[m_game->m_item_equipment_status[equip_pos]].get());
+	auto itemInfo2 = item_name_formatter::get().format(m_game->m_player->m_item_list[m_game->m_item_equipment_status[equip_pos]].get());
 	G_cTxt = std::format(ITEM_EQUIPMENT_RELEASED, itemInfo2.name.c_str());
 	m_game->add_event_list(G_cTxt.c_str(), 10);
 	m_game->m_is_item_equipped[m_game->m_item_equipment_status[equip_pos]] = false;
@@ -198,26 +198,26 @@ void inventory_manager::equip_item(int item_id)
 	std::string G_cTxt;
 	if (check_item_operation_enabled(item_id) == false) return;
 	if (m_game->m_is_item_equipped[item_id] == true) return;
-	CItem* cfg = m_game->get_item_config(m_game->m_item_list[item_id]->m_id_num);
+	CItem* cfg = m_game->get_item_config(m_game->m_player->m_item_list[item_id]->m_id_num);
 	if (!cfg) return;
 	if (cfg->get_equip_pos() == EquipPos::None)
 	{
 		m_game->add_event_list(BITEMDROP_CHARACTER3, 10);
 		return;
 	}
-	if (m_game->m_item_list[item_id]->m_cur_life_span == 0)
+	if (m_game->m_player->m_item_list[item_id]->m_cur_life_span == 0)
 	{
 		m_game->add_event_list(BITEMDROP_CHARACTER1, 10);
 		return;
 	}
-	int light_pct = m_game->m_item_list[item_id]->get_light_percent();
+	int light_pct = m_game->m_player->m_item_list[item_id]->get_light_percent();
 	int equip_weight = (light_pct > 0) ? cfg->m_weight * (100 - light_pct) / 100 : cfg->m_weight;
 	if (equip_weight / 100 > m_game->m_player->m_str + m_game->m_player->m_angelic_str)
 	{
 		m_game->add_event_list(BITEMDROP_CHARACTER2, 10);
 		return;
 	}
-	if (((m_game->m_item_list[item_id]->m_attribute & 0x00000001) == 0) && (cfg->m_level_limit > m_game->m_player->m_level))
+	if (((m_game->m_player->m_item_list[item_id]->m_attribute & 0x00000001) == 0) && (cfg->m_level_limit > m_game->m_player->m_level))
 	{
 		m_game->add_event_list(BITEMDROP_CHARACTER4, 10);
 		return;
@@ -288,22 +288,22 @@ void inventory_manager::equip_item(int item_id)
 	if ((cfg->get_item_type() == ItemType::Equip)
 		&& (cfg->m_equip_pos >= 11))
 	{
-		int angel_value = (m_game->m_item_list[item_id]->m_attribute & 0xF0000000) >> 28;
-		if (m_game->m_item_list[item_id]->m_id_num == hb::shared::item::ItemId::AngelicPandentSTR)
+		int angel_value = (m_game->m_player->m_item_list[item_id]->m_attribute & 0xF0000000) >> 28;
+		if (m_game->m_player->m_item_list[item_id]->m_id_num == hb::shared::item::ItemId::AngelicPandentSTR)
 			m_game->m_player->m_angelic_str = 1 + angel_value;
-		else if (m_game->m_item_list[item_id]->m_id_num == hb::shared::item::ItemId::AngelicPandentDEX)
+		else if (m_game->m_player->m_item_list[item_id]->m_id_num == hb::shared::item::ItemId::AngelicPandentDEX)
 			m_game->m_player->m_angelic_dex = 1 + angel_value;
-		else if (m_game->m_item_list[item_id]->m_id_num == hb::shared::item::ItemId::AngelicPandentINT)
+		else if (m_game->m_player->m_item_list[item_id]->m_id_num == hb::shared::item::ItemId::AngelicPandentINT)
 			m_game->m_player->m_angelic_int = 1 + angel_value;
-		else if (m_game->m_item_list[item_id]->m_id_num == hb::shared::item::ItemId::AngelicPandentMAG)
+		else if (m_game->m_player->m_item_list[item_id]->m_id_num == hb::shared::item::ItemId::AngelicPandentMAG)
 			m_game->m_player->m_angelic_mag = 1 + angel_value;
 	}
 
-	auto itemInfo3 = item_name_formatter::get().format(m_game->m_item_list[item_id].get());
+	auto itemInfo3 = item_name_formatter::get().format(m_game->m_player->m_item_list[item_id].get());
 	G_cTxt = std::format(BITEMDROP_CHARACTER9, itemInfo3.name.c_str());
 	m_game->add_event_list(G_cTxt.c_str(), 10);
 	{
-		short id = m_game->m_item_list[item_id]->m_id_num;
+		short id = m_game->m_player->m_item_list[item_id]->m_id_num;
 		if (id == hb::shared::item::ItemId::AngelicPandentSTR || id == hb::shared::item::ItemId::AngelicPandentDEX ||
 			id == hb::shared::item::ItemId::AngelicPandentINT || id == hb::shared::item::ItemId::AngelicPandentMAG)
 			m_game->play_game_sound('E', 52, 0);

@@ -3,6 +3,7 @@
 //////////////////////////////////////////////////////////////////////
 
 #include "Screen_OnGame.h"
+#include "Player.h"
 #include "Game.h"
 #include "EventListManager.h"
 #include "TextInputManager.h"
@@ -25,8 +26,11 @@
 #include "SpellAoE.h"
 #include "Magic.h"
 #include "DialogBox_GuildMenu.h"
+#include "DialogBox_GuildOperation.h"
 #include "DialogBox_ItemDropAmount.h"
+#include "DialogBox_Party.h"
 #include "DialogBox_SellList.h"
+#include "DialogBox_Skill.h"
 #include "DialogBox_Exchange.h"
 #include "DialogBox_NpcActionQuery.h"
 #include "Log.h"
@@ -50,15 +54,52 @@ using namespace hb::shared::item;
 using namespace hb::client::config;
 using namespace hb::client::sprite_id;
 
+std::unique_ptr<CPlayer> Screen_OnGame::s_player;
+
 Screen_OnGame::Screen_OnGame(CGame* game)
     : IGameScreen(game)
 {
+}
+
+void Screen_OnGame::create_player()
+{
+    s_player = std::make_unique<CPlayer>();
+}
+
+void Screen_OnGame::destroy_player()
+{
+    s_player.reset();
 }
 
 void Screen_OnGame::on_initialize()
 {
     // Set current mode for code that checks GameModeManager::get_mode()
     GameModeManager::set_current_mode(GameMode::MainGame);
+
+    // Reset all gameplay state and create the player
+    m_game->init_game_settings();
+
+    // Wire the static player into CGame for gameplay access
+    m_game->m_player = s_player.get();
+
+    // Copy session identity into the player
+    s_player->m_player_name = m_game->m_selected_char_name;
+    s_player->m_level = m_game->m_selected_char_level;
+
+    // Create dialog box manager — owned by this screen
+    m_dialog_box_manager = std::make_unique<DialogBoxManager>(*m_game, *s_player);
+    m_dialog_box_manager->initialize_dialog_boxes();
+
+    // Reset dialog state that init_game_settings couldn't do (dialogs didn't exist yet)
+    m_dialog_box_manager->get_dialog_as<DialogBox_Skill>(DialogBoxId::Skill)->m_is_down_skill_pending = false;
+    m_dialog_box_manager->reset_all_for_map_change();
+    m_dialog_box_manager->get_dialog_as<DialogBox_GuildOperation>(DialogBoxId::GuildOperation)->reset();
+    m_dialog_box_manager->get_dialog_as<DialogBox_SellList>(DialogBoxId::SellList)->reset();
+    m_dialog_box_manager->get_dialog_as<DialogBox_Party>(DialogBoxId::Party)->reset_members();
+    m_dialog_box_manager->enable_dialog_box(DialogBoxId::GuideMap, 0, 0, 0);
+
+    m_guild_manager.set_game(m_game);
+    m_guild_manager.clear_name_cache();
 
     m_time = GameClock::get_time_ms();
     m_game->m_fps_time = m_time;
@@ -69,12 +110,18 @@ void Screen_OnGame::on_initialize()
 
     if (audio_manager::get().is_music_enabled())
         m_game->start_bgm();
+
+    // Connect to the game server. The player and dialog boxes are ready to
+    // handle any responses the server sends back.
+    m_game->connect_to_game_server();
 }
 
 void Screen_OnGame::on_uninitialize()
 {
     text_input_manager::get().end_input();
     audio_manager::get().stop_music();
+    m_dialog_box_manager.reset();
+    m_game->m_player = nullptr;
 }
 
 bool Screen_OnGame::on_text_input(uint32_t codepoint)
@@ -119,15 +166,15 @@ void Screen_OnGame::on_update()
     // Enter key handling
     if (hb::shared::input::is_key_pressed(KeyCode::Enter) == true)
     {
-        if ((m_game->m_dialog_box_manager.is_enabled(DialogBoxId::GuildMenu) == true) && (m_game->m_dialog_box_manager.get_dialog_as<DialogBox_GuildMenu>(DialogBoxId::GuildMenu)->m_mode == DialogBox_GuildMenu::mode::create_guild) && (m_game->m_dialog_box_manager.get_top_id() == DialogBoxId::GuildMenu)) {
+        if ((m_game->get_dialog_box_manager().is_enabled(DialogBoxId::GuildMenu) == true) && (m_game->get_dialog_box_manager().get_dialog_as<DialogBox_GuildMenu>(DialogBoxId::GuildMenu)->m_mode == DialogBox_GuildMenu::mode::create_guild) && (m_game->get_dialog_box_manager().get_top_id() == DialogBoxId::GuildMenu)) {
             text_input_manager::get().end_input();
             if (m_game->m_player->m_guild_name.empty()) return;
             if (m_game->m_player->m_guild_name != "NONE") {
                 m_game->send_command(MsgId::request_create_new_guild, MsgType::Confirm, 0, 0, 0, 0, 0);
-                m_game->m_dialog_box_manager.get_dialog_as<DialogBox_GuildMenu>(DialogBoxId::GuildMenu)->m_mode = DialogBox_GuildMenu::mode::creating;
+                m_game->get_dialog_box_manager().get_dialog_as<DialogBox_GuildMenu>(DialogBoxId::GuildMenu)->m_mode = DialogBox_GuildMenu::mode::creating;
             }
         }
-        else if ((m_game->m_dialog_box_manager.is_enabled(DialogBoxId::ItemDropExternal) == true) && (m_game->m_dialog_box_manager.get_dialog_as<DialogBox_ItemDropAmount>(DialogBoxId::ItemDropExternal)->m_mode == DialogBox_ItemDropAmount::mode::input) && (m_game->m_dialog_box_manager.get_top_id() == DialogBoxId::ItemDropExternal)) {
+        else if ((m_game->get_dialog_box_manager().is_enabled(DialogBoxId::ItemDropExternal) == true) && (m_game->get_dialog_box_manager().get_dialog_as<DialogBox_ItemDropAmount>(DialogBoxId::ItemDropExternal)->m_mode == DialogBox_ItemDropAmount::mode::input) && (m_game->get_dialog_box_manager().get_top_id() == DialogBoxId::ItemDropExternal)) {
             text_input_manager::get().end_input();
 
             if (m_game->m_skill_using_status == true) {
@@ -135,12 +182,12 @@ void Screen_OnGame::on_update()
                 return;
             }
 
-            if ((m_game->m_dialog_box_manager.is_enabled(DialogBoxId::NpcActionQuery) == true) && ((m_game->m_dialog_box_manager.get_dialog_as<DialogBox_NpcActionQuery>(DialogBoxId::NpcActionQuery)->m_mode == DialogBox_NpcActionQuery::mode::give_to_player) || (m_game->m_dialog_box_manager.get_dialog_as<DialogBox_NpcActionQuery>(DialogBoxId::NpcActionQuery)->m_mode == DialogBox_NpcActionQuery::mode::sell_to_shop))) {
+            if ((m_game->get_dialog_box_manager().is_enabled(DialogBoxId::NpcActionQuery) == true) && ((m_game->get_dialog_box_manager().get_dialog_as<DialogBox_NpcActionQuery>(DialogBoxId::NpcActionQuery)->m_mode == DialogBox_NpcActionQuery::mode::give_to_player) || (m_game->get_dialog_box_manager().get_dialog_as<DialogBox_NpcActionQuery>(DialogBoxId::NpcActionQuery)->m_mode == DialogBox_NpcActionQuery::mode::sell_to_shop))) {
                 m_game->add_event_list(UPDATE_SCREEN_ONGAME1, 10);
                 return;
             }
 
-            if ((m_game->m_dialog_box_manager.is_enabled(DialogBoxId::ItemDropConfirm) == true) || (m_game->m_dialog_box_manager.is_enabled(DialogBoxId::SellOrRepair) == true) || (m_game->m_dialog_box_manager.is_enabled(DialogBoxId::Manufacture) == true)) {
+            if ((m_game->get_dialog_box_manager().is_enabled(DialogBoxId::ItemDropConfirm) == true) || (m_game->get_dialog_box_manager().is_enabled(DialogBoxId::SellOrRepair) == true) || (m_game->get_dialog_box_manager().is_enabled(DialogBoxId::Manufacture) == true)) {
                 m_game->add_event_list(UPDATE_SCREEN_ONGAME1, 10);
                 return;
             }
@@ -150,25 +197,25 @@ void Screen_OnGame::on_update()
                 uint64_t parsed_amount = 0;
                 auto [ptr, ec] = std::from_chars(m_game->m_amount_string.data(), m_game->m_amount_string.data() + m_game->m_amount_string.size(), parsed_amount);
                 if (ec != std::errc{}) return;
-                uint64_t item_count = m_game->m_item_list[m_game->m_dialog_box_manager.get_dialog_as<DialogBox_ItemDropAmount>(DialogBoxId::ItemDropExternal)->m_item_index]->m_count;
+                uint64_t item_count = m_game->m_player->m_item_list[m_game->get_dialog_box_manager().get_dialog_as<DialogBox_ItemDropAmount>(DialogBoxId::ItemDropExternal)->m_item_index]->m_count;
                 if (parsed_amount > item_count) parsed_amount = item_count;
                 amount = static_cast<int>(std::min<uint64_t>(parsed_amount, INT_MAX));
             }
 
             if (amount != 0) {
-                if (m_game->m_item_list[m_game->m_dialog_box_manager.get_dialog_as<DialogBox_ItemDropAmount>(DialogBoxId::ItemDropExternal)->m_item_index]->m_count >= static_cast<uint64_t>(amount)) {
-                    if (m_game->m_dialog_box_manager.get_dialog_as<DialogBox_ItemDropAmount>(DialogBoxId::ItemDropExternal)->m_drop_x != 0) {
-                        absX = abs(m_game->m_dialog_box_manager.get_dialog_as<DialogBox_ItemDropAmount>(DialogBoxId::ItemDropExternal)->m_drop_x - m_game->m_player->m_player_x);
-                        absY = abs(m_game->m_dialog_box_manager.get_dialog_as<DialogBox_ItemDropAmount>(DialogBoxId::ItemDropExternal)->m_drop_y - m_game->m_player->m_player_y);
+                if (m_game->m_player->m_item_list[m_game->get_dialog_box_manager().get_dialog_as<DialogBox_ItemDropAmount>(DialogBoxId::ItemDropExternal)->m_item_index]->m_count >= static_cast<uint64_t>(amount)) {
+                    if (m_game->get_dialog_box_manager().get_dialog_as<DialogBox_ItemDropAmount>(DialogBoxId::ItemDropExternal)->m_drop_x != 0) {
+                        absX = abs(m_game->get_dialog_box_manager().get_dialog_as<DialogBox_ItemDropAmount>(DialogBoxId::ItemDropExternal)->m_drop_x - m_game->m_player->m_player_x);
+                        absY = abs(m_game->get_dialog_box_manager().get_dialog_as<DialogBox_ItemDropAmount>(DialogBoxId::ItemDropExternal)->m_drop_y - m_game->m_player->m_player_y);
 
                         if ((absX == 0) && (absY == 0))
                             m_game->add_event_list(UPDATE_SCREEN_ONGAME5, 10);
                         else if ((absX <= 8) && (absY <= 8)) {
-                            switch (m_game->m_dialog_box_manager.get_dialog_as<DialogBox_ItemDropAmount>(DialogBoxId::ItemDropExternal)->m_drop_target_type) {
+                            switch (m_game->get_dialog_box_manager().get_dialog_as<DialogBox_ItemDropAmount>(DialogBoxId::ItemDropExternal)->m_drop_target_type) {
                             case 1: case 2: case 3: case 4: case 5: case 6:
                             {
-                                auto* dropDlg = m_game->m_dialog_box_manager.get_dialog_as<DialogBox_ItemDropAmount>(DialogBoxId::ItemDropExternal);
-                                auto* npcDlg = m_game->m_dialog_box_manager.get_dialog_as<DialogBox_NpcActionQuery>(DialogBoxId::NpcActionQuery);
+                                auto* dropDlg = m_game->get_dialog_box_manager().get_dialog_as<DialogBox_ItemDropAmount>(DialogBoxId::ItemDropExternal);
+                                auto* npcDlg = m_game->get_dialog_box_manager().get_dialog_as<DialogBox_NpcActionQuery>(DialogBoxId::NpcActionQuery);
                                 npcDlg->enable_with_target(1, dropDlg->m_item_index, dropDlg->m_drop_target_type, amount, m_game->m_comm_object_id, dropDlg->m_drop_x, dropDlg->m_drop_y, dropDlg->m_target_name);
                                 tX = m_sMsX - 117; tY = m_sMsY - 50;
                                 if (tX < 0) tX = 0;
@@ -180,8 +227,8 @@ void Screen_OnGame::on_update()
                             }   break;
                             case 20:
                             {
-                                auto* dropDlg = m_game->m_dialog_box_manager.get_dialog_as<DialogBox_ItemDropAmount>(DialogBoxId::ItemDropExternal);
-                                auto* npcDlg = m_game->m_dialog_box_manager.get_dialog_as<DialogBox_NpcActionQuery>(DialogBoxId::NpcActionQuery);
+                                auto* dropDlg = m_game->get_dialog_box_manager().get_dialog_as<DialogBox_ItemDropAmount>(DialogBoxId::ItemDropExternal);
+                                auto* npcDlg = m_game->get_dialog_box_manager().get_dialog_as<DialogBox_NpcActionQuery>(DialogBoxId::NpcActionQuery);
                                 npcDlg->enable_with_target(3, dropDlg->m_item_index, dropDlg->m_drop_target_type, amount, m_game->m_comm_object_id, dropDlg->m_drop_x, dropDlg->m_drop_y, dropDlg->m_target_name);
                                 tX = m_sMsX - 117; tY = m_sMsY - 50;
                                 if (tX < 0) tX = 0;
@@ -193,8 +240,8 @@ void Screen_OnGame::on_update()
                             }   break;
                             case 15: case 24:
                             {
-                                auto* dropDlg = m_game->m_dialog_box_manager.get_dialog_as<DialogBox_ItemDropAmount>(DialogBoxId::ItemDropExternal);
-                                auto* npcDlg = m_game->m_dialog_box_manager.get_dialog_as<DialogBox_NpcActionQuery>(DialogBoxId::NpcActionQuery);
+                                auto* dropDlg = m_game->get_dialog_box_manager().get_dialog_as<DialogBox_ItemDropAmount>(DialogBoxId::ItemDropExternal);
+                                auto* npcDlg = m_game->get_dialog_box_manager().get_dialog_as<DialogBox_NpcActionQuery>(DialogBoxId::NpcActionQuery);
                                 npcDlg->enable_with_target(2, dropDlg->m_item_index, dropDlg->m_drop_target_type, amount, m_game->m_comm_object_id, 0, 0, dropDlg->m_target_name);
                                 tX = m_sMsX - 117; tY = m_sMsY - 50;
                                 if (tX < 0) tX = 0;
@@ -206,11 +253,11 @@ void Screen_OnGame::on_update()
                             }   break;
                             case 1000:
                             {
-                                int ex_item = m_game->m_dialog_box_manager.get_dialog_as<DialogBox_ItemDropAmount>(DialogBoxId::ItemDropExternal)->m_drop_target_id;
-                                if (m_game->m_dialog_box_manager.get_dialog_as<DialogBox_Exchange>(DialogBoxId::Exchange)->m_slots[0].v1 == -1) m_game->m_dialog_box_manager.get_dialog_as<DialogBox_Exchange>(DialogBoxId::Exchange)->m_slots[0].inv_slot = ex_item;
-                                else if (m_game->m_dialog_box_manager.get_dialog_as<DialogBox_Exchange>(DialogBoxId::Exchange)->m_slots[1].v1 == -1) m_game->m_dialog_box_manager.get_dialog_as<DialogBox_Exchange>(DialogBoxId::Exchange)->m_slots[1].inv_slot = ex_item;
-                                else if (m_game->m_dialog_box_manager.get_dialog_as<DialogBox_Exchange>(DialogBoxId::Exchange)->m_slots[2].v1 == -1) m_game->m_dialog_box_manager.get_dialog_as<DialogBox_Exchange>(DialogBoxId::Exchange)->m_slots[2].inv_slot = ex_item;
-                                else if (m_game->m_dialog_box_manager.get_dialog_as<DialogBox_Exchange>(DialogBoxId::Exchange)->m_slots[3].v1 == -1) m_game->m_dialog_box_manager.get_dialog_as<DialogBox_Exchange>(DialogBoxId::Exchange)->m_slots[3].inv_slot = ex_item;
+                                int ex_item = m_game->get_dialog_box_manager().get_dialog_as<DialogBox_ItemDropAmount>(DialogBoxId::ItemDropExternal)->m_drop_target_id;
+                                if (m_game->get_dialog_box_manager().get_dialog_as<DialogBox_Exchange>(DialogBoxId::Exchange)->m_slots[0].v1 == -1) m_game->get_dialog_box_manager().get_dialog_as<DialogBox_Exchange>(DialogBoxId::Exchange)->m_slots[0].inv_slot = ex_item;
+                                else if (m_game->get_dialog_box_manager().get_dialog_as<DialogBox_Exchange>(DialogBoxId::Exchange)->m_slots[1].v1 == -1) m_game->get_dialog_box_manager().get_dialog_as<DialogBox_Exchange>(DialogBoxId::Exchange)->m_slots[1].inv_slot = ex_item;
+                                else if (m_game->get_dialog_box_manager().get_dialog_as<DialogBox_Exchange>(DialogBoxId::Exchange)->m_slots[2].v1 == -1) m_game->get_dialog_box_manager().get_dialog_as<DialogBox_Exchange>(DialogBoxId::Exchange)->m_slots[2].inv_slot = ex_item;
+                                else if (m_game->get_dialog_box_manager().get_dialog_as<DialogBox_Exchange>(DialogBoxId::Exchange)->m_slots[3].v1 == -1) m_game->get_dialog_box_manager().get_dialog_as<DialogBox_Exchange>(DialogBoxId::Exchange)->m_slots[3].inv_slot = ex_item;
                                 else return;
                                 inventory_manager::get().lock_item(ex_item);
                                 m_game->send_command(MsgId::CommandCommon, CommonType::set_exchange_item, 0, ex_item, amount, 0, 0);
@@ -218,8 +265,8 @@ void Screen_OnGame::on_update()
                             }
                             case 1001:
                             {
-                                auto* sellDlg = m_game->m_dialog_box_manager.get_dialog_as<DialogBox_SellList>(DialogBoxId::SellList);
-                                int drop_id = m_game->m_dialog_box_manager.get_dialog_as<DialogBox_ItemDropAmount>(DialogBoxId::ItemDropExternal)->m_drop_target_id;
+                                auto* sellDlg = m_game->get_dialog_box_manager().get_dialog_as<DialogBox_SellList>(DialogBoxId::SellList);
+                                int drop_id = m_game->get_dialog_box_manager().get_dialog_as<DialogBox_ItemDropAmount>(DialogBoxId::ItemDropExternal)->m_drop_target_id;
                                 if (sellDlg->add_item(drop_id, amount))
                                     inventory_manager::get().lock_item(drop_id);
                                 else
@@ -229,40 +276,40 @@ void Screen_OnGame::on_update()
                             case 1002:
                                 if (inventory_manager::get().get_bank_item_count() >= (m_game->m_max_bank_items - 1)) m_game->add_event_list(DLGBOX_CLICK_NPCACTION_QUERY9, 10);
                                 else {
-                                    CItem* cfg = m_game->get_item_config(m_game->m_item_list[m_game->m_dialog_box_manager.m_give_item.item_index]->m_id_num);
-                                    if (cfg) m_game->send_command(MsgId::CommandCommon, CommonType::GiveItemToChar, m_game->m_dialog_box_manager.m_give_item.item_index, amount, m_game->m_dialog_box_manager.m_give_item.target_x, m_game->m_dialog_box_manager.m_give_item.target_y, cfg->m_name, m_game->m_dialog_box_manager.m_give_item.object_id);
+                                    CItem* cfg = m_game->get_item_config(m_game->m_player->m_item_list[m_game->get_dialog_box_manager().m_give_item.item_index]->m_id_num);
+                                    if (cfg) m_game->send_command(MsgId::CommandCommon, CommonType::GiveItemToChar, m_game->get_dialog_box_manager().m_give_item.item_index, amount, m_game->get_dialog_box_manager().m_give_item.target_x, m_game->get_dialog_box_manager().m_give_item.target_y, cfg->m_name, m_game->get_dialog_box_manager().m_give_item.object_id);
                                 }
                                 break;
                             default:
                             {
-                                CItem* cfg = m_game->get_item_config(m_game->m_item_list[m_game->m_dialog_box_manager.get_dialog_as<DialogBox_ItemDropAmount>(DialogBoxId::ItemDropExternal)->m_item_index]->m_id_num);
-                                if (cfg) m_game->send_command(MsgId::CommandCommon, CommonType::GiveItemToChar, static_cast<char>(m_game->m_dialog_box_manager.get_dialog_as<DialogBox_ItemDropAmount>(DialogBoxId::ItemDropExternal)->m_item_index), amount, m_game->m_dialog_box_manager.get_dialog_as<DialogBox_ItemDropAmount>(DialogBoxId::ItemDropExternal)->m_drop_x, m_game->m_dialog_box_manager.get_dialog_as<DialogBox_ItemDropAmount>(DialogBoxId::ItemDropExternal)->m_drop_y, cfg->m_name);
+                                CItem* cfg = m_game->get_item_config(m_game->m_player->m_item_list[m_game->get_dialog_box_manager().get_dialog_as<DialogBox_ItemDropAmount>(DialogBoxId::ItemDropExternal)->m_item_index]->m_id_num);
+                                if (cfg) m_game->send_command(MsgId::CommandCommon, CommonType::GiveItemToChar, static_cast<char>(m_game->get_dialog_box_manager().get_dialog_as<DialogBox_ItemDropAmount>(DialogBoxId::ItemDropExternal)->m_item_index), amount, m_game->get_dialog_box_manager().get_dialog_as<DialogBox_ItemDropAmount>(DialogBoxId::ItemDropExternal)->m_drop_x, m_game->get_dialog_box_manager().get_dialog_as<DialogBox_ItemDropAmount>(DialogBoxId::ItemDropExternal)->m_drop_y, cfg->m_name);
                             }
                                 break;
                             }
-                            inventory_manager::get().lock_item(m_game->m_dialog_box_manager.get_dialog_as<DialogBox_ItemDropAmount>(DialogBoxId::ItemDropExternal)->m_item_index);
+                            inventory_manager::get().lock_item(m_game->get_dialog_box_manager().get_dialog_as<DialogBox_ItemDropAmount>(DialogBoxId::ItemDropExternal)->m_item_index);
                         }
                         else m_game->add_event_list(UPDATE_SCREEN_ONGAME7, 10);
                     }
                     else {
                         if (amount <= 0) m_game->add_event_list(UPDATE_SCREEN_ONGAME8, 10);
                         else {
-                            CItem* cfg = m_game->get_item_config(m_game->m_item_list[m_game->m_dialog_box_manager.get_dialog_as<DialogBox_ItemDropAmount>(DialogBoxId::ItemDropExternal)->m_item_index]->m_id_num);
-                            if (cfg) m_game->send_command(MsgId::CommandCommon, CommonType::ItemDrop, 0, m_game->m_dialog_box_manager.get_dialog_as<DialogBox_ItemDropAmount>(DialogBoxId::ItemDropExternal)->m_item_index, amount, 0, cfg->m_name);
-                            inventory_manager::get().lock_item(m_game->m_dialog_box_manager.get_dialog_as<DialogBox_ItemDropAmount>(DialogBoxId::ItemDropExternal)->m_item_index);
+                            CItem* cfg = m_game->get_item_config(m_game->m_player->m_item_list[m_game->get_dialog_box_manager().get_dialog_as<DialogBox_ItemDropAmount>(DialogBoxId::ItemDropExternal)->m_item_index]->m_id_num);
+                            if (cfg) m_game->send_command(MsgId::CommandCommon, CommonType::ItemDrop, 0, m_game->get_dialog_box_manager().get_dialog_as<DialogBox_ItemDropAmount>(DialogBoxId::ItemDropExternal)->m_item_index, amount, 0, cfg->m_name);
+                            inventory_manager::get().lock_item(m_game->get_dialog_box_manager().get_dialog_as<DialogBox_ItemDropAmount>(DialogBoxId::ItemDropExternal)->m_item_index);
                         }
                     }
                 }
                 else m_game->add_event_list(UPDATE_SCREEN_ONGAME9, 10);
             }
-            m_game->m_dialog_box_manager.disable_dialog_box(DialogBoxId::ItemDropExternal);
+            m_game->get_dialog_box_manager().disable_dialog_box(DialogBoxId::ItemDropExternal);
         }
 #ifdef TESTER_ONLY
-        else if ((m_game->m_dialog_box_manager.is_enabled(DialogBoxId::ItemCreator) == true) &&
-                 (m_game->m_dialog_box_manager.get_top_id() == DialogBoxId::ItemCreator))
+        else if ((m_game->get_dialog_box_manager().is_enabled(DialogBoxId::ItemCreator) == true) &&
+                 (m_game->get_dialog_box_manager().get_top_id() == DialogBoxId::ItemCreator))
         {
             auto* dlg = dynamic_cast<DialogBox_ItemCreator*>(
-                m_game->m_dialog_box_manager.get_dialog_box(DialogBoxId::ItemCreator));
+                m_game->get_dialog_box_manager().get_dialog_box(DialogBoxId::ItemCreator));
             if (dlg) dlg->on_enter_pressed();
         }
 #endif // TESTER_ONLY
@@ -474,7 +521,7 @@ void Screen_OnGame::on_update()
 void Screen_OnGame::on_render()
 {
     // update all dialog boxes first (before drawing)
-    m_game->m_dialog_box_manager.update_all();
+    m_game->get_dialog_box_manager().update_all();
 
     // update entity motion interpolation for all tiles
     uint32_t time = m_game->m_cur_time;
@@ -589,7 +636,7 @@ void Screen_OnGame::on_render()
 
     // UI rendering
     FrameTiming::begin_profile(ProfileStage::DrawDialogs);
-    m_game->m_dialog_box_manager.draw_all();
+    m_game->get_dialog_box_manager().draw_all();
     FrameTiming::end_profile(ProfileStage::DrawDialogs);
 
     FrameTiming::begin_profile(ProfileStage::DrawMisc);
@@ -605,7 +652,7 @@ void Screen_OnGame::on_render()
     short tooltip_item_id = CursorTarget::get_selected_id();
     if ((CursorTarget::GetSelectedType() == SelectedObjectType::Item) &&
         (tooltip_item_id >= 0) && (tooltip_item_id < hb::shared::limits::MaxItems) &&
-        (m_game->m_item_list[tooltip_item_id] != 0))
+        (m_game->m_player->m_item_list[tooltip_item_id] != 0))
     {
         render_item_tooltip();
     }
@@ -641,7 +688,7 @@ void Screen_OnGame::render_item_tooltip()
 {
 	std::string G_cTxt;
 	short target_id = CursorTarget::get_selected_id();
-    CItem* item = m_game->m_item_list[target_id].get();
+    CItem* item = m_game->m_player->m_item_list[target_id].get();
     if (!item) return;
     CItem* cfg = m_game->get_item_config(item->m_id_num);
     if (!cfg) return;
@@ -730,7 +777,7 @@ void Screen_OnGame::render_item_tooltip()
     // Stack count
     if (cfg->is_stackable())
     {
-        auto count = std::count_if(m_game->m_item_list.begin(), m_game->m_item_list.end(),
+        auto count = std::count_if(m_game->m_player->m_item_list.begin(), m_game->m_player->m_item_list.end(),
             [item](const std::unique_ptr<CItem>& otherItem) {
                 return otherItem != nullptr && otherItem->m_id_num == item->m_id_num;
             });
@@ -933,14 +980,14 @@ void Screen_OnGame::item_drop_external_screen(char item_id, short mouse_x, short
         }
         else
         {
-            CItem* cfg = m_game->get_item_config(m_game->m_item_list[item_id]->m_id_num);
+            CItem* cfg = m_game->get_item_config(m_game->m_player->m_item_list[item_id]->m_id_num);
             if (cfg && ((cfg->get_item_type() == ItemType::Consume) || (cfg->get_item_type() == ItemType::Arrow))
-                && (m_game->m_item_list[item_id]->m_count > 1))
+                && (m_game->m_player->m_item_list[item_id]->m_count > 1))
             {
-                m_game->m_dialog_box_manager.get_dialog_box(DialogBoxId::ItemDropExternal)->m_x = mouse_x - 140;
-                m_game->m_dialog_box_manager.get_dialog_box(DialogBoxId::ItemDropExternal)->m_y = mouse_y - 70;
-                if (m_game->m_dialog_box_manager.get_dialog_box(DialogBoxId::ItemDropExternal)->m_y < 0) m_game->m_dialog_box_manager.get_dialog_box(DialogBoxId::ItemDropExternal)->m_y = 0;
-                auto* dropDlg = m_game->m_dialog_box_manager.get_dialog_as<DialogBox_ItemDropAmount>(DialogBoxId::ItemDropExternal);
+                m_game->get_dialog_box_manager().get_dialog_box(DialogBoxId::ItemDropExternal)->m_x = mouse_x - 140;
+                m_game->get_dialog_box_manager().get_dialog_box(DialogBoxId::ItemDropExternal)->m_y = mouse_y - 70;
+                if (m_game->get_dialog_box_manager().get_dialog_box(DialogBoxId::ItemDropExternal)->m_y < 0) m_game->get_dialog_box_manager().get_dialog_box(DialogBoxId::ItemDropExternal)->m_y = 0;
+                auto* dropDlg = m_game->get_dialog_box_manager().get_dialog_as<DialogBox_ItemDropAmount>(DialogBoxId::ItemDropExternal);
                 if (hb::shared::owner::can_receive_items(owner_type) && dropDlg)
                 {
                     dropDlg->m_drop_x = m_game->m_mcx;
@@ -961,7 +1008,7 @@ void Screen_OnGame::item_drop_external_screen(char item_id, short mouse_x, short
                     dropDlg->m_drop_target_id = 0;
                     std::memset(dropDlg->m_target_name, 0, sizeof(dropDlg->m_target_name));
                 }
-                m_game->m_dialog_box_manager.enable_dialog_box(DialogBoxId::ItemDropExternal, item_id, static_cast<int64_t>(m_game->m_item_list[item_id]->m_count), 0);
+                m_game->get_dialog_box_manager().enable_dialog_box(DialogBoxId::ItemDropExternal, item_id, static_cast<int64_t>(m_game->m_player->m_item_list[item_id]->m_count), 0);
             }
             else
             {
@@ -973,7 +1020,7 @@ void Screen_OnGame::item_drop_external_screen(char item_id, short mouse_x, short
                 case 5:
                 case 6:
                 {
-                    auto* npcDlg = m_game->m_dialog_box_manager.get_dialog_as<DialogBox_NpcActionQuery>(DialogBoxId::NpcActionQuery);
+                    auto* npcDlg = m_game->get_dialog_box_manager().get_dialog_as<DialogBox_NpcActionQuery>(DialogBoxId::NpcActionQuery);
                     npcDlg->enable_with_target(1, item_id, owner_type, 1, m_game->m_comm_object_id, m_game->m_mcx, m_game->m_mcy, name.c_str());
                     dialog_x = mouse_x - 117;
                     dialog_y = mouse_y - 50;
@@ -992,7 +1039,7 @@ void Screen_OnGame::item_drop_external_screen(char item_id, short mouse_x, short
 
                 case hb::shared::owner::Howard: // Howard
                 {
-                    auto* npcDlg = m_game->m_dialog_box_manager.get_dialog_as<DialogBox_NpcActionQuery>(DialogBoxId::NpcActionQuery);
+                    auto* npcDlg = m_game->get_dialog_box_manager().get_dialog_as<DialogBox_NpcActionQuery>(DialogBoxId::NpcActionQuery);
                     npcDlg->enable_with_target(3, item_id, owner_type, 1, m_game->m_comm_object_id, m_game->m_mcx, m_game->m_mcy, m_game->get_npc_config_name_by_id(npc_config_id));
                     dialog_x = mouse_x - 117;
                     dialog_y = mouse_y - 50;
@@ -1007,7 +1054,7 @@ void Screen_OnGame::item_drop_external_screen(char item_id, short mouse_x, short
                 case hb::shared::owner::ShopKeeper: // ShopKeeper-W
                 case hb::shared::owner::Tom: // Tom
                 {
-                    auto* npcDlg = m_game->m_dialog_box_manager.get_dialog_as<DialogBox_NpcActionQuery>(DialogBoxId::NpcActionQuery);
+                    auto* npcDlg = m_game->get_dialog_box_manager().get_dialog_as<DialogBox_NpcActionQuery>(DialogBoxId::NpcActionQuery);
                     npcDlg->enable_with_target(2, item_id, owner_type, 1, m_game->m_comm_object_id, m_game->m_mcx, m_game->m_mcy, m_game->get_npc_config_name_by_id(npc_config_id));
                     dialog_x = mouse_x - 117;
                     dialog_y = mouse_y - 50;
@@ -1022,12 +1069,12 @@ void Screen_OnGame::item_drop_external_screen(char item_id, short mouse_x, short
                 default:
                     if (cfg)
                     {
-                        if (m_game->item_drop_history(m_game->m_item_list[item_id]->m_id_num))
+                        if (m_game->item_drop_history(m_game->m_player->m_item_list[item_id]->m_id_num))
                         {
-                            m_game->m_dialog_box_manager.get_dialog_box(DialogBoxId::ItemDropConfirm)->m_x = mouse_x - 140;
-                            m_game->m_dialog_box_manager.get_dialog_box(DialogBoxId::ItemDropConfirm)->m_y = mouse_y - 70;
-                            if (m_game->m_dialog_box_manager.get_dialog_box(DialogBoxId::ItemDropConfirm)->m_y < 0) m_game->m_dialog_box_manager.get_dialog_box(DialogBoxId::ItemDropConfirm)->m_y = 0;
-                            m_game->m_dialog_box_manager.enable_dialog_box(DialogBoxId::ItemDropConfirm, item_id, static_cast<int64_t>(m_game->m_item_list[item_id]->m_count), 0);
+                            m_game->get_dialog_box_manager().get_dialog_box(DialogBoxId::ItemDropConfirm)->m_x = mouse_x - 140;
+                            m_game->get_dialog_box_manager().get_dialog_box(DialogBoxId::ItemDropConfirm)->m_y = mouse_y - 70;
+                            if (m_game->get_dialog_box_manager().get_dialog_box(DialogBoxId::ItemDropConfirm)->m_y < 0) m_game->get_dialog_box_manager().get_dialog_box(DialogBoxId::ItemDropConfirm)->m_y = 0;
+                            m_game->get_dialog_box_manager().enable_dialog_box(DialogBoxId::ItemDropConfirm, item_id, static_cast<int64_t>(m_game->m_player->m_item_list[item_id]->m_count), 0);
                         }
                         else
                         {
@@ -1042,14 +1089,14 @@ void Screen_OnGame::item_drop_external_screen(char item_id, short mouse_x, short
     }
     else
     {
-        CItem* cfg2 = m_game->get_item_config(m_game->m_item_list[item_id]->m_id_num);
+        CItem* cfg2 = m_game->get_item_config(m_game->m_player->m_item_list[item_id]->m_id_num);
         if (cfg2 && ((cfg2->get_item_type() == ItemType::Consume) || (cfg2->get_item_type() == ItemType::Arrow))
-            && (m_game->m_item_list[item_id]->m_count > 1))
+            && (m_game->m_player->m_item_list[item_id]->m_count > 1))
         {
-            m_game->m_dialog_box_manager.get_dialog_box(DialogBoxId::ItemDropExternal)->m_x = mouse_x - 140;
-            m_game->m_dialog_box_manager.get_dialog_box(DialogBoxId::ItemDropExternal)->m_y = mouse_y - 70;
-            if (m_game->m_dialog_box_manager.get_dialog_box(DialogBoxId::ItemDropExternal)->m_y < 0) m_game->m_dialog_box_manager.get_dialog_box(DialogBoxId::ItemDropExternal)->m_y = 0;
-            if (auto* dropDlg2 = m_game->m_dialog_box_manager.get_dialog_as<DialogBox_ItemDropAmount>(DialogBoxId::ItemDropExternal))
+            m_game->get_dialog_box_manager().get_dialog_box(DialogBoxId::ItemDropExternal)->m_x = mouse_x - 140;
+            m_game->get_dialog_box_manager().get_dialog_box(DialogBoxId::ItemDropExternal)->m_y = mouse_y - 70;
+            if (m_game->get_dialog_box_manager().get_dialog_box(DialogBoxId::ItemDropExternal)->m_y < 0) m_game->get_dialog_box_manager().get_dialog_box(DialogBoxId::ItemDropExternal)->m_y = 0;
+            if (auto* dropDlg2 = m_game->get_dialog_box_manager().get_dialog_as<DialogBox_ItemDropAmount>(DialogBoxId::ItemDropExternal))
             {
                 dropDlg2->m_drop_x = 0;
                 dropDlg2->m_drop_y = 0;
@@ -1057,16 +1104,16 @@ void Screen_OnGame::item_drop_external_screen(char item_id, short mouse_x, short
                 dropDlg2->m_drop_target_id = 0;
                 std::memset(dropDlg2->m_target_name, 0, sizeof(dropDlg2->m_target_name));
             }
-            m_game->m_dialog_box_manager.enable_dialog_box(DialogBoxId::ItemDropExternal, item_id, static_cast<int64_t>(m_game->m_item_list[item_id]->m_count), 0);
+            m_game->get_dialog_box_manager().enable_dialog_box(DialogBoxId::ItemDropExternal, item_id, static_cast<int64_t>(m_game->m_player->m_item_list[item_id]->m_count), 0);
         }
         else
         {
-            if (m_game->item_drop_history(m_game->m_item_list[item_id]->m_id_num))
+            if (m_game->item_drop_history(m_game->m_player->m_item_list[item_id]->m_id_num))
             {
-                m_game->m_dialog_box_manager.get_dialog_box(DialogBoxId::ItemDropConfirm)->m_x = mouse_x - 140;
-                m_game->m_dialog_box_manager.get_dialog_box(DialogBoxId::ItemDropConfirm)->m_y = mouse_y - 70;
-                if (m_game->m_dialog_box_manager.get_dialog_box(DialogBoxId::ItemDropConfirm)->m_y < 0) m_game->m_dialog_box_manager.get_dialog_box(DialogBoxId::ItemDropConfirm)->m_y = 0;
-                m_game->m_dialog_box_manager.enable_dialog_box(DialogBoxId::ItemDropConfirm, item_id, static_cast<int64_t>(m_game->m_item_list[item_id]->m_count), 0);
+                m_game->get_dialog_box_manager().get_dialog_box(DialogBoxId::ItemDropConfirm)->m_x = mouse_x - 140;
+                m_game->get_dialog_box_manager().get_dialog_box(DialogBoxId::ItemDropConfirm)->m_y = mouse_y - 70;
+                if (m_game->get_dialog_box_manager().get_dialog_box(DialogBoxId::ItemDropConfirm)->m_y < 0) m_game->get_dialog_box_manager().get_dialog_box(DialogBoxId::ItemDropConfirm)->m_y = 0;
+                m_game->get_dialog_box_manager().enable_dialog_box(DialogBoxId::ItemDropConfirm, item_id, static_cast<int64_t>(m_game->m_player->m_item_list[item_id]->m_count), 0);
             }
             else
             {

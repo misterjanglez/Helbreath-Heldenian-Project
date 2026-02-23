@@ -34,6 +34,6 @@ namespace NetworkMessageHandlers {
 
 	void HandleResurrectPlayer(CGame* game, char* data)
 	{
-		game->m_dialog_box_manager.enable_dialog_box(DialogBoxId::Resurrect, 0, 0, 0);
+		game->get_dialog_box_manager().enable_dialog_box(DialogBoxId::Resurrect, 0, 0, 0);
 	}
 } // namespace NetworkMessageHandlers

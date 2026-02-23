@@ -90,12 +90,12 @@ void CGame::hotkey_toggle_help()
 	if (!hb::shared::input::is_ctrl_down() || GameModeManager::get_mode() != GameMode::MainGame || text_input_manager::get().is_active()) {
 		return;
 	}
-	if (m_dialog_box_manager.is_enabled(DialogBoxId::Help) == false)
-		m_dialog_box_manager.enable_dialog_box(DialogBoxId::Help, 0, 0, 0);
+	if (get_dialog_box_manager().is_enabled(DialogBoxId::Help) == false)
+		get_dialog_box_manager().enable_dialog_box(DialogBoxId::Help, 0, 0, 0);
 	else
 	{
-		m_dialog_box_manager.disable_dialog_box(DialogBoxId::Help);
-		m_dialog_box_manager.disable_dialog_box(DialogBoxId::Text);
+		get_dialog_box_manager().disable_dialog_box(DialogBoxId::Help);
+		get_dialog_box_manager().disable_dialog_box(DialogBoxId::Text);
 	}
 }
 
@@ -113,9 +113,9 @@ void CGame::hotkey_toggle_system_menu()
 	if (!hb::shared::input::is_ctrl_down() || GameModeManager::get_mode() != GameMode::MainGame || text_input_manager::get().is_active()) {
 		return;
 	}
-	if (m_dialog_box_manager.is_enabled(DialogBoxId::SystemMenu) == false)
-		m_dialog_box_manager.enable_dialog_box(DialogBoxId::SystemMenu, 0, 0, 0);
-	else m_dialog_box_manager.disable_dialog_box(DialogBoxId::SystemMenu);
+	if (get_dialog_box_manager().is_enabled(DialogBoxId::SystemMenu) == false)
+		get_dialog_box_manager().enable_dialog_box(DialogBoxId::SystemMenu, 0, 0, 0);
+	else get_dialog_box_manager().disable_dialog_box(DialogBoxId::SystemMenu);
 }
 
 void CGame::hotkey_toggle_guide_map()
@@ -123,8 +123,8 @@ void CGame::hotkey_toggle_guide_map()
 	if (GameModeManager::get_mode() != GameMode::MainGame || !hb::shared::input::is_ctrl_down()) {
 		return;
 	}
-	if (m_dialog_box_manager.is_enabled(DialogBoxId::GuideMap) == true) m_dialog_box_manager.disable_dialog_box(DialogBoxId::GuideMap);
-	else m_dialog_box_manager.enable_dialog_box(DialogBoxId::GuideMap, 0, 0, 0, 0);
+	if (get_dialog_box_manager().is_enabled(DialogBoxId::GuideMap) == true) get_dialog_box_manager().disable_dialog_box(DialogBoxId::GuideMap);
+	else get_dialog_box_manager().enable_dialog_box(DialogBoxId::GuideMap, 0, 0, 0, 0);
 }
 
 void CGame::hotkey_toggle_running_mode()
@@ -190,8 +190,8 @@ void CGame::hotkey_whisper_target()
 
 	char lb, rb;
 	short sX, sY, mouse_x, mouse_y, z;
-	sX = m_dialog_box_manager.get_dialog_box(DialogBoxId::ChatHistory)->m_x;
-	sY = m_dialog_box_manager.get_dialog_box(DialogBoxId::ChatHistory)->m_y;
+	sX = get_dialog_box_manager().get_dialog_box(DialogBoxId::ChatHistory)->m_x;
+	sY = get_dialog_box_manager().get_dialog_box(DialogBoxId::ChatHistory)->m_y;
 	mouse_x = static_cast<short>(hb::shared::input::get_mouse_x());
 
 	mouse_y = static_cast<short>(hb::shared::input::get_mouse_y());
@@ -201,14 +201,14 @@ void CGame::hotkey_whisper_target()
 	lb = hb::shared::input::is_mouse_button_down(MouseButton::Left) ? 1 : 0;
 
 	rb = hb::shared::input::is_mouse_button_down(MouseButton::Right) ? 1 : 0;
-	if (m_dialog_box_manager.is_enabled(DialogBoxId::ChatHistory) == true && (mouse_x >= sX + 20) && (mouse_x <= sX + 360) && (mouse_y >= sY + 35) && (mouse_y <= sY + 139))
+	if (get_dialog_box_manager().is_enabled(DialogBoxId::ChatHistory) == true && (mouse_x >= sX + 20) && (mouse_x <= sX + 360) && (mouse_y >= sY + 35) && (mouse_y <= sY + 139))
 	{
 		char buff[64];
 		int i = (139 - mouse_y + sY) / 13;
-		int msg_idx = i + m_dialog_box_manager.get_dialog_as<DialogBox_ChatHistory>(DialogBoxId::ChatHistory)->m_scroll_position;
+		int msg_idx = i + get_dialog_box_manager().get_dialog_as<DialogBox_ChatHistory>(DialogBoxId::ChatHistory)->m_scroll_position;
 		CMsg* chat_msg = ChatManager::get().get_message(msg_idx);
 		if (chat_msg == nullptr) return;
-		if (chat_msg->m_pMsg[0] == ' ') { i++; chat_msg = ChatManager::get().get_message(i + m_dialog_box_manager.get_dialog_as<DialogBox_ChatHistory>(DialogBoxId::ChatHistory)->m_scroll_position); }
+		if (chat_msg->m_pMsg[0] == ' ') { i++; chat_msg = ChatManager::get().get_message(i + get_dialog_box_manager().get_dialog_as<DialogBox_ChatHistory>(DialogBoxId::ChatHistory)->m_scroll_position); }
 		if (chat_msg == nullptr) return;
 		std::snprintf(buff, sizeof(buff), "%s", chat_msg->m_pMsg);
 		char* sep = std::strchr(buff, ':');
@@ -240,16 +240,16 @@ void CGame::hotkey_simple_use_health_potion()
 		add_event_list(USE_RED_POTION1, 10);
 		return;
 	}
-	if (m_dialog_box_manager.is_enabled(DialogBoxId::Exchange) == true)
+	if (get_dialog_box_manager().is_enabled(DialogBoxId::Exchange) == true)
 	{
 		add_event_list(USE_RED_POTION2, 10);
 		return;
 	}
 	for (i = 0; i < hb::shared::limits::MaxItems; i++)
 	{
-		if ((m_item_list[i] != 0) && (!inventory_manager::get().is_locked(i)))
+		if ((m_player->m_item_list[i] != 0) && (!inventory_manager::get().is_locked(i)))
 		{
-			CItem* cfg = get_item_config(m_item_list[i]->m_id_num);
+			CItem* cfg = get_item_config(m_player->m_item_list[i]->m_id_num);
 			if (cfg && cfg->get_item_type() == ItemType::Consume && cfg->m_item_effect_type == hb::shared::item::to_int(hb::shared::item::ItemEffectType::HP))
 			{
 				send_command(MsgId::CommandCommon, CommonType::ReqUseItem, 0, i, 0, 0, 0);
@@ -270,7 +270,7 @@ void CGame::hotkey_simple_use_mana_potion()
 		add_event_list(USE_BLUE_POTION1, 10);
 		return;
 	}
-	if (m_dialog_box_manager.is_enabled(DialogBoxId::Exchange) == true)
+	if (get_dialog_box_manager().is_enabled(DialogBoxId::Exchange) == true)
 	{
 		add_event_list(USE_BLUE_POTION2, 10);
 		return;
@@ -278,9 +278,9 @@ void CGame::hotkey_simple_use_mana_potion()
 
 	for (i = 0; i < hb::shared::limits::MaxItems; i++)
 	{
-		if ((m_item_list[i] != 0) && (!inventory_manager::get().is_locked(i)))
+		if ((m_player->m_item_list[i] != 0) && (!inventory_manager::get().is_locked(i)))
 		{
-			CItem* cfg = get_item_config(m_item_list[i]->m_id_num);
+			CItem* cfg = get_item_config(m_player->m_item_list[i]->m_id_num);
 			if (cfg && cfg->get_item_type() == ItemType::Consume && cfg->m_item_effect_type == hb::shared::item::to_int(hb::shared::item::ItemEffectType::MP))
 			{
 				send_command(MsgId::CommandCommon, CommonType::ReqUseItem, 0, i, 0, 0, 0);
@@ -294,8 +294,8 @@ void CGame::hotkey_simple_use_mana_potion()
 
 void CGame::hotkey_simple_load_backup_chat()
 {
-	if (((m_dialog_box_manager.is_enabled(DialogBoxId::GuildMenu) == true) && (m_dialog_box_manager.get_dialog_as<DialogBox_GuildMenu>(DialogBoxId::GuildMenu)->m_mode == DialogBox_GuildMenu::mode::create_guild) && (m_dialog_box_manager.get_top_id() == DialogBoxId::GuildMenu)) ||
-		((m_dialog_box_manager.is_enabled(DialogBoxId::ItemDropExternal) == true) && (m_dialog_box_manager.get_dialog_as<DialogBox_ItemDropAmount>(DialogBoxId::ItemDropExternal)->m_mode == DialogBox_ItemDropAmount::mode::input) && (m_dialog_box_manager.get_top_id() == DialogBoxId::ItemDropExternal)))
+	if (((get_dialog_box_manager().is_enabled(DialogBoxId::GuildMenu) == true) && (get_dialog_box_manager().get_dialog_as<DialogBox_GuildMenu>(DialogBoxId::GuildMenu)->m_mode == DialogBox_GuildMenu::mode::create_guild) && (get_dialog_box_manager().get_top_id() == DialogBoxId::GuildMenu)) ||
+		((get_dialog_box_manager().is_enabled(DialogBoxId::ItemDropExternal) == true) && (get_dialog_box_manager().get_dialog_as<DialogBox_ItemDropAmount>(DialogBoxId::ItemDropExternal)->m_mode == DialogBox_ItemDropAmount::mode::input) && (get_dialog_box_manager().get_top_id() == DialogBoxId::ItemDropExternal)))
 	{
 		return;
 	}
@@ -316,45 +316,45 @@ void CGame::hotkey_simple_use_magic_shortcut()
 
 void CGame::hotkey_simple_toggle_character_info()
 {
-	if (m_dialog_box_manager.is_enabled(DialogBoxId::CharacterInfo) == false)
-		m_dialog_box_manager.enable_dialog_box(DialogBoxId::CharacterInfo, 0, 0, 0);
-	else m_dialog_box_manager.disable_dialog_box(DialogBoxId::CharacterInfo);
+	if (get_dialog_box_manager().is_enabled(DialogBoxId::CharacterInfo) == false)
+		get_dialog_box_manager().enable_dialog_box(DialogBoxId::CharacterInfo, 0, 0, 0);
+	else get_dialog_box_manager().disable_dialog_box(DialogBoxId::CharacterInfo);
 }
 
 void CGame::hotkey_simple_toggle_inventory()
 {
-	if (m_dialog_box_manager.is_enabled(DialogBoxId::Inventory) == false)
-		m_dialog_box_manager.enable_dialog_box(DialogBoxId::Inventory, 0, 0, 0);
-	else m_dialog_box_manager.disable_dialog_box(DialogBoxId::Inventory);
+	if (get_dialog_box_manager().is_enabled(DialogBoxId::Inventory) == false)
+		get_dialog_box_manager().enable_dialog_box(DialogBoxId::Inventory, 0, 0, 0);
+	else get_dialog_box_manager().disable_dialog_box(DialogBoxId::Inventory);
 }
 
 void CGame::hotkey_simple_toggle_magic()
 {
-	if (m_dialog_box_manager.is_enabled(DialogBoxId::Magic) == false)
-		m_dialog_box_manager.enable_dialog_box(DialogBoxId::Magic, 0, 0, 0);
-	else m_dialog_box_manager.disable_dialog_box(DialogBoxId::Magic);
+	if (get_dialog_box_manager().is_enabled(DialogBoxId::Magic) == false)
+		get_dialog_box_manager().enable_dialog_box(DialogBoxId::Magic, 0, 0, 0);
+	else get_dialog_box_manager().disable_dialog_box(DialogBoxId::Magic);
 }
 
 void CGame::hotkey_simple_toggle_skill()
 {
-	if (m_dialog_box_manager.is_enabled(DialogBoxId::Skill) == false)
-		m_dialog_box_manager.enable_dialog_box(DialogBoxId::Skill, 0, 0, 0);
-	else m_dialog_box_manager.disable_dialog_box(DialogBoxId::Skill);
+	if (get_dialog_box_manager().is_enabled(DialogBoxId::Skill) == false)
+		get_dialog_box_manager().enable_dialog_box(DialogBoxId::Skill, 0, 0, 0);
+	else get_dialog_box_manager().disable_dialog_box(DialogBoxId::Skill);
 }
 
 void CGame::hotkey_simple_toggle_chat_history()
 {
-	if (m_dialog_box_manager.is_enabled(DialogBoxId::ChatHistory) == false)
-		m_dialog_box_manager.enable_dialog_box(DialogBoxId::ChatHistory, 0, 0, 0);
-	else m_dialog_box_manager.disable_dialog_box(DialogBoxId::ChatHistory);
+	if (get_dialog_box_manager().is_enabled(DialogBoxId::ChatHistory) == false)
+		get_dialog_box_manager().enable_dialog_box(DialogBoxId::ChatHistory, 0, 0, 0);
+	else get_dialog_box_manager().disable_dialog_box(DialogBoxId::ChatHistory);
 }
 
 void CGame::hotkey_simple_toggle_system_menu()
 {
 	if (text_input_manager::get().is_active()) return;
-	if (m_dialog_box_manager.is_enabled(DialogBoxId::SystemMenu) == false)
-		m_dialog_box_manager.enable_dialog_box(DialogBoxId::SystemMenu, 0, 0, 0);
-	else m_dialog_box_manager.disable_dialog_box(DialogBoxId::SystemMenu);
+	if (get_dialog_box_manager().is_enabled(DialogBoxId::SystemMenu) == false)
+		get_dialog_box_manager().enable_dialog_box(DialogBoxId::SystemMenu, 0, 0, 0);
+	else get_dialog_box_manager().disable_dialog_box(DialogBoxId::SystemMenu);
 }
 
 void CGame::hotkey_simple_use_shortcut1()
@@ -461,7 +461,7 @@ void CGame::hotkey_simple_escape()
 
 		if ((m_is_observer_mode == true) && (hb::shared::input::is_shift_down())) {
 			if (m_logout_count == -1) { m_logout_count = 1; m_logout_count_time = GameClock::get_time_ms(); }
-			m_dialog_box_manager.disable_dialog_box(DialogBoxId::SystemMenu);
+			get_dialog_box_manager().disable_dialog_box(DialogBoxId::SystemMenu);
 			play_game_sound('E', 14, 5);
 		}
 		else if (m_logout_count != -1) {

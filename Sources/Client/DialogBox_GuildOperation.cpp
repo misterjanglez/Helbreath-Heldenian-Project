@@ -144,7 +144,7 @@ bool DialogBox_GuildOperation::on_click()
 		if ((mouse_x >= sX + ui_layout::right_btn_x) && (mouse_x <= sX + ui_layout::right_btn_x + ui_layout::btn_size_x) && (mouse_y > sY + ui_layout::btn_y) && (mouse_y < sY + ui_layout::btn_y + ui_layout::btn_size_y)) {
 			shift();
 			if (m_op_list[0].op_mode == 0)
-				m_game->m_dialog_box_manager.disable_dialog_box(DialogBoxId::GuildOperation);
+				m_game->get_dialog_box_manager().disable_dialog_box(DialogBoxId::GuildOperation);
 			return true;
 		}
 		return false;
@@ -166,7 +166,7 @@ bool DialogBox_GuildOperation::on_click()
 		}
 		shift();
 		if (m_op_list[0].op_mode == 0)
-			m_game->m_dialog_box_manager.disable_dialog_box(DialogBoxId::GuildOperation);
+			m_game->get_dialog_box_manager().disable_dialog_box(DialogBoxId::GuildOperation);
 		return true;
 	}
 
@@ -186,7 +186,7 @@ bool DialogBox_GuildOperation::on_click()
 		}
 		shift();
 		if (m_op_list[0].op_mode == 0)
-			m_game->m_dialog_box_manager.disable_dialog_box(DialogBoxId::GuildOperation);
+			m_game->get_dialog_box_manager().disable_dialog_box(DialogBoxId::GuildOperation);
 		return true;
 	}
 

@@ -69,7 +69,7 @@ void DialogBox_Shop::draw_item_list(short sX, short sY)
     else pointer_loc = 0;
 
     if (lb != 0 && total_lines > 13) {
-        if ((m_game->m_dialog_box_manager.get_top_id() == DialogBoxId::SaleMenu)) {
+        if ((m_game->get_dialog_box_manager().get_top_id() == DialogBoxId::SaleMenu)) {
             if ((mouse_x >= sX + 235) && (mouse_x <= sX + 260) && (mouse_y >= sY + 10) && (mouse_y <= sY + 330)) {
                 d1 = static_cast<double>(mouse_y - (sY + 35));
                 d2 = static_cast<double>(total_lines - 13);
@@ -80,7 +80,7 @@ void DialogBox_Shop::draw_item_list(short sX, short sY)
     }
     else m_is_scroll_selected = false;
 
-    if (m_game->m_dialog_box_manager.get_top_id() == DialogBoxId::SaleMenu && z != 0) {
+    if (m_game->get_dialog_box_manager().get_top_id() == DialogBoxId::SaleMenu && z != 0) {
         m_scroll_offset = m_scroll_offset - z / 60;
 
     }
@@ -110,7 +110,7 @@ void DialogBox_Shop::draw_item_list(short sX, short sY)
     for (int i = 0; i < 13; i++)
         if (((i + m_scroll_offset) < game_limits::max_menu_items) &&
             (shop_manager::get().get_item_list()[i + m_scroll_offset] != 0)) {
-            discount_ratio = ((m_game->m_player->m_charisma - 10) / 4);
+            discount_ratio = ((player().m_charisma - 10) / 4);
             tmp1 = static_cast<double>(discount_ratio);
             tmp2 = tmp1 / 100.0f;
             tmp1 = static_cast<double>(shop_manager::get().get_item_list()[i + m_scroll_offset]->m_price);
@@ -131,7 +131,7 @@ void DialogBox_Shop::draw_item_list(short sX, short sY)
 
 int DialogBox_Shop::calculate_discounted_price(int item_index)
 {
-    int discount_ratio = ((m_game->m_player->m_charisma - 10) / 4);
+    int discount_ratio = ((player().m_charisma - 10) / 4);
     double tmp1 = static_cast<double>(discount_ratio);
     double tmp2 = tmp1 / 100.0f;
     tmp1 = static_cast<double>(shop_manager::get().get_item_list()[item_index]->m_price);
@@ -228,7 +228,7 @@ void DialogBox_Shop::draw_weapon_stats(short sX, short sY, int item_index, bool&
     else std::snprintf(temp_buf, sizeof(temp_buf), ": %d(%d ~ %d)", shop_manager::get().get_item_list()[item_index]->m_speed, temp, shop_manager::get().get_item_list()[item_index]->m_speed * 13);
     hb::shared::text::draw_text(GameFont::Default, sX + 140, sY + 160, temp_buf, hb::shared::text::TextStyle::from_color(GameColors::UILabel));
 
-    if ((shop_manager::get().get_item_list()[item_index]->m_weight / 100) > m_game->m_player->m_str) {
+    if ((shop_manager::get().get_item_list()[item_index]->m_weight / 100) > player().m_str) {
         auto strWarn = std::format(DRAW_DIALOGBOX_SHOP11, (shop_manager::get().get_item_list()[item_index]->m_weight / 100));
         hb::shared::text::draw_text_aligned(GameFont::Default, sX + 25, sY + 258, (sX + 240) - (sX + 25), 15, strWarn.c_str(), hb::shared::text::TextStyle::from_color(GameColors::UIWarningRed), hb::shared::text::Align::TopCenter);
         hb::shared::text::draw_text_aligned(GameFont::Default, sX + 26, sY + 258, (sX + 241) - (sX + 26), 15, strWarn.c_str(), hb::shared::text::TextStyle::from_color(GameColors::UIWarningRed), hb::shared::text::Align::TopCenter);
@@ -245,7 +245,7 @@ void DialogBox_Shop::draw_shield_stats(short sX, short sY, int item_index, bool&
     std::snprintf(temp, sizeof(temp), ": +%d%%", shop_manager::get().get_item_list()[item_index]->m_item_effect_value1);
     hb::shared::text::draw_text(GameFont::Default, sX + 140, sY + 145, temp, hb::shared::text::TextStyle::from_color(GameColors::UILabel));
 
-    if ((shop_manager::get().get_item_list()[item_index]->m_weight / 100) > m_game->m_player->m_str) {
+    if ((shop_manager::get().get_item_list()[item_index]->m_weight / 100) > player().m_str) {
         auto strWarn = std::format(DRAW_DIALOGBOX_SHOP11, (shop_manager::get().get_item_list()[item_index]->m_weight / 100));
         hb::shared::text::draw_text_aligned(GameFont::Default, sX + 25, sY + 258, (sX + 240) - (sX + 25), 15, strWarn.c_str(), hb::shared::text::TextStyle::from_color(GameColors::UIWarningRed), hb::shared::text::Align::TopCenter);
         hb::shared::text::draw_text_aligned(GameFont::Default, sX + 26, sY + 258, (sX + 241) - (sX + 26), 15, strWarn.c_str(), hb::shared::text::TextStyle::from_color(GameColors::UIWarningRed), hb::shared::text::Align::TopCenter);
@@ -267,7 +267,7 @@ void DialogBox_Shop::draw_armor_stats(short sX, short sY, int item_index, bool& 
     switch (shop_manager::get().get_item_list()[item_index]->m_item_effect_value4) {
     case 10://"Available for above Str %d"
         statReq = std::format(DRAW_DIALOGBOX_SHOP15, shop_manager::get().get_item_list()[item_index]->m_item_effect_value5);
-        if (m_game->m_player->m_str >= shop_manager::get().get_item_list()[item_index]->m_item_effect_value5) {
+        if (player().m_str >= shop_manager::get().get_item_list()[item_index]->m_item_effect_value5) {
             hb::shared::text::draw_text_aligned(GameFont::Default, sX + 25, sY + 160, (sX + 240) - (sX + 25), 15, statReq.c_str(), hb::shared::text::TextStyle::from_color(GameColors::UILabel), hb::shared::text::Align::TopCenter);
             hb::shared::text::draw_text_aligned(GameFont::Default, sX + 26, sY + 160, (sX + 241) - (sX + 26), 15, statReq.c_str(), hb::shared::text::TextStyle::from_color(GameColors::UILabel), hb::shared::text::Align::TopCenter);
         }
@@ -279,7 +279,7 @@ void DialogBox_Shop::draw_armor_stats(short sX, short sY, int item_index, bool& 
         break;
     case 11: // "Available for above Dex %d"
         statReq = std::format(DRAW_DIALOGBOX_SHOP16, shop_manager::get().get_item_list()[item_index]->m_item_effect_value5);
-        if (m_game->m_player->m_dex >= shop_manager::get().get_item_list()[item_index]->m_item_effect_value5) {
+        if (player().m_dex >= shop_manager::get().get_item_list()[item_index]->m_item_effect_value5) {
             hb::shared::text::draw_text_aligned(GameFont::Default, sX + 25, sY + 160, (sX + 240) - (sX + 25), 15, statReq.c_str(), hb::shared::text::TextStyle::from_color(GameColors::UILabel), hb::shared::text::Align::TopCenter);
             hb::shared::text::draw_text_aligned(GameFont::Default, sX + 26, sY + 160, (sX + 241) - (sX + 26), 15, statReq.c_str(), hb::shared::text::TextStyle::from_color(GameColors::UILabel), hb::shared::text::Align::TopCenter);
         }
@@ -291,7 +291,7 @@ void DialogBox_Shop::draw_armor_stats(short sX, short sY, int item_index, bool& 
         break;
     case 12: // "Available for above Vit %d"
         statReq = std::format(DRAW_DIALOGBOX_SHOP17, shop_manager::get().get_item_list()[item_index]->m_item_effect_value5);
-        if (m_game->m_player->m_vit >= shop_manager::get().get_item_list()[item_index]->m_item_effect_value5) {
+        if (player().m_vit >= shop_manager::get().get_item_list()[item_index]->m_item_effect_value5) {
             hb::shared::text::draw_text_aligned(GameFont::Default, sX + 25, sY + 160, (sX + 240) - (sX + 25), 15, statReq.c_str(), hb::shared::text::TextStyle::from_color(GameColors::UILabel), hb::shared::text::Align::TopCenter);
             hb::shared::text::draw_text_aligned(GameFont::Default, sX + 26, sY + 160, (sX + 241) - (sX + 26), 15, statReq.c_str(), hb::shared::text::TextStyle::from_color(GameColors::UILabel), hb::shared::text::Align::TopCenter);
         }
@@ -303,7 +303,7 @@ void DialogBox_Shop::draw_armor_stats(short sX, short sY, int item_index, bool& 
         break;
     case 13: // "Available for above Int %d"
         statReq = std::format(DRAW_DIALOGBOX_SHOP18, shop_manager::get().get_item_list()[item_index]->m_item_effect_value5);
-        if (m_game->m_player->m_int >= shop_manager::get().get_item_list()[item_index]->m_item_effect_value5) {
+        if (player().m_int >= shop_manager::get().get_item_list()[item_index]->m_item_effect_value5) {
             hb::shared::text::draw_text_aligned(GameFont::Default, sX + 25, sY + 160, (sX + 240) - (sX + 25), 15, statReq.c_str(), hb::shared::text::TextStyle::from_color(GameColors::UILabel), hb::shared::text::Align::TopCenter);
             hb::shared::text::draw_text_aligned(GameFont::Default, sX + 26, sY + 160, (sX + 241) - (sX + 26), 15, statReq.c_str(), hb::shared::text::TextStyle::from_color(GameColors::UILabel), hb::shared::text::Align::TopCenter);
         }
@@ -315,7 +315,7 @@ void DialogBox_Shop::draw_armor_stats(short sX, short sY, int item_index, bool& 
         break;
     case 14: // "Available for above Mag %d"
         statReq = std::format(DRAW_DIALOGBOX_SHOP19, shop_manager::get().get_item_list()[item_index]->m_item_effect_value5);
-        if (m_game->m_player->m_mag >= shop_manager::get().get_item_list()[item_index]->m_item_effect_value5) {
+        if (player().m_mag >= shop_manager::get().get_item_list()[item_index]->m_item_effect_value5) {
             hb::shared::text::draw_text_aligned(GameFont::Default, sX + 25, sY + 160, (sX + 240) - (sX + 25), 15, statReq.c_str(), hb::shared::text::TextStyle::from_color(GameColors::UILabel), hb::shared::text::Align::TopCenter);
             hb::shared::text::draw_text_aligned(GameFont::Default, sX + 26, sY + 160, (sX + 241) - (sX + 26), 15, statReq.c_str(), hb::shared::text::TextStyle::from_color(GameColors::UILabel), hb::shared::text::Align::TopCenter);
         }
@@ -327,7 +327,7 @@ void DialogBox_Shop::draw_armor_stats(short sX, short sY, int item_index, bool& 
         break;
     case 15: // "Available for above Chr %d"
         statReq = std::format(DRAW_DIALOGBOX_SHOP20, shop_manager::get().get_item_list()[item_index]->m_item_effect_value5);
-        if (m_game->m_player->m_charisma >= shop_manager::get().get_item_list()[item_index]->m_item_effect_value5) {
+        if (player().m_charisma >= shop_manager::get().get_item_list()[item_index]->m_item_effect_value5) {
             hb::shared::text::draw_text_aligned(GameFont::Default, sX + 25, sY + 160, (sX + 240) - (sX + 25), 15, statReq.c_str(), hb::shared::text::TextStyle::from_color(GameColors::UILabel), hb::shared::text::Align::TopCenter);
             hb::shared::text::draw_text_aligned(GameFont::Default, sX + 26, sY + 160, (sX + 241) - (sX + 26), 15, statReq.c_str(), hb::shared::text::TextStyle::from_color(GameColors::UILabel), hb::shared::text::Align::TopCenter);
         }
@@ -341,7 +341,7 @@ void DialogBox_Shop::draw_armor_stats(short sX, short sY, int item_index, bool& 
         break;
     }
 
-    if ((shop_manager::get().get_item_list()[item_index]->m_weight / 100) > m_game->m_player->m_str) {
+    if ((shop_manager::get().get_item_list()[item_index]->m_weight / 100) > player().m_str) {
         auto strWarn2 = std::format(DRAW_DIALOGBOX_SHOP11, (shop_manager::get().get_item_list()[item_index]->m_weight / 100));
         hb::shared::text::draw_text_aligned(GameFont::Default, sX + 25, sY + 288, (sX + 240) - (sX + 25), 15, strWarn2.c_str(), hb::shared::text::TextStyle::from_color(GameColors::UIWarningRed), hb::shared::text::Align::TopCenter);
         hb::shared::text::draw_text_aligned(GameFont::Default, sX + 26, sY + 288, (sX + 241) - (sX + 26), 15, strWarn2.c_str(), hb::shared::text::TextStyle::from_color(GameColors::UIWarningRed), hb::shared::text::Align::TopCenter);
@@ -353,13 +353,13 @@ void DialogBox_Shop::draw_armor_stats(short sX, short sY, int item_index, bool& 
         flag_red_shown = true;
     }
     else if ((strstr(shop_manager::get().get_item_list()[item_index]->m_name, "(M)") != 0)
-        && (m_game->m_player->m_player_type > 3)) {
+        && (player().m_player_type > 3)) {
         hb::shared::text::draw_text_aligned(GameFont::Default, sX + 25, sY + 258, (sX + 240) - (sX + 25), 15, DRAW_DIALOGBOX_SHOP22, hb::shared::text::TextStyle::from_color(GameColors::UIWarningRed), hb::shared::text::Align::TopCenter);
         hb::shared::text::draw_text_aligned(GameFont::Default, sX + 26, sY + 258, (sX + 241) - (sX + 26), 15, DRAW_DIALOGBOX_SHOP22, hb::shared::text::TextStyle::from_color(GameColors::UIWarningRed), hb::shared::text::Align::TopCenter);
         flag_red_shown = true;
     }
     else if ((strstr(shop_manager::get().get_item_list()[item_index]->m_name, "(W)") != 0)
-        && (m_game->m_player->m_player_type <= 3)) {
+        && (player().m_player_type <= 3)) {
         hb::shared::text::draw_text_aligned(GameFont::Default, sX + 25, sY + 258, (sX + 240) - (sX + 25), 15, DRAW_DIALOGBOX_SHOP23, hb::shared::text::TextStyle::from_color(GameColors::UIWarningRed), hb::shared::text::Align::TopCenter);
         hb::shared::text::draw_text_aligned(GameFont::Default, sX + 26, sY + 258, (sX + 241) - (sX + 26), 15, DRAW_DIALOGBOX_SHOP23, hb::shared::text::TextStyle::from_color(GameColors::UIWarningRed), hb::shared::text::Align::TopCenter);
         flag_red_shown = true;
@@ -369,7 +369,7 @@ void DialogBox_Shop::draw_armor_stats(short sX, short sY, int item_index, bool& 
 void DialogBox_Shop::draw_level_requirement(short sX, short sY, int item_index, bool& flag_red_shown)
 {
     if (shop_manager::get().get_item_list()[item_index]->m_level_limit != 0) {
-        if (m_game->m_player->m_level >= shop_manager::get().get_item_list()[item_index]->m_level_limit) {
+        if (player().m_level >= shop_manager::get().get_item_list()[item_index]->m_level_limit) {
             hb::shared::text::draw_text(GameFont::Default, sX + 90, sY + 190, DRAW_DIALOGBOX_SHOP24, hb::shared::text::TextStyle::from_color(GameColors::UILabel));
             hb::shared::text::draw_text(GameFont::Default, sX + 91, sY + 190, DRAW_DIALOGBOX_SHOP24, hb::shared::text::TextStyle::from_color(GameColors::UILabel));
             auto lvlReq = std::format(DRAW_DIALOGBOX_SHOP25, shop_manager::get().get_item_list()[item_index]->m_level_limit);
@@ -399,7 +399,7 @@ void DialogBox_Shop::draw_quantity_selector(short sX, short sY, short mouse_x, s
     hb::shared::text::draw_text(GameFont::Default, sX + 123 - 35, sY + 237 - 10, DRAW_DIALOGBOX_SHOP27, hb::shared::text::TextStyle::from_color(GameColors::UILabel)); // "Quantity:"
     hb::shared::text::draw_text(GameFont::Default, sX + 124 - 35, sY + 237 - 10, DRAW_DIALOGBOX_SHOP27, hb::shared::text::TextStyle::from_color(GameColors::UILabel));
 
-    if (m_game->m_dialog_box_manager.get_top_id() == DialogBoxId::SaleMenu && z != 0) {
+    if (m_game->get_dialog_box_manager().get_top_id() == DialogBoxId::SaleMenu && z != 0) {
         m_quantity = m_quantity + z / 60;
 
     }
@@ -569,7 +569,7 @@ bool DialogBox_Shop::on_enable(int type, int64_t v1, int v2, const char* string)
 bool DialogBox_Shop::on_disable()
 {
 	shop_manager::get().clear_items();
-	auto& give = m_game->m_dialog_box_manager.m_give_item;
+	auto& give = m_game->get_dialog_box_manager().m_give_item;
 	give.action_type = 0;
 	give.object_id = 0;
 	give.target_x = 0;

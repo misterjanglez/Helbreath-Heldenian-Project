@@ -56,64 +56,60 @@
 
 using namespace hb::shared::net;
 
-DialogBoxManager::DialogBoxManager(CGame* game)
+DialogBoxManager::DialogBoxManager(CGame& game, CPlayer& player)
 	: m_game(game)
+	, m_player(player)
 {
-}
-
-void DialogBoxManager::initialize(CGame* game)
-{
-	m_game = game;
 }
 
 void DialogBoxManager::initialize_dialog_boxes()
 {
-	register_dialog_box(std::make_unique<DialogBox_WarningMsg>(m_game));
-	register_dialog_box(std::make_unique<DialogBox_Resurrect>(m_game));
-	register_dialog_box(std::make_unique<DialogBox_Noticement>(m_game));
-	register_dialog_box(std::make_unique<DialogBox_RepairAll>(m_game));
-	register_dialog_box(std::make_unique<DialogBox_ConfirmExchange>(m_game));
-	register_dialog_box(std::make_unique<DialogBox_Help>(m_game));
-	register_dialog_box(std::make_unique<DialogBox_ItemDrop>(m_game));
-	register_dialog_box(std::make_unique<DialogBox_LevelUpSetting>(m_game));
-	register_dialog_box(std::make_unique<DialogBox_Character>(m_game));
-	register_dialog_box(std::make_unique<DialogBox_Inventory>(m_game));
-	register_dialog_box(std::make_unique<DialogBox_Skill>(m_game));
-	register_dialog_box(std::make_unique<DialogBox_Magic>(m_game));
-	register_dialog_box(std::make_unique<DialogBox_HudPanel>(m_game));
-	register_dialog_box(std::make_unique<DialogBox_GuideMap>(m_game));
-	register_dialog_box(std::make_unique<DialogBox_Fishing>(m_game));
-	register_dialog_box(std::make_unique<DialogBox_CrusadeJob>(m_game));
-	register_dialog_box(std::make_unique<DialogBox_ItemDropAmount>(m_game));
-	register_dialog_box(std::make_unique<DialogBox_Map>(m_game));
-	register_dialog_box(std::make_unique<DialogBox_NpcActionQuery>(m_game));
-	register_dialog_box(std::make_unique<DialogBox_SysMenu>(m_game));
-	register_dialog_box(std::make_unique<DialogBox_Text>(m_game));
-	register_dialog_box(std::make_unique<DialogBox_MagicShop>(m_game));
-	register_dialog_box(std::make_unique<DialogBox_NpcTalk>(m_game));
-	register_dialog_box(std::make_unique<DialogBox_ChatHistory>(m_game));
-	register_dialog_box(std::make_unique<DialogBox_CityHallMenu>(m_game));
-	register_dialog_box(std::make_unique<DialogBox_Shop>(m_game));
-	register_dialog_box(std::make_unique<DialogBox_ItemUpgrade>(m_game));
-	register_dialog_box(std::make_unique<DialogBox_SellList>(m_game));
-	register_dialog_box(std::make_unique<DialogBox_GuildMenu>(m_game));
-	register_dialog_box(std::make_unique<DialogBox_GuildOperation>(m_game));
-	register_dialog_box(std::make_unique<DialogBox_Bank>(m_game));
-	register_dialog_box(std::make_unique<DialogBox_Exchange>(m_game));
-	register_dialog_box(std::make_unique<DialogBox_Party>(m_game));
-	register_dialog_box(std::make_unique<DialogBox_Quest>(m_game));
-	register_dialog_box(std::make_unique<DialogBox_Commander>(m_game));
-	register_dialog_box(std::make_unique<DialogBox_Constructor>(m_game));
-	register_dialog_box(std::make_unique<DialogBox_Soldier>(m_game));
-	register_dialog_box(std::make_unique<DialogBox_Slates>(m_game));
-	register_dialog_box(std::make_unique<DialogBox_ChangeStatsMajestic>(m_game));
-	register_dialog_box(std::make_unique<DialogBox_GuildHallMenu>(m_game));
-	register_dialog_box(std::make_unique<DialogBox_SellOrRepair>(m_game));
-	register_dialog_box(std::make_unique<DialogBox_Manufacture>(m_game));
+	register_dialog_box(std::make_unique<DialogBox_WarningMsg>(&m_game));
+	register_dialog_box(std::make_unique<DialogBox_Resurrect>(&m_game));
+	register_dialog_box(std::make_unique<DialogBox_Noticement>(&m_game));
+	register_dialog_box(std::make_unique<DialogBox_RepairAll>(&m_game));
+	register_dialog_box(std::make_unique<DialogBox_ConfirmExchange>(&m_game));
+	register_dialog_box(std::make_unique<DialogBox_Help>(&m_game));
+	register_dialog_box(std::make_unique<DialogBox_ItemDrop>(&m_game));
+	register_dialog_box(std::make_unique<DialogBox_LevelUpSetting>(&m_game));
+	register_dialog_box(std::make_unique<DialogBox_Character>(&m_game));
+	register_dialog_box(std::make_unique<DialogBox_Inventory>(&m_game));
+	register_dialog_box(std::make_unique<DialogBox_Skill>(&m_game));
+	register_dialog_box(std::make_unique<DialogBox_Magic>(&m_game));
+	register_dialog_box(std::make_unique<DialogBox_HudPanel>(&m_game));
+	register_dialog_box(std::make_unique<DialogBox_GuideMap>(&m_game));
+	register_dialog_box(std::make_unique<DialogBox_Fishing>(&m_game));
+	register_dialog_box(std::make_unique<DialogBox_CrusadeJob>(&m_game));
+	register_dialog_box(std::make_unique<DialogBox_ItemDropAmount>(&m_game));
+	register_dialog_box(std::make_unique<DialogBox_Map>(&m_game));
+	register_dialog_box(std::make_unique<DialogBox_NpcActionQuery>(&m_game));
+	register_dialog_box(std::make_unique<DialogBox_SysMenu>(&m_game));
+	register_dialog_box(std::make_unique<DialogBox_Text>(&m_game));
+	register_dialog_box(std::make_unique<DialogBox_MagicShop>(&m_game));
+	register_dialog_box(std::make_unique<DialogBox_NpcTalk>(&m_game));
+	register_dialog_box(std::make_unique<DialogBox_ChatHistory>(&m_game));
+	register_dialog_box(std::make_unique<DialogBox_CityHallMenu>(&m_game));
+	register_dialog_box(std::make_unique<DialogBox_Shop>(&m_game));
+	register_dialog_box(std::make_unique<DialogBox_ItemUpgrade>(&m_game));
+	register_dialog_box(std::make_unique<DialogBox_SellList>(&m_game));
+	register_dialog_box(std::make_unique<DialogBox_GuildMenu>(&m_game));
+	register_dialog_box(std::make_unique<DialogBox_GuildOperation>(&m_game));
+	register_dialog_box(std::make_unique<DialogBox_Bank>(&m_game));
+	register_dialog_box(std::make_unique<DialogBox_Exchange>(&m_game));
+	register_dialog_box(std::make_unique<DialogBox_Party>(&m_game));
+	register_dialog_box(std::make_unique<DialogBox_Quest>(&m_game));
+	register_dialog_box(std::make_unique<DialogBox_Commander>(&m_game));
+	register_dialog_box(std::make_unique<DialogBox_Constructor>(&m_game));
+	register_dialog_box(std::make_unique<DialogBox_Soldier>(&m_game));
+	register_dialog_box(std::make_unique<DialogBox_Slates>(&m_game));
+	register_dialog_box(std::make_unique<DialogBox_ChangeStatsMajestic>(&m_game));
+	register_dialog_box(std::make_unique<DialogBox_GuildHallMenu>(&m_game));
+	register_dialog_box(std::make_unique<DialogBox_SellOrRepair>(&m_game));
+	register_dialog_box(std::make_unique<DialogBox_Manufacture>(&m_game));
 #ifdef TESTER_ONLY
 	// TESTER MENU — dialog registration (tester builds only)
-	register_dialog_box(std::make_unique<DialogBox_TesterMenu>(m_game));
-	register_dialog_box(std::make_unique<DialogBox_ItemCreator>(m_game));
+	register_dialog_box(std::make_unique<DialogBox_TesterMenu>(&m_game));
+	register_dialog_box(std::make_unique<DialogBox_ItemCreator>(&m_game));
 #endif // TESTER_ONLY
 
 	// HudPanel is always topmost — drawn last, not draggable
@@ -123,6 +119,7 @@ void DialogBoxManager::initialize_dialog_boxes()
 void DialogBoxManager::register_dialog_box(std::unique_ptr<IDialogBox> dialog_box)
 {
 	if (!dialog_box) return;
+	dialog_box->set_manager(*this);
 	int id = static_cast<int>(dialog_box->get_id());
 	m_dialogs[id] = std::move(dialog_box);
 }
@@ -254,7 +251,7 @@ void DialogBoxManager::update_all()
 
 void DialogBoxManager::draw_all()
 {
-	if (m_game && m_game->m_is_observer_mode) return;
+	if (m_game.m_is_observer_mode) return;
 
 	// Normal layer: drawn bottom to top
 	for (uint8_t id : m_normal_order)

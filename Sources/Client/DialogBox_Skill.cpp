@@ -96,7 +96,7 @@ void DialogBox_Skill::on_draw()
 
 		if (lb != 0 && total_lines > 17)
 		{
-			if ((m_game->m_dialog_box_manager.get_top_id() == DialogBoxId::Skill))
+			if ((m_game->get_dialog_box_manager().get_top_id() == DialogBoxId::Skill))
 			{
 				if ((mouse_x >= sX + 240) && (mouse_x <= sX + 260) && (mouse_y >= sY + 30) && (mouse_y <= sY + 320))
 				{
@@ -110,7 +110,7 @@ void DialogBox_Skill::on_draw()
 			}
 		}
 		else m_is_scroll_selected = false;
-		if (m_game->m_dialog_box_manager.get_top_id() == DialogBoxId::Skill && z != 0)
+		if (m_game->get_dialog_box_manager().get_top_id() == DialogBoxId::Skill && z != 0)
 		{
 			if (z > 0) m_scroll_position--;
 			if (z < 0) m_scroll_position++;
@@ -147,7 +147,7 @@ bool DialogBox_Skill::on_click()
 							add_event_list(DLGBOX_CLICK_SKILL1, 10); // "You are already using other skill."
 							return true;
 						}
-						if ((m_game->m_player->m_Controller.is_command_available() == false) || (m_game->m_player->m_hp <= 0))
+						if ((player().m_Controller.is_command_available() == false) || (player().m_hp <= 0))
 						{
 							add_event_list(DLGBOX_CLICK_SKILL2, 10); // "You can't use a skill while you are moving."
 							return true;

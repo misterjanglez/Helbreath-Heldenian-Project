@@ -1,4 +1,6 @@
 #include "IDialogBox.h"
+#include "DialogBoxManager.h"
+#include "Player.h"
 #include "Game.h"
 #include "GameFonts.h"
 #include "TextLibExt.h"
@@ -59,20 +61,25 @@ void IDialogBox::set_default_rect(short sX, short sY, short size_x, short size_y
 
 void IDialogBox::enable_dialog_box(DialogBoxId::Type id, int type, int64_t v1, int v2, const char* string)
 {
-	m_game->m_dialog_box_manager.enable_dialog_box(id, type, v1, v2, string);
+	m_manager->enable_dialog_box(id, type, v1, v2, string);
 }
 
 void IDialogBox::disable_dialog_box(DialogBoxId::Type id)
 {
-	m_game->m_dialog_box_manager.disable_dialog_box(id);
+	m_manager->disable_dialog_box(id);
 }
 
 void IDialogBox::disable_this_dialog()
 {
-	m_game->m_dialog_box_manager.disable_dialog_box(m_id);
+	m_manager->disable_dialog_box(m_id);
 }
 
 IDialogBox* IDialogBox::get_dialog_box(DialogBoxId::Type id)
 {
-	return m_game->m_dialog_box_manager.get_dialog_box(id);
+	return m_manager->get_dialog_box(id);
+}
+
+CPlayer& IDialogBox::player() const
+{
+	return m_manager->get_player();
 }

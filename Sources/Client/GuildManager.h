@@ -3,15 +3,32 @@
 
 #pragma once
 
+#include "GameConstants.h"
+#include <cstdint>
+#include <string>
+
 class CGame;
 
 class guild_manager
 {
 public:
+	struct guild_name_entry
+	{
+		uint32_t ref_time = 0;
+		int guild_rank = -1;
+		std::string char_name;
+		std::string guild_name;
+	};
+
 	guild_manager() = default;
 	~guild_manager() = default;
 
 	void set_game(CGame* game) { m_game = game; }
+
+	// Guild name cache
+	bool find_guild_name(const char* name, uint32_t cur_time, int* out_index);
+	void clear_name_cache();
+	guild_name_entry& get_name_entry(int index) { return m_name_cache[index]; }
 
 	// Guild creation/disband responses
 	void handle_create_new_guild_response(char* data);
@@ -42,4 +59,5 @@ public:
 private:
 	static void update_location_flags(CGame* game, const char* location);
 	CGame* m_game = nullptr;
+	guild_name_entry m_name_cache[game_limits::max_guild_names];
 };

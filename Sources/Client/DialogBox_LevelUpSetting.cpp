@@ -65,30 +65,30 @@ void DialogBox_LevelUpSetting::on_draw()
 
 	// Points Left
 	put_string(sX + 20, sY + 85, DRAW_DIALOGBOX_LEVELUP_SETTING3, GameColors::UIBlack);
-	txt = std::format("{}", m_game->m_player->m_lu_point);
-	if (m_game->m_player->m_lu_point > 0)
+	txt = std::format("{}", player().m_lu_point);
+	if (player().m_lu_point > 0)
 		put_string(sX + 73, sY + 102, txt.c_str(), GameColors::UIGreen);
 	else
 		put_string(sX + 73, sY + 102, txt.c_str(), GameColors::UIBlack);
 
 	// draw stat rows
-	draw_stat_row(sX, sY, 125, DRAW_DIALOGBOX_LEVELUP_SETTING4, m_game->m_player->m_str, m_game->m_player->m_lu_str,
-	            mouse_x, mouse_y, 127, (m_game->m_player->m_str < m_game->m_max_stats), (m_game->m_player->m_lu_str > 0));
+	draw_stat_row(sX, sY, 125, DRAW_DIALOGBOX_LEVELUP_SETTING4, player().m_str, player().m_lu_str,
+	            mouse_x, mouse_y, 127, (player().m_str < m_game->m_max_stats), (player().m_lu_str > 0));
 
-	draw_stat_row(sX, sY, 144, DRAW_DIALOGBOX_LEVELUP_SETTING5, m_game->m_player->m_vit, m_game->m_player->m_lu_vit,
-	            mouse_x, mouse_y, 146, (m_game->m_player->m_vit < m_game->m_max_stats), (m_game->m_player->m_lu_vit > 0));
+	draw_stat_row(sX, sY, 144, DRAW_DIALOGBOX_LEVELUP_SETTING5, player().m_vit, player().m_lu_vit,
+	            mouse_x, mouse_y, 146, (player().m_vit < m_game->m_max_stats), (player().m_lu_vit > 0));
 
-	draw_stat_row(sX, sY, 163, DRAW_DIALOGBOX_LEVELUP_SETTING6, m_game->m_player->m_dex, m_game->m_player->m_lu_dex,
-	            mouse_x, mouse_y, 165, (m_game->m_player->m_dex < m_game->m_max_stats), (m_game->m_player->m_lu_dex > 0));
+	draw_stat_row(sX, sY, 163, DRAW_DIALOGBOX_LEVELUP_SETTING6, player().m_dex, player().m_lu_dex,
+	            mouse_x, mouse_y, 165, (player().m_dex < m_game->m_max_stats), (player().m_lu_dex > 0));
 
-	draw_stat_row(sX, sY, 182, DRAW_DIALOGBOX_LEVELUP_SETTING7, m_game->m_player->m_int, m_game->m_player->m_lu_int,
-	            mouse_x, mouse_y, 184, (m_game->m_player->m_int < m_game->m_max_stats), (m_game->m_player->m_lu_int > 0));
+	draw_stat_row(sX, sY, 182, DRAW_DIALOGBOX_LEVELUP_SETTING7, player().m_int, player().m_lu_int,
+	            mouse_x, mouse_y, 184, (player().m_int < m_game->m_max_stats), (player().m_lu_int > 0));
 
-	draw_stat_row(sX, sY, 201, DRAW_DIALOGBOX_LEVELUP_SETTING8, m_game->m_player->m_mag, m_game->m_player->m_lu_mag,
-	            mouse_x, mouse_y, 203, (m_game->m_player->m_mag < m_game->m_max_stats), (m_game->m_player->m_lu_mag > 0));
+	draw_stat_row(sX, sY, 201, DRAW_DIALOGBOX_LEVELUP_SETTING8, player().m_mag, player().m_lu_mag,
+	            mouse_x, mouse_y, 203, (player().m_mag < m_game->m_max_stats), (player().m_lu_mag > 0));
 
-	draw_stat_row(sX, sY, 220, DRAW_DIALOGBOX_LEVELUP_SETTING9, m_game->m_player->m_charisma, m_game->m_player->m_lu_char,
-	            mouse_x, mouse_y, 222, (m_game->m_player->m_charisma < m_game->m_max_stats), (m_game->m_player->m_lu_char > 0));
+	draw_stat_row(sX, sY, 220, DRAW_DIALOGBOX_LEVELUP_SETTING9, player().m_charisma, player().m_lu_char,
+	            mouse_x, mouse_y, 222, (player().m_charisma < m_game->m_max_stats), (player().m_lu_char > 0));
 
 	// Close button
 	if ((mouse_x >= sX + ui_layout::right_btn_x) && (mouse_x <= sX + ui_layout::right_btn_x + ui_layout::btn_size_x) &&
@@ -98,18 +98,18 @@ void DialogBox_LevelUpSetting::on_draw()
 		draw_new_dialog_box(InterfaceNdButton, sX + ui_layout::right_btn_x, sY + ui_layout::btn_y, 0);
 
 	// Majestic button (only if no pending changes and no points left)
-	if ((m_game->m_player->m_lu_str == 0) && (m_game->m_player->m_lu_vit == 0) && (m_game->m_player->m_lu_dex == 0) &&
-	    (m_game->m_player->m_lu_int == 0) && (m_game->m_player->m_lu_mag == 0) && (m_game->m_player->m_lu_char == 0))
+	if ((player().m_lu_str == 0) && (player().m_lu_vit == 0) && (player().m_lu_dex == 0) &&
+	    (player().m_lu_int == 0) && (player().m_lu_mag == 0) && (player().m_lu_char == 0))
 	{
 		if ((mouse_x >= sX + ui_layout::left_btn_x) && (mouse_x <= sX + ui_layout::left_btn_x + ui_layout::btn_size_x) &&
 		    (mouse_y > sY + ui_layout::btn_y) && (mouse_y < sY + ui_layout::btn_y + ui_layout::btn_size_y))
 		{
-			if (m_game->m_player->m_lu_point <= 0)
+			if (player().m_lu_point <= 0)
 				draw_new_dialog_box(InterfaceNdButton, sX + ui_layout::left_btn_x, sY + ui_layout::btn_y, 21);
 		}
 		else
 		{
-			if (m_game->m_player->m_lu_point <= 0)
+			if (player().m_lu_point <= 0)
 				draw_new_dialog_box(InterfaceNdButton, sX + ui_layout::left_btn_x, sY + ui_layout::btn_y, 20);
 		}
 	}
@@ -118,25 +118,25 @@ void DialogBox_LevelUpSetting::on_draw()
 bool DialogBox_LevelUpSetting::handle_stat_click(short mouse_x, short mouse_y, short sX, short sY,
                                                 int y_offset, int& current_stat, int16_t& pending_change)
 {
-	bool majestic_open = m_game->m_dialog_box_manager.is_enabled(DialogBoxId::ChangeStatsMajestic);
+	bool majestic_open = m_game->get_dialog_box_manager().is_enabled(DialogBoxId::ChangeStatsMajestic);
 
 	// + button
 	if ((mouse_x >= sX + 195) && (mouse_x <= sX + 205) && (mouse_y >= sY + y_offset) && (mouse_y <= sY + y_offset + 6) &&
-	    (current_stat <= m_game->m_max_stats) && (m_game->m_player->m_lu_point > 0))
+	    (current_stat <= m_game->m_max_stats) && (player().m_lu_point > 0))
 	{
 		if (hb::shared::input::is_ctrl_down())
 		{
-			if ((m_game->m_player->m_lu_point >= 5) && !majestic_open)
+			if ((player().m_lu_point >= 5) && !majestic_open)
 			{
-				m_game->m_player->m_lu_point -= 5;
+				player().m_lu_point -= 5;
 				pending_change += 5;
 			}
 		}
 		else
 		{
-			if ((m_game->m_player->m_lu_point > 0) && !majestic_open)
+			if ((player().m_lu_point > 0) && !majestic_open)
 			{
-				m_game->m_player->m_lu_point--;
+				player().m_lu_point--;
 				pending_change++;
 			}
 		}
@@ -153,7 +153,7 @@ bool DialogBox_LevelUpSetting::handle_stat_click(short mouse_x, short mouse_y, s
 			if ((pending_change >= 5) && !majestic_open)
 			{
 				pending_change -= 5;
-				m_game->m_player->m_lu_point += 5;
+				player().m_lu_point += 5;
 			}
 		}
 		else
@@ -161,7 +161,7 @@ bool DialogBox_LevelUpSetting::handle_stat_click(short mouse_x, short mouse_y, s
 			if ((pending_change > 0) && !majestic_open)
 			{
 				pending_change--;
-				m_game->m_player->m_lu_point++;
+				player().m_lu_point++;
 			}
 		}
 		play_sound_effect('E', 14, 5);
@@ -179,34 +179,34 @@ bool DialogBox_LevelUpSetting::on_click()
 	short sY = m_y;
 
 	// Strength +/-
-	if (handle_stat_click(mouse_x, mouse_y, sX, sY, 127, m_game->m_player->m_str, m_game->m_player->m_lu_str))
+	if (handle_stat_click(mouse_x, mouse_y, sX, sY, 127, player().m_str, player().m_lu_str))
 		return true;
 
 	// Vitality +/-
-	if (handle_stat_click(mouse_x, mouse_y, sX, sY, 146, m_game->m_player->m_vit, m_game->m_player->m_lu_vit))
+	if (handle_stat_click(mouse_x, mouse_y, sX, sY, 146, player().m_vit, player().m_lu_vit))
 		return true;
 
 	// Dexterity +/-
-	if (handle_stat_click(mouse_x, mouse_y, sX, sY, 165, m_game->m_player->m_dex, m_game->m_player->m_lu_dex))
+	if (handle_stat_click(mouse_x, mouse_y, sX, sY, 165, player().m_dex, player().m_lu_dex))
 		return true;
 
 	// Intelligence +/-
-	if (handle_stat_click(mouse_x, mouse_y, sX, sY, 184, m_game->m_player->m_int, m_game->m_player->m_lu_int))
+	if (handle_stat_click(mouse_x, mouse_y, sX, sY, 184, player().m_int, player().m_lu_int))
 		return true;
 
 	// Magic +/-
-	if (handle_stat_click(mouse_x, mouse_y, sX, sY, 203, m_game->m_player->m_mag, m_game->m_player->m_lu_mag))
+	if (handle_stat_click(mouse_x, mouse_y, sX, sY, 203, player().m_mag, player().m_lu_mag))
 		return true;
 
 	// Charisma +/-
-	if (handle_stat_click(mouse_x, mouse_y, sX, sY, 222, m_game->m_player->m_charisma, m_game->m_player->m_lu_char))
+	if (handle_stat_click(mouse_x, mouse_y, sX, sY, 222, player().m_charisma, player().m_lu_char))
 		return true;
 
 	// Close/OK button
 	if ((mouse_x >= sX + ui_layout::right_btn_x) && (mouse_x <= sX + ui_layout::right_btn_x + ui_layout::btn_size_x) &&
 	    (mouse_y > sY + ui_layout::btn_y) && (mouse_y < sY + ui_layout::btn_y + ui_layout::btn_size_y))
 	{
-		if (m_initial_lu_points != m_game->m_player->m_lu_point)
+		if (m_initial_lu_points != player().m_lu_point)
 			send_command(MsgId::LevelUpSettings, 0, 0, 0, 0, 0, 0);
 		disable_this_dialog();
 		play_sound_effect('E', 14, 5);
@@ -217,9 +217,9 @@ bool DialogBox_LevelUpSetting::on_click()
 	if ((mouse_x >= sX + ui_layout::left_btn_x) && (mouse_x <= sX + ui_layout::left_btn_x + ui_layout::btn_size_x) &&
 	    (mouse_y > sY + ui_layout::btn_y) && (mouse_y < sY + ui_layout::btn_y + ui_layout::btn_size_y))
 	{
-		if ((m_game->m_gizon_item_upgrade_left > 0) && (m_game->m_player->m_lu_point <= 0) &&
-		    (m_game->m_player->m_lu_str == 0) && (m_game->m_player->m_lu_vit == 0) && (m_game->m_player->m_lu_dex == 0) &&
-		    (m_game->m_player->m_lu_int == 0) && (m_game->m_player->m_lu_mag == 0) && (m_game->m_player->m_lu_char == 0))
+		if ((m_game->m_gizon_item_upgrade_left > 0) && (player().m_lu_point <= 0) &&
+		    (player().m_lu_str == 0) && (player().m_lu_vit == 0) && (player().m_lu_dex == 0) &&
+		    (player().m_lu_int == 0) && (player().m_lu_mag == 0) && (player().m_lu_char == 0))
 		{
 			disable_this_dialog();
 			enable_dialog_box(DialogBoxId::ChangeStatsMajestic, 0, 0, 0);
@@ -235,6 +235,6 @@ bool DialogBox_LevelUpSetting::on_enable(int type, int64_t v1, int v2, const cha
 	if (is_enabled()) return true;
 	auto* charDlg = get_dialog_box(DialogBoxId::CharacterInfo);
 	if (charDlg) { m_x = charDlg->m_x + 20; m_y = charDlg->m_y + 20; }
-	m_initial_lu_points = m_game->m_player->m_lu_point;
+	m_initial_lu_points = player().m_lu_point;
 	return true;
 }

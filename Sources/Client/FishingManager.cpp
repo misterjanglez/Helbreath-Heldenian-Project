@@ -18,7 +18,7 @@ void fishing_manager::handle_fish_chance(char* data)
 		data, sizeof(hb::net::PacketNotifyFishChance));
 	if (!pkt) return;
 	fish_chance = pkt->chance;
-	auto* fish_dlg = m_game->m_dialog_box_manager.get_dialog_as<DialogBox_Fishing>(DialogBoxId::Fishing);
+	auto* fish_dlg = m_game->get_dialog_box_manager().get_dialog_as<DialogBox_Fishing>(DialogBoxId::Fishing);
 	if (fish_dlg) fish_dlg->m_catch_chance = fish_chance;
 }
 
@@ -37,7 +37,7 @@ void fishing_manager::handle_event_fish_mode(char* data)
 	static_assert(sizeof(pkt->name) <= sizeof(name), "Packet name field exceeds local buffer");
 	memcpy(name, pkt->name, sizeof(pkt->name));
 
-	m_game->m_dialog_box_manager.enable_dialog_box(DialogBoxId::Fishing, 0, 0, price, name);
+	m_game->get_dialog_box_manager().enable_dialog_box(DialogBoxId::Fishing, 0, 0, price, name);
 	// m_v3/m_v4 were unused sprite fields — removed
 
 	m_game->add_event_list(NOTIFYMSG_EVENTFISHMODE1, 10);
@@ -52,15 +52,15 @@ void fishing_manager::handle_fish_canceled(char* data)
 	switch (pkt->reason) {
 	case 0:
 		m_game->add_event_list(NOTIFY_MSG_HANDLER52, 10);
-		m_game->m_dialog_box_manager.disable_dialog_box(DialogBoxId::Fishing);
+		m_game->get_dialog_box_manager().disable_dialog_box(DialogBoxId::Fishing);
 		break;
 	case 1:
 		m_game->add_event_list(NOTIFY_MSG_HANDLER53, 10);
-		m_game->m_dialog_box_manager.disable_dialog_box(DialogBoxId::Fishing);
+		m_game->get_dialog_box_manager().disable_dialog_box(DialogBoxId::Fishing);
 		break;
 	case 2:
 		m_game->add_event_list(NOTIFY_MSG_HANDLER54, 10);
-		m_game->m_dialog_box_manager.disable_dialog_box(DialogBoxId::Fishing);
+		m_game->get_dialog_box_manager().disable_dialog_box(DialogBoxId::Fishing);
 		break;
 	}
 }

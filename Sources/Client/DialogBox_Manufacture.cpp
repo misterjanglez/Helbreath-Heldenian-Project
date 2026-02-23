@@ -131,37 +131,37 @@ void DialogBox_Manufacture::draw_alchemy_waiting(short sX, short sY)
 	m_game->m_sprite[InterfaceAddInterface]->draw(sX, sY, 1);
 
 	if (m_slot_1 != -1) {
-		CItem* cfg = m_game->get_item_config(m_game->m_item_list[m_slot_1]->m_id_num);
+		CItem* cfg = m_game->get_item_config(player().m_item_list[m_slot_1]->m_id_num);
 		if (cfg) { auto d = m_game->get_item_draw(cfg->m_display_id, item_atlas::pack, cfg->sprite_is_female());
 		d.sprite->draw(sX + adj_x + 55 + (1 - (rand() % 3)), sY + adj_y + 55 + (1 - (rand() % 3)), d.frame, hb::shared::sprite::DrawParams::alpha_blend(0.5f)); }
 	}
 
 	if (m_slot_2 != -1) {
-		CItem* cfg = m_game->get_item_config(m_game->m_item_list[m_slot_2]->m_id_num);
+		CItem* cfg = m_game->get_item_config(player().m_item_list[m_slot_2]->m_id_num);
 		if (cfg) { auto d = m_game->get_item_draw(cfg->m_display_id, item_atlas::pack, cfg->sprite_is_female());
 		d.sprite->draw(sX + adj_x + 55 + 45 * 1 + (1 - (rand() % 3)), sY + adj_y + 55 + (1 - (rand() % 3)), d.frame, hb::shared::sprite::DrawParams::alpha_blend(0.5f)); }
 	}
 
 	if (m_slot_3 != -1) {
-		CItem* cfg = m_game->get_item_config(m_game->m_item_list[m_slot_3]->m_id_num);
+		CItem* cfg = m_game->get_item_config(player().m_item_list[m_slot_3]->m_id_num);
 		if (cfg) { auto d = m_game->get_item_draw(cfg->m_display_id, item_atlas::pack, cfg->sprite_is_female());
 		d.sprite->draw(sX + adj_x + 55 + 45 * 2 + (1 - (rand() % 3)), sY + adj_y + 55 + (1 - (rand() % 3)), d.frame, hb::shared::sprite::DrawParams::alpha_blend(0.5f)); }
 	}
 
 	if (m_slot_4 != -1) {
-		CItem* cfg = m_game->get_item_config(m_game->m_item_list[m_slot_4]->m_id_num);
+		CItem* cfg = m_game->get_item_config(player().m_item_list[m_slot_4]->m_id_num);
 		if (cfg) { auto d = m_game->get_item_draw(cfg->m_display_id, item_atlas::pack, cfg->sprite_is_female());
 		d.sprite->draw(sX + adj_x + 55 + (1 - (rand() % 3)), sY + adj_y + 100 + (1 - (rand() % 3)), d.frame, hb::shared::sprite::DrawParams::alpha_blend(0.5f)); }
 	}
 
 	if (m_slot_5 != -1) {
-		CItem* cfg = m_game->get_item_config(m_game->m_item_list[m_slot_5]->m_id_num);
+		CItem* cfg = m_game->get_item_config(player().m_item_list[m_slot_5]->m_id_num);
 		if (cfg) { auto d = m_game->get_item_draw(cfg->m_display_id, item_atlas::pack, cfg->sprite_is_female());
 		d.sprite->draw(sX + adj_x + 55 + 45 * 1 + (1 - (rand() % 3)), sY + adj_y + 100 + (1 - (rand() % 3)), d.frame, hb::shared::sprite::DrawParams::alpha_blend(0.5f)); }
 	}
 
 	if (m_slot_6 != -1) {
-		CItem* cfg = m_game->get_item_config(m_game->m_item_list[m_slot_6]->m_id_num);
+		CItem* cfg = m_game->get_item_config(player().m_item_list[m_slot_6]->m_id_num);
 		if (cfg) { auto d = m_game->get_item_draw(cfg->m_display_id, item_atlas::pack, cfg->sprite_is_female());
 		d.sprite->draw(sX + adj_x + 55 + 45 * 2 + (1 - (rand() % 3)), sY + adj_y + 100 + (1 - (rand() % 3)), d.frame, hb::shared::sprite::DrawParams::alpha_blend(0.5f)); }
 	}
@@ -180,37 +180,37 @@ void DialogBox_Manufacture::draw_alchemy_creating(short sX, short sY)
 	m_game->m_sprite[InterfaceAddInterface]->draw(sX, sY, 1);
 
 	if (m_slot_1 != -1) {
-		CItem* cfg = m_game->get_item_config(m_game->m_item_list[m_slot_1]->m_id_num);
+		CItem* cfg = m_game->get_item_config(player().m_item_list[m_slot_1]->m_id_num);
 		if (cfg) { auto d = m_game->get_item_draw(cfg->m_display_id, item_atlas::pack, cfg->sprite_is_female());
 		d.sprite->draw(sX + adj_x + 55 + (1 - (rand() % 3)), sY + adj_y + 55 + (1 - (rand() % 3)), d.frame, hb::shared::sprite::DrawParams::alpha_blend(0.5f)); }
 	}
 
 	if (m_slot_2 != -1) {
-		CItem* cfg = m_game->get_item_config(m_game->m_item_list[m_slot_2]->m_id_num);
+		CItem* cfg = m_game->get_item_config(player().m_item_list[m_slot_2]->m_id_num);
 		if (cfg) { auto d = m_game->get_item_draw(cfg->m_display_id, item_atlas::pack, cfg->sprite_is_female());
 		d.sprite->draw(sX + adj_x + 55 + 45 * 1 + (1 - (rand() % 3)), sY + adj_y + 55 + (1 - (rand() % 3)), d.frame, hb::shared::sprite::DrawParams::alpha_blend(0.5f)); }
 	}
 
 	if (m_slot_3 != -1) {
-		CItem* cfg = m_game->get_item_config(m_game->m_item_list[m_slot_3]->m_id_num);
+		CItem* cfg = m_game->get_item_config(player().m_item_list[m_slot_3]->m_id_num);
 		if (cfg) { auto d = m_game->get_item_draw(cfg->m_display_id, item_atlas::pack, cfg->sprite_is_female());
 		d.sprite->draw(sX + adj_x + 55 + 45 * 2 + (1 - (rand() % 3)), sY + adj_y + 55 + (1 - (rand() % 3)), d.frame, hb::shared::sprite::DrawParams::alpha_blend(0.5f)); }
 	}
 
 	if (m_slot_4 != -1) {
-		CItem* cfg = m_game->get_item_config(m_game->m_item_list[m_slot_4]->m_id_num);
+		CItem* cfg = m_game->get_item_config(player().m_item_list[m_slot_4]->m_id_num);
 		if (cfg) { auto d = m_game->get_item_draw(cfg->m_display_id, item_atlas::pack, cfg->sprite_is_female());
 		d.sprite->draw(sX + adj_x + 55 + (1 - (rand() % 3)), sY + adj_y + 100 + (1 - (rand() % 3)), d.frame, hb::shared::sprite::DrawParams::alpha_blend(0.5f)); }
 	}
 
 	if (m_slot_5 != -1) {
-		CItem* cfg = m_game->get_item_config(m_game->m_item_list[m_slot_5]->m_id_num);
+		CItem* cfg = m_game->get_item_config(player().m_item_list[m_slot_5]->m_id_num);
 		if (cfg) { auto d = m_game->get_item_draw(cfg->m_display_id, item_atlas::pack, cfg->sprite_is_female());
 		d.sprite->draw(sX + adj_x + 55 + 45 * 1 + (1 - (rand() % 3)), sY + adj_y + 100 + (1 - (rand() % 3)), d.frame, hb::shared::sprite::DrawParams::alpha_blend(0.5f)); }
 	}
 
 	if (m_slot_6 != -1) {
-		CItem* cfg = m_game->get_item_config(m_game->m_item_list[m_slot_6]->m_id_num);
+		CItem* cfg = m_game->get_item_config(player().m_item_list[m_slot_6]->m_id_num);
 		if (cfg) { auto d = m_game->get_item_draw(cfg->m_display_id, item_atlas::pack, cfg->sprite_is_female());
 		d.sprite->draw(sX + adj_x + 55 + 45 * 2 + (1 - (rand() % 3)), sY + adj_y + 100 + (1 - (rand() % 3)), d.frame, hb::shared::sprite::DrawParams::alpha_blend(0.5f)); }
 	}
@@ -226,7 +226,7 @@ void DialogBox_Manufacture::draw_alchemy_creating(short sX, short sY)
 	if (m_progress >= 5)
 	{
 		m_game->send_command(MsgId::CommandCommon, CommonType::ReqCreatePortion, 0, 0, 0, 0, 0);
-		m_game->m_dialog_box_manager.disable_dialog_box(DialogBoxId::Manufacture);
+		m_game->get_dialog_box_manager().disable_dialog_box(DialogBoxId::Manufacture);
 		m_game->play_game_sound('E', 42, 0);
 	}
 }
@@ -286,7 +286,7 @@ void DialogBox_Manufacture::draw_manufacture_list(short sX, short sY)
 		m_game->m_sprite[InterfaceNdGame2]->draw(sX + adj_x + 225, sY + adj_y + 230, 24);
 	else m_game->m_sprite[InterfaceNdGame2]->draw(sX + adj_x + 225, sY + adj_y + 230, 24, hb::shared::sprite::DrawParams::tinted_alpha(GameColors::UIBlack.r, GameColors::UIBlack.g, GameColors::UIBlack.b, 0.7f));
 
-	if ((lb != 0) && (m_game->m_dialog_box_manager.get_top_id() == DialogBoxId::Manufacture)) {
+	if ((lb != 0) && (m_game->get_dialog_box_manager().get_top_id() == DialogBoxId::Manufacture)) {
 		if ((mouse_x >= sX + adj_x + 225) && (mouse_x <= sX + adj_x + 245) && (mouse_y >= sY + adj_y + 210) && (mouse_y <= sY + adj_y + 230)) {
 			m_scroll_view--;
 		}
@@ -296,7 +296,7 @@ void DialogBox_Manufacture::draw_manufacture_list(short sX, short sY)
 				m_scroll_view++;
 		}
 	}
-	if ((z != 0) && (m_game->m_dialog_box_manager.get_top_id() == DialogBoxId::Manufacture)) {
+	if ((z != 0) && (m_game->get_dialog_box_manager().get_top_id() == DialogBoxId::Manufacture)) {
 		m_scroll_view = m_scroll_view - z / 60;
 
 	}
@@ -381,32 +381,32 @@ void DialogBox_Manufacture::draw_manufacture_waiting(short sX, short sY)
 
 		// draw items in slots
 		if (m_slot_1 != -1) {
-			CItem* cfg = m_game->get_item_config(m_game->m_item_list[m_slot_1]->m_id_num);
+			CItem* cfg = m_game->get_item_config(player().m_item_list[m_slot_1]->m_id_num);
 			if (cfg) { auto d = m_game->get_item_draw(cfg->m_display_id, item_atlas::pack, cfg->sprite_is_female());
 			d.sprite->draw(sX + adj_x + 55 + 30 + 13, sY + adj_y + 55 + 180, d.frame); }
 		}
 		if (m_slot_2 != -1) {
-			CItem* cfg = m_game->get_item_config(m_game->m_item_list[m_slot_2]->m_id_num);
+			CItem* cfg = m_game->get_item_config(player().m_item_list[m_slot_2]->m_id_num);
 			if (cfg) { auto d = m_game->get_item_draw(cfg->m_display_id, item_atlas::pack, cfg->sprite_is_female());
 			d.sprite->draw(sX + adj_x + 55 + 45 + 30 + 13, sY + adj_y + 55 + 180, d.frame); }
 		}
 		if (m_slot_3 != -1) {
-			CItem* cfg = m_game->get_item_config(m_game->m_item_list[m_slot_3]->m_id_num);
+			CItem* cfg = m_game->get_item_config(player().m_item_list[m_slot_3]->m_id_num);
 			if (cfg) { auto d = m_game->get_item_draw(cfg->m_display_id, item_atlas::pack, cfg->sprite_is_female());
 			d.sprite->draw(sX + adj_x + 55 + 90 + 30 + 13, sY + adj_y + 55 + 180, d.frame); }
 		}
 		if (m_slot_4 != -1) {
-			CItem* cfg = m_game->get_item_config(m_game->m_item_list[m_slot_4]->m_id_num);
+			CItem* cfg = m_game->get_item_config(player().m_item_list[m_slot_4]->m_id_num);
 			if (cfg) { auto d = m_game->get_item_draw(cfg->m_display_id, item_atlas::pack, cfg->sprite_is_female());
 			d.sprite->draw(sX + adj_x + 55 + 30 + 13, sY + adj_y + 100 + 180, d.frame); }
 		}
 		if (m_slot_5 != -1) {
-			CItem* cfg = m_game->get_item_config(m_game->m_item_list[m_slot_5]->m_id_num);
+			CItem* cfg = m_game->get_item_config(player().m_item_list[m_slot_5]->m_id_num);
 			if (cfg) { auto d = m_game->get_item_draw(cfg->m_display_id, item_atlas::pack, cfg->sprite_is_female());
 			d.sprite->draw(sX + adj_x + 55 + 45 + 30 + 13, sY + adj_y + 100 + 180, d.frame); }
 		}
 		if (m_slot_6 != -1) {
-			CItem* cfg = m_game->get_item_config(m_game->m_item_list[m_slot_6]->m_id_num);
+			CItem* cfg = m_game->get_item_config(player().m_item_list[m_slot_6]->m_id_num);
 			if (cfg) { auto d = m_game->get_item_draw(cfg->m_display_id, item_atlas::pack, cfg->sprite_is_female());
 			d.sprite->draw(sX + adj_x + 55 + 90 + 30 + 13, sY + adj_y + 100 + 180, d.frame); }
 		}
@@ -501,32 +501,32 @@ void DialogBox_Manufacture::draw_manufacture_in_progress(short sX, short sY)
 
 	// draw items in slots
 	if (m_slot_1 != -1) {
-		CItem* cfg = m_game->get_item_config(m_game->m_item_list[m_slot_1]->m_id_num);
+		CItem* cfg = m_game->get_item_config(player().m_item_list[m_slot_1]->m_id_num);
 		if (cfg) { auto d = m_game->get_item_draw(cfg->m_display_id, item_atlas::pack, cfg->sprite_is_female());
 		d.sprite->draw(sX + adj_x + 55 + 30 + 13, sY + adj_y + 55 + 180, d.frame); }
 	}
 	if (m_slot_2 != -1) {
-		CItem* cfg = m_game->get_item_config(m_game->m_item_list[m_slot_2]->m_id_num);
+		CItem* cfg = m_game->get_item_config(player().m_item_list[m_slot_2]->m_id_num);
 		if (cfg) { auto d = m_game->get_item_draw(cfg->m_display_id, item_atlas::pack, cfg->sprite_is_female());
 		d.sprite->draw(sX + adj_x + 55 + 45 + 30 + 13, sY + adj_y + 55 + 180, d.frame); }
 	}
 	if (m_slot_3 != -1) {
-		CItem* cfg = m_game->get_item_config(m_game->m_item_list[m_slot_3]->m_id_num);
+		CItem* cfg = m_game->get_item_config(player().m_item_list[m_slot_3]->m_id_num);
 		if (cfg) { auto d = m_game->get_item_draw(cfg->m_display_id, item_atlas::pack, cfg->sprite_is_female());
 		d.sprite->draw(sX + adj_x + 55 + 90 + 30 + 13, sY + adj_y + 55 + 180, d.frame); }
 	}
 	if (m_slot_4 != -1) {
-		CItem* cfg = m_game->get_item_config(m_game->m_item_list[m_slot_4]->m_id_num);
+		CItem* cfg = m_game->get_item_config(player().m_item_list[m_slot_4]->m_id_num);
 		if (cfg) { auto d = m_game->get_item_draw(cfg->m_display_id, item_atlas::pack, cfg->sprite_is_female());
 		d.sprite->draw(sX + adj_x + 55 + 30 + 13, sY + adj_y + 100 + 180, d.frame); }
 	}
 	if (m_slot_5 != -1) {
-		CItem* cfg = m_game->get_item_config(m_game->m_item_list[m_slot_5]->m_id_num);
+		CItem* cfg = m_game->get_item_config(player().m_item_list[m_slot_5]->m_id_num);
 		if (cfg) { auto d = m_game->get_item_draw(cfg->m_display_id, item_atlas::pack, cfg->sprite_is_female());
 		d.sprite->draw(sX + adj_x + 55 + 45 + 30 + 13, sY + adj_y + 100 + 180, d.frame); }
 	}
 	if (m_slot_6 != -1) {
-		CItem* cfg = m_game->get_item_config(m_game->m_item_list[m_slot_6]->m_id_num);
+		CItem* cfg = m_game->get_item_config(player().m_item_list[m_slot_6]->m_id_num);
 		if (cfg) { auto d = m_game->get_item_draw(cfg->m_display_id, item_atlas::pack, cfg->sprite_is_female());
 		d.sprite->draw(sX + adj_x + 55 + 90 + 30 + 13, sY + adj_y + 100 + 180, d.frame); }
 	}
@@ -602,32 +602,32 @@ void DialogBox_Manufacture::draw_crafting_waiting(short sX, short sY)
 	m_game->m_sprite[InterfaceCrafting]->draw(sX, sY, 0);
 
 	if (m_slot_1 != -1) {
-		CItem* cfg = m_game->get_item_config(m_game->m_item_list[m_slot_1]->m_id_num);
+		CItem* cfg = m_game->get_item_config(player().m_item_list[m_slot_1]->m_id_num);
 		if (cfg) { auto d = m_game->get_item_draw(cfg->m_display_id, item_atlas::pack, cfg->sprite_is_female());
 		d.sprite->draw(sX + adj_x + 55 + (1 - (rand() % 3)), sY + adj_y + 55 + (1 - (rand() % 3)), d.frame); }
 	}
 	if (m_slot_2 != -1) {
-		CItem* cfg = m_game->get_item_config(m_game->m_item_list[m_slot_2]->m_id_num);
+		CItem* cfg = m_game->get_item_config(player().m_item_list[m_slot_2]->m_id_num);
 		if (cfg) { auto d = m_game->get_item_draw(cfg->m_display_id, item_atlas::pack, cfg->sprite_is_female());
 		d.sprite->draw(sX + adj_x + 65 + 45 + (1 - (rand() % 3)), sY + adj_y + 40 + (1 - (rand() % 3)), d.frame); }
 	}
 	if (m_slot_3 != -1) {
-		CItem* cfg = m_game->get_item_config(m_game->m_item_list[m_slot_3]->m_id_num);
+		CItem* cfg = m_game->get_item_config(player().m_item_list[m_slot_3]->m_id_num);
 		if (cfg) { auto d = m_game->get_item_draw(cfg->m_display_id, item_atlas::pack, cfg->sprite_is_female());
 		d.sprite->draw(sX + adj_x + 65 + 90 + (1 - (rand() % 3)), sY + adj_y + 55 + (1 - (rand() % 3)), d.frame); }
 	}
 	if (m_slot_4 != -1) {
-		CItem* cfg = m_game->get_item_config(m_game->m_item_list[m_slot_4]->m_id_num);
+		CItem* cfg = m_game->get_item_config(player().m_item_list[m_slot_4]->m_id_num);
 		if (cfg) { auto d = m_game->get_item_draw(cfg->m_display_id, item_atlas::pack, cfg->sprite_is_female());
 		d.sprite->draw(sX + adj_x + 65 + (1 - (rand() % 3)), sY + adj_y + 100 + (1 - (rand() % 3)), d.frame); }
 	}
 	if (m_slot_5 != -1) {
-		CItem* cfg = m_game->get_item_config(m_game->m_item_list[m_slot_5]->m_id_num);
+		CItem* cfg = m_game->get_item_config(player().m_item_list[m_slot_5]->m_id_num);
 		if (cfg) { auto d = m_game->get_item_draw(cfg->m_display_id, item_atlas::pack, cfg->sprite_is_female());
 		d.sprite->draw(sX + adj_x + 65 + 45 + (1 - (rand() % 3)), sY + adj_y + 115 + (1 - (rand() % 3)), d.frame); }
 	}
 	if (m_slot_6 != -1) {
-		CItem* cfg = m_game->get_item_config(m_game->m_item_list[m_slot_6]->m_id_num);
+		CItem* cfg = m_game->get_item_config(player().m_item_list[m_slot_6]->m_id_num);
 		if (cfg) { auto d = m_game->get_item_draw(cfg->m_display_id, item_atlas::pack, cfg->sprite_is_female());
 		d.sprite->draw(sX + adj_x + 75 + 90 + (1 - (rand() % 3)), sY + adj_y + 100 + (1 - (rand() % 3)), d.frame); }
 	}
@@ -647,7 +647,7 @@ void DialogBox_Manufacture::draw_crafting_in_progress(short sX, short sY)
 
 	if (m_slot_1 != -1)
 	{
-		CItem* cfg = m_game->get_item_config(m_game->m_item_list[m_slot_1]->m_id_num);
+		CItem* cfg = m_game->get_item_config(player().m_item_list[m_slot_1]->m_id_num);
 		if (cfg) {
 			auto d = m_game->get_item_draw(cfg->m_display_id, item_atlas::pack, cfg->sprite_is_female());
 			d.sprite->draw(sX + adj_x + 55 + (1 - (rand() % 3)), sY + adj_y + 55 + (1 - (rand() % 3)), d.frame);
@@ -657,7 +657,7 @@ void DialogBox_Manufacture::draw_crafting_in_progress(short sX, short sY)
 	}
 	if (m_slot_2 != -1)
 	{
-		CItem* cfg = m_game->get_item_config(m_game->m_item_list[m_slot_2]->m_id_num);
+		CItem* cfg = m_game->get_item_config(player().m_item_list[m_slot_2]->m_id_num);
 		if (cfg) {
 			auto d = m_game->get_item_draw(cfg->m_display_id, item_atlas::pack, cfg->sprite_is_female());
 			d.sprite->draw(sX + adj_x + 65 + 45 + (1 - (rand() % 3)), sY + adj_y + 40 + (1 - (rand() % 3)), d.frame);
@@ -667,7 +667,7 @@ void DialogBox_Manufacture::draw_crafting_in_progress(short sX, short sY)
 	}
 	if (m_slot_3 != -1)
 	{
-		CItem* cfg = m_game->get_item_config(m_game->m_item_list[m_slot_3]->m_id_num);
+		CItem* cfg = m_game->get_item_config(player().m_item_list[m_slot_3]->m_id_num);
 		if (cfg) {
 			auto d = m_game->get_item_draw(cfg->m_display_id, item_atlas::pack, cfg->sprite_is_female());
 			d.sprite->draw(sX + adj_x + 65 + 90 + (1 - (rand() % 3)), sY + adj_y + 55 + (1 - (rand() % 3)), d.frame);
@@ -677,7 +677,7 @@ void DialogBox_Manufacture::draw_crafting_in_progress(short sX, short sY)
 	}
 	if (m_slot_4 != -1)
 	{
-		CItem* cfg = m_game->get_item_config(m_game->m_item_list[m_slot_4]->m_id_num);
+		CItem* cfg = m_game->get_item_config(player().m_item_list[m_slot_4]->m_id_num);
 		if (cfg) {
 			auto d = m_game->get_item_draw(cfg->m_display_id, item_atlas::pack, cfg->sprite_is_female());
 			d.sprite->draw(sX + adj_x + 65 + (1 - (rand() % 3)), sY + adj_y + 100 + (1 - (rand() % 3)), d.frame);
@@ -687,7 +687,7 @@ void DialogBox_Manufacture::draw_crafting_in_progress(short sX, short sY)
 	}
 	if (m_slot_5 != -1)
 	{
-		CItem* cfg = m_game->get_item_config(m_game->m_item_list[m_slot_5]->m_id_num);
+		CItem* cfg = m_game->get_item_config(player().m_item_list[m_slot_5]->m_id_num);
 		if (cfg) {
 			auto d = m_game->get_item_draw(cfg->m_display_id, item_atlas::pack, cfg->sprite_is_female());
 			d.sprite->draw(sX + adj_x + 65 + 45 + (1 - (rand() % 3)), sY + adj_y + 115 + (1 - (rand() % 3)), d.frame);
@@ -697,7 +697,7 @@ void DialogBox_Manufacture::draw_crafting_in_progress(short sX, short sY)
 	}
 	if (m_slot_6 != -1)
 	{
-		CItem* cfg = m_game->get_item_config(m_game->m_item_list[m_slot_6]->m_id_num);
+		CItem* cfg = m_game->get_item_config(player().m_item_list[m_slot_6]->m_id_num);
 		if (cfg) {
 			auto d = m_game->get_item_draw(cfg->m_display_id, item_atlas::pack, cfg->sprite_is_female());
 			d.sprite->draw(sX + adj_x + 75 + 90 + (1 - (rand() % 3)), sY + adj_y + 100 + (1 - (rand() % 3)), d.frame);
@@ -716,7 +716,7 @@ void DialogBox_Manufacture::draw_crafting_in_progress(short sX, short sY)
 	if (m_anim_frame >= 5)
 	{
 		m_game->send_command(MsgId::CommandCommon, CommonType::CraftItem, 0, 0, 0, 0, 0);
-		m_game->m_dialog_box_manager.disable_dialog_box(DialogBoxId::Manufacture);
+		m_game->get_dialog_box_manager().disable_dialog_box(DialogBoxId::Manufacture);
 		m_game->play_game_sound('E', 42, 0);
 	}
 }
@@ -837,10 +837,10 @@ bool DialogBox_Manufacture::check_slot_item_click(int slotIndex, int itemIdx, in
 {
 	short mouse_x = static_cast<short>(hb::shared::input::get_mouse_x());
 	short mouse_y = static_cast<short>(hb::shared::input::get_mouse_y());
-	if (itemIdx == -1 || m_game->m_item_list[itemIdx] == nullptr)
+	if (itemIdx == -1 || player().m_item_list[itemIdx] == nullptr)
 		return false;
 
-	CItem* cfg = m_game->get_item_config(m_game->m_item_list[itemIdx]->m_id_num);
+	CItem* cfg = m_game->get_item_config(player().m_item_list[itemIdx]->m_id_num);
 	if (!cfg) return false;
 
 	auto mfg_draw = m_game->get_item_draw(cfg->m_display_id, item_atlas::pack, cfg->sprite_is_female());
@@ -962,9 +962,9 @@ bool DialogBox_Manufacture::try_add_item_to_slot(int item_id, bool updateBuildSt
 				m_recipe_valid = static_cast<char>(build_item_manager::get().validate_current_recipe());
 
 			// Only disable non-stackable items (stackable consumables can be added multiple times)
-			CItem* cfg = m_game->get_item_config(m_game->m_item_list[item_id]->m_id_num);
+			CItem* cfg = m_game->get_item_config(player().m_item_list[item_id]->m_id_num);
 			if (!cfg || cfg->get_item_type() != ItemType::Consume ||
-				m_game->m_item_list[item_id]->m_count <= 1)
+				player().m_item_list[item_id]->m_count <= 1)
 			{
 				inventory_manager::get().lock_item(item_id);
 			}
@@ -976,29 +976,29 @@ bool DialogBox_Manufacture::try_add_item_to_slot(int item_id, bool updateBuildSt
 
 bool DialogBox_Manufacture::on_item_drop()
 {
-	if (m_game->m_player->m_Controller.get_command() < 0) return false;
+	if (player().m_Controller.get_command() < 0) return false;
 
 	int item_id = CursorTarget::get_selected_id();
 	if (item_id < 0 || item_id >= hb::shared::limits::MaxItems) return false;
-	if (m_game->m_item_list[item_id] == nullptr) return false;
+	if (player().m_item_list[item_id] == nullptr) return false;
 	if (inventory_manager::get().is_locked(item_id)) return false;
-	CItem* cfg = m_game->get_item_config(m_game->m_item_list[item_id]->m_id_num);
+	CItem* cfg = m_game->get_item_config(player().m_item_list[item_id]->m_id_num);
 	if (!cfg) return false;
 
 	// Check if other dialogs are blocking
-	if (m_game->m_dialog_box_manager.is_enabled(DialogBoxId::ItemDropExternal))
+	if (m_game->get_dialog_box_manager().is_enabled(DialogBoxId::ItemDropExternal))
 	{
 		add_event_list(BITEMDROP_SKILLDIALOG1, 10);
 		return false;
 	}
-	if (m_game->m_dialog_box_manager.is_enabled(DialogBoxId::NpcActionQuery) &&
-		(m_game->m_dialog_box_manager.get_dialog_as<DialogBox_NpcActionQuery>(DialogBoxId::NpcActionQuery)->m_mode == DialogBox_NpcActionQuery::mode::give_to_player ||
-		 m_game->m_dialog_box_manager.get_dialog_as<DialogBox_NpcActionQuery>(DialogBoxId::NpcActionQuery)->m_mode == DialogBox_NpcActionQuery::mode::sell_to_shop))
+	if (m_game->get_dialog_box_manager().is_enabled(DialogBoxId::NpcActionQuery) &&
+		(m_game->get_dialog_box_manager().get_dialog_as<DialogBox_NpcActionQuery>(DialogBoxId::NpcActionQuery)->m_mode == DialogBox_NpcActionQuery::mode::give_to_player ||
+		 m_game->get_dialog_box_manager().get_dialog_as<DialogBox_NpcActionQuery>(DialogBoxId::NpcActionQuery)->m_mode == DialogBox_NpcActionQuery::mode::sell_to_shop))
 	{
 		add_event_list(BITEMDROP_SKILLDIALOG1, 10);
 		return false;
 	}
-	if (m_game->m_dialog_box_manager.is_enabled(DialogBoxId::SellOrRepair))
+	if (m_game->get_dialog_box_manager().is_enabled(DialogBoxId::SellOrRepair))
 	{
 		add_event_list(BITEMDROP_SKILLDIALOG1, 10);
 		return false;
@@ -1017,7 +1017,7 @@ bool DialogBox_Manufacture::on_item_drop()
 			if (m_slot_4 == item_id) consume_num++;
 			if (m_slot_5 == item_id) consume_num++;
 			if (m_slot_6 == item_id) consume_num++;
-			if (consume_num >= static_cast<int>(m_game->m_item_list[item_id]->m_count)) return false;
+			if (consume_num >= static_cast<int>(player().m_item_list[item_id]->m_count)) return false;
 		}
 
 		// Only allow EAT, CONSUME, or NONE item types for alchemy
@@ -1045,7 +1045,7 @@ bool DialogBox_Manufacture::on_item_drop()
 			if (m_slot_4 == item_id) consume_num++;
 			if (m_slot_5 == item_id) consume_num++;
 			if (m_slot_6 == item_id) consume_num++;
-			if (consume_num >= static_cast<int>(m_game->m_item_list[item_id]->m_count)) return false;
+			if (consume_num >= static_cast<int>(player().m_item_list[item_id]->m_count)) return false;
 		}
 
 		if (!try_add_item_to_slot(item_id, true))
@@ -1075,17 +1075,17 @@ bool DialogBox_Manufacture::on_item_drop()
 
 void DialogBox_Manufacture::reset_item_slots()
 {
-	if ((m_slot_1 != -1) && (m_game->m_item_list[m_slot_1] != 0))
+	if ((m_slot_1 != -1) && (player().m_item_list[m_slot_1] != 0))
 		inventory_manager::get().unlock_item(m_slot_1);
-	if ((m_slot_2 != -1) && (m_game->m_item_list[m_slot_2] != 0))
+	if ((m_slot_2 != -1) && (player().m_item_list[m_slot_2] != 0))
 		inventory_manager::get().unlock_item(m_slot_2);
-	if ((m_slot_3 != -1) && (m_game->m_item_list[m_slot_3] != 0))
+	if ((m_slot_3 != -1) && (player().m_item_list[m_slot_3] != 0))
 		inventory_manager::get().unlock_item(m_slot_3);
-	if ((m_slot_4 != -1) && (m_game->m_item_list[m_slot_4] != 0))
+	if ((m_slot_4 != -1) && (player().m_item_list[m_slot_4] != 0))
 		inventory_manager::get().unlock_item(m_slot_4);
-	if ((m_slot_5 != -1) && (m_game->m_item_list[m_slot_5] != 0))
+	if ((m_slot_5 != -1) && (player().m_item_list[m_slot_5] != 0))
 		inventory_manager::get().unlock_item(m_slot_5);
-	if ((m_slot_6 != -1) && (m_game->m_item_list[m_slot_6] != 0))
+	if ((m_slot_6 != -1) && (player().m_item_list[m_slot_6] != 0))
 		inventory_manager::get().unlock_item(m_slot_6);
 
 	m_slot_1 = -1;

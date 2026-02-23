@@ -41,7 +41,7 @@ void DialogBox_Text::on_draw()
 		m_game->draw_new_dialog_box(InterfaceNdGame2, sX, sY, 1);
 
 	// Mouse wheel scrolling
-	if (m_game->m_dialog_box_manager.get_top_id() == DialogBoxId::Text && z != 0)
+	if (m_game->get_dialog_box_manager().get_top_id() == DialogBoxId::Text && z != 0)
 	{
 		m_scroll_view -= z / 60;
 
@@ -97,7 +97,7 @@ void DialogBox_Text::on_draw()
 	// Handle scroll bar dragging
 	if (lb != 0 && total_lines > 17)
 	{
-		if (m_game->m_dialog_box_manager.get_top_id() == DialogBoxId::Text)
+		if (m_game->get_dialog_box_manager().get_top_id() == DialogBoxId::Text)
 		{
 			if (mouse_in(area_scroll))
 			{
@@ -128,7 +128,7 @@ bool DialogBox_Text::on_click()
 	// Close button
 	if (mouse_in(btn_close))
 	{
-		m_game->m_dialog_box_manager.disable_dialog_box(DialogBoxId::Text);
+		m_game->get_dialog_box_manager().disable_dialog_box(DialogBoxId::Text);
 		m_game->play_game_sound('E', 14, 5);
 		return true;
 	}

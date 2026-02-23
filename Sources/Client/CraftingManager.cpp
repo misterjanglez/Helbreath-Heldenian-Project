@@ -16,7 +16,7 @@ void crafting_manager::handle_crafting_success(char* data)
 	if (!m_game) return;
 	m_game->m_player->m_contribution -= m_game->m_contribution_price;
 	m_game->m_contribution_price = 0;
-	m_game->m_dialog_box_manager.disable_dialog_box(DialogBoxId::Noticement);
+	m_game->get_dialog_box_manager().disable_dialog_box(DialogBoxId::Noticement);
 	m_game->add_event_list(NOTIFY_MSG_HANDLER42, 10);		// "Item manufacture success!"
 	m_game->play_game_sound('E', 23, 5);
 	switch (m_game->m_player->m_player_type) {
@@ -65,7 +65,7 @@ void crafting_manager::handle_build_item_success(char* data)
 {
 	if (!m_game) return;
 	short v1, v2;
-	m_game->m_dialog_box_manager.disable_dialog_box(DialogBoxId::Manufacture);
+	m_game->get_dialog_box_manager().disable_dialog_box(DialogBoxId::Manufacture);
 	{
 		const auto* pkt = hb::net::PacketCast<hb::net::PacketNotifyBuildItemResult>(
 			data, sizeof(hb::net::PacketNotifyBuildItemResult));
@@ -75,13 +75,13 @@ void crafting_manager::handle_build_item_success(char* data)
 	}
 	if (hb::shared::object_id::is_player_id(v1))
 	{
-		m_game->m_dialog_box_manager.enable_dialog_box(DialogBoxId::Manufacture, 6, 1, v1, 0);
-		m_game->m_dialog_box_manager.get_dialog_as<DialogBox_Manufacture>(DialogBoxId::Manufacture)->m_slot_1 = v2;
+		m_game->get_dialog_box_manager().enable_dialog_box(DialogBoxId::Manufacture, 6, 1, v1, 0);
+		m_game->get_dialog_box_manager().get_dialog_as<DialogBox_Manufacture>(DialogBoxId::Manufacture)->m_slot_1 = v2;
 	}
 	else
 	{
-		m_game->m_dialog_box_manager.enable_dialog_box(DialogBoxId::Manufacture, 6, 1, -1 * (v1 - 10000), 0);
-		m_game->m_dialog_box_manager.get_dialog_as<DialogBox_Manufacture>(DialogBoxId::Manufacture)->m_slot_1 = v2;
+		m_game->get_dialog_box_manager().enable_dialog_box(DialogBoxId::Manufacture, 6, 1, -1 * (v1 - 10000), 0);
+		m_game->get_dialog_box_manager().get_dialog_as<DialogBox_Manufacture>(DialogBoxId::Manufacture)->m_slot_1 = v2;
 	}
 	m_game->add_event_list(NOTIFY_MSG_HANDLER42, 10);
 	m_game->play_game_sound('E', 23, 5);
@@ -103,8 +103,8 @@ void crafting_manager::handle_build_item_success(char* data)
 void crafting_manager::handle_build_item_fail(char* data)
 {
 	if (!m_game) return;
-	m_game->m_dialog_box_manager.disable_dialog_box(DialogBoxId::Manufacture);
-	m_game->m_dialog_box_manager.enable_dialog_box(DialogBoxId::Manufacture, 6, 0, 0);
+	m_game->get_dialog_box_manager().disable_dialog_box(DialogBoxId::Manufacture);
+	m_game->get_dialog_box_manager().enable_dialog_box(DialogBoxId::Manufacture, 6, 0, 0);
 	m_game->add_event_list(NOTIFY_MSG_HANDLER43, 10);
 	m_game->play_game_sound('E', 24, 5);
 }

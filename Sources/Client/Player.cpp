@@ -1,4 +1,5 @@
 ﻿#include "Player.h"
+#include "Item/Item.h"
 
 CPlayer::CPlayer()
 {
@@ -15,10 +16,8 @@ void CPlayer::reset()
     m_player_name.clear();
     m_player_object_id = 0;
     m_player_type = 0;
-    m_account_name.clear();
-    m_account_password.clear();
     m_guild_name.clear();
-    m_guild_rank = 0;
+    m_guild_rank = -1;
 
     // POSITION & MOVEMENT
     m_player_x = 0;
@@ -101,10 +100,22 @@ void CPlayer::reset()
     m_aresden = false;
     m_citizen = false;
 
+    // ADMIN / GM
+    m_is_gm_mode = false;
+
     // CRUSADE/WAR
     m_crusade_duty = 0;
     m_war_contribution = 0;
     m_construction_point = 0;
-    m_construct_loc_x = 0;
-    m_construct_loc_y = 0;
+    m_construct_loc_x = -1;
+    m_construct_loc_y = -1;
+
+    // INVENTORY
+    for (auto& item : m_item_list) item.reset();
+
+    // BANK
+    for (auto& item : m_bank_list) item.reset();
+
+    // MOVEMENT CONTROLLER
+    m_Controller.reset();
 }

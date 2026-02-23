@@ -58,8 +58,8 @@ void DialogBox_Bank::draw_item_list(short sX, short sY, short size_x)
 
 	for (int i = 0; i < m_item_count; i++) {
 		int itemIndex = i + m_scroll_offset;
-		if ((itemIndex < hb::shared::limits::MaxBankItems) && (m_game->m_bank_list[itemIndex] != 0)) {
-			auto itemInfo = item_name_formatter::get().format(m_game->m_bank_list[itemIndex].get());
+		if ((itemIndex < hb::shared::limits::MaxBankItems) && (player().m_bank_list[itemIndex] != 0)) {
+			auto itemInfo = item_name_formatter::get().format(player().m_bank_list[itemIndex].get());
 
 			if ((mouse_x > sX + 30) && (mouse_x < sX + 210) && (mouse_y >= sY + 110 + i * 15) && (mouse_y <= sY + 124 + i * 15)) {
 				flag = true;
@@ -78,7 +78,7 @@ void DialogBox_Bank::draw_item_list(short sX, short sY, short size_x)
 	// Count total items for scrollbar
 	int total_lines = 0;
 	for (int i = 0; i < hb::shared::limits::MaxBankItems; i++)
-		if (m_game->m_bank_list[i] != 0) total_lines++;
+		if (player().m_bank_list[i] != 0) total_lines++;
 
 	draw_scrollbar(sX, sY, total_lines);
 
@@ -92,7 +92,7 @@ void DialogBox_Bank::draw_item_list(short sX, short sY, short size_x)
 void DialogBox_Bank::draw_item_details(short sX, short sY, short size_x, int item_index, int loc)
 {
 
-	CItem* item = m_game->m_bank_list[item_index].get();
+	CItem* item = player().m_bank_list[item_index].get();
 	CItem* cfg = m_game->get_item_config(item->m_id_num);
 	if (cfg == nullptr) return;
 
@@ -172,7 +172,7 @@ void DialogBox_Bank::draw_scrollbar(short sX, short sY, int total_lines)
 		pointer_loc = 0;
 	}
 
-	if (lb != 0 && (m_game->m_dialog_box_manager.get_top_id() == DialogBoxId::Bank) && total_lines > m_item_count) {
+	if (lb != 0 && (m_game->get_dialog_box_manager().get_top_id() == DialogBoxId::Bank) && total_lines > m_item_count) {
 		if ((mouse_x >= sX + 230) && (mouse_x <= sX + 260) && (mouse_y >= sY + 40) && (mouse_y <= sY + 320)) {
 			d1 = static_cast<double>(mouse_y - (sY + 35));
 			d2 = static_cast<double>(total_lines - m_item_count);
@@ -187,7 +187,7 @@ void DialogBox_Bank::draw_scrollbar(short sX, short sY, int total_lines)
 		m_is_scroll_selected = false;
 	}
 
-	if (m_game->m_dialog_box_manager.get_top_id() == DialogBoxId::Bank && z != 0) {
+	if (m_game->get_dialog_box_manager().get_top_id() == DialogBoxId::Bank && z != 0) {
 		if (total_lines > 50)
 			m_scroll_offset = m_scroll_offset - z / 30;
 		else {
@@ -219,7 +219,7 @@ bool DialogBox_Bank::on_click()
 		for (int i = 0; i < m_item_count; i++) {
 			if ((mouse_x > sX + 30) && (mouse_x < sX + 210) && (mouse_y >= sY + 110 + i * 15) && (mouse_y <= sY + 124 + i * 15)) {
 				int itemIndex = m_scroll_offset + i;
-				if ((itemIndex < hb::shared::limits::MaxBankItems) && (m_game->m_bank_list[itemIndex] != 0)) {
+				if ((itemIndex < hb::shared::limits::MaxBankItems) && (player().m_bank_list[itemIndex] != 0)) {
 					if (inventory_manager::get().get_total_item_count() >= 50) {
 						add_event_list(DLGBOX_CLICK_BANK1, 10);
 						return true;
@@ -251,13 +251,13 @@ bool DialogBox_Bank::on_item_drop()
 {
 	short mouse_x = static_cast<short>(hb::shared::input::get_mouse_x());
 	short mouse_y = static_cast<short>(hb::shared::input::get_mouse_y());
-	auto& give = m_game->m_dialog_box_manager.m_give_item;
+	auto& give = m_game->get_dialog_box_manager().m_give_item;
 	give.item_index = CursorTarget::get_selected_id();
 
-	if (m_game->m_player->m_Controller.get_command() < 0) {
+	if (player().m_Controller.get_command() < 0) {
 		return false;
 	}
-	if (m_game->m_item_list[give.item_index] == nullptr) {
+	if (player().m_item_list[give.item_index] == nullptr) {
 		return false;
 	}
 	if (inventory_manager::get().is_locked(give.item_index)) {
@@ -265,50 +265,50 @@ bool DialogBox_Bank::on_item_drop()
 	}
 
 	// Check if other dialogs are blocking
-	if (m_game->m_dialog_box_manager.is_enabled(DialogBoxId::ItemDropExternal))
+	if (m_game->get_dialog_box_manager().is_enabled(DialogBoxId::ItemDropExternal))
 	{
 		add_event_list(BITEMDROP_SKILLDIALOG1, 10);
 		return false;
 	}
-	if (m_game->m_dialog_box_manager.is_enabled(DialogBoxId::NpcActionQuery) &&
-		(m_game->m_dialog_box_manager.get_dialog_as<DialogBox_NpcActionQuery>(DialogBoxId::NpcActionQuery)->m_mode == DialogBox_NpcActionQuery::mode::give_to_player ||
-		 m_game->m_dialog_box_manager.get_dialog_as<DialogBox_NpcActionQuery>(DialogBoxId::NpcActionQuery)->m_mode == DialogBox_NpcActionQuery::mode::sell_to_shop))
+	if (m_game->get_dialog_box_manager().is_enabled(DialogBoxId::NpcActionQuery) &&
+		(m_game->get_dialog_box_manager().get_dialog_as<DialogBox_NpcActionQuery>(DialogBoxId::NpcActionQuery)->m_mode == DialogBox_NpcActionQuery::mode::give_to_player ||
+		 m_game->get_dialog_box_manager().get_dialog_as<DialogBox_NpcActionQuery>(DialogBoxId::NpcActionQuery)->m_mode == DialogBox_NpcActionQuery::mode::sell_to_shop))
 	{
 		add_event_list(BITEMDROP_SKILLDIALOG1, 10);
 		return false;
 	}
-	if (m_game->m_dialog_box_manager.is_enabled(DialogBoxId::SellOrRepair))
+	if (m_game->get_dialog_box_manager().is_enabled(DialogBoxId::SellOrRepair))
 	{
 		add_event_list(BITEMDROP_SKILLDIALOG1, 10);
 		return false;
 	}
-	if (m_game->m_dialog_box_manager.is_enabled(DialogBoxId::ItemDropConfirm))
+	if (m_game->get_dialog_box_manager().is_enabled(DialogBoxId::ItemDropConfirm))
 	{
 		add_event_list(BITEMDROP_SKILLDIALOG1, 10);
 		return false;
 	}
 
 	// Stackable items - open quantity dialog
-	CItem* cfg = m_game->get_item_config(m_game->m_item_list[give.item_index]->m_id_num);
+	CItem* cfg = m_game->get_item_config(player().m_item_list[give.item_index]->m_id_num);
 	if (cfg == nullptr) {
 		return false;
 	}
 
 	if (((cfg->get_item_type() == ItemType::Consume) ||
 		(cfg->get_item_type() == ItemType::Arrow)) &&
-		(m_game->m_item_list[give.item_index]->m_count > 1))
+		(player().m_item_list[give.item_index]->m_count > 1))
 	{
-		auto* dropDlg = m_game->m_dialog_box_manager.get_dialog_as<DialogBox_ItemDropAmount>(DialogBoxId::ItemDropExternal);
+		auto* dropDlg = m_game->get_dialog_box_manager().get_dialog_as<DialogBox_ItemDropAmount>(DialogBoxId::ItemDropExternal);
 		dropDlg->m_x = mouse_x - 140;
 		dropDlg->m_y = mouse_y - 70;
 		if (dropDlg->m_y < 0) dropDlg->m_y = 0;
-		dropDlg->m_drop_x = m_game->m_player->m_player_x + 1;
-		dropDlg->m_drop_y = m_game->m_player->m_player_y + 1;
+		dropDlg->m_drop_x = player().m_player_x + 1;
+		dropDlg->m_drop_y = player().m_player_y + 1;
 		dropDlg->m_drop_target_type = 1002; // NPC
 		dropDlg->m_drop_target_id = give.item_index;
 		std::memset(dropDlg->m_target_name, 0, sizeof(dropDlg->m_target_name));
-		m_game->m_dialog_box_manager.enable_dialog_box(DialogBoxId::ItemDropExternal, give.item_index,
-			static_cast<int64_t>(m_game->m_item_list[give.item_index]->m_count), 0);
+		m_game->get_dialog_box_manager().enable_dialog_box(DialogBoxId::ItemDropExternal, give.item_index,
+			static_cast<int64_t>(player().m_item_list[give.item_index]->m_count), 0);
 	}
 	else
 	{

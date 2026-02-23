@@ -151,9 +151,9 @@ void Screen_CreateAccount::submit_create_account()
 
     m_game->m_arrow_pressed = 0;
 
-    // Copy account name/password to player session
-    m_game->m_player->m_account_name = tb_name->text().c_str();
-    m_game->m_player->m_account_password = tb_pass->text().c_str();
+    // Copy account credentials to session data
+    m_game->m_account_name = tb_name->text().c_str();
+    m_game->m_account_password = tb_pass->text().c_str();
 
     // Build CreateAccountRequest packet
     hb::net::CreateAccountRequest req{};

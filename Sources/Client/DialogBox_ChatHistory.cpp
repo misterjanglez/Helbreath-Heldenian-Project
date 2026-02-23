@@ -40,7 +40,7 @@ void DialogBox_ChatHistory::handle_scroll_input(short sX, short sY)
 	short mouse_y = static_cast<short>(hb::shared::input::get_mouse_y());
 	char lb = hb::shared::input::is_mouse_button_down(hb::shared::input::MouseButton::Left) ? 1 : 0;
 	// Mouse wheel scrolling
-	if (m_game->m_dialog_box_manager.get_top_id() == DialogBoxId::ChatHistory)
+	if (m_game->get_dialog_box_manager().get_top_id() == DialogBoxId::ChatHistory)
 	{
 		short wheel_delta = hb::shared::input::get_mouse_wheel_delta();
 		if (wheel_delta != 0)
@@ -50,7 +50,7 @@ void DialogBox_ChatHistory::handle_scroll_input(short sX, short sY)
 	}
 
 	// Scroll bar dragging
-	if ((lb != 0) && (m_game->m_dialog_box_manager.get_top_id() == DialogBoxId::ChatHistory))
+	if ((lb != 0) && (m_game->get_dialog_box_manager().get_top_id() == DialogBoxId::ChatHistory))
 	{
 		// Drag scrollbar track
 		if (mouse_in(scroll_track))

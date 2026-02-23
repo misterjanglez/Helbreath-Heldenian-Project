@@ -106,7 +106,7 @@ void DialogBox_NpcTalk::handle_scroll_bar_drag(short sX, short sY, short mouse_x
 {
 	if (lb != 0 && total_lines > 17)
 	{
-		if (m_game->m_dialog_box_manager.get_top_id() == DialogBoxId::NpcTalk)
+		if (m_game->get_dialog_box_manager().get_top_id() == DialogBoxId::NpcTalk)
 		{
 			if (mouse_in(area_scroll))
 			{
@@ -134,7 +134,7 @@ bool DialogBox_NpcTalk::on_click()
 	case mode::ok_only:
 		if (mouse_in(btn_right))
 		{
-			m_game->m_dialog_box_manager.disable_dialog_box(DialogBoxId::NpcTalk);
+			m_game->get_dialog_box_manager().disable_dialog_box(DialogBoxId::NpcTalk);
 			m_game->play_game_sound('E', 14, 5);
 			return true;
 		}
@@ -145,14 +145,14 @@ bool DialogBox_NpcTalk::on_click()
 		{
 			// Accept
 			m_game->send_command(MsgId::CommandCommon, CommonType::QuestAccepted, 0, 0, 0, 0, 0);
-			m_game->m_dialog_box_manager.disable_dialog_box(DialogBoxId::NpcTalk);
+			m_game->get_dialog_box_manager().disable_dialog_box(DialogBoxId::NpcTalk);
 			m_game->play_game_sound('E', 14, 5);
 			return true;
 		}
 		if (mouse_in(btn_right))
 		{
 			// Decline
-			m_game->m_dialog_box_manager.disable_dialog_box(DialogBoxId::NpcTalk);
+			m_game->get_dialog_box_manager().disable_dialog_box(DialogBoxId::NpcTalk);
 			m_game->play_game_sound('E', 14, 5);
 			return true;
 		}
@@ -161,7 +161,7 @@ bool DialogBox_NpcTalk::on_click()
 	case mode::next:
 		if (mouse_in(btn_right))
 		{
-			m_game->m_dialog_box_manager.disable_dialog_box(DialogBoxId::NpcTalk);
+			m_game->get_dialog_box_manager().disable_dialog_box(DialogBoxId::NpcTalk);
 			m_game->play_game_sound('E', 14, 5);
 			return true;
 		}

@@ -140,19 +140,19 @@ void DialogBox_Map::on_draw()
 		}
 
 		v1 = static_cast<double>(m_game->m_map_data->m_map_size_x);
-		v2 = static_cast<double>(m_game->m_player->m_player_x);
+		v2 = static_cast<double>(player().m_player_x);
 		v3 = (v2 * static_cast<double>(size_x)) / v1;
 		tX = static_cast<int>(v3) + dX;
 
 		v1 = static_cast<double>(m_game->m_map_data->m_map_size_y);
 		if (v1 == 752) v1 = 680;
-		v2 = static_cast<double>(m_game->m_player->m_player_y);
+		v2 = static_cast<double>(player().m_player_y);
 		v3 = (v2 * static_cast<double>(size_y)) / v1;
 		tY = static_cast<int>(v3) + dY;
 
 		draw_new_dialog_box(InterfaceNdGame4, sX + tX, sY + tY, 43);
 		std::string coordBuf;
-		coordBuf = std::format("{},{}", m_game->m_player->m_player_x, m_game->m_player->m_player_y);
+		coordBuf = std::format("{},{}", player().m_player_x, player().m_player_y);
 		hb::shared::text::draw_text(GameFont::SprFont3_2, sX + 10 + tX - 5, sY + 10 + tY - 6, coordBuf.c_str(), hb::shared::text::TextStyle::with_two_point_shadow(GameColors::Yellow4x));
 		break;
 	}

@@ -84,34 +84,34 @@ void DialogBox_ChangeStatsMajestic::on_draw()
 	bool can_afford = (remaining > 0);
 
 	draw_stat_row(sX, sY, 125, DRAW_DIALOGBOX_LEVELUP_SETTING4,
-		m_game->m_player->m_str, m_game->m_player->m_lu_str, mouse_x, mouse_y, 127,
-		(m_game->m_player->m_lu_str < 0),
-		can_afford && (m_game->m_player->m_str + m_game->m_player->m_lu_str - POINTS_PER_MAJESTIC >= MIN_STAT_VALUE));
+		player().m_str, player().m_lu_str, mouse_x, mouse_y, 127,
+		(player().m_lu_str < 0),
+		can_afford && (player().m_str + player().m_lu_str - POINTS_PER_MAJESTIC >= MIN_STAT_VALUE));
 
 	draw_stat_row(sX, sY, 144, DRAW_DIALOGBOX_LEVELUP_SETTING5,
-		m_game->m_player->m_vit, m_game->m_player->m_lu_vit, mouse_x, mouse_y, 146,
-		(m_game->m_player->m_lu_vit < 0),
-		can_afford && (m_game->m_player->m_vit + m_game->m_player->m_lu_vit - POINTS_PER_MAJESTIC >= MIN_STAT_VALUE));
+		player().m_vit, player().m_lu_vit, mouse_x, mouse_y, 146,
+		(player().m_lu_vit < 0),
+		can_afford && (player().m_vit + player().m_lu_vit - POINTS_PER_MAJESTIC >= MIN_STAT_VALUE));
 
 	draw_stat_row(sX, sY, 163, DRAW_DIALOGBOX_LEVELUP_SETTING6,
-		m_game->m_player->m_dex, m_game->m_player->m_lu_dex, mouse_x, mouse_y, 165,
-		(m_game->m_player->m_lu_dex < 0),
-		can_afford && (m_game->m_player->m_dex + m_game->m_player->m_lu_dex - POINTS_PER_MAJESTIC >= MIN_STAT_VALUE));
+		player().m_dex, player().m_lu_dex, mouse_x, mouse_y, 165,
+		(player().m_lu_dex < 0),
+		can_afford && (player().m_dex + player().m_lu_dex - POINTS_PER_MAJESTIC >= MIN_STAT_VALUE));
 
 	draw_stat_row(sX, sY, 182, DRAW_DIALOGBOX_LEVELUP_SETTING7,
-		m_game->m_player->m_int, m_game->m_player->m_lu_int, mouse_x, mouse_y, 184,
-		(m_game->m_player->m_lu_int < 0),
-		can_afford && (m_game->m_player->m_int + m_game->m_player->m_lu_int - POINTS_PER_MAJESTIC >= MIN_STAT_VALUE));
+		player().m_int, player().m_lu_int, mouse_x, mouse_y, 184,
+		(player().m_lu_int < 0),
+		can_afford && (player().m_int + player().m_lu_int - POINTS_PER_MAJESTIC >= MIN_STAT_VALUE));
 
 	draw_stat_row(sX, sY, 201, DRAW_DIALOGBOX_LEVELUP_SETTING8,
-		m_game->m_player->m_mag, m_game->m_player->m_lu_mag, mouse_x, mouse_y, 203,
-		(m_game->m_player->m_lu_mag < 0),
-		can_afford && (m_game->m_player->m_mag + m_game->m_player->m_lu_mag - POINTS_PER_MAJESTIC >= MIN_STAT_VALUE));
+		player().m_mag, player().m_lu_mag, mouse_x, mouse_y, 203,
+		(player().m_lu_mag < 0),
+		can_afford && (player().m_mag + player().m_lu_mag - POINTS_PER_MAJESTIC >= MIN_STAT_VALUE));
 
 	draw_stat_row(sX, sY, 220, DRAW_DIALOGBOX_LEVELUP_SETTING9,
-		m_game->m_player->m_charisma, m_game->m_player->m_lu_char, mouse_x, mouse_y, 222,
-		(m_game->m_player->m_lu_char < 0),
-		can_afford && (m_game->m_player->m_charisma + m_game->m_player->m_lu_char - POINTS_PER_MAJESTIC >= MIN_STAT_VALUE));
+		player().m_charisma, player().m_lu_char, mouse_x, mouse_y, 222,
+		(player().m_lu_char < 0),
+		can_afford && (player().m_charisma + player().m_lu_char - POINTS_PER_MAJESTIC >= MIN_STAT_VALUE));
 
 	// Cancel button (left)
 	if (mouse_in(btn_cancel))
@@ -145,12 +145,12 @@ bool DialogBox_ChangeStatsMajestic::on_click()
 	};
 
 	StatEntry stats[] = {
-		{ &m_game->m_player->m_lu_str,  m_game->m_player->m_str,      127 },
-		{ &m_game->m_player->m_lu_vit,  m_game->m_player->m_vit,      146 },
-		{ &m_game->m_player->m_lu_dex,  m_game->m_player->m_dex,      165 },
-		{ &m_game->m_player->m_lu_int,  m_game->m_player->m_int,      184 },
-		{ &m_game->m_player->m_lu_mag,  m_game->m_player->m_mag,      203 },
-		{ &m_game->m_player->m_lu_char, m_game->m_player->m_charisma, 222 },
+		{ &player().m_lu_str,  player().m_str,      127 },
+		{ &player().m_lu_vit,  player().m_vit,      146 },
+		{ &player().m_lu_dex,  player().m_dex,      165 },
+		{ &player().m_lu_int,  player().m_int,      184 },
+		{ &player().m_lu_mag,  player().m_mag,      203 },
+		{ &player().m_lu_char, player().m_charisma, 222 },
 	};
 
 	for (auto& s : stats)
@@ -191,8 +191,8 @@ bool DialogBox_ChangeStatsMajestic::on_click()
 	// Cancel button (left) — discard changes and close
 	if (mouse_in(btn_cancel))
 	{
-		m_game->m_player->m_lu_str = m_game->m_player->m_lu_vit = m_game->m_player->m_lu_dex = 0;
-		m_game->m_player->m_lu_int = m_game->m_player->m_lu_mag = m_game->m_player->m_lu_char = 0;
+		player().m_lu_str = player().m_lu_vit = player().m_lu_dex = 0;
+		player().m_lu_int = player().m_lu_mag = player().m_lu_char = 0;
 		disable_dialog_box(DialogBoxId::ChangeStatsMajestic);
 		play_sound_effect('E', 14, 5);
 	}
@@ -207,19 +207,19 @@ bool DialogBox_ChangeStatsMajestic::on_enable(int type, int64_t v1, int v2, cons
 	if (luDlg) { m_x = luDlg->m_x + 10; m_y = luDlg->m_y + 10; }
 	m_mode = 0;
 	m_view = 0;
-	m_game->m_player->m_lu_str = m_game->m_player->m_lu_vit = m_game->m_player->m_lu_dex = 0;
-	m_game->m_player->m_lu_int = m_game->m_player->m_lu_mag = m_game->m_player->m_lu_char = 0;
+	player().m_lu_str = player().m_lu_vit = player().m_lu_dex = 0;
+	player().m_lu_int = player().m_lu_mag = player().m_lu_char = 0;
 	m_game->m_skill_using_status = false;
 	return true;
 }
 
 bool DialogBox_ChangeStatsMajestic::on_disable()
 {
-	m_game->m_player->m_lu_str = 0;
-	m_game->m_player->m_lu_vit = 0;
-	m_game->m_player->m_lu_dex = 0;
-	m_game->m_player->m_lu_int = 0;
-	m_game->m_player->m_lu_mag = 0;
-	m_game->m_player->m_lu_char = 0;
+	player().m_lu_str = 0;
+	player().m_lu_vit = 0;
+	player().m_lu_dex = 0;
+	player().m_lu_int = 0;
+	player().m_lu_mag = 0;
+	player().m_lu_char = 0;
 	return true;
 }

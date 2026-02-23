@@ -41,8 +41,8 @@ void DialogBox_GuideMap::draw_zoomed_map(short sX, short sY)
 	if (m_game->m_map_index >= 35)
 		m_iMaxMapIndex = InterfaceGuideMap + m_game->m_map_index + 1;
 
-	short shX = m_game->m_player->m_player_x - 64;
-	short shY = m_game->m_player->m_player_y - 64;
+	short shX = player().m_player_x - 64;
+	short shY = player().m_player_y - 64;
 	if (shX < 0) shX = 0;
 	if (shY < 0) shY = 0;
 	if (shX > m_game->m_map_data->m_map_size_x - 128) shX = m_game->m_map_data->m_map_size_x - 128;
@@ -53,7 +53,7 @@ void DialogBox_GuideMap::draw_zoomed_map(short sX, short sY)
 	else
 		m_game->m_sprite[m_iMaxMapIndex]->DrawShifted(sX, sY, shX, shY, 0);
 
-	m_game->m_sprite[InterfaceNdCrusade]->draw(sX - shX + m_game->m_player->m_player_x, sY - shY + m_game->m_player->m_player_y, 37);
+	m_game->m_sprite[InterfaceNdCrusade]->draw(sX - shX + player().m_player_x, sY - shY + player().m_player_y, 37);
 
 	if ((m_game->m_cur_time - m_game->m_monster_event_time) < 30000)
 	{
@@ -85,8 +85,8 @@ void DialogBox_GuideMap::draw_full_map(short sX, short sY)
 	else
 		m_game->m_sprite[m_iMinMapIndex]->draw(sX, sY, m_iMinMapSquare, hb::shared::sprite::DrawParams::no_color_key());
 
-	short shX = (m_game->m_player->m_player_x * 128) / (m_game->m_map_data->m_map_size_x);
-	short shY = (m_game->m_player->m_player_y * 128) / (m_game->m_map_data->m_map_size_y);
+	short shX = (player().m_player_x * 128) / (m_game->m_map_data->m_map_size_x);
+	short shY = (player().m_player_y * 128) / (m_game->m_map_data->m_map_size_y);
 	m_game->m_sprite[InterfaceNdCrusade]->draw(sX + shX, sY + shY, 37);
 
 	if ((m_game->m_cur_time - m_game->m_monster_event_time) < 30000)
@@ -108,8 +108,8 @@ void DialogBox_GuideMap::draw_location_tooltip(short mouse_x, short mouse_y, sho
 
 	if (config_manager::get().is_zoom_map_enabled())
 	{
-		shX = m_game->m_player->m_player_x - 64;
-		shY = m_game->m_player->m_player_y - 64;
+		shX = player().m_player_x - 64;
+		shY = player().m_player_y - 64;
 		if (shX < 0) shX = 0;
 		if (shY < 0) shY = 0;
 		if (shX > m_game->m_map_data->m_map_size_x - 128) shX = m_game->m_map_data->m_map_size_x - 128;
@@ -252,8 +252,8 @@ bool DialogBox_GuideMap::on_double_click()
 	short shX, shY;
 	if (config_manager::get().is_zoom_map_enabled())
 	{
-		shX = m_game->m_player->m_player_x - 64;
-		shY = m_game->m_player->m_player_y - 64;
+		shX = player().m_player_x - 64;
+		shY = player().m_player_y - 64;
 		if (shX < 0) shX = 0;
 		if (shY < 0) shY = 0;
 		if (shX > m_game->m_map_data->m_map_size_x - 128) shX = m_game->m_map_data->m_map_size_x - 128;
@@ -270,13 +270,13 @@ bool DialogBox_GuideMap::on_double_click()
 	if (shX < 30 || shY < 30) return false;
 	if (shX > m_game->m_map_data->m_map_size_x - 30 || shY > m_game->m_map_data->m_map_size_y - 30) return false;
 
-	if (config_manager::get().is_running_mode_enabled() && m_game->m_player->m_sp > 0)
-		m_game->m_player->m_Controller.set_command(Type::Run);
+	if (config_manager::get().is_running_mode_enabled() && player().m_sp > 0)
+		player().m_Controller.set_command(Type::Run);
 	else
-		m_game->m_player->m_Controller.set_command(Type::Move);
+		player().m_Controller.set_command(Type::Move);
 
-	m_game->m_player->m_Controller.set_destination(shX, shY);
-	m_game->m_player->m_Controller.calculate_player_turn(m_game->m_player->m_player_x, m_game->m_player->m_player_y, m_game->m_map_data.get());
+	player().m_Controller.set_destination(shX, shY);
+	player().m_Controller.calculate_player_turn(player().m_player_x, player().m_player_y, m_game->m_map_data.get());
 
 	return true;
 }

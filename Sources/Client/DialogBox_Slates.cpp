@@ -109,27 +109,27 @@ bool DialogBox_Slates::on_click()
 
 bool DialogBox_Slates::on_item_drop()
 {
-	if (m_game->m_player->m_Controller.get_command() < 0) return false;
+	if (player().m_Controller.get_command() < 0) return false;
 
 	int item_id = CursorTarget::get_selected_id();
 	if (item_id < 0 || item_id >= hb::shared::limits::MaxItems) return false;
-	if (m_game->m_item_list[item_id] == nullptr) return false;
+	if (player().m_item_list[item_id] == nullptr) return false;
 	if (inventory_manager::get().is_locked(item_id)) return false;
 
 	// Check if other dialogs are blocking
-	if (m_game->m_dialog_box_manager.is_enabled(DialogBoxId::ItemDropExternal))
+	if (m_game->get_dialog_box_manager().is_enabled(DialogBoxId::ItemDropExternal))
 	{
 		add_event_list(BITEMDROP_SKILLDIALOG1, 10);
 		return false;
 	}
-	if (m_game->m_dialog_box_manager.is_enabled(DialogBoxId::NpcActionQuery) &&
-		(m_game->m_dialog_box_manager.get_dialog_as<DialogBox_NpcActionQuery>(DialogBoxId::NpcActionQuery)->m_mode == DialogBox_NpcActionQuery::mode::give_to_player ||
-		 m_game->m_dialog_box_manager.get_dialog_as<DialogBox_NpcActionQuery>(DialogBoxId::NpcActionQuery)->m_mode == DialogBox_NpcActionQuery::mode::sell_to_shop))
+	if (m_game->get_dialog_box_manager().is_enabled(DialogBoxId::NpcActionQuery) &&
+		(m_game->get_dialog_box_manager().get_dialog_as<DialogBox_NpcActionQuery>(DialogBoxId::NpcActionQuery)->m_mode == DialogBox_NpcActionQuery::mode::give_to_player ||
+		 m_game->get_dialog_box_manager().get_dialog_as<DialogBox_NpcActionQuery>(DialogBoxId::NpcActionQuery)->m_mode == DialogBox_NpcActionQuery::mode::sell_to_shop))
 	{
 		add_event_list(BITEMDROP_SKILLDIALOG1, 10);
 		return false;
 	}
-	if (m_game->m_dialog_box_manager.is_enabled(DialogBoxId::SellOrRepair))
+	if (m_game->get_dialog_box_manager().is_enabled(DialogBoxId::SellOrRepair))
 	{
 		add_event_list(BITEMDROP_SKILLDIALOG1, 10);
 		return false;
@@ -139,7 +139,7 @@ bool DialogBox_Slates::on_item_drop()
 	case mode::waiting:
 	{
 		// Only accept slate items (IDs 868-871)
-		short slate_id = m_game->m_item_list[item_id]->m_id_num;
+		short slate_id = player().m_item_list[item_id]->m_id_num;
 		if (slate_id >= 868 && slate_id <= 871)
 		{
 			std::string item_id_text;

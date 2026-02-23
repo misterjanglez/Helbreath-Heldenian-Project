@@ -8,6 +8,7 @@
 struct ui_rect { int x, y, w, h; };
 
 class CGame;
+class CPlayer;
 class DialogBoxManager;
 
 // Result of on_press - determines how the click is handled
@@ -43,6 +44,9 @@ public:
 	virtual bool is_draggable() const { return true; }
 	virtual bool cancels_text_input_on_enable() const { return true; }
 
+	// --- Manager injection (called by DialogBoxManager::register_dialog_box) ---
+	void set_manager(DialogBoxManager& mgr) { m_manager = &mgr; }
+
 	// --- Common state ---
 	DialogBoxId::Type get_id() const { return m_id; }
 	bool is_enabled() const { return m_enabled; }
@@ -76,10 +80,15 @@ protected:
 	template<typename T>
 	T* get_dialog_box_as(DialogBoxId::Type id) { return static_cast<T*>(get_dialog_box(id)); }
 
+	// Player access via manager
+	CPlayer& player() const;
+	DialogBoxManager& manager() const { return *m_manager; }
+
 	// Direct access to game - use m_game->member for all game state
 	CGame* m_game;
 	DialogBoxId::Type m_id;
 
 private:
+	DialogBoxManager* m_manager = nullptr;
 	bool m_enabled = false;
 };

@@ -31,7 +31,7 @@ void DialogBox_ItemDropAmount::on_draw()
 	{
 	case mode::input:
 	{
-		auto itemInfo = item_name_formatter::get().format(m_game->m_item_list[m_item_index].get());
+		auto itemInfo = item_name_formatter::get().format(player().m_item_list[m_item_index].get());
 
 		if (m_label[0] == '\0')
 			txt = std::format(DRAW_DIALOGBOX_QUERY_DROP_ITEM_AMOUNT1, itemInfo.name.c_str());
@@ -43,17 +43,17 @@ void DialogBox_ItemDropAmount::on_draw()
 
 		put_string(sX + 30, sY + 35, DRAW_DIALOGBOX_QUERY_DROP_ITEM_AMOUNT3, GameColors::UILabel);
 
-		if (m_game->m_dialog_box_manager.get_top_id() != DialogBoxId::ItemDropExternal)
+		if (m_game->get_dialog_box_manager().get_top_id() != DialogBoxId::ItemDropExternal)
 			hb::shared::text::draw_text(GameFont::Default, sX + 40, sY + 57, m_game->m_amount_string.c_str(), hb::shared::text::TextStyle::from_color(GameColors::UIWhite));
 
-		txt = std::format("__________ (0 ~ {})", m_game->m_item_list[m_item_index]->m_count);
+		txt = std::format("__________ (0 ~ {})", player().m_item_list[m_item_index]->m_count);
 		put_string(sX + 38, sY + 62, txt.c_str(), GameColors::UILabel);
 		break;
 	}
 
 	case mode::selected:
 	{
-		auto itemInfo2 = item_name_formatter::get().format(m_game->m_item_list[m_item_index].get());
+		auto itemInfo2 = item_name_formatter::get().format(player().m_item_list[m_item_index].get());
 
 		if (m_label[0] == '\0')
 			txt = std::format(DRAW_DIALOGBOX_QUERY_DROP_ITEM_AMOUNT1, itemInfo2.name.c_str());
@@ -66,7 +66,7 @@ void DialogBox_ItemDropAmount::on_draw()
 		put_string(sX + 30, sY + 35, DRAW_DIALOGBOX_QUERY_DROP_ITEM_AMOUNT3, GameColors::UILabel);
 		hb::shared::text::draw_text(GameFont::Default, sX + 40, sY + 57, m_game->m_amount_string.c_str(), hb::shared::text::TextStyle::from_color(GameColors::UIWhite));
 
-		txt = std::format("__________ (0 ~ {})", m_game->m_item_list[m_item_index]->m_count);
+		txt = std::format("__________ (0 ~ {})", player().m_item_list[m_item_index]->m_count);
 		put_string(sX + 38, sY + 62, txt.c_str(), GameColors::UILabel);
 		break;
 	}

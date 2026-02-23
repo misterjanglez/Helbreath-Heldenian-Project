@@ -53,7 +53,7 @@ void Overlay_ChangePassword::on_initialize()
 
     // === Textboxes ===
     // Account name is displayed as static text in on_render() — not editable.
-    // handle_submit() reads directly from m_game->m_player->m_account_name.
+    // handle_submit() reads directly from m_game->m_account_name.
 
     auto* tb_old_pw = m_controls.add<cc::textbox>(TXT_OLD_PW, cc::rect{dlgX + 161, dlgY + 67, 125, 17}, 11);
     tb_old_pw->set_hidden(true);
@@ -129,7 +129,7 @@ void Overlay_ChangePassword::handle_submit()
     auto* tb_new = m_controls.find_as<cc::textbox>(TXT_NEW_PW);
     auto* tb_conf = m_controls.find_as<cc::textbox>(TXT_CONFIRM_PW);
 
-    const auto& account_name = m_game->m_player->m_account_name;
+    const auto& account_name = m_game->m_account_name;
     if (account_name.empty())
     {
         m_error_msg = "No account loaded.";
@@ -162,8 +162,8 @@ void Overlay_ChangePassword::handle_submit()
     }
     m_error_msg.clear();
 
-    // Copy password to player session (account name is already set from login)
-    m_game->m_player->m_account_password = tb_old->text();
+    // Store current password for verification
+    m_game->m_account_password = tb_old->text();
 
     // Build ChangePasswordRequest packet
     hb::net::ChangePasswordRequest req{};
@@ -223,7 +223,7 @@ void Overlay_ChangePassword::on_render()
 
     // draw labels
     put_string(dlgX + 53, dlgY + 43, UPDATE_SCREEN_ON_CHANGE_PASSWORD1, GameColors::UILabel);
-    put_string(dlgX + 161, dlgY + 43, m_game->m_player->m_account_name.c_str(), GameColors::InputValid);
+    put_string(dlgX + 161, dlgY + 43, m_game->m_account_name.c_str(), GameColors::InputValid);
     put_string(dlgX + 53, dlgY + 67, UPDATE_SCREEN_ON_CHANGE_PASSWORD2, GameColors::UILabel);
     put_string(dlgX + 53, dlgY + 91, UPDATE_SCREEN_ON_CHANGE_PASSWORD3, GameColors::UILabel);
     put_string(dlgX + 53, dlgY + 115, UPDATE_SCREEN_ON_CHANGE_PASSWORD4, GameColors::UILabel);

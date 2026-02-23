@@ -25,11 +25,11 @@ int magic_casting_system::get_mana_cost(int magic_no)
 	if (!m_game->m_magic_cfg_list[magic_no]) return 1;
 	for (i = 0; i < hb::shared::limits::MaxItems; i++)
 	{
-		if (m_game->m_item_list[i] == 0) continue;
+		if (m_game->m_player->m_item_list[i] == 0) continue;
 		if (m_game->m_is_item_equipped[i] == true)
 		{
 			// Look up the item config — inventory items don't carry effect data
-			CItem* cfg = m_game->get_item_config(m_game->m_item_list[i]->m_id_num);
+			CItem* cfg = m_game->get_item_config(m_game->m_player->m_item_list[i]->m_id_num);
 			if (!cfg) continue;
 
 			auto effectType = cfg->get_item_effect_type();
@@ -95,5 +95,5 @@ void magic_casting_system::begin_cast(int magic_no)
 	m_game->m_magic_short_cut = magic_no;
 	m_game->m_recent_short_cut = magic_no + 100;
 	m_game->m_point_command_type = magic_no + 100;
-	m_game->m_dialog_box_manager.disable_dialog_box(DialogBoxId::Magic);
+	m_game->get_dialog_box_manager().disable_dialog_box(DialogBoxId::Magic);
 }

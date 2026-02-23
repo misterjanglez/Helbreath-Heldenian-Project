@@ -31,12 +31,12 @@ namespace NetworkMessageHandlers {
 				if ((game->m_player->m_crusade_duty != 3) && (game->m_player->m_citizen == true))
 					game->request_map_status("middleland", 3);
 				if (game->m_player->m_crusade_duty != 0)
-					game->m_dialog_box_manager.enable_dialog_box(DialogBoxId::CrusadeJob, 2, v2, 0);
-				else game->m_dialog_box_manager.enable_dialog_box(DialogBoxId::CrusadeJob, 1, 0, 0);
+					game->get_dialog_box_manager().enable_dialog_box(DialogBoxId::CrusadeJob, 2, v2, 0);
+				else game->get_dialog_box_manager().enable_dialog_box(DialogBoxId::CrusadeJob, 1, 0, 0);
 				
-				if (game->m_player->m_citizen == false) game->m_dialog_box_manager.enable_dialog_box(DialogBoxId::Text, LOGICAL_WIDTH(), 0, 0);
-				else if (game->m_player->m_aresden == true) game->m_dialog_box_manager.enable_dialog_box(DialogBoxId::Text, 801, 0, 0);
-				else if (game->m_player->m_aresden == false) game->m_dialog_box_manager.enable_dialog_box(DialogBoxId::Text, 802, 0, 0);
+				if (game->m_player->m_citizen == false) game->get_dialog_box_manager().enable_dialog_box(DialogBoxId::Text, LOGICAL_WIDTH(), 0, 0);
+				else if (game->m_player->m_aresden == true) game->get_dialog_box_manager().enable_dialog_box(DialogBoxId::Text, 801, 0, 0);
+				else if (game->m_player->m_aresden == false) game->get_dialog_box_manager().enable_dialog_box(DialogBoxId::Text, 802, 0, 0);
 				
 				if (game->m_player->m_citizen == false) game->set_top_msg(NOTIFY_MSG_CRUSADESTART_NONE, 10);
 				else if (game->m_game_msg_list[9]) game->set_top_msg(game->m_game_msg_list[9]->m_pMsg, 10);
@@ -65,7 +65,7 @@ namespace NetworkMessageHandlers {
 				if (game->m_player->m_crusade_duty != v2)
 				{
 					game->m_player->m_crusade_duty = v2;
-					game->m_dialog_box_manager.enable_dialog_box(DialogBoxId::CrusadeJob, 2, v2, 0);
+					game->get_dialog_box_manager().enable_dialog_box(DialogBoxId::CrusadeJob, 2, v2, 0);
 					game->play_game_sound('E', 25, 0, 0);
 				}
 			}

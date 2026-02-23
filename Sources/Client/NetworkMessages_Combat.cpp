@@ -119,7 +119,7 @@ namespace NetworkMessageHandlers {
 		if (!pkt) return;
 
 		auto* dlg = dynamic_cast<DialogBox_ItemCreator*>(
-			game->m_dialog_box_manager.get_dialog_box(DialogBoxId::ItemCreator));
+			game->get_dialog_box_manager().get_dialog_box(DialogBoxId::ItemCreator));
 		if (dlg) dlg->receive_search_results(pkt);
 	}
 
@@ -130,7 +130,7 @@ namespace NetworkMessageHandlers {
 		if (!pkt) return;
 
 		auto* dlg = dynamic_cast<DialogBox_TesterMenu*>(
-			game->m_dialog_box_manager.get_dialog_box(DialogBoxId::TesterMenu));
+			game->get_dialog_box_manager().get_dialog_box(DialogBoxId::TesterMenu));
 		if (dlg) dlg->receive_map_list(pkt);
 	}
 #endif // TESTER_ONLY

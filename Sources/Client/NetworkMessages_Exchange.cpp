@@ -12,9 +12,9 @@ namespace NetworkMessageHandlers {
 	void HandleExchangeItemComplete(CGame* game, char* data)
 	{
 		game->add_event_list(NOTIFYMSG_EXCHANGEITEM_COMPLETE1, 10);
-		game->m_dialog_box_manager.disable_dialog_box(DialogBoxId::Exchange);
+		game->get_dialog_box_manager().disable_dialog_box(DialogBoxId::Exchange);
 		//Snoopy: MultiTrade
-		game->m_dialog_box_manager.disable_dialog_box(DialogBoxId::ConfirmExchange);
+		game->get_dialog_box_manager().disable_dialog_box(DialogBoxId::ConfirmExchange);
 		game->play_game_sound('E', 23, 5);
 	}
 
@@ -27,7 +27,7 @@ namespace NetworkMessageHandlers {
 		// Explicitly clear item disabled flags before disabling dialogs.
 		// disable_dialog_box(Exchange) also clears these, but if exchange info
 		// was partially cleared by item removal, flags could get stuck.
-		auto* exDlg = game->m_dialog_box_manager.get_dialog_as<DialogBox_Exchange>(DialogBoxId::Exchange);
+		auto* exDlg = game->get_dialog_box_manager().get_dialog_as<DialogBox_Exchange>(DialogBoxId::Exchange);
 		for (int i = 0; i < 4; i++)
 		{
 			int slot = exDlg->m_slots[i].inv_slot;
@@ -36,7 +36,7 @@ namespace NetworkMessageHandlers {
 		}
 
 		//Snoopy: MultiTrade
-		game->m_dialog_box_manager.disable_dialog_box(DialogBoxId::ConfirmExchange);
-		game->m_dialog_box_manager.disable_dialog_box(DialogBoxId::Exchange);
+		game->get_dialog_box_manager().disable_dialog_box(DialogBoxId::ConfirmExchange);
+		game->get_dialog_box_manager().disable_dialog_box(DialogBoxId::Exchange);
 	}
 } // namespace NetworkMessageHandlers

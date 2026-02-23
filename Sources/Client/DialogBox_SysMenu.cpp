@@ -149,7 +149,7 @@ void DialogBox_SysMenu::on_draw()
 	draw_new_dialog_box(InterfaceNdText, sX, sY, 6);
 
 	// Handle mouse scroll over dialog to cycle tabs (or scroll graphics content)
-	if (m_game->m_dialog_box_manager.get_top_id() == DialogBoxId::SystemMenu && z != 0)
+	if (m_game->get_dialog_box_manager().get_top_id() == DialogBoxId::SystemMenu && z != 0)
 	{
 		if (m_iActiveTab == TAB_GRAPHICS)
 		{
@@ -373,7 +373,7 @@ void DialogBox_SysMenu::draw_general_tab(short sX, short sY)
 	}
 
 	// Restart button (right side, only when dead)
-	if ((m_game->m_player->m_hp <= 0) && (m_game->m_restart_count == -1))
+	if ((player().m_hp <= 0) && (m_game->m_restart_count == -1))
 	{
 		bool hover = (mouse_x >= sX + ui_layout::right_btn_x && mouse_x <= sX + ui_layout::right_btn_x + ui_layout::btn_size_x &&
 			mouse_y >= buttonY && mouse_y <= buttonY + ui_layout::btn_size_y);
@@ -868,7 +868,7 @@ void DialogBox_SysMenu::draw_system_tab(short sX, short sY)
 	// Guide Map toggle
 	put_string(labelX, lineY, DRAW_DIALOGBOX_SYSMENU_GUIDEMAP, GameColors::UILabel);
 	put_string(labelX + 1, lineY, DRAW_DIALOGBOX_SYSMENU_GUIDEMAP, GameColors::UILabel);
-	draw_toggle(valueX, lineY, m_game->m_dialog_box_manager.is_enabled(DialogBoxId::GuideMap));
+	draw_toggle(valueX, lineY, m_game->get_dialog_box_manager().is_enabled(DialogBoxId::GuideMap));
 
 	lineY += 20;
 
@@ -1030,7 +1030,7 @@ bool DialogBox_SysMenu::on_click_general(short sX, short sY)
 	}
 
 	// Restart button (only when dead)
-	if ((m_game->m_player->m_hp <= 0) && (m_game->m_restart_count == -1))
+	if ((player().m_hp <= 0) && (m_game->m_restart_count == -1))
 	{
 		if (mouse_x >= sX + ui_layout::right_btn_x && mouse_x <= sX + ui_layout::right_btn_x + ui_layout::btn_size_x &&
 			mouse_y >= buttonY && mouse_y <= buttonY + ui_layout::btn_size_y)
@@ -1425,7 +1425,7 @@ bool DialogBox_SysMenu::on_click_system(short sX, short sY)
 
 	// Guide Map toggle
 	if (is_in_toggle_area(valueX, lineY)) {
-		if (m_game->m_dialog_box_manager.is_enabled(DialogBoxId::GuideMap))
+		if (m_game->get_dialog_box_manager().is_enabled(DialogBoxId::GuideMap))
 			disable_dialog_box(DialogBoxId::GuideMap);
 		else
 			enable_dialog_box(DialogBoxId::GuideMap, 0, 0, 0);

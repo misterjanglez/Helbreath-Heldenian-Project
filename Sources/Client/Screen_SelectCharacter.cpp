@@ -34,7 +34,6 @@ void Screen_SelectCharacter::on_initialize()
     GameModeManager::set_current_mode(GameMode::SelectCharacter);
 
     weather_manager::get().set_ambient_light(1);
-    m_game->init_game_settings();
 
     m_game->m_arrow_pressed = 0;
     m_dwSelCharCTime = GameClock::get_time_ms();
@@ -207,9 +206,9 @@ bool Screen_SelectCharacter::enter_game()
     if (!m_game->m_char_list[slot_index]) return false;
     if (m_game->m_char_list[slot_index]->m_sex == 0) return false;
 
-    m_game->m_player->m_player_name = m_game->m_char_list[slot_index]->m_name.c_str();
-    m_game->m_player->m_level = static_cast<int>(m_game->m_char_list[slot_index]->m_level);
-    if (!CMisc::check_valid_string(m_game->m_player->m_player_name.c_str())) return false;
+    m_game->m_selected_char_name = m_game->m_char_list[slot_index]->m_name.c_str();
+    m_game->m_selected_char_level = static_cast<int>(m_game->m_char_list[slot_index]->m_level);
+    if (!CMisc::check_valid_string(m_game->m_selected_char_name.c_str())) return false;
 
     m_game->m_sprite[InterfaceNdLogin]->Unload();
     m_game->m_sprite[InterfaceNdMainMenu]->Unload();

@@ -18,7 +18,7 @@ namespace NetworkMessageHandlers {
 		if (!pkt) return;
 		skill_index = static_cast<short>(pkt->skill_index);
 		game->m_down_skill_index = skill_index;
-		auto* skill_dlg = game->m_dialog_box_manager.get_dialog_as<DialogBox_Skill>(DialogBoxId::Skill);
+		auto* skill_dlg = game->get_dialog_box_manager().get_dialog_as<DialogBox_Skill>(DialogBoxId::Skill);
 		if (skill_dlg) skill_dlg->m_is_down_skill_pending = false;
 	}
 
@@ -377,8 +377,8 @@ namespace NetworkMessageHandlers {
 		game->m_player->m_lu_point = (game->m_player->m_level - 1) * 3 - ((game->m_player->m_str + game->m_player->m_vit + game->m_player->m_dex + game->m_player->m_int + game->m_player->m_mag + game->m_player->m_charisma) - 70);
 		game->m_gizon_item_upgrade_left -= majestic_cost;
 		game->m_player->m_lu_str = game->m_player->m_lu_vit = game->m_player->m_lu_dex = game->m_player->m_lu_int = game->m_player->m_lu_mag = game->m_player->m_lu_char = 0;
-		game->m_dialog_box_manager.disable_dialog_box(DialogBoxId::ChangeStatsMajestic);
-		game->m_dialog_box_manager.enable_dialog_box(DialogBoxId::LevelUpSetting, 0, 0, 0);
+		game->get_dialog_box_manager().disable_dialog_box(DialogBoxId::ChangeStatsMajestic);
+		game->get_dialog_box_manager().enable_dialog_box(DialogBoxId::LevelUpSetting, 0, 0, 0);
 		game->add_event_list("Your stat has been changed.", 10);
 	}
 
@@ -386,7 +386,7 @@ namespace NetworkMessageHandlers {
 	{
 		game->m_player->m_lu_str = game->m_player->m_lu_vit = game->m_player->m_lu_dex = game->m_player->m_lu_int = game->m_player->m_lu_mag = game->m_player->m_lu_char = 0;
 		game->m_player->m_lu_point = (game->m_player->m_level - 1) * 3 - ((game->m_player->m_str + game->m_player->m_vit + game->m_player->m_dex + game->m_player->m_int + game->m_player->m_mag + game->m_player->m_charisma) - 70);
-		game->m_dialog_box_manager.disable_dialog_box(DialogBoxId::ChangeStatsMajestic);
+		game->get_dialog_box_manager().disable_dialog_box(DialogBoxId::ChangeStatsMajestic);
 		game->add_event_list("Your stat has not been changed.", 10);
 	}
 

@@ -8,6 +8,7 @@
 #include <vector>
 
 class CGame;
+class CPlayer;
 
 namespace z_layer
 {
@@ -27,11 +28,12 @@ struct give_item_state
 class DialogBoxManager
 {
 public:
-	explicit DialogBoxManager(CGame* game = nullptr);
+	DialogBoxManager(CGame& game, CPlayer& player);
 	~DialogBoxManager() = default;
 
-	void initialize(CGame* game);
 	void initialize_dialog_boxes();
+
+	CPlayer& get_player() { return m_player; }
 
 	// --- Registration ---
 	void register_dialog_box(std::unique_ptr<IDialogBox> dialog_box);
@@ -91,7 +93,8 @@ public:
 	give_item_state m_give_item;
 
 private:
-	CGame* m_game = nullptr;
+	CGame& m_game;
+	CPlayer& m_player;
 
 	// Dynamic dialog storage — no fixed arrays
 	std::unordered_map<int, std::unique_ptr<IDialogBox>> m_dialogs;

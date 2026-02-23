@@ -23,7 +23,7 @@ void DialogBox_ItemDrop::on_draw()
 
 	draw_new_dialog_box(InterfaceNdGame1, sX, sY, 2);
 
-	auto itemInfo = item_name_formatter::get().format(m_game->m_item_list[m_item_index].get());
+	auto itemInfo = item_name_formatter::get().format(player().m_item_list[m_item_index].get());
 
 	if (m_name[0] == '\0')
 		txt = itemInfo.name.c_str();
@@ -87,13 +87,13 @@ void DialogBox_ItemDrop::on_draw()
 
 bool DialogBox_ItemDrop::on_click()
 {
-	if (m_game->m_player->m_Controller.get_command() < 0) return false;
+	if (player().m_Controller.get_command() < 0) return false;
 
 	// Yes button - drop item
 	if (mouse_in(btn_yes))
 	{
 		m_mode = 3;
-		CItem* cfg = m_game->get_item_config(m_game->m_item_list[m_item_index]->m_id_num);
+		CItem* cfg = m_game->get_item_config(player().m_item_list[m_item_index]->m_id_num);
 		if (cfg) send_command(MsgId::CommandCommon,
 			CommonType::ItemDrop,
 			0,

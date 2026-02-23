@@ -42,9 +42,9 @@ void DialogBox_SellOrRepair::on_draw()
 
 		item_id = m_item_index;
 
-		item_color = m_game->m_item_list[item_id]->m_item_color;
+		item_color = player().m_item_list[item_id]->m_item_color;
 		{
-			CItem* sell_cfg = m_game->get_item_config(m_game->m_item_list[item_id]->m_id_num);
+			CItem* sell_cfg = m_game->get_item_config(player().m_item_list[item_id]->m_id_num);
 			auto sell_draw = m_game->get_item_draw(sell_cfg ? sell_cfg->m_display_id : 0, item_atlas::pack, sell_cfg ? sell_cfg->sprite_is_female() : false);
 			if (item_color == 0)
 				sell_draw.sprite->draw(sX + 62 + 15, sY + 84 + 30, sell_draw.frame);
@@ -57,7 +57,7 @@ void DialogBox_SellOrRepair::on_draw()
 			}
 		}
 
-		auto itemInfo = item_name_formatter::get().format(m_game->m_item_list[item_id].get());
+		auto itemInfo = item_name_formatter::get().format(player().m_item_list[item_id].get());
 		txt = itemInfo.name;
 
 		if (itemInfo.is_special)
@@ -92,9 +92,9 @@ void DialogBox_SellOrRepair::on_draw()
 		draw_new_dialog_box(InterfaceNdGame2, sX, sY, 2);
 		draw_new_dialog_box(InterfaceNdText, sX, sY, 10);
 		item_id = m_item_index;
-		item_color = m_game->m_item_list[item_id]->m_item_color;
+		item_color = player().m_item_list[item_id]->m_item_color;
 		{
-			CItem* rep_cfg = m_game->get_item_config(m_game->m_item_list[item_id]->m_id_num);
+			CItem* rep_cfg = m_game->get_item_config(player().m_item_list[item_id]->m_id_num);
 			auto rep_draw = m_game->get_item_draw(rep_cfg ? rep_cfg->m_display_id : 0, item_atlas::pack, rep_cfg ? rep_cfg->sprite_is_female() : false);
 			if (item_color == 0)
 				rep_draw.sprite->draw(sX + 62 + 15, sY + 84 + 30, rep_draw.frame);
@@ -106,7 +106,7 @@ void DialogBox_SellOrRepair::on_draw()
 				rep_draw.sprite->draw(sX + 62 + 15, sY + 84 + 30, rep_draw.frame, hb::shared::sprite::DrawParams::tint(rep_tint.r, rep_tint.g, rep_tint.b));
 			}
 		}
-		auto itemInfo2 = item_name_formatter::get().format(m_game->m_item_list[item_id].get());
+		auto itemInfo2 = item_name_formatter::get().format(player().m_item_list[item_id].get());
 		txt = itemInfo2.name.c_str();
 		if (itemInfo2.is_special)
 		{
@@ -164,7 +164,7 @@ bool DialogBox_SellOrRepair::on_click()
 	switch (m_mode) {
 	case mode::sell:
 	{
-		CItem* cfg = m_game->get_item_config(m_game->m_item_list[m_item_index]->m_id_num);
+		CItem* cfg = m_game->get_item_config(player().m_item_list[m_item_index]->m_id_num);
 		if (mouse_in(btn_confirm)) {
 			// Sell
 			if (cfg) m_game->send_command(MsgId::CommandCommon, CommonType::ReqSellItemConfirm, 0, m_item_index, m_item_count, m_secondary_price, cfg->m_name);
@@ -174,7 +174,7 @@ bool DialogBox_SellOrRepair::on_click()
 		if (mouse_in(btn_cancel)) {
 			// Cancel
 			inventory_manager::get().unlock_item(m_item_index);
-			m_game->m_dialog_box_manager.disable_dialog_box(DialogBoxId::SellOrRepair);
+			m_game->get_dialog_box_manager().disable_dialog_box(DialogBoxId::SellOrRepair);
 			return true;
 		}
 		break;
@@ -182,7 +182,7 @@ bool DialogBox_SellOrRepair::on_click()
 
 	case mode::repair:
 	{
-		CItem* cfg = m_game->get_item_config(m_game->m_item_list[m_item_index]->m_id_num);
+		CItem* cfg = m_game->get_item_config(player().m_item_list[m_item_index]->m_id_num);
 		if (mouse_in(btn_confirm)) {
 			// Repair
 			if (cfg) m_game->send_command(MsgId::CommandCommon, CommonType::ReqRepairItemConfirm, 0, m_item_index, 0, 0, cfg->m_name);
@@ -192,7 +192,7 @@ bool DialogBox_SellOrRepair::on_click()
 		if (mouse_in(btn_cancel)) {
 			// Cancel
 			inventory_manager::get().unlock_item(m_item_index);
-			m_game->m_dialog_box_manager.disable_dialog_box(DialogBoxId::SellOrRepair);
+			m_game->get_dialog_box_manager().disable_dialog_box(DialogBoxId::SellOrRepair);
 			return true;
 		}
 		break;

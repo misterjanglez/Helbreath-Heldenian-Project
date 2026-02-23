@@ -47,19 +47,19 @@ void DialogBox_ItemUpgrade::on_draw()
 
 int DialogBox_ItemUpgrade::calculate_upgrade_cost(int item_index)
 {
-    int value = (m_game->m_item_list[item_index]->m_attribute & 0xF0000000) >> 28;
+    int value = (player().m_item_list[item_index]->m_attribute & 0xF0000000) >> 28;
     value = value * (value + 6) / 8 + 2;
 
     // Special handling for Angelic Pendants
-    CItem* cfg = m_game->get_item_config(m_game->m_item_list[item_index]->m_id_num);
+    CItem* cfg = m_game->get_item_config(player().m_item_list[item_index]->m_id_num);
     if (cfg && (cfg->m_equip_pos >= 11)
         && (cfg->get_item_type() == ItemType::Equip))
     {
-        short id = m_game->m_item_list[item_index]->m_id_num;
+        short id = player().m_item_list[item_index]->m_id_num;
         if (id == hb::shared::item::ItemId::AngelicPandentSTR || id == hb::shared::item::ItemId::AngelicPandentDEX ||
             id == hb::shared::item::ItemId::AngelicPandentINT || id == hb::shared::item::ItemId::AngelicPandentMAG)
         {
-            value = (m_game->m_item_list[item_index]->m_attribute & 0xF0000000) >> 28;
+            value = (player().m_item_list[item_index]->m_attribute & 0xF0000000) >> 28;
             switch (value) {
             case 0: value = 10; break;
             case 1: value = 11; break;
@@ -79,8 +79,8 @@ int DialogBox_ItemUpgrade::calculate_upgrade_cost(int item_index)
 
 void DialogBox_ItemUpgrade::draw_item_preview(int sX, int sY, int item_index)
 {
-    char item_color = m_game->m_item_list[item_index]->m_item_color;
-    CItem* cfg = m_game->get_item_config(m_game->m_item_list[item_index]->m_id_num);
+    char item_color = player().m_item_list[item_index]->m_item_color;
+    CItem* cfg = m_game->get_item_config(player().m_item_list[item_index]->m_id_num);
     if (!cfg) return;
 
     auto upg_draw = m_game->get_item_draw(cfg->m_display_id, item_atlas::pack, cfg->sprite_is_female());
@@ -99,7 +99,7 @@ void DialogBox_ItemUpgrade::draw_item_preview(int sX, int sY, int item_index)
         upg_draw.sprite->draw(sX + 134, sY + 182, upg_draw.frame, hb::shared::sprite::DrawParams::tint(GameColors::Items[item_color].r, GameColors::Items[item_color].g, GameColors::Items[item_color].b));
     }
 
-    auto itemInfo = item_name_formatter::get().format(m_game->m_item_list[item_index].get());
+    auto itemInfo = item_name_formatter::get().format(player().m_item_list[item_index].get());
     hb::shared::text::draw_text_aligned(GameFont::Default, sX + 24, sY + 230 + 20, (sX + 248) - (sX + 24), 15, itemInfo.name.c_str(), hb::shared::text::TextStyle::from_color(GameColors::UIBlack), hb::shared::text::Align::TopCenter);
     auto effect = itemInfo.effect_text();
     auto extra = itemInfo.extra_text();
@@ -170,8 +170,8 @@ void DialogBox_ItemUpgrade::DrawMode2_InProgress(int sX, int sY)
     if (item_index != -1)
     {
         m_game->draw_new_dialog_box(InterfaceNdGame3, sX, sY, 3);
-        char item_color = m_game->m_item_list[item_index]->m_item_color;
-        CItem* cfg = m_game->get_item_config(m_game->m_item_list[item_index]->m_id_num);
+        char item_color = player().m_item_list[item_index]->m_item_color;
+        CItem* cfg = m_game->get_item_config(player().m_item_list[item_index]->m_id_num);
 
         if (cfg)
         {
@@ -196,7 +196,7 @@ void DialogBox_ItemUpgrade::DrawMode2_InProgress(int sX, int sY)
                 upg2_draw.sprite->draw(sX + 134, sY + 182, upg2_draw.frame, hb::shared::sprite::DrawParams::alpha_blend(0.25f));
         }
 
-        auto itemInfo2 = item_name_formatter::get().format(m_game->m_item_list[item_index].get());
+        auto itemInfo2 = item_name_formatter::get().format(player().m_item_list[item_index].get());
         auto effect2 = itemInfo2.effect_text();
         auto extra2 = itemInfo2.extra_text();
         hb::shared::text::draw_text_aligned(GameFont::Default, sX + 24, sY + 230 + 20, (sX + 248) - (sX + 24), 15, itemInfo2.name.c_str(), hb::shared::text::TextStyle::from_color(GameColors::UIBlack), hb::shared::text::Align::TopCenter);
@@ -244,7 +244,7 @@ void DialogBox_ItemUpgrade::DrawMode4_Failed(int sX, int sY)
     hb::shared::text::draw_text_aligned(GameFont::Default, sX + 24, sY + 55 + 30 + 282 - 117 - 170, (sX + 248) - (sX + 24), 15, DRAW_DIALOGBOX_ITEMUPGRADE9, hb::shared::text::TextStyle::from_color(GameColors::UIBlack), hb::shared::text::Align::TopCenter);
 
     // Check if item was destroyed
-    if ((item_index != -1) && (m_game->m_item_list[item_index] == 0))
+    if ((item_index != -1) && (player().m_item_list[item_index] == 0))
     {
         m_game->play_game_sound('E', 24, 0, 0);
         m_mode = mode::item_lost;
@@ -440,7 +440,7 @@ bool DialogBox_ItemUpgrade::on_click()
             && (mouse_y >= sY + ui_layout::btn_y) && (mouse_y <= sY + ui_layout::btn_y + ui_layout::btn_size_y))
         {
             m_game->play_game_sound('E', 14, 5);
-            m_game->m_dialog_box_manager.disable_dialog_box(DialogBoxId::ItemUpgrade);
+            m_game->get_dialog_box_manager().disable_dialog_box(DialogBoxId::ItemUpgrade);
             return true;
         }
         break;
@@ -456,7 +456,7 @@ bool DialogBox_ItemUpgrade::on_click()
             && (mouse_y > sY + ui_layout::btn_y) && (mouse_y < sY + ui_layout::btn_y + ui_layout::btn_size_y))
         {
             m_game->play_game_sound('E', 14, 5);
-            m_game->m_dialog_box_manager.disable_dialog_box(DialogBoxId::ItemUpgrade);
+            m_game->get_dialog_box_manager().disable_dialog_box(DialogBoxId::ItemUpgrade);
             return true;
         }
         break;
@@ -468,12 +468,12 @@ bool DialogBox_ItemUpgrade::on_click()
             m_game->play_game_sound('E', 14, 5);
             int so_x = 0, so_m = 0;
             for (int i = 0; i < hb::shared::limits::MaxItems; i++)
-                if (m_game->m_item_list[i] != 0)
+                if (player().m_item_list[i] != 0)
                 {
-                    CItem* cfg = m_game->get_item_config(m_game->m_item_list[i]->m_id_num);
+                    CItem* cfg = m_game->get_item_config(player().m_item_list[i]->m_id_num);
                     if (!cfg) continue;
-                    if (m_game->m_item_list[i]->m_id_num == 656) so_x++; // Stone of Xelima
-                    if (m_game->m_item_list[i]->m_id_num == 657) so_m++; // Stone of Merien
+                    if (player().m_item_list[i]->m_id_num == 656) so_x++; // Stone of Xelima
+                    if (player().m_item_list[i]->m_id_num == 657) so_m++; // Stone of Merien
                 }
 
             if ((so_x > 0) || (so_m > 0))
@@ -485,7 +485,7 @@ bool DialogBox_ItemUpgrade::on_click()
             else
             {
                 m_game->add_event_list(DRAW_DIALOGBOX_ITEMUPGRADE30, 10);
-                m_game->m_dialog_box_manager.disable_dialog_box(DialogBoxId::ItemUpgrade);
+                m_game->get_dialog_box_manager().disable_dialog_box(DialogBoxId::ItemUpgrade);
             }
             return true;
         }
@@ -500,7 +500,7 @@ bool DialogBox_ItemUpgrade::on_click()
             else
             {
                 m_game->add_event_list(DRAW_DIALOGBOX_ITEMUPGRADE40, 10);
-                m_game->m_dialog_box_manager.disable_dialog_box(DialogBoxId::ItemUpgrade);
+                m_game->get_dialog_box_manager().disable_dialog_box(DialogBoxId::ItemUpgrade);
             }
             return true;
         }
@@ -509,7 +509,7 @@ bool DialogBox_ItemUpgrade::on_click()
             && (mouse_y >= sY + ui_layout::btn_y) && (mouse_y <= sY + ui_layout::btn_y + ui_layout::btn_size_y))
         {
             m_game->play_game_sound('E', 14, 5);
-            m_game->m_dialog_box_manager.disable_dialog_box(DialogBoxId::ItemUpgrade);
+            m_game->get_dialog_box_manager().disable_dialog_box(DialogBoxId::ItemUpgrade);
             return true;
         }
         break;
@@ -528,7 +528,7 @@ bool DialogBox_ItemUpgrade::on_click()
             && (mouse_y >= sY + ui_layout::btn_y) && (mouse_y <= sY + ui_layout::btn_y + ui_layout::btn_size_y))
         {
             m_game->play_game_sound('E', 14, 5);
-            m_game->m_dialog_box_manager.disable_dialog_box(DialogBoxId::ItemUpgrade);
+            m_game->get_dialog_box_manager().disable_dialog_box(DialogBoxId::ItemUpgrade);
             return true;
         }
         break;
@@ -542,8 +542,8 @@ bool DialogBox_ItemUpgrade::on_item_drop()
 	int item_id = CursorTarget::get_selected_id();
 	if (item_id < 0 || item_id >= hb::shared::limits::MaxItems) return false;
 	if (inventory_manager::get().is_locked(item_id)) return false;
-	if (m_game->m_player->m_Controller.get_command() < 0) return false;
-	CItem* cfg = m_game->get_item_config(m_game->m_item_list[item_id]->m_id_num);
+	if (player().m_Controller.get_command() < 0) return false;
+	CItem* cfg = m_game->get_item_config(player().m_item_list[item_id]->m_id_num);
 	if (!cfg || cfg->get_equip_pos() == EquipPos::None) return false;
 
 	switch (m_mode) {

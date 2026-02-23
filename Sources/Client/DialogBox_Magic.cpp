@@ -52,7 +52,7 @@ void DialogBox_Magic::on_draw()
 	draw_new_dialog_box(InterfaceNdText, sX, sY, 7, false, dialogTrans);
 
 	// Handle scroll wheel input
-	if (m_game->m_dialog_box_manager.get_top_id() == DialogBoxId::Magic && z != 0)
+	if (m_game->get_dialog_box_manager().get_top_id() == DialogBoxId::Magic && z != 0)
 	{
 		if (z > 0) m_circle_view--;
 		if (z < 0) m_circle_view++;
@@ -75,14 +75,14 @@ void DialogBox_Magic::on_draw()
 	yloc = 0;
 	for (i = 0; i < 9; i++)
 	{
-		if ((m_game->m_player->m_magic_mastery[c_pivot + i] != 0) && (m_game->m_magic_cfg_list[c_pivot + i] != 0))
+		if ((player().m_magic_mastery[c_pivot + i] != 0) && (m_game->m_magic_cfg_list[c_pivot + i] != 0))
 		{
 			std::snprintf(txt, sizeof(txt), "%s", m_game->m_magic_cfg_list[c_pivot + i]->m_name.c_str());
 			CMisc::replace_string(txt, '-', ' ');
 
 			mana_cost = magic_casting_system::get().get_mana_cost(c_pivot + i);
 
-			if (mana_cost > m_game->m_player->m_mp)
+			if (mana_cost > player().m_mp)
 			{
 				hb::shared::text::draw_text(GameFont::Bitmap1, sX + 30, sY + 70 + yloc, txt, hb::shared::text::TextStyle::with_highlight(GameColors::UIMagicPurple));
 				mana = std::format("{:3}", mana_cost);
@@ -138,25 +138,25 @@ void DialogBox_Magic::on_draw()
 	static int _tmp_iMCProb[] = { 0, 300, 250, 200, 150, 100, 80, 70, 60, 50, 40 };
 	static int _tmp_iMLevelPenalty[] = { 0,   5,   5,   8,   8,  10, 14, 28, 32, 36, 40 };
 
-	if (m_game->m_player->m_skill_mastery[4] == 0)
+	if (player().m_skill_mastery[4] == 0)
 		v1 = 1.0f;
 	else
-		v1 = static_cast<double>(m_game->m_player->m_skill_mastery[4]);
+		v1 = static_cast<double>(player().m_skill_mastery[4]);
 
 	v2 = static_cast<double>(v1 / 100.0f);
 	v3 = static_cast<double>(_tmp_iMCProb[magic_circle]);
 	v1 = v2 * v3;
 	result = static_cast<int>(v1);
 
-	if ((m_game->m_player->m_int + m_game->m_player->m_angelic_int) > 50)
-		result += ((m_game->m_player->m_int + m_game->m_player->m_angelic_int) - 50) / 2;
+	if ((player().m_int + player().m_angelic_int) > 50)
+		result += ((player().m_int + player().m_angelic_int) - 50) / 2;
 
-	level_magic = (m_game->m_player->m_level / 10);
+	level_magic = (player().m_level / 10);
 	if (magic_circle != level_magic)
 	{
 		if (magic_circle > level_magic)
 		{
-			v1 = static_cast<double>(m_game->m_player->m_level - level_magic * 10);
+			v1 = static_cast<double>(player().m_level - level_magic * 10);
 			v2 = static_cast<double>(abs(magic_circle - level_magic)) * _tmp_iMLevelPenalty[magic_circle];
 			v3 = static_cast<double>(abs(magic_circle - level_magic)) * 10;
 			v4 = (v1 / v3) * v2;
@@ -180,13 +180,13 @@ void DialogBox_Magic::on_draw()
 	// Equipment magic bonus
 	for (i = 0; i < hb::shared::limits::MaxItems; i++)
 	{
-		if (m_game->m_item_list[i] == 0) continue;
+		if (player().m_item_list[i] == 0) continue;
 		if (m_game->m_is_item_equipped[i] == true)
 		{
-			if (((m_game->m_item_list[i]->m_attribute & 0x00F00000) >> 20) == 10)
+			if (((player().m_item_list[i]->m_attribute & 0x00F00000) >> 20) == 10)
 			{
 				v1 = static_cast<double>(result);
-				v2 = static_cast<double>(((m_game->m_item_list[i]->m_attribute & 0x000F0000) >> 16) * 3);
+				v2 = static_cast<double>(((player().m_item_list[i]->m_attribute & 0x000F0000) >> 16) * 3);
 				v3 = v1 + v2;
 				result = static_cast<int>(v3);
 				break;
@@ -195,7 +195,7 @@ void DialogBox_Magic::on_draw()
 	}
 
 	if (result > 100) result = 100;
-	if (m_game->m_player->m_sp < 1) result = result * 9 / 10;
+	if (player().m_sp < 1) result = result * 9 / 10;
 	if (result < 1) result = 1;
 
 	// Display magic probability
@@ -223,7 +223,7 @@ bool DialogBox_Magic::on_click()
 	yloc = 0;
 	for (i = 0; i < 9; i++)
 	{
-		if ((m_game->m_player->m_magic_mastery[c_pivot + i] != 0) && (m_game->m_magic_cfg_list[c_pivot + i] != 0))
+		if ((player().m_magic_mastery[c_pivot + i] != 0) && (m_game->m_magic_cfg_list[c_pivot + i] != 0))
 		{
 			if ((mouse_x >= sX + 30) && (mouse_x <= sX + 240) && (mouse_y >= sY + 70 + yloc) && (mouse_y <= sY + 70 + 18 + yloc))
 			{
@@ -247,15 +247,15 @@ bool DialogBox_Magic::on_click()
 
 	if (mouse_in(btn_alchemy))
 	{
-		if (m_game->m_player->m_skill_mastery[12] == 0) add_event_list(BDLBBOX_DOUBLE_CLICK_INVENTORY16, 10);
+		if (player().m_skill_mastery[12] == 0) add_event_list(BDLBBOX_DOUBLE_CLICK_INVENTORY16, 10);
 		else
 		{
 			for (i = 0; i < hb::shared::limits::MaxItems; i++)
 			{
-				if (m_game->m_item_list[i] == 0) continue;
-				CItem* cfg = m_game->get_item_config(m_game->m_item_list[i]->m_id_num);
+				if (player().m_item_list[i] == 0) continue;
+				CItem* cfg = m_game->get_item_config(player().m_item_list[i]->m_id_num);
 				if (cfg && (cfg->get_item_type() == ItemType::UseSkillEnableDialogBox) &&
-					(m_game->m_item_list[i]->m_id_num == 227)) // Alchemy Bowl
+					(player().m_item_list[i]->m_id_num == 227)) // Alchemy Bowl
 				{
 					enable_dialog_box(DialogBoxId::Manufacture, 1, 0, 0, 0);
 					add_event_list(BDLBBOX_DOUBLE_CLICK_INVENTORY10, 10);

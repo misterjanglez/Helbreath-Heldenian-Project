@@ -160,11 +160,11 @@ void DialogBox_Soldier::on_draw()
 			if (m_game->m_map_name == "middleland")
 			{
 				v1 = static_cast<double>(MapSzX);
-				v2 = static_cast<double>(m_game->m_player->m_player_x);
+				v2 = static_cast<double>(player().m_player_x);
 				v3 = (v2 * static_cast<double>(size_x)) / v1;
 				tX = static_cast<int>(v3);
 				v1 = static_cast<double>(MapSzY);
-				v2 = static_cast<double>(m_game->m_player->m_player_y);
+				v2 = static_cast<double>(player().m_player_y);
 				v3 = (v2 * static_cast<double>(size_y)) / v1;
 				tY = static_cast<int>(v3);
 				draw_new_dialog_box(InterfaceNdCrusade, sX + tX + 15, sY + tY + 60, 43);

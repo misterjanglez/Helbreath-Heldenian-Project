@@ -45,7 +45,7 @@ void DialogBox_CityHallMenu::on_draw()
 void DialogBox_CityHallMenu::DrawMode0_MainMenu(short sX, short sY, short size_x)
 {
 	// Citizenship request
-	if (m_game->m_player->m_citizen == false)
+	if (player().m_citizen == false)
 	{
 		if (mouse_in(link_citizenship))
 			hb::shared::text::draw_text_aligned(GameFont::Default, sX, sY + 70, (sX + size_x) - (sX), 15, DRAW_DIALOGBOX_CITYHALL_MENU1, hb::shared::text::TextStyle::from_color(GameColors::UIWhite), hb::shared::text::Align::TopCenter);
@@ -56,7 +56,7 @@ void DialogBox_CityHallMenu::DrawMode0_MainMenu(short sX, short sY, short size_x
 		hb::shared::text::draw_text_aligned(GameFont::Default, sX, sY + 70, (sX + size_x) - (sX), 15, DRAW_DIALOGBOX_CITYHALL_MENU1, hb::shared::text::TextStyle::from_color(GameColors::UIDisabled), hb::shared::text::Align::TopCenter);
 
 	// Reward gold
-	if (m_game->m_player->m_reward_gold > 0)
+	if (player().m_reward_gold > 0)
 	{
 		if (mouse_in(link_reward_gold))
 			hb::shared::text::draw_text_aligned(GameFont::Default, sX, sY + 95, (sX + size_x) - (sX), 15, DRAW_DIALOGBOX_CITYHALL_MENU4, hb::shared::text::TextStyle::from_color(GameColors::UIWhite), hb::shared::text::Align::TopCenter);
@@ -67,7 +67,7 @@ void DialogBox_CityHallMenu::DrawMode0_MainMenu(short sX, short sY, short size_x
 		hb::shared::text::draw_text_aligned(GameFont::Default, sX, sY + 95, (sX + size_x) - (sX), 15, DRAW_DIALOGBOX_CITYHALL_MENU4, hb::shared::text::TextStyle::from_color(GameColors::UIDisabled), hb::shared::text::Align::TopCenter);
 
 	// Hero's Items
-	if ((m_game->m_player->m_enemy_kill_count >= 100) && (m_game->m_player->m_contribution >= 10))
+	if ((player().m_enemy_kill_count >= 100) && (player().m_contribution >= 10))
 	{
 		if (mouse_in(link_hero_items))
 			hb::shared::text::draw_text_aligned(GameFont::Default, sX, sY + 120, (sX + size_x) - (sX), 15, DRAW_DIALOGBOX_CITYHALL_MENU8, hb::shared::text::TextStyle::from_color(GameColors::UIWhite), hb::shared::text::Align::TopCenter);
@@ -89,16 +89,16 @@ void DialogBox_CityHallMenu::DrawMode0_MainMenu(short sX, short sY, short size_x
 		hb::shared::text::draw_text_aligned(GameFont::Default, sX, sY + 145, (sX + size_x) - (sX), 15, DRAW_DIALOGBOX_CITYHALL_MENU11, hb::shared::text::TextStyle::from_color(GameColors::UIDisabled), hb::shared::text::Align::TopCenter);
 
 	// Change playmode
-	if ((m_game->m_is_crusade_mode == false) && m_game->m_player->m_citizen && (m_game->m_player->m_pk_count == 0))
+	if ((m_game->m_is_crusade_mode == false) && player().m_citizen && (player().m_pk_count == 0))
 	{
-		if (m_game->m_player->m_hunter == true)
+		if (player().m_hunter == true)
 		{
 			if (mouse_in(link_change_playmode))
 				hb::shared::text::draw_text_aligned(GameFont::Default, sX, sY + 170, (sX + size_x) - (sX), 15, DRAW_DIALOGBOX_CITYHALL_MENU56, hb::shared::text::TextStyle::from_color(GameColors::UIWhite), hb::shared::text::Align::TopCenter);
 			else
 				hb::shared::text::draw_text_aligned(GameFont::Default, sX, sY + 170, (sX + size_x) - (sX), 15, DRAW_DIALOGBOX_CITYHALL_MENU56, hb::shared::text::TextStyle::from_color(GameColors::UIMagicBlue), hb::shared::text::Align::TopCenter);
 		}
-		else if (m_game->m_player->m_level < 100)
+		else if (player().m_level < 100)
 		{
 			if (mouse_in(link_change_playmode))
 				hb::shared::text::draw_text_aligned(GameFont::Default, sX, sY + 170, (sX + size_x) - (sX), 15, DRAW_DIALOGBOX_CITYHALL_MENU56, hb::shared::text::TextStyle::from_color(GameColors::UIWhite), hb::shared::text::Align::TopCenter);
@@ -112,7 +112,7 @@ void DialogBox_CityHallMenu::DrawMode0_MainMenu(short sX, short sY, short size_x
 		hb::shared::text::draw_text_aligned(GameFont::Default, sX, sY + 170, (sX + size_x) - (sX), 15, DRAW_DIALOGBOX_CITYHALL_MENU56, hb::shared::text::TextStyle::from_color(GameColors::UIDisabled), hb::shared::text::Align::TopCenter);
 
 	// Teleport menu
-	if ((m_game->m_is_crusade_mode == false) && m_game->m_player->m_citizen && (m_game->m_player->m_pk_count == 0))
+	if ((m_game->m_is_crusade_mode == false) && player().m_citizen && (player().m_pk_count == 0))
 	{
 		if (mouse_in(link_teleport))
 			hb::shared::text::draw_text_aligned(GameFont::Default, sX, sY + 195, (sX + size_x) - (sX), 15, DRAW_DIALOGBOX_CITYHALL_MENU69, hb::shared::text::TextStyle::from_color(GameColors::UIWhite), hb::shared::text::Align::TopCenter);
@@ -123,7 +123,7 @@ void DialogBox_CityHallMenu::DrawMode0_MainMenu(short sX, short sY, short size_x
 		hb::shared::text::draw_text_aligned(GameFont::Default, sX, sY + 195, (sX + size_x) - (sX), 15, DRAW_DIALOGBOX_CITYHALL_MENU69, hb::shared::text::TextStyle::from_color(GameColors::UIDisabled), hb::shared::text::Align::TopCenter);
 
 	// Change crusade role
-	if (m_game->m_is_crusade_mode && m_game->m_player->m_citizen)
+	if (m_game->m_is_crusade_mode && player().m_citizen)
 	{
 		if (mouse_in(link_crusade_role))
 			hb::shared::text::draw_text_aligned(GameFont::Default, sX, sY + 220, (sX + size_x) - (sX), 15, DRAW_DIALOGBOX_CITYHALL_MENU14, hb::shared::text::TextStyle::from_color(GameColors::UIWhite), hb::shared::text::Align::TopCenter);
@@ -200,7 +200,7 @@ void DialogBox_CityHallMenu::DrawMode5_RewardGold(short sX, short sY, short size
 	std::string txt;
 
 	hb::shared::text::draw_text_aligned(GameFont::Default, sX, sY + 125, (sX + size_x) - (sX), 15, DRAW_DIALOGBOX_CITYHALL_MENU33, hb::shared::text::TextStyle::from_color(GameColors::UILabel), hb::shared::text::Align::TopCenter);
-	txt = std::format(DRAW_DIALOGBOX_CITYHALL_MENU34, m_game->m_player->m_reward_gold);
+	txt = std::format(DRAW_DIALOGBOX_CITYHALL_MENU34, player().m_reward_gold);
 	hb::shared::text::draw_text_aligned(GameFont::Default, sX, sY + 140, (sX + size_x) - (sX), 15, txt.c_str(), hb::shared::text::TextStyle::from_color(GameColors::UILabel), hb::shared::text::Align::TopCenter);
 	hb::shared::text::draw_text_aligned(GameFont::Default, sX, sY + 155, (sX + size_x) - (sX), 15, DRAW_DIALOGBOX_CITYHALL_MENU35, hb::shared::text::TextStyle::from_color(GameColors::UILabel), hb::shared::text::Align::TopCenter);
 
@@ -222,7 +222,7 @@ void DialogBox_CityHallMenu::DrawMode7_HeroItems(short sX, short sY, short size_
 	hb::shared::text::draw_text_aligned(GameFont::Default, sX, sY + 60, (sX + size_x) - (sX), 15, DRAW_DIALOGBOX_CITYHALL_MENU46, hb::shared::text::TextStyle::from_color(GameColors::UIWhite), hb::shared::text::Align::TopCenter);
 
 	// Hero's Cape (EK 300)
-	if (m_game->m_player->m_enemy_kill_count >= 300)
+	if (player().m_enemy_kill_count >= 300)
 	{
 		if ((mouse_x > sX + 35) && (mouse_x < sX + 220) && (mouse_y > sY + 95) && (mouse_y < sY + 110))
 			hb::shared::text::draw_text_aligned(GameFont::Default, sX, sY + 95, (sX + size_x) - (sX), 15, DRAW_DIALOGBOX_CITYHALL_MENU47, hb::shared::text::TextStyle::from_color(GameColors::UIWhite), hb::shared::text::Align::TopCenter);
@@ -233,7 +233,7 @@ void DialogBox_CityHallMenu::DrawMode7_HeroItems(short sX, short sY, short size_
 		hb::shared::text::draw_text_aligned(GameFont::Default, sX, sY + 95, (sX + size_x) - (sX), 15, DRAW_DIALOGBOX_CITYHALL_MENU47, hb::shared::text::TextStyle::from_color(GameColors::UIDisabled), hb::shared::text::Align::TopCenter);
 
 	// Hero's Helm (EK 150 - Contrib 20)
-	if ((m_game->m_player->m_enemy_kill_count >= 150) && (m_game->m_player->m_contribution >= 20))
+	if ((player().m_enemy_kill_count >= 150) && (player().m_contribution >= 20))
 	{
 		if ((mouse_x > sX + 35) && (mouse_x < sX + 220) && (mouse_y > sY + 125) && (mouse_y < sY + 140))
 			hb::shared::text::draw_text_aligned(GameFont::Default, sX, sY + 125, (sX + size_x) - (sX), 15, DRAW_DIALOGBOX_CITYHALL_MENU48, hb::shared::text::TextStyle::from_color(GameColors::UIWhite), hb::shared::text::Align::TopCenter);
@@ -244,7 +244,7 @@ void DialogBox_CityHallMenu::DrawMode7_HeroItems(short sX, short sY, short size_
 		hb::shared::text::draw_text_aligned(GameFont::Default, sX, sY + 125, (sX + size_x) - (sX), 15, DRAW_DIALOGBOX_CITYHALL_MENU48, hb::shared::text::TextStyle::from_color(GameColors::UIDisabled), hb::shared::text::Align::TopCenter);
 
 	// Hero's Cap (EK 100 - Contrib 20)
-	if ((m_game->m_player->m_enemy_kill_count >= 100) && (m_game->m_player->m_contribution >= 20))
+	if ((player().m_enemy_kill_count >= 100) && (player().m_contribution >= 20))
 	{
 		if ((mouse_x > sX + 35) && (mouse_x < sX + 220) && (mouse_y > sY + 155) && (mouse_y < sY + 170))
 			hb::shared::text::draw_text_aligned(GameFont::Default, sX, sY + 155, (sX + size_x) - (sX), 15, DRAW_DIALOGBOX_CITYHALL_MENU49, hb::shared::text::TextStyle::from_color(GameColors::UIWhite), hb::shared::text::Align::TopCenter);
@@ -255,7 +255,7 @@ void DialogBox_CityHallMenu::DrawMode7_HeroItems(short sX, short sY, short size_
 		hb::shared::text::draw_text_aligned(GameFont::Default, sX, sY + 155, (sX + size_x) - (sX), 15, DRAW_DIALOGBOX_CITYHALL_MENU49, hb::shared::text::TextStyle::from_color(GameColors::UIDisabled), hb::shared::text::Align::TopCenter);
 
 	// Hero's Armor (EK 300 - Contrib 30)
-	if ((m_game->m_player->m_enemy_kill_count >= 300) && (m_game->m_player->m_contribution >= 30))
+	if ((player().m_enemy_kill_count >= 300) && (player().m_contribution >= 30))
 	{
 		if ((mouse_x > sX + 35) && (mouse_x < sX + 220) && (mouse_y > sY + 185) && (mouse_y < sY + 200))
 			hb::shared::text::draw_text_aligned(GameFont::Default, sX, sY + 185, (sX + size_x) - (sX), 15, DRAW_DIALOGBOX_CITYHALL_MENU50, hb::shared::text::TextStyle::from_color(GameColors::UIWhite), hb::shared::text::Align::TopCenter);
@@ -266,7 +266,7 @@ void DialogBox_CityHallMenu::DrawMode7_HeroItems(short sX, short sY, short size_
 		hb::shared::text::draw_text_aligned(GameFont::Default, sX, sY + 185, (sX + size_x) - (sX), 15, DRAW_DIALOGBOX_CITYHALL_MENU50, hb::shared::text::TextStyle::from_color(GameColors::UIDisabled), hb::shared::text::Align::TopCenter);
 
 	// Hero's Robe (EK 200 - Contrib 20)
-	if ((m_game->m_player->m_enemy_kill_count >= 200) && (m_game->m_player->m_contribution >= 20))
+	if ((player().m_enemy_kill_count >= 200) && (player().m_contribution >= 20))
 	{
 		if ((mouse_x > sX + 35) && (mouse_x < sX + 220) && (mouse_y > sY + 215) && (mouse_y < sY + 230))
 			hb::shared::text::draw_text_aligned(GameFont::Default, sX, sY + 215, (sX + size_x) - (sX), 15, DRAW_DIALOGBOX_CITYHALL_MENU51, hb::shared::text::TextStyle::from_color(GameColors::UIWhite), hb::shared::text::Align::TopCenter);
@@ -277,7 +277,7 @@ void DialogBox_CityHallMenu::DrawMode7_HeroItems(short sX, short sY, short size_
 		hb::shared::text::draw_text_aligned(GameFont::Default, sX, sY + 215, (sX + size_x) - (sX), 15, DRAW_DIALOGBOX_CITYHALL_MENU51, hb::shared::text::TextStyle::from_color(GameColors::UIDisabled), hb::shared::text::Align::TopCenter);
 
 	// Hero's Hauberk (EK 100 - Contrib 10)
-	if ((m_game->m_player->m_enemy_kill_count >= 100) && (m_game->m_player->m_contribution >= 10))
+	if ((player().m_enemy_kill_count >= 100) && (player().m_contribution >= 10))
 	{
 		if ((mouse_x > sX + 35) && (mouse_x < sX + 220) && (mouse_y > sY + 245) && (mouse_y < sY + 260))
 			hb::shared::text::draw_text_aligned(GameFont::Default, sX, sY + 245, (sX + size_x) - (sX), 15, DRAW_DIALOGBOX_CITYHALL_MENU52, hb::shared::text::TextStyle::from_color(GameColors::UIWhite), hb::shared::text::Align::TopCenter);
@@ -288,7 +288,7 @@ void DialogBox_CityHallMenu::DrawMode7_HeroItems(short sX, short sY, short size_
 		hb::shared::text::draw_text_aligned(GameFont::Default, sX, sY + 245, (sX + size_x) - (sX), 15, DRAW_DIALOGBOX_CITYHALL_MENU52, hb::shared::text::TextStyle::from_color(GameColors::UIDisabled), hb::shared::text::Align::TopCenter);
 
 	// Hero's Leggings (EK 150 - Contrib 15)
-	if ((m_game->m_player->m_enemy_kill_count >= 150) && (m_game->m_player->m_contribution >= 15))
+	if ((player().m_enemy_kill_count >= 150) && (player().m_contribution >= 15))
 	{
 		if ((mouse_x > sX + 35) && (mouse_x < sX + 220) && (mouse_y > sY + 275) && (mouse_y < sY + 290))
 			hb::shared::text::draw_text_aligned(GameFont::Default, sX, sY + 275, (sX + size_x) - (sX), 15, DRAW_DIALOGBOX_CITYHALL_MENU53, hb::shared::text::TextStyle::from_color(GameColors::UIWhite), hb::shared::text::Align::TopCenter);
@@ -321,7 +321,7 @@ void DialogBox_CityHallMenu::DrawMode9_ChangePlayMode(short sX, short sY, short 
 {
 	short mouse_x = static_cast<short>(hb::shared::input::get_mouse_x());
 	short mouse_y = static_cast<short>(hb::shared::input::get_mouse_y());
-	if (m_game->m_player->m_hunter)
+	if (player().m_hunter)
 		hb::shared::text::draw_text_aligned(GameFont::Default, sX, sY + 53, (sX + size_x) - (sX), 15, DRAW_DIALOGBOX_CITYHALL_MENU57, hb::shared::text::TextStyle::from_color(GameColors::UIYellow), hb::shared::text::Align::TopCenter);
 	else
 		hb::shared::text::draw_text_aligned(GameFont::Default, sX, sY + 53, (sX + size_x) - (sX), 15, DRAW_DIALOGBOX_CITYHALL_MENU58, hb::shared::text::TextStyle::from_color(GameColors::UIYellow), hb::shared::text::Align::TopCenter);
@@ -432,7 +432,7 @@ bool DialogBox_CityHallMenu::on_click_mode0(short sX, short sY)
 	// Citizenship request
 	if (mouse_in(link_citizenship))
 	{
-		if (m_game->m_player->m_citizen == true) return false;
+		if (player().m_citizen == true) return false;
 		m_mode = mode::citizenship_warning;
 		m_game->play_game_sound('E', 14, 5);
 		return true;
@@ -441,7 +441,7 @@ bool DialogBox_CityHallMenu::on_click_mode0(short sX, short sY)
 	// Reward gold
 	if (mouse_in(link_reward_gold))
 	{
-		if (m_game->m_player->m_reward_gold <= 0) return false;
+		if (player().m_reward_gold <= 0) return false;
 		m_mode = mode::reward_gold;
 		m_game->play_game_sound('E', 14, 5);
 		return true;
@@ -450,7 +450,7 @@ bool DialogBox_CityHallMenu::on_click_mode0(short sX, short sY)
 	// Hero items
 	if (mouse_in(link_hero_items))
 	{
-		if (m_game->m_player->m_enemy_kill_count < 100) return false;
+		if (player().m_enemy_kill_count < 100) return false;
 		m_mode = mode::hero_items;
 		m_game->play_game_sound('E', 14, 5);
 		return true;
@@ -469,9 +469,9 @@ bool DialogBox_CityHallMenu::on_click_mode0(short sX, short sY)
 	if (mouse_in(link_change_playmode))
 	{
 		if (m_game->m_is_crusade_mode) return false;
-		if (m_game->m_player->m_pk_count != 0) return false;
-		if (m_game->m_player->m_citizen == false) return false;
-		if ((m_game->m_player->m_level > 100) && (m_game->m_player->m_hunter == false)) return false;
+		if (player().m_pk_count != 0) return false;
+		if (player().m_citizen == false) return false;
+		if ((player().m_level > 100) && (player().m_hunter == false)) return false;
 		m_mode = mode::change_play_mode;
 		m_game->play_game_sound('E', 14, 5);
 		return true;
@@ -491,7 +491,7 @@ bool DialogBox_CityHallMenu::on_click_mode0(short sX, short sY)
 	if (mouse_in(link_crusade_role))
 	{
 		if (m_game->m_is_crusade_mode == false) return false;
-		m_game->m_dialog_box_manager.enable_dialog_box(DialogBoxId::CrusadeJob, 1, 0, 0);
+		m_game->get_dialog_box_manager().enable_dialog_box(DialogBoxId::CrusadeJob, 1, 0, 0);
 		m_game->play_game_sound('E', 14, 5);
 		return true;
 	}
@@ -573,7 +573,7 @@ bool DialogBox_CityHallMenu::on_click_mode7(short sX, short sY)
 	// Hero's Cape
 	if ((mouse_x >= sX + 35) && (mouse_x <= sX + 220) && (mouse_y >= sY + 95) && (mouse_y <= sY + 110))
 	{
-		if (m_game->m_player->m_aresden == true) req_hero_item_id = 400;
+		if (player().m_aresden == true) req_hero_item_id = 400;
 		else req_hero_item_id = 401;
 		m_cTakeHeroItemName = DRAW_DIALOGBOX_CITYHALL_MENU47;
 		m_mode = mode::hero_item_confirm;
@@ -585,10 +585,10 @@ bool DialogBox_CityHallMenu::on_click_mode7(short sX, short sY)
 	// Hero's Helm
 	if ((mouse_x >= sX + 35) && (mouse_x <= sX + 220) && (mouse_y >= sY + 125) && (mouse_y <= sY + 140))
 	{
-		if ((m_game->m_player->m_aresden == true) && (m_game->m_char_list[m_game->m_cur_focus - 1]->m_sex == 1)) req_hero_item_id = 403;
-		if ((m_game->m_player->m_aresden == true) && (m_game->m_char_list[m_game->m_cur_focus - 1]->m_sex == 2)) req_hero_item_id = 404;
-		if ((m_game->m_player->m_aresden == false) && (m_game->m_char_list[m_game->m_cur_focus - 1]->m_sex == 1)) req_hero_item_id = 405;
-		if ((m_game->m_player->m_aresden == false) && (m_game->m_char_list[m_game->m_cur_focus - 1]->m_sex == 2)) req_hero_item_id = 406;
+		if ((player().m_aresden == true) && (m_game->m_char_list[m_game->m_cur_focus - 1]->m_sex == 1)) req_hero_item_id = 403;
+		if ((player().m_aresden == true) && (m_game->m_char_list[m_game->m_cur_focus - 1]->m_sex == 2)) req_hero_item_id = 404;
+		if ((player().m_aresden == false) && (m_game->m_char_list[m_game->m_cur_focus - 1]->m_sex == 1)) req_hero_item_id = 405;
+		if ((player().m_aresden == false) && (m_game->m_char_list[m_game->m_cur_focus - 1]->m_sex == 2)) req_hero_item_id = 406;
 		m_cTakeHeroItemName = DRAW_DIALOGBOX_CITYHALL_MENU48;
 		m_mode = mode::hero_item_confirm;
 		m_hero_item_id = req_hero_item_id;
@@ -599,10 +599,10 @@ bool DialogBox_CityHallMenu::on_click_mode7(short sX, short sY)
 	// Hero's Cap
 	if ((mouse_x >= sX + 35) && (mouse_x <= sX + 220) && (mouse_y >= sY + 155) && (mouse_y <= sY + 170))
 	{
-		if ((m_game->m_player->m_aresden == true) && (m_game->m_char_list[m_game->m_cur_focus - 1]->m_sex == 1)) req_hero_item_id = 407;
-		if ((m_game->m_player->m_aresden == true) && (m_game->m_char_list[m_game->m_cur_focus - 1]->m_sex == 2)) req_hero_item_id = 408;
-		if ((m_game->m_player->m_aresden == false) && (m_game->m_char_list[m_game->m_cur_focus - 1]->m_sex == 1)) req_hero_item_id = 409;
-		if ((m_game->m_player->m_aresden == false) && (m_game->m_char_list[m_game->m_cur_focus - 1]->m_sex == 2)) req_hero_item_id = 410;
+		if ((player().m_aresden == true) && (m_game->m_char_list[m_game->m_cur_focus - 1]->m_sex == 1)) req_hero_item_id = 407;
+		if ((player().m_aresden == true) && (m_game->m_char_list[m_game->m_cur_focus - 1]->m_sex == 2)) req_hero_item_id = 408;
+		if ((player().m_aresden == false) && (m_game->m_char_list[m_game->m_cur_focus - 1]->m_sex == 1)) req_hero_item_id = 409;
+		if ((player().m_aresden == false) && (m_game->m_char_list[m_game->m_cur_focus - 1]->m_sex == 2)) req_hero_item_id = 410;
 		m_cTakeHeroItemName = DRAW_DIALOGBOX_CITYHALL_MENU49;
 		m_mode = mode::hero_item_confirm;
 		m_hero_item_id = req_hero_item_id;
@@ -613,10 +613,10 @@ bool DialogBox_CityHallMenu::on_click_mode7(short sX, short sY)
 	// Hero's Armor
 	if ((mouse_x >= sX + 35) && (mouse_x <= sX + 220) && (mouse_y >= sY + 185) && (mouse_y <= sY + 200))
 	{
-		if ((m_game->m_player->m_aresden == true) && (m_game->m_char_list[m_game->m_cur_focus - 1]->m_sex == 1)) req_hero_item_id = 411;
-		if ((m_game->m_player->m_aresden == true) && (m_game->m_char_list[m_game->m_cur_focus - 1]->m_sex == 2)) req_hero_item_id = 412;
-		if ((m_game->m_player->m_aresden == false) && (m_game->m_char_list[m_game->m_cur_focus - 1]->m_sex == 1)) req_hero_item_id = 413;
-		if ((m_game->m_player->m_aresden == false) && (m_game->m_char_list[m_game->m_cur_focus - 1]->m_sex == 2)) req_hero_item_id = 414;
+		if ((player().m_aresden == true) && (m_game->m_char_list[m_game->m_cur_focus - 1]->m_sex == 1)) req_hero_item_id = 411;
+		if ((player().m_aresden == true) && (m_game->m_char_list[m_game->m_cur_focus - 1]->m_sex == 2)) req_hero_item_id = 412;
+		if ((player().m_aresden == false) && (m_game->m_char_list[m_game->m_cur_focus - 1]->m_sex == 1)) req_hero_item_id = 413;
+		if ((player().m_aresden == false) && (m_game->m_char_list[m_game->m_cur_focus - 1]->m_sex == 2)) req_hero_item_id = 414;
 		m_cTakeHeroItemName = DRAW_DIALOGBOX_CITYHALL_MENU50;
 		m_mode = mode::hero_item_confirm;
 		m_hero_item_id = req_hero_item_id;
@@ -627,10 +627,10 @@ bool DialogBox_CityHallMenu::on_click_mode7(short sX, short sY)
 	// Hero's Robe
 	if ((mouse_x >= sX + 35) && (mouse_x <= sX + 220) && (mouse_y >= sY + 215) && (mouse_y <= sY + 230))
 	{
-		if ((m_game->m_player->m_aresden == true) && (m_game->m_char_list[m_game->m_cur_focus - 1]->m_sex == 1)) req_hero_item_id = 415;
-		if ((m_game->m_player->m_aresden == true) && (m_game->m_char_list[m_game->m_cur_focus - 1]->m_sex == 2)) req_hero_item_id = 416;
-		if ((m_game->m_player->m_aresden == false) && (m_game->m_char_list[m_game->m_cur_focus - 1]->m_sex == 1)) req_hero_item_id = 417;
-		if ((m_game->m_player->m_aresden == false) && (m_game->m_char_list[m_game->m_cur_focus - 1]->m_sex == 2)) req_hero_item_id = 418;
+		if ((player().m_aresden == true) && (m_game->m_char_list[m_game->m_cur_focus - 1]->m_sex == 1)) req_hero_item_id = 415;
+		if ((player().m_aresden == true) && (m_game->m_char_list[m_game->m_cur_focus - 1]->m_sex == 2)) req_hero_item_id = 416;
+		if ((player().m_aresden == false) && (m_game->m_char_list[m_game->m_cur_focus - 1]->m_sex == 1)) req_hero_item_id = 417;
+		if ((player().m_aresden == false) && (m_game->m_char_list[m_game->m_cur_focus - 1]->m_sex == 2)) req_hero_item_id = 418;
 		m_cTakeHeroItemName = DRAW_DIALOGBOX_CITYHALL_MENU51;
 		m_mode = mode::hero_item_confirm;
 		m_hero_item_id = req_hero_item_id;
@@ -641,10 +641,10 @@ bool DialogBox_CityHallMenu::on_click_mode7(short sX, short sY)
 	// Hero's Hauberk
 	if ((mouse_x >= sX + 35) && (mouse_x <= sX + 220) && (mouse_y >= sY + 245) && (mouse_y <= sY + 260))
 	{
-		if ((m_game->m_player->m_aresden == true) && (m_game->m_char_list[m_game->m_cur_focus - 1]->m_sex == 1)) req_hero_item_id = 419;
-		if ((m_game->m_player->m_aresden == true) && (m_game->m_char_list[m_game->m_cur_focus - 1]->m_sex == 2)) req_hero_item_id = 420;
-		if ((m_game->m_player->m_aresden == false) && (m_game->m_char_list[m_game->m_cur_focus - 1]->m_sex == 1)) req_hero_item_id = 421;
-		if ((m_game->m_player->m_aresden == false) && (m_game->m_char_list[m_game->m_cur_focus - 1]->m_sex == 2)) req_hero_item_id = 422;
+		if ((player().m_aresden == true) && (m_game->m_char_list[m_game->m_cur_focus - 1]->m_sex == 1)) req_hero_item_id = 419;
+		if ((player().m_aresden == true) && (m_game->m_char_list[m_game->m_cur_focus - 1]->m_sex == 2)) req_hero_item_id = 420;
+		if ((player().m_aresden == false) && (m_game->m_char_list[m_game->m_cur_focus - 1]->m_sex == 1)) req_hero_item_id = 421;
+		if ((player().m_aresden == false) && (m_game->m_char_list[m_game->m_cur_focus - 1]->m_sex == 2)) req_hero_item_id = 422;
 		m_cTakeHeroItemName = DRAW_DIALOGBOX_CITYHALL_MENU52;
 		m_mode = mode::hero_item_confirm;
 		m_hero_item_id = req_hero_item_id;
@@ -655,10 +655,10 @@ bool DialogBox_CityHallMenu::on_click_mode7(short sX, short sY)
 	// Hero's Leggings
 	if ((mouse_x >= sX + 35) && (mouse_x <= sX + 220) && (mouse_y >= sY + 275) && (mouse_y <= sY + 290))
 	{
-		if ((m_game->m_player->m_aresden == true) && (m_game->m_char_list[m_game->m_cur_focus - 1]->m_sex == 1)) req_hero_item_id = 423;
-		if ((m_game->m_player->m_aresden == true) && (m_game->m_char_list[m_game->m_cur_focus - 1]->m_sex == 2)) req_hero_item_id = 424;
-		if ((m_game->m_player->m_aresden == false) && (m_game->m_char_list[m_game->m_cur_focus - 1]->m_sex == 1)) req_hero_item_id = 425;
-		if ((m_game->m_player->m_aresden == false) && (m_game->m_char_list[m_game->m_cur_focus - 1]->m_sex == 2)) req_hero_item_id = 426;
+		if ((player().m_aresden == true) && (m_game->m_char_list[m_game->m_cur_focus - 1]->m_sex == 1)) req_hero_item_id = 423;
+		if ((player().m_aresden == true) && (m_game->m_char_list[m_game->m_cur_focus - 1]->m_sex == 2)) req_hero_item_id = 424;
+		if ((player().m_aresden == false) && (m_game->m_char_list[m_game->m_cur_focus - 1]->m_sex == 1)) req_hero_item_id = 425;
+		if ((player().m_aresden == false) && (m_game->m_char_list[m_game->m_cur_focus - 1]->m_sex == 2)) req_hero_item_id = 426;
 		m_cTakeHeroItemName = DRAW_DIALOGBOX_CITYHALL_MENU53;
 		m_mode = mode::hero_item_confirm;
 		m_hero_item_id = req_hero_item_id;
@@ -728,7 +728,7 @@ bool DialogBox_CityHallMenu::on_click_mode10(short sX, short sY)
 			if ((mouse_x >= sX + ui_layout::left_btn_x) && (mouse_x <= sX + ui_layout::right_btn_x + ui_layout::btn_size_x) && (mouse_y >= sY + 130 + i * 15) && (mouse_y <= sY + 144 + i * 15))
 			{
 				m_game->send_command(ClientMsgId::RequestChargedTeleport, 0, 0, teleport_manager::get().get_list()[i].index, 0, 0, 0);
-				m_game->m_dialog_box_manager.disable_dialog_box(DialogBoxId::CityHallMenu);
+				m_game->get_dialog_box_manager().disable_dialog_box(DialogBoxId::CityHallMenu);
 				return true;
 			}
 		}

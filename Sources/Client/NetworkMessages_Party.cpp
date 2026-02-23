@@ -41,15 +41,15 @@ void HandleParty(CGame* game, char* data)
 	case 1: //
 		switch (v2) {
 		case 0:
-			game->m_dialog_box_manager.enable_dialog_box(DialogBoxId::Party, 0, 0, 0);
-			game->m_dialog_box_manager.get_dialog_as<DialogBox_Party>(DialogBoxId::Party)->m_mode = DialogBox_Party::mode::already_in_party;
+			game->get_dialog_box_manager().enable_dialog_box(DialogBoxId::Party, 0, 0, 0);
+			game->get_dialog_box_manager().get_dialog_as<DialogBox_Party>(DialogBoxId::Party)->m_mode = DialogBox_Party::mode::already_in_party;
 			break;
 
 		case 1:
 			game->m_party_status = 1;
 			game->m_total_party_member = 0;
-			game->m_dialog_box_manager.enable_dialog_box(DialogBoxId::Party, 0, 0, 0);
-			game->m_dialog_box_manager.get_dialog_as<DialogBox_Party>(DialogBoxId::Party)->m_mode = DialogBox_Party::mode::failed;
+			game->get_dialog_box_manager().enable_dialog_box(DialogBoxId::Party, 0, 0, 0);
+			game->get_dialog_box_manager().get_dialog_as<DialogBox_Party>(DialogBoxId::Party)->m_mode = DialogBox_Party::mode::failed;
 			game->send_command(MsgId::CommandCommon, CommonType::RequestJoinParty, 0, 2, 0, 0, game->m_mc_name.c_str());
 			break;
 		}
@@ -58,8 +58,8 @@ void HandleParty(CGame* game, char* data)
 	case 2: //
 		game->m_party_status = 0;
 		game->m_total_party_member = 0;
-		game->m_dialog_box_manager.enable_dialog_box(DialogBoxId::Party, 0, 0, 0);
-		game->m_dialog_box_manager.get_dialog_as<DialogBox_Party>(DialogBoxId::Party)->m_mode = DialogBox_Party::mode::disbanded;
+		game->get_dialog_box_manager().enable_dialog_box(DialogBoxId::Party, 0, 0, 0);
+		game->get_dialog_box_manager().get_dialog_as<DialogBox_Party>(DialogBoxId::Party)->m_mode = DialogBox_Party::mode::disbanded;
 		break;
 
 	case 4:
@@ -72,15 +72,15 @@ void HandleParty(CGame* game, char* data)
 
 		switch (v2) {
 		case 0: //
-			game->m_dialog_box_manager.enable_dialog_box(DialogBoxId::Party, 0, 0, 0);
-			game->m_dialog_box_manager.get_dialog_as<DialogBox_Party>(DialogBoxId::Party)->m_mode = DialogBox_Party::mode::already_in_party;
+			game->get_dialog_box_manager().enable_dialog_box(DialogBoxId::Party, 0, 0, 0);
+			game->get_dialog_box_manager().get_dialog_as<DialogBox_Party>(DialogBoxId::Party)->m_mode = DialogBox_Party::mode::already_in_party;
 			break;
 
 		case 1: //
 			if (strcmp(txt, game->m_player->m_player_name.c_str()) == 0) {
 				game->m_party_status = 2;
-				game->m_dialog_box_manager.enable_dialog_box(DialogBoxId::Party, 0, 0, 0);
-				game->m_dialog_box_manager.get_dialog_as<DialogBox_Party>(DialogBoxId::Party)->m_mode = DialogBox_Party::mode::failed;
+				game->get_dialog_box_manager().enable_dialog_box(DialogBoxId::Party, 0, 0, 0);
+				game->get_dialog_box_manager().get_dialog_as<DialogBox_Party>(DialogBoxId::Party)->m_mode = DialogBox_Party::mode::failed;
 			}
 			else {
 				std::string partyMsgBuf;
@@ -89,7 +89,7 @@ void HandleParty(CGame* game, char* data)
 			}
 
 			game->m_total_party_member++;
-			game->m_dialog_box_manager.get_dialog_as<DialogBox_Party>(DialogBoxId::Party)->add_member_name(txt);
+			game->get_dialog_box_manager().get_dialog_as<DialogBox_Party>(DialogBoxId::Party)->add_member_name(txt);
 			break;
 
 		case 2: //
@@ -107,7 +107,7 @@ void HandleParty(CGame* game, char* data)
 			if (!pkt) return;
 			const char* names = pkt->names;
 			game->m_total_party_member = (std::min)(static_cast<int>(pkt->count), hb::shared::limits::MaxPartyMembers);
-			game->m_dialog_box_manager.get_dialog_as<DialogBox_Party>(DialogBoxId::Party)->set_name_list(
+			game->get_dialog_box_manager().get_dialog_as<DialogBox_Party>(DialogBoxId::Party)->set_name_list(
 				pkt->count, names, hb::shared::limits::CharNameLen);
 		}
 		break;
@@ -122,22 +122,22 @@ void HandleParty(CGame* game, char* data)
 
 		switch (v2) {
 		case 0: //
-			game->m_dialog_box_manager.enable_dialog_box(DialogBoxId::Party, 0, 0, 0);
-			game->m_dialog_box_manager.get_dialog_as<DialogBox_Party>(DialogBoxId::Party)->m_mode = DialogBox_Party::mode::party_full;
+			game->get_dialog_box_manager().enable_dialog_box(DialogBoxId::Party, 0, 0, 0);
+			game->get_dialog_box_manager().get_dialog_as<DialogBox_Party>(DialogBoxId::Party)->m_mode = DialogBox_Party::mode::party_full;
 			break;
 
 		case 1: //
 			if (strcmp(txt, game->m_player->m_player_name.c_str()) == 0) {
 				game->m_party_status = 0;
-				game->m_dialog_box_manager.enable_dialog_box(DialogBoxId::Party, 0, 0, 0);
-				game->m_dialog_box_manager.get_dialog_as<DialogBox_Party>(DialogBoxId::Party)->m_mode = DialogBox_Party::mode::withdrawn;
+				game->get_dialog_box_manager().enable_dialog_box(DialogBoxId::Party, 0, 0, 0);
+				game->get_dialog_box_manager().get_dialog_as<DialogBox_Party>(DialogBoxId::Party)->m_mode = DialogBox_Party::mode::withdrawn;
 			}
 			else {
 				std::string partyMsgBuf;
 				partyMsgBuf = std::format(NOTIFY_MSG_HANDLER2, txt);
 				game->add_event_list(partyMsgBuf.c_str(), 10);
 			}
-			if (game->m_dialog_box_manager.get_dialog_as<DialogBox_Party>(DialogBoxId::Party)->remove_member_name(txt))
+			if (game->get_dialog_box_manager().get_dialog_as<DialogBox_Party>(DialogBoxId::Party)->remove_member_name(txt))
 					game->m_total_party_member--;
 			break;
 		}
@@ -145,8 +145,8 @@ void HandleParty(CGame* game, char* data)
 	break;
 
 	case 7: //
-		game->m_dialog_box_manager.enable_dialog_box(DialogBoxId::Party, 0, 0, 0);
-		game->m_dialog_box_manager.get_dialog_as<DialogBox_Party>(DialogBoxId::Party)->m_mode = DialogBox_Party::mode::already_in_party;
+		game->get_dialog_box_manager().enable_dialog_box(DialogBoxId::Party, 0, 0, 0);
+		game->get_dialog_box_manager().get_dialog_as<DialogBox_Party>(DialogBoxId::Party)->m_mode = DialogBox_Party::mode::already_in_party;
 		break;
 
 	case 8: //
@@ -158,8 +158,8 @@ void HandleParty(CGame* game, char* data)
 
 void HandleQueryJoinParty(CGame* game, char* data)
 {
-	game->m_dialog_box_manager.enable_dialog_box(DialogBoxId::Party, 0, 0, 0);
-	auto* party_dlg = game->m_dialog_box_manager.get_dialog_as<DialogBox_Party>(DialogBoxId::Party);
+	game->get_dialog_box_manager().enable_dialog_box(DialogBoxId::Party, 0, 0, 0);
+	auto* party_dlg = game->get_dialog_box_manager().get_dialog_as<DialogBox_Party>(DialogBoxId::Party);
 	if (!party_dlg) return;
 	party_dlg->m_mode = DialogBox_Party::mode::invited;
 	std::memset(party_dlg->m_leader_name, 0, sizeof(party_dlg->m_leader_name));
@@ -176,11 +176,11 @@ void HandleResponseCreateNewParty(CGame* game, char* data)
 	if (!pkt) return;
 	if ((bool)pkt->result == true)
 	{
-		game->m_dialog_box_manager.get_dialog_as<DialogBox_Party>(DialogBoxId::Party)->m_mode = DialogBox_Party::mode::pointing;
+		game->get_dialog_box_manager().get_dialog_as<DialogBox_Party>(DialogBoxId::Party)->m_mode = DialogBox_Party::mode::pointing;
 	}
 	else
 	{
-		game->m_dialog_box_manager.get_dialog_as<DialogBox_Party>(DialogBoxId::Party)->m_mode = DialogBox_Party::mode::join_requested;
+		game->get_dialog_box_manager().get_dialog_as<DialogBox_Party>(DialogBoxId::Party)->m_mode = DialogBox_Party::mode::join_requested;
 	}
 }
 

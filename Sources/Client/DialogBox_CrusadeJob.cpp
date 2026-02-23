@@ -21,9 +21,9 @@ void DialogBox_CrusadeJob::draw_mode_select_job(short sX, short sY)
 	put_aligned_string(sX + 24, sX + 246, sY + 75 + 20, DRAWDIALOGBOX_CRUSADEJOB3);
 	put_aligned_string(sX + 24, sX + 246, sY + 90 + 20, DRAWDIALOGBOX_CRUSADEJOB4);
 
-	if (m_game->m_player->m_citizen)
+	if (player().m_citizen)
 	{
-		if (m_game->m_player->m_guild_rank == 0)
+		if (player().m_guild_rank == 0)
 		{
 			// Guild master can be Commander
 			if (mouse_in(link_job_1))
@@ -40,7 +40,7 @@ void DialogBox_CrusadeJob::draw_mode_select_job(short sX, short sY)
 				put_aligned_string(sX + 24, sX + 246, sY + 150, DRAWDIALOGBOX_CRUSADEJOB7, GameColors::UIMagicBlue);
 
 			// Guild members can also be Constructor
-			if (m_game->m_player->m_guild_rank != -1)
+			if (player().m_guild_rank != -1)
 			{
 				if (mouse_in(link_job_2))
 					put_aligned_string(sX + 24, sX + 246, sY + 175, DRAWDIALOGBOX_CRUSADEJOB9, GameColors::UIWhite);
@@ -64,7 +64,7 @@ void DialogBox_CrusadeJob::draw_mode_confirm(short sX, short sY)
 {
 	put_aligned_string(sX + 24, sX + 246, sY + 90 + 20, DRAWDIALOGBOX_CRUSADEJOB18);
 
-	switch (m_game->m_player->m_crusade_duty)
+	switch (player().m_crusade_duty)
 	{
 	case 1: put_aligned_string(sX + 24, sX + 246, sY + 125, DRAWDIALOGBOX_CRUSADEJOB19); break;
 	case 2: put_aligned_string(sX + 24, sX + 246, sY + 125, DRAWDIALOGBOX_CRUSADEJOB20); break;
@@ -112,14 +112,14 @@ bool DialogBox_CrusadeJob::on_click()
 	switch (m_mode)
 	{
 	case mode::select_job:
-		if (!m_game->m_player->m_citizen)
+		if (!player().m_citizen)
 		{
 			disable_dialog_box(DialogBoxId::CrusadeJob);
 			m_game->play_game_sound('E', 14, 5);
 			return true;
 		}
 
-		if (m_game->m_player->m_guild_rank == 0)
+		if (player().m_guild_rank == 0)
 		{
 			// Guild master - Commander option
 			if (mouse_in(link_job_1))
@@ -142,7 +142,7 @@ bool DialogBox_CrusadeJob::on_click()
 			}
 
 			// Constructor option (guild members only)
-			if (m_game->m_player->m_guild_rank != -1)
+			if (player().m_guild_rank != -1)
 			{
 				if (mouse_in(link_job_2))
 				{
@@ -157,8 +157,8 @@ bool DialogBox_CrusadeJob::on_click()
 		// Help button
 		if (mouse_in(btn_help))
 		{
-			m_game->m_dialog_box_manager.disable_dialog_box(DialogBoxId::Text);
-			m_game->m_dialog_box_manager.enable_dialog_box(DialogBoxId::Text, 813, 0, 0);
+			m_game->get_dialog_box_manager().disable_dialog_box(DialogBoxId::Text);
+			m_game->get_dialog_box_manager().enable_dialog_box(DialogBoxId::Text, 813, 0, 0);
 			m_game->play_game_sound('E', 14, 5);
 			return true;
 		}
@@ -168,11 +168,11 @@ bool DialogBox_CrusadeJob::on_click()
 		// View details link
 		if (mouse_in(link_details))
 		{
-			switch (m_game->m_player->m_crusade_duty)
+			switch (player().m_crusade_duty)
 			{
-			case 1: m_game->m_dialog_box_manager.enable_dialog_box(DialogBoxId::Text, 803, 0, 0); break;
-			case 2: m_game->m_dialog_box_manager.enable_dialog_box(DialogBoxId::Text, 805, 0, 0); break;
-			case 3: m_game->m_dialog_box_manager.enable_dialog_box(DialogBoxId::Text, 808, 0, 0); break;
+			case 1: m_game->get_dialog_box_manager().enable_dialog_box(DialogBoxId::Text, 803, 0, 0); break;
+			case 2: m_game->get_dialog_box_manager().enable_dialog_box(DialogBoxId::Text, 805, 0, 0); break;
+			case 3: m_game->get_dialog_box_manager().enable_dialog_box(DialogBoxId::Text, 808, 0, 0); break;
 			}
 			return true;
 		}
@@ -192,7 +192,7 @@ bool DialogBox_CrusadeJob::on_click()
 
 bool DialogBox_CrusadeJob::on_enable(int type, int64_t v1, int v2, const char* string)
 {
-	if ((m_game->m_player->m_hp <= 0) || (m_game->m_player->m_citizen == false))
+	if ((player().m_hp <= 0) || (player().m_citizen == false))
 		return false;
 	if (!is_enabled())
 	{

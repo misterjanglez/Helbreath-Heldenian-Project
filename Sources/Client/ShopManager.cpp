@@ -123,7 +123,7 @@ void shop_manager::handle_response(char* data)
 	// Only show shop dialog if we have items and there was a pending request
 	if (shopIndex > 0 && m_pending_npc_config_id != 0) {
 		// enable the SaleMenu dialog - this will call enable_dialog_box which sets up the dialog
-		m_game->m_dialog_box_manager.enable_dialog_box(DialogBoxId::SaleMenu, m_pending_npc_config_id, 0, 0, nullptr);
+		m_game->get_dialog_box_manager().enable_dialog_box(DialogBoxId::SaleMenu, m_pending_npc_config_id, 0, 0, nullptr);
 		m_pending_npc_config_id = 0;  // clear pending request
 	} else if (m_pending_npc_config_id != 0) {
 		// No items available - show message to user

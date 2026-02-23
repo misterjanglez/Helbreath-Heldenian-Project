@@ -38,7 +38,7 @@ void DialogBox_Exchange::on_draw()
 
 	switch (m_mode) {
 	case mode::pending:
-		put_aligned_string(sX + 80, sX + 180, sY + 38, m_game->m_player->m_player_name.c_str(), GameColors::UIDarkGreen);
+		put_aligned_string(sX + 80, sX + 180, sY + 38, player().m_player_name.c_str(), GameColors::UIDarkGreen);
 		if (m_slots[4].v1 != -1)
 			put_aligned_string(sX + 250, sX + 540, sY + 38, m_slots[4].str2.c_str(), GameColors::UIDarkGreen);
 
@@ -72,14 +72,14 @@ void DialogBox_Exchange::on_draw()
 				hb::shared::text::draw_text(GameFont::Bitmap1, sX + 220, sY + 310, "Exchange", hb::shared::text::TextStyle::with_highlight(GameColors::BmpBtnNormal));
 		}
 		if (mouse_in(btn_cancel)
-			&& (m_game->m_dialog_box_manager.is_enabled(DialogBoxId::ConfirmExchange) == false))
+			&& (m_game->get_dialog_box_manager().is_enabled(DialogBoxId::ConfirmExchange) == false))
 			hb::shared::text::draw_text(GameFont::Bitmap1, sX + 450, sY + 310, "Cancel", hb::shared::text::TextStyle::with_highlight(GameColors::UIMagicBlue));
 		else
 			hb::shared::text::draw_text(GameFont::Bitmap1, sX + 450, sY + 310, "Cancel", hb::shared::text::TextStyle::with_highlight(GameColors::BmpBtnNormal));
 		break;
 
 	case mode::confirmed:
-		put_aligned_string(sX + 80, sX + 180, sY + 38, m_game->m_player->m_player_name.c_str(), GameColors::UIDarkGreen);
+		put_aligned_string(sX + 80, sX + 180, sY + 38, player().m_player_name.c_str(), GameColors::UIDarkGreen);
 		if (m_slots[4].v1 != -1)
 			put_aligned_string(sX + 250, sX + 540, sY + 38, m_slots[4].str2.c_str(), GameColors::UIDarkGreen);
 
@@ -202,16 +202,16 @@ bool DialogBox_Exchange::on_click()
 				play_sound_effect('E', 14, 5);
 				m_mode = mode::confirmed;
 				// Show confirmation dialog
-				m_game->m_dialog_box_manager.enable_dialog_box(DialogBoxId::ConfirmExchange, 0, 0, 0);
+				m_game->get_dialog_box_manager().enable_dialog_box(DialogBoxId::ConfirmExchange, 0, 0, 0);
 				get_dialog_box_as<DialogBox_ConfirmExchange>(DialogBoxId::ConfirmExchange)->m_mode = DialogBox_ConfirmExchange::mode::question;
 			}
 			return true;
 		}
 		if (mouse_in(btn_cancel)
-			&& (m_game->m_dialog_box_manager.is_enabled(DialogBoxId::ConfirmExchange) == false)) {
+			&& (m_game->get_dialog_box_manager().is_enabled(DialogBoxId::ConfirmExchange) == false)) {
 			// Cancel button
-			m_game->m_dialog_box_manager.disable_dialog_box(DialogBoxId::Exchange);
-			m_game->m_dialog_box_manager.disable_dialog_box(DialogBoxId::Map);
+			m_game->get_dialog_box_manager().disable_dialog_box(DialogBoxId::Exchange);
+			m_game->get_dialog_box_manager().disable_dialog_box(DialogBoxId::Map);
 			send_command(MsgId::CommandCommon, CommonType::cancel_exchange_item, 0, 0, 0, 0, 0);
 			play_sound_effect('E', 14, 5);
 			return true;
@@ -229,7 +229,7 @@ bool DialogBox_Exchange::on_item_drop()
 {
 	short mouse_x = static_cast<short>(hb::shared::input::get_mouse_x());
 	short mouse_y = static_cast<short>(hb::shared::input::get_mouse_y());
-	if (m_game->m_player->m_Controller.get_command() < 0) return false;
+	if (player().m_Controller.get_command() < 0) return false;
 	if (m_slots[3].v1 != -1) return false; // Already 4 items
 
 	int item_id = CursorTarget::get_selected_id();
@@ -244,23 +244,23 @@ bool DialogBox_Exchange::on_item_drop()
 	else return false; // Impossible case
 
 	// Stackable items - open quantity dialog
-	CItem* cfg = m_game->get_item_config(m_game->m_item_list[item_id]->m_id_num);
+	CItem* cfg = m_game->get_item_config(player().m_item_list[item_id]->m_id_num);
 	if (cfg && ((cfg->get_item_type() == ItemType::Consume) ||
 		(cfg->get_item_type() == ItemType::Arrow)) &&
-		(m_game->m_item_list[item_id]->m_count > 1))
+		(player().m_item_list[item_id]->m_count > 1))
 	{
-		auto* dropDlg = m_game->m_dialog_box_manager.get_dialog_as<DialogBox_ItemDropAmount>(DialogBoxId::ItemDropExternal);
+		auto* dropDlg = m_game->get_dialog_box_manager().get_dialog_as<DialogBox_ItemDropAmount>(DialogBoxId::ItemDropExternal);
 		dropDlg->m_x = mouse_x - 140;
 		dropDlg->m_y = mouse_y - 70;
 		if (dropDlg->m_y < 0) dropDlg->m_y = 0;
-		dropDlg->m_drop_x = m_game->m_player->m_player_x + 1;
-		dropDlg->m_drop_y = m_game->m_player->m_player_y + 1;
+		dropDlg->m_drop_x = player().m_player_x + 1;
+		dropDlg->m_drop_y = player().m_player_y + 1;
 		dropDlg->m_drop_target_type = 1000;
 		dropDlg->m_drop_target_id = item_id;
 		m_slots[slot].inv_slot = item_id;
 		std::memset(dropDlg->m_target_name, 0, sizeof(dropDlg->m_target_name));
-		m_game->m_dialog_box_manager.enable_dialog_box(DialogBoxId::ItemDropExternal, item_id,
-			static_cast<int64_t>(m_game->m_item_list[item_id]->m_count), 0);
+		m_game->get_dialog_box_manager().enable_dialog_box(DialogBoxId::ItemDropExternal, item_id,
+			static_cast<int64_t>(player().m_item_list[item_id]->m_count), 0);
 	}
 	else
 	{

@@ -1,6 +1,7 @@
 ﻿#pragma once
 #include <cstdint>
 #include <cstring>
+#include <memory>
 #include <string>
 #include <array>
 #include "PlayerController.h"
@@ -9,6 +10,8 @@
 #include "PlayerStatusData.h"
 #include "ActionID.h"
 #include "DirectionHelpers.h"
+
+class CItem;
 
 using hb::shared::direction::direction;
 
@@ -76,8 +79,6 @@ public:
     std::string m_player_name;
     short m_player_object_id;
     short m_player_type;
-    std::string m_account_name;
-    std::string m_account_password;
     std::string m_guild_name;
     int m_guild_rank;
 
@@ -130,4 +131,10 @@ public:
     // CRUSADE/WAR
     int m_crusade_duty, m_war_contribution, m_construction_point;
     int m_construct_loc_x, m_construct_loc_y;
+
+    // INVENTORY
+    std::array<std::unique_ptr<CItem>, hb::shared::limits::MaxItems> m_item_list;
+
+    // BANK
+    std::array<std::unique_ptr<CItem>, hb::shared::limits::MaxBankItems> m_bank_list;
 };

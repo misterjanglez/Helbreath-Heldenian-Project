@@ -253,7 +253,7 @@ bool DialogBox_Party::on_click()
 		}
 
 		if (mouse_in(btn_right)) {
-			m_game->m_dialog_box_manager.disable_dialog_box(DialogBoxId::Party);
+			m_game->get_dialog_box_manager().disable_dialog_box(DialogBoxId::Party);
 			return true;
 		}
 		break;
@@ -261,14 +261,14 @@ bool DialogBox_Party::on_click()
 	case mode::invited:
 		if (mouse_in(btn_left)) {
 			send_command(MsgId::CommandCommon, CommonType::RequestAcceptJoinParty, 0, 1, 0, 0, m_leader_name);
-			m_game->m_dialog_box_manager.disable_dialog_box(DialogBoxId::Party);
+			m_game->get_dialog_box_manager().disable_dialog_box(DialogBoxId::Party);
 			play_sound_effect('E', 14, 5);
 			return true;
 		}
 
 		if (mouse_in(btn_right)) {
 			send_command(MsgId::CommandCommon, CommonType::RequestAcceptJoinParty, 0, 0, 0, 0, m_leader_name);
-			m_game->m_dialog_box_manager.disable_dialog_box(DialogBoxId::Party);
+			m_game->get_dialog_box_manager().disable_dialog_box(DialogBoxId::Party);
 			play_sound_effect('E', 14, 5);
 			return true;
 		}
@@ -286,7 +286,7 @@ bool DialogBox_Party::on_click()
 		if (mouse_in(btn_right)) {
 			m_mode = mode::main_menu;
 			send_command(MsgId::CommandCommon, CommonType::RequestAcceptJoinParty, 0, 2, 0, 0, m_leader_name);
-			m_game->m_dialog_box_manager.disable_dialog_box(DialogBoxId::Party);
+			m_game->get_dialog_box_manager().disable_dialog_box(DialogBoxId::Party);
 			play_sound_effect('E', 14, 5);
 			return true;
 		}

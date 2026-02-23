@@ -293,7 +293,7 @@ void DialogBox_ItemCreator::draw_search_page(short sX, short sY, short size_x, s
 	}
 
 	// Mouse wheel
-	if (m_game->m_dialog_box_manager.get_top_id() == DialogBoxId::ItemCreator && z != 0)
+	if (m_game->get_dialog_box_manager().get_top_id() == DialogBoxId::ItemCreator && z != 0)
 	{
 		m_scroll_offset -= z / 60;
 		int max_scroll = std::max(0, m_result_count - layout::list_rows);
@@ -489,7 +489,7 @@ void DialogBox_ItemCreator::draw_configure_page(short sX, short sY, short size_x
 	if (m_open_dropdown != dropdown_id::none)
 	{
 		// Mouse wheel scrolls the open dropdown list
-		if (m_game->m_dialog_box_manager.get_top_id() == DialogBoxId::ItemCreator && z != 0)
+		if (m_game->get_dialog_box_manager().get_top_id() == DialogBoxId::ItemCreator && z != 0)
 		{
 			int total = get_open_dropdown_count();
 			if (total > dropdown_max_vis)

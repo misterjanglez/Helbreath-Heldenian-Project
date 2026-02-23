@@ -130,14 +130,14 @@ void DialogBox_Commander::on_draw()
 		break;
 
 	case mode::summon: {
-		if ((m_game->m_player->m_citizen == true) && (m_game->m_player->m_aresden == true))
+		if ((player().m_citizen == true) && (player().m_aresden == true))
 		{
 			m_game->m_sprite[InterfaceNdCrusade]->draw(sX + 20, sY + 220, 6);
 			m_game->m_sprite[InterfaceNdCrusade]->draw(sX + 20 + 50, sY + 220, 5);
 			m_game->m_sprite[InterfaceNdCrusade]->draw(sX + 20 + 100, sY + 220, 7);
 			m_game->m_sprite[InterfaceNdCrusade]->draw(sX + 20 + 150, sY + 220, 35);
 		}
-		else if ((m_game->m_player->m_citizen == true) && (m_game->m_player->m_aresden == false))
+		else if ((player().m_citizen == true) && (player().m_aresden == false))
 		{
 			m_game->m_sprite[InterfaceNdCrusade]->draw(sX + 20, sY + 220, 9);
 			m_game->m_sprite[InterfaceNdCrusade]->draw(sX + 20 + 50, sY + 220, 8);
@@ -149,14 +149,14 @@ void DialogBox_Commander::on_draw()
 
 		put_aligned_string(sX, sX + size_x, sY + 40, DRAW_DIALOGBOX_COMMANDER14);
 
-		auto pointsBuf = std::format("{} {}", DRAW_DIALOGBOX_COMMANDER15, m_game->m_player->m_construction_point);
+		auto pointsBuf = std::format("{} {}", DRAW_DIALOGBOX_COMMANDER15, player().m_construction_point);
 		put_aligned_string(sX, sX + 323, sY + 190, pointsBuf.c_str());
 
-		if ((m_game->m_player->m_citizen == true) && (m_game->m_player->m_aresden == true))
+		if ((player().m_citizen == true) && (player().m_aresden == true))
 		{
 			if (mouse_in(btn_unit_1))
 			{
-				if (m_game->m_player->m_construction_point >= 3000)
+				if (player().m_construction_point >= 3000)
 				{
 					m_game->m_sprite[InterfaceNdCrusade]->draw(sX + 20, sY + 220, 11);
 				}
@@ -165,7 +165,7 @@ void DialogBox_Commander::on_draw()
 			}
 			else if (mouse_in(btn_unit_2))
 			{
-				if (m_game->m_player->m_construction_point >= 2000)
+				if (player().m_construction_point >= 2000)
 				{
 					m_game->m_sprite[InterfaceNdCrusade]->draw(sX + 20 + 50, sY + 220, 10);
 				}
@@ -174,7 +174,7 @@ void DialogBox_Commander::on_draw()
 			}
 			else if (mouse_in(btn_unit_3))
 			{
-				if (m_game->m_player->m_construction_point >= 1000)
+				if (player().m_construction_point >= 1000)
 				{
 					m_game->m_sprite[InterfaceNdCrusade]->draw(sX + 20 + 100, sY + 220, 12);
 				}
@@ -183,7 +183,7 @@ void DialogBox_Commander::on_draw()
 			}
 			else if (mouse_in(btn_unit_4))
 			{
-				if (m_game->m_player->m_construction_point >= 5000)
+				if (player().m_construction_point >= 5000)
 				{
 					m_game->m_sprite[InterfaceNdCrusade]->draw(sX + 20 + 150, sY + 220, 29);
 				}
@@ -209,11 +209,11 @@ void DialogBox_Commander::on_draw()
 				hb::shared::text::draw_text(GameFont::Default, mouse_x + 20, mouse_y + 35, DRAW_DIALOGBOX_COMMANDER27, hb::shared::text::TextStyle::with_shadow(GameColors::UIWhite));
 			}
 		}
-		else if ((m_game->m_player->m_citizen == true) && (m_game->m_player->m_aresden == false))
+		else if ((player().m_citizen == true) && (player().m_aresden == false))
 		{
 			if (mouse_in(btn_unit_1))
 			{
-				if (m_game->m_player->m_construction_point >= 3000)
+				if (player().m_construction_point >= 3000)
 				{
 					m_game->m_sprite[InterfaceNdCrusade]->draw(sX + 20, sY + 220, 14);
 				}
@@ -222,7 +222,7 @@ void DialogBox_Commander::on_draw()
 			}
 			else if (mouse_in(btn_unit_2))
 			{
-				if (m_game->m_player->m_construction_point >= 2000)
+				if (player().m_construction_point >= 2000)
 				{
 					m_game->m_sprite[InterfaceNdCrusade]->draw(sX + 20 + 50, sY + 220, 13);
 				}
@@ -231,7 +231,7 @@ void DialogBox_Commander::on_draw()
 			}
 			else if (mouse_in(btn_unit_3))
 			{
-				if (m_game->m_player->m_construction_point >= 1000)
+				if (player().m_construction_point >= 1000)
 				{
 					m_game->m_sprite[InterfaceNdCrusade]->draw(sX + 20 + 100, sY + 220, 12);
 				}
@@ -240,7 +240,7 @@ void DialogBox_Commander::on_draw()
 			}
 			else if (mouse_in(btn_unit_4))
 			{
-				if (m_game->m_player->m_construction_point >= 5000)
+				if (player().m_construction_point >= 5000)
 				{
 					m_game->m_sprite[InterfaceNdCrusade]->draw(sX + 20 + 150, sY + 220, 29);
 				}
@@ -376,14 +376,14 @@ void DialogBox_Commander::on_draw()
 				tY = static_cast<int>(v3);
 				draw_new_dialog_box(InterfaceNdCrusade, sX + tX + 15, sY + tY + 60, 42, false, true);
 			}
-			if ((m_mode != mode::use_tp) && (m_game->m_player->m_construct_loc_x != -1))
+			if ((m_mode != mode::use_tp) && (player().m_construct_loc_x != -1))
 			{
 				v1 = static_cast<double>(MapSzX);
-				v2 = static_cast<double>(m_game->m_player->m_construct_loc_x);
+				v2 = static_cast<double>(player().m_construct_loc_x);
 				v3 = (v2 * static_cast<double>(size_x)) / v1;
 				tX = static_cast<int>(v3);
 				v1 = static_cast<double>(MapSzY);
-				v2 = static_cast<double>(m_game->m_player->m_construct_loc_y);
+				v2 = static_cast<double>(player().m_construct_loc_y);
 				v3 = (v2 * static_cast<double>(size_y)) / v1;
 				tY = static_cast<int>(v3);
 				draw_new_dialog_box(InterfaceNdCrusade, sX + tX + 15, sY + tY + 60, 41, false, true);
@@ -391,11 +391,11 @@ void DialogBox_Commander::on_draw()
 			if (m_game->m_map_name == "middleland")
 			{
 				v1 = static_cast<double>(MapSzX);
-				v2 = static_cast<double>(m_game->m_player->m_player_x);
+				v2 = static_cast<double>(player().m_player_x);
 				v3 = (v2 * static_cast<double>(size_x)) / v1;
 				tX = static_cast<int>(v3);
 				v1 = static_cast<double>(MapSzY);
-				v2 = static_cast<double>(m_game->m_player->m_player_y);
+				v2 = static_cast<double>(player().m_player_y);
 				v3 = (v2 * static_cast<double>(size_y)) / v1;
 				tY = static_cast<int>(v3);
 				draw_new_dialog_box(InterfaceNdCrusade, sX + tX + 15, sY + tY + 60, 43);
@@ -533,11 +533,11 @@ bool DialogBox_Commander::on_click()
 		break;
 
 	case mode::summon:
-		if (m_game->m_player->m_aresden == true)
+		if (player().m_aresden == true)
 		{
 			if (mouse_in(btn_unit_1))
 			{
-				if (m_game->m_player->m_construction_point >= 3000)
+				if (player().m_construction_point >= 3000)
 				{
 					send_command(MsgId::CommandCommon, CommonType::SummonWarUnit, 0, 47, 1, m_selected_faction, 0);
 					play_sound_effect('E', 14, 5);
@@ -546,7 +546,7 @@ bool DialogBox_Commander::on_click()
 			}
 			if (mouse_in(btn_unit_2))
 			{
-				if (m_game->m_player->m_construction_point >= 2000)
+				if (player().m_construction_point >= 2000)
 				{
 					send_command(MsgId::CommandCommon, CommonType::SummonWarUnit, 0, 46, 1, m_selected_faction, 0);
 					play_sound_effect('E', 14, 5);
@@ -555,7 +555,7 @@ bool DialogBox_Commander::on_click()
 			}
 			if (mouse_in(btn_unit_3))
 			{
-				if (m_game->m_player->m_construction_point >= 1000)
+				if (player().m_construction_point >= 1000)
 				{
 					send_command(MsgId::CommandCommon, CommonType::SummonWarUnit, 0, 43, 1, m_selected_faction, 0);
 					play_sound_effect('E', 14, 5);
@@ -564,7 +564,7 @@ bool DialogBox_Commander::on_click()
 			}
 			if (mouse_in(btn_unit_4))
 			{
-				if (m_game->m_player->m_construction_point >= 1500)
+				if (player().m_construction_point >= 1500)
 				{
 					send_command(MsgId::CommandCommon, CommonType::SummonWarUnit, 0, 51, 1, m_selected_faction, 0);
 					play_sound_effect('E', 14, 5);
@@ -572,11 +572,11 @@ bool DialogBox_Commander::on_click()
 				}
 			}
 		}
-		else if (m_game->m_player->m_aresden == false)
+		else if (player().m_aresden == false)
 		{
 			if (mouse_in(btn_unit_1))
 			{
-				if (m_game->m_player->m_construction_point >= 3000)
+				if (player().m_construction_point >= 3000)
 				{
 					send_command(MsgId::CommandCommon, CommonType::SummonWarUnit, 0, 45, 1, m_selected_faction, 0);
 					play_sound_effect('E', 14, 5);
@@ -585,7 +585,7 @@ bool DialogBox_Commander::on_click()
 			}
 			if (mouse_in(btn_unit_2))
 			{
-				if (m_game->m_player->m_construction_point >= 2000)
+				if (player().m_construction_point >= 2000)
 				{
 					send_command(MsgId::CommandCommon, CommonType::SummonWarUnit, 0, 44, 1, m_selected_faction, 0);
 					play_sound_effect('E', 14, 5);
@@ -594,7 +594,7 @@ bool DialogBox_Commander::on_click()
 			}
 			if (mouse_in(btn_unit_3))
 			{
-				if (m_game->m_player->m_construction_point >= 1000)
+				if (player().m_construction_point >= 1000)
 				{
 					send_command(MsgId::CommandCommon, CommonType::SummonWarUnit, 0, 43, 1, m_selected_faction, 0);
 					play_sound_effect('E', 14, 5);
@@ -603,7 +603,7 @@ bool DialogBox_Commander::on_click()
 			}
 			if (mouse_in(btn_unit_4))
 			{
-				if (m_game->m_player->m_construction_point >= 1500)
+				if (player().m_construction_point >= 1500)
 				{
 					send_command(MsgId::CommandCommon, CommonType::SummonWarUnit, 0, 51, 1, m_selected_faction, 0);
 					play_sound_effect('E', 14, 5);

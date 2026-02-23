@@ -134,7 +134,7 @@ void DialogBox_Quest::on_draw()
 bool DialogBox_Quest::on_click()
 {
 	if (mouse_in(btn_ok)) {
-		m_game->m_dialog_box_manager.disable_dialog_box(DialogBoxId::Quest);
+		m_game->get_dialog_box_manager().disable_dialog_box(DialogBoxId::Quest);
 		play_sound_effect('E', 14, 5);
 		return true;
 	}

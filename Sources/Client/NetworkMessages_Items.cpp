@@ -57,9 +57,9 @@ namespace NetworkMessageHandlers {
 		if ((item_type == ItemType::Consume) || (item_type == ItemType::Arrow))
 		{
 			for (i = 0; i < hb::shared::limits::MaxItems; i++)
-				if ((game->m_item_list[i] != 0) && (game->m_item_list[i]->m_id_num == item_id))
+				if ((game->m_player->m_item_list[i] != 0) && (game->m_player->m_item_list[i]->m_id_num == item_id))
 				{
-					game->m_item_list[i]->m_count += count;
+					game->m_player->m_item_list[i]->m_count += count;
 					return;
 				}
 		}
@@ -67,10 +67,10 @@ namespace NetworkMessageHandlers {
 		short nX, nY;
 		for (i = 0; i < hb::shared::limits::MaxItems; i++)
 		{
-			if ((game->m_item_list[i] != 0) && (game->m_item_list[i]->m_id_num == item_id))
+			if ((game->m_player->m_item_list[i] != 0) && (game->m_player->m_item_list[i]->m_id_num == item_id))
 			{
-				nX = game->m_item_list[i]->m_x;
-				nY = game->m_item_list[i]->m_y;
+				nX = game->m_player->m_item_list[i]->m_x;
+				nY = game->m_player->m_item_list[i]->m_y;
 				break;
 			}
 			else
@@ -81,19 +81,19 @@ namespace NetworkMessageHandlers {
 		}
 
 		for (i = 0; i < hb::shared::limits::MaxItems; i++)
-			if (game->m_item_list[i] == 0)
+			if (game->m_player->m_item_list[i] == 0)
 			{
-				game->m_item_list[i] = std::make_unique<CItem>();
-				game->m_item_list[i]->m_id_num = item_id;
-				game->m_item_list[i]->m_count = count;
-				game->m_item_list[i]->m_x = nX;
-				game->m_item_list[i]->m_y = nY;
+				game->m_player->m_item_list[i] = std::make_unique<CItem>();
+				game->m_player->m_item_list[i]->m_id_num = item_id;
+				game->m_player->m_item_list[i]->m_count = count;
+				game->m_player->m_item_list[i]->m_x = nX;
+				game->m_player->m_item_list[i]->m_y = nY;
 				game->send_command(MsgId::RequestSetItemPos, 0, i, nX, nY, 0, 0);
 				inventory_manager::get().unlock_item(i);
 				game->m_is_item_equipped[i] = false;
-				game->m_item_list[i]->m_cur_life_span = cur_life_span;
-				game->m_item_list[i]->m_item_color = item_color;
-				game->m_item_list[i]->m_attribute = 0;
+				game->m_player->m_item_list[i]->m_cur_life_span = cur_life_span;
+				game->m_player->m_item_list[i]->m_item_color = item_color;
+				game->m_player->m_item_list[i]->m_attribute = 0;
 
 				for (j = 0; j < hb::shared::limits::MaxItems; j++)
 					if (game->m_item_order[j] == -1) {
@@ -150,9 +150,9 @@ namespace NetworkMessageHandlers {
 		if ((item_type == ItemType::Consume) || (item_type == ItemType::Arrow))
 		{
 			for (i = 0; i < hb::shared::limits::MaxItems; i++)
-				if ((game->m_item_list[i] != 0) && (game->m_item_list[i]->m_id_num == item_id))
+				if ((game->m_player->m_item_list[i] != 0) && (game->m_player->m_item_list[i]->m_id_num == item_id))
 				{
-					game->m_item_list[i]->m_count += count;
+					game->m_player->m_item_list[i]->m_count += count;
 					inventory_manager::get().unlock_item(i);
 					return;
 				}
@@ -161,10 +161,10 @@ namespace NetworkMessageHandlers {
 		short nX, nY;
 		for (i = 0; i < hb::shared::limits::MaxItems; i++)
 		{
-			if ((game->m_item_list[i] != 0) && (game->m_item_list[i]->m_id_num == item_id))
+			if ((game->m_player->m_item_list[i] != 0) && (game->m_player->m_item_list[i]->m_id_num == item_id))
 			{
-				nX = game->m_item_list[i]->m_x;
-				nY = game->m_item_list[i]->m_y;
+				nX = game->m_player->m_item_list[i]->m_x;
+				nY = game->m_player->m_item_list[i]->m_y;
 				break;
 			}
 			else
@@ -175,20 +175,20 @@ namespace NetworkMessageHandlers {
 		}
 
 		for (i = 0; i < hb::shared::limits::MaxItems; i++)
-			if (game->m_item_list[i] == 0)
+			if (game->m_player->m_item_list[i] == 0)
 			{
-				game->m_item_list[i] = std::make_unique<CItem>();
-				game->m_item_list[i]->m_id_num = item_id;
-				game->m_item_list[i]->m_count = count;
-				game->m_item_list[i]->m_x = nX;
-				game->m_item_list[i]->m_y = nY;
+				game->m_player->m_item_list[i] = std::make_unique<CItem>();
+				game->m_player->m_item_list[i]->m_id_num = item_id;
+				game->m_player->m_item_list[i]->m_count = count;
+				game->m_player->m_item_list[i]->m_x = nX;
+				game->m_player->m_item_list[i]->m_y = nY;
 				game->send_command(MsgId::RequestSetItemPos, 0, i, nX, nY, 0, 0);
 				inventory_manager::get().unlock_item(i);
 				game->m_is_item_equipped[i] = false;
-				game->m_item_list[i]->m_cur_life_span = cur_life_span;
-				game->m_item_list[i]->m_item_color = item_color;
-				game->m_item_list[i]->m_item_special_effect_value2 = special_ev2;
-				game->m_item_list[i]->m_attribute = attribute;
+				game->m_player->m_item_list[i]->m_cur_life_span = cur_life_span;
+				game->m_player->m_item_list[i]->m_item_color = item_color;
+				game->m_player->m_item_list[i]->m_item_special_effect_value2 = special_ev2;
+				game->m_player->m_item_list[i]->m_attribute = attribute;
 
 				build_item_manager::get().update_available_recipes();
 
@@ -230,10 +230,10 @@ namespace NetworkMessageHandlers {
 		short nX = 40, nY = 30;
 		for (int i = 0; i < hb::shared::limits::MaxItems; i++)
 		{
-			if ((game->m_item_list[i] != 0) && (game->m_item_list[i]->m_id_num == item_id))
+			if ((game->m_player->m_item_list[i] != 0) && (game->m_player->m_item_list[i]->m_id_num == item_id))
 			{
-				nX = game->m_item_list[i]->m_x;
-				nY = game->m_item_list[i]->m_y;
+				nX = game->m_player->m_item_list[i]->m_x;
+				nY = game->m_player->m_item_list[i]->m_y;
 				break;
 			}
 		}
@@ -243,22 +243,22 @@ namespace NetworkMessageHandlers {
 		{
 			for (int i = 0; i < hb::shared::limits::MaxItems; i++)
 			{
-				if (game->m_item_list[i] == 0)
+				if (game->m_player->m_item_list[i] == 0)
 				{
-					game->m_item_list[i] = std::make_unique<CItem>();
-					game->m_item_list[i]->m_id_num = item_id;
-					game->m_item_list[i]->m_count = 1;
-					game->m_item_list[i]->m_x = nX;
-					game->m_item_list[i]->m_y = nY;
+					game->m_player->m_item_list[i] = std::make_unique<CItem>();
+					game->m_player->m_item_list[i]->m_id_num = item_id;
+					game->m_player->m_item_list[i]->m_count = 1;
+					game->m_player->m_item_list[i]->m_x = nX;
+					game->m_player->m_item_list[i]->m_y = nY;
 					game->send_command(MsgId::RequestSetItemPos, 0, i, nX, nY, 0, 0);
 					inventory_manager::get().unlock_item(i);
 					game->m_is_item_equipped[i] = false;
-					game->m_item_list[i]->m_cur_life_span = cur_life_span;
-					game->m_item_list[i]->m_max_life_span = max_life_span;
-					game->m_item_list[i]->m_weight = weight;
-					game->m_item_list[i]->m_item_color = item_color;
-					game->m_item_list[i]->m_item_special_effect_value2 = special_ev2;
-					game->m_item_list[i]->m_attribute = attribute;
+					game->m_player->m_item_list[i]->m_cur_life_span = cur_life_span;
+					game->m_player->m_item_list[i]->m_max_life_span = max_life_span;
+					game->m_player->m_item_list[i]->m_weight = weight;
+					game->m_player->m_item_list[i]->m_item_color = item_color;
+					game->m_player->m_item_list[i]->m_item_special_effect_value2 = special_ev2;
+					game->m_player->m_item_list[i]->m_attribute = attribute;
 
 					for (int j = 0; j < hb::shared::limits::MaxItems; j++)
 					{
@@ -289,14 +289,14 @@ namespace NetworkMessageHandlers {
 		equip_pos = static_cast<short>(pkt->equip_pos);
 		item_index = static_cast<short>(pkt->item_index);
 		if (item_index < 0 || item_index >= hb::shared::limits::MaxItems) return;
-		if (!game->m_item_list[item_index]) return;
+		if (!game->m_player->m_item_list[item_index]) return;
 
-		auto itemInfo = item_name_formatter::get().format(game->m_item_list[item_index].get());
+		auto itemInfo = item_name_formatter::get().format(game->m_player->m_item_list[item_index].get());
 		txt = std::format(NOTIFYMSG_ITEMLIFE_SPANEND1, itemInfo.name.c_str());
 		game->add_event_list(txt.c_str(), 10);
-		game->m_item_equipment_status[game->m_item_list[item_index]->m_equip_pos] = -1;
+		game->m_item_equipment_status[game->m_player->m_item_list[item_index]->m_equip_pos] = -1;
 		game->m_is_item_equipped[item_index] = false;
-		game->m_item_list[item_index]->m_cur_life_span = 0;
+		game->m_player->m_item_list[item_index]->m_cur_life_span = 0;
 
 		game->play_game_sound('E', 10, 0);
 	}
@@ -312,16 +312,16 @@ namespace NetworkMessageHandlers {
 		equip_pos = static_cast<short>(pkt->equip_pos);
 		item_index = static_cast<short>(pkt->item_index);
 		if (item_index < 0 || item_index >= hb::shared::limits::MaxItems) return;
-		if (!game->m_item_list[item_index]) return;
+		if (!game->m_player->m_item_list[item_index]) return;
 
-		auto itemInfo2 = item_name_formatter::get().format(game->m_item_list[item_index].get());
+		auto itemInfo2 = item_name_formatter::get().format(game->m_player->m_item_list[item_index].get());
 		txt = std::format(ITEM_EQUIPMENT_RELEASED, itemInfo2.name.c_str());
 		game->add_event_list(txt.c_str(), 10);
 		game->m_is_item_equipped[item_index] = false;
-		game->m_item_equipment_status[game->m_item_list[item_index]->m_equip_pos] = -1;
+		game->m_item_equipment_status[game->m_player->m_item_list[item_index]->m_equip_pos] = -1;
 
 		{
-			short id = game->m_item_list[item_index]->m_id_num;
+			short id = game->m_player->m_item_list[item_index]->m_id_num;
 			if (id == hb::shared::item::ItemId::AngelicPandentSTR || id == hb::shared::item::ItemId::AngelicPandentDEX ||
 				id == hb::shared::item::ItemId::AngelicPandentINT || id == hb::shared::item::ItemId::AngelicPandentMAG)
 				game->play_game_sound('E', 53, 0);
@@ -342,9 +342,9 @@ namespace NetworkMessageHandlers {
 		if (item_index < 0 || item_index >= hb::shared::limits::MaxItems) return;
 		count = pkt->count;
 		is_item_use_response = (pkt->notify != 0);
-		if (game->m_item_list[item_index] != 0)
+		if (game->m_player->m_item_list[item_index] != 0)
 		{
-			game->m_item_list[item_index]->m_count = count;
+			game->m_player->m_item_list[item_index]->m_count = count;
 			if (is_item_use_response == true) inventory_manager::get().unlock_item(item_index);
 		}
 	}
@@ -360,12 +360,12 @@ namespace NetworkMessageHandlers {
 		if (!pkt) return;
 		item_index = static_cast<short>(pkt->item_index);
 		if (item_index < 0 || item_index >= hb::shared::limits::MaxItems) return;
-		if (!game->m_item_list[item_index]) return;
+		if (!game->m_player->m_item_list[item_index]) return;
 		is_use_item_result = (pkt->use_result != 0);
 
-		auto itemInfo3 = item_name_formatter::get().format(game->m_item_list[item_index].get());
+		auto itemInfo3 = item_name_formatter::get().format(game->m_player->m_item_list[item_index].get());
 
-		CItem* cfg = game->get_item_config(game->m_item_list[item_index]->m_id_num);
+		CItem* cfg = game->get_item_config(game->m_player->m_item_list[item_index]->m_id_num);
 
 		if (game->m_is_item_equipped[item_index] == true) {
 			txt = std::format(ITEM_EQUIPMENT_RELEASED, itemInfo3.name.c_str());
@@ -424,16 +424,16 @@ namespace NetworkMessageHandlers {
 		if (!pkt) return;
 		item_index = static_cast<short>(pkt->item_index);
 		if (item_index < 0 || item_index >= hb::shared::limits::MaxItems) return;
-		if (!game->m_item_list[item_index]) return;
+		if (!game->m_player->m_item_list[item_index]) return;
 		amount = static_cast<int>(pkt->amount);
 
-		auto itemInfo4 = item_name_formatter::get().format(game->m_item_list[item_index].get());
+		auto itemInfo4 = item_name_formatter::get().format(game->m_player->m_item_list[item_index].get());
 
 		if (game->m_is_item_equipped[item_index] == true)
 		{
 			txt = std::format(ITEM_EQUIPMENT_RELEASED, itemInfo4.name.c_str());
 			game->add_event_list(txt.c_str(), 10);
-			game->m_item_equipment_status[game->m_item_list[item_index]->m_equip_pos] = -1;
+			game->m_item_equipment_status[game->m_player->m_item_list[item_index]->m_equip_pos] = -1;
 			game->m_is_item_equipped[item_index] = false;
 		}
 		if (game->m_player->m_hp > 0)
@@ -467,12 +467,12 @@ namespace NetworkMessageHandlers {
 		if (!pkt) return;
 		item_index = static_cast<short>(pkt->item_index);
 		if (item_index < 0 || item_index >= hb::shared::limits::MaxItems) return;
-		if (!game->m_item_list[item_index]) return;
+		if (!game->m_player->m_item_list[item_index]) return;
 		amount = static_cast<int>(pkt->amount);
 
 		memcpy(name, pkt->name, sizeof(pkt->name));
 
-		CItem* cfg = game->get_item_config(game->m_item_list[item_index]->m_id_num);
+		CItem* cfg = game->get_item_config(game->m_player->m_item_list[item_index]->m_id_num);
 		const char* item_name = cfg ? cfg->m_name : "Unknown";
 
 		if (game->m_is_item_equipped[item_index] == true) {
@@ -509,17 +509,17 @@ namespace NetworkMessageHandlers {
 		if (!pkt) return;
 		item_id = pkt->item_id;
 		if (item_id >= static_cast<uint32_t>(hb::shared::limits::MaxItems)) return;
-		if (!game->m_item_list[item_id]) return;
+		if (!game->m_player->m_item_list[item_id]) return;
 		life = pkt->life;
 
-		game->m_item_list[item_id]->m_cur_life_span = static_cast<uint16_t>(life);
+		game->m_player->m_item_list[item_id]->m_cur_life_span = static_cast<uint16_t>(life);
 		inventory_manager::get().unlock_item(item_id);
-		auto itemInfo5 = item_name_formatter::get().format(game->m_item_list[item_id].get());
+		auto itemInfo5 = item_name_formatter::get().format(game->m_player->m_item_list[item_id].get());
 
 		txt = std::format(NOTIFYMSG_ITEMREPAIRED1, itemInfo5.name.c_str());
 
 		game->add_event_list(txt.c_str(), 10);
-		game->m_dialog_box_manager.disable_dialog_box(DialogBoxId::SellOrRepair);
+		game->get_dialog_box_manager().disable_dialog_box(DialogBoxId::SellOrRepair);
 	}
 
 	void HandleRepairItemPrice(CGame* game, char* data)
@@ -534,8 +534,8 @@ namespace NetworkMessageHandlers {
 		v3 = pkt->v3;
 		v4 = pkt->v4;
 		memcpy(name, pkt->item_name, sizeof(pkt->item_name));
-		game->m_dialog_box_manager.enable_dialog_box(DialogBoxId::SellOrRepair, 2, v1, v2);
-		if (auto* dlg = game->m_dialog_box_manager.get_dialog_as<DialogBox_SellOrRepair>(DialogBoxId::SellOrRepair))
+		game->get_dialog_box_manager().enable_dialog_box(DialogBoxId::SellOrRepair, 2, v1, v2);
+		if (auto* dlg = game->get_dialog_box_manager().get_dialog_as<DialogBox_SellOrRepair>(DialogBoxId::SellOrRepair))
 			dlg->m_secondary_price = v3;
 	}
 
@@ -559,9 +559,9 @@ namespace NetworkMessageHandlers {
 			game->totalPrice += game->m_repair_all[i].price;
 		}
 		if (game->totalItemRepair == 0)
-			game->m_dialog_box_manager.enable_dialog_box(DialogBoxId::RepairAll, 1, 0, 0);
+			game->get_dialog_box_manager().enable_dialog_box(DialogBoxId::RepairAll, 1, 0, 0);
 		else
-			game->m_dialog_box_manager.enable_dialog_box(DialogBoxId::RepairAll, 0, 0, 0);
+			game->get_dialog_box_manager().enable_dialog_box(DialogBoxId::RepairAll, 0, 0, 0);
 	}
 
 	void HandleSellItemPrice(CGame* game, char* data)
@@ -576,8 +576,8 @@ namespace NetworkMessageHandlers {
 		v3 = pkt->v3;
 		v4 = pkt->v4;
 		memcpy(name, pkt->item_name, sizeof(pkt->item_name));
-		game->m_dialog_box_manager.enable_dialog_box(DialogBoxId::SellOrRepair, 1, v1, v2);
-		if (auto* dlg = game->m_dialog_box_manager.get_dialog_as<DialogBox_SellOrRepair>(DialogBoxId::SellOrRepair))
+		game->get_dialog_box_manager().enable_dialog_box(DialogBoxId::SellOrRepair, 1, v1, v2);
+		if (auto* dlg = game->get_dialog_box_manager().get_dialog_as<DialogBox_SellOrRepair>(DialogBoxId::SellOrRepair))
 		{
 			dlg->m_secondary_price = v3;
 			dlg->m_item_count = v4;
@@ -595,8 +595,8 @@ namespace NetworkMessageHandlers {
 		const auto v1 = pkt->item_index;
 		const auto v2 = pkt->reason;
 		if (v1 < 0 || v1 >= hb::shared::limits::MaxItems) return;
-		if (!game->m_item_list[v1]) { inventory_manager::get().unlock_item(v1); return; }
-		auto itemInfo6 = item_name_formatter::get().format(game->m_item_list[v1].get());
+		if (!game->m_player->m_item_list[v1]) { inventory_manager::get().unlock_item(v1); return; }
+		auto itemInfo6 = item_name_formatter::get().format(game->m_player->m_item_list[v1].get());
 
 		switch (v2) {
 		case 1:
@@ -622,9 +622,9 @@ namespace NetworkMessageHandlers {
 		const auto v1 = pkt->item_index;
 		const auto v2 = pkt->reason;
 		if (v1 < 0 || v1 >= hb::shared::limits::MaxItems) return;
-		if (!game->m_item_list[v1]) { inventory_manager::get().unlock_item(v1); return; }
+		if (!game->m_player->m_item_list[v1]) { inventory_manager::get().unlock_item(v1); return; }
 
-		auto itemInfo7 = item_name_formatter::get().format(game->m_item_list[v1].get());
+		auto itemInfo7 = item_name_formatter::get().format(game->m_player->m_item_list[v1].get());
 
 		switch (v2) {
 		case 1:
@@ -662,11 +662,11 @@ namespace NetworkMessageHandlers {
 		if (!pkt) return;
 		const auto item_index = pkt->item_index;
 		if (item_index < 0 || item_index >= hb::shared::limits::MaxItems) return;
-		if (!game->m_item_list[item_index]) return;
+		if (!game->m_player->m_item_list[item_index]) return;
 		const auto amount = static_cast<int>(pkt->amount);
 		memcpy(name, pkt->name, sizeof(pkt->name));
 
-		auto itemInfo8 = item_name_formatter::get().format(game->m_item_list[item_index].get());
+		auto itemInfo8 = item_name_formatter::get().format(game->m_player->m_item_list[item_index].get());
 		txt = std::format(NOTIFYMSG_CANNOT_GIVE_ITEM2, itemInfo8.name.c_str(), name);
 
 		game->add_event_list(txt.c_str(), 10);
@@ -685,10 +685,10 @@ namespace NetworkMessageHandlers {
 		if (item_index < 0 || item_index >= hb::shared::limits::MaxItems) return;
 		item_color = static_cast<short>(pkt->item_color);
 
-		if (game->m_item_list[item_index] != 0) {
-			auto itemInfo9 = item_name_formatter::get().format(game->m_item_list[item_index].get());
+		if (game->m_player->m_item_list[item_index] != 0) {
+			auto itemInfo9 = item_name_formatter::get().format(game->m_player->m_item_list[item_index].get());
 			if (item_color != -1) {
-				game->m_item_list[item_index]->m_item_color = static_cast<char>(item_color);
+				game->m_player->m_item_list[item_index]->m_item_color = static_cast<char>(item_color);
 				txt = std::format(NOTIFYMSG_ITEMCOLOR_CHANGE1, itemInfo9.name.c_str());
 				game->add_event_list(txt.c_str(), 10);
 			}
@@ -708,10 +708,10 @@ namespace NetworkMessageHandlers {
 		if (!pkt) return;
 		const auto item_index = pkt->item_index;
 		if (item_index < 0 || item_index >= hb::shared::limits::MaxItems) return;
-		if (!game->m_item_list[item_index]) return;
+		if (!game->m_player->m_item_list[item_index]) return;
 		const auto amount = static_cast<int>(pkt->amount);
 
-		CItem* cfg = game->get_item_config(game->m_item_list[item_index]->m_id_num);
+		CItem* cfg = game->get_item_config(game->m_player->m_item_list[item_index]->m_id_num);
 		txt = std::format(NOTIFYMSG_THROW_ITEM1, amount, cfg ? cfg->m_name : "Unknown");
 
 		game->add_event_list(txt.c_str(), 10);
@@ -730,12 +730,12 @@ namespace NetworkMessageHandlers {
 		if (!pkt) return;
 		item_index = pkt->item_index;
 		if (item_index >= hb::shared::limits::MaxItems) return;
-		if (!game->m_item_list[item_index]) return;
+		if (!game->m_player->m_item_list[item_index]) return;
 		amount = static_cast<int>(pkt->amount);
 
 		memcpy(name, pkt->name, sizeof(pkt->name));
 
-		CItem* cfg = game->get_item_config(game->m_item_list[item_index]->m_id_num);
+		CItem* cfg = game->get_item_config(game->m_player->m_item_list[item_index]->m_id_num);
 		if (amount == 1) txt = std::format(NOTIFYMSG_GIVEITEMFIN_COUNTCHANGED1, cfg ? cfg->m_name : "Unknown", name);
 		else txt = std::format(NOTIFYMSG_GIVEITEMFIN_COUNTCHANGED2, amount, cfg ? cfg->m_name : "Unknown", name);
 		game->add_event_list(txt.c_str(), 10);
@@ -763,7 +763,7 @@ namespace NetworkMessageHandlers {
 		attribute = pkt->attribute;
 		item_id = pkt->item_id;
 
-		auto* exDlg = game->m_dialog_box_manager.get_dialog_as<DialogBox_Exchange>(DialogBoxId::Exchange);
+		auto* exDlg = game->get_dialog_box_manager().get_dialog_as<DialogBox_Exchange>(DialogBoxId::Exchange);
 		if (dir >= 1000)  // Set the item I want to exchange
 		{
 			i = 0;
@@ -817,8 +817,8 @@ namespace NetworkMessageHandlers {
 		attribute = pkt->attribute;
 		item_id = pkt->item_id;
 
-		game->m_dialog_box_manager.enable_dialog_box(DialogBoxId::Exchange, 1, 0, 0, 0);
-		auto* exDlg = game->m_dialog_box_manager.get_dialog_as<DialogBox_Exchange>(DialogBoxId::Exchange);
+		game->get_dialog_box_manager().enable_dialog_box(DialogBoxId::Exchange, 1, 0, 0, 0);
+		auto* exDlg = game->get_dialog_box_manager().get_dialog_as<DialogBox_Exchange>(DialogBoxId::Exchange);
 		// initialize all exchange slots
 		for (int j = 0; j < 8; j++)
 		{
@@ -872,15 +872,15 @@ namespace NetworkMessageHandlers {
 		int item_index = pkt->item_index;
 		if (item_index < 0 || item_index >= hb::shared::limits::MaxItems) return;
 
-		if (game->m_item_list[item_index] == nullptr)
+		if (game->m_player->m_item_list[item_index] == nullptr)
 			return;
 
-		game->m_item_list[item_index]->m_cur_life_span = static_cast<uint16_t>(pkt->cur_lifespan);
+		game->m_player->m_item_list[item_index]->m_cur_life_span = static_cast<uint16_t>(pkt->cur_lifespan);
 	}
 
 	void HandleNotEnoughGold(CGame* game, char* data)
 	{
-		game->m_dialog_box_manager.disable_dialog_box(DialogBoxId::SellOrRepair);
+		game->get_dialog_box_manager().disable_dialog_box(DialogBoxId::SellOrRepair);
 		game->add_event_list(NOTIFY_MSG_HANDLER67, 10);
 		const auto* pkt = hb::net::PacketCast<hb::net::PacketNotifyNotEnoughGold>(
 			data, sizeof(hb::net::PacketNotifyNotEnoughGold));
@@ -895,7 +895,7 @@ namespace NetworkMessageHandlers {
 		game->add_event_list(NOTIFY_MSG_HANDLER65, 10);
 		game->add_event_list(NOTIFY_MSG_HANDLER66, 10);
 		// Bank dialog Box
-		game->m_dialog_box_manager.get_dialog_as<DialogBox_Bank>(DialogBoxId::Bank)->m_mode = DialogBox_Bank::mode::list;
+		game->get_dialog_box_manager().get_dialog_as<DialogBox_Bank>(DialogBoxId::Bank)->m_mode = DialogBox_Bank::mode::list;
 	}
 
 	void HandleItemAttributeChange(CGame* game, char* data)
@@ -907,27 +907,27 @@ namespace NetworkMessageHandlers {
 		if (!pkt) return;
 		v1 = static_cast<short>(pkt->item_index);
 		if (v1 < 0 || v1 >= hb::shared::limits::MaxItems) return;
-		if (!game->m_item_list[v1]) return;
-		temp = game->m_item_list[v1]->m_attribute;
-		game->m_item_list[v1]->m_attribute = pkt->attribute;
+		if (!game->m_player->m_item_list[v1]) return;
+		temp = game->m_player->m_item_list[v1]->m_attribute;
+		game->m_player->m_item_list[v1]->m_attribute = pkt->attribute;
 		if (pkt->spec_value1 != 0)
-			game->m_item_list[v1]->m_item_special_effect_value1 = static_cast<short>(pkt->spec_value1);
+			game->m_player->m_item_list[v1]->m_item_special_effect_value1 = static_cast<short>(pkt->spec_value1);
 		if (pkt->spec_value2 != 0)
-			game->m_item_list[v1]->m_item_special_effect_value2 = static_cast<short>(pkt->spec_value2);
+			game->m_player->m_item_list[v1]->m_item_special_effect_value2 = static_cast<short>(pkt->spec_value2);
 		
-		if (temp == game->m_item_list[v1]->m_attribute)
+		if (temp == game->m_player->m_item_list[v1]->m_attribute)
 		{
-			if (game->m_dialog_box_manager.is_enabled(DialogBoxId::ItemUpgrade) == true)
+			if (game->get_dialog_box_manager().is_enabled(DialogBoxId::ItemUpgrade) == true)
 			{
-				game->m_dialog_box_manager.get_dialog_as<DialogBox_ItemUpgrade>(DialogBoxId::ItemUpgrade)->m_mode = DialogBox_ItemUpgrade::mode::failed;
+				game->get_dialog_box_manager().get_dialog_as<DialogBox_ItemUpgrade>(DialogBoxId::ItemUpgrade)->m_mode = DialogBox_ItemUpgrade::mode::failed;
 			}
 			game->play_game_sound('E', 24, 5);
 		}
 		else
 		{
-			if (game->m_dialog_box_manager.is_enabled(DialogBoxId::ItemUpgrade) == true)
+			if (game->get_dialog_box_manager().is_enabled(DialogBoxId::ItemUpgrade) == true)
 			{
-				game->m_dialog_box_manager.get_dialog_as<DialogBox_ItemUpgrade>(DialogBoxId::ItemUpgrade)->m_mode = DialogBox_ItemUpgrade::mode::success;
+				game->get_dialog_box_manager().get_dialog_as<DialogBox_ItemUpgrade>(DialogBoxId::ItemUpgrade)->m_mode = DialogBox_ItemUpgrade::mode::success;
 			}
 			game->play_game_sound('E', 23, 5);
 			switch (game->m_player->m_player_type) {
@@ -952,17 +952,17 @@ namespace NetworkMessageHandlers {
 			data, sizeof(hb::net::PacketNotifyItemUpgradeFail));
 		if (!pkt) return;
 		v1 = static_cast<short>(pkt->reason);
-		if (game->m_dialog_box_manager.is_enabled(DialogBoxId::ItemUpgrade) == false) return;
+		if (game->get_dialog_box_manager().is_enabled(DialogBoxId::ItemUpgrade) == false) return;
 		game->play_game_sound('E', 24, 5);
 		switch (v1) {
 		case 1:
-			game->m_dialog_box_manager.get_dialog_as<DialogBox_ItemUpgrade>(DialogBoxId::ItemUpgrade)->m_mode = DialogBox_ItemUpgrade::mode::max_upgrade;
+			game->get_dialog_box_manager().get_dialog_as<DialogBox_ItemUpgrade>(DialogBoxId::ItemUpgrade)->m_mode = DialogBox_ItemUpgrade::mode::max_upgrade;
 			break;
 		case 2:
-			game->m_dialog_box_manager.get_dialog_as<DialogBox_ItemUpgrade>(DialogBoxId::ItemUpgrade)->m_mode = DialogBox_ItemUpgrade::mode::cannot_upgrade;
+			game->get_dialog_box_manager().get_dialog_as<DialogBox_ItemUpgrade>(DialogBoxId::ItemUpgrade)->m_mode = DialogBox_ItemUpgrade::mode::cannot_upgrade;
 			break;
 		case 3:
-			game->m_dialog_box_manager.get_dialog_as<DialogBox_ItemUpgrade>(DialogBoxId::ItemUpgrade)->m_mode = DialogBox_ItemUpgrade::mode::no_points;
+			game->get_dialog_box_manager().get_dialog_as<DialogBox_ItemUpgrade>(DialogBoxId::ItemUpgrade)->m_mode = DialogBox_ItemUpgrade::mode::no_points;
 			break;
 		}
 	}
@@ -988,16 +988,16 @@ namespace NetworkMessageHandlers {
 		if (!pkt) return;
 		v1 = static_cast<short>(pkt->item_index);
 		if (v1 < 0 || v1 >= hb::shared::limits::MaxItems) return;
-		if (!game->m_item_list[v1]) return;
-		if (pkt->item_id > 0) game->m_item_list[v1]->m_id_num = pkt->item_id;
-		game->m_item_list[v1]->m_cur_life_span = pkt->cur_lifespan;
-		game->m_item_list[v1]->m_item_color = pkt->item_color;
-		game->m_item_list[v1]->m_item_special_effect_value2 = pkt->spec_value2;
-		game->m_item_list[v1]->m_attribute = pkt->attribute;
+		if (!game->m_player->m_item_list[v1]) return;
+		if (pkt->item_id > 0) game->m_player->m_item_list[v1]->m_id_num = pkt->item_id;
+		game->m_player->m_item_list[v1]->m_cur_life_span = pkt->cur_lifespan;
+		game->m_player->m_item_list[v1]->m_item_color = pkt->item_color;
+		game->m_player->m_item_list[v1]->m_item_special_effect_value2 = pkt->spec_value2;
+		game->m_player->m_item_list[v1]->m_attribute = pkt->attribute;
 		
-		if (game->m_dialog_box_manager.is_enabled(DialogBoxId::ItemUpgrade) == true)
+		if (game->get_dialog_box_manager().is_enabled(DialogBoxId::ItemUpgrade) == true)
 		{
-			game->m_dialog_box_manager.get_dialog_as<DialogBox_ItemUpgrade>(DialogBoxId::ItemUpgrade)->m_mode = DialogBox_ItemUpgrade::mode::success;
+			game->get_dialog_box_manager().get_dialog_as<DialogBox_ItemUpgrade>(DialogBoxId::ItemUpgrade)->m_mode = DialogBox_ItemUpgrade::mode::success;
 		}
 		game->play_game_sound('E', 23, 5);
 		switch (game->m_player->m_player_type) {
@@ -1024,21 +1024,21 @@ namespace NetworkMessageHandlers {
 		for (i = 0; i < hb::shared::limits::MaxItems; i++) {
 			sX = pkt->positions[i * 2];
 			sY = pkt->positions[i * 2 + 1];
-			if (game->m_item_list[i] != 0) {
+			if (game->m_player->m_item_list[i] != 0) {
 				if (sY < -10) sY = -10;
 				if (sX < 0)   sX = 0;
 				if (sX > 170) sX = 170;
 				if (sY > 95)  sY = 95;
 
-				game->m_item_list[i]->m_x = sX;
-				game->m_item_list[i]->m_y = sY;
+				game->m_player->m_item_list[i]->m_x = sX;
+				game->m_player->m_item_list[i]->m_y = sY;
 			}
 		}
 	}
 
 	void HandleItemSold(CGame* game, char* data)
 	{
-		game->m_dialog_box_manager.disable_dialog_box(DialogBoxId::SellOrRepair);
+		game->get_dialog_box_manager().disable_dialog_box(DialogBoxId::SellOrRepair);
 	}
 }
 

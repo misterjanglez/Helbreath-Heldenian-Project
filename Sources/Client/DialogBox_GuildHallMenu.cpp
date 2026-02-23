@@ -79,7 +79,7 @@ void DialogBox_GuildHallMenu::on_draw()
 
 	case mode::hire_soldier:
 		put_aligned_string(sX, sX + size_x, sY + 45, "You will hire a soldier by summon points", GameColors::UIWhite);
-		if ((m_game->m_player->m_construction_point >= 2000) && (m_game->m_is_crusade_mode == false))
+		if ((player().m_construction_point >= 2000) && (m_game->m_is_crusade_mode == false))
 		{
 			if (mouse_in(link_1))
 				put_aligned_string(sX, sX + size_x, sY + 70, "Sorceress             2000 Point", GameColors::UIWhite);
@@ -87,7 +87,7 @@ void DialogBox_GuildHallMenu::on_draw()
 		}
 		else put_aligned_string(sX, sX + size_x, sY + 70, "Sorceress             2000 Point", GameColors::UIDisabled);
 
-		if ((m_game->m_player->m_construction_point >= 3000) && (m_game->m_is_crusade_mode == false))
+		if ((player().m_construction_point >= 3000) && (m_game->m_is_crusade_mode == false))
 		{
 			if (mouse_in(link_2))
 				put_aligned_string(sX, sX + size_x, sY + 95, "Ancient Temple Knight 3000 Point", GameColors::UIWhite);
@@ -95,7 +95,7 @@ void DialogBox_GuildHallMenu::on_draw()
 		}
 		else put_aligned_string(sX, sX + size_x, sY + 95, "Ancient Temple Knight 3000 Point", GameColors::UIDisabled);
 
-		if ((m_game->m_player->m_construction_point >= 1500) && (m_game->m_is_crusade_mode == false))
+		if ((player().m_construction_point >= 1500) && (m_game->m_is_crusade_mode == false))
 		{
 			if (mouse_in(link_3))
 				put_aligned_string(sX, sX + size_x, sY + 120, "Elf Master            1500 Point", GameColors::UIWhite);
@@ -103,7 +103,7 @@ void DialogBox_GuildHallMenu::on_draw()
 		}
 		else put_aligned_string(sX, sX + size_x, sY + 120, "Elf Master            1500 Point", GameColors::UIDisabled);
 
-		if ((m_game->m_player->m_construction_point >= 3000) && (m_game->m_is_crusade_mode == false))
+		if ((player().m_construction_point >= 3000) && (m_game->m_is_crusade_mode == false))
 		{
 			if (mouse_in(link_4))
 				put_aligned_string(sX, sX + size_x, sY + 145, "Dark Shadow Knight    3000 Point", GameColors::UIWhite);
@@ -111,7 +111,7 @@ void DialogBox_GuildHallMenu::on_draw()
 		}
 		else put_aligned_string(sX, sX + size_x, sY + 145, "Dark Shadow Knight    3000 Point", GameColors::UIDisabled);
 
-		if ((m_game->m_player->m_construction_point >= 4000) && (m_game->m_is_crusade_mode == false))
+		if ((player().m_construction_point >= 4000) && (m_game->m_is_crusade_mode == false))
 		{
 			if (mouse_in(link_5))
 				put_aligned_string(sX, sX + size_x, sY + 170, "Heavy Battle Tank     4000 Point", GameColors::UIWhite);
@@ -119,7 +119,7 @@ void DialogBox_GuildHallMenu::on_draw()
 		}
 		else put_aligned_string(sX, sX + size_x, sY + 170, "Heavy Battle Tank     4000 Point", GameColors::UIDisabled);
 
-		if ((m_game->m_player->m_construction_point >= 3000) && (m_game->m_is_crusade_mode == false))
+		if ((player().m_construction_point >= 3000) && (m_game->m_is_crusade_mode == false))
 		{
 			if (mouse_in(link_6))
 				put_aligned_string(sX, sX + size_x, sY + 195, "Barbarian             3000 Point", GameColors::UIWhite);
@@ -129,7 +129,7 @@ void DialogBox_GuildHallMenu::on_draw()
 
 		put_aligned_string(sX, sX + size_x, sY + 220, "You should join a guild to hire soldiers.", GameColors::UIMagicBlue);
 		char pointsBuf[64];
-		snprintf(pointsBuf, sizeof(pointsBuf), "Summon points : %d", m_game->m_player->m_construction_point);
+		snprintf(pointsBuf, sizeof(pointsBuf), "Summon points : %d", player().m_construction_point);
 		put_aligned_string(sX, sX + size_x, sY + 250, pointsBuf, GameColors::UIMagicBlue);
 		put_aligned_string(sX, sX + size_x, sY + 280, "Maximum summon points : 12000 points.", GameColors::UIMagicBlue);
 		put_aligned_string(sX, sX + size_x, sY + 300, "Maximum hiring number : 5 ", GameColors::UIMagicBlue);
@@ -225,37 +225,37 @@ bool DialogBox_GuildHallMenu::on_click()
 
 	case mode::hire_soldier:
 		if (mouse_in(link_1)
-			&& (m_game->m_player->m_construction_point >= 2000) && (m_game->m_is_crusade_mode == false))
+			&& (player().m_construction_point >= 2000) && (m_game->m_is_crusade_mode == false))
 		{
 			send_command(MsgId::RequestHeldenianScroll, 875, 1, 2, 3, 4, "Gail", 5);
 			play_sound_effect('E', 14, 5);
 		}
 		if (mouse_in(link_2)
-			&& (m_game->m_player->m_construction_point >= 3000) && (m_game->m_is_crusade_mode == false))
+			&& (player().m_construction_point >= 3000) && (m_game->m_is_crusade_mode == false))
 		{
 			send_command(MsgId::RequestHeldenianScroll, 876, 0, 0, 0, 0, "Gail", 0);
 			play_sound_effect('E', 14, 5);
 		}
 		if (mouse_in(link_3)
-			&& (m_game->m_player->m_construction_point >= 1500) && (m_game->m_is_crusade_mode == false))
+			&& (player().m_construction_point >= 1500) && (m_game->m_is_crusade_mode == false))
 		{
 			send_command(MsgId::RequestHeldenianScroll, 877, 0, 0, 0, 0, "Gail", 0);
 			play_sound_effect('E', 14, 5);
 		}
 		if (mouse_in(link_4)
-			&& (m_game->m_player->m_construction_point >= 3000) && (m_game->m_is_crusade_mode == false))
+			&& (player().m_construction_point >= 3000) && (m_game->m_is_crusade_mode == false))
 		{
 			send_command(MsgId::RequestHeldenianScroll, 878, 0, 0, 0, 0, "Gail", 0);
 			play_sound_effect('E', 14, 5);
 		}
 		if (mouse_in(link_5)
-			&& (m_game->m_player->m_construction_point >= 4000) && (m_game->m_is_crusade_mode == false))
+			&& (player().m_construction_point >= 4000) && (m_game->m_is_crusade_mode == false))
 		{
 			send_command(MsgId::RequestHeldenianScroll, 879, 0, 0, 0, 0, "Gail", 0);
 			play_sound_effect('E', 14, 5);
 		}
 		if (mouse_in(link_6)
-			&& (m_game->m_player->m_construction_point >= 3000) && (m_game->m_is_crusade_mode == false))
+			&& (player().m_construction_point >= 3000) && (m_game->m_is_crusade_mode == false))
 		{
 			send_command(MsgId::RequestHeldenianScroll, 880, 0, 0, 0, 0, "Gail", 0);
 			play_sound_effect('E', 14, 5);
@@ -264,7 +264,7 @@ bool DialogBox_GuildHallMenu::on_click()
 
 	case mode::take_flag:
 		if (mouse_in(link_take_flag)
-			&& (m_game->m_player->m_enemy_kill_count >= 3))
+			&& (player().m_enemy_kill_count >= 3))
 		{
 			send_command(MsgId::CommandCommon, CommonType::ReqGetOccupyFlag, 0, 0, 0, 0, 0, 0);
 			play_sound_effect('E', 14, 5);

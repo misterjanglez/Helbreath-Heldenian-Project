@@ -63,7 +63,6 @@
 #include "FishingManager.h"
 #include "CraftingManager.h"
 #include "QuestManager.h"
-#include "GuildManager.h"
 
 #include "GameConstants.h"
 #include "Application.h"
@@ -85,11 +84,32 @@ struct item_draw_ref
 	int16_t frame;
 };
 
+// Temporary storage for character creation screen data
+struct char_creation_data
+{
+	std::string player_name;
+	int8_t gender = 0, skin_col = 0, hair_style = 0, hair_col = 0, under_col = 0;
+	int8_t stat_str = 10, stat_vit = 10, stat_dex = 10;
+	int8_t stat_int = 10, stat_mag = 10, stat_chr = 10;
+};
+
 class CGame : public hb::shared::render::application
 {
 public:
 	CGame(hb::shared::types::NativeInstance native_instance, int icon_resource_id);
 	~CGame() override;
+
+	// Active screen shortcut — set/cleared by GameModeManager on screen transitions
+	IGameScreen* m_active_screen = nullptr;
+
+	template<typename T>
+	T* get_active_screen_as() { return GameModeManager::get_active_screen_as<T>(); }
+
+	// Convenience accessor — routes through the active Screen_OnGame
+	DialogBoxManager& get_dialog_box_manager();
+
+	// Connect to the game server using stored connection info
+	void connect_to_game_server();
 
 	// --- application overrides ---
 	bool on_initialize() override;
@@ -111,7 +131,6 @@ public:
 	void read_settings();
 	void write_settings();
 
-	bool find_guild_name(const char* name, int* ipIndex);
 	void create_screen_shot();
 	void crusade_war_result(int winner_side);
 	void crusade_contribution_result(int war_contribution);
@@ -125,7 +144,7 @@ public:
 	void draw_new_dialog_box(char type, int sX, int sY, int frame, bool is_no_color_key = false, bool is_trans = false);
 	void add_map_status_info(const char* data, bool is_last_data);
 	void request_map_status(const char* map_name, int mode);
-	// draw_dialog_boxs REMOVED — use m_dialog_box_manager.draw_all()
+	// draw_dialog_boxs REMOVED — use get_dialog_box_manager().draw_all()
 	std::string format_comma_number(uint64_t value);
 
 	void response_panning_handler(char * data);
@@ -174,7 +193,7 @@ public:
 	void init_game_settings();
 	void common_event_handler(char * data);
 	// get_top_dialog_box_index, enable_dialog_box, disable_dialog_box REMOVED
-	// — use m_dialog_box_manager.get_top_id(), enable_dialog_box(), disable_dialog_box()
+	// — use get_dialog_box_manager().get_top_id(), enable_dialog_box(), disable_dialog_box()
 	void init_item_list(char * packet_data);
 	hb::shared::sprite::BoundRect draw_object_on_dead(int indexX, int indexY, int sX, int sY, bool trans, uint32_t time);
 	hb::shared::sprite::BoundRect draw_object_on_dying(int indexX, int indexY, int sX, int sY, bool trans, uint32_t time);
@@ -188,7 +207,6 @@ public:
 	hb::shared::sprite::BoundRect draw_object_on_run(int indexX, int indexY, int sX, int sY, bool trans, uint32_t time);
 	hb::shared::sprite::BoundRect draw_object_on_damage(int indexX, int indexY, int sX, int sY, bool trans, uint32_t time);
 	hb::shared::sprite::BoundRect draw_object_on_get_item(int indexX, int indexY, int sX, int sY, bool trans, uint32_t time);
-	void clear_guild_name_list();
 	void draw_background(short div_x, short mod_x, short div_y, short mod_y);
 	void chat_msg_handler(char * packet_data);
 	void release_unused_sprites();
@@ -273,11 +291,9 @@ public:
 	bool item_drop_history(short item_id);
 
 	GameTimer m_game_timer;
-	DialogBoxManager m_dialog_box_manager;
 	fishing_manager m_fishing_manager;
 	crafting_manager m_crafting_manager;
 	quest_manager m_quest_manager;
-	guild_manager m_guild_manager;
 
 
 	struct {
@@ -293,15 +309,6 @@ public:
 		char side;
 	} m_crusade_structure_info[hb::shared::limits::MaxCrusadeStructures];
 
-	// v2.171 2002-6-14
-	struct {
-		uint32_t ref_time;
-		int guild_rank;
-		std::string char_name;
-		std::string guild_name;
-	} m_guild_name_cache[game_limits::max_guild_names];
-
-
 	class hb::shared::render::IRenderer* m_Renderer;  // Abstract renderer interface
 	std::unique_ptr<hb::shared::sprite::ISpriteFactory> m_sprite_factory;  // Sprite factory for creating sprites
 	hb::shared::sprite::SpriteCollection m_sprite;
@@ -310,25 +317,32 @@ public:
 	hb::shared::sprite::SpriteCollection m_item_sprites;	// Atlas: [0]=equip, [1]=ground, [2]=pack
 	hb::shared::sprite::SpriteCollection m_equip_sprites;	// Per-item equipment sprites (indexed via equip_sprite::index)
 
-	std::unique_ptr<CPlayer> m_player;  // Main player data
-	std::unique_ptr<class CMapData> m_map_data;
+	// Player: owned by Screen_OnGame (static). Raw pointer for gameplay access.
+	CPlayer* m_player = nullptr;
+
+	// Session data (login/character selection — exists before player)
+	std::string m_account_name;
+	std::string m_account_password;
+	std::string m_selected_char_name;
+	int m_selected_char_level = 0;
+	char_creation_data m_new_char;
+
+	std::unique_ptr<CMapData> m_map_data;
 	std::unique_ptr<hb::shared::net::IOServicePool> m_io_pool;  // 0 threads = manual poll mode for client
-	std::unique_ptr<class hb::shared::net::ASIOSocket> m_g_sock;
-	std::unique_ptr<class hb::shared::net::ASIOSocket> m_l_sock;
+	std::unique_ptr<hb::shared::net::ASIOSocket> m_g_sock;
+	std::unique_ptr<hb::shared::net::ASIOSocket> m_l_sock;
 	floating_text_manager m_floating_text;
 	std::unique_ptr<effect_manager> m_effect_manager;
 	std::unique_ptr<NetworkMessageManager> m_network_message_manager;
-	std::array<std::unique_ptr<class CItem>, hb::shared::limits::MaxItems> m_item_list;
-	std::array<std::unique_ptr<class CItem>, hb::shared::limits::MaxBankItems> m_bank_list;
-	std::array<std::unique_ptr<class CMagic>, hb::shared::limits::MaxMagicType> m_magic_cfg_list;
-	std::array<std::unique_ptr<class CSkill>, hb::shared::limits::MaxSkillType> m_skill_cfg_list;
-	std::array<std::unique_ptr<class CMsg>, game_limits::max_text_dlg_lines> m_msg_text_list;
-	std::array<std::unique_ptr<class CMsg>, game_limits::max_text_dlg_lines> m_msg_text_list2;
-	std::array<std::unique_ptr<class CMsg>, game_limits::max_text_dlg_lines> m_agree_msg_text_list;
-	std::unique_ptr<class CMsg> m_ex_id;
+	std::array<std::unique_ptr<CMagic>, hb::shared::limits::MaxMagicType> m_magic_cfg_list;
+	std::array<std::unique_ptr<CSkill>, hb::shared::limits::MaxSkillType> m_skill_cfg_list;
+	std::array<std::unique_ptr<CMsg>, game_limits::max_text_dlg_lines> m_msg_text_list;
+	std::array<std::unique_ptr<CMsg>, game_limits::max_text_dlg_lines> m_msg_text_list2;
+	std::array<std::unique_ptr<CMsg>, game_limits::max_text_dlg_lines> m_agree_msg_text_list;
+	std::unique_ptr<CMsg> m_ex_id;
 
-	std::array<std::unique_ptr<class CCharInfo>, 4> m_char_list;
-	std::array<std::unique_ptr<class CMsg>, game_limits::max_game_msgs> m_game_msg_list;
+	std::array<std::unique_ptr<CCharInfo>, 4> m_char_list;
+	std::array<std::unique_ptr<CMsg>, game_limits::max_game_msgs> m_game_msg_list;
 
 
 	uint32_t m_connect_mode;
@@ -450,7 +464,7 @@ std::array<bool, hb::shared::limits::MaxItems> m_is_item_equipped{};
 	std::string m_construct_map_name;
 	std::string m_game_server_name; //  Gateway
 
-	std::array<std::unique_ptr<class CItem>, 5000> m_item_config_list;
+	std::array<std::unique_ptr<CItem>, 5000> m_item_config_list;
 	bool cache_process_item_config(char* data, uint32_t msg_size);
 	bool cache_process_magic_config(char* data, uint32_t msg_size);
 	bool cache_process_skill_config(char* data, uint32_t msg_size);

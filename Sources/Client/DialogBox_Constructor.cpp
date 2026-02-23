@@ -48,12 +48,12 @@ void DialogBox_Constructor::on_draw()
 
 	switch (m_mode) {
 	case mode::main:
-		if (m_game->m_player->m_construct_loc_x != -1)
+		if (player().m_construct_loc_x != -1)
 		{
 			std::string locationBuf;
 			std::memset(map_name, 0, sizeof(map_name));
 			m_game->get_official_map_name(m_game->m_construct_map_name.c_str(), map_name);
-			locationBuf = std::format(DRAW_DIALOGBOX_CONSTRUCTOR1, map_name, m_game->m_player->m_construct_loc_x, m_game->m_player->m_construct_loc_y);
+			locationBuf = std::format(DRAW_DIALOGBOX_CONSTRUCTOR1, map_name, player().m_construct_loc_x, player().m_construct_loc_y);
 			put_aligned_string(sX, sX + size_x, sY + 40, locationBuf.c_str());
 		}
 		else put_aligned_string(sX, sX + size_x, sY + 40, DRAW_DIALOGBOX_CONSTRUCTOR2);
@@ -211,14 +211,14 @@ void DialogBox_Constructor::on_draw()
 				tY = static_cast<int>(v3);
 				draw_new_dialog_box(InterfaceNdCrusade, sX + tX + 15, sY + tY + 60, 42, false, true);
 			}
-			if ((m_mode != mode::teleport) && (m_game->m_player->m_construct_loc_x != -1))
+			if ((m_mode != mode::teleport) && (player().m_construct_loc_x != -1))
 			{
 				v1 = static_cast<double>(MapSzX);
-				v2 = static_cast<double>(m_game->m_player->m_construct_loc_x);
+				v2 = static_cast<double>(player().m_construct_loc_x);
 				v3 = (v2 * static_cast<double>(size_x)) / v1;
 				tX = static_cast<int>(v3);
 				v1 = static_cast<double>(MapSzY);
-				v2 = static_cast<double>(m_game->m_player->m_construct_loc_y);
+				v2 = static_cast<double>(player().m_construct_loc_y);
 				v3 = (v2 * static_cast<double>(size_y)) / v1;
 				tY = static_cast<int>(v3);
 				draw_new_dialog_box(InterfaceNdCrusade, sX + tX + 15, sY + tY + 60, 41, false, true);
@@ -226,11 +226,11 @@ void DialogBox_Constructor::on_draw()
 			if (m_game->m_map_name == "middleland")
 			{
 				v1 = static_cast<double>(MapSzX);
-				v2 = static_cast<double>(m_game->m_player->m_player_x);
+				v2 = static_cast<double>(player().m_player_x);
 				v3 = (v2 * static_cast<double>(size_x)) / v1;
 				tX = static_cast<int>(v3);
 				v1 = static_cast<double>(MapSzY);
-				v2 = static_cast<double>(m_game->m_player->m_player_y);
+				v2 = static_cast<double>(player().m_player_y);
 				v3 = (v2 * static_cast<double>(size_y)) / v1;
 				tY = static_cast<int>(v3);
 				draw_new_dialog_box(InterfaceNdCrusade, sX + tX + 15, sY + tY + 60, 43);
@@ -270,7 +270,7 @@ bool DialogBox_Constructor::on_click()
 	case mode::main:
 		if (mouse_in(btn_construct))
 		{
-			if (m_game->m_player->m_construct_loc_x == -1)
+			if (player().m_construct_loc_x == -1)
 			{
 				m_game->set_top_msg(m_game->m_game_msg_list[14]->m_pMsg, 5);
 			}
@@ -307,25 +307,25 @@ bool DialogBox_Constructor::on_click()
 	case mode::select_building:
 		if (mouse_in(btn_building_1))
 		{
-			send_command(MsgId::CommandCommon, CommonType::SummonWarUnit, 0, 38, 1, m_game->m_dialog_box_manager.get_dialog_as<DialogBox_Commander>(DialogBoxId::CrusadeCommander)->m_selected_faction, 0);
+			send_command(MsgId::CommandCommon, CommonType::SummonWarUnit, 0, 38, 1, m_game->get_dialog_box_manager().get_dialog_as<DialogBox_Commander>(DialogBoxId::CrusadeCommander)->m_selected_faction, 0);
 			play_sound_effect('E', 14, 5);
 			disable_dialog_box(DialogBoxId::CrusadeConstructor);
 		}
 		if (mouse_in(btn_building_2))
 		{
-			send_command(MsgId::CommandCommon, CommonType::SummonWarUnit, 0, 39, 1, m_game->m_dialog_box_manager.get_dialog_as<DialogBox_Commander>(DialogBoxId::CrusadeCommander)->m_selected_faction, 0);
+			send_command(MsgId::CommandCommon, CommonType::SummonWarUnit, 0, 39, 1, m_game->get_dialog_box_manager().get_dialog_as<DialogBox_Commander>(DialogBoxId::CrusadeCommander)->m_selected_faction, 0);
 			play_sound_effect('E', 14, 5);
 			disable_dialog_box(DialogBoxId::CrusadeConstructor);
 		}
 		if (mouse_in(btn_building_3))
 		{
-			send_command(MsgId::CommandCommon, CommonType::SummonWarUnit, 0, 36, 1, m_game->m_dialog_box_manager.get_dialog_as<DialogBox_Commander>(DialogBoxId::CrusadeCommander)->m_selected_faction, 0);
+			send_command(MsgId::CommandCommon, CommonType::SummonWarUnit, 0, 36, 1, m_game->get_dialog_box_manager().get_dialog_as<DialogBox_Commander>(DialogBoxId::CrusadeCommander)->m_selected_faction, 0);
 			play_sound_effect('E', 14, 5);
 			disable_dialog_box(DialogBoxId::CrusadeConstructor);
 		}
 		if (mouse_in(btn_building_4))
 		{
-			send_command(MsgId::CommandCommon, CommonType::SummonWarUnit, 0, 37, 1, m_game->m_dialog_box_manager.get_dialog_as<DialogBox_Commander>(DialogBoxId::CrusadeCommander)->m_selected_faction, 0);
+			send_command(MsgId::CommandCommon, CommonType::SummonWarUnit, 0, 37, 1, m_game->get_dialog_box_manager().get_dialog_as<DialogBox_Commander>(DialogBoxId::CrusadeCommander)->m_selected_faction, 0);
 			play_sound_effect('E', 14, 5);
 			disable_dialog_box(DialogBoxId::CrusadeConstructor);
 		}

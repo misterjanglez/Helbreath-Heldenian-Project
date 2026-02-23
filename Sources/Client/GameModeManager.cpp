@@ -220,6 +220,7 @@ void GameModeManager::apply_screen_change()
         m_previousScreenType = m_pCurrentScreen->get_type_id();
         m_pCurrentScreen->on_uninitialize();
         m_pCurrentScreen.reset();
+        m_game->m_active_screen = nullptr;
     }
 
     // Create and initialize new screen from factory
@@ -230,6 +231,7 @@ void GameModeManager::apply_screen_change()
 
         if (m_pCurrentScreen)
         {
+            m_game->m_active_screen = m_pCurrentScreen.get();
             m_pCurrentScreen->on_initialize();
 
             // Apply user's configured display settings on every screen transition

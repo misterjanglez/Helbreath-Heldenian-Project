@@ -40,7 +40,7 @@ void DialogBox_GuildMenu::on_draw()
 		break;
 	case mode::guild_created:
 		put_aligned_string(sX, sX + size_x, sY + 125, DRAW_DIALOGBOX_GUILDMENU20, GameColors::UILabel);
-		put_aligned_string(sX, sX + size_x, sY + 140, m_game->m_player->m_guild_name.c_str(), GameColors::UILabel);
+		put_aligned_string(sX, sX + size_x, sY + 140, player().m_guild_name.c_str(), GameColors::UILabel);
 		put_aligned_string(sX, sX + size_x, sY + 150, "____________________", GameColors::UILabel);
 		put_aligned_string(sX, sX + size_x, sY + 165, DRAW_DIALOGBOX_GUILDMENU21, GameColors::UILabel);
 		if ((mouse_x >= sX + ui_layout::right_btn_x) && (mouse_x <= sX + ui_layout::right_btn_x + ui_layout::btn_size_x) && (mouse_y > sY + ui_layout::btn_y) && (mouse_y < sY + ui_layout::btn_y + ui_layout::btn_size_y))
@@ -155,7 +155,7 @@ void DialogBox_GuildMenu::DrawMode0_MainMenu(short sX, short sY, short size_x)
 	short mouse_x = static_cast<short>(hb::shared::input::get_mouse_x());
 	short mouse_y = static_cast<short>(hb::shared::input::get_mouse_y());
 	// Create new guild option
-	if ((m_game->m_player->m_guild_rank == -1) && (m_game->m_player->m_charisma >= 20) && (m_game->m_player->m_level >= 20)) {
+	if ((player().m_guild_rank == -1) && (player().m_charisma >= 20) && (player().m_level >= 20)) {
 		if ((mouse_x > sX + ADJX + 80) && (mouse_x < sX + ADJX + 210) && (mouse_y > sY + ADJY + 63) && (mouse_y < sY + ADJY + 78))
 			put_aligned_string(sX, sX + size_x, sY + ADJY + 65, DRAW_DIALOGBOX_GUILDMENU1, GameColors::UIWhite);
 		else put_aligned_string(sX, sX + size_x, sY + ADJY + 65, DRAW_DIALOGBOX_GUILDMENU1, GameColors::UIMagicBlue);
@@ -163,7 +163,7 @@ void DialogBox_GuildMenu::DrawMode0_MainMenu(short sX, short sY, short size_x)
 	else put_aligned_string(sX, sX + size_x, sY + ADJY + 65, DRAW_DIALOGBOX_GUILDMENU1, GameColors::UIDisabled);
 
 	// Disband guild option
-	if (m_game->m_player->m_guild_rank == 0) {
+	if (player().m_guild_rank == 0) {
 		if ((mouse_x > sX + ADJX + 72) && (mouse_x < sX + ADJX + 222) && (mouse_y > sY + ADJY + 82) && (mouse_y < sY + ADJY + 99))
 			put_aligned_string(sX, sX + size_x, sY + ADJY + 85, DRAW_DIALOGBOX_GUILDMENU4, GameColors::UIWhite);
 		else put_aligned_string(sX, sX + size_x, sY + ADJY + 85, DRAW_DIALOGBOX_GUILDMENU4, GameColors::UIMagicBlue);
@@ -181,12 +181,12 @@ void DialogBox_GuildMenu::DrawMode0_MainMenu(short sX, short sY, short size_x)
 	else put_aligned_string(sX, sX + size_x, sY + ADJY + 125, DRAW_DIALOGBOX_GUILDMENU9, GameColors::UIMagicBlue);
 
 	// Fightzone options
-	if (m_game->m_player->m_guild_rank == 0 && m_game->m_fightzone_number == 0) {
+	if (player().m_guild_rank == 0 && m_game->m_fightzone_number == 0) {
 		if ((mouse_x > sX + ADJX + 72) && (mouse_x < sX + ADJX + 228) && (mouse_y > sY + ADJY + 143) && (mouse_y < sY + ADJY + 169))
 			put_aligned_string(sX, sX + size_x, sY + ADJY + 145, DRAW_DIALOGBOX_GUILDMENU11, GameColors::UIWhite);
 		else put_aligned_string(sX, sX + size_x, sY + ADJY + 145, DRAW_DIALOGBOX_GUILDMENU11, GameColors::UIMagicBlue);
 	}
-	else if (m_game->m_player->m_guild_rank == 0 && m_game->m_fightzone_number > 0) {
+	else if (player().m_guild_rank == 0 && m_game->m_fightzone_number > 0) {
 		if ((mouse_x > sX + ADJX + 72) && (mouse_x < sX + ADJX + 216) && (mouse_y > sY + ADJY + 143) && (mouse_y < sY + ADJY + 169))
 			put_aligned_string(sX, sX + size_x, sY + ADJY + 145, DRAW_DIALOGBOX_GUILDMENU13, GameColors::UIWhite);
 		else put_aligned_string(sX, sX + size_x, sY + ADJY + 145, DRAW_DIALOGBOX_GUILDMENU13, GameColors::UIMagicBlue);
@@ -206,13 +206,13 @@ void DialogBox_GuildMenu::DrawMode1_CreateGuild(short sX, short sY, short size_x
 	put_aligned_string(sX, sX + size_x, sY + 125, DRAW_DIALOGBOX_GUILDMENU18, GameColors::UILabel);
 	put_string(sX + 75, sY + 150, "____________________", GameColors::UILabel);
 
-	if (m_game->m_dialog_box_manager.get_top_id() != DialogBoxId::GuildMenu) {
-		std::string masked(m_game->m_player->m_guild_name.size(), '*');
+	if (m_game->get_dialog_box_manager().get_top_id() != DialogBoxId::GuildMenu) {
+		std::string masked(player().m_guild_name.size(), '*');
 		hb::shared::text::draw_text(GameFont::Default, sX + 75, sY + 140, masked.c_str(), hb::shared::text::TextStyle::from_color(GameColors::UIWhite));
 	}
 
 	if ((mouse_x >= sX + ui_layout::left_btn_x) && (mouse_x <= sX + ui_layout::left_btn_x + ui_layout::btn_size_x) && (mouse_y >= sY + ui_layout::btn_y) && (mouse_y <= sY + ui_layout::btn_y + ui_layout::btn_size_y)) {
-		if ((m_game->m_player->m_guild_name == "NONE") || m_game->m_player->m_guild_name.empty()) {
+		if ((player().m_guild_name == "NONE") || player().m_guild_name.empty()) {
 			m_game->draw_new_dialog_box(InterfaceNdButton, sX + ui_layout::left_btn_x, sY + ui_layout::btn_y, 24);
 		}
 		else m_game->draw_new_dialog_box(InterfaceNdButton, sX + ui_layout::left_btn_x, sY + ui_layout::btn_y, 25);
@@ -229,7 +229,7 @@ void DialogBox_GuildMenu::DrawMode5_DisbandConfirm(short sX, short sY, short siz
 	short mouse_x = static_cast<short>(hb::shared::input::get_mouse_x());
 	short mouse_y = static_cast<short>(hb::shared::input::get_mouse_y());
 	put_aligned_string(sX, sX + size_x, sY + 90, DRAW_DIALOGBOX_GUILDMENU24);
-	put_aligned_string(sX, sX + size_x, sY + 105, m_game->m_player->m_guild_name.c_str(), GameColors::UILabel);
+	put_aligned_string(sX, sX + size_x, sY + 105, player().m_guild_name.c_str(), GameColors::UILabel);
 	put_aligned_string(sX, sX + size_x, sY + 118, "____________________", GameColors::UIBlack);
 	put_aligned_string(sX, sX + size_x, sY + 130, DRAW_DIALOGBOX_GUILDMENU25);
 	put_aligned_string(sX, sX + size_x, sY + 145, DRAW_DIALOGBOX_GUILDMENU26);
@@ -339,7 +339,7 @@ void DialogBox_GuildMenu::DrawMode20_ConfirmCancel(short sX, short sY, short siz
 	short mouse_y = static_cast<short>(hb::shared::input::get_mouse_y());
 	put_aligned_string(sX, sX + size_x, sY + 125, DRAW_DIALOGBOX_GUILDMENU75, GameColors::UILabel);
 	put_string(sX + 75, sY + 150, "____________________", GameColors::UILabel);
-	hb::shared::text::draw_text(GameFont::Default, sX + 75, sY + 140, m_game->m_player->m_guild_name.c_str(), hb::shared::text::TextStyle::from_color(GameColors::UIWhite));
+	hb::shared::text::draw_text(GameFont::Default, sX + 75, sY + 140, player().m_guild_name.c_str(), hb::shared::text::TextStyle::from_color(GameColors::UIWhite));
 	if ((mouse_x >= sX + ui_layout::left_btn_x) && (mouse_x <= sX + ui_layout::left_btn_x + ui_layout::btn_size_x) && (mouse_y >= sY + ui_layout::btn_y) && (mouse_y <= sY + ui_layout::btn_y + ui_layout::btn_size_y))
 		m_game->draw_new_dialog_box(InterfaceNdButton, sX + ui_layout::left_btn_x, sY + ui_layout::btn_y, 25);
 	else m_game->draw_new_dialog_box(InterfaceNdButton, sX + ui_layout::left_btn_x, sY + ui_layout::btn_y, 24);
@@ -392,12 +392,12 @@ bool DialogBox_GuildMenu::on_click_mode0(short sX, short sY)
 	short mouse_y = static_cast<short>(hb::shared::input::get_mouse_y());
 	// Create new guild
 	if ((mouse_x > sX + ADJX + 80) && (mouse_x < sX + ADJX + 210) && (mouse_y > sY + ADJY + 63) && (mouse_y < sY + ADJY + 78)) {
-		if (m_game->m_player->m_guild_rank != -1) return false;
-		if (m_game->m_player->m_charisma < 20) return false;
-		if (m_game->m_player->m_level < 20) return false;
+		if (player().m_guild_rank != -1) return false;
+		if (player().m_charisma < 20) return false;
+		if (player().m_level < 20) return false;
 		if (m_game->m_is_crusade_mode) return false;
 		text_input_manager::get().end_input();
-		text_input_manager::get().start_input(sX + 75, sY + 140, 21, m_game->m_player->m_guild_name, false, hb::client::guild_name_allowed_chars);
+		text_input_manager::get().start_input(sX + 75, sY + 140, 21, player().m_guild_name, false, hb::client::guild_name_allowed_chars);
 		m_mode = mode::create_guild;
 		play_sound_effect('E', 14, 5);
 		return true;
@@ -405,7 +405,7 @@ bool DialogBox_GuildMenu::on_click_mode0(short sX, short sY)
 
 	// Disband guild
 	if ((mouse_x > sX + ADJX + 72) && (mouse_x < sX + ADJX + 222) && (mouse_y > sY + ADJY + 82) && (mouse_y < sY + ADJY + 99)) {
-		if (m_game->m_player->m_guild_rank != 0) return false;
+		if (player().m_guild_rank != 0) return false;
 		if (m_game->m_is_crusade_mode) return false;
 		m_mode = mode::disband_confirm;
 		play_sound_effect('E', 14, 5);
@@ -429,7 +429,7 @@ bool DialogBox_GuildMenu::on_click_mode0(short sX, short sY)
 	// Fightzone
 	if (m_game->m_fightzone_number < 0) return false;
 	if ((mouse_x > sX + ADJX + 72) && (mouse_x < sX + ADJX + 228) && (mouse_y > sY + ADJY + 143) && (mouse_y < sY + ADJY + 169)) {
-		if (m_game->m_player->m_guild_rank != 0) return false;
+		if (player().m_guild_rank != 0) return false;
 		if (m_game->m_fightzone_number == 0)
 			m_mode = mode::fightzone_select;
 		else {
@@ -449,8 +449,8 @@ bool DialogBox_GuildMenu::on_click_mode1(short sX, short sY)
 	short mouse_y = static_cast<short>(hb::shared::input::get_mouse_y());
 	// Submit button
 	if ((mouse_x >= sX + 30) && (mouse_x <= sX + 30 + ui_layout::btn_size_x) && (mouse_y >= sY + ui_layout::btn_y) && (mouse_y <= sY + ui_layout::btn_y + ui_layout::btn_size_y)) {
-		if (m_game->m_player->m_guild_name == "NONE") return false;
-		if (m_game->m_player->m_guild_name.empty()) return false;
+		if (player().m_guild_name == "NONE") return false;
+		if (player().m_guild_name.empty()) return false;
 		send_command(MsgId::request_create_new_guild, MsgType::Confirm, 0, 0, 0, 0, 0);
 		m_mode = mode::creating;
 		text_input_manager::get().end_input();
@@ -636,7 +636,7 @@ bool DialogBox_GuildMenu::on_enable(int type, int64_t v1, int v2, const char* st
 {
 	if (m_mode == mode::create_guild) {
 		text_input_manager::get().end_input();
-		text_input_manager::get().start_input(m_x + 75, m_y + 140, 21, m_game->m_player->m_guild_name, false, hb::client::guild_name_allowed_chars);
+		text_input_manager::get().start_input(m_x + 75, m_y + 140, 21, player().m_guild_name, false, hb::client::guild_name_allowed_chars);
 	}
 	return true;
 }
