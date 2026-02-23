@@ -58,6 +58,7 @@ private:
 	bool is_in_toggle_area(int x, int y);
 
 	int m_iActiveTab;
+	int m_graphics_scroll_offset = 0;
 
 	// Cached frame dimensions (initialized on first update)
 	bool m_bFrameSizesInitialized;

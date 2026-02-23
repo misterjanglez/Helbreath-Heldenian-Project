@@ -12,6 +12,7 @@
         "uiVolume": 14
     },
     "display": {
+        "backgroundFpsThrottle": true,
         "borderless": false,
         "captureMouse": false,
         "detailLevel": 2,
