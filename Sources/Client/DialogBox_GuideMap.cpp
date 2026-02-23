@@ -235,7 +235,7 @@ bool DialogBox_GuideMap::on_double_click()
 {
 	short mouse_x = static_cast<short>(hb::shared::input::get_mouse_x());
 	short mouse_y = static_cast<short>(hb::shared::input::get_mouse_y());
-	if (CursorTarget::get_cursor_frame() != 0) return false;
+	if (CursorTarget::get_cursor_type() != cursor_type::arrow) return false;
 	if (m_game->m_map_index < 0) return false;
 
 	short sX = m_x;

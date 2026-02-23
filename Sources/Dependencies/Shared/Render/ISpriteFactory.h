@@ -25,10 +25,14 @@ public:
     // alphaEffect: Whether this sprite supports alpha degree changes
     virtual ISprite* create_sprite(const std::string& pakName, int spriteIndex, bool alphaEffect = true) = 0;
 
-    // Create a sprite from pre-loaded PAK sprite data (used by SpriteLoader for batch loading)
-    // spriteData: Pre-loaded sprite data from PAKLib
-    // alphaEffect: Whether this sprite supports alpha degree changes
-    virtual ISprite* create_sprite_from_data(const PAKLib::sprite& spriteData, bool alphaEffect = true) = 0;
+    // Create a sprite from pre-loaded metadata (used by SpriteLoader for batch loading)
+    // Only stores frame rects + PAK path/index — no image data is copied.
+    // Texture is loaded on demand from disk when the sprite is first drawn.
+    virtual ISprite* create_sprite_from_metadata(
+        const std::vector<PAKLib::sprite_rect>& frames,
+        const std::string& pakFilePath,
+        int spriteIndex,
+        bool alphaEffect = true) = 0;
 
     // Destroy a sprite and free its resources
     virtual void destroy_sprite(ISprite* sprite) = 0;

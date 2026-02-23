@@ -322,7 +322,9 @@
       <Filter>Rendering</Filter>
     </ClInclude>
     <ClInclude Include="Game.h" />
-    <ClInclude Include="GameConstants.h" />
+    <ClInclude Include="GameConstants.h">
+      <Filter>Core</Filter>
+    </ClInclude>
     <ClInclude Include="GameFonts.h">
       <Filter>Core</Filter>
     </ClInclude>
@@ -336,6 +338,15 @@
       <Filter>Shared\Rendering</Filter>
     </ClInclude>
     <ClInclude Include="GlobalDef.h" />
+    <ClInclude Include="InputStateHelper.h">
+      <Filter>Input</Filter>
+    </ClInclude>
+    <ClInclude Include="ItemTooltip.h">
+      <Filter>Rendering</Filter>
+    </ClInclude>
+    <ClInclude Include="TextFieldRenderer.h">
+      <Filter>Rendering</Filter>
+    </ClInclude>
     <ClInclude Include="IDialogBox.h">
       <Filter>DialogBox</Filter>
     </ClInclude>
@@ -648,9 +659,15 @@
     <ClInclude Include="GameEvents.h">
       <Filter>Core</Filter>
     </ClInclude>
-    <ClInclude Include="performance_monitor.h" />
-    <ClInclude Include="$(SolutionDir)Dependencies\Shared\Entity\OwnerType.h" />
-    <ClInclude Include="$(SolutionDir)Dependencies\Shared\Entity\ObjectIDRange.h" />
+    <ClInclude Include="performance_monitor.h">
+      <Filter>Core</Filter>
+    </ClInclude>
+    <ClInclude Include="$(SolutionDir)Dependencies\Shared\Entity\OwnerType.h">
+      <Filter>Shared\Entity</Filter>
+    </ClInclude>
+    <ClInclude Include="$(SolutionDir)Dependencies\Shared\Entity\ObjectIDRange.h">
+      <Filter>Shared\Entity</Filter>
+    </ClInclude>
     <ClInclude Include="..\Dependencies\Shared\version_info.h">
       <Filter>Shared</Filter>
     </ClInclude>
@@ -1090,7 +1107,18 @@
     <ClCompile Include="ClientLog.cpp">
       <Filter>Core</Filter>
     </ClCompile>
-    <ClCompile Include="performance_monitor.cpp" />
+    <ClCompile Include="performance_monitor.cpp">
+      <Filter>Core</Filter>
+    </ClCompile>
+    <ClCompile Include="InputStateHelper.cpp">
+      <Filter>Input</Filter>
+    </ClCompile>
+    <ClCompile Include="ItemTooltip.cpp">
+      <Filter>Rendering</Filter>
+    </ClCompile>
+    <ClCompile Include="TextFieldRenderer.cpp">
+      <Filter>Rendering</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="Game.rc">
@@ -1101,6 +1129,8 @@
     </Image>
   </ItemGroup>
   <ItemGroup>
-    <None Include="..\version.cfg" />
+    <None Include="..\version.cfg">
+      <Filter>Core</Filter>
+    </None>
   </ItemGroup>
 </Project>

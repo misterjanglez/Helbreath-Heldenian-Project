@@ -112,7 +112,6 @@ public:
 	void write_settings();
 
 	bool find_guild_name(const char* name, int* ipIndex);
-	void item_drop_external_screen(char item_id, short mouse_x, short mouse_y);
 	void create_screen_shot();
 	void crusade_war_result(int winner_side);
 	void crusade_contribution_result(int war_contribution);
@@ -209,7 +208,6 @@ public:
 	void game_recv_msg_handler(uint32_t msg_size, char * data);
 	void draw_objects(short pivot_x, short pivot_y, short div_x, short div_y, short mod_x, short mod_y, short mouse_x, short mouse_y);
 	bool send_command(uint32_t message_id, uint16_t command, char direction, int value1, int value2, int value3, const char* text, int value4 = 0); // v1.4
-	void restore_sprites();
 	void command_processor(short mouse_x, short mouse_y, short tile_x, short tile_y, char left_button, char right_button);
 	bool process_left_click(short mouse_x, short mouse_y, short tile_x, short tile_y, uint32_t current_time, uint16_t& action_type);
 	bool process_right_click(short mouse_x, short mouse_y, short tile_x, short tile_y, uint32_t current_time, uint16_t& action_type);
@@ -453,11 +451,11 @@ std::array<bool, hb::shared::limits::MaxItems> m_is_item_equipped{};
 	std::string m_game_server_name; //  Gateway
 
 	std::array<std::unique_ptr<class CItem>, 5000> m_item_config_list;
-	bool decode_item_config_file_contents(char* data, uint32_t msg_size);
-	bool decode_magic_config_file_contents(char* data, uint32_t msg_size);
-	bool decode_skill_config_file_contents(char* data, uint32_t msg_size);
-	bool decode_npc_config_file_contents(char* data, uint32_t msg_size);
-	bool decode_map_config_file_contents(char* data, uint32_t msg_size);
+	bool cache_process_item_config(char* data, uint32_t msg_size);
+	bool cache_process_magic_config(char* data, uint32_t msg_size);
+	bool cache_process_skill_config(char* data, uint32_t msg_size);
+	bool cache_process_npc_config(char* data, uint32_t msg_size);
+	bool cache_process_map_config(char* data, uint32_t msg_size);
 
 	struct NpcConfig { short npcType = 0; std::string name; bool valid = false; };
 	std::array<NpcConfig, hb::shared::limits::MaxNpcConfigs> m_npc_config_list{};   // indexed by npc_id

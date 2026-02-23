@@ -23,11 +23,21 @@ namespace {
     bool s_overGroundItem = false;
 
     // Cursor state
-    CursorType s_cursorType = CursorType::Arrow;
+    cursor_type s_cursorType = cursor_type::arrow;
 
-    // Item cursor animation
-    int64_t s_itemAnimTime = 0;
-    int s_itemAnimFrame = 1;
+    // Grab cursor animation
+    int64_t s_grabAnimTime = 0;
+    bool s_grabAnimOpen = true;
+
+    // Item target cursor ping-pong animation (9 → 10 → 11 → 10 → 9 ...)
+    int64_t s_itemTargetAnimTime = 0;
+    int s_itemTargetStep = 0;                          // index into sequence
+    constexpr cursor_type item_target_sequence[] = {
+        cursor_type::item_target,
+        cursor_type::item_target_2,
+        cursor_type::item_target_3,
+        cursor_type::item_target_2,
+    };
 
     // UI Selection state (for item/dialog dragging)
     SelectedObjectType s_selectedType = SelectedObjectType::None;
@@ -62,7 +72,7 @@ void CursorTarget::begin_frame()
     s_overGroundItem = false;
 
     // reset cursor (will be determined in end_frame)
-    s_cursorType = CursorType::Arrow;
+    s_cursorType = cursor_type::arrow;
 }
 
 void CursorTarget::end_frame(EntityRelationship relationship, int commandType, bool commandAvailable, bool get_pointing_mode)
@@ -76,18 +86,22 @@ void CursorTarget::end_frame(EntityRelationship relationship, int commandType, b
         if (commandType >= 100 && commandType < 200) {
             if (commandAvailable) {
                 if (s_focusedObject.m_valid && IsHostile(relationship))
-                    s_cursorType = CursorType::SpellHostile;
+                    s_cursorType = cursor_type::spell_hostile;
                 else
-                    s_cursorType = CursorType::SpellFriendly;
+                    s_cursorType = cursor_type::spell_friendly;
             } else {
-                s_cursorType = CursorType::Unavailable;
+                s_cursorType = cursor_type::hourglass;
             }
             return;
         }
 
-        // Item use mode (0-49)
+        // Item use mode (0-49) — ping-pong animation: 9 → 10 → 11 → 10 → 9 ...
         if (commandType >= 0 && commandType < 50) {
-            s_cursorType = CursorType::ItemUse;
+            if (now - s_itemTargetAnimTime > 200) {
+                s_itemTargetAnimTime = now;
+                s_itemTargetStep = (s_itemTargetStep + 1) % 4;
+            }
+            s_cursorType = item_target_sequence[s_itemTargetStep];
             return;
         }
     }
@@ -95,25 +109,25 @@ void CursorTarget::end_frame(EntityRelationship relationship, int commandType, b
     // Entity focus takes priority — mobs/NPCs/players over ground items
     if (s_focusedObject.m_valid) {
         if (IsHostile(relationship) || hb::shared::input::is_ctrl_down())
-            s_cursorType = CursorType::TargetHostile;
+            s_cursorType = cursor_type::attack;
         else
-            s_cursorType = CursorType::TargetNeutral;
+            s_cursorType = cursor_type::arrow_blue;
         return;
     }
 
-    // Ground item cursor - only when no entity is focused on the tile
+    // Ground item cursor — only when no entity is focused on the tile
     if (s_overGroundItem) {
-        if (now - s_itemAnimTime > 200) {
-            s_itemAnimTime = now;
-            s_itemAnimFrame = (s_itemAnimFrame == 1) ? 2 : 1;
+        if (now - s_grabAnimTime > 200) {
+            s_grabAnimTime = now;
+            s_grabAnimOpen = !s_grabAnimOpen;
         }
-        s_cursorType = (s_itemAnimFrame == 1) ?
-            CursorType::ItemGround1 : CursorType::ItemGround2;
+        s_cursorType = s_grabAnimOpen ?
+            cursor_type::grab_open : cursor_type::grab_closed;
         return;
     }
 
     // Default
-    s_cursorType = CursorType::Arrow;
+    s_cursorType = cursor_type::arrow;
 }
 
 //-----------------------------------------------------------------------------
@@ -208,14 +222,9 @@ bool CursorTarget::has_focused_object()
     return s_focusedObject.m_valid;
 }
 
-CursorType CursorTarget::GetCursorType()
+cursor_type CursorTarget::get_cursor_type()
 {
     return s_cursorType;
-}
-
-int CursorTarget::get_cursor_frame()
-{
-    return static_cast<int>(s_cursorType);
 }
 
 short CursorTarget::get_focused_map_x()

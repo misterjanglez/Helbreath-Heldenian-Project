@@ -6,6 +6,9 @@
 #include <stdexcept>
 #include <fstream>
 #include <sstream>
+#include <unordered_map>
+#include <memory>
+#include <mutex>
 
 namespace PAKLib {
 	// Only pack POD structs that are read directly from binary files
@@ -330,6 +333,126 @@ namespace PAKLib {
 
 		return sprite_obj;
 	}
+
+	// Load only metadata (sprite entries + frame rects) from a PAK file.
+	// Skips all image data — sprites store only frame rects and reload from disk on demand.
+	inline static pak loadpak_metadata_fast(const std::string& filepath) {
+		pak pak_file{};
+		std::ifstream file(filepath, std::ios::binary);
+		if (!file.is_open()) {
+			throw std::runtime_error("Failed to open PAK file: " + filepath);
+		}
+
+		file.seekg(sizeof(file_header), std::ios::beg);
+
+		file.read(reinterpret_cast<char*>(&pak_file.sprite_count), sizeof(uint32_t));
+		if (pak_file.sprite_count == 0 || pak_file.sprite_count > 1500) {
+			throw std::runtime_error("Invalid sprite count in: " + filepath);
+		}
+
+		pak_file.sprite_entries.resize(pak_file.sprite_count);
+		file.read(reinterpret_cast<char*>(pak_file.sprite_entries.data()), pak_file.sprite_count * sizeof(sprite_entry));
+		if (file.fail()) {
+			throw std::runtime_error("Failed to read sprite entries from: " + filepath);
+		}
+
+		pak_file.sprites.resize(pak_file.sprite_count);
+		for (size_t i = 0; i < pak_file.sprite_count; ++i) {
+			const auto& entry = pak_file.sprite_entries[i];
+			file.seekg(entry.offset + SPRITE_HEADER_SKIP, std::ios::beg);
+
+			uint32_t rect_count = 0;
+			file.read(reinterpret_cast<char*>(&rect_count), sizeof(uint32_t));
+			if (rect_count > 1000) {
+				throw std::runtime_error("Invalid rect count in: " + filepath);
+			}
+
+			auto& sprite_obj = pak_file.sprites[i];
+			if (rect_count == 0) continue;
+
+			sprite_obj.sprite_rectangles.resize(rect_count);
+			file.read(reinterpret_cast<char*>(sprite_obj.sprite_rectangles.data()), rect_count * sizeof(sprite_rect));
+			if (file.fail()) {
+				throw std::runtime_error("Failed to read sprite rectangles from: " + filepath);
+			}
+
+			// Skip image data — not needed for metadata-only load
+		}
+
+		pak_file.pak_file_path = filepath;
+		return pak_file;
+	}
+
+	// Load only metadata (frame rects) for a single sprite from a PAK file.
+	// Skips image data entirely.
+	inline static sprite get_sprite_metadata_fast(const std::string& filepath, size_t sprite_index) {
+		std::ifstream file(filepath, std::ios::binary);
+		if (!file.is_open()) {
+			throw std::runtime_error("Failed to open PAK file: " + filepath);
+		}
+
+		sprite_entry entry{};
+		file.seekg(sizeof(file_header) + sizeof(uint32_t) + (sprite_index * sizeof(sprite_entry)), std::ios::beg);
+		file.read(reinterpret_cast<char*>(&entry), sizeof(entry));
+		if (file.fail()) {
+			throw std::runtime_error("Failed to read sprite entry from: " + filepath);
+		}
+
+		file.seekg(entry.offset + SPRITE_HEADER_SKIP, std::ios::beg);
+
+		sprite sprite_obj{};
+		uint32_t rect_count = 0;
+		file.read(reinterpret_cast<char*>(&rect_count), sizeof(uint32_t));
+		if (rect_count > 1000) {
+			throw std::runtime_error("Invalid rect count in: " + filepath);
+		}
+
+		if (rect_count == 0) return sprite_obj;
+
+		sprite_obj.sprite_rectangles.resize(rect_count);
+		file.read(reinterpret_cast<char*>(sprite_obj.sprite_rectangles.data()), rect_count * sizeof(sprite_rect));
+		if (file.fail()) {
+			throw std::runtime_error("Failed to read sprite rectangles from: " + filepath);
+		}
+
+		// Skip image data — not needed for metadata-only load
+		return sprite_obj;
+	}
+
+	// Soft-locks PAK files by holding open file handles to prevent external modification.
+	// On Windows, an open ifstream prevents deletion/rename of the file.
+	// On Linux, this is advisory only — provides a held file descriptor.
+	class pak_lock_manager {
+	public:
+		static void lock(const std::string& filepath) {
+			std::lock_guard<std::mutex> guard(s_mutex);
+			if (s_locks.find(filepath) != s_locks.end())
+				return;
+			auto file = std::make_unique<std::ifstream>(filepath, std::ios::binary);
+			if (file->is_open()) {
+				s_locks[filepath] = std::move(file);
+			}
+		}
+
+		static void unlock(const std::string& filepath) {
+			std::lock_guard<std::mutex> guard(s_mutex);
+			s_locks.erase(filepath);
+		}
+
+		static void unlock_all() {
+			std::lock_guard<std::mutex> guard(s_mutex);
+			s_locks.clear();
+		}
+
+		static bool is_locked(const std::string& filepath) {
+			std::lock_guard<std::mutex> guard(s_mutex);
+			return s_locks.find(filepath) != s_locks.end();
+		}
+
+	private:
+		static inline std::mutex s_mutex;
+		static inline std::unordered_map<std::string, std::unique_ptr<std::ifstream>> s_locks;
+	};
 
 	inline uint8_t rotl8(uint8_t v, unsigned int s) {
 		return static_cast<uint8_t>((v << s) | (v >> (8 - s)));

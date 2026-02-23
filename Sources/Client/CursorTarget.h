@@ -16,18 +16,22 @@
 using hb::shared::direction::direction;
 
 //=============================================================================
-// Cursor Types (replacing magic frame numbers)
+// Cursor Types — maps 1:1 to sprite frames in MouseCursor sprite sheet
 //=============================================================================
-enum class CursorType {
-    Arrow = 0,           // Default cursor
-    ItemGround1 = 1,     // Item on ground (animated frame 1)
-    ItemGround2 = 2,     // Item on ground (animated frame 2)
-    TargetHostile = 3,   // Red - hostile/dead body
-    SpellFriendly = 4,   // Blue - spell on friendly
-    SpellHostile = 5,    // Red - spell on hostile
-    TargetNeutral = 6,   // Blue - neutral/friendly
-    Unavailable = 8,     // Can't perform action
-    ItemUse = 10         // Hand cursor for item use
+enum class cursor_type : int
+{
+    arrow           = 0,   // Standard arrow cursor
+    grab_open       = 1,   // Open hand — item pickup (animation frame 1)
+    grab_closed     = 2,   // Closed hand — item pickup (animation frame 2)
+    attack          = 3,   // Sword — target is attackable / friendly attack toggled
+    spell_friendly  = 4,   // Magic cast on friendly target
+    spell_hostile   = 5,   // Magic cast on enemy target
+    arrow_blue      = 6,   // Arrow with blue outline — friendly/neutral hover
+    arrow_red       = 7,   // Arrow with red outline — unused, reserved
+    hourglass       = 8,   // Waiting / loading
+    item_target     = 9,   // Item-on-item targeting (animation frame 1 of 3)
+    item_target_2   = 10,  // Item-on-item targeting (animation frame 2 of 3)
+    item_target_3   = 11,  // Item-on-item targeting (animation frame 3 of 3)
 };
 
 //=============================================================================
@@ -148,8 +152,7 @@ namespace CursorTarget {
     const FocusedObject& GetFocusedObject();
     bool has_focused_object();
 
-    CursorType GetCursorType();
-    int get_cursor_frame();  // Returns (int)CursorType for compatibility
+    cursor_type get_cursor_type();
 
     // Map coordinates (for m_mcx/m_mcy compatibility)
     short get_focused_map_x();

@@ -35,9 +35,13 @@ hb::shared::sprite::ISprite* SFMLSpriteFactory::create_sprite(const std::string&
     return sprite;
 }
 
-hb::shared::sprite::ISprite* SFMLSpriteFactory::create_sprite_from_data(const PAKLib::sprite& spriteData, bool alphaEffect)
+hb::shared::sprite::ISprite* SFMLSpriteFactory::create_sprite_from_metadata(
+    const std::vector<PAKLib::sprite_rect>& frames,
+    const std::string& pakFilePath,
+    int spriteIndex,
+    bool alphaEffect)
 {
-    SFMLSprite* sprite = new SFMLSprite(m_renderer, spriteData, alphaEffect);
+    SFMLSprite* sprite = new SFMLSprite(m_renderer, frames, pakFilePath, spriteIndex, alphaEffect);
 
     // Apply global alpha degree
     if (alphaEffect && m_ambient_light_level != 1)
@@ -75,7 +79,7 @@ int SFMLSpriteFactory::get_sprite_count(const std::string& pakName) const
 
     try
     {
-        PAKLib::pak pakFile = PAKLib::loadpak_fast(fullPath);
+        PAKLib::pak pakFile = PAKLib::loadpak_metadata_fast(fullPath);
         return static_cast<int>(pakFile.sprite_count);
     }
     catch (...)

@@ -18,8 +18,9 @@ namespace hb::shared::sprite {
 
 class SpriteLoader {
 public:
-    // Open a PAK file and execute a callback with the loader
-    // The PAK file is loaded once and kept in memory during the callback
+    // Open a PAK file and execute a callback with the loader.
+    // Only reads metadata (frame rects) — no image data is loaded.
+    // The PAK file is soft-locked to prevent external modification.
     template<typename Func>
     static void open_pak(const std::string& pakName, Func&& use) {
         SpriteLoader loader;
@@ -34,8 +35,9 @@ public:
         std::string pakPath = factory->get_sprite_path() + "/" + pakName + ".pak";
 
         try {
-            loader.m_pak = PAKLib::loadpak_fast(pakPath);
+            loader.m_pak = PAKLib::loadpak_metadata_fast(pakPath);
             loader.m_isPakOpen = true;
+            PAKLib::pak_lock_manager::lock(pakPath);
             use(loader);
         }
         catch (...) {
@@ -45,33 +47,8 @@ public:
         loader.m_isPakOpen = false;
     }
 
-    // Open a PAK file with access to the raw PAK data
-    template<typename Func>
-    static void open_pak_with_data(const std::string& pakName, Func&& use) {
-        SpriteLoader loader;
-        loader.m_pakName = pakName;
-
-        ISpriteFactory* factory = Sprites::get_factory();
-        if (!factory) {
-            throw std::runtime_error("No sprite factory set");
-        }
-
-        std::string pakPath = factory->get_sprite_path() + "/" + pakName + ".pak";
-
-        try {
-            loader.m_pak = PAKLib::loadpak_fast(pakPath);
-            loader.m_isPakOpen = true;
-            use(loader, loader.m_pak);
-        }
-        catch (...) {
-            loader.m_isPakOpen = false;
-            throw;
-        }
-        loader.m_isPakOpen = false;
-    }
-
-    // get a sprite from the loaded PAK file
-    // Returns nullptr if sprite creation fails
+    // get a sprite from the loaded PAK file.
+    // Returns a sprite with only metadata — texture loaded on demand from disk.
     ISprite* get_sprite(size_t index, bool alphaEffect = true) {
         if (!m_isPakOpen) {
             throw std::runtime_error("No PAK file is currently open");
@@ -86,8 +63,11 @@ public:
             return nullptr;
         }
 
-        // Use factory's CreateFromData method if available
-        return factory->create_sprite_from_data(m_pak.sprites[index], alphaEffect);
+        return factory->create_sprite_from_metadata(
+            m_pak.sprites[index].sprite_rectangles,
+            m_pak.pak_file_path,
+            static_cast<int>(index),
+            alphaEffect);
     }
 
     // get the number of sprites in the PAK

@@ -77,6 +77,23 @@ void Screen_OnGame::on_uninitialize()
     audio_manager::get().stop_music();
 }
 
+bool Screen_OnGame::on_text_input(uint32_t codepoint)
+{
+    // Auto-activate chat on printable keypress when toggle-to-chat is disabled
+    if (!text_input_manager::get().is_active()
+        && !config_manager::get().is_toggle_to_chat_enabled()
+        && GameModeManager::get_active_overlay() == nullptr
+        && codepoint >= 32 && codepoint != 127)
+    {
+        text_input_manager::get().start_input(
+            CHAT_INPUT_X(), CHAT_INPUT_Y(), CGame::ChatMsgMaxLen, m_game->m_chat_msg);
+        text_input_manager::get().set_chat_background(true);
+        text_input_manager::get().clear_input();
+        return true;
+    }
+    return false;
+}
+
 void Screen_OnGame::on_update()
 {
     std::string G_cTxt;
@@ -896,4 +913,161 @@ void Screen_OnGame::draw_patching_grid()
         m_game->m_Renderer->draw_line(0, y, screenW, y, overlayGridColor);
     }
 #endif
+}
+
+void Screen_OnGame::item_drop_external_screen(char item_id, short mouse_x, short mouse_y)
+{
+	std::string name;
+	short owner_type, dialog_x, dialog_y;
+	short npc_config_id = -1;
+	hb::shared::entity::PlayerStatus status;
+
+	if (inventory_manager::get().check_item_operation_enabled(item_id) == false) return;
+
+	if ((m_game->m_mcx != 0) && (m_game->m_mcy != 0) && (abs(m_game->m_player->m_player_x - m_game->m_mcx) <= 8) && (abs(m_game->m_player->m_player_y - m_game->m_mcy) <= 8))
+	{
+		name.clear();
+		m_game->m_map_data->get_owner(m_game->m_mcx, m_game->m_mcy, name, &owner_type, &status, &m_game->m_comm_object_id, &npc_config_id);
+		if (m_game->m_player->m_player_name == name)
+		{
+		}
+		else
+		{
+			CItem* cfg = m_game->get_item_config(m_game->m_item_list[item_id]->m_id_num);
+			if (cfg && ((cfg->get_item_type() == ItemType::Consume) || (cfg->get_item_type() == ItemType::Arrow))
+				&& (m_game->m_item_list[item_id]->m_count > 1))
+			{
+				m_game->m_dialog_box_manager.get_dialog_box(DialogBoxId::ItemDropExternal)->m_x = mouse_x - 140;
+				m_game->m_dialog_box_manager.get_dialog_box(DialogBoxId::ItemDropExternal)->m_y = mouse_y - 70;
+				if (m_game->m_dialog_box_manager.get_dialog_box(DialogBoxId::ItemDropExternal)->m_y < 0) m_game->m_dialog_box_manager.get_dialog_box(DialogBoxId::ItemDropExternal)->m_y = 0;
+				auto* dropDlg = m_game->m_dialog_box_manager.get_dialog_as<DialogBox_ItemDropAmount>(DialogBoxId::ItemDropExternal);
+				if (hb::shared::owner::can_receive_items(owner_type) && dropDlg)
+				{
+					dropDlg->m_drop_x = m_game->m_mcx;
+					dropDlg->m_drop_y = m_game->m_mcy;
+					dropDlg->m_drop_target_type = owner_type;
+					dropDlg->m_drop_target_id = m_game->m_comm_object_id;
+					std::memset(dropDlg->m_target_name, 0, sizeof(dropDlg->m_target_name));
+					if (owner_type < 10)
+						std::snprintf(dropDlg->m_target_name, sizeof(dropDlg->m_target_name), "%s", name.c_str());
+					else
+						std::snprintf(dropDlg->m_target_name, sizeof(dropDlg->m_target_name), "%s", m_game->get_npc_config_name_by_id(npc_config_id));
+				}
+				else if (dropDlg)
+				{
+					dropDlg->m_drop_x = 0;
+					dropDlg->m_drop_y = 0;
+					dropDlg->m_drop_target_type = 0;
+					dropDlg->m_drop_target_id = 0;
+					std::memset(dropDlg->m_target_name, 0, sizeof(dropDlg->m_target_name));
+				}
+				m_game->m_dialog_box_manager.enable_dialog_box(DialogBoxId::ItemDropExternal, item_id, static_cast<int64_t>(m_game->m_item_list[item_id]->m_count), 0);
+			}
+			else
+			{
+				switch (owner_type) {
+				case 1:
+				case 2:
+				case 3:
+				case 4:
+				case 5:
+				case 6:
+				{
+					auto* npcDlg = m_game->m_dialog_box_manager.get_dialog_as<DialogBox_NpcActionQuery>(DialogBoxId::NpcActionQuery);
+					npcDlg->enable_with_target(1, item_id, owner_type, 1, m_game->m_comm_object_id, m_game->m_mcx, m_game->m_mcy, name.c_str());
+					dialog_x = mouse_x - 117;
+					dialog_y = mouse_y - 50;
+					if (dialog_x < 0) dialog_x = 0;
+					if ((dialog_x + 235) > LOGICAL_MAX_X()) dialog_x = LOGICAL_MAX_X() - 235;
+					if (dialog_y < 0) dialog_y = 0;
+					if ((dialog_y + 100) > LOGICAL_MAX_Y()) dialog_y = LOGICAL_MAX_Y() - 100;
+					npcDlg->m_x = dialog_x;
+					npcDlg->m_y = dialog_y;
+				}	break;
+
+				case hb::shared::owner::Howard: // Howard
+				{
+					auto* npcDlg = m_game->m_dialog_box_manager.get_dialog_as<DialogBox_NpcActionQuery>(DialogBoxId::NpcActionQuery);
+					npcDlg->enable_with_target(3, item_id, owner_type, 1, m_game->m_comm_object_id, m_game->m_mcx, m_game->m_mcy, m_game->get_npc_config_name_by_id(npc_config_id));
+					dialog_x = mouse_x - 117;
+					dialog_y = mouse_y - 50;
+					if (dialog_x < 0) dialog_x = 0;
+					if ((dialog_x + 235) > LOGICAL_MAX_X()) dialog_x = LOGICAL_MAX_X() - 235;
+					if (dialog_y < 0) dialog_y = 0;
+					if ((dialog_y + 100) > LOGICAL_MAX_Y()) dialog_y = LOGICAL_MAX_Y() - 100;
+					npcDlg->m_x = dialog_x;
+					npcDlg->m_y = dialog_y;
+				}	break;
+
+				case hb::shared::owner::ShopKeeper: // ShopKeeper-W
+				case hb::shared::owner::Tom: // Tom
+				{
+					auto* npcDlg = m_game->m_dialog_box_manager.get_dialog_as<DialogBox_NpcActionQuery>(DialogBoxId::NpcActionQuery);
+					npcDlg->enable_with_target(2, item_id, owner_type, 1, m_game->m_comm_object_id, m_game->m_mcx, m_game->m_mcy, m_game->get_npc_config_name_by_id(npc_config_id));
+					dialog_x = mouse_x - 117;
+					dialog_y = mouse_y - 50;
+					if (dialog_x < 0) dialog_x = 0;
+					if ((dialog_x + 235) > LOGICAL_MAX_X()) dialog_x = LOGICAL_MAX_X() - 235;
+					if (dialog_y < 0) dialog_y = 0;
+					if ((dialog_y + 100) > LOGICAL_MAX_Y()) dialog_y = LOGICAL_MAX_Y() - 100;
+					npcDlg->m_x = dialog_x;
+					npcDlg->m_y = dialog_y;
+				}	break;
+
+				default:
+					if (cfg)
+					{
+						if (m_game->item_drop_history(m_game->m_item_list[item_id]->m_id_num))
+						{
+							m_game->m_dialog_box_manager.get_dialog_box(DialogBoxId::ItemDropConfirm)->m_x = mouse_x - 140;
+							m_game->m_dialog_box_manager.get_dialog_box(DialogBoxId::ItemDropConfirm)->m_y = mouse_y - 70;
+							if (m_game->m_dialog_box_manager.get_dialog_box(DialogBoxId::ItemDropConfirm)->m_y < 0) m_game->m_dialog_box_manager.get_dialog_box(DialogBoxId::ItemDropConfirm)->m_y = 0;
+							m_game->m_dialog_box_manager.enable_dialog_box(DialogBoxId::ItemDropConfirm, item_id, static_cast<int64_t>(m_game->m_item_list[item_id]->m_count), 0);
+						}
+						else
+						{
+							m_game->send_command(MsgId::CommandCommon, CommonType::ItemDrop, 0, item_id, 1, 0, cfg->m_name);
+						}
+					}
+					break;
+				}
+			}
+			inventory_manager::get().lock_item(item_id);
+		}
+	}
+	else
+	{
+		CItem* cfg2 = m_game->get_item_config(m_game->m_item_list[item_id]->m_id_num);
+		if (cfg2 && ((cfg2->get_item_type() == ItemType::Consume) || (cfg2->get_item_type() == ItemType::Arrow))
+			&& (m_game->m_item_list[item_id]->m_count > 1))
+		{
+			m_game->m_dialog_box_manager.get_dialog_box(DialogBoxId::ItemDropExternal)->m_x = mouse_x - 140;
+			m_game->m_dialog_box_manager.get_dialog_box(DialogBoxId::ItemDropExternal)->m_y = mouse_y - 70;
+			if (m_game->m_dialog_box_manager.get_dialog_box(DialogBoxId::ItemDropExternal)->m_y < 0)		m_game->m_dialog_box_manager.get_dialog_box(DialogBoxId::ItemDropExternal)->m_y = 0;
+			if (auto* dropDlg2 = m_game->m_dialog_box_manager.get_dialog_as<DialogBox_ItemDropAmount>(DialogBoxId::ItemDropExternal))
+			{
+				dropDlg2->m_drop_x = 0;
+				dropDlg2->m_drop_y = 0;
+				dropDlg2->m_drop_target_type = 0;
+				dropDlg2->m_drop_target_id = 0;
+				std::memset(dropDlg2->m_target_name, 0, sizeof(dropDlg2->m_target_name));
+			}
+			m_game->m_dialog_box_manager.enable_dialog_box(DialogBoxId::ItemDropExternal, item_id, static_cast<int64_t>(m_game->m_item_list[item_id]->m_count), 0);
+		}
+		else
+		{
+			if (m_game->item_drop_history(m_game->m_item_list[item_id]->m_id_num))
+			{
+				m_game->m_dialog_box_manager.get_dialog_box(DialogBoxId::ItemDropConfirm)->m_x = mouse_x - 140;
+				m_game->m_dialog_box_manager.get_dialog_box(DialogBoxId::ItemDropConfirm)->m_y = mouse_y - 70;
+				if (m_game->m_dialog_box_manager.get_dialog_box(DialogBoxId::ItemDropConfirm)->m_y < 0)	m_game->m_dialog_box_manager.get_dialog_box(DialogBoxId::ItemDropConfirm)->m_y = 0;
+				m_game->m_dialog_box_manager.enable_dialog_box(DialogBoxId::ItemDropConfirm, item_id, static_cast<int64_t>(m_game->m_item_list[item_id]->m_count), 0);
+			}
+			else
+			{
+				if (cfg2) m_game->send_command(MsgId::CommandCommon, CommonType::ItemDrop, 0, item_id, 1, 0, cfg2->m_name);
+			}
+		}
+		inventory_manager::get().lock_item(item_id);
+	}
 }

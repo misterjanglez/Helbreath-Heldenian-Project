@@ -21,9 +21,11 @@ public:
     void on_uninitialize() override;
     void on_update() override;
     void on_render() override;
+    bool on_text_input(uint32_t codepoint) override;
 
 private:
     void render_item_tooltip();
+    void item_drop_external_screen(char item_id, short mouse_x, short mouse_y);
     void draw_tile_grid();           // Simple dark grid lines
     void draw_patching_grid();       // Debug grid with zone colors
     void draw_spell_target_overlay(); // Spell AoE targeting overlay (debug only)

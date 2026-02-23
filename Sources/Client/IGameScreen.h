@@ -58,6 +58,11 @@ public:
     // Override to false for overlays that draw their own background (e.g. DevConsole).
     virtual bool wants_background_dim() const { return true; }
 
+    // Called when a text character is entered (WM_CHAR / SFML TextEntered).
+    // Return true if handled (e.g. auto-activated chat input).
+    // The universal on_text_char forwarding happens regardless of return value.
+    virtual bool on_text_input(uint32_t codepoint) { return false; }
+
     // Called when a server response arrives in log_response_handler.
     // Return true if this screen handled the response (stops further processing),
     // false to fall through to default handling. Optional — not all screens need this.
