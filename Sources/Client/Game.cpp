@@ -2087,6 +2087,107 @@ void CGame::on_timer()
 	}
 }
 
+void CGame::item_drop_external_screen(char item_id, short mouse_x, short mouse_y)
+{
+	std::string name;
+	short owner_type, dialog_x, dialog_y;
+	short npc_config_id = -1;
+	hb::shared::entity::PlayerStatus status;
+
+	if (inventory_manager::get().check_item_operation_enabled(item_id) == false) return;
+
+	if ((m_mcx != 0) && (m_mcy != 0) && (abs(m_player->m_player_x - m_mcx) <= 8) && (abs(m_player->m_player_y - m_mcy) <= 8))
+	{
+		name.clear();
+		m_map_data->get_owner(m_mcx, m_mcy, name, &owner_type, &status, &m_comm_object_id, &npc_config_id);
+		if (m_player->m_player_name == name)
+		{
+		}
+		else
+		{
+			CItem* cfg = get_item_config(m_item_list[item_id]->m_id_num);
+			if (cfg && ((cfg->get_item_type() == ItemType::Consume) || (cfg->get_item_type() == ItemType::Arrow))
+				&& (m_item_list[item_id]->m_count > 1))
+			{
+				m_dialog_box_manager.get_dialog_box(DialogBoxId::ItemDropExternal)->m_x = mouse_x - 140;
+				m_dialog_box_manager.get_dialog_box(DialogBoxId::ItemDropExternal)->m_y = mouse_y - 70;
+				if (m_dialog_box_manager.get_dialog_box(DialogBoxId::ItemDropExternal)->m_y < 0) m_dialog_box_manager.get_dialog_box(DialogBoxId::ItemDropExternal)->m_y = 0;
+				auto* dropDlg = m_dialog_box_manager.get_dialog_as<DialogBox_ItemDropAmount>(DialogBoxId::ItemDropExternal);
+				if (hb::shared::owner::can_receive_items(owner_type) && dropDlg)
+				{
+					dropDlg->m_drop_x = m_mcx;
+					dropDlg->m_drop_y = m_mcy;
+					dropDlg->m_drop_target_type = owner_type;
+					dropDlg->m_drop_target_id = m_comm_object_id;
+					std::memset(dropDlg->m_target_name, 0, sizeof(dropDlg->m_target_name));
+					if (owner_type < 10)
+						std::snprintf(dropDlg->m_target_name, sizeof(dropDlg->m_target_name), "%s", name.c_str());
+					else
+						std::snprintf(dropDlg->m_target_name, sizeof(dropDlg->m_target_name), "%s", get_npc_config_name_by_id(npc_config_id));
+				}
+				else if (dropDlg)
+				{
+					dropDlg->m_drop_x = 0;
+					dropDlg->m_drop_y = 0;
+					dropDlg->m_drop_target_type = 0;
+					dropDlg->m_drop_target_id = 0;
+					std::memset(dropDlg->m_target_name, 0, sizeof(dropDlg->m_target_name));
+				}
+				m_dialog_box_manager.enable_dialog_box(DialogBoxId::ItemDropExternal, item_id, static_cast<int64_t>(m_item_list[item_id]->m_count), 0);
+			}
+			else
+			{
+				switch (owner_type) {
+				case 1:
+				case 2:
+				case 3:
+				case 4:
+				case 5:
+				case 6:
+					{	auto* npcDlg = m_dialog_box_manager.get_dialog_as<DialogBox_NpcActionQuery>(DialogBoxId::NpcActionQuery);
+					npcDlg->enable_with_target(1, item_id, owner_type, 1, m_comm_object_id, m_mcx, m_mcy, name.c_str());
+					dialog_x = mouse_x - 117;
+					dialog_y = mouse_y - 50;
+					if (dialog_x < 0) dialog_x = 0;
+					if ((dialog_x + 235) > LOGICAL_MAX_X()) dialog_x = LOGICAL_MAX_X() - 235;
+					if (dialog_y < 0) dialog_y = 0;
+					if ((dialog_y + 100) > LOGICAL_MAX_Y()) dialog_y = LOGICAL_MAX_Y() - 100;
+					npcDlg->m_x = dialog_x;
+					npcDlg->m_y = dialog_y;
+				}	break;
+
+				case hb::shared::owner::Kennedy:
+					if (cfg)
+						send_command(MsgId::CommandCommon, CommonType::GiveItemToChar, item_id, 1, m_mcx, m_mcy, cfg->m_name, m_comm_object_id);
+					break;
+
+				case hb::shared::owner::Howard: // Howard
+				{	auto* npcDlg = m_dialog_box_manager.get_dialog_as<DialogBox_NpcActionQuery>(DialogBoxId::NpcActionQuery);
+					npcDlg->enable_with_target(3, item_id, owner_type, 1, m_comm_object_id, m_mcx, m_mcy, get_npc_config_name_by_id(npc_config_id));
+					dialog_x = mouse_x - 117;
+					dialog_y = mouse_y - 50;
+					if (dialog_x < 0) dialog_x = 0;
+					if ((dialog_x + 235) > LOGICAL_MAX_X()) dialog_x = LOGICAL_MAX_X() - 235;
+					if (dialog_y < 0) dialog_y = 0;
+					if ((dialog_y + 100) > LOGICAL_MAX_Y()) dialog_y = LOGICAL_MAX_Y() - 100;
+					npcDlg->m_x = dialog_x;
+					npcDlg->m_y = dialog_y;
+				}	break;
+
+				case hb::shared::owner::ShopKeeper: // ShopKeeper-W
+				case hb::shared::owner::Tom: // Tom
+				{	auto* npcDlg = m_dialog_box_manager.get_dialog_as<DialogBox_NpcActionQuery>(DialogBoxId::NpcActionQuery);
+					npcDlg->enable_with_target(2, item_id, owner_type, 1, m_comm_object_id, m_mcx, m_mcy, get_npc_config_name_by_id(npc_config_id));
+					dialog_x = mouse_x - 117;
+					dialog_y = mouse_y - 50;
+					if (dialog_x < 0) dialog_x = 0;
+					if ((dialog_x + 235) > LOGICAL_MAX_X()) dialog_x = LOGICAL_MAX_X() - 235;
+					if (dialog_y < 0) dialog_y = 0;
+					if ((dialog_y + 100) > LOGICAL_MAX_Y()) dialog_y = LOGICAL_MAX_Y() - 100;
+					npcDlg->m_x = dialog_x;
+					npcDlg->m_y = dialog_y;
+				}	break;
+
 void CGame::common_event_handler(char* data)
 {
 	uint16_t event_type;
@@ -2144,6 +2245,8 @@ void CGame::clear_guild_name_list()
 	for (int i = 0; i < game_limits::max_guild_names; i++) {
 		m_guild_name_cache[i].ref_time = 0;
 		m_guild_name_cache[i].guild_rank = -1;
+		m_guild_name_cache[i].char_name.clear();
+		m_guild_name_cache[i].guild_name.clear();
 	}
 }
 
@@ -2396,6 +2499,7 @@ void CGame::init_player_characteristics(char* data)
 	m_player->m_guild_name.assign(pkt->guild_name, strnlen(pkt->guild_name, sizeof(pkt->guild_name)));
 
 	if (m_player->m_guild_name == "NONE")
+		m_player->m_guild_name.clear();
 
 		std::replace(m_player->m_guild_name.begin(), m_player->m_guild_name.end(), '_', ' ');
 	m_player->m_guild_rank = pkt->guild_rank;
@@ -4849,20 +4953,14 @@ void CGame::draw_object_name(short screen_x, short screen_y, const char* name, c
 						{
 							guild_text = std::format(DEF_MSG_GUILDMASTER, m_guild_name_cache[guild_index].guild_name);//
 							hb::shared::text::draw_text(GameFont::Default, screen_x, screen_y + 14, guild_text.c_str(), hb::shared::text::TextStyle::with_shadow(GameColors::InfoGrayLight));
-							m_guild_name_cache[guild_index].ref_time = m_cur_time;
 							y_offset = 14;
 						}
 						else if (m_guild_name_cache[guild_index].guild_rank > 0)
 						{
 							guild_text = std::format(DEF_MSG_GUILDSMAN, m_guild_name_cache[guild_index].guild_name);//"
 							hb::shared::text::draw_text(GameFont::Default, screen_x, screen_y + 14, guild_text.c_str(), hb::shared::text::TextStyle::with_shadow(GameColors::InfoGrayLight));
-							m_guild_name_cache[guild_index].ref_time = m_cur_time;
 							y_offset = 14;
 						}
-					}
-					else
-					{
-						m_guild_name_cache[guild_index].ref_time = 0;
 					}
 				}
 			}
@@ -4910,7 +5008,15 @@ bool CGame::find_guild_name(const char* name, int* ipIndex)
 	{
 		if (memcmp(m_guild_name_cache[i].char_name.c_str(), name, 10) == 0)
 		{
-			m_guild_name_cache[i].ref_time = m_cur_time;
+			// Expire cached entries after 15 seconds to detect guild changes
+			if (m_cur_time - m_guild_name_cache[i].ref_time > 15000)
+			{
+				m_guild_name_cache[i].guild_rank = -1;
+				m_guild_name_cache[i].guild_name.clear();
+				m_guild_name_cache[i].ref_time = m_cur_time;
+				*ipIndex = i;
+				return false;
+			}
 			*ipIndex = i;
 			return true;
 		}

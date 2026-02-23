@@ -2148,48 +2148,53 @@ bool CombatManager::check_client_attack_frequency(int client_h, uint32_t client_
 	return false;
 }
 
-bool CombatManager::calculate_endurance_decrement(short target_h, short attacker_h, char target_type, int armor_type)
+bool CombatManager::calculate_endurance_decrement(short target_h, short attacker_h, char attacker_type, char target_type, int armor_type)
 {
 	int down_value = 1, hammer_chance = 100, item_index;
-	uint16_t weapon_type;
+	uint16_t weapon_type = 0;
 
 	if (m_game->m_client_list[target_h] == 0) return false;
-	if (attacker_h > MaxClients) return false;
-	if ((target_type == hb::shared::owner_class::Player) && (m_game->m_client_list[attacker_h] == 0)) return false;
-	weapon_type = m_game->m_client_list[attacker_h]->get_equipped_weapon_type();		// attacker_h was 2536 == null
-	if ((target_type == hb::shared::owner_class::Player) && (m_game->m_client_list[target_h]->m_side != m_game->m_client_list[attacker_h]->m_side)) {
-		switch (m_game->m_client_list[attacker_h]->m_using_weapon_skill) {
-		case 14:
-			if ((weapon_type == 31) || (weapon_type == 32)) {
-				item_index = m_game->m_client_list[attacker_h]->m_item_equipment_status[to_int(EquipPos::TwoHand)];
-				if ((item_index != -1) && (m_game->m_client_list[attacker_h]->m_item_list[item_index] != 0)) {
-					if (m_game->m_client_list[attacker_h]->m_item_list[item_index]->m_id_num == 761) { // BattleHammer 
-						down_value = 30;
+
+	// Player-specific weapon skill logic (only when attacker is a player)
+	if (attacker_type == hb::shared::owner_class::Player) {
+		if (attacker_h > MaxClients) return false;
+		if (m_game->m_client_list[attacker_h] == 0) return false;
+		weapon_type = m_game->m_client_list[attacker_h]->get_equipped_weapon_type();
+		if ((target_type == hb::shared::owner_class::Player) && (m_game->m_client_list[target_h]->m_side != m_game->m_client_list[attacker_h]->m_side)) {
+			switch (m_game->m_client_list[attacker_h]->m_using_weapon_skill) {
+			case 14:
+				if ((weapon_type == 31) || (weapon_type == 32)) {
+					item_index = m_game->m_client_list[attacker_h]->m_item_equipment_status[to_int(EquipPos::TwoHand)];
+					if ((item_index != -1) && (m_game->m_client_list[attacker_h]->m_item_list[item_index] != 0)) {
+						if (m_game->m_client_list[attacker_h]->m_item_list[item_index]->m_id_num == 761) { // BattleHammer
+							down_value = 30;
+						}
+						if (m_game->m_client_list[attacker_h]->m_item_list[item_index]->m_id_num == 762) { // GiantBattleHammer
+							down_value = 35;
+						}
+						if (m_game->m_client_list[attacker_h]->m_item_list[item_index]->m_id_num == 843) { // BarbarianHammer
+							down_value = 30;
+						}
+						if (m_game->m_client_list[attacker_h]->m_item_list[item_index]->m_id_num == 745) { // MasterBattleHammer
+							down_value = 30;
+						}
+						break;
 					}
-					if (m_game->m_client_list[attacker_h]->m_item_list[item_index]->m_id_num == 762) { // GiantBattleHammer
-						down_value = 35;
-					}
-					if (m_game->m_client_list[attacker_h]->m_item_list[item_index]->m_id_num == 843) { // BarbarianHammer
-						down_value = 30;
-					}
-					if (m_game->m_client_list[attacker_h]->m_item_list[item_index]->m_id_num == 745) { // MasterBattleHammer
-						down_value = 30;
-					}
-					break;
 				}
+				else {
+					down_value = 20;
+				}
+				break;
+			case 10:
+				down_value = 3;
+				break;
+			default:
+				down_value = 1;
+				break;
 			}
-			else {
-				down_value = 20;
-			}
-			break;
-		case 10:
-			down_value = 3;
-			break;
-		default:
-			down_value = 1;
-			break;
 		}
 	}
+	// NPC attackers use default down_value = 1
 	if (m_game->m_client_list[target_h]->m_is_special_ability_enabled) {
 		switch (m_game->m_client_list[target_h]->m_special_ability_type) {
 		case 52:
@@ -2211,7 +2216,7 @@ bool CombatManager::calculate_endurance_decrement(short target_h, short attacker
 		m_game->m_item_manager->release_item_handler(target_h, armor_type, true);
 		return true;
 	}
-	if ((target_type == hb::shared::owner_class::Player) && (m_game->m_client_list[attacker_h]->m_using_weapon_skill == 14) && (hammer_chance == 100)) {
+	if ((attacker_type == hb::shared::owner_class::Player) && (target_type == hb::shared::owner_class::Player) && (m_game->m_client_list[attacker_h]->m_using_weapon_skill == 14) && (hammer_chance == 100)) {
 		if (m_game->m_client_list[target_h]->m_item_list[armor_type]->m_max_life_span < 2000) {
 			hammer_chance = m_game->dice(6, (m_game->m_client_list[target_h]->m_item_list[armor_type]->m_max_life_span - m_game->m_client_list[target_h]->m_item_list[armor_type]->m_cur_life_span));
 		}
@@ -3092,19 +3097,19 @@ uint32_t CombatManager::calculate_attack_effect(short target_h, char target_type
 				case 1:
 					temp = m_game->m_client_list[target_h]->m_item_equipment_status[to_int(EquipPos::Body)];
 					if ((temp != -1) && (m_game->m_client_list[target_h]->m_item_list[temp] != 0)) {
-						calculate_endurance_decrement(target_h, attacker_h, target_type, temp);
+						calculate_endurance_decrement(target_h, attacker_h, attacker_type, target_type, temp);
 					}
 					break;
 
 				case 2:
 					temp = m_game->m_client_list[target_h]->m_item_equipment_status[to_int(EquipPos::Pants)];
 					if ((temp != -1) && (m_game->m_client_list[target_h]->m_item_list[temp] != 0)) {
-						calculate_endurance_decrement(target_h, attacker_h, target_type, temp);
+						calculate_endurance_decrement(target_h, attacker_h, attacker_type, target_type, temp);
 					}
 					else {
 						temp = m_game->m_client_list[target_h]->m_item_equipment_status[to_int(EquipPos::Leggings)];
 						if ((temp != -1) && (m_game->m_client_list[target_h]->m_item_list[temp] != 0)) {
-							calculate_endurance_decrement(target_h, attacker_h, target_type, temp);
+							calculate_endurance_decrement(target_h, attacker_h, attacker_type, target_type, temp);
 						}
 					}
 					break;
@@ -3112,14 +3117,14 @@ uint32_t CombatManager::calculate_attack_effect(short target_h, char target_type
 				case 3:
 					temp = m_game->m_client_list[target_h]->m_item_equipment_status[to_int(EquipPos::Arms)];
 					if ((temp != -1) && (m_game->m_client_list[target_h]->m_item_list[temp] != 0)) {
-						calculate_endurance_decrement(target_h, attacker_h, target_type, temp);
+						calculate_endurance_decrement(target_h, attacker_h, attacker_type, target_type, temp);
 					}
 					break;
 
 				case 4:
 					temp = m_game->m_client_list[target_h]->m_item_equipment_status[to_int(EquipPos::Head)];
 					if ((temp != -1) && (m_game->m_client_list[target_h]->m_item_list[temp] != 0)) {
-						calculate_endurance_decrement(target_h, attacker_h, target_type, temp);
+						calculate_endurance_decrement(target_h, attacker_h, attacker_type, target_type, temp);
 					}
 					break;
 				}

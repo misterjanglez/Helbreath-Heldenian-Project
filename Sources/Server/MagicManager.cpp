@@ -256,14 +256,8 @@ void MagicManager::player_magic_handler(int client_h, int dX, int dY, short type
 		(dY < 0) || (dY >= m_game->m_map_list[m_game->m_client_list[client_h]->m_map_index]->m_size_y)) return;
 
 	if (((time - m_game->m_client_list[client_h]->m_recent_attack_time) < 1000) && (item_effect == 0)) {
-		try
-		{
-			hb::logger::warn<log_channel::security>("Fast cast detection: IP={} player={}, magic casting too fast", m_game->m_client_list[client_h]->m_ip_address, m_game->m_client_list[client_h]->m_char_name);
-			m_game->delete_client(client_h, true, true);
-		}
-		catch (...)
-		{
-		}
+		hb::logger::warn<log_channel::security>("Fast cast detection: IP={} player={}, magic casting too fast", m_game->m_client_list[client_h]->m_ip_address, m_game->m_client_list[client_h]->m_char_name);
+		m_game->m_client_list[client_h]->m_magic_confirm = false;
 		return;
 	}
 	m_game->m_client_list[client_h]->m_recent_attack_time = time;
@@ -328,14 +322,9 @@ void MagicManager::player_magic_handler(int client_h, int dX, int dY, short type
 	}
 
 	if ((m_game->m_client_list[client_h]->m_spell_count > 1) && (item_effect == false)) {
-		try
-		{
-			hb::logger::warn<log_channel::security>("Spell hack: IP={} player={}, casting without precast", m_game->m_client_list[client_h]->m_ip_address, m_game->m_client_list[client_h]->m_char_name);
-			m_game->delete_client(client_h, true, true);
-		}
-		catch (...)
-		{
-		}
+		hb::logger::warn<log_channel::security>("Spell hack: IP={} player={}, casting without precast", m_game->m_client_list[client_h]->m_ip_address, m_game->m_client_list[client_h]->m_char_name);
+		m_game->m_client_list[client_h]->m_spell_count = 0;
+		m_game->m_client_list[client_h]->m_magic_confirm = false;
 		return;
 	}
 
@@ -2673,15 +2662,7 @@ bool MagicManager::check_client_magic_frequency(int client_h, uint32_t client_ti
 		m_game->m_client_list[client_h]->m_magic_freq_time = client_time;
 
 		if ((time_gap < 1500) && (m_game->m_client_list[client_h]->m_magic_confirm)) {
-			try
-			{
-				hb::logger::warn<log_channel::security>("Speed cast: IP={} player={}, irregular casting rate", m_game->m_client_list[client_h]->m_ip_address, m_game->m_client_list[client_h]->m_char_name);
-				m_game->delete_client(client_h, true, true);
-			}
-			catch (...)
-			{
-			}
-			return false;
+			hb::logger::warn<log_channel::security>("Speed cast: IP={} player={}, irregular casting rate", m_game->m_client_list[client_h]->m_ip_address, m_game->m_client_list[client_h]->m_char_name);
 		}
 
 		m_game->m_client_list[client_h]->m_spell_count--;
