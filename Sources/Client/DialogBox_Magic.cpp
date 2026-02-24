@@ -16,7 +16,8 @@ using namespace hb::client::sprite_id;
 
 bool DialogBox_Magic::on_enable(int type, int64_t v1, int v2, const char* string)
 {
-	if (v1 >= 0 && v1 <= 9)
+	// type=1: explicit circle selection (Ctrl+number keys)
+	if (type == 1 && v1 >= 0 && v1 <= 9)
 		m_circle_view = static_cast<short>(v1);
 	return true;
 }

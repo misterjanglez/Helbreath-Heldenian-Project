@@ -1,5 +1,7 @@
 ﻿#include "RenderHelpers.h"
 #include "Game.h"
+#include "Screen_OnGame.h"
+#include "FloatingTextManager.h"
 #include "CommonTypes.h"
 #include "ConfigManager.h"
 #include <algorithm>
@@ -81,7 +83,8 @@ void draw_weapon(CGame& game, hb::shared::sprite::SpriteCollection& sprites,
 	// Shader adds a flat color offset to every pixel before additive blending:
 	//   dest += clamp(src + (r, g, b))
 	int weaponGlare = eq.m_weapon_glare;
-	game.dk_glare(eq.m_weapon_color, eq.m_weapon_item_id, &weaponGlare);
+	if (auto* on_game = GameModeManager::get_active_screen_as<Screen_OnGame>())
+		on_game->dk_glare(eq.m_weapon_color, eq.m_weapon_item_id, &weaponGlare);
 	if (weaponGlare != 0)
 	{
 		int f = game.m_draw_flag;
@@ -339,14 +342,14 @@ void apply_direction_override(CEntityRenderState& state)
 }
 
 // -----------------------------------------------------------------------
-void draw_name(CGame& game, const CEntityRenderState& state, int sX, int sY)
+void draw_name(Screen_OnGame& screen, const CEntityRenderState& state, int sX, int sY)
 {
 	if (state.m_name[0] != '\0')
 	{
 		if (state.is_player())
-			game.draw_object_name(sX, sY, state.m_name.data(), state.m_status, state.m_object_id);
+			screen.draw_object_name(sX, sY, state.m_name.data(), state.m_status, state.m_object_id);
 		else
-			game.draw_npc_name(sX, sY, state.m_owner_type, state.m_status, state.m_npc_config_id);
+			screen.draw_npc_name(sX, sY, state.m_owner_type, state.m_status, state.m_npc_config_id);
 	}
 }
 
@@ -356,9 +359,9 @@ void update_chat(CGame& game, const CEntityRenderState& state,
 {
 	if (state.m_chat_index == 0) return;
 
-	if (game.m_floating_text.is_valid(state.m_chat_index, state.m_object_id))
+	if (game.get_floating_text().is_valid(state.m_chat_index, state.m_object_id))
 	{
-		game.m_floating_text.update_position(state.m_chat_index, static_cast<short>(sX), static_cast<short>(sY));
+		game.get_floating_text().update_position(state.m_chat_index, static_cast<short>(sX), static_cast<short>(sY));
 	}
 	else
 	{

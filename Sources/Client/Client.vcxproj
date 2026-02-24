@@ -516,7 +516,7 @@
     <ClCompile Include="performance_monitor.cpp" />
     <ClCompile Include="HotkeyManager.cpp" />
     <ClCompile Include="Screen_OnGame.Hotkeys.cpp" />
-    <ClCompile Include="Game.DrawObjects.cpp" />
+    <ClCompile Include="Screen_OnGame.DrawObjects.cpp" />
     <ClCompile Include="EquipmentIndices.cpp" />
     <ClCompile Include="RenderHelpers.cpp" />
     <ClCompile Include="PlayerRenderer.cpp" />

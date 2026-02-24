@@ -1,4 +1,5 @@
 ﻿#include "Game.h"
+#include "FloatingTextManager.h"
 #include "NetworkMessageManager.h"
 #include "Packet/SharedPackets.h"
 #include "DialogBox_Skill.h"
@@ -97,14 +98,14 @@ namespace NetworkMessageHandlers {
 		if (skill_index < 0 || skill_index >= hb::shared::limits::MaxSkillType) return;
 		if (!game->m_skill_cfg_list[skill_index]) return;
 		value = static_cast<short>(pkt->skill_value);
-		game->m_floating_text.remove_by_object_id(game->m_player->m_player_object_id);
+		game->get_floating_text().remove_by_object_id(game->m_player->m_player_object_id);
 		if (game->m_skill_cfg_list[skill_index]->m_level < value)
 		{
 			txt = std::format(NOTIFYMSG_SKILL1, game->m_skill_cfg_list[skill_index]->m_name, value - game->m_skill_cfg_list[skill_index]->m_level);
 			game->add_event_list(txt.c_str(), 10);
 			game->play_game_sound('E', 23, 0);
 			txt = std::format("{} +{}%", game->m_skill_cfg_list[skill_index]->m_name, value - game->m_skill_cfg_list[skill_index]->m_level);
-			game->m_floating_text.add_notify_text(notify_text_type::skill_change, txt, game->m_cur_time,
+			game->get_floating_text().add_notify_text(notify_text_type::skill_change, txt, game->m_cur_time,
 				game->m_player->m_player_object_id, game->m_map_data.get());
 		}
 		else if (game->m_skill_cfg_list[skill_index]->m_level > value) {
@@ -112,7 +113,7 @@ namespace NetworkMessageHandlers {
 			game->add_event_list(txt.c_str(), 10);
 			game->play_game_sound('E', 24, 0);
 			txt = std::format("{} -{}%", game->m_skill_cfg_list[skill_index]->m_name, value - game->m_skill_cfg_list[skill_index]->m_level);
-			game->m_floating_text.add_notify_text(notify_text_type::skill_change, txt, game->m_cur_time,
+			game->get_floating_text().add_notify_text(notify_text_type::skill_change, txt, game->m_cur_time,
 				game->m_player->m_player_object_id, game->m_map_data.get());
 		}
 		game->m_skill_cfg_list[skill_index]->m_level = value;

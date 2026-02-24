@@ -4,6 +4,7 @@
 
 #include "Screen_CreateNewCharacter.h"
 #include "Game.h"
+#include "Screen_OnGame.h"
 #include "GameModeManager.h"
 #include "InputStateHelper.h"
 #include "TextFieldRenderer.h"
@@ -463,7 +464,7 @@ void Screen_CreateNewCharacter::on_render()
     m_game->m_entity_state.m_action = Type::Move;
     m_game->m_entity_state.m_frame = m_game->m_menu_frame;
 
-    m_game->draw_character_body(507 + OX, 267 + OY, m_game->m_entity_state.m_owner_type);
+    Screen_OnGame::draw_character_body(*m_game, 507 + OX, 267 + OY, m_game->m_entity_state.m_owner_type);
     m_game->draw_object_on_move_for_menu(0, 0, 500 + OX, 174 + OY, false, time, false);
 
     // === Derived stats ===

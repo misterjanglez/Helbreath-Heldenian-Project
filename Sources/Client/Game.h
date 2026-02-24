@@ -55,14 +55,7 @@
 #include "EntityRenderState.h"
 #include "Camera.h"
 #include "GameModeManager.h"
-#include "PlayerRenderer.h"
-#include "NpcRenderer.h"
 #include "GameTimer.h"
-#include "FloatingTextManager.h"
-#include "FishingManager.h"
-#include "CraftingManager.h"
-#include "QuestManager.h"
-
 #include "GameConstants.h"
 #include "Application.h"
 #include "GameEvents.h"
@@ -93,6 +86,8 @@ struct char_creation_data
 };
 
 namespace hb { namespace net { struct packet_base; } }
+
+class floating_text_manager;
 
 class CGame : public hb::shared::render::application
 {
@@ -136,9 +131,7 @@ public:
 	void crusade_war_result(int winner_side);
 	void crusade_contribution_result(int war_contribution);
 	void cannot_construct(int code);
-	void draw_top_msg();
 	void set_top_msg(const char* string, unsigned char last_sec);
-	void draw_object_foe(int ix, int iy, int frame);
 	void grand_magic_result(const char* map_name, int ares_crusade_points, int elv_crusade_points, int ares_industry_points, int elv_industry_points, int ares_crusade_casualties, int ares_industry_casualties, int elv_crusade_casualties, int elv_industry_casualties);
 	void meteor_strike_coming(int code);
 
@@ -175,15 +168,12 @@ public:
 	bool is_item_on_hand();
 	void dynamic_object_handler(char * data);
 	bool check_item_by_type(hb::shared::item::ItemType type);
-	void draw_npc_name(   short screen_x, short screen_y, short owner_type, const hb::shared::entity::PlayerStatus& status, short npc_config_id = -1);
-	void draw_object_name(short screen_x, short screen_y, const char* name, const hb::shared::entity::PlayerStatus& status, uint16_t object_id);
 	void play_game_sound(char type, int num, int dist, long lPan = 0);  // Forwards to audio_manager
 	void load_text_dlg_contents(int type);
 	int  load_text_dlg_contents2(int type);
 	void request_full_object_data(uint16_t object_id);
 	void retrieve_item_handler(char * data);
 	void civil_right_admission_handler(char * data);
-	void draw_character_body(short sX, short sY, short type);
 	void request_teleport_and_wait_data();
 	void point_command_handler(int indexX, int indexY, char item_id = -1);
 	void add_event_list(const char* txt, char color = 0, bool dup_allow = true);
@@ -194,19 +184,7 @@ public:
 	// get_top_dialog_box_index, enable_dialog_box, disable_dialog_box REMOVED
 	// — use get_dialog_box_manager().get_top_id(), enable_dialog_box(), disable_dialog_box()
 	void init_item_list(char * packet_data);
-	hb::shared::sprite::BoundRect draw_object_on_dead(int indexX, int indexY, int sX, int sY, bool trans, uint32_t time);
-	hb::shared::sprite::BoundRect draw_object_on_dying(int indexX, int indexY, int sX, int sY, bool trans, uint32_t time);
-	hb::shared::sprite::BoundRect draw_object_on_magic(int indexX, int indexY, int sX, int sY, bool trans, uint32_t time);
-	hb::shared::sprite::BoundRect draw_object_on_attack(int indexX, int indexY, int sX, int sY, bool trans, uint32_t time);
-	hb::shared::sprite::BoundRect draw_object_on_attack_move(int indexX, int indexY, int sX, int sY, bool trans, uint32_t time);
-	hb::shared::sprite::BoundRect draw_object_on_stop(int indexX, int indexY, int sX, int sY, bool trans, uint32_t time);
 	hb::shared::sprite::BoundRect draw_object_on_move_for_menu(int indexX, int indexY, int sX, int sY, bool trans, uint32_t time, bool draw_shadow = false);
-	hb::shared::sprite::BoundRect draw_object_on_move(int indexX, int indexY, int sX, int sY, bool trans, uint32_t time);
-	hb::shared::sprite::BoundRect draw_object_on_damage_move(int indexX, int indexY, int sX, int sY, bool trans, uint32_t time);
-	hb::shared::sprite::BoundRect draw_object_on_run(int indexX, int indexY, int sX, int sY, bool trans, uint32_t time);
-	hb::shared::sprite::BoundRect draw_object_on_damage(int indexX, int indexY, int sX, int sY, bool trans, uint32_t time);
-	hb::shared::sprite::BoundRect draw_object_on_get_item(int indexX, int indexY, int sX, int sY, bool trans, uint32_t time);
-	void draw_background(short div_x, short mod_x, short div_y, short mod_y);
 	void chat_msg_handler(char * packet_data);
 	void release_unused_sprites();
 	void handle_key_up(KeyCode key);
@@ -223,7 +201,8 @@ public:
 	void connection_establish_handler(char where);
 	void motion_response_handler(char * packet_data);
 	void game_recv_msg_handler(uint32_t msg_size, char * data);
-	void draw_objects(short pivot_x, short pivot_y, short div_x, short div_y, short mod_x, short mod_y, short mouse_x, short mouse_y);
+	// Convenience accessor — routes through the active Screen_OnGame
+	floating_text_manager& get_floating_text();
 	// --- Packet transport API (caller constructs packet, CGame owns the wire) ---
 	bool send_game_packet_impl(const hb::net::packet_base& pkt, size_t size, bool encrypt = true);
 
@@ -260,9 +239,6 @@ public:
 
 	int has_hero_set(const hb::shared::entity::PlayerAppearance& appr, short OwnerType);
 	void show_heldenian_victory(short side);
-	void dk_glare(int weapon_color, int16_t weapon_item_id, int* weapon_glare);
-	void abaddon_corpse(int sX, int sY);
-	void draw_angel(int sprite, short sX, short sY, char frame, uint32_t time);
 
 	//50Cent - Repair All
 	short totalItemRepair;
@@ -276,9 +252,6 @@ public:
 	bool item_drop_history(short item_id);
 
 	GameTimer m_game_timer;
-	fishing_manager m_fishing_manager;
-	crafting_manager m_crafting_manager;
-	quest_manager m_quest_manager;
 
 
 	struct {
@@ -316,7 +289,6 @@ public:
 	std::unique_ptr<hb::shared::net::IOServicePool> m_io_pool;  // 0 threads = manual poll mode for client
 	std::unique_ptr<hb::shared::net::ASIOSocket> m_g_sock;
 	std::unique_ptr<hb::shared::net::ASIOSocket> m_l_sock;
-	floating_text_manager m_floating_text;
 	std::unique_ptr<effect_manager> m_effect_manager;
 	std::array<std::unique_ptr<CMagic>, hb::shared::limits::MaxMagicType> m_magic_cfg_list;
 	std::array<std::unique_ptr<CSkill>, hb::shared::limits::MaxSkillType> m_skill_cfg_list;
@@ -495,10 +467,6 @@ std::array<bool, hb::shared::limits::MaxItems> m_is_item_equipped{};
 
 	// Entity render state (temporary state for currently rendered entity)
 	CEntityRenderState m_entity_state;
-
-	// hb::shared::render::Renderer classes for entity drawing
-	CPlayerRenderer m_player_renderer;
-	CNpcRenderer m_npc_renderer;
 
 	int   m_contribution_price;
 

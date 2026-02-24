@@ -3,6 +3,7 @@
 #include "EquipmentIndices.h"
 
 class CGame;
+class Screen_OnGame;
 class CEntityRenderState;
 namespace hb::shared::sprite { class SpriteCollection; }
 
@@ -73,7 +74,7 @@ namespace RenderHelpers
 	void apply_direction_override(CEntityRenderState& state);
 
 	// draw entity name (player or NPC).
-	void draw_name(CGame& game, const CEntityRenderState& state, int sX, int sY);
+	void draw_name(Screen_OnGame& screen, const CEntityRenderState& state, int sX, int sY);
 
 	// update chat message position or clear expired chat.
 	// indexX/indexY needed for chat message clearing when message expires.

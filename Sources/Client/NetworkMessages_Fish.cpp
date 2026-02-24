@@ -3,32 +3,38 @@
 // NetworkMessageHandlers namespace wrappers for backward compatibility.
 
 #include "Game.h"
+#include "Screen_OnGame.h"
 
 namespace NetworkMessageHandlers {
 
 void handle_fish_chance(CGame* game, char* data)
 {
-	game->m_fishing_manager.handle_fish_chance(data);
+	auto* screen = game->get_active_screen_as<Screen_OnGame>();
+	if (screen) screen->get_fishing_manager().handle_fish_chance(data);
 }
 
 void handle_event_fish_mode(CGame* game, char* data)
 {
-	game->m_fishing_manager.handle_event_fish_mode(data);
+	auto* screen = game->get_active_screen_as<Screen_OnGame>();
+	if (screen) screen->get_fishing_manager().handle_event_fish_mode(data);
 }
 
 void handle_fish_canceled(CGame* game, char* data)
 {
-	game->m_fishing_manager.handle_fish_canceled(data);
+	auto* screen = game->get_active_screen_as<Screen_OnGame>();
+	if (screen) screen->get_fishing_manager().handle_fish_canceled(data);
 }
 
 void handle_fish_success(CGame* game, char* data)
 {
-	game->m_fishing_manager.handle_fish_success(data);
+	auto* screen = game->get_active_screen_as<Screen_OnGame>();
+	if (screen) screen->get_fishing_manager().handle_fish_success(data);
 }
 
 void handle_fish_fail(CGame* game, char* data)
 {
-	game->m_fishing_manager.handle_fish_fail(data);
+	auto* screen = game->get_active_screen_as<Screen_OnGame>();
+	if (screen) screen->get_fishing_manager().handle_fish_fail(data);
 }
 
 } // namespace NetworkMessageHandlers

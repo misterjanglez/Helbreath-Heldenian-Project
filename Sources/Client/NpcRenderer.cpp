@@ -1,5 +1,7 @@
 #include "NpcRenderer.h"
 #include "Game.h"
+#include "Screen_OnGame.h"
+#include "FloatingTextManager.h"
 #include "EquipmentIndices.h"
 #include "RenderHelpers.h"
 #include "CommonTypes.h"
@@ -38,7 +40,7 @@ hb::shared::sprite::BoundRect CNpcRenderer::draw_stop(int indexX, int indexY, in
 
 	// Crusade FOE indicator
 	if (m_game.m_is_crusade_mode)
-		m_game.draw_object_foe(sX, sY, state.m_frame);
+		m_screen->draw_object_foe(sX, sY, state.m_frame);
 
 	// NPC ground lights
 	RenderHelpers::draw_npc_light(m_game, state.m_owner_type, sX, sY);
@@ -67,12 +69,12 @@ hb::shared::sprite::BoundRect CNpcRenderer::draw_stop(int indexX, int indexY, in
 		RenderHelpers::draw_berserk_glow(m_game, eq, state, sX, sY);
 
 		// Angel + aura
-		m_game.draw_angel(40 + (state.m_dir - 1), sX + 20, sY - 20, state.m_frame % 4, time);
+		m_screen->draw_angel(40 + (state.m_dir - 1), sX + 20, sY - 20, state.m_frame % 4, time);
 		m_game.check_active_aura2(sX, sY, time, state.m_owner_type);
 	}
 	else if (state.m_name[0] != '\0')
 	{
-		RenderHelpers::draw_name(m_game, state, sX, sY);
+		RenderHelpers::draw_name(*m_screen, state, sX, sY);
 	}
 
 	// Chat message (always)
@@ -175,7 +177,7 @@ hb::shared::sprite::BoundRect CNpcRenderer::draw_move(int indexX, int indexY, in
 
 	// Crusade FOE indicator
 	if (m_game.m_is_crusade_mode)
-		m_game.draw_object_foe(fix_x, fix_y, state.m_frame);
+		m_screen->draw_object_foe(fix_x, fix_y, state.m_frame);
 
 	// Effect auras
 	RenderHelpers::draw_effect_auras(m_game, state, fix_x, fix_y);
@@ -201,12 +203,12 @@ hb::shared::sprite::BoundRect CNpcRenderer::draw_move(int indexX, int indexY, in
 		RenderHelpers::draw_berserk_glow(m_game, eq, state, fix_x, fix_y);
 
 		// Angel + aura
-		m_game.draw_angel(40 + (state.m_dir - 1), fix_x + 20, fix_y - 20, state.m_frame % 4, time);
+		m_screen->draw_angel(40 + (state.m_dir - 1), fix_x + 20, fix_y - 20, state.m_frame % 4, time);
 		m_game.check_active_aura2(fix_x, fix_y, time, state.m_owner_type);
 	}
 	else if (state.m_name[0] != '\0')
 	{
-		RenderHelpers::draw_name(m_game, state, fix_x, fix_y);
+		RenderHelpers::draw_name(*m_screen, state, fix_x, fix_y);
 	}
 
 	// Chat message (always)
@@ -295,7 +297,7 @@ hb::shared::sprite::BoundRect CNpcRenderer::draw_run(int indexX, int indexY, int
 
 	// Crusade FOE indicator
 	if (m_game.m_is_crusade_mode)
-		m_game.draw_object_foe(fix_x, fix_y, state.m_frame);
+		m_screen->draw_object_foe(fix_x, fix_y, state.m_frame);
 
 	// Effect auras
 	RenderHelpers::draw_effect_auras(m_game, state, fix_x, fix_y);
@@ -311,12 +313,12 @@ hb::shared::sprite::BoundRect CNpcRenderer::draw_run(int indexX, int indexY, int
 		RenderHelpers::draw_berserk_glow(m_game, eq, state, fix_x, fix_y);
 
 		// Angel + aura
-		m_game.draw_angel(40 + (state.m_dir - 1), fix_x + 20, fix_y - 20, state.m_frame % 4, time);
+		m_screen->draw_angel(40 + (state.m_dir - 1), fix_x + 20, fix_y - 20, state.m_frame % 4, time);
 		m_game.check_active_aura2(fix_x, fix_y, time, state.m_owner_type);
 	}
 	else if (state.m_name[0] != '\0')
 	{
-		RenderHelpers::draw_name(m_game, state, fix_x, fix_y);
+		RenderHelpers::draw_name(*m_screen, state, fix_x, fix_y);
 	}
 
 	// Chat message (always)
@@ -360,7 +362,7 @@ hb::shared::sprite::BoundRect CNpcRenderer::draw_attack(int indexX, int indexY, 
 
 	// Crusade FOE indicator
 	if (m_game.m_is_crusade_mode)
-		m_game.draw_object_foe(sX, sY, state.m_frame);
+		m_screen->draw_object_foe(sX, sY, state.m_frame);
 
 	// Effect auras
 	RenderHelpers::draw_effect_auras(m_game, state, sX, sY);
@@ -376,12 +378,12 @@ hb::shared::sprite::BoundRect CNpcRenderer::draw_attack(int indexX, int indexY, 
 		RenderHelpers::draw_berserk_glow(m_game, eq, state, sX, sY);
 
 		// Angel + aura — OnAttack uses (dir-1) angel index, frame % 8
-		m_game.draw_angel(state.m_dir - 1, sX + 20, sY - 20, state.m_frame % 8, time);
+		m_screen->draw_angel(state.m_dir - 1, sX + 20, sY - 20, state.m_frame % 8, time);
 		m_game.check_active_aura2(sX, sY, time, state.m_owner_type);
 	}
 	else if (state.m_name[0] != '\0')
 	{
-		RenderHelpers::draw_name(m_game, state, sX, sY);
+		RenderHelpers::draw_name(*m_screen, state, sX, sY);
 	}
 
 	// Chat message (always)
@@ -478,7 +480,7 @@ hb::shared::sprite::BoundRect CNpcRenderer::draw_attack_move(int indexX, int ind
 
 	// Crusade FOE indicator
 	if (m_game.m_is_crusade_mode)
-		m_game.draw_object_foe(sX + dx, sY + dy, state.m_frame);
+		m_screen->draw_object_foe(sX + dx, sY + dy, state.m_frame);
 
 	// Effect auras
 	RenderHelpers::draw_effect_auras(m_game, state, sX + dx, sY + dy);
@@ -494,7 +496,7 @@ hb::shared::sprite::BoundRect CNpcRenderer::draw_attack_move(int indexX, int ind
 		RenderHelpers::draw_berserk_glow(m_game, eq, state, sX + dx, sY + dy);
 
 		// Angel + aura
-		m_game.draw_angel(8 + (state.m_dir - 1), sX + dx + 20, sY + dy - 20, state.m_frame % 8, time);
+		m_screen->draw_angel(8 + (state.m_dir - 1), sX + dx + 20, sY + dy - 20, state.m_frame % 8, time);
 		m_game.check_active_aura2(sX + dx, sY + dy, time, state.m_owner_type);
 
 		// Dash ghost effect
@@ -506,7 +508,7 @@ hb::shared::sprite::BoundRect CNpcRenderer::draw_attack_move(int indexX, int ind
 	}
 	else if (state.m_name[0] != '\0')
 	{
-		RenderHelpers::draw_name(m_game, state, sX + dx, sY + dy);
+		RenderHelpers::draw_name(*m_screen, state, sX + dx, sY + dy);
 	}
 
 	// Chat message (always)
@@ -598,7 +600,7 @@ hb::shared::sprite::BoundRect CNpcRenderer::draw_damage(int indexX, int indexY, 
 
 	// Crusade FOE indicator
 	if (m_game.m_is_crusade_mode)
-		m_game.draw_object_foe(sX, sY, frame);
+		m_screen->draw_object_foe(sX, sY, frame);
 
 	// Effect auras
 	RenderHelpers::draw_effect_auras(m_game, state, sX, sY);
@@ -614,12 +616,12 @@ hb::shared::sprite::BoundRect CNpcRenderer::draw_damage(int indexX, int indexY, 
 		RenderHelpers::draw_berserk_glow(m_game, eq, state, sX, sY);
 
 		// Angel + aura — OnDamage uses 16+dir-1, frame%4
-		m_game.draw_angel(16 + (state.m_dir - 1), sX + 20, sY - 20, frame % 4, time);
+		m_screen->draw_angel(16 + (state.m_dir - 1), sX + 20, sY - 20, frame % 4, time);
 		m_game.check_active_aura2(sX, sY, time, state.m_owner_type);
 	}
 	else if (state.m_name[0] != '\0')
 	{
-		RenderHelpers::draw_name(m_game, state, sX, sY);
+		RenderHelpers::draw_name(*m_screen, state, sX, sY);
 	}
 
 	// Chat message (always)
@@ -686,7 +688,7 @@ hb::shared::sprite::BoundRect CNpcRenderer::draw_damage_move(int indexX, int ind
 
 	// Crusade FOE indicator
 	if (m_game.m_is_crusade_mode)
-		m_game.draw_object_foe(fix_x, fix_y, frame);
+		m_screen->draw_object_foe(fix_x, fix_y, frame);
 
 	// Effect auras
 	RenderHelpers::draw_effect_auras(m_game, state, fix_x, fix_y);
@@ -702,12 +704,12 @@ hb::shared::sprite::BoundRect CNpcRenderer::draw_damage_move(int indexX, int ind
 		RenderHelpers::draw_berserk_glow(m_game, eq, state, fix_x, fix_y);
 
 		// Angel + aura — OnDamageMove uses 16+dir-1, frame%4
-		m_game.draw_angel(16 + (state.m_dir - 1), fix_x + 20, fix_y - 20, frame % 4, time);
+		m_screen->draw_angel(16 + (state.m_dir - 1), fix_x + 20, fix_y - 20, frame % 4, time);
 		m_game.check_active_aura2(fix_x, fix_y, time, state.m_owner_type);
 	}
 	else if (state.m_name[0] != '\0')
 	{
-		RenderHelpers::draw_name(m_game, state, fix_x, fix_y);
+		RenderHelpers::draw_name(*m_screen, state, fix_x, fix_y);
 	}
 
 	// Chat message (always)
@@ -793,7 +795,7 @@ hb::shared::sprite::BoundRect CNpcRenderer::draw_dying(int indexX, int indexY, i
 
 	// Crusade FOE indicator
 	if (m_game.m_is_crusade_mode)
-		m_game.draw_object_foe(sX, sY, frame);
+		m_screen->draw_object_foe(sX, sY, frame);
 
 	// Effect auras
 	RenderHelpers::draw_effect_auras(m_game, state, sX, sY);
@@ -858,12 +860,12 @@ hb::shared::sprite::BoundRect CNpcRenderer::draw_dying(int indexX, int indexY, i
 		RenderHelpers::draw_berserk_glow(m_game, eq, state, sX, sY);
 
 		// Angel + aura — OnDying uses 24+dir-1, ORIGINAL frame
-		m_game.draw_angel(24 + (state.m_dir - 1), sX + 20, sY - 20, originalFrame, time);
+		m_screen->draw_angel(24 + (state.m_dir - 1), sX + 20, sY - 20, originalFrame, time);
 		m_game.check_active_aura2(sX, sY, time, state.m_owner_type);
 	}
 	else if (state.m_name[0] != '\0')
 	{
-		RenderHelpers::draw_name(m_game, state, sX, sY);
+		RenderHelpers::draw_name(*m_screen, state, sX, sY);
 	}
 
 	// Chat message (always)
@@ -1013,15 +1015,15 @@ hb::shared::sprite::BoundRect CNpcRenderer::draw_dead(int indexX, int indexY, in
 	}
 	else if (state.m_name[0] != '\0')
 	{
-		RenderHelpers::draw_name(m_game, state, sX, sY);
+		RenderHelpers::draw_name(*m_screen, state, sX, sY);
 	}
 
 	// Chat message — uses clear_dead_chat_msg for dead entities
 	if (state.m_chat_index != 0)
 	{
-		if (m_game.m_floating_text.is_valid(state.m_chat_index, state.m_object_id))
+		if (m_game.get_floating_text().is_valid(state.m_chat_index, state.m_object_id))
 		{
-			m_game.m_floating_text.update_position(state.m_chat_index, static_cast<short>(sX), static_cast<short>(sY));
+			m_game.get_floating_text().update_position(state.m_chat_index, static_cast<short>(sX), static_cast<short>(sY));
 		}
 		else
 		{
@@ -1032,7 +1034,7 @@ hb::shared::sprite::BoundRect CNpcRenderer::draw_dead(int indexX, int indexY, in
 	// Abaddon corpse effects
 	if (state.m_owner_type == hb::shared::owner::Abaddon)
 	{
-		m_game.abaddon_corpse(sX, sY);
+		m_screen->abaddon_corpse(sX, sY);
 	}
 	else if (state.m_owner_type == hb::shared::owner::FireWyvern)
 	{

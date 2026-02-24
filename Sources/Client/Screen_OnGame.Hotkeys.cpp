@@ -265,18 +265,18 @@ bool Screen_OnGame::on_key_down(KeyCode key)
 	{
 		if (hb::shared::input::is_ctrl_down())
 		{
-			// Ctrl+0-9 for magic views
+			// Ctrl+0-9 for magic views (type=1 for explicit circle selection)
 			switch (key) {
-			case KeyCode::Num0: get_dialog_box_manager().enable_dialog_box(DialogBoxId::Magic, 0, 9, 0); break;
-			case KeyCode::Num1: get_dialog_box_manager().enable_dialog_box(DialogBoxId::Magic, 0, 0, 0); break;
-			case KeyCode::Num2: get_dialog_box_manager().enable_dialog_box(DialogBoxId::Magic, 0, 1, 0); break;
-			case KeyCode::Num3: get_dialog_box_manager().enable_dialog_box(DialogBoxId::Magic, 0, 2, 0); break;
-			case KeyCode::Num4: get_dialog_box_manager().enable_dialog_box(DialogBoxId::Magic, 0, 3, 0); break;
-			case KeyCode::Num5: get_dialog_box_manager().enable_dialog_box(DialogBoxId::Magic, 0, 4, 0); break;
-			case KeyCode::Num6: get_dialog_box_manager().enable_dialog_box(DialogBoxId::Magic, 0, 5, 0); break;
-			case KeyCode::Num7: get_dialog_box_manager().enable_dialog_box(DialogBoxId::Magic, 0, 6, 0); break;
-			case KeyCode::Num8: get_dialog_box_manager().enable_dialog_box(DialogBoxId::Magic, 0, 7, 0); break;
-			case KeyCode::Num9: get_dialog_box_manager().enable_dialog_box(DialogBoxId::Magic, 0, 8, 0); break;
+			case KeyCode::Num0: get_dialog_box_manager().enable_dialog_box(DialogBoxId::Magic, 1, 9, 0); break;
+			case KeyCode::Num1: get_dialog_box_manager().enable_dialog_box(DialogBoxId::Magic, 1, 0, 0); break;
+			case KeyCode::Num2: get_dialog_box_manager().enable_dialog_box(DialogBoxId::Magic, 1, 1, 0); break;
+			case KeyCode::Num3: get_dialog_box_manager().enable_dialog_box(DialogBoxId::Magic, 1, 2, 0); break;
+			case KeyCode::Num4: get_dialog_box_manager().enable_dialog_box(DialogBoxId::Magic, 1, 3, 0); break;
+			case KeyCode::Num5: get_dialog_box_manager().enable_dialog_box(DialogBoxId::Magic, 1, 4, 0); break;
+			case KeyCode::Num6: get_dialog_box_manager().enable_dialog_box(DialogBoxId::Magic, 1, 5, 0); break;
+			case KeyCode::Num7: get_dialog_box_manager().enable_dialog_box(DialogBoxId::Magic, 1, 6, 0); break;
+			case KeyCode::Num8: get_dialog_box_manager().enable_dialog_box(DialogBoxId::Magic, 1, 7, 0); break;
+			case KeyCode::Num9: get_dialog_box_manager().enable_dialog_box(DialogBoxId::Magic, 1, 8, 0); break;
 			default: break;
 			}
 		}

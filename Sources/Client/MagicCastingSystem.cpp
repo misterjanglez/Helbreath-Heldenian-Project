@@ -91,7 +91,8 @@ void magic_casting_system::begin_cast(int magic_no)
 		m_game->add_event_list(DLGBOX_CLICK_MAGIC2, 10);
 		return;
 	}
-	if (!m_game->m_player->m_playerAppearance.is_walking) m_game->send_game_packet(hb::net::make_common_command(CommonType::ToggleCombatMode, m_game->m_player->m_player_x, m_game->m_player->m_player_y));
+	if (!m_game->m_player->m_playerAppearance.is_walking)
+		m_game->send_game_packet(hb::net::make_common_command(CommonType::ToggleCombatMode, m_game->m_player->m_player_x, m_game->m_player->m_player_y));
 	m_game->m_player->m_Controller.set_command(Type::Magic);
 	m_game->m_casting_magic_type = magic_no;
 	m_game->m_magic_short_cut = magic_no;

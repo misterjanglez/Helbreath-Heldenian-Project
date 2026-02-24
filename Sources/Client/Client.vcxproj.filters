@@ -892,8 +892,8 @@
     <ClCompile Include="FloatingTextManager.cpp">
       <Filter>Rendering</Filter>
     </ClCompile>
-    <ClCompile Include="Game.DrawObjects.cpp">
-      <Filter>Rendering</Filter>
+    <ClCompile Include="Screen_OnGame.DrawObjects.cpp">
+      <Filter>Screens</Filter>
     </ClCompile>
     <ClCompile Include="Screen_OnGame.Hotkeys.cpp">
       <Filter>Screens</Filter>

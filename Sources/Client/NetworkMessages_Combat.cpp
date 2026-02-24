@@ -1,4 +1,5 @@
 ﻿#include "Game.h"
+#include "FloatingTextManager.h"
 #include "NetworkMessageManager.h"
 #include "Packet/SharedPackets.h"
 #ifdef TESTER_ONLY
@@ -194,8 +195,8 @@ namespace NetworkMessageHandlers {
 		game->m_player->m_enemy_kill_count = enemy_kill_count;
 		game->play_game_sound('E', 23, 0);
 
-		game->m_floating_text.remove_by_object_id(game->m_player->m_player_object_id);
-		game->m_floating_text.add_notify_text(notify_text_type::enemy_kill, "Enemy Kill!", game->m_cur_time,
+		game->get_floating_text().remove_by_object_id(game->m_player->m_player_object_id);
+		game->get_floating_text().add_notify_text(notify_text_type::enemy_kill, "Enemy Kill!", game->m_cur_time,
 			game->m_player->m_player_object_id, game->m_map_data.get());
 		game->create_screen_shot();
 	}

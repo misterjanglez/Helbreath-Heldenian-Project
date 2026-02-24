@@ -1,4 +1,5 @@
 #include "Game.h"
+#include "FloatingTextManager.h"
 #include "NetworkMessageManager.h"
 #include "Packet/SharedPackets.h"
 #include "lan_eng.h"
@@ -150,8 +151,8 @@ namespace NetworkMessageHandlers {
 			break;
 		}
 
-		game->m_floating_text.remove_by_object_id(game->m_player->m_player_object_id);
-		game->m_floating_text.add_notify_text(notify_text_type::LevelUp, "Level up!", game->m_cur_time,
+		game->get_floating_text().remove_by_object_id(game->m_player->m_player_object_id);
+		game->get_floating_text().add_notify_text(notify_text_type::LevelUp, "Level up!", game->m_cur_time,
 			game->m_player->m_player_object_id, game->m_map_data.get());
 		return;
 	}

@@ -10,6 +10,13 @@
 #include "GuildManager.h"
 #include "DialogBoxManager.h"
 #include "NetworkMessageManager.h"
+#include "FishingManager.h"
+#include "CraftingManager.h"
+#include "QuestManager.h"
+#include "PlayerRenderer.h"
+#include "NpcRenderer.h"
+#include "FloatingTextManager.h"
+#include "PlayerStatusData.h"
 #include <cstdint>
 #include <memory>
 
@@ -38,6 +45,12 @@ public:
     void item_drop_external_screen(char item_id, short mouse_x, short mouse_y);
     guild_manager& get_guild_manager() { return m_guild_manager; }
     DialogBoxManager& get_dialog_box_manager() { return *m_dialog_box_manager; }
+    fishing_manager& get_fishing_manager() { return m_fishing_manager; }
+    crafting_manager& get_crafting_manager() { return m_crafting_manager; }
+    quest_manager& get_quest_manager() { return m_quest_manager; }
+    CPlayerRenderer& get_player_renderer() { return m_player_renderer; }
+    CNpcRenderer& get_npc_renderer() { return m_npc_renderer; }
+    floating_text_manager& get_floating_text() { return m_floating_text; }
 
     // Player lifecycle — static because there's only ever one player
     static void create_player();
@@ -46,6 +59,29 @@ public:
 
     // Hotkey registration (Screen_OnGame.Hotkeys.cpp)
     void register_hotkeys();
+
+    // Gameplay draw methods (Screen_OnGame.DrawObjects.cpp)
+    void draw_objects(short pivot_x, short pivot_y, short div_x, short div_y, short mod_x, short mod_y, short mouse_x, short mouse_y);
+    void draw_background(short div_x, short mod_x, short div_y, short mod_y);
+    void draw_top_msg();
+    static void draw_character_body(CGame& game, short sX, short sY, short type);
+    void draw_object_name(short screen_x, short screen_y, const char* name, const hb::shared::entity::PlayerStatus& status, uint16_t object_id);
+    void draw_npc_name(short screen_x, short screen_y, short owner_type, const hb::shared::entity::PlayerStatus& status, short npc_config_id = -1);
+    void draw_object_foe(int ix, int iy, int frame);
+    void draw_angel(int sprite, short sX, short sY, char frame, uint32_t time);
+    void dk_glare(int weapon_color, int16_t weapon_item_id, int* weapon_glare);
+    void abaddon_corpse(int sX, int sY);
+    hb::shared::sprite::BoundRect draw_object_on_stop(int indexX, int indexY, int sX, int sY, bool trans, uint32_t time);
+    hb::shared::sprite::BoundRect draw_object_on_move(int indexX, int indexY, int sX, int sY, bool trans, uint32_t time);
+    hb::shared::sprite::BoundRect draw_object_on_run(int indexX, int indexY, int sX, int sY, bool trans, uint32_t time);
+    hb::shared::sprite::BoundRect draw_object_on_attack(int indexX, int indexY, int sX, int sY, bool trans, uint32_t time);
+    hb::shared::sprite::BoundRect draw_object_on_attack_move(int indexX, int indexY, int sX, int sY, bool trans, uint32_t time);
+    hb::shared::sprite::BoundRect draw_object_on_magic(int indexX, int indexY, int sX, int sY, bool trans, uint32_t time);
+    hb::shared::sprite::BoundRect draw_object_on_get_item(int indexX, int indexY, int sX, int sY, bool trans, uint32_t time);
+    hb::shared::sprite::BoundRect draw_object_on_damage(int indexX, int indexY, int sX, int sY, bool trans, uint32_t time);
+    hb::shared::sprite::BoundRect draw_object_on_damage_move(int indexX, int indexY, int sX, int sY, bool trans, uint32_t time);
+    hb::shared::sprite::BoundRect draw_object_on_dying(int indexX, int indexY, int sX, int sY, bool trans, uint32_t time);
+    hb::shared::sprite::BoundRect draw_object_on_dead(int indexX, int indexY, int sX, int sY, bool trans, uint32_t time);
 
 private:
     // Complex hotkey handlers (Screen_OnGame.Hotkeys.cpp)
@@ -84,8 +120,16 @@ private:
     uint32_t m_dwPrevChatTime = 0;
     uint32_t m_dwLastBubbleTime = 0;
     guild_manager m_guild_manager;
+    fishing_manager m_fishing_manager;
+    crafting_manager m_crafting_manager;
+    quest_manager m_quest_manager;
     std::unique_ptr<DialogBoxManager> m_dialog_box_manager;
     std::unique_ptr<NetworkMessageManager> m_network_message_manager;
+
+    // Entity renderers and floating text (gameplay-only)
+    CPlayerRenderer m_player_renderer;
+    CNpcRenderer m_npc_renderer;
+    floating_text_manager m_floating_text;
 
     static std::unique_ptr<CPlayer> s_player;
 };

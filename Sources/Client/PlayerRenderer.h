@@ -4,11 +4,13 @@
 #include <cstdint>
 
 class CGame;
+class Screen_OnGame;
 
 class CPlayerRenderer
 {
 public:
 	explicit CPlayerRenderer(CGame& game) : m_game(game) {}
+	void set_screen(Screen_OnGame* screen) { m_screen = screen; }
 
 	hb::shared::sprite::BoundRect draw_stop(int indexX, int indexY, int sX, int sY, bool trans, uint32_t time);
 	hb::shared::sprite::BoundRect draw_move(int indexX, int indexY, int sX, int sY, bool trans, uint32_t time);
@@ -24,4 +26,5 @@ public:
 
 private:
 	CGame& m_game;
+	Screen_OnGame* m_screen = nullptr;
 };

@@ -61,7 +61,11 @@ std::unique_ptr<CPlayer> Screen_OnGame::s_player;
 
 Screen_OnGame::Screen_OnGame(CGame* game)
     : IGameScreen(game)
+    , m_player_renderer(*game)
+    , m_npc_renderer(*game)
 {
+    m_player_renderer.set_screen(this);
+    m_npc_renderer.set_screen(this);
 }
 
 void Screen_OnGame::create_player()
@@ -107,6 +111,10 @@ void Screen_OnGame::on_initialize()
 
     m_guild_manager.set_game(m_game);
     m_guild_manager.clear_name_cache();
+
+    m_fishing_manager.set_game(m_game);
+    m_crafting_manager.set_game(m_game);
+    m_quest_manager.set_game(m_game);
 
     m_time = GameClock::get_time_ms();
     m_game->m_fps_time = m_time;
@@ -632,7 +640,7 @@ void Screen_OnGame::on_render()
 
     // Main scene rendering
     FrameTiming::begin_profile(ProfileStage::draw_background);
-    m_game->draw_background(m_sDivX, m_sModX, m_sDivY, m_sModY);
+    draw_background(m_sDivX, m_sModX, m_sDivY, m_sModY);
     FrameTiming::end_profile(ProfileStage::draw_background);
 
     FrameTiming::begin_profile(ProfileStage::draw_effect_lights);
@@ -643,7 +651,7 @@ void Screen_OnGame::on_render()
     draw_tile_grid();
 
     FrameTiming::begin_profile(ProfileStage::draw_objects);
-    m_game->draw_objects(m_pivot_x, m_pivot_y, m_sDivX, m_sDivY, m_sModX, m_sModY, m_sMsX, m_sMsY);
+    draw_objects(m_pivot_x, m_pivot_y, m_sDivX, m_sDivY, m_sModX, m_sModY, m_sMsX, m_sMsY);
     FrameTiming::end_profile(ProfileStage::draw_objects);
 
     FrameTiming::begin_profile(ProfileStage::draw_effects);
@@ -662,7 +670,7 @@ void Screen_OnGame::on_render()
     FrameTiming::end_profile(ProfileStage::DrawWeather);
 
     FrameTiming::begin_profile(ProfileStage::DrawChat);
-    m_game->m_floating_text.draw_all(-100, 0, LOGICAL_WIDTH(), LOGICAL_HEIGHT(), m_game->m_cur_time, m_game->m_Renderer);
+    m_floating_text.draw_all(-100, 0, LOGICAL_WIDTH(), LOGICAL_HEIGHT(), m_game->m_cur_time, m_game->m_Renderer);
     FrameTiming::end_profile(ProfileStage::DrawChat);
 
     // Apocalypse map effects
@@ -729,7 +737,7 @@ void Screen_OnGame::on_render()
         hb::shared::text::draw_text(GameFont::Default, 10, 200, G_cTxt.c_str(), hb::shared::text::TextStyle::from_color(GameColors::UIWhite));
     }
 
-    m_game->draw_top_msg();
+    draw_top_msg();
 
     FrameTiming::end_profile(ProfileStage::DrawMisc);
 

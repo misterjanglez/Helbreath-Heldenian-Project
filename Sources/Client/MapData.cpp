@@ -2,6 +2,7 @@
 //
 //////////////////////////////////////////////////////////////////////
 #include "MapData.h"
+#include "FloatingTextManager.h"
 #include "OwnerType.h"
 #include "ObjectIDRange.h"
 #include "DirectionHelpers.h"
@@ -1107,7 +1108,7 @@ bool CMapData::set_owner(uint16_t object_id, int sX, int sY, int type, direction
 				m_data[iX][iY].m_owner_name.clear();
 				name.clear();
 
-				m_game->m_floating_text.clear(m_data[iX][iY].m_chat_msg);
+				m_game->get_floating_text().clear(m_data[iX][iY].m_chat_msg);
 				m_data[iX][iY].m_chat_msg = 0;
 				m_data[iX][iY].m_effect_type = 0;
 				m_object_id_cache_loc_x[object_id] = 0;
@@ -1129,7 +1130,7 @@ bool CMapData::set_owner(uint16_t object_id, int sX, int sY, int type, direction
 			{
 				m_data[iX][iY].m_dead_owner_frame = 0;
 				name.clear();
-				m_game->m_floating_text.clear(m_data[iX][iY].m_dead_chat_msg);
+				m_game->get_floating_text().clear(m_data[iX][iY].m_dead_chat_msg);
 				m_data[iX][iY].m_dead_chat_msg = 0;
 				m_object_id_cache_loc_x[object_id] = 0;
 				m_object_id_cache_loc_y[object_id] = 0;
@@ -1146,7 +1147,7 @@ bool CMapData::set_owner(uint16_t object_id, int sX, int sY, int type, direction
 					m_data[iX][iY].m_npc_config_id = -1;
 					m_data[iX][iY].m_owner_name.clear();
 					name.clear();
-					m_game->m_floating_text.clear(m_data[iX][iY].m_chat_msg);
+					m_game->get_floating_text().clear(m_data[iX][iY].m_chat_msg);
 					m_data[iX][iY].m_chat_msg = 0;
 					m_object_id_cache_loc_x[object_id] = 0;
 					m_object_id_cache_loc_y[object_id] = 0;
@@ -1158,7 +1159,7 @@ bool CMapData::set_owner(uint16_t object_id, int sX, int sY, int type, direction
 				{
 					m_data[iX][iY].m_dead_owner_frame = 0;
 					name.clear();
-					m_game->m_floating_text.clear(m_data[iX][iY].m_dead_chat_msg);
+					m_game->get_floating_text().clear(m_data[iX][iY].m_dead_chat_msg);
 					m_data[iX][iY].m_dead_chat_msg = 0;
 					m_object_id_cache_loc_x[object_id] = 0;
 					m_object_id_cache_loc_y[object_id] = 0;
@@ -2088,7 +2089,7 @@ int CMapData::object_frame_counter(const std::string& player_name, short view_po
 							m_data[dX][dY].m_owner_type = 0;
 							m_data[dX][dY].m_npc_config_id = -1;
 							m_data[dX][dY].m_owner_name.clear();
-							m_game->m_floating_text.clear(m_data[dX][dY].m_chat_msg);
+							m_game->get_floating_text().clear(m_data[dX][dY].m_chat_msg);
 						}
 					}
 					if (m_data[dX][dY].m_animation.m_action == Type::stop) { // Type::stop = 1 // 00497334
@@ -4102,7 +4103,7 @@ bool CMapData::set_chat_msg_owner(uint16_t object_id, short sX, short sY, int in
 
 void CMapData::clear_chat_msg(short sX, short sY)
 {
-	m_game->m_floating_text.clear(m_data[sX - m_pivot_x][sY - m_pivot_y].m_chat_msg);
+	m_game->get_floating_text().clear(m_data[sX - m_pivot_x][sY - m_pivot_y].m_chat_msg);
 	m_data[sX - m_pivot_x][sY - m_pivot_y].m_chat_msg = 0;
 }
 

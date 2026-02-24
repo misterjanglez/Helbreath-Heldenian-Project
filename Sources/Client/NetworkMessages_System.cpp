@@ -1,4 +1,5 @@
 ﻿#include "Game.h"
+#include "FloatingTextManager.h"
 #include "GameModeManager.h"
 #include "AudioManager.h"
 #include "WeatherManager.h"
@@ -68,7 +69,7 @@ void HandleStatusText(CGame* game, char* data)
 	if (!pkt) return;
 
 	// Display floating text above the local player's head (like "* Failed! *")
-	game->m_floating_text.add_damage_text(damage_text_type::Medium, pkt->text, game->m_cur_time,
+	game->get_floating_text().add_damage_text(damage_text_type::Medium, pkt->text, game->m_cur_time,
 		game->m_player->m_player_object_id, game->m_map_data.get());
 }
 

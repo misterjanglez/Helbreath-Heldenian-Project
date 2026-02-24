@@ -179,8 +179,6 @@ void CGame::write_settings()
 CGame::CGame(hb::shared::types::NativeInstance native_instance, int icon_resource_id)
 	: m_native_instance(native_instance)
 	, m_icon_resource_id(icon_resource_id)
-	, m_player_renderer(*this)
-	, m_npc_renderer(*this)
 {
 	m_io_pool = std::make_unique<hb::shared::net::IOServicePool>(0);  // 0 threads = manual poll mode
 	m_Renderer = nullptr;
@@ -212,9 +210,6 @@ CGame::CGame(hb::shared::types::NativeInstance native_instance, int icon_resourc
 
 	// initialize Managers (Networking v4) - using make_unique
 	m_effect_manager = std::make_unique<effect_manager>(this);
-	m_fishing_manager.set_game(this);
-	m_crafting_manager.set_game(this);
-	m_quest_manager.set_game(this);
 	// All pointer arrays (std::array<std::unique_ptr<T>, N>) default to nullptr
 	// Dialog box order initialization
 
@@ -1474,7 +1469,7 @@ void CGame::on_timer()
 		if ((time - m_check_chat_time) > 2000)
 		{
 			m_check_chat_time = time;
-			m_floating_text.release_expired(time);
+			get_floating_text().release_expired(time);
 			if (m_player->m_Controller.get_command_count() >= 6)
 			{
 				m_net_lag_count++;
@@ -1588,7 +1583,7 @@ void CGame::init_game_settings()
 
 	if (m_effect_manager) m_effect_manager->clear_all_effects();
 
-	m_floating_text.clear_all();
+	get_floating_text().clear_all();
 
 	ChatManager::get().clear_messages();
 	ChatManager::get().clear_whispers();
@@ -1941,7 +1936,7 @@ void CGame::log_event_handler(char* data)
 	break;
 	}
 
-	m_floating_text.remove_by_object_id(object_id);
+	get_floating_text().remove_by_object_id(object_id);
 }
 
 // MODERNIZED: No longer a window message handler - polls socket directly
@@ -2283,10 +2278,10 @@ void CGame::chat_msg_handler(char* packet_data)
 
 	m_Renderer->end_text_batch();
 
-	m_floating_text.remove_by_object_id(object_id);
+	get_floating_text().remove_by_object_id(object_id);
 
 	const char* cp = packet_data + sizeof(hb::net::PacketCommandChatMsgHeader);
-	int chat_slot = m_floating_text.add_chat_text(cp, current_time, object_id, m_map_data.get(), map_x, map_y);
+	int chat_slot = get_floating_text().add_chat_text(cp, current_time, object_id, m_map_data.get(), map_x, map_y);
 	if (chat_slot != 0 || msg_type == 20 || msg_type == 10) {
 		if ((msg_type != 0) && (get_dialog_box_manager().is_enabled(DialogBoxId::ChatHistory) != true)) {
 			head_msg = std::format("{}:{}", name, cp);
@@ -2301,46 +2296,182 @@ void CGame::chat_msg_handler(char* packet_data)
 	}
 }
 
-void CGame::draw_background(short div_x, short mod_x, short div_y, short mod_y)
+// Equipment sprite indices for character rendering (menu only)
+struct MenuCharEquipment {
+	int body, undies, hair, bodyArmor, armArmor, pants, boots, weapon, shield, mantle, helm;
+	int weaponColor, shieldColor, armorColor, mantleColor, armColor, pantsColor, bootsColor, helmColor;
+	bool skirtDraw;
+};
+
+// Calculate equipment indices for human characters (male/female) in menu
+static void CalcHumanEquipment(const CEntityRenderState& state, bool female, MenuCharEquipment& eq)
 {
-	if (div_x < 0 || div_y < 0) return;
+	const auto& appr = state.m_appearance;
 
-	// Tile-based loop constants
-	constexpr int TILE_SIZE = 32;
-	const int visibleTilesX = (LOGICAL_WIDTH() / TILE_SIZE) + 2;   // +2 for partial tiles on edges
-	const int visibleTilesY = (LOGICAL_HEIGHT() / TILE_SIZE) + 2;
+	// Walking uses pose 3, standing uses pose 2
+	bool walking = appr.is_walking;
+	int pose = walking ? 3 : 2;
 
-	// Map pivot for tile array access
-	const short pivotX = m_map_data->m_pivot_x;
-	const short pivotY = m_map_data->m_pivot_y;
+	// Body index (still from m_sprite)
+	eq.body = 500 + (state.m_owner_type - 1) * 8 * 15 + (pose * 8);
 
-	// draw tiles directly to backbuffer (no caching)
-	for (int tileY = 0; tileY < visibleTilesY; tileY++)
-	{
-		int indexY = div_y + pivotY + tileY;
-		int iy = tileY * TILE_SIZE - mod_y;
+	// Cosmetics — still from m_sprite with old base IDs
+	int UNDIES = female ? UndiesW : UndiesM;
+	int HAIR   = female ? HairW  : HairM;
+	eq.undies = UNDIES + appr.underwear_type * 15 + pose;
+	eq.hair   = HAIR + appr.hair_style * 15 + pose;
 
-		for (int tileX = 0; tileX < visibleTilesX; tileX++)
-		{
-			int indexX = div_x + pivotX + tileX;
-			int ix = tileX * TILE_SIZE - mod_x;
+	// Equipment — from m_equip_sprites via equip_sprite::index()
+	eq.bodyArmor = (!appr.hide_armor && appr.armor_item_id > 0)  ? equip_sprite::index(female, appr.armor_display_id, pose)   : -1;
+	eq.armArmor  = (appr.arm_item_id > 0)    ? equip_sprite::index(female, appr.arm_display_id, pose)    : -1;
+	eq.pants     = (appr.pants_item_id > 0)   ? equip_sprite::index(female, appr.pants_display_id, pose)  : -1;
+	eq.boots     = (appr.boots_item_id > 0)   ? equip_sprite::index(female, appr.boots_display_id, pose)  : -1;
+	eq.mantle    = (appr.mantle_item_id > 0)  ? equip_sprite::index(female, appr.mantle_display_id, pose) : -1;
+	eq.helm      = (appr.helm_item_id > 0)    ? equip_sprite::index(female, appr.helm_display_id, pose)   : -1;
+	eq.weapon    = (appr.weapon_item_id > 0)  ? equip_sprite::index(female, appr.weapon_display_id, pose) : -1;
+	eq.shield    = (appr.shield_item_id > 0)  ? equip_sprite::index(female, appr.shield_display_id, pose) : -1;
 
-			// Bounds check for tile array (752x752)
-			if (indexX >= 0 && indexX < 752 && indexY >= 0 && indexY < 752)
-			{
-				short spr = m_map_data->m_tile[indexX][indexY].m_sTileSprite;
-				short spr_frame = m_map_data->m_tile[indexX][indexY].m_sTileSpriteFrame;
-				m_tile_spr[spr]->draw(ix - 16, iy - 16, spr_frame, hb::shared::sprite::DrawParams::no_color_key());
-			}
-		}
-	}
-
-	if (m_is_crusade_mode)
-	{
-		if (m_player->m_construct_loc_x != -1) draw_new_dialog_box(InterfaceNdCrusade, m_player->m_construct_loc_x * 32 - m_Camera.get_x(), m_player->m_construct_loc_y * 32 - m_Camera.get_y(), 41);
-		if (teleport_manager::get().get_loc_x() != -1) draw_new_dialog_box(InterfaceNdCrusade, teleport_manager::get().get_loc_x() * 32 - m_Camera.get_x(), teleport_manager::get().get_loc_y() * 32 - m_Camera.get_y(), 42);
-	}
+	// Female skirt check — from is_skirt flag computed at broadcast time
+	eq.skirtDraw = female && appr.is_skirt;
 }
+
+hb::shared::sprite::BoundRect CGame::draw_object_on_move_for_menu(int indexX, int indexY, int sX, int sY, bool trans, uint32_t time, bool draw_shadow)
+{
+	if (m_entity_state.m_dir < 1 || m_entity_state.m_dir > 8) return {};
+
+	// Extract equipment colors from packed appearance color
+	MenuCharEquipment eq = {};
+	eq.weaponColor = m_entity_state.m_appearance.weapon_color;
+	eq.shieldColor = m_entity_state.m_appearance.shield_color;
+	eq.armorColor  = m_entity_state.m_appearance.armor_color;
+	eq.mantleColor = m_entity_state.m_appearance.mantle_color;
+	eq.armColor    = m_entity_state.m_appearance.arm_color;
+	eq.pantsColor  = m_entity_state.m_appearance.pants_color;
+	eq.bootsColor  = m_entity_state.m_appearance.boots_color;
+	eq.helmColor   = m_entity_state.m_appearance.helm_color;
+
+	// Calculate equipment indices based on character type
+	bool mob = false;
+	switch (m_entity_state.m_owner_type) {
+	case 1: case 2: case 3:  // Male
+		CalcHumanEquipment(m_entity_state, false, eq);
+		break;
+	case 4: case 5: case 6:  // Female
+		CalcHumanEquipment(m_entity_state, true, eq);
+		break;
+	default:  // Mob/NPC
+		if (m_entity_state.m_owner_type < 10) return {};
+		eq.body = Mob + (m_entity_state.m_owner_type - 10) * 8 * 7 + (1 * 8);
+		eq.undies = eq.hair = eq.bodyArmor = eq.armArmor = -1;
+		eq.boots = eq.pants = eq.weapon = eq.shield = eq.helm = eq.mantle = -1;
+		mob = true;
+		break;
+	}
+	// Helper lambdas for drawing with optional color tint
+	int dirFrame = (m_entity_state.m_dir - 1) * 8 + m_entity_state.m_frame;
+	int hairColor = m_entity_state.m_appearance.hair_color;
+
+	// Equipment draws from m_equip_sprites, cosmetics from m_sprite
+	auto drawCosmeticLayer = [&](int idx, int color) {
+		if (idx == -1) return;
+		if (color == 0)
+			m_sprite[idx]->draw(sX, sY, dirFrame);
+		else
+			m_sprite[idx]->draw(sX, sY, dirFrame, hb::shared::sprite::DrawParams::tint(GameColors::Items[color].r, GameColors::Items[color].g, GameColors::Items[color].b));
+	};
+
+	auto drawEquipLayer = [&](int idx, int color) {
+		if (idx == -1) return;
+		if (color == 0)
+			m_equip_sprites[idx]->draw(sX, sY, dirFrame);
+		else
+			m_equip_sprites[idx]->draw(sX, sY, dirFrame, hb::shared::sprite::DrawParams::tint(GameColors::Items[color].r, GameColors::Items[color].g, GameColors::Items[color].b));
+	};
+
+	auto drawWeapon = [&]() {
+		if (eq.weapon == -1) return;
+		if (eq.weaponColor == 0)
+			m_equip_sprites[eq.weapon]->draw(sX, sY, dirFrame);
+		else
+			m_equip_sprites[eq.weapon]->draw(sX, sY, dirFrame, hb::shared::sprite::DrawParams::tint(GameColors::Weapons[eq.weaponColor].r, GameColors::Weapons[eq.weaponColor].g, GameColors::Weapons[eq.weaponColor].b));
+	};
+
+	auto drawMantle = [&](int order) {
+		if (eq.mantle != -1 && mantle_draw_order[m_entity_state.m_dir] == order)
+			drawEquipLayer(eq.mantle, eq.mantleColor);
+	};
+
+	// Check if mob type should skip shadow
+	auto shouldSkipShadow = [&]() {
+		switch (m_entity_state.m_owner_type) {
+		case hb::shared::owner::Slime: case hb::shared::owner::EnergySphere: case hb::shared::owner::TigerWorm: case hb::shared::owner::Catapult: case hb::shared::owner::CannibalPlant: case hb::shared::owner::IceGolem: case hb::shared::owner::Abaddon: case hb::shared::owner::Gate:
+			return true;
+		default:
+			return false;
+		}
+	};
+
+	// draw body shadow
+	if (draw_shadow && !shouldSkipShadow() && config_manager::get().get_detail_level() != 0 && !mob)
+		m_sprite[eq.body + (m_entity_state.m_dir - 1)]->draw(sX, sY, m_entity_state.m_frame, hb::shared::sprite::DrawParams::shadow());
+
+	// draw weapon first if drawing order is 1
+	if (weapon_draw_order[m_entity_state.m_dir] == 1)
+		drawWeapon();
+
+	// draw body
+	if (mob)
+		m_sprite[eq.body + (m_entity_state.m_dir - 1)]->draw(sX, sY, m_entity_state.m_frame, hb::shared::sprite::DrawParams::alpha_blend(0.5f));
+	else
+		m_sprite[eq.body + (m_entity_state.m_dir - 1)]->draw(sX, sY, m_entity_state.m_frame);
+
+	// draw equipment layers (back-to-front order)
+	drawMantle(0);  // Mantle behind body
+	drawCosmeticLayer(eq.undies, 0);  // Undies from m_sprite
+
+	// Hair (cosmetic, from m_sprite, only if no helm)
+	if (eq.hair != -1 && eq.helm == -1)
+	{
+		const auto& hc = GameColors::Hair[hairColor];
+		m_sprite[eq.hair]->draw(sX, sY, dirFrame, hb::shared::sprite::DrawParams::tint(hc.r, hc.g, hc.b));
+	}
+
+	// Boots before pants if wearing skirt
+	if (eq.skirtDraw)
+		drawEquipLayer(eq.boots, eq.bootsColor);
+
+	drawEquipLayer(eq.pants, eq.pantsColor);
+	drawEquipLayer(eq.armArmor, eq.armColor);
+
+	// Boots after pants if not wearing skirt
+	if (!eq.skirtDraw)
+		drawEquipLayer(eq.boots, eq.bootsColor);
+
+	drawEquipLayer(eq.bodyArmor, eq.armorColor);
+	drawEquipLayer(eq.helm, eq.helmColor);
+	drawMantle(2);  // Mantle over armor
+	drawEquipLayer(eq.shield, eq.shieldColor);
+	drawMantle(1);  // Mantle in front
+
+	// draw weapon last if drawing order is not 1
+	if (weapon_draw_order[m_entity_state.m_dir] != 1)
+		drawWeapon();
+
+	// Chat message
+	if (m_entity_state.m_chat_index != 0)
+	{
+		if (get_floating_text().is_occupied(m_entity_state.m_chat_index))
+			get_floating_text().draw_single(m_entity_state.m_chat_index, sX, sY, m_cur_time, m_Renderer);
+		else
+			m_map_data->clear_chat_msg(indexX, indexY);
+	}
+
+	m_entity_state.m_move_offset_x = 0;
+	m_entity_state.m_move_offset_y = 0;
+	return m_sprite[eq.body + (m_entity_state.m_dir - 1)]->GetBoundRect();
+}
+
+// draw_background moved to Screen_OnGame.DrawObjects.cpp
 
 void CGame::init_item_list(char* packet_data)
 {
@@ -2457,26 +2588,7 @@ void CGame::init_item_list(char* packet_data)
 // draw_dialog_boxs REMOVED — rendering moved to DialogBoxManager::draw_all()
 // Super attack overlay moved to DialogBox_HudPanel::draw_super_attack_overlay()
 
-void CGame::draw_character_body(short sX, short sY, short type)
-{
-	uint32_t time = m_cur_time;
-
-	if (type <= 3)
-	{
-		m_sprite[ItemEquipPivotPoint + 0]->draw(sX, sY, type - 1);
-		const auto& hcM = GameColors::Hair[m_entity_state.m_appearance.hair_color];
-		m_sprite[ItemEquipPivotPoint + 18]->draw(sX, sY, m_entity_state.m_appearance.hair_style, hb::shared::sprite::DrawParams::tint(hcM.r, hcM.g, hcM.b));
-
-		m_sprite[ItemEquipPivotPoint + 19]->draw(sX, sY, m_entity_state.m_appearance.underwear_type);
-	}
-	else
-	{
-		m_sprite[ItemEquipPivotPoint + 40]->draw(sX, sY, type - 4);
-		const auto& hcF = GameColors::Hair[m_entity_state.m_appearance.hair_color];
-		m_sprite[ItemEquipPivotPoint + 18 + 40]->draw(sX, sY, m_entity_state.m_appearance.hair_style, hb::shared::sprite::DrawParams::tint(hcF.r, hcF.g, hcF.b));
-		m_sprite[ItemEquipPivotPoint + 19 + 40]->draw(sX, sY, m_entity_state.m_appearance.underwear_type);
-	}
-}
+// draw_character_body REMOVED — moved to Screen_OnGame::draw_character_body (static)
 
 // get_top_dialog_box_index REMOVED — use get_dialog_box_manager().get_top_id()
 
@@ -2660,13 +2772,7 @@ void CGame::meteor_strike_coming(int code)
 	}
 }
 
-void CGame::draw_object_foe(int ix, int iy, int frame)
-{
-	if (IsHostile(m_entity_state.m_status.relationship)) // red crusade circle
-	{
-		if (frame <= 4) m_effect_sprites[38]->draw(ix, iy, frame, hb::shared::sprite::DrawParams::alpha_blend(0.5f));
-	}
-}
+// draw_object_foe REMOVED — moved to Screen_OnGame
 
 void CGame::set_top_msg(const char* string, unsigned char last_sec)
 {
@@ -2676,18 +2782,7 @@ void CGame::set_top_msg(const char* string, unsigned char last_sec)
 	m_top_msg_time = GameClock::get_time_ms();
 }
 
-void CGame::draw_top_msg()
-{
-	if (m_top_msg.size() == 0) return;
-	m_Renderer->draw_rect_filled(0, 0, LOGICAL_MAX_X(), 30, hb::shared::render::Color::Black(128));
-
-	if ((((GameClock::get_time_ms() - m_top_msg_time) / 250) % 2) == 0)
-		hb::shared::text::draw_text_aligned(GameFont::Default, 0, 10, LOGICAL_MAX_X(), 15, m_top_msg.c_str(), hb::shared::text::TextStyle::from_color(GameColors::UITopMsgYellow), hb::shared::text::Align::TopCenter);
-
-	if (GameClock::get_time_ms() > (m_top_msg_last_sec * 1000 + m_top_msg_time)) {
-		m_top_msg.clear();
-	}
-}
+// draw_top_msg moved to Screen_OnGame.DrawObjects.cpp
 
 void CGame::cannot_construct(int code)
 {
@@ -2716,6 +2811,12 @@ DialogBoxManager& CGame::get_dialog_box_manager()
 {
 	auto* screen = get_active_screen_as<Screen_OnGame>();
 	return screen->get_dialog_box_manager();
+}
+
+floating_text_manager& CGame::get_floating_text()
+{
+	auto* screen = get_active_screen_as<Screen_OnGame>();
+	return screen->get_floating_text();
 }
 
 void CGame::connect_to_game_server()
@@ -3568,260 +3669,8 @@ void CGame::retrieve_item_handler(char* data)
 	get_dialog_box_manager().get_dialog_as<DialogBox_Bank>(DialogBoxId::Bank)->m_mode = DialogBox_Bank::mode::list;
 }
 
-void CGame::draw_npc_name(short screen_x, short screen_y, short owner_type, const hb::shared::entity::PlayerStatus& status, short npc_config_id)
-{
-	std::string text, text2;
-
-	auto npcName = [&]() -> const char* {
-		if (npc_config_id >= 0)
-			return get_npc_config_name_by_id(npc_config_id);
-		return "Unknown";
-		};
-
-	// Crop subtypes override the base "Crop" name from config
-	if (owner_type == hb::shared::owner::Crops) {
-		static const char* cropNames[] = {
-			"Crop", "WaterMelon", "Pumpkin", "Garlic", "Barley", "Carrot",
-			"Radish", "Corn", "Chinese Bell Flower", "Melone", "Tomato",
-			"Grapes", "Blue Grape", "Mushroom", "Ginseng"
-		};
-		int sub = m_entity_state.m_appearance.sub_type;
-		if (sub >= 1 && sub <= 14)
-			text = cropNames[sub];
-		else
-			text = npcName();
-	}
-	// Crusade structure kit suffix
-	else if ((owner_type == hb::shared::owner::ArrowGuardTower || owner_type == hb::shared::owner::CannonGuardTower ||
-		owner_type == hb::shared::owner::ManaCollector || owner_type == hb::shared::owner::Detector) &&
-		m_entity_state.m_appearance.HasNpcSpecialState()) {
-		text = std::format("{} Kit", npcName());
-	}
-	else {
-		text = npcName();
-	}
-	if (status.berserk) text += DRAW_OBJECT_NAME50;//" Berserk"
-	if (status.frozen) text += DRAW_OBJECT_NAME51;//" Frozen"
-	hb::shared::text::draw_text(GameFont::Default, screen_x, screen_y, text.c_str(), hb::shared::text::TextStyle::with_shadow(GameColors::UIWhite));
-	if (m_is_observer_mode == true) hb::shared::text::draw_text(GameFont::Default, screen_x, screen_y + 14, text.c_str(), hb::shared::text::TextStyle::with_shadow(GameColors::NeutralNamePlate));
-	else if (m_player->m_is_confusion || (m_ilusion_owner_h != 0))
-	{
-		text = DRAW_OBJECT_NAME87;//"(Unknown)"
-		hb::shared::text::draw_text(GameFont::Default, screen_x, screen_y + 14, text.c_str(), hb::shared::text::TextStyle::with_shadow(GameColors::UIDisabled)); // v2.171
-	}
-	else
-	{
-		if (IsHostile(status.relationship))
-			hb::shared::text::draw_text(GameFont::Default, screen_x, screen_y + 14, DRAW_OBJECT_NAME90, hb::shared::text::TextStyle::with_shadow(GameColors::UIRed)); // "(Enemy)"
-		else if (IsFriendly(status.relationship))
-			hb::shared::text::draw_text(GameFont::Default, screen_x, screen_y + 14, DRAW_OBJECT_NAME89, hb::shared::text::TextStyle::with_shadow(GameColors::FriendlyNamePlate)); // "(Friendly)"
-		else
-			hb::shared::text::draw_text(GameFont::Default, screen_x, screen_y + 14, DRAW_OBJECT_NAME88, hb::shared::text::TextStyle::with_shadow(GameColors::NeutralNamePlate)); // "(Neutral)"
-	}
-	switch (status.angel_percent) {
-	case 0: break;
-	case 1: text2 = DRAW_OBJECT_NAME52; break;//"Clairvoyant"
-	case 2: text2 = DRAW_OBJECT_NAME53; break;//"Destruction of Magic Protection"
-	case 3: text2 = DRAW_OBJECT_NAME54; break;//"Anti-Physical Damage"
-	case 4: text2 = DRAW_OBJECT_NAME55; break;//"Anti-Magic Damage"
-	case 5: text2 = DRAW_OBJECT_NAME56; break;//"Poisonous"
-	case 6: text2 = DRAW_OBJECT_NAME57; break;//"Critical Poisonous"
-	case 7: text2 = DRAW_OBJECT_NAME58; break;//"Explosive"
-	case 8: text2 = DRAW_OBJECT_NAME59; break;//"Critical Explosive"
-	}
-	hb::shared::text::draw_text(GameFont::Default, screen_x, screen_y + 28, text2.c_str(), hb::shared::text::TextStyle::with_shadow(GameColors::MonsterStatusEffect));
-
-	// centu: no muestra la barra de hp de algunos npc
-	switch (owner_type) {
-	case hb::shared::owner::ShopKeeper:
-	case hb::shared::owner::Gandalf:
-	case hb::shared::owner::Howard:
-	case hb::shared::owner::Tom:
-	case hb::shared::owner::William:
-	case hb::shared::owner::Kennedy:
-	case hb::shared::owner::ManaStone:
-	case hb::shared::owner::Bunny:
-	case hb::shared::owner::Cat:
-	case hb::shared::owner::McGaffin:
-	case hb::shared::owner::Perry:
-	case hb::shared::owner::Devlin:
-	case hb::shared::owner::Crops:
-	{
-		switch (m_entity_state.m_appearance.sub_type) {
-		case 1:
-		case 2:
-		case 3:
-		case 4:
-		case 5:
-		case 6:
-		case 7:
-		case 8:
-		case 9:
-		case hb::shared::owner::Slime:
-		case hb::shared::owner::Skeleton:
-		case hb::shared::owner::StoneGolem:
-		case hb::shared::owner::Cyclops:
-		case hb::shared::owner::OrcMage:
-		default:
-			break;
-		}
-	}
-	case hb::shared::owner::Gail:
-		break;
-	default:
-		break;
-	}
-}
-
-void CGame::draw_object_name(short screen_x, short screen_y, const char* name, const hb::shared::entity::PlayerStatus& status, uint16_t object_id)
-{
-	std::string guild_text;
-	std::string text, text2;
-	uint8_t red = 0, green = 0, blue = 0;
-	int guild_index = 0, y_offset = 0;
-	bool is_pk = false, is_citizen = false, is_aresden = false, is_hunter = false;
-	auto relationship = status.relationship;
-	if (IsHostile(relationship))
-	{
-		red = 255; green = 0; blue = 0;
-	}
-	else if (IsFriendly(relationship))
-	{
-		red = 30; green = 200; blue = 30;
-	}
-	else
-	{
-		red = 50; green = 50; blue = 255;
-	}
-
-	if (m_ilusion_owner_h == 0)
-	{
-		if (m_is_crusade_mode == false) text = name;
-		else
-		{
-			if (!hb::shared::object_id::is_player_id(m_entity_state.m_object_id)) text = "Barbarian";
-			else
-			{
-				if (relationship == EntityRelationship::Enemy) text = std::format("{}", m_entity_state.m_object_id);
-				else text = name;
-			}
-		}
-		if (m_party_status != 0)
-		{
-			if (get_dialog_box_manager().get_dialog_as<DialogBox_Party>(DialogBoxId::Party)->is_party_member(name))
-				text += BGET_NPC_NAME23; // ", Party Member"
-		}
-	}
-	else text = "?????";
-
-	if (status.berserk) text += DRAW_OBJECT_NAME50;//" Berserk"
-	if (status.frozen) text += DRAW_OBJECT_NAME51;//" Frozen"
-
-	hb::shared::text::draw_text(GameFont::Default, screen_x, screen_y, text.c_str(), hb::shared::text::TextStyle::with_shadow(GameColors::UIWhite));
-
-	if (object_id == m_player->m_player_object_id)
-	{
-		if (m_player->m_guild_rank == 0)
-		{
-			guild_text = std::format(DEF_MSG_GUILDMASTER, m_player->m_guild_name);//" Guildmaster)"
-			hb::shared::text::draw_text(GameFont::Default, screen_x, screen_y + 14, guild_text.c_str(), hb::shared::text::TextStyle::with_shadow(GameColors::InfoGrayLight));
-			y_offset = 14;
-		}
-		if (m_player->m_guild_rank > 0)
-		{
-			guild_text = std::format(DEF_MSG_GUILDSMAN, m_player->m_guild_name);//" Guildsman)"
-			hb::shared::text::draw_text(GameFont::Default, screen_x, screen_y + 14, guild_text.c_str(), hb::shared::text::TextStyle::with_shadow(GameColors::InfoGrayLight));
-			y_offset = 14;
-		}
-		if (m_player->m_pk_count != 0)
-		{
-			is_pk = true;
-			red = 255; green = 0; blue = 0;
-		}
-		else
-		{
-			is_pk = false;
-			red = 30; green = 200; blue = 30;
-		}
-		is_citizen = m_player->m_citizen;
-		is_aresden = m_player->m_aresden;
-		is_hunter = m_player->m_hunter;
-	}
-	else
-	{	// CLEROTH - CRASH BUG ( STATUS )
-		is_pk = status.pk;
-		is_citizen = status.citizen;
-		is_aresden = status.aresden;
-		is_hunter = status.hunter;
-		if (m_is_crusade_mode == false || !IsHostile(relationship))
-		{
-			if (auto* on_game = GameModeManager::get_active_screen_as<Screen_OnGame>())
-			{
-				auto& gm = on_game->get_guild_manager();
-				if (gm.find_guild_name(name, m_cur_time, &guild_index) == true)
-				{
-					auto& entry = gm.get_name_entry(guild_index);
-					if (!entry.guild_name.empty())
-					{
-						if (entry.guild_name != "NONE")
-						{
-							if (entry.guild_rank == 0)
-							{
-								guild_text = std::format(DEF_MSG_GUILDMASTER, entry.guild_name);
-								hb::shared::text::draw_text(GameFont::Default, screen_x, screen_y + 14, guild_text.c_str(), hb::shared::text::TextStyle::with_shadow(GameColors::InfoGrayLight));
-								y_offset = 14;
-							}
-							else if (entry.guild_rank > 0)
-							{
-								guild_text = std::format(DEF_MSG_GUILDSMAN, entry.guild_name);
-								hb::shared::text::draw_text(GameFont::Default, screen_x, screen_y + 14, guild_text.c_str(), hb::shared::text::TextStyle::with_shadow(GameColors::InfoGrayLight));
-								y_offset = 14;
-							}
-						}
-					}
-				}
-				else
-				{
-					auto pkt = hb::net::make_common_command(CommonType::ReqGuildName, m_player->m_player_x, m_player->m_player_y);
-					pkt.v1 = m_entity_state.m_object_id;
-					pkt.v2 = guild_index;
-					send_game_packet(pkt);
-				}
-			}
-		}
-	}
-
-	if (is_citizen == false)
-	{
-		text = DRAW_OBJECT_NAME60;// "Traveller"
-		red = GameColors::NeutralNamePlate.r;
-		green = GameColors::NeutralNamePlate.g;
-		blue = GameColors::NeutralNamePlate.b;
-	}
-	else
-	{
-		if (is_aresden)
-		{
-			if (is_hunter == true) text = DEF_MSG_ARECIVIL; // "Aresden Civilian"
-			else text = DEF_MSG_ARESOLDIER; // "Aresden Combatant"
-		}
-		else
-		{
-			if (is_hunter == true) text = DEF_MSG_ELVCIVIL;// "Elvine Civilian"
-			else text = DEF_MSG_ELVSOLDIER;	// "Elvine Combatant"
-		}
-	}
-	if (is_pk == true)
-	{
-		if (is_citizen == false) text = DEF_MSG_PK;	//"Criminal"
-		else
-		{
-			if (is_aresden) text = DEF_MSG_AREPK;// "Aresden Criminal"
-			else text = DEF_MSG_ELVPK;  // "Elvine Criminal"
-		}
-	}
-	hb::shared::text::draw_text(GameFont::Default, screen_x, screen_y + 14 + y_offset, text.c_str(), hb::shared::text::TextStyle::with_shadow(hb::shared::render::Color(red, green, blue)));
-}
+// draw_npc_name REMOVED — moved to Screen_OnGame
+// draw_object_name REMOVED — moved to Screen_OnGame
 
 void CGame::draw_version()
 {
@@ -5981,7 +5830,7 @@ void CGame::process_motion_commands(uint16_t action_type)
 				}
 			}
 
-			m_floating_text.add_damage_from_value(m_player->m_damage_move_amount, false, m_cur_time,
+			get_floating_text().add_damage_from_value(m_player->m_damage_move_amount, false, m_cur_time,
 				m_player->m_player_object_id, m_map_data.get());
 			m_player->m_damage_move = 0;
 			m_player->m_damage_move_amount = 0;
@@ -6227,10 +6076,10 @@ void CGame::process_motion_commands(uint16_t action_type)
 			if (m_point_command_type >= 100 && m_point_command_type < 200)
 				m_is_get_pointing_mode = true;
 			m_player->m_Controller.set_command(Type::stop);
-			m_floating_text.remove_by_object_id(m_player->m_player_object_id);
+			get_floating_text().remove_by_object_id(m_player->m_player_object_id);
 			{
 				text = std::format("{}!", m_magic_cfg_list[m_casting_magic_type]->m_name);
-				m_floating_text.add_notify_text(notify_text_type::magic_cast_name, text, GameClock::get_time_ms(),
+				get_floating_text().add_notify_text(notify_text_type::magic_cast_name, text, GameClock::get_time_ms(),
 					m_player->m_player_object_id, m_map_data.get());
 			}
 			return;
@@ -6290,7 +6139,7 @@ void CGame::init_data_response_handler(char* packet_data)
 	if (auto* on_game = GameModeManager::get_active_screen_as<Screen_OnGame>())
 		on_game->get_guild_manager().clear_name_cache();
 
-	m_floating_text.clear_all();
+	get_floating_text().clear_all();
 
 	const auto* pkt = hb::net::PacketCast<hb::net::PacketResponseInitDataHeader>(
 		packet_data, sizeof(hb::net::PacketResponseInitDataHeader));
@@ -6593,17 +6442,17 @@ void CGame::motion_event_handler(char* packet_data)
 
 	switch (event_type) {
 	case Type::Magic: // Casting
-		m_floating_text.remove_by_object_id(hb::shared::object_id::ToRealID(object_id));
+		get_floating_text().remove_by_object_id(hb::shared::object_id::ToRealID(object_id));
 		{
 			text = std::format("{}!", m_magic_cfg_list[value1]->m_name);
-			m_floating_text.add_notify_text(notify_text_type::magic_cast_name, text, m_cur_time,
+			get_floating_text().add_notify_text(notify_text_type::magic_cast_name, text, m_cur_time,
 				hb::shared::object_id::ToRealID(object_id), m_map_data.get());
 		}
 		break;
 
 	case Type::Dying:
-		m_floating_text.remove_by_object_id(hb::shared::object_id::ToRealID(object_id));
-		m_floating_text.add_damage_from_value(value1, true, m_cur_time,
+		get_floating_text().remove_by_object_id(hb::shared::object_id::ToRealID(object_id));
+		get_floating_text().add_damage_from_value(value1, true, m_cur_time,
 			hb::shared::object_id::ToRealID(object_id), m_map_data.get());
 		break;
 
@@ -6623,8 +6472,8 @@ void CGame::motion_event_handler(char* packet_data)
 			m_player->m_Controller.set_command_available(false);
 			m_player->m_Controller.set_command_time(GameClock::get_time_ms());
 		}
-		m_floating_text.remove_by_object_id(hb::shared::object_id::ToRealID(object_id));
-		m_floating_text.add_damage_from_value(value1, false, m_cur_time,
+		get_floating_text().remove_by_object_id(hb::shared::object_id::ToRealID(object_id));
+		get_floating_text().add_damage_from_value(value1, false, m_cur_time,
 			hb::shared::object_id::ToRealID(object_id), m_map_data.get());
 		break;
 
@@ -6989,32 +6838,7 @@ void CGame::check_active_aura2(short sX, short sY, uint32_t time, short owner_ty
 		m_effect_sprites[81]->draw(sX + 115, sY + 120 - entity_visual::attacker_height[owner_type], m_entity_state.m_effect_frame % 21, hb::shared::sprite::DrawParams::alpha_blend(0.7f));
 }
 
-void CGame::draw_angel(int sprite, short sX, short sY, char frame, uint32_t time)
-{
-	if (m_entity_state.m_status.invisibility)
-	{
-		if (m_entity_state.m_status.angel_str)
-			m_sprite[TutelaryAngelsPivotPoint + sprite]->draw(sX, sY, frame, hb::shared::sprite::DrawParams::alpha_blend(0.5f));  //AngelicPendant(STR)
-		else if (m_entity_state.m_status.angel_dex)
-			m_sprite[TutelaryAngelsPivotPoint + (50 * 1) + sprite]->draw(sX, sY, frame, hb::shared::sprite::DrawParams::alpha_blend(0.5f)); //AngelicPendant(DEX)
-		else if (m_entity_state.m_status.angel_int)
-			m_sprite[TutelaryAngelsPivotPoint + (50 * 2) + sprite]->draw(sX, sY - 15, frame, hb::shared::sprite::DrawParams::alpha_blend(0.5f));//AngelicPendant(INT)
-		else if (m_entity_state.m_status.angel_mag)
-			m_sprite[TutelaryAngelsPivotPoint + (50 * 3) + sprite]->draw(sX, sY - 15, frame, hb::shared::sprite::DrawParams::alpha_blend(0.5f));//AngelicPendant(MAG)
-	}
-	else
-	{
-		if (m_entity_state.m_status.angel_str)
-			m_sprite[TutelaryAngelsPivotPoint + sprite]->draw(sX, sY, frame);  //AngelicPendant(STR)
-		else if (m_entity_state.m_status.angel_dex)
-			m_sprite[TutelaryAngelsPivotPoint + (50 * 1) + sprite]->draw(sX, sY, frame); //AngelicPendant(DEX)
-		else if (m_entity_state.m_status.angel_int)
-			m_sprite[TutelaryAngelsPivotPoint + (50 * 2) + sprite]->draw(sX, sY - 15, frame);//AngelicPendant(INT)
-		else if (m_entity_state.m_status.angel_mag)
-			m_sprite[TutelaryAngelsPivotPoint + (50 * 3) + sprite]->draw(sX, sY - 15, frame);//AngelicPendant(MAG)
-	}
-
-}
+// draw_angel REMOVED — moved to Screen_OnGame
 /*********************************************************************************************************************
 **  int CGame::has_hero_set( short m_sAppr3, short m_sAppr3, char OwnerType)		( Snoopy )							**
 **  description			:: check weather the object (is character) is using a hero set (1:war, 2:mage)				**
@@ -7136,63 +6960,5 @@ void CGame::show_heldenian_victory(short side)
 **  void 	ResponseHeldenianTeleportList(char *data)									(  Snoopy )					**
 **  description			: Gail's TP																					**
 **********************************************************************************************************************/
-/*********************************************************************************************************************
-**  bool dk_glare(int weapon_index, int weapon_index, int *weapon_glare)	( Snoopy )									**
-**  description			: test glowing condition for DK set															**
-**********************************************************************************************************************/
-void CGame::dk_glare(int weapon_color, int16_t weapon_item_id, int* weapon_glare)
-{
-	if (weapon_color != 9) return;
-	if (weapon_item_id <= 0) return;
-	CItem* cfg = get_item_config(weapon_item_id);
-	if (!cfg) return;
-	uint8_t appr_val = static_cast<uint8_t>(cfg->m_appearance_value);
-	if (appr_val == 14) // Sword3 (msw3/wsw3)
-	{
-		*weapon_glare = 3;
-	}
-	else if (appr_val == 37) // Staff3 (MStaff3/WStaff3)
-	{
-		*weapon_glare = 2;
-	}
-}
-/*********************************************************************************************************************
-**  void CGame::abaddon_corpse(int sX, int sY);		( Snoopy )														**
-**  description			: Placeholder for abaddon's death lightnings												**
-**********************************************************************************************************************/
-void CGame::abaddon_corpse(int sX, int sY)
-{
-	int ir = (rand() % 20) - 10;
-	weather_manager::get().draw_thunder_effect(sX + 30, 0, sX + 30, sY - 10, ir, ir, 1);
-	weather_manager::get().draw_thunder_effect(sX + 30, 0, sX + 30, sY - 10, ir + 2, ir, 2);
-	weather_manager::get().draw_thunder_effect(sX + 30, 0, sX + 30, sY - 10, ir - 2, ir, 2);
-	ir = (rand() % 20) - 10;
-	weather_manager::get().draw_thunder_effect(sX - 20, 0, sX - 20, sY - 35, ir, ir, 1);
-	weather_manager::get().draw_thunder_effect(sX - 20, 0, sX - 20, sY - 35, ir + 2, ir, 2);
-	weather_manager::get().draw_thunder_effect(sX - 20, 0, sX - 20, sY - 35, ir - 2, ir, 2);
-	ir = (rand() % 20) - 10;
-	weather_manager::get().draw_thunder_effect(sX - 10, 0, sX - 10, sY + 30, ir, ir, 1);
-	weather_manager::get().draw_thunder_effect(sX - 10, 0, sX - 10, sY + 30, ir + 2, ir + 2, 2);
-	weather_manager::get().draw_thunder_effect(sX - 10, 0, sX - 10, sY + 30, ir - 2, ir + 2, 2);
-	ir = (rand() % 20) - 10;
-	weather_manager::get().draw_thunder_effect(sX + 50, 0, sX + 50, sY + 35, ir, ir, 1);
-	weather_manager::get().draw_thunder_effect(sX + 50, 0, sX + 50, sY + 35, ir + 2, ir + 2, 2);
-	weather_manager::get().draw_thunder_effect(sX + 50, 0, sX + 50, sY + 35, ir - 2, ir + 2, 2);
-	ir = (rand() % 20) - 10;
-	weather_manager::get().draw_thunder_effect(sX + 65, 0, sX + 65, sY - 5, ir, ir, 1);
-	weather_manager::get().draw_thunder_effect(sX + 65, 0, sX + 65, sY - 5, ir + 2, ir + 2, 2);
-	weather_manager::get().draw_thunder_effect(sX + 65, 0, sX + 65, sY - 5, ir - 2, ir + 2, 2);
-	ir = (rand() % 20) - 10;
-	weather_manager::get().draw_thunder_effect(sX + 45, 0, sX + 45, sY - 50, ir, ir, 1);
-	weather_manager::get().draw_thunder_effect(sX + 45, 0, sX + 45, sY - 50, ir + 2, ir + 2, 2);
-	weather_manager::get().draw_thunder_effect(sX + 45, 0, sX + 45, sY - 50, ir - 2, ir + 2, 2);
-
-	for (int x = sX - 50; x <= sX + 100; x += rand() % 35)
-	{
-		for (int y = sY - 30; y <= sY + 50; y += rand() % 45)
-		{
-			ir = (rand() % 20) - 10;
-			weather_manager::get().draw_thunder_effect(x, 0, x, y, ir, ir, 2);
-		}
-	}
-}
+// dk_glare REMOVED — moved to Screen_OnGame
+// abaddon_corpse REMOVED — moved to Screen_OnGame
