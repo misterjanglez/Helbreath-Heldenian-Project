@@ -42,6 +42,7 @@
 #include "DialogBox_GuildHallMenu.h"
 #include "DialogBox_SellOrRepair.h"
 #include "DialogBox_Manufacture.h"
+#include "DialogBox_StatusOverlay.h"
 #ifdef TESTER_ONLY
 // TESTER MENU — includes (tester builds only)
 #include "DialogBox_TesterMenu.h"
@@ -53,6 +54,7 @@
 #include "TextFieldRenderer.h"
 #include "CursorTarget.h"
 #include "IInput.h"
+#include "Screen_OnGame.h"
 
 using namespace hb::shared::net;
 
@@ -112,6 +114,10 @@ void DialogBoxManager::initialize_dialog_boxes()
 	register_dialog_box(std::make_unique<DialogBox_ItemCreator>(&m_game));
 #endif // TESTER_ONLY
 
+	register_dialog_box(std::make_unique<DialogBox_StatusOverlay>(&m_game));
+
+	// StatusOverlay is underlay — drawn first, receives clicks last
+	set_z_layer(DialogBoxId::StatusOverlay, z_layer::underlay);
 	// HudPanel is always topmost — drawn last, not draggable
 	set_z_layer(DialogBoxId::HudPanel, z_layer::topmost);
 }
@@ -156,7 +162,10 @@ z_layer::type DialogBoxManager::get_z_layer(int id) const
 
 void DialogBoxManager::bring_to_front(int id)
 {
-	auto& order = (get_z_layer(id) == z_layer::topmost) ? m_topmost_order : m_normal_order;
+	auto layer = get_z_layer(id);
+	auto& order = (layer == z_layer::topmost) ? m_topmost_order
+	            : (layer == z_layer::underlay) ? m_underlay_order
+	            : m_normal_order;
 
 	// Remove if already present
 	for (auto it = order.begin(); it != order.end(); ++it)
@@ -183,6 +192,7 @@ void DialogBoxManager::remove_from_order(int id)
 			}
 		}
 	};
+	remove_from(m_underlay_order);
 	remove_from(m_normal_order);
 	remove_from(m_topmost_order);
 }
@@ -221,6 +231,16 @@ bool DialogBoxManager::for_each_top_to_bottom(Func&& fn) const
 				return true;
 		}
 	}
+	// Then underlay layer last (back to front = reverse iterate)
+	for (int i = static_cast<int>(m_underlay_order.size()) - 1; i >= 0; i--)
+	{
+		auto it = m_dialogs.find(m_underlay_order[i]);
+		if (it != m_dialogs.end() && it->second->is_enabled())
+		{
+			if (fn(it->second.get()))
+				return true;
+		}
+	}
 	return false;
 }
 
@@ -251,7 +271,15 @@ void DialogBoxManager::update_all()
 
 void DialogBoxManager::draw_all()
 {
-	if (m_game.m_is_observer_mode) return;
+	if (m_game.on_game() && m_game.on_game()->m_is_observer_mode) return;
+
+	// Underlay layer: drawn first (underneath everything)
+	for (uint8_t id : m_underlay_order)
+	{
+		auto it = m_dialogs.find(id);
+		if (it != m_dialogs.end() && it->second->is_enabled())
+			it->second->on_draw();
+	}
 
 	// Normal layer: drawn bottom to top
 	for (uint8_t id : m_normal_order)
@@ -285,8 +313,8 @@ void DialogBoxManager::enable_dialog_box(int box_id, int type, int64_t v1, int v
 	if (!dlg->on_enable(type, v1, v2, string))
 		return;  // on_enable returned false to cancel
 
-	// Clamp position (skip topmost-layer dialogs like HudPanel)
-	if (get_z_layer(box_id) != z_layer::topmost)
+	// Clamp position (skip topmost/underlay dialogs like HudPanel, StatusOverlay)
+	if (get_z_layer(box_id) == z_layer::normal)
 	{
 		if (dlg->is_enabled() == false)
 			clamp_position(dlg);
@@ -368,9 +396,11 @@ void DialogBoxManager::reset_all_for_map_change()
 		dlg->m_is_scroll_selected = false;
 	}
 
+	m_underlay_order.clear();
 	m_normal_order.clear();
 	m_topmost_order.clear();
 
+	enable_dialog_box(DialogBoxId::StatusOverlay, 0, 0, 0);
 	enable_dialog_box(DialogBoxId::HudPanel, 0, 0, 0);
 }
 

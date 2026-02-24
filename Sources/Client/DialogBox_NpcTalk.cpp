@@ -5,6 +5,7 @@
 #include "IInput.h"
 #include "NetMessages.h"
 #include "PacketSendHelpers.h"
+#include "Screen_OnGame.h"
 
 
 
@@ -21,7 +22,7 @@ int DialogBox_NpcTalk::get_total_lines() const
 	int total_lines = 0;
 	for (int i = 0; i < game_limits::max_text_dlg_lines; i++)
 	{
-		if (m_game->m_msg_text_list2[i] != nullptr)
+		if (m_game->on_game()->m_msg_text_list2[i] != nullptr)
 			total_lines++;
 	}
 	return total_lines;
@@ -84,10 +85,10 @@ void DialogBox_NpcTalk::draw_text_content(short sX, short sY)
 
 	for (int i = 0; i < 17; i++)
 	{
-		if ((i < game_limits::max_text_dlg_lines) && (m_game->m_msg_text_list2[i + view] != nullptr))
+		if ((i < game_limits::max_text_dlg_lines) && (m_game->on_game()->m_msg_text_list2[i + view] != nullptr))
 		{
 			hb::shared::text::draw_text_aligned(GameFont::Default, sX, sY + 57 + i * 15, sX + size_x - sX, 15,
-				m_game->m_msg_text_list2[i + view]->m_pMsg, hb::shared::text::TextStyle::from_color(GameColors::UILabel), hb::shared::text::Align::TopCenter);
+				m_game->on_game()->m_msg_text_list2[i + view]->m_pMsg, hb::shared::text::TextStyle::from_color(GameColors::UILabel), hb::shared::text::Align::TopCenter);
 		}
 	}
 }

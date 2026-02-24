@@ -6,6 +6,7 @@
 #include <cstring>
 #include <format>
 #include <string>
+#include "Screen_OnGame.h"
 
 namespace NetworkMessageHandlers {
 
@@ -24,14 +25,14 @@ void HandleApocGateOpen(CGame* game, char* data)
 	const auto* pkt = hb::net::PacketCast<hb::net::PacketNotifyApocGateOpen>(
 		data, sizeof(hb::net::PacketNotifyApocGateOpen));
 	if (!pkt) return;
-	game->m_gate_posit_x = pkt->gate_x;
-	game->m_gate_posit_y = pkt->gate_y;
+	game->on_game()->m_gate_posit_x = pkt->gate_x;
+	game->on_game()->m_gate_posit_y = pkt->gate_y;
 	game->m_gate_map_name.assign(pkt->map_name, strnlen(pkt->map_name, sizeof(pkt->map_name)));
 }
 
 void HandleApocGateClose(CGame* game, char* data)
 {
-	game->m_gate_posit_x = game->m_gate_posit_y = -1;
+	game->on_game()->m_gate_posit_x = game->on_game()->m_gate_posit_y = -1;
 }
 
 void HandleApocForceRecall(CGame* game, char* data)

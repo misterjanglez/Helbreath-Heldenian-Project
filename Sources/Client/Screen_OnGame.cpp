@@ -45,6 +45,9 @@
 #include <climits>
 #include "Packet/SharedPackets.h"
 #include "PacketSendHelpers.h"
+#include "CombatSystem.h"
+#include "TeleportManager.h"
+#include "GameTimer.h"
 
 
 
@@ -83,11 +86,114 @@ void Screen_OnGame::on_initialize()
     // Set current mode for code that checks GameModeManager::get_mode()
     GameModeManager::set_current_mode(GameMode::MainGame);
 
-    // Reset all gameplay state and create the player
-    m_game->init_game_settings();
-
-    // Wire the static player into CGame for gameplay access
+    // Create the player
+    Screen_OnGame::create_player();
     m_game->m_player = s_player.get();
+    combat_system::get().set_player(*s_player);
+
+    // Reset CGame-level state
+    m_game->m_check_connection_time = 0;
+    m_game->m_Camera.set_shake(0);
+
+    for (int r = 0; r < 4; r++) m_game->m_config_retry[r] = CGame::ConfigRetryLevel::None;
+    m_game->m_config_request_time = 0;
+    m_game->m_init_data_ready = false;
+    m_game->m_configs_ready = false;
+
+    CursorTarget::reset_selection_click_time();
+
+    m_game->m_net_lag_count = 0;
+    m_game->m_latency_ms = -1;
+    m_game->m_last_net_msg_id = 0;
+    m_game->m_last_net_msg_time = 0;
+    m_game->m_last_net_msg_size = 0;
+    m_game->m_last_net_recv_time = 0;
+    m_game->m_last_npc_event_time = 0;
+
+    if (m_game->m_effect_manager) m_game->m_effect_manager->clear_all_effects();
+
+    m_floating_text.clear_all();
+
+    ChatManager::get().clear_messages();
+    ChatManager::get().clear_whispers();
+
+    m_game->m_force_disconn = false;
+
+    CursorTarget::clear_selection();
+
+    teleport_manager::get().reset();
+
+    // Reset gameplay state (now on Screen_OnGame)
+    m_is_get_pointing_mode = false;
+    m_wait_for_new_click = false;
+    m_magic_cast_time = 0;
+    m_point_command_type = -1;
+
+    m_skill_using_status = false;
+    m_item_using_status = false;
+    m_using_slate = false;
+
+    m_down_skill_index = -1;
+
+    m_ilusion_owner_h = 0;
+    m_ilusion_owner_type = 0;
+
+    m_draw_flag = 0;
+    m_is_crusade_mode = false;
+
+    m_env_effect_time = GameClock::get_time_ms();
+
+    for (int i = 0; i < game_limits::max_text_dlg_lines; i++)
+    {
+        if (m_msg_text_list[i] != 0)
+            m_msg_text_list[i].reset();
+
+        if (m_msg_text_list2[i] != 0)
+            m_msg_text_list2[i].reset();
+
+        if (m_agree_msg_text_list[i] != 0)
+            m_agree_msg_text_list[i].reset();
+    }
+
+    m_logout_count = -1;
+    m_logout_count_time = 0;
+    m_fightzone_number = 0;
+    m_fightzone_number_temp = 0;
+    m_quest.who = 0;
+    m_quest.quest_type = 0;
+    m_quest.contribution = 0;
+    m_quest.target_type = 0;
+    m_quest.target_count = 0;
+    m_quest.current_count = 0;
+    m_quest.x = 0;
+    m_quest.y = 0;
+    m_quest.range = 0;
+    m_quest.is_quest_completed = false;
+    m_is_observer_mode = false;
+    m_is_observer_commanded = false;
+    m_special_ability_setting_time = 0;
+    m_is_f1_help_window_enabled = false;
+    for (int i = 0; i < hb::shared::limits::MaxCrusadeStructures; i++)
+    {
+        m_crusade_structure_info[i].type = 0;
+        m_crusade_structure_info[i].side = 0;
+        m_crusade_structure_info[i].x = 0;
+        m_crusade_structure_info[i].y = 0;
+    }
+    m_commander_command_requested_time = 0;
+    m_top_msg_last_sec = 0;
+    m_top_msg_time = 0;
+
+    m_gate_posit_x = m_gate_posit_y = -1;
+    m_heldenian_aresden_left_tower = -1;
+    m_heldenian_elvine_left_tower = -1;
+    m_heldenian_aresden_flags = -1;
+    m_heldenian_elvine_flags = -1;
+    m_is_xmas = false;
+    m_total_party_member = 0;
+    m_party_status = 0;
+    m_gizon_item_upgrade_left = 0;
+
 
     // Copy session identity into the player
     s_player->m_player_name = m_game->m_selected_char_name;
@@ -203,7 +309,7 @@ void Screen_OnGame::on_update()
         else if ((m_game->get_dialog_box_manager().is_enabled(DialogBoxId::ItemDropExternal) == true) && (m_game->get_dialog_box_manager().get_dialog_as<DialogBox_ItemDropAmount>(DialogBoxId::ItemDropExternal)->m_mode == DialogBox_ItemDropAmount::mode::input) && (m_game->get_dialog_box_manager().get_top_id() == DialogBoxId::ItemDropExternal)) {
             text_input_manager::get().end_input();
 
-            if (m_game->m_skill_using_status == true) {
+            if (m_skill_using_status == true) {
                 m_game->add_event_list(UPDATE_SCREEN_ONGAME1, 10);
                 return;
             }
@@ -415,16 +521,16 @@ void Screen_OnGame::on_update()
     m_sModY = val % 32;
 
     // Logout countdown
-    if (m_game->m_logout_count > 0) {
-        if ((m_time - m_game->m_logout_count_time) > 1000) {
-            m_game->m_logout_count--;
-            m_game->m_logout_count_time = m_time;
-            G_cTxt = std::format(UPDATE_SCREEN_ONGAME13, m_game->m_logout_count);
+    if (m_logout_count > 0) {
+        if ((m_time - m_logout_count_time) > 1000) {
+            m_logout_count--;
+            m_logout_count_time = m_time;
+            G_cTxt = std::format(UPDATE_SCREEN_ONGAME13, m_logout_count);
             m_game->add_event_list(G_cTxt.c_str(), 10);
         }
     }
-    if (m_game->m_logout_count == 0) {
-        m_game->m_logout_count = -1;
+    if (m_logout_count == 0) {
+        m_logout_count = -1;
         m_game->write_settings();
         m_game->m_g_sock.reset();
         play_game_sound('E', 14, 5);
@@ -559,7 +665,7 @@ void Screen_OnGame::on_update()
     m_game->m_Camera.update(m_time);
 
     // Observer mode camera (additional updates for keyboard-driven movement)
-    if (m_game->m_is_observer_mode) {
+    if (m_is_observer_mode) {
         if ((m_time - m_game->m_observer_cam_time) > 25) {
             m_game->m_observer_cam_time = m_time;
             m_game->m_Camera.update(m_time);
@@ -572,9 +678,9 @@ void Screen_OnGame::on_update()
     {
         uint32_t phase = GameClock::get_time_ms() % 4000;
         if (phase < 2000)
-            m_game->m_draw_flag = (phase * 200) / 2000;
+            m_draw_flag = (phase * 200) / 2000;
         else
-            m_game->m_draw_flag = 200 - ((phase - 2000) * 200) / 2000;
+            m_draw_flag = 200 - ((phase - 2000) * 200) / 2000;
     }
 }
 
@@ -593,7 +699,7 @@ void Screen_OnGame::on_render()
 
     // Snap camera to player position BEFORE drawing to eliminate character vibration
     // This ensures viewport and entity position use the same motion offset
-    if (!m_game->m_is_observer_mode)
+    if (!m_is_observer_mode)
     {
         int playerDX = m_game->m_player->m_player_x - m_game->m_map_data->m_pivot_x;
         int playerDY = m_game->m_player->m_player_y - m_game->m_map_data->m_pivot_y;
@@ -689,9 +795,9 @@ void Screen_OnGame::on_render()
     }
 
     // Apocalypse gate
-    if ((m_game->m_gate_posit_x >= m_game->m_Camera.get_x() / 32) && (m_game->m_gate_posit_x <= m_game->m_Camera.get_x() / 32 + VIEW_TILE_WIDTH())
-        && (m_game->m_gate_posit_y >= m_game->m_Camera.get_y() / 32) && (m_game->m_gate_posit_y <= m_game->m_Camera.get_y() / 32 + VIEW_TILE_HEIGHT())) {
-        m_game->m_effect_sprites[101]->draw(m_game->m_gate_posit_x * 32 - m_game->m_Camera.get_x() - 96, m_game->m_gate_posit_y * 32 - m_game->m_Camera.get_y() - 69, m_game->m_entity_state.m_effect_frame % 30, hb::shared::sprite::DrawParams::alpha_blend(0.5f));
+    if ((m_gate_posit_x >= m_game->m_Camera.get_x() / 32) && (m_gate_posit_x <= m_game->m_Camera.get_x() / 32 + VIEW_TILE_WIDTH())
+        && (m_gate_posit_y >= m_game->m_Camera.get_y() / 32) && (m_gate_posit_y <= m_game->m_Camera.get_y() / 32 + VIEW_TILE_HEIGHT())) {
+        m_game->m_effect_sprites[101]->draw(m_gate_posit_x * 32 - m_game->m_Camera.get_x() - 96, m_gate_posit_y * 32 - m_game->m_Camera.get_y() - 69, m_game->m_entity_state.m_effect_frame % 30, hb::shared::sprite::DrawParams::alpha_blend(0.5f));
     }
 
     // UI rendering
@@ -725,15 +831,15 @@ void Screen_OnGame::on_render()
     }
 
     // Heldenian tower count
-    if ((m_game->m_heldenian_aresden_left_tower != -1) && (m_game->m_cur_location.starts_with("BtField"))) {
+    if ((m_heldenian_aresden_left_tower != -1) && (m_game->m_cur_location.starts_with("BtField"))) {
         std::string G_cTxt;
-        G_cTxt = std::format("Aresden Flags : {}", m_game->m_heldenian_aresden_flags);
+        G_cTxt = std::format("Aresden Flags : {}", m_heldenian_aresden_flags);
         hb::shared::text::draw_text(GameFont::Default, 10, 140, G_cTxt.c_str(), hb::shared::text::TextStyle::from_color(GameColors::UIWhite));
-        G_cTxt = std::format("Elvine Flags : {}", m_game->m_heldenian_elvine_flags);
+        G_cTxt = std::format("Elvine Flags : {}", m_heldenian_elvine_flags);
         hb::shared::text::draw_text(GameFont::Default, 10, 160, G_cTxt.c_str(), hb::shared::text::TextStyle::from_color(GameColors::UIWhite));
-        G_cTxt = std::format("Aresden's rest building number : {}", m_game->m_heldenian_aresden_left_tower);
+        G_cTxt = std::format("Aresden's rest building number : {}", m_heldenian_aresden_left_tower);
         hb::shared::text::draw_text(GameFont::Default, 10, 180, G_cTxt.c_str(), hb::shared::text::TextStyle::from_color(GameColors::UIWhite));
-        G_cTxt = std::format("Elvine's rest building number : {}", m_game->m_heldenian_elvine_left_tower);
+        G_cTxt = std::format("Elvine's rest building number : {}", m_heldenian_elvine_left_tower);
         hb::shared::text::draw_text(GameFont::Default, 10, 200, G_cTxt.c_str(), hb::shared::text::TextStyle::from_color(GameColors::UIWhite));
     }
 
@@ -862,10 +968,10 @@ void Screen_OnGame::draw_spell_target_overlay()
 #ifndef _DEBUG
     return;
 #else
-    if (!m_game->m_is_get_pointing_mode) return;
-    if (m_game->m_point_command_type < 100) return;
+    if (!m_is_get_pointing_mode) return;
+    if (m_point_command_type < 100) return;
 
-    int magicId = m_game->m_point_command_type - 100;
+    int magicId = m_point_command_type - 100;
     if (magicId < 0 || magicId >= hb::shared::limits::MaxMagicType) return;
     if (!m_game->m_magic_cfg_list[magicId]) return;
 

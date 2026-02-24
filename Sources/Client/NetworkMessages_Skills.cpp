@@ -9,6 +9,7 @@
 #include <cmath>
 #include <format>
 #include <string>
+#include "Screen_OnGame.h"
 
 namespace NetworkMessageHandlers {
 	void HandleDownSkillIndexSet(CGame* game, char* data)
@@ -18,7 +19,7 @@ namespace NetworkMessageHandlers {
 			data, sizeof(hb::net::PacketNotifyDownSkillIndexSet));
 		if (!pkt) return;
 		skill_index = static_cast<short>(pkt->skill_index);
-		game->m_down_skill_index = skill_index;
+		game->on_game()->m_down_skill_index = skill_index;
 		auto* skill_dlg = game->get_dialog_box_manager().get_dialog_as<DialogBox_Skill>(DialogBoxId::Skill);
 		if (skill_dlg) skill_dlg->m_is_down_skill_pending = false;
 	}
@@ -135,7 +136,7 @@ namespace NetworkMessageHandlers {
 			game->add_event_list(NOTIFYMSG_SKILL_USINGEND2, 10);
 			break;
 		}
-		game->m_skill_using_status = false;
+		game->on_game()->m_skill_using_status = false;
 	}
 
 	void HandleMagicEffectOn(CGame* game, char* data)
@@ -297,7 +298,7 @@ namespace NetworkMessageHandlers {
 				break;
 			case 3:	// "Illusion magic has vanished."
 				game->add_event_list(NOTIFYMSG_MAGICEFFECT_OFF9, 10);
-				game->m_ilusion_owner_h = 0;
+				game->on_game()->m_ilusion_owner_h = 0;
 				break;
 			case 4:	// "At last, you gather your senses." // snoopy
 				game->add_event_list(NOTIFYMSG_MAGICEFFECT_OFF15, 10);
@@ -376,7 +377,7 @@ namespace NetworkMessageHandlers {
 		game->m_player->m_mag += game->m_player->m_lu_mag;
 		game->m_player->m_charisma += game->m_player->m_lu_char;
 		game->m_player->m_lu_point = (game->m_player->m_level - 1) * 3 - ((game->m_player->m_str + game->m_player->m_vit + game->m_player->m_dex + game->m_player->m_int + game->m_player->m_mag + game->m_player->m_charisma) - 70);
-		game->m_gizon_item_upgrade_left -= majestic_cost;
+		game->on_game()->m_gizon_item_upgrade_left -= majestic_cost;
 		game->m_player->m_lu_str = game->m_player->m_lu_vit = game->m_player->m_lu_dex = game->m_player->m_lu_int = game->m_player->m_lu_mag = game->m_player->m_lu_char = 0;
 		game->get_dialog_box_manager().disable_dialog_box(DialogBoxId::ChangeStatsMajestic);
 		game->get_dialog_box_manager().enable_dialog_box(DialogBoxId::LevelUpSetting, 0, 0, 0);
@@ -465,13 +466,13 @@ namespace NetworkMessageHandlers {
 				}
 			}
 			game->m_player->m_special_ability_type = static_cast<int>(v2);
-			game->m_special_ability_setting_time = game->m_cur_time;
+			game->on_game()->m_special_ability_setting_time = game->m_cur_time;
 			game->m_player->m_special_ability_time_left_sec = static_cast<int>(v3);
 		}
 		else if (v1 == 3)  // End of using time
 		{
 			game->m_player->m_is_special_ability_enabled = false;
-			game->m_special_ability_setting_time = game->m_cur_time;
+			game->on_game()->m_special_ability_setting_time = game->m_cur_time;
 			if (v3 == 0)
 			{
 				game->m_player->m_special_ability_time_left_sec = 1200;

@@ -9,6 +9,7 @@
 #include <cmath>
 #include <format>
 #include <string>
+#include "Screen_OnGame.h"
 
 namespace NetworkMessageHandlers {
 	void HandleCrusade(CGame* game, char* data)
@@ -22,11 +23,11 @@ namespace NetworkMessageHandlers {
 		v3 = pkt->v3;
 		v4 = pkt->v4;
 
-		if (game->m_is_crusade_mode == false)
+		if (game->on_game()->m_is_crusade_mode == false)
 		{
 			if (v1 != 0) // begin crusade
 			{
-				game->m_is_crusade_mode = true;
+				game->on_game()->m_is_crusade_mode = true;
 				game->m_player->m_crusade_duty = v2;
 				if ((game->m_player->m_crusade_duty != 3) && (game->m_player->m_citizen == true))
 					game->request_map_status("middleland", 3);
@@ -55,7 +56,7 @@ namespace NetworkMessageHandlers {
 		{
 			if (v1 == 0) // crusade finished show result (1st result: winner)
 			{
-				game->m_is_crusade_mode = false;
+				game->on_game()->m_is_crusade_mode = false;
 				game->m_player->m_crusade_duty = 0;
 				game->crusade_war_result(v4);
 				if (game->m_game_msg_list[57]) game->set_top_msg(game->m_game_msg_list[57]->m_pMsg, 8);

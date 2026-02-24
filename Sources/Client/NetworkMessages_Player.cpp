@@ -1,8 +1,10 @@
 ﻿#include "Game.h"
+#include "Screen_OnGame.h"
 #include "ChatManager.h"
 #include "NetworkMessageManager.h"
 #include "Packet/SharedPackets.h"
 #include "lan_eng.h"
+#include <algorithm>
 #include <cstdio>
 #include <cstring>
 #include <string_view>
@@ -159,5 +161,78 @@ namespace NetworkMessageHandlers {
 		if (time == 0) txt = NOTIFYMSG_CANNOT_RATING1;
 		else txt = std::format(NOTIFYMSG_CANNOT_RATING2, time * 3);
 		game->add_event_list(txt.c_str(), 10);
+	}
+
+	void HandlePlayerCharacterContents(CGame* game, char* data)
+	{
+		game->m_player->m_angelic_str = 0;
+		game->m_player->m_angelic_dex = 0;
+		game->m_player->m_angelic_int = 0;
+		game->m_player->m_angelic_mag = 0;
+
+		const auto* pkt = hb::net::PacketCast<hb::net::PacketResponsePlayerCharacterContents>(
+			data, sizeof(hb::net::PacketResponsePlayerCharacterContents));
+		if (!pkt) return;
+
+		game->m_player->m_hp = pkt->hp;
+		game->m_player->m_mp = pkt->mp;
+		game->m_player->m_sp = pkt->sp;
+		game->m_player->m_ac = pkt->ac;
+		game->m_player->m_thac0 = pkt->thac0;
+		game->m_player->m_level = pkt->level;
+		game->m_player->m_str = pkt->str;
+		game->m_player->m_int = pkt->intel;
+		game->m_player->m_vit = pkt->vit;
+		game->m_player->m_dex = pkt->dex;
+		game->m_player->m_mag = pkt->mag;
+		game->m_player->m_charisma = pkt->chr;
+		game->m_player->m_lu_point = pkt->lu_point;
+		game->m_player->m_exp = pkt->exp;
+		game->m_player->m_enemy_kill_count = pkt->enemy_kills;
+		game->m_player->m_pk_count = pkt->pk_count;
+		game->m_player->m_reward_gold = pkt->reward_gold;
+
+		game->m_location.assign(pkt->location, strnlen(pkt->location, sizeof(pkt->location)));
+		if (game->m_location.starts_with("aresden"))
+		{
+			game->m_player->m_aresden = true;
+			game->m_player->m_citizen = true;
+			game->m_player->m_hunter = false;
+		}
+		else if (game->m_location.starts_with("arehunter"))
+		{
+			game->m_player->m_aresden = true;
+			game->m_player->m_citizen = true;
+			game->m_player->m_hunter = true;
+		}
+		else if (game->m_location.starts_with("elvine"))
+		{
+			game->m_player->m_aresden = false;
+			game->m_player->m_citizen = true;
+			game->m_player->m_hunter = false;
+		}
+		else if (game->m_location.starts_with("elvhunter"))
+		{
+			game->m_player->m_aresden = false;
+			game->m_player->m_citizen = true;
+			game->m_player->m_hunter = true;
+		}
+		else
+		{
+			game->m_player->m_aresden = true;
+			game->m_player->m_citizen = false;
+			game->m_player->m_hunter = true;
+		}
+
+		game->m_player->m_guild_name.assign(pkt->guild_name, strnlen(pkt->guild_name, sizeof(pkt->guild_name)));
+		if (game->m_player->m_guild_name == "NONE")
+			game->m_player->m_guild_name.clear();
+		std::replace(game->m_player->m_guild_name.begin(), game->m_player->m_guild_name.end(), '_', ' ');
+		game->m_player->m_guild_rank = pkt->guild_rank;
+		game->m_player->m_super_attack_left = pkt->super_attack_left;
+		game->on_game()->m_fightzone_number = pkt->fightzone_number;
+		game->m_max_stats = pkt->max_stats;
+		game->m_max_level = pkt->max_level;
+		game->m_max_bank_items = pkt->max_bank_items;
 	}
 }

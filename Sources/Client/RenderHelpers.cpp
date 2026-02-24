@@ -85,9 +85,9 @@ void draw_weapon(CGame& game, hb::shared::sprite::SpriteCollection& sprites,
 	int weaponGlare = eq.m_weapon_glare;
 	if (auto* on_game = GameModeManager::get_active_screen_as<Screen_OnGame>())
 		on_game->dk_glare(eq.m_weapon_color, eq.m_weapon_item_id, &weaponGlare);
-	if (weaponGlare != 0)
+	if (weaponGlare != 0 && game.on_game())
 	{
-		int f = game.m_draw_flag;
+		int f = game.on_game()->m_draw_flag;
 		switch (weaponGlare) {
 		case 1: sprites[eq.m_weapon_index]->draw(sX, sY, weaponFrame, hb::shared::sprite::DrawParams::additive_tinted(f, 0, 0)); break;
 		case 2: sprites[eq.m_weapon_index]->draw(sX, sY, weaponFrame, hb::shared::sprite::DrawParams::additive_tinted(0, f, 0)); break;
@@ -119,9 +119,9 @@ void draw_shield(CGame& game, hb::shared::sprite::SpriteCollection& sprites,
 	}
 
 	// Shield glare — single-pass shader matching DDraw PutTransSpriteRGB
-	if (eq.m_shield_glare != 0)
+	if (eq.m_shield_glare != 0 && game.on_game())
 	{
-		int sf = game.m_draw_flag;
+		int sf = game.on_game()->m_draw_flag;
 		switch (eq.m_shield_glare) {
 		case 1:
 			// GM sprite (m_effect_sprites[45]) is only drawn by draw_gm_effect when gm_mode is true

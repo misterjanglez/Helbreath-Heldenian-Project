@@ -12,6 +12,7 @@
 #include "IInput.h"
 #include "Packet/SharedPackets.h"
 #include "PacketSendHelpers.h"
+#include "Screen_OnGame.h"
 
 
 using namespace hb::shared::net;
@@ -82,7 +83,7 @@ void DialogBox_GuildHallMenu::on_draw()
 
 	case mode::hire_soldier:
 		put_aligned_string(sX, sX + size_x, sY + 45, "You will hire a soldier by summon points", GameColors::UIWhite);
-		if ((player().m_construction_point >= 2000) && (m_game->m_is_crusade_mode == false))
+		if ((player().m_construction_point >= 2000) && (m_game->on_game()->m_is_crusade_mode == false))
 		{
 			if (mouse_in(link_1))
 				put_aligned_string(sX, sX + size_x, sY + 70, "Sorceress             2000 Point", GameColors::UIWhite);
@@ -90,7 +91,7 @@ void DialogBox_GuildHallMenu::on_draw()
 		}
 		else put_aligned_string(sX, sX + size_x, sY + 70, "Sorceress             2000 Point", GameColors::UIDisabled);
 
-		if ((player().m_construction_point >= 3000) && (m_game->m_is_crusade_mode == false))
+		if ((player().m_construction_point >= 3000) && (m_game->on_game()->m_is_crusade_mode == false))
 		{
 			if (mouse_in(link_2))
 				put_aligned_string(sX, sX + size_x, sY + 95, "Ancient Temple Knight 3000 Point", GameColors::UIWhite);
@@ -98,7 +99,7 @@ void DialogBox_GuildHallMenu::on_draw()
 		}
 		else put_aligned_string(sX, sX + size_x, sY + 95, "Ancient Temple Knight 3000 Point", GameColors::UIDisabled);
 
-		if ((player().m_construction_point >= 1500) && (m_game->m_is_crusade_mode == false))
+		if ((player().m_construction_point >= 1500) && (m_game->on_game()->m_is_crusade_mode == false))
 		{
 			if (mouse_in(link_3))
 				put_aligned_string(sX, sX + size_x, sY + 120, "Elf Master            1500 Point", GameColors::UIWhite);
@@ -106,7 +107,7 @@ void DialogBox_GuildHallMenu::on_draw()
 		}
 		else put_aligned_string(sX, sX + size_x, sY + 120, "Elf Master            1500 Point", GameColors::UIDisabled);
 
-		if ((player().m_construction_point >= 3000) && (m_game->m_is_crusade_mode == false))
+		if ((player().m_construction_point >= 3000) && (m_game->on_game()->m_is_crusade_mode == false))
 		{
 			if (mouse_in(link_4))
 				put_aligned_string(sX, sX + size_x, sY + 145, "Dark Shadow Knight    3000 Point", GameColors::UIWhite);
@@ -114,7 +115,7 @@ void DialogBox_GuildHallMenu::on_draw()
 		}
 		else put_aligned_string(sX, sX + size_x, sY + 145, "Dark Shadow Knight    3000 Point", GameColors::UIDisabled);
 
-		if ((player().m_construction_point >= 4000) && (m_game->m_is_crusade_mode == false))
+		if ((player().m_construction_point >= 4000) && (m_game->on_game()->m_is_crusade_mode == false))
 		{
 			if (mouse_in(link_5))
 				put_aligned_string(sX, sX + size_x, sY + 170, "Heavy Battle Tank     4000 Point", GameColors::UIWhite);
@@ -122,7 +123,7 @@ void DialogBox_GuildHallMenu::on_draw()
 		}
 		else put_aligned_string(sX, sX + size_x, sY + 170, "Heavy Battle Tank     4000 Point", GameColors::UIDisabled);
 
-		if ((player().m_construction_point >= 3000) && (m_game->m_is_crusade_mode == false))
+		if ((player().m_construction_point >= 3000) && (m_game->on_game()->m_is_crusade_mode == false))
 		{
 			if (mouse_in(link_6))
 				put_aligned_string(sX, sX + size_x, sY + 195, "Barbarian             3000 Point", GameColors::UIWhite);
@@ -151,22 +152,22 @@ void DialogBox_GuildHallMenu::on_draw()
 		put_aligned_string(sX, sX + size_x, sY + 45, "5 majestic points will be deducted", GameColors::UIMagicBlue);
 		put_aligned_string(sX, sX + size_x, sY + 80, "upon receiving the Pendant of Tutelary Angel.", GameColors::UIMagicBlue);
 		put_aligned_string(sX, sX + size_x, sY + 105, "Would you like to receive the Tutelary Angel?", GameColors::UIMagicBlue);
-		auto angelBuf = std::format(DRAW_DIALOGBOX_ITEMUPGRADE11, m_game->m_gizon_item_upgrade_left);
+		auto angelBuf = std::format(DRAW_DIALOGBOX_ITEMUPGRADE11, m_game->on_game()->m_gizon_item_upgrade_left);
 		put_aligned_string(sX, sX + size_x, sY + 140, angelBuf.c_str(), GameColors::UIBlack);
 
-		if (mouse_in(link_angel_str) && (m_game->m_gizon_item_upgrade_left > 4))
+		if (mouse_in(link_angel_str) && (m_game->on_game()->m_gizon_item_upgrade_left > 4))
 			put_aligned_string(sX, sX + size_x, sY + 175, "Tutelary Angel (STR) will be handed out.", GameColors::UIWhite);
 		else put_aligned_string(sX, sX + size_x, sY + 175, "Tutelary Angel (STR) will be handed out.", GameColors::UIMenuHighlight);
 
-		if (mouse_in(link_angel_dex) && (m_game->m_gizon_item_upgrade_left > 4))
+		if (mouse_in(link_angel_dex) && (m_game->on_game()->m_gizon_item_upgrade_left > 4))
 			put_aligned_string(sX, sX + size_x, sY + 200, "Tutelary Angel (DEX) will be handed out.", GameColors::UIWhite);
 		else put_aligned_string(sX, sX + size_x, sY + 200, "Tutelary Angel (DEX) will be handed out.", GameColors::UIMenuHighlight);
 
-		if (mouse_in(link_angel_int) && (m_game->m_gizon_item_upgrade_left > 4))
+		if (mouse_in(link_angel_int) && (m_game->on_game()->m_gizon_item_upgrade_left > 4))
 			put_aligned_string(sX, sX + size_x, sY + 225, "Tutelary Angel (INT) will be handed out.", GameColors::UIWhite);
 		else put_aligned_string(sX, sX + size_x, sY + 225, "Tutelary Angel (INT) will be handed out.", GameColors::UIMenuHighlight);
 
-		if (mouse_in(link_angel_mag) && (m_game->m_gizon_item_upgrade_left > 4))
+		if (mouse_in(link_angel_mag) && (m_game->on_game()->m_gizon_item_upgrade_left > 4))
 			put_aligned_string(sX, sX + size_x, sY + 250, "Tutelary Angel (MAG) will be handed out.", GameColors::UIWhite);
 		else put_aligned_string(sX, sX + size_x, sY + 250, "Tutelary Angel (MAG) will be handed out.", GameColors::UIMenuHighlight);
 		break;
@@ -240,7 +241,7 @@ bool DialogBox_GuildHallMenu::on_click()
 
 	case mode::hire_soldier:
 		if (mouse_in(link_1)
-			&& (player().m_construction_point >= 2000) && (m_game->m_is_crusade_mode == false))
+			&& (player().m_construction_point >= 2000) && (m_game->on_game()->m_is_crusade_mode == false))
 		{
 			{
 				hb::net::PacketRequestHeldenianScroll req{};
@@ -253,7 +254,7 @@ bool DialogBox_GuildHallMenu::on_click()
 			play_sound_effect('E', 14, 5);
 		}
 		if (mouse_in(link_2)
-			&& (player().m_construction_point >= 3000) && (m_game->m_is_crusade_mode == false))
+			&& (player().m_construction_point >= 3000) && (m_game->on_game()->m_is_crusade_mode == false))
 		{
 			{
 				hb::net::PacketRequestHeldenianScroll req{};
@@ -266,7 +267,7 @@ bool DialogBox_GuildHallMenu::on_click()
 			play_sound_effect('E', 14, 5);
 		}
 		if (mouse_in(link_3)
-			&& (player().m_construction_point >= 1500) && (m_game->m_is_crusade_mode == false))
+			&& (player().m_construction_point >= 1500) && (m_game->on_game()->m_is_crusade_mode == false))
 		{
 			{
 				hb::net::PacketRequestHeldenianScroll req{};
@@ -279,7 +280,7 @@ bool DialogBox_GuildHallMenu::on_click()
 			play_sound_effect('E', 14, 5);
 		}
 		if (mouse_in(link_4)
-			&& (player().m_construction_point >= 3000) && (m_game->m_is_crusade_mode == false))
+			&& (player().m_construction_point >= 3000) && (m_game->on_game()->m_is_crusade_mode == false))
 		{
 			{
 				hb::net::PacketRequestHeldenianScroll req{};
@@ -292,7 +293,7 @@ bool DialogBox_GuildHallMenu::on_click()
 			play_sound_effect('E', 14, 5);
 		}
 		if (mouse_in(link_5)
-			&& (player().m_construction_point >= 4000) && (m_game->m_is_crusade_mode == false))
+			&& (player().m_construction_point >= 4000) && (m_game->on_game()->m_is_crusade_mode == false))
 		{
 			{
 				hb::net::PacketRequestHeldenianScroll req{};
@@ -305,7 +306,7 @@ bool DialogBox_GuildHallMenu::on_click()
 			play_sound_effect('E', 14, 5);
 		}
 		if (mouse_in(link_6)
-			&& (player().m_construction_point >= 3000) && (m_game->m_is_crusade_mode == false))
+			&& (player().m_construction_point >= 3000) && (m_game->on_game()->m_is_crusade_mode == false))
 		{
 			{
 				hb::net::PacketRequestHeldenianScroll req{};
@@ -330,7 +331,7 @@ bool DialogBox_GuildHallMenu::on_click()
 
 	case mode::tutelary_angel:
 		if (mouse_in(link_angel_str)
-			&& (m_game->m_gizon_item_upgrade_left >= 5))
+			&& (m_game->on_game()->m_gizon_item_upgrade_left >= 5))
 		{
 			{
 				hb::net::PacketRequestAngel req{};
@@ -343,7 +344,7 @@ bool DialogBox_GuildHallMenu::on_click()
 			play_sound_effect('E', 14, 5);
 		}
 		if (mouse_in(link_angel_dex)
-			&& (m_game->m_gizon_item_upgrade_left >= 5))
+			&& (m_game->on_game()->m_gizon_item_upgrade_left >= 5))
 		{
 			{
 				hb::net::PacketRequestAngel req{};
@@ -356,7 +357,7 @@ bool DialogBox_GuildHallMenu::on_click()
 			play_sound_effect('E', 14, 5);
 		}
 		if (mouse_in(link_angel_int)
-			&& (m_game->m_gizon_item_upgrade_left >= 5))
+			&& (m_game->on_game()->m_gizon_item_upgrade_left >= 5))
 		{
 			{
 				hb::net::PacketRequestAngel req{};
@@ -369,7 +370,7 @@ bool DialogBox_GuildHallMenu::on_click()
 			play_sound_effect('E', 14, 5);
 		}
 		if (mouse_in(link_angel_mag)
-			&& (m_game->m_gizon_item_upgrade_left >= 5))
+			&& (m_game->on_game()->m_gizon_item_upgrade_left >= 5))
 		{
 			{
 				hb::net::PacketRequestAngel req{};

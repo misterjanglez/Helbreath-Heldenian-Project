@@ -9,6 +9,7 @@
 #include <algorithm>
 #include <climits>
 #include <format>
+#include "Screen_OnGame.h"
 
 using namespace hb::shared::net;
 using hb::shared::item::ItemType;
@@ -146,7 +147,7 @@ bool inventory_manager::check_item_operation_enabled(int item_id)
 	if (teleport_manager::get().is_requested()) return false;
 	if (is_locked(item_id)) return false;
 
-	if ((m_game->m_player->m_item_list[item_id]->m_id_num == 867) && (m_game->m_using_slate == true)) // Ancient Tablet
+	if ((m_game->m_player->m_item_list[item_id]->m_id_num == 867) && (m_game->on_game()->m_using_slate == true)) // Ancient Tablet
 	{
 		if ((m_game->m_map_index == 35) || (m_game->m_map_index == 36) || (m_game->m_map_index == 37))
 		{
@@ -224,7 +225,7 @@ void inventory_manager::equip_item(int item_id)
 		m_game->add_event_list(BITEMDROP_CHARACTER4, 10);
 		return;
 	}
-	if (m_game->m_skill_using_status == true)
+	if (m_game->on_game()->m_skill_using_status == true)
 	{
 		m_game->add_event_list(BITEMDROP_CHARACTER5, 10);
 		return;

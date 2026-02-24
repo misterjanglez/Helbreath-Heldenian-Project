@@ -206,7 +206,6 @@ CGame::CGame(hb::shared::types::NativeInstance native_instance, int icon_resourc
 	m_comm_object_id = 0;
 	m_last_attack_target_id = 0;
 	m_enter_game_type = 0;
-	m_is_observer_mode = false;
 
 	// initialize Managers (Networking v4) - using make_unique
 	m_effect_manager = std::make_unique<effect_manager>(this);
@@ -396,16 +395,16 @@ void CGame::on_event(const hb::shared::render::event& e)
 		{
 			// In main game, start logout countdown instead of closing immediately
 #ifdef _DEBUG
-			if (m_logout_count == -1 || m_logout_count > 2)
+			if (on_game()->m_logout_count == -1 || on_game()->m_logout_count > 2)
 			{
-				m_logout_count = 1;
-				m_logout_count_time = GameClock::get_time_ms();
+				on_game()->m_logout_count = 1;
+				on_game()->m_logout_count_time = GameClock::get_time_ms();
 			}
 #else
-			if (m_logout_count == -1 || m_logout_count > 11)
+			if (on_game()->m_logout_count == -1 || on_game()->m_logout_count > 11)
 			{
-				m_logout_count = 11;
-				m_logout_count_time = GameClock::get_time_ms();
+				on_game()->m_logout_count = 11;
+				on_game()->m_logout_count_time = GameClock::get_time_ms();
 			}
 #endif
 		}
@@ -542,7 +541,7 @@ void CGame::draw_cursor()
 	switch (GameModeManager::get_mode()) {
 	case GameMode::MainGame:
 		// In-game uses context-sensitive cursor from CursorTarget
-		if (m_is_observer_mode) {
+		if (on_game()->m_is_observer_mode) {
 			// Observer mode shows a small crosshair instead of cursor sprite
 			m_Renderer->draw_pixel(mouse_x, mouse_y, hb::shared::render::Color::White());
 			m_Renderer->draw_pixel(mouse_x + 1, mouse_y, hb::shared::render::Color::White());
@@ -1376,7 +1375,7 @@ void CGame::connection_establish_handler(char where)
 		std::snprintf(req.player, sizeof(req.player), "%s", m_selected_char_name.c_str());
 		std::snprintf(req.account, sizeof(req.account), "%s", m_account_name.c_str());
 		std::snprintf(req.password, sizeof(req.password), "%s", m_account_password.c_str());
-		req.is_observer = static_cast<uint8_t>(m_is_observer_mode);
+		req.is_observer = static_cast<uint8_t>(on_game()->m_is_observer_mode);
 		std::snprintf(req.server, sizeof(req.server), "%s", m_game_server_name.c_str());
 		req.padding = 0;
 		send_game_packet(req);
@@ -1406,7 +1405,7 @@ void CGame::init_player_response_handler(char* data)
 		std::snprintf(req.player, sizeof(req.player), "%s", m_selected_char_name.c_str());
 		std::snprintf(req.account, sizeof(req.account), "%s", m_account_name.c_str());
 		std::snprintf(req.password, sizeof(req.password), "%s", m_account_password.c_str());
-		req.is_observer = static_cast<uint8_t>(m_is_observer_mode);
+		req.is_observer = static_cast<uint8_t>(on_game()->m_is_observer_mode);
 		std::snprintf(req.server, sizeof(req.server), "%s", m_game_server_name.c_str());
 		std::snprintf(req.itemConfigHash, sizeof(req.itemConfigHash), "%s",
 			LocalCacheManager::get().get_hash(ConfigCacheType::Items).c_str());
@@ -1463,7 +1462,7 @@ void CGame::on_timer()
 		if ((time - m_check_conn_time) > 5000)
 		{
 			m_check_conn_time = time;
-			if ((m_is_crusade_mode) && (m_player->m_crusade_duty == 0)) get_dialog_box_manager().enable_dialog_box(DialogBoxId::CrusadeJob, 1, 0, 0);
+			if ((on_game()->m_is_crusade_mode) && (m_player->m_crusade_duty == 0)) get_dialog_box_manager().enable_dialog_box(DialogBoxId::CrusadeJob, 1, 0, 0);
 		}
 
 		if ((time - m_check_chat_time) > 2000)
@@ -1538,190 +1537,14 @@ void CGame::common_event_handler(char* data)
 	}
 }
 
-void CGame::init_game_settings()
+
+Screen_OnGame* CGame::on_game()
 {
-	Screen_OnGame::create_player();
-	m_player = Screen_OnGame::get_player();
-	combat_system::get().set_player(*m_player);
-
-	m_check_connection_time = 0;
-	m_Camera.set_shake(0);
-
-	m_is_get_pointing_mode = false;
-	m_wait_for_new_click = false;
-	m_magic_cast_time = 0;
-	m_point_command_type = -1;
-
-	for (int r = 0; r < 4; r++) m_config_retry[r] = ConfigRetryLevel::None;
-	m_config_request_time = 0;
-	m_init_data_ready = false;
-	m_configs_ready = false;
-
-	CursorTarget::reset_selection_click_time();
-
-	m_skill_using_status = false;
-	m_item_using_status = false;
-	m_using_slate = false;
-
-	m_down_skill_index = -1;
-
-	m_ilusion_owner_h = 0;
-	m_ilusion_owner_type = 0;
-
-	m_draw_flag = 0;
-	m_is_crusade_mode = false;
-
-	m_net_lag_count = 0;
-	m_latency_ms = -1;
-	m_last_net_msg_id = 0;
-	m_last_net_msg_time = 0;
-	m_last_net_msg_size = 0;
-	m_last_net_recv_time = 0;
-	m_last_npc_event_time = 0;
-
-	m_env_effect_time = GameClock::get_time_ms();
-
-	if (m_effect_manager) m_effect_manager->clear_all_effects();
-
-	get_floating_text().clear_all();
-
-	ChatManager::get().clear_messages();
-	ChatManager::get().clear_whispers();
-
-	for (int i = 0; i < game_limits::max_text_dlg_lines; i++) {
-		if (m_msg_text_list[i] != 0)
-			m_msg_text_list[i].reset();
-
-		if (m_msg_text_list2[i] != 0)
-			m_msg_text_list2[i].reset();
-
-		if (m_agree_msg_text_list[i] != 0)
-			m_agree_msg_text_list[i].reset();
-	}
-
-	m_logout_count = -1;
-	m_logout_count_time = 0;
-	m_fightzone_number = 0;
-	m_quest.who = 0;
-	m_quest.quest_type = 0;
-	m_quest.contribution = 0;
-	m_quest.target_type = 0;
-	m_quest.target_count = 0;
-	m_quest.current_count = 0;
-	m_quest.x = 0;
-	m_quest.y = 0;
-	m_quest.range = 0;
-	m_quest.is_quest_completed = false;
-	m_is_observer_mode = false;
-	m_is_observer_commanded = false;
-	m_force_disconn = false;
-	m_special_ability_setting_time = 0;
-	CursorTarget::clear_selection();
-	m_is_f1_help_window_enabled = false;
-	for (int i = 0; i < hb::shared::limits::MaxCrusadeStructures; i++)
-	{
-		m_crusade_structure_info[i].type = 0;
-		m_crusade_structure_info[i].side = 0;
-		m_crusade_structure_info[i].x = 0;
-		m_crusade_structure_info[i].y = 0;
-	}
-	m_commander_command_requested_time = 0;
-	m_top_msg_last_sec = 0;
-	m_top_msg_time = 0;
-	teleport_manager::get().reset();
-
-	m_gate_posit_x = m_gate_posit_y = -1;
-	m_heldenian_aresden_left_tower = -1;
-	m_heldenian_elvine_left_tower = -1;
-	m_heldenian_aresden_flags = -1;
-	m_heldenian_elvine_flags = -1;
-	m_is_xmas = false;
-	m_total_party_member = 0;
-	m_party_status = 0;
-	m_gizon_item_upgrade_left = 0;
+	return get_active_screen_as<Screen_OnGame>();
 }
 
 // create_new_guild_response_handler MOVED to Screen_OnGame.Network.cpp
-
-void CGame::init_player_characteristics(char* data)
-{
-	// Snoopy: Angels
-	m_player->m_angelic_str = 0;
-	m_player->m_angelic_dex = 0;
-	m_player->m_angelic_int = 0;
-	m_player->m_angelic_mag = 0;
-
-	const auto* pkt = hb::net::PacketCast<hb::net::PacketResponsePlayerCharacterContents>(
-		data, sizeof(hb::net::PacketResponsePlayerCharacterContents));
-	if (!pkt) return;
-
-	m_player->m_hp = pkt->hp;
-	m_player->m_mp = pkt->mp;
-	m_player->m_sp = pkt->sp;
-	m_player->m_ac = pkt->ac;		//? m_iDefenseRatio
-	m_player->m_thac0 = pkt->thac0;    //? m_iHitRatio
-	m_player->m_level = pkt->level;
-	m_player->m_str = pkt->str;
-	m_player->m_int = pkt->intel;
-	m_player->m_vit = pkt->vit;
-	m_player->m_dex = pkt->dex;
-	m_player->m_mag = pkt->mag;
-	m_player->m_charisma = pkt->chr;
-
-	// CLEROTH - LU
-	m_player->m_lu_point = pkt->lu_point;
-
-	m_player->m_exp = pkt->exp;
-	m_player->m_enemy_kill_count = pkt->enemy_kills;
-	m_player->m_pk_count = pkt->pk_count;
-	m_player->m_reward_gold = pkt->reward_gold;
-
-	m_location.assign(pkt->location, strnlen(pkt->location, sizeof(pkt->location)));
-	if (m_location.starts_with("aresden"))
-	{
-		m_player->m_aresden = true;
-		m_player->m_citizen = true;
-		m_player->m_hunter = false;
-	}
-	else if (m_location.starts_with("arehunter"))
-	{
-		m_player->m_aresden = true;
-		m_player->m_citizen = true;
-		m_player->m_hunter = true;
-	}
-	else if (m_location.starts_with("elvine"))
-	{
-		m_player->m_aresden = false;
-		m_player->m_citizen = true;
-		m_player->m_hunter = false;
-	}
-	else if (m_location.starts_with("elvhunter"))
-	{
-		m_player->m_aresden = false;
-		m_player->m_citizen = true;
-		m_player->m_hunter = true;
-	}
-	else
-	{
-		m_player->m_aresden = true;
-		m_player->m_citizen = false;
-		m_player->m_hunter = true;
-	}
-
-	m_player->m_guild_name.assign(pkt->guild_name, strnlen(pkt->guild_name, sizeof(pkt->guild_name)));
-
-	if (m_player->m_guild_name == "NONE")
-		m_player->m_guild_name.clear();
-
-		std::replace(m_player->m_guild_name.begin(), m_player->m_guild_name.end(), '_', ' ');
-	m_player->m_guild_rank = pkt->guild_rank;
-	m_player->m_super_attack_left = pkt->super_attack_left;
-	m_fightzone_number = pkt->fightzone_number;
-	m_max_stats = pkt->max_stats;
-	m_max_level = pkt->max_level;
-	m_max_bank_items = pkt->max_bank_items;
-}
-
+// init_player_characteristics MOVED to NetworkMessages_Player.cpp
 // disband_guild_response_handler MOVED to Screen_OnGame.Network.cpp
 
 // put_guild_operation_list / shift_guild_operation_list REMOVED — use DialogBox_GuildOperation::put/shift
@@ -2597,8 +2420,8 @@ void CGame::load_text_dlg_contents(int type)
 {
 	for (int i = 0; i < game_limits::max_text_dlg_lines; i++)
 	{
-		if (m_msg_text_list[i] != 0)
-			m_msg_text_list[i].reset();
+		if (on_game()->m_msg_text_list[i] != 0)
+			on_game()->m_msg_text_list[i].reset();
 	}
 
 	std::string fileName = std::format("contents/contents{}.txt", type);
@@ -2612,7 +2435,7 @@ void CGame::load_text_dlg_contents(int type)
 	{
 		if (!line.empty())
 		{
-			m_msg_text_list[index] = std::make_unique<CMsg>(0, line.c_str(), 0);
+			on_game()->m_msg_text_list[index] = std::make_unique<CMsg>(0, line.c_str(), 0);
 			index++;
 		}
 	}
@@ -2622,8 +2445,8 @@ int CGame::load_text_dlg_contents2(int type)
 {
 	for (int i = 0; i < game_limits::max_text_dlg_lines; i++)
 	{
-		if (m_msg_text_list2[i] != 0)
-			m_msg_text_list2[i].reset();
+		if (on_game()->m_msg_text_list2[i] != 0)
+			on_game()->m_msg_text_list2[i].reset();
 	}
 
 	std::string fileName = std::format("contents/contents{}.txt", type);
@@ -2637,7 +2460,7 @@ int CGame::load_text_dlg_contents2(int type)
 	{
 		if (!line.empty())
 		{
-			m_msg_text_list2[index] = std::make_unique<CMsg>(0, line.c_str(), 0);
+			on_game()->m_msg_text_list2[index] = std::make_unique<CMsg>(0, line.c_str(), 0);
 			index++;
 		}
 	}
@@ -2707,10 +2530,10 @@ void CGame::add_map_status_info(const char* data, bool is_last_data)
 	const auto* entries = reinterpret_cast<const hb::net::PacketNotifyMapStatusEntry*>(header + 1);
 
 	for (i = 1; i <= total; i++) {
-		m_crusade_structure_info[index].type = entries->type;
-		m_crusade_structure_info[index].x = entries->x;
-		m_crusade_structure_info[index].y = entries->y;
-		m_crusade_structure_info[index].side = entries->side;
+		on_game()->m_crusade_structure_info[index].type = entries->type;
+		on_game()->m_crusade_structure_info[index].x = entries->x;
+		on_game()->m_crusade_structure_info[index].y = entries->y;
+		on_game()->m_crusade_structure_info[index].side = entries->side;
 		entries++;
 
 		index++;
@@ -2718,10 +2541,10 @@ void CGame::add_map_status_info(const char* data, bool is_last_data)
 
 	if (is_last_data == true) {
 		while (index < hb::shared::limits::MaxCrusadeStructures) {
-			m_crusade_structure_info[index].type = 0;
-			m_crusade_structure_info[index].x = 0;
-			m_crusade_structure_info[index].y = 0;
-			m_crusade_structure_info[index].side = 0;
+			on_game()->m_crusade_structure_info[index].type = 0;
+			on_game()->m_crusade_structure_info[index].x = 0;
+			on_game()->m_crusade_structure_info[index].y = 0;
+			on_game()->m_crusade_structure_info[index].side = 0;
 			index++;
 		}
 	}
@@ -2776,10 +2599,10 @@ void CGame::meteor_strike_coming(int code)
 
 void CGame::set_top_msg(const char* string, unsigned char last_sec)
 {
-	m_top_msg = string;
+	on_game()->m_top_msg = string;
 
-	m_top_msg_last_sec = last_sec;
-	m_top_msg_time = GameClock::get_time_ms();
+	on_game()->m_top_msg_last_sec = last_sec;
+	on_game()->m_top_msg_time = GameClock::get_time_ms();
 }
 
 // draw_top_msg moved to Screen_OnGame.DrawObjects.cpp
@@ -2851,26 +2674,26 @@ void CGame::crusade_contribution_result(int war_contribution)
 	get_dialog_box_manager().disable_dialog_box(DialogBoxId::Text);
 	for (int i = 0; i < game_limits::max_text_dlg_lines; i++)
 	{
-		if (m_msg_text_list[i] != 0)
-			m_msg_text_list[i].reset();
+		if (on_game()->m_msg_text_list[i] != 0)
+			on_game()->m_msg_text_list[i].reset();
 	}
 	if (war_contribution > 0)
 	{
 		play_game_sound('E', 23, 0, 0);
 		play_game_sound('C', 21, 0, 0);
 		play_game_sound('C', 22, 0, 0);
-		m_msg_text_list[0] = std::make_unique<CMsg>(0, m_game_msg_list[22]->m_pMsg, 0); // Congratulations! Your nation
-		m_msg_text_list[1] = std::make_unique<CMsg>(0, m_game_msg_list[23]->m_pMsg, 0); // was victory in the battle!
-		m_msg_text_list[2] = std::make_unique<CMsg>(0, " ", 0);
-		m_msg_text_list[3] = std::make_unique<CMsg>(0, m_game_msg_list[24]->m_pMsg, 0); // As a victorious citizen
-		m_msg_text_list[4] = std::make_unique<CMsg>(0, m_game_msg_list[25]->m_pMsg, 0); // You will receive
-		m_msg_text_list[5] = std::make_unique<CMsg>(0, m_game_msg_list[26]->m_pMsg, 0); // a prize
-		m_msg_text_list[6] = std::make_unique<CMsg>(0, " ", 0);
-		m_msg_text_list[7] = std::make_unique<CMsg>(0, m_game_msg_list[27]->m_pMsg, 0); // Experience point of the battle contribution:
+		on_game()->m_msg_text_list[0] = std::make_unique<CMsg>(0, m_game_msg_list[22]->m_pMsg, 0); // Congratulations! Your nation
+		on_game()->m_msg_text_list[1] = std::make_unique<CMsg>(0, m_game_msg_list[23]->m_pMsg, 0); // was victory in the battle!
+		on_game()->m_msg_text_list[2] = std::make_unique<CMsg>(0, " ", 0);
+		on_game()->m_msg_text_list[3] = std::make_unique<CMsg>(0, m_game_msg_list[24]->m_pMsg, 0); // As a victorious citizen
+		on_game()->m_msg_text_list[4] = std::make_unique<CMsg>(0, m_game_msg_list[25]->m_pMsg, 0); // You will receive
+		on_game()->m_msg_text_list[5] = std::make_unique<CMsg>(0, m_game_msg_list[26]->m_pMsg, 0); // a prize
+		on_game()->m_msg_text_list[6] = std::make_unique<CMsg>(0, " ", 0);
+		on_game()->m_msg_text_list[7] = std::make_unique<CMsg>(0, m_game_msg_list[27]->m_pMsg, 0); // Experience point of the battle contribution:
 		std::snprintf(temp, sizeof(temp), "+%d exp Points!", war_contribution);
-		m_msg_text_list[8] = std::make_unique<CMsg>(0, temp, 0);
+		on_game()->m_msg_text_list[8] = std::make_unique<CMsg>(0, temp, 0);
 		for (int i = 9; i < 18; i++)
-			m_msg_text_list[i] = std::make_unique<CMsg>(0, " ", 0);
+			on_game()->m_msg_text_list[i] = std::make_unique<CMsg>(0, " ", 0);
 
 	}
 	else if (war_contribution < 0)
@@ -2878,31 +2701,31 @@ void CGame::crusade_contribution_result(int war_contribution)
 		play_game_sound('E', 24, 0, 0);
 		play_game_sound('C', 12, 0, 0);
 		play_game_sound('C', 13, 0, 0);
-		m_msg_text_list[0] = std::make_unique<CMsg>(0, m_game_msg_list[28]->m_pMsg, 0); // Unfortunately! Your country
-		m_msg_text_list[1] = std::make_unique<CMsg>(0, m_game_msg_list[29]->m_pMsg, 0); // have lost the all out war.
-		m_msg_text_list[2] = std::make_unique<CMsg>(0, " ", 0);
-		m_msg_text_list[3] = std::make_unique<CMsg>(0, m_game_msg_list[30]->m_pMsg, 0); // As a losser citizen;
-		m_msg_text_list[4] = std::make_unique<CMsg>(0, m_game_msg_list[31]->m_pMsg, 0); // the prize that accomplishes
-		m_msg_text_list[5] = std::make_unique<CMsg>(0, m_game_msg_list[32]->m_pMsg, 0); // will not be given.
-		m_msg_text_list[6] = std::make_unique<CMsg>(0, " ", 0);
-		m_msg_text_list[7] = std::make_unique<CMsg>(0, m_game_msg_list[33]->m_pMsg, 0); // I hope you to win
-		m_msg_text_list[8] = std::make_unique<CMsg>(0, m_game_msg_list[34]->m_pMsg, 0); // in the next battle
+		on_game()->m_msg_text_list[0] = std::make_unique<CMsg>(0, m_game_msg_list[28]->m_pMsg, 0); // Unfortunately! Your country
+		on_game()->m_msg_text_list[1] = std::make_unique<CMsg>(0, m_game_msg_list[29]->m_pMsg, 0); // have lost the all out war.
+		on_game()->m_msg_text_list[2] = std::make_unique<CMsg>(0, " ", 0);
+		on_game()->m_msg_text_list[3] = std::make_unique<CMsg>(0, m_game_msg_list[30]->m_pMsg, 0); // As a losser citizen;
+		on_game()->m_msg_text_list[4] = std::make_unique<CMsg>(0, m_game_msg_list[31]->m_pMsg, 0); // the prize that accomplishes
+		on_game()->m_msg_text_list[5] = std::make_unique<CMsg>(0, m_game_msg_list[32]->m_pMsg, 0); // will not be given.
+		on_game()->m_msg_text_list[6] = std::make_unique<CMsg>(0, " ", 0);
+		on_game()->m_msg_text_list[7] = std::make_unique<CMsg>(0, m_game_msg_list[33]->m_pMsg, 0); // I hope you to win
+		on_game()->m_msg_text_list[8] = std::make_unique<CMsg>(0, m_game_msg_list[34]->m_pMsg, 0); // in the next battle
 		for (int i = 9; i < 18; i++)
-			m_msg_text_list[i] = std::make_unique<CMsg>(0, " ", 0);
+			on_game()->m_msg_text_list[i] = std::make_unique<CMsg>(0, " ", 0);
 	}
 	else if (war_contribution == 0)
 	{
 		play_game_sound('E', 25, 0, 0);
-		m_msg_text_list[0] = std::make_unique<CMsg>(0, m_game_msg_list[50]->m_pMsg, 0); // The battle that you have participated
-		m_msg_text_list[1] = std::make_unique<CMsg>(0, m_game_msg_list[51]->m_pMsg, 0); // is already finished;
-		m_msg_text_list[2] = std::make_unique<CMsg>(0, m_game_msg_list[52]->m_pMsg, 0); //
-		m_msg_text_list[3] = std::make_unique<CMsg>(0, " ", 0);
-		m_msg_text_list[4] = std::make_unique<CMsg>(0, m_game_msg_list[53]->m_pMsg, 0); // You must connect after finishing
-		m_msg_text_list[5] = std::make_unique<CMsg>(0, m_game_msg_list[54]->m_pMsg, 0); // the previous and before starting
-		m_msg_text_list[6] = std::make_unique<CMsg>(0, m_game_msg_list[55]->m_pMsg, 0); // the next battle so you can receive
-		m_msg_text_list[7] = std::make_unique<CMsg>(0, m_game_msg_list[56]->m_pMsg, 0); // the prize
+		on_game()->m_msg_text_list[0] = std::make_unique<CMsg>(0, m_game_msg_list[50]->m_pMsg, 0); // The battle that you have participated
+		on_game()->m_msg_text_list[1] = std::make_unique<CMsg>(0, m_game_msg_list[51]->m_pMsg, 0); // is already finished;
+		on_game()->m_msg_text_list[2] = std::make_unique<CMsg>(0, m_game_msg_list[52]->m_pMsg, 0); //
+		on_game()->m_msg_text_list[3] = std::make_unique<CMsg>(0, " ", 0);
+		on_game()->m_msg_text_list[4] = std::make_unique<CMsg>(0, m_game_msg_list[53]->m_pMsg, 0); // You must connect after finishing
+		on_game()->m_msg_text_list[5] = std::make_unique<CMsg>(0, m_game_msg_list[54]->m_pMsg, 0); // the previous and before starting
+		on_game()->m_msg_text_list[6] = std::make_unique<CMsg>(0, m_game_msg_list[55]->m_pMsg, 0); // the next battle so you can receive
+		on_game()->m_msg_text_list[7] = std::make_unique<CMsg>(0, m_game_msg_list[56]->m_pMsg, 0); // the prize
 		for (int i = 8; i < 18; i++)
-			m_msg_text_list[i] = std::make_unique<CMsg>(0, " ", 0);
+			on_game()->m_msg_text_list[i] = std::make_unique<CMsg>(0, " ", 0);
 	}
 	get_dialog_box_manager().enable_dialog_box(DialogBoxId::Text, 0, 0, 0);
 }
@@ -2913,8 +2736,8 @@ void CGame::crusade_war_result(int winner_side)
 	get_dialog_box_manager().disable_dialog_box(DialogBoxId::Text);
 	for (int i = 0; i < game_limits::max_text_dlg_lines; i++)
 	{
-		if (m_msg_text_list[i] != 0)
-			m_msg_text_list[i].reset();
+		if (on_game()->m_msg_text_list[i] != 0)
+			on_game()->m_msg_text_list[i].reset();
 	}
 	if (m_player->m_citizen == false) player_side = 0;
 	else if (m_player->m_aresden == true) player_side = 1;
@@ -2924,40 +2747,40 @@ void CGame::crusade_war_result(int winner_side)
 		switch (winner_side) {
 		case 0:
 			play_game_sound('E', 25, 0, 0);
-			m_msg_text_list[0] = std::make_unique<CMsg>(0, m_game_msg_list[35]->m_pMsg, 0); // All out war finished!
-			m_msg_text_list[1] = std::make_unique<CMsg>(0, m_game_msg_list[36]->m_pMsg, 0); // There was a draw in the
-			m_msg_text_list[2] = std::make_unique<CMsg>(0, m_game_msg_list[37]->m_pMsg, 0); // battle
-			m_msg_text_list[3] = std::make_unique<CMsg>(0, " ", 0);
+			on_game()->m_msg_text_list[0] = std::make_unique<CMsg>(0, m_game_msg_list[35]->m_pMsg, 0); // All out war finished!
+			on_game()->m_msg_text_list[1] = std::make_unique<CMsg>(0, m_game_msg_list[36]->m_pMsg, 0); // There was a draw in the
+			on_game()->m_msg_text_list[2] = std::make_unique<CMsg>(0, m_game_msg_list[37]->m_pMsg, 0); // battle
+			on_game()->m_msg_text_list[3] = std::make_unique<CMsg>(0, " ", 0);
 			break;
 		case 1:
 			play_game_sound('E', 25, 0, 0);
-			m_msg_text_list[0] = std::make_unique<CMsg>(0, m_game_msg_list[35]->m_pMsg, 0); // All out war finished!
-			m_msg_text_list[1] = std::make_unique<CMsg>(0, m_game_msg_list[38]->m_pMsg, 0); // Aresden was victorious
-			m_msg_text_list[2] = std::make_unique<CMsg>(0, m_game_msg_list[39]->m_pMsg, 0); // and put an end to the war
-			m_msg_text_list[3] = std::make_unique<CMsg>(0, " ", 0);
+			on_game()->m_msg_text_list[0] = std::make_unique<CMsg>(0, m_game_msg_list[35]->m_pMsg, 0); // All out war finished!
+			on_game()->m_msg_text_list[1] = std::make_unique<CMsg>(0, m_game_msg_list[38]->m_pMsg, 0); // Aresden was victorious
+			on_game()->m_msg_text_list[2] = std::make_unique<CMsg>(0, m_game_msg_list[39]->m_pMsg, 0); // and put an end to the war
+			on_game()->m_msg_text_list[3] = std::make_unique<CMsg>(0, " ", 0);
 			break;
 		case 2:
 			play_game_sound('E', 25, 0, 0);
-			m_msg_text_list[0] = std::make_unique<CMsg>(0, m_game_msg_list[35]->m_pMsg, 0); // All out war finished!
-			m_msg_text_list[1] = std::make_unique<CMsg>(0, m_game_msg_list[40]->m_pMsg, 0); // Elvine was victorious
-			m_msg_text_list[2] = std::make_unique<CMsg>(0, m_game_msg_list[41]->m_pMsg, 0); // and put an end to the war
-			m_msg_text_list[3] = std::make_unique<CMsg>(0, " ", 0);
+			on_game()->m_msg_text_list[0] = std::make_unique<CMsg>(0, m_game_msg_list[35]->m_pMsg, 0); // All out war finished!
+			on_game()->m_msg_text_list[1] = std::make_unique<CMsg>(0, m_game_msg_list[40]->m_pMsg, 0); // Elvine was victorious
+			on_game()->m_msg_text_list[2] = std::make_unique<CMsg>(0, m_game_msg_list[41]->m_pMsg, 0); // and put an end to the war
+			on_game()->m_msg_text_list[3] = std::make_unique<CMsg>(0, " ", 0);
 			break;
 		}
 		for (int i = 4; i < 18; i++)
-			m_msg_text_list[i] = std::make_unique<CMsg>(0, " ", 0);
+			on_game()->m_msg_text_list[i] = std::make_unique<CMsg>(0, " ", 0);
 	}
 	else
 	{
 		if (winner_side == 0)
 		{
 			play_game_sound('E', 25, 0, 0);
-			m_msg_text_list[0] = std::make_unique<CMsg>(0, m_game_msg_list[35]->m_pMsg, 0); // All out war finished!
-			m_msg_text_list[1] = std::make_unique<CMsg>(0, m_game_msg_list[36]->m_pMsg, 0); // There was a draw in the
-			m_msg_text_list[2] = std::make_unique<CMsg>(0, m_game_msg_list[37]->m_pMsg, 0); // battle
-			m_msg_text_list[3] = std::make_unique<CMsg>(0, " ", 0);
+			on_game()->m_msg_text_list[0] = std::make_unique<CMsg>(0, m_game_msg_list[35]->m_pMsg, 0); // All out war finished!
+			on_game()->m_msg_text_list[1] = std::make_unique<CMsg>(0, m_game_msg_list[36]->m_pMsg, 0); // There was a draw in the
+			on_game()->m_msg_text_list[2] = std::make_unique<CMsg>(0, m_game_msg_list[37]->m_pMsg, 0); // battle
+			on_game()->m_msg_text_list[3] = std::make_unique<CMsg>(0, " ", 0);
 			for (int i = 4; i < 18; i++)
-				m_msg_text_list[i] = std::make_unique<CMsg>(0, " ", 0);
+				on_game()->m_msg_text_list[i] = std::make_unique<CMsg>(0, " ", 0);
 		}
 		else
 		{
@@ -2968,28 +2791,28 @@ void CGame::crusade_war_result(int winner_side)
 				play_game_sound('C', 22, 0, 0);
 				switch (winner_side) {
 				case 1:
-					m_msg_text_list[0] = std::make_unique<CMsg>(0, m_game_msg_list[35]->m_pMsg, 0); // All out war finished!;
-					m_msg_text_list[1] = std::make_unique<CMsg>(0, m_game_msg_list[38]->m_pMsg, 0); // Aresden was victorious;
-					m_msg_text_list[2] = std::make_unique<CMsg>(0, m_game_msg_list[39]->m_pMsg, 0); // and put an end to the war
-					m_msg_text_list[3] = std::make_unique<CMsg>(0, " ", 0);
-					m_msg_text_list[4] = std::make_unique<CMsg>(0, m_game_msg_list[42]->m_pMsg, 0); // Congratulations!
-					m_msg_text_list[5] = std::make_unique<CMsg>(0, m_game_msg_list[43]->m_pMsg, 0); // As a victorious citizen
-					m_msg_text_list[6] = std::make_unique<CMsg>(0, m_game_msg_list[44]->m_pMsg, 0); // You will receive
-					m_msg_text_list[7] = std::make_unique<CMsg>(0, m_game_msg_list[45]->m_pMsg, 0); // a prize
+					on_game()->m_msg_text_list[0] = std::make_unique<CMsg>(0, m_game_msg_list[35]->m_pMsg, 0); // All out war finished!;
+					on_game()->m_msg_text_list[1] = std::make_unique<CMsg>(0, m_game_msg_list[38]->m_pMsg, 0); // Aresden was victorious;
+					on_game()->m_msg_text_list[2] = std::make_unique<CMsg>(0, m_game_msg_list[39]->m_pMsg, 0); // and put an end to the war
+					on_game()->m_msg_text_list[3] = std::make_unique<CMsg>(0, " ", 0);
+					on_game()->m_msg_text_list[4] = std::make_unique<CMsg>(0, m_game_msg_list[42]->m_pMsg, 0); // Congratulations!
+					on_game()->m_msg_text_list[5] = std::make_unique<CMsg>(0, m_game_msg_list[43]->m_pMsg, 0); // As a victorious citizen
+					on_game()->m_msg_text_list[6] = std::make_unique<CMsg>(0, m_game_msg_list[44]->m_pMsg, 0); // You will receive
+					on_game()->m_msg_text_list[7] = std::make_unique<CMsg>(0, m_game_msg_list[45]->m_pMsg, 0); // a prize
 					break;
 				case 2:
-					m_msg_text_list[0] = std::make_unique<CMsg>(0, m_game_msg_list[35]->m_pMsg, 0); // All out war finished!
-					m_msg_text_list[1] = std::make_unique<CMsg>(0, m_game_msg_list[40]->m_pMsg, 0); // Elvine was victorious
-					m_msg_text_list[2] = std::make_unique<CMsg>(0, m_game_msg_list[41]->m_pMsg, 0); // and put an end to the war
-					m_msg_text_list[3] = std::make_unique<CMsg>(0, " ", 0);
-					m_msg_text_list[4] = std::make_unique<CMsg>(0, m_game_msg_list[42]->m_pMsg, 0); // Congratulations!
-					m_msg_text_list[5] = std::make_unique<CMsg>(0, m_game_msg_list[43]->m_pMsg, 0); // As a victorious citizen
-					m_msg_text_list[6] = std::make_unique<CMsg>(0, m_game_msg_list[44]->m_pMsg, 0); // You will receive
-					m_msg_text_list[7] = std::make_unique<CMsg>(0, m_game_msg_list[45]->m_pMsg, 0); // a prize
+					on_game()->m_msg_text_list[0] = std::make_unique<CMsg>(0, m_game_msg_list[35]->m_pMsg, 0); // All out war finished!
+					on_game()->m_msg_text_list[1] = std::make_unique<CMsg>(0, m_game_msg_list[40]->m_pMsg, 0); // Elvine was victorious
+					on_game()->m_msg_text_list[2] = std::make_unique<CMsg>(0, m_game_msg_list[41]->m_pMsg, 0); // and put an end to the war
+					on_game()->m_msg_text_list[3] = std::make_unique<CMsg>(0, " ", 0);
+					on_game()->m_msg_text_list[4] = std::make_unique<CMsg>(0, m_game_msg_list[42]->m_pMsg, 0); // Congratulations!
+					on_game()->m_msg_text_list[5] = std::make_unique<CMsg>(0, m_game_msg_list[43]->m_pMsg, 0); // As a victorious citizen
+					on_game()->m_msg_text_list[6] = std::make_unique<CMsg>(0, m_game_msg_list[44]->m_pMsg, 0); // You will receive
+					on_game()->m_msg_text_list[7] = std::make_unique<CMsg>(0, m_game_msg_list[45]->m_pMsg, 0); // a prize
 					break;
 				}
 				for (int i = 8; i < 18; i++)
-					m_msg_text_list[i] = std::make_unique<CMsg>(0, " ", 0);
+					on_game()->m_msg_text_list[i] = std::make_unique<CMsg>(0, " ", 0);
 			}
 			else if (winner_side != player_side)
 			{
@@ -2998,28 +2821,28 @@ void CGame::crusade_war_result(int winner_side)
 				play_game_sound('C', 13, 0, 0);
 				switch (winner_side) {
 				case 1:
-					m_msg_text_list[0] = std::make_unique<CMsg>(0, m_game_msg_list[35]->m_pMsg, 0); // All out war finished!
-					m_msg_text_list[1] = std::make_unique<CMsg>(0, m_game_msg_list[38]->m_pMsg, 0); // Aresden was victorious;
-					m_msg_text_list[2] = std::make_unique<CMsg>(0, m_game_msg_list[39]->m_pMsg, 0); // and put an end to the war
-					m_msg_text_list[3] = std::make_unique<CMsg>(0, " ", 0);
-					m_msg_text_list[4] = std::make_unique<CMsg>(0, m_game_msg_list[46]->m_pMsg, 0); // Unfortunately,
-					m_msg_text_list[5] = std::make_unique<CMsg>(0, m_game_msg_list[47]->m_pMsg, 0); // As a losser citizen
-					m_msg_text_list[6] = std::make_unique<CMsg>(0, m_game_msg_list[48]->m_pMsg, 0); // the prize that accomplishes
-					m_msg_text_list[7] = std::make_unique<CMsg>(0, m_game_msg_list[49]->m_pMsg, 0); // will not be given.
+					on_game()->m_msg_text_list[0] = std::make_unique<CMsg>(0, m_game_msg_list[35]->m_pMsg, 0); // All out war finished!
+					on_game()->m_msg_text_list[1] = std::make_unique<CMsg>(0, m_game_msg_list[38]->m_pMsg, 0); // Aresden was victorious;
+					on_game()->m_msg_text_list[2] = std::make_unique<CMsg>(0, m_game_msg_list[39]->m_pMsg, 0); // and put an end to the war
+					on_game()->m_msg_text_list[3] = std::make_unique<CMsg>(0, " ", 0);
+					on_game()->m_msg_text_list[4] = std::make_unique<CMsg>(0, m_game_msg_list[46]->m_pMsg, 0); // Unfortunately,
+					on_game()->m_msg_text_list[5] = std::make_unique<CMsg>(0, m_game_msg_list[47]->m_pMsg, 0); // As a losser citizen
+					on_game()->m_msg_text_list[6] = std::make_unique<CMsg>(0, m_game_msg_list[48]->m_pMsg, 0); // the prize that accomplishes
+					on_game()->m_msg_text_list[7] = std::make_unique<CMsg>(0, m_game_msg_list[49]->m_pMsg, 0); // will not be given.
 					break;
 				case 2:
-					m_msg_text_list[0] = std::make_unique<CMsg>(0, m_game_msg_list[35]->m_pMsg, 0); // All out war finished!
-					m_msg_text_list[1] = std::make_unique<CMsg>(0, m_game_msg_list[40]->m_pMsg, 0); // Elvine was victorious
-					m_msg_text_list[2] = std::make_unique<CMsg>(0, m_game_msg_list[41]->m_pMsg, 0); // and put an end to the war
-					m_msg_text_list[3] = std::make_unique<CMsg>(0, " ", 0);
-					m_msg_text_list[4] = std::make_unique<CMsg>(0, m_game_msg_list[46]->m_pMsg, 0); // Unfortunately,
-					m_msg_text_list[5] = std::make_unique<CMsg>(0, m_game_msg_list[47]->m_pMsg, 0); // As a losser citizen
-					m_msg_text_list[6] = std::make_unique<CMsg>(0, m_game_msg_list[48]->m_pMsg, 0); // the prize that accomplishes
-					m_msg_text_list[7] = std::make_unique<CMsg>(0, m_game_msg_list[49]->m_pMsg, 0); // will not be given.
+					on_game()->m_msg_text_list[0] = std::make_unique<CMsg>(0, m_game_msg_list[35]->m_pMsg, 0); // All out war finished!
+					on_game()->m_msg_text_list[1] = std::make_unique<CMsg>(0, m_game_msg_list[40]->m_pMsg, 0); // Elvine was victorious
+					on_game()->m_msg_text_list[2] = std::make_unique<CMsg>(0, m_game_msg_list[41]->m_pMsg, 0); // and put an end to the war
+					on_game()->m_msg_text_list[3] = std::make_unique<CMsg>(0, " ", 0);
+					on_game()->m_msg_text_list[4] = std::make_unique<CMsg>(0, m_game_msg_list[46]->m_pMsg, 0); // Unfortunately,
+					on_game()->m_msg_text_list[5] = std::make_unique<CMsg>(0, m_game_msg_list[47]->m_pMsg, 0); // As a losser citizen
+					on_game()->m_msg_text_list[6] = std::make_unique<CMsg>(0, m_game_msg_list[48]->m_pMsg, 0); // the prize that accomplishes
+					on_game()->m_msg_text_list[7] = std::make_unique<CMsg>(0, m_game_msg_list[49]->m_pMsg, 0); // will not be given.
 					break;
 				}
 				for (int i = 8; i < 18; i++)
-					m_msg_text_list[i] = std::make_unique<CMsg>(0, " ", 0);
+					on_game()->m_msg_text_list[i] = std::make_unique<CMsg>(0, " ", 0);
 			}
 		}
 	}
@@ -3448,10 +3271,10 @@ void CGame::set_ilusion_effect(int owner_h)
 {
 	direction dir;
 
-	m_ilusion_owner_h = owner_h;
+	on_game()->m_ilusion_owner_h = owner_h;
 
 	std::string nameBuf_IE;
-	m_map_data->get_owner_status_by_object_id(owner_h, &m_ilusion_owner_type, &dir, &m_player->m_illusionAppearance, &m_player->m_illusionStatus, nameBuf_IE);
+	m_map_data->get_owner_status_by_object_id(owner_h, &on_game()->m_ilusion_owner_type, &dir, &m_player->m_illusionAppearance, &m_player->m_illusionStatus, nameBuf_IE);
 	(void)nameBuf_IE; // Unused
 }
 
@@ -3482,7 +3305,7 @@ void CGame::response_panning_handler(char* data)
 	const char* mapData = reinterpret_cast<const char*>(data) + sizeof(hb::net::PacketResponsePanningHeader);
 	read_map_data(sX, sY, mapData);
 
-	m_is_observer_commanded = false;
+	on_game()->m_is_observer_commanded = false;
 }
 
 /*********************************************************************************************************************
@@ -3557,12 +3380,12 @@ void CGame::reserve_fightzone_response_handler(char* data)
 	case MsgType::Confirm:
 		add_event_list(RESERVE_FIGHTZONE_RESPONSE_HANDLER1, 10);
 		get_dialog_box_manager().get_dialog_as<DialogBox_GuildMenu>(DialogBoxId::GuildMenu)->m_mode = DialogBox_GuildMenu::mode::fightzone_reserved;
-		m_fightzone_number = m_fightzone_number_temp;
+		on_game()->m_fightzone_number = on_game()->m_fightzone_number_temp;
 		break;
 
 	case MsgType::Reject:
 		add_event_list(RESERVE_FIGHTZONE_RESPONSE_HANDLER2, 10);
-		m_fightzone_number_temp = 0;
+		on_game()->m_fightzone_number_temp = 0;
 
 		if (pkt->result == 0) {
 			get_dialog_box_manager().get_dialog_as<DialogBox_GuildMenu>(DialogBoxId::GuildMenu)->m_mode = DialogBox_GuildMenu::mode::fightzone_won;
@@ -4071,7 +3894,7 @@ bool CGame::check_local_chat_command(const char* pMsg)
 
 void CGame::clear_skill_using_status()
 {
-	if (m_skill_using_status == true)
+	if (on_game()->m_skill_using_status == true)
 	{
 		add_event_list(CLEAR_SKILL_USING_STATUS1, 10);//"
 		get_dialog_box_manager().disable_crafting_dialogs();
@@ -4080,7 +3903,7 @@ void CGame::clear_skill_using_status()
 			m_player->m_Controller.set_destination(m_player->m_player_x, m_player->m_player_y);
 		}
 	}
-	m_skill_using_status = false;
+	on_game()->m_skill_using_status = false;
 }
 
 void CGame::npc_talk_handler(char* packet_data)
@@ -4116,104 +3939,104 @@ void CGame::npc_talk_handler(char* packet_data)
 	if ((npc_type >= 1) && (npc_type <= 100))
 	{
 		index = get_dialog_box_manager().get_dialog_as<DialogBox_NpcTalk>(DialogBoxId::NpcTalk)->m_text_line_count;
-		m_msg_text_list2[index] = std::make_unique<CMsg>(0, "  ", 0);
+		on_game()->m_msg_text_list2[index] = std::make_unique<CMsg>(0, "  ", 0);
 		index++;
 		question_type = 0;
 		switch (npc_type) {
 		case 1: //Monster Hunt
 			std::snprintf(temp, hb::shared::limits::NpcNameLen, "%s", get_npc_config_name_by_id(target_type));
 			text = std::format(NPC_TALK_HANDLER16, target_count, temp);
-			m_msg_text_list2[index] = std::make_unique<CMsg>(0, text.c_str(), 0);
+			on_game()->m_msg_text_list2[index] = std::make_unique<CMsg>(0, text.c_str(), 0);
 			index++;
 
 			if (memcmp(target_name, "NONE", 4) == 0) {
 				text = NPC_TALK_HANDLER17;//"
-				m_msg_text_list2[index] = std::make_unique<CMsg>(0, text.c_str(), 0);
+				on_game()->m_msg_text_list2[index] = std::make_unique<CMsg>(0, text.c_str(), 0);
 				index++;
 			}
 			else {
 				std::memset(temp, 0, sizeof(temp));
 				get_official_map_name(target_name, temp);
 				text = std::format(NPC_TALK_HANDLER18, temp);//"Map : %s"
-				m_msg_text_list2[index] = std::make_unique<CMsg>(0, text.c_str(), 0);
+				on_game()->m_msg_text_list2[index] = std::make_unique<CMsg>(0, text.c_str(), 0);
 				index++;
 
 				if (target_x != 0) {
 					text = std::format(NPC_TALK_HANDLER19, target_x, target_y, target_range);//"Position: %d,%d within %d blocks"
-					m_msg_text_list2[index] = std::make_unique<CMsg>(0, text.c_str(), 0);
+					on_game()->m_msg_text_list2[index] = std::make_unique<CMsg>(0, text.c_str(), 0);
 					index++;
 				}
 
 				text = std::format(NPC_TALK_HANDLER20, contribution);//"
-				m_msg_text_list2[index] = std::make_unique<CMsg>(0, text.c_str(), 0);
+				on_game()->m_msg_text_list2[index] = std::make_unique<CMsg>(0, text.c_str(), 0);
 				index++;
 			}
 			question_type = 1;
 			break;
 
 		case 7: //
-			m_msg_text_list2[index] = std::make_unique<CMsg>(0, NPC_TALK_HANDLER21, 0);
+			on_game()->m_msg_text_list2[index] = std::make_unique<CMsg>(0, NPC_TALK_HANDLER21, 0);
 			index++;
 
 			if (memcmp(target_name, "NONE", 4) == 0) {
 				text = NPC_TALK_HANDLER22;
-				m_msg_text_list2[index] = std::make_unique<CMsg>(0, text.c_str(), 0);
+				on_game()->m_msg_text_list2[index] = std::make_unique<CMsg>(0, text.c_str(), 0);
 				index++;
 			}
 			else {
 				std::memset(temp, 0, sizeof(temp));
 				get_official_map_name(target_name, temp);
 				text = std::format(NPC_TALK_HANDLER23, temp);
-				m_msg_text_list2[index] = std::make_unique<CMsg>(0, text.c_str(), 0);
+				on_game()->m_msg_text_list2[index] = std::make_unique<CMsg>(0, text.c_str(), 0);
 				index++;
 
 				if (target_x != 0) {
 					text = std::format(NPC_TALK_HANDLER24, target_x, target_y, target_range);
-					m_msg_text_list2[index] = std::make_unique<CMsg>(0, text.c_str(), 0);
+					on_game()->m_msg_text_list2[index] = std::make_unique<CMsg>(0, text.c_str(), 0);
 					index++;
 				}
 
 				text = std::format(NPC_TALK_HANDLER25, contribution);
-				m_msg_text_list2[index] = std::make_unique<CMsg>(0, text.c_str(), 0);
+				on_game()->m_msg_text_list2[index] = std::make_unique<CMsg>(0, text.c_str(), 0);
 				index++;
 			}
 			question_type = 1;
 			break;
 
 		case hb::shared::owner::Slime: // Crusade
-			m_msg_text_list2[index] = std::make_unique<CMsg>(0, NPC_TALK_HANDLER26, 0);
+			on_game()->m_msg_text_list2[index] = std::make_unique<CMsg>(0, NPC_TALK_HANDLER26, 0);
 			index++;
 
 			text = NPC_TALK_HANDLER27;//"
-			m_msg_text_list2[index] = std::make_unique<CMsg>(0, text.c_str(), 0);
+			on_game()->m_msg_text_list2[index] = std::make_unique<CMsg>(0, text.c_str(), 0);
 			index++;
 
 			text = NPC_TALK_HANDLER28;//"
-			m_msg_text_list2[index] = std::make_unique<CMsg>(0, text.c_str(), 0);
+			on_game()->m_msg_text_list2[index] = std::make_unique<CMsg>(0, text.c_str(), 0);
 			index++;
 
 			text = NPC_TALK_HANDLER29;//"
-			m_msg_text_list2[index] = std::make_unique<CMsg>(0, text.c_str(), 0);
+			on_game()->m_msg_text_list2[index] = std::make_unique<CMsg>(0, text.c_str(), 0);
 			index++;
 
 			text = NPC_TALK_HANDLER30;//"
-			m_msg_text_list2[index] = std::make_unique<CMsg>(0, text.c_str(), 0);
+			on_game()->m_msg_text_list2[index] = std::make_unique<CMsg>(0, text.c_str(), 0);
 			index++;
 
 			text = " ";
-			m_msg_text_list2[index] = std::make_unique<CMsg>(0, text.c_str(), 0);
+			on_game()->m_msg_text_list2[index] = std::make_unique<CMsg>(0, text.c_str(), 0);
 			index++;
 
 			if (memcmp(target_name, "NONE", 4) == 0) {
 				text = NPC_TALK_HANDLER31;//"
-				m_msg_text_list2[index] = std::make_unique<CMsg>(0, text.c_str(), 0);
+				on_game()->m_msg_text_list2[index] = std::make_unique<CMsg>(0, text.c_str(), 0);
 				index++;
 			}
 			else {
 				std::memset(temp, 0, sizeof(temp));
 				get_official_map_name(target_name, temp);
 				text = std::format(NPC_TALK_HANDLER32, temp);//"
-				m_msg_text_list2[index] = std::make_unique<CMsg>(0, text.c_str(), 0);
+				on_game()->m_msg_text_list2[index] = std::make_unique<CMsg>(0, text.c_str(), 0);
 				index++;
 			}
 			question_type = 2;
@@ -4222,22 +4045,22 @@ void CGame::npc_talk_handler(char* packet_data)
 
 		switch (question_type) {
 		case 1:
-			m_msg_text_list2[index] = std::make_unique<CMsg>(0, "  ", 0);
+			on_game()->m_msg_text_list2[index] = std::make_unique<CMsg>(0, "  ", 0);
 			index++;
-			m_msg_text_list2[index] = std::make_unique<CMsg>(0, NPC_TALK_HANDLER33, 0);//"
+			on_game()->m_msg_text_list2[index] = std::make_unique<CMsg>(0, NPC_TALK_HANDLER33, 0);//"
 			index++;
-			m_msg_text_list2[index] = std::make_unique<CMsg>(0, NPC_TALK_HANDLER34, 0);//"
+			on_game()->m_msg_text_list2[index] = std::make_unique<CMsg>(0, NPC_TALK_HANDLER34, 0);//"
 			index++;
-			m_msg_text_list2[index] = std::make_unique<CMsg>(0, "  ", 0);
+			on_game()->m_msg_text_list2[index] = std::make_unique<CMsg>(0, "  ", 0);
 			index++;
 			break;
 
 		case 2:
-			m_msg_text_list2[index] = std::make_unique<CMsg>(0, "  ", 0);
+			on_game()->m_msg_text_list2[index] = std::make_unique<CMsg>(0, "  ", 0);
 			index++;
-			m_msg_text_list2[index] = std::make_unique<CMsg>(0, NPC_TALK_HANDLER35, 0);//"
+			on_game()->m_msg_text_list2[index] = std::make_unique<CMsg>(0, NPC_TALK_HANDLER35, 0);//"
 			index++;
-			m_msg_text_list2[index] = std::make_unique<CMsg>(0, "  ", 0);
+			on_game()->m_msg_text_list2[index] = std::make_unique<CMsg>(0, "  ", 0);
 			index++;
 			break;
 
@@ -4249,7 +4072,7 @@ void CGame::npc_talk_handler(char* packet_data)
 void CGame::point_command_handler(int indexX, int indexY, char item_id)
 {
 	char temp[31];
-	if ((m_point_command_type >= 100) && (m_point_command_type < 200))
+	if ((on_game()->m_point_command_type >= 100) && (on_game()->m_point_command_type < 200))
 	{
 		// get target object ID for auto-aim (lag compensation)
 		// If player clicked on an entity, send its ID so server can track its current position
@@ -4267,16 +4090,16 @@ void CGame::point_command_handler(int indexX, int indexY, char item_id)
 			req.base.y = m_player->m_player_y;
 			req.v1 = indexX;
 			req.v2 = indexY;
-			req.v3 = m_point_command_type;
+			req.v3 = on_game()->m_point_command_type;
 			req.time_ms = static_cast<uint32_t>(targetObjectID);
 			send_game_packet(req, false);
 		}
 	}
-	else if ((m_point_command_type >= 0) && (m_point_command_type < 50))
+	else if ((on_game()->m_point_command_type >= 0) && (on_game()->m_point_command_type < 50))
 	{
 		{
 			auto pkt = hb::net::make_common_command_str(CommonType::ReqUseItem, m_player->m_player_x, m_player->m_player_y);
-			pkt.v1 = m_point_command_type;
+			pkt.v1 = on_game()->m_point_command_type;
 			pkt.v2 = indexX;
 			pkt.v3 = indexY;
 			std::snprintf(pkt.text, sizeof(pkt.text), "%s", temp);
@@ -4284,11 +4107,11 @@ void CGame::point_command_handler(int indexX, int indexY, char item_id)
 			send_game_packet(pkt);
 		}
 
-		CItem* cfg_pt = get_item_config(m_player->m_item_list[m_point_command_type]->m_id_num);
+		CItem* cfg_pt = get_item_config(m_player->m_item_list[on_game()->m_point_command_type]->m_id_num);
 		if (cfg_pt && cfg_pt->get_item_type() == ItemType::UseSkill)
-			m_skill_using_status = true;
+			on_game()->m_skill_using_status = true;
 	}
-	else if (m_point_command_type == 200) // Normal Hand
+	else if (on_game()->m_point_command_type == 200) // Normal Hand
 	{
 		if ((m_mc_name.size() == 0) || (m_mc_name == m_player->m_player_name) || (m_mc_name[0] == '_'))
 		{
@@ -4318,7 +4141,7 @@ void CGame::start_bgm()
 	// Determine track name based on current location
 	const char* trackName = "maintm";
 
-	if ((m_is_xmas == true) && (weather_manager::get().is_snowing()))
+	if ((on_game()->m_is_xmas == true) && (weather_manager::get().is_snowing()))
 	{
 		trackName = "carol";
 	}
@@ -4408,7 +4231,7 @@ void CGame::motion_response_handler(char* packet_data)
 			m_player->m_playerStatus, m_player->m_player_name,
 			Type::stop, 0, 0, 0);
 		m_player->m_Controller.reset_command_count();
-		m_is_get_pointing_mode = false;
+		on_game()->m_is_get_pointing_mode = false;
 		m_Camera.snap_to((m_player->m_player_x - VIEW_CENTER_TILE_X()) * 32 - 16, (m_player->m_player_y - VIEW_CENTER_TILE_Y()) * 32 - 16);
 		break;
 
@@ -4433,9 +4256,9 @@ void CGame::motion_response_handler(char* packet_data)
 				G_cTxt = std::format(NOTIFYMSG_HP_DOWN, previous_hp - m_player->m_hp);
 				add_event_list(G_cTxt.c_str(), 10);
 				m_damaged_time = GameClock::get_time_ms();
-				if ((m_logout_count > 0) && (m_force_disconn == false))
+				if ((on_game()->m_logout_count > 0) && (m_force_disconn == false))
 				{
-					m_logout_count = -1;
+					on_game()->m_logout_count = -1;
 					add_event_list(MOTION_RESPONSE_HANDLER2, 10);
 				}
 			}
@@ -4475,7 +4298,7 @@ void CGame::motion_response_handler(char* packet_data)
 			Type::stop, 0, 0, 0,
 			0, 7);
 		m_player->m_Controller.reset_command_count();
-		m_is_get_pointing_mode = false;
+		on_game()->m_is_get_pointing_mode = false;
 		m_Camera.snap_to((m_player->m_player_x - VIEW_CENTER_TILE_X()) * 32 - 16, (m_player->m_player_y - VIEW_CENTER_TILE_Y()) * 32 - 16);
 		m_player->m_Controller.set_prev_move_blocked(true);
 		switch (m_player->m_player_type) {
@@ -4503,7 +4326,7 @@ void CGame::command_processor(short mouse_x, short mouse_y, short tile_x, short 
 	direction move_dir = direction{};
 
 	// Fixed by Snoopy
-	if ((m_is_observer_commanded == false) && (m_is_observer_mode == true))
+	if ((on_game()->m_is_observer_commanded == false) && (on_game()->m_is_observer_mode == true))
 	{
 		if ((mouse_x == 0) && (mouse_y == 0) && (m_Camera.get_destination_x() > 32 * VIEW_TILE_WIDTH()) && (m_Camera.get_destination_y() > 32 * VIEW_TILE_HEIGHT()))
 			send_game_packet(hb::net::make_panning_request(8));
@@ -4523,12 +4346,12 @@ void CGame::command_processor(short mouse_x, short mouse_y, short tile_x, short 
 			send_game_packet(hb::net::make_panning_request(5));
 		else return;
 
-		m_is_observer_commanded = true;
+		on_game()->m_is_observer_commanded = true;
 		m_arrow_pressed = 0;
 		return;
 	}
 
-	if (m_is_observer_mode == true) return;
+	if (on_game()->m_is_observer_mode == true) return;
 
 	if (hb::shared::input::is_alt_down()) // [ALT]
 		m_player->m_super_attack_mode = true;
@@ -4538,60 +4361,21 @@ void CGame::command_processor(short mouse_x, short mouse_y, short tile_x, short 
 	case CursorStatus::Null:
 		if (left_button != 0)
 		{
-#ifdef TESTER_ONLY
-			// Tester overlay — always block map input when clicking this area
-			if ((mouse_x >= LEVELUP_TEXT_X()) && (mouse_x < LEVELUP_TEXT_X() + 75)
-				&& (mouse_y >= LEVELUP_TEXT_Y() - 35) && (mouse_y < LEVELUP_TEXT_Y()))
-			{
-				if (!get_dialog_box_manager().is_enabled(DialogBoxId::TesterMenu))
-				{
-					get_dialog_box_manager().enable_dialog_box(DialogBoxId::TesterMenu, 0, 0, 0);
-					play_game_sound('E', 14, 5);
-				}
-				return;
-			}
-#endif // TESTER_ONLY
-			// Level Up / Restart overlay — always block map input when clicking this area
-			if ((mouse_x >= LEVELUP_TEXT_X()) && (mouse_x < LEVELUP_TEXT_X() + 75)
-				&& (mouse_y >= LEVELUP_TEXT_Y()) && (mouse_y < LEVELUP_TEXT_Y() + 21))
-			{
-				if (m_player->m_hp > 0)
-				{
-					if (!get_dialog_box_manager().is_enabled(DialogBoxId::LevelUpSetting) && (m_player->m_lu_point > 0))
-					{
-						get_dialog_box_manager().enable_dialog_box(DialogBoxId::LevelUpSetting, 0, 0, 0);
-						play_game_sound('E', 14, 5);
-					}
-				}
-				else
-				{
-					if (m_restart_count == -1)
-					{
-						m_restart_count = 5;
-						m_restart_count_time = GameClock::get_time_ms();
-						std::string txt = std::format(DLGBOX_CLICK_SYSMENU1, m_restart_count);
-						add_event_list(txt.c_str(), 10);
-						play_game_sound('E', 14, 5);
-					}
-				}
-				return;
-			}
-
 			result = get_dialog_box_manager().handle_mouse_down();
 			if (result == 1)
 			{
 				CursorTarget::set_cursor_status(CursorStatus::Selected);
 				return;
 			}
-			else if (result == 0)
-			{
-				CursorTarget::set_cursor_status(CursorStatus::Pressed);
-			}
 			else if (result == -1)
 			{
 				// Scroll/slider claimed - set status to prevent re-processing
 				CursorTarget::set_cursor_status(CursorStatus::Selected);
 				return;
+			}
+			else if (result == 0)
+			{
+				CursorTarget::set_cursor_status(CursorStatus::Pressed);
 			}
 		}
 		else if (right_button != 0)
@@ -4805,7 +4589,7 @@ void CGame::command_processor(short mouse_x, short mouse_y, short tile_x, short 
 				if (pending_dir != 0) m_player->m_Controller.set_pending_stop_dir(pending_dir);
 			}
 		}
-		else if (config_manager::get().is_quick_actions_enabled() && right_button != 0 && cmd == Type::stop && !m_is_get_pointing_mode)
+		else if (config_manager::get().is_quick_actions_enabled() && right_button != 0 && cmd == Type::stop && !on_game()->m_is_get_pointing_mode)
 		{
 			// Right click while stopped (and not casting): process turn immediately
 			// But don't interrupt attack/magic animations — the controller command is STOP
@@ -4874,7 +4658,7 @@ bool CGame::process_left_click(short mouse_x, short mouse_y, short tile_x, short
 	hb::shared::entity::PlayerStatus object_status;
 	char abs_x = 0, abs_y = 0;
 
-	if (m_is_get_pointing_mode == true)
+	if (on_game()->m_is_get_pointing_mode == true)
 	{
 		if ((m_mcx != 0) || (m_mcy != 0))
 			point_command_handler(m_mcx, m_mcy);
@@ -4882,13 +4666,13 @@ bool CGame::process_left_click(short mouse_x, short mouse_y, short tile_x, short
 
 		m_player->m_Controller.set_command_available(false);
 		m_player->m_Controller.set_command_time(GameClock::get_time_ms());
-		m_is_get_pointing_mode = false;
-		m_magic_cast_time = current_time;  // Track when magic was cast
+		on_game()->m_is_get_pointing_mode = false;
+		on_game()->m_magic_cast_time = current_time;  // Track when magic was cast
 		return true;
 	}
 
 	// Delay after magic cast before allowing held-click actions
-	if (m_magic_cast_time > 0 && (current_time - m_magic_cast_time) < 750) return true;
+	if (on_game()->m_magic_cast_time > 0 && (current_time - on_game()->m_magic_cast_time) < 750) return true;
 
 	m_map_data->get_owner(m_mcx, m_mcy - 1, name, &object_type, &object_status, &m_comm_object_id); // v1.4
 	if (m_mc_name == m_player->m_player_name && (object_type <= 6 || (m_map_data->m_data[m_player->m_player_x - m_map_data->m_pivot_x][m_player->m_player_y - m_map_data->m_pivot_y].m_item_id != 0 && m_item_config_list[m_map_data->m_data[m_player->m_player_x - m_map_data->m_pivot_x][m_player->m_player_y - m_map_data->m_pivot_y].m_item_id] != nullptr)))
@@ -5538,9 +5322,9 @@ bool CGame::process_right_click(short mouse_x, short mouse_y, short tile_x, shor
 	{
 		// Original right click behavior (stop, turn, attack, etc.)
 		m_player->m_Controller.set_command(Type::stop);
-		if (m_is_get_pointing_mode == true)
+		if (on_game()->m_is_get_pointing_mode == true)
 		{
-			m_is_get_pointing_mode = false;
+			on_game()->m_is_get_pointing_mode = false;
 			add_event_list(COMMAND_PROCESSOR1, 10);
 		}
 		if (m_player->m_Controller.is_command_available() == false) return true;
@@ -5890,9 +5674,9 @@ void CGame::process_motion_commands(uint16_t action_type)
 				if (move_dir != 0)
 				{
 					// Cancel logout countdown on movement
-					if ((m_logout_count > 0) && (m_force_disconn == false))
+					if ((on_game()->m_logout_count > 0) && (m_force_disconn == false))
 					{
-						m_logout_count = -1;
+						on_game()->m_logout_count = -1;
 						add_event_list(DLGBOX_CLICK_SYSMENU2, 10);
 					}
 
@@ -5922,8 +5706,8 @@ void CGame::process_motion_commands(uint16_t action_type)
 
 			if (m_player->m_Controller.get_command() == Type::DamageMove)
 			{
-				m_is_get_pointing_mode = false;
-				m_point_command_type = -1;
+				on_game()->m_is_get_pointing_mode = false;
+				on_game()->m_point_command_type = -1;
 				clear_skill_using_status();
 				m_player->m_Controller.set_command(Type::stop);
 			}
@@ -5940,9 +5724,9 @@ void CGame::process_motion_commands(uint16_t action_type)
 			if (move_dir != 0)
 			{
 				// Cancel logout countdown on attack
-				if ((m_logout_count > 0) && (m_force_disconn == false))
+				if ((on_game()->m_logout_count > 0) && (m_force_disconn == false))
 				{
-					m_logout_count = -1;
+					on_game()->m_logout_count = -1;
 					add_event_list(DLGBOX_CLICK_SYSMENU2, 10);
 				}
 
@@ -5996,9 +5780,9 @@ void CGame::process_motion_commands(uint16_t action_type)
 				if (move_dir != 0)
 				{
 					// Cancel logout countdown on attack-move
-					if ((m_logout_count > 0) && (m_force_disconn == false))
+					if ((on_game()->m_logout_count > 0) && (m_force_disconn == false))
 					{
-						m_logout_count = -1;
+						on_game()->m_logout_count = -1;
 						add_event_list(DLGBOX_CLICK_SYSMENU2, 10);
 					}
 
@@ -6043,9 +5827,9 @@ void CGame::process_motion_commands(uint16_t action_type)
 
 		case Type::GetItem:
 			// Cancel logout countdown on get item
-			if ((m_logout_count > 0) && (m_force_disconn == false))
+			if ((on_game()->m_logout_count > 0) && (m_force_disconn == false))
 			{
-				m_logout_count = -1;
+				on_game()->m_logout_count = -1;
 				add_event_list(DLGBOX_CLICK_SYSMENU2, 10);
 			}
 
@@ -6061,9 +5845,9 @@ void CGame::process_motion_commands(uint16_t action_type)
 
 		case Type::Magic:
 			// Cancel logout countdown on magic cast
-			if ((m_logout_count > 0) && (m_force_disconn == false))
+			if ((on_game()->m_logout_count > 0) && (m_force_disconn == false))
 			{
-				m_logout_count = -1;
+				on_game()->m_logout_count = -1;
 				add_event_list(DLGBOX_CLICK_SYSMENU2, 10);
 			}
 
@@ -6076,8 +5860,8 @@ void CGame::process_motion_commands(uint16_t action_type)
 			m_player->m_Controller.set_command_available(false);
 			m_player->m_Controller.set_command_time(GameClock::get_time_ms());
 			// Only enter targeting mode if the cast wasn't interrupted by damage
-			if (m_point_command_type >= 100 && m_point_command_type < 200)
-				m_is_get_pointing_mode = true;
+			if (on_game()->m_point_command_type >= 100 && on_game()->m_point_command_type < 200)
+				on_game()->m_is_get_pointing_mode = true;
 			m_player->m_Controller.set_command(Type::stop);
 			get_floating_text().remove_by_object_id(m_player->m_player_object_id);
 			{
@@ -6122,15 +5906,15 @@ void CGame::init_data_response_handler(char* packet_data)
 
 	m_player->m_Controller.set_command(Type::stop);
 	m_player->m_Controller.reset_command_count();
-	m_is_get_pointing_mode = false;
-	m_point_command_type = -1;
-	m_ilusion_owner_h = 0;
-	m_ilusion_owner_type = 0;
+	on_game()->m_is_get_pointing_mode = false;
+	on_game()->m_point_command_type = -1;
+	on_game()->m_ilusion_owner_h = 0;
+	on_game()->m_ilusion_owner_type = 0;
 	teleport_manager::get().set_requested(false);
 	m_player->m_is_confusion = false;
-	m_skill_using_status = false;
+	on_game()->m_skill_using_status = false;
 
-	m_item_using_status = false;
+	on_game()->m_item_using_status = false;
 
 	m_restart_count = -1;
 	m_restart_count_time = 0;
@@ -6189,12 +5973,12 @@ void CGame::init_data_response_handler(char* packet_data)
 	weather_manager::get().set_weather_status(static_cast<char>(pkt->weather_status));
 	switch (weather_manager::get().get_ambient_light()) { // Xmas bulbs
 		// Will be sent by server if DayTime is 3 (and a snowy weather)
-	case 1:	m_is_xmas = false; break;
-	case 2: m_is_xmas = false; break;
+	case 1:	on_game()->m_is_xmas = false; break;
+	case 2: on_game()->m_is_xmas = false; break;
 	case 3: // Snoopy Special night with chrismas bulbs
-		if (weather_manager::get().get_weather_status() > 3) m_is_xmas = true;
-		else m_is_xmas = false;
-		weather_manager::get().set_xmas(m_is_xmas);
+		if (weather_manager::get().get_weather_status() > 3) on_game()->m_is_xmas = true;
+		else on_game()->m_is_xmas = false;
+		weather_manager::get().set_xmas(on_game()->m_is_xmas);
 		weather_manager::get().set_ambient_light(2);
 		break;
 	}
@@ -6466,8 +6250,8 @@ void CGame::motion_event_handler(char* packet_data)
 			// Cancel spell casting if in the animation phase (Type::Magic)
 			if (m_player->m_Controller.get_command() == Type::Magic)
 				m_player->m_Controller.set_command(Type::stop);
-			m_is_get_pointing_mode = false;
-			m_point_command_type = -1;
+			on_game()->m_is_get_pointing_mode = false;
+			on_game()->m_point_command_type = -1;
 			clear_skill_using_status();
 			// Lock the controller until the damage animation finishes.
 			// Without this, quick actions allows immediate movement after being hit.
@@ -6501,8 +6285,8 @@ void CGame::grand_magic_result(const char* map_name, int ares_crusade_points, in
 
 	for (int i = 0; i < game_limits::max_text_dlg_lines; i++)
 	{
-		if (m_msg_text_list[i] != 0)
-			m_msg_text_list[i].reset();
+		if (on_game()->m_msg_text_list[i] != 0)
+			on_game()->m_msg_text_list[i].reset();
 	}
 
 	for (int i = 0; i < 92; i++)
@@ -6510,47 +6294,47 @@ void CGame::grand_magic_result(const char* map_name, int ares_crusade_points, in
 
 	if (strcmp(map_name, "aresden") == 0)
 	{
-		m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[2]->m_pMsg, 0);
-		m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[3]->m_pMsg, 0);
-		m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, " ", 0);
+		on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[2]->m_pMsg, 0);
+		on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[3]->m_pMsg, 0);
+		on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, " ", 0);
 
 		std::snprintf(temp, sizeof(temp), "%s %d", m_game_msg_list[4]->m_pMsg, ares_crusade_points);
-		m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, temp, 0);
+		on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, temp, 0);
 
 		std::snprintf(temp, sizeof(temp), "%s %d", m_game_msg_list[5]->m_pMsg, elv_crusade_points);
-		m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, temp, 0);
+		on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, temp, 0);
 
 		std::snprintf(temp, sizeof(temp), "%s %d", m_game_msg_list[6]->m_pMsg, ares_industry_points);
-		m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, temp, 0);
+		on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, temp, 0);
 
 		std::snprintf(temp, sizeof(temp), "%s %d", m_game_msg_list[58]->m_pMsg, elv_industry_points);
-		m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, temp, 0);
-		m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, " ", 0);
+		on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, temp, 0);
+		on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, " ", 0);
 
 		std::snprintf(temp, sizeof(temp), "%s %d %d %d %d", NOTIFY_MSG_STRUCTURE_HP, ares_crusade_casualties, ares_industry_casualties, elv_crusade_casualties, elv_industry_casualties);
-		m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, temp, 0);
-		m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, " ", 0);
+		on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, temp, 0);
+		on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, " ", 0);
 
 		if (elv_crusade_points == 0) {
 			if ((m_player->m_citizen == true) && (m_player->m_aresden == false))
 			{
 				play_game_sound('E', 25, 0, 0);
-				m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[59]->m_pMsg, 0);
-				m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[60]->m_pMsg, 0);
-				m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[61]->m_pMsg, 0);
-				m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[62]->m_pMsg, 0);
-				for (int i = text_index; i < 18; i++) m_msg_text_list[i] = std::make_unique<CMsg>(0, " ", 0);
+				on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[59]->m_pMsg, 0);
+				on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[60]->m_pMsg, 0);
+				on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[61]->m_pMsg, 0);
+				on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[62]->m_pMsg, 0);
+				for (int i = text_index; i < 18; i++) on_game()->m_msg_text_list[i] = std::make_unique<CMsg>(0, " ", 0);
 			}
 			else if ((m_player->m_citizen == true) && (m_player->m_aresden == true))
 			{
 				play_game_sound('E', 25, 0, 0);
-				m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[69]->m_pMsg, 0);
-				m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[70]->m_pMsg, 0);
-				m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[71]->m_pMsg, 0);
-				m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[72]->m_pMsg, 0);
-				m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[73]->m_pMsg, 0);
-				m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[74]->m_pMsg, 0);
-				for (int i = text_index; i < 18; i++) m_msg_text_list[i] = std::make_unique<CMsg>(0, " ", 0);
+				on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[69]->m_pMsg, 0);
+				on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[70]->m_pMsg, 0);
+				on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[71]->m_pMsg, 0);
+				on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[72]->m_pMsg, 0);
+				on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[73]->m_pMsg, 0);
+				on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[74]->m_pMsg, 0);
+				for (int i = text_index; i < 18; i++) on_game()->m_msg_text_list[i] = std::make_unique<CMsg>(0, " ", 0);
 			}
 			else play_game_sound('E', 25, 0, 0);
 		}
@@ -6563,25 +6347,25 @@ void CGame::grand_magic_result(const char* map_name, int ares_crusade_points, in
 					play_game_sound('E', 23, 0, 0);
 					play_game_sound('C', 21, 0, 0);
 					play_game_sound('C', 22, 0, 0);
-					m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[63]->m_pMsg, 0);
-					m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[64]->m_pMsg, 0);
-					m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[65]->m_pMsg, 0);
-					for (int i = text_index; i < 18; i++) m_msg_text_list[i] = std::make_unique<CMsg>(0, " ", 0);
+					on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[63]->m_pMsg, 0);
+					on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[64]->m_pMsg, 0);
+					on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[65]->m_pMsg, 0);
+					for (int i = text_index; i < 18; i++) on_game()->m_msg_text_list[i] = std::make_unique<CMsg>(0, " ", 0);
 				}
 				else if ((m_player->m_citizen == true) && (m_player->m_aresden == true))
 				{
 					play_game_sound('E', 24, 0, 0);
 					play_game_sound('C', 12, 0, 0);
 					play_game_sound('C', 13, 0, 0);
-					m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[75]->m_pMsg, 0);
-					m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[76]->m_pMsg, 0);
-					m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[77]->m_pMsg, 0);
-					m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[78]->m_pMsg, 0);
-					m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[79]->m_pMsg, 0);
-					m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[80]->m_pMsg, 0);
-					m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[81]->m_pMsg, 0);
-					m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[82]->m_pMsg, 0);
-					for (int i = text_index; i < 18; i++) m_msg_text_list[i] = std::make_unique<CMsg>(0, " ", 0);
+					on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[75]->m_pMsg, 0);
+					on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[76]->m_pMsg, 0);
+					on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[77]->m_pMsg, 0);
+					on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[78]->m_pMsg, 0);
+					on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[79]->m_pMsg, 0);
+					on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[80]->m_pMsg, 0);
+					on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[81]->m_pMsg, 0);
+					on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[82]->m_pMsg, 0);
+					for (int i = text_index; i < 18; i++) on_game()->m_msg_text_list[i] = std::make_unique<CMsg>(0, " ", 0);
 				}
 				else play_game_sound('E', 25, 0, 0);
 			}
@@ -6590,23 +6374,23 @@ void CGame::grand_magic_result(const char* map_name, int ares_crusade_points, in
 				if ((m_player->m_citizen == true) && (m_player->m_aresden == false))
 				{
 					play_game_sound('E', 23, 0, 0);
-					m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[66]->m_pMsg, 0);
-					m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[67]->m_pMsg, 0);
-					m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[68]->m_pMsg, 0);
-					for (int i = text_index; i < 18; i++) m_msg_text_list[i] = std::make_unique<CMsg>(0, " ", 0);
+					on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[66]->m_pMsg, 0);
+					on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[67]->m_pMsg, 0);
+					on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[68]->m_pMsg, 0);
+					for (int i = text_index; i < 18; i++) on_game()->m_msg_text_list[i] = std::make_unique<CMsg>(0, " ", 0);
 				}
 				else if ((m_player->m_citizen == true) && (m_player->m_aresden == true))
 				{
 					play_game_sound('E', 24, 0, 0);
-					m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[83]->m_pMsg, 0);
-					m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[84]->m_pMsg, 0);
-					m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[85]->m_pMsg, 0);
-					m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[86]->m_pMsg, 0);
-					m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[87]->m_pMsg, 0);
-					m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[88]->m_pMsg, 0);
-					m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[89]->m_pMsg, 0);
-					m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[90]->m_pMsg, 0);
-					for (int i = text_index; i < 18; i++) m_msg_text_list[i] = std::make_unique<CMsg>(0, " ", 0);
+					on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[83]->m_pMsg, 0);
+					on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[84]->m_pMsg, 0);
+					on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[85]->m_pMsg, 0);
+					on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[86]->m_pMsg, 0);
+					on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[87]->m_pMsg, 0);
+					on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[88]->m_pMsg, 0);
+					on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[89]->m_pMsg, 0);
+					on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[90]->m_pMsg, 0);
+					for (int i = text_index; i < 18; i++) on_game()->m_msg_text_list[i] = std::make_unique<CMsg>(0, " ", 0);
 				}
 				else play_game_sound('E', 25, 0, 0);
 			}
@@ -6614,47 +6398,47 @@ void CGame::grand_magic_result(const char* map_name, int ares_crusade_points, in
 	}
 	else if (strcmp(map_name, "elvine") == 0)
 	{
-		m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[7]->m_pMsg, 0);
-		m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[8]->m_pMsg, 0);
-		m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, " ", 0);
+		on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[7]->m_pMsg, 0);
+		on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[8]->m_pMsg, 0);
+		on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, " ", 0);
 
 		std::snprintf(temp, sizeof(temp), "%s %d", m_game_msg_list[4]->m_pMsg, ares_crusade_points);
-		m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, temp, 0);
+		on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, temp, 0);
 
 		std::snprintf(temp, sizeof(temp), "%s %d", m_game_msg_list[5]->m_pMsg, elv_crusade_points);
-		m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, temp, 0);
+		on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, temp, 0);
 
 		std::snprintf(temp, sizeof(temp), "%s %d", m_game_msg_list[6]->m_pMsg, ares_industry_points);
-		m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, temp, 0);
+		on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, temp, 0);
 
 		std::snprintf(temp, sizeof(temp), "%s %d", m_game_msg_list[58]->m_pMsg, elv_industry_points);
-		m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, temp, 0);
-		m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, " ", 0);
+		on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, temp, 0);
+		on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, " ", 0);
 
 		std::snprintf(temp, sizeof(temp), "%s %d %d %d %d", NOTIFY_MSG_STRUCTURE_HP, ares_crusade_casualties, ares_industry_casualties, elv_crusade_casualties, elv_industry_casualties);
-		m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, temp, 0);
-		m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, " ", 0);
+		on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, temp, 0);
+		on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, " ", 0);
 
 		if (elv_crusade_points == 0) {
 			if ((m_player->m_citizen == true) && (m_player->m_aresden == true))
 			{
 				play_game_sound('E', 25, 0, 0);
-				m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[59]->m_pMsg, 0);
-				m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[60]->m_pMsg, 0);
-				m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[61]->m_pMsg, 0);
-				m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[62]->m_pMsg, 0);
-				for (int i = text_index; i < 18; i++) m_msg_text_list[i] = std::make_unique<CMsg>(0, " ", 0);
+				on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[59]->m_pMsg, 0);
+				on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[60]->m_pMsg, 0);
+				on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[61]->m_pMsg, 0);
+				on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[62]->m_pMsg, 0);
+				for (int i = text_index; i < 18; i++) on_game()->m_msg_text_list[i] = std::make_unique<CMsg>(0, " ", 0);
 			}
 			else if ((m_player->m_citizen == true) && (m_player->m_aresden == false))
 			{
 				play_game_sound('E', 25, 0, 0);
-				m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[69]->m_pMsg, 0);
-				m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[70]->m_pMsg, 0);
-				m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[71]->m_pMsg, 0);
-				m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[72]->m_pMsg, 0);
-				m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[73]->m_pMsg, 0);
-				m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[74]->m_pMsg, 0);
-				for (int i = text_index; i < 18; i++) m_msg_text_list[i] = std::make_unique<CMsg>(0, " ", 0);
+				on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[69]->m_pMsg, 0);
+				on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[70]->m_pMsg, 0);
+				on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[71]->m_pMsg, 0);
+				on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[72]->m_pMsg, 0);
+				on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[73]->m_pMsg, 0);
+				on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[74]->m_pMsg, 0);
+				for (int i = text_index; i < 18; i++) on_game()->m_msg_text_list[i] = std::make_unique<CMsg>(0, " ", 0);
 			}
 			else play_game_sound('E', 25, 0, 0);
 		}
@@ -6666,25 +6450,25 @@ void CGame::grand_magic_result(const char* map_name, int ares_crusade_points, in
 					play_game_sound('E', 23, 0, 0);
 					play_game_sound('C', 21, 0, 0);
 					play_game_sound('C', 22, 0, 0);
-					m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[63]->m_pMsg, 0);
-					m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[64]->m_pMsg, 0);
-					m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[65]->m_pMsg, 0);
-					for (int i = text_index; i < 18; i++) m_msg_text_list[i] = std::make_unique<CMsg>(0, " ", 0);
+					on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[63]->m_pMsg, 0);
+					on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[64]->m_pMsg, 0);
+					on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[65]->m_pMsg, 0);
+					for (int i = text_index; i < 18; i++) on_game()->m_msg_text_list[i] = std::make_unique<CMsg>(0, " ", 0);
 				}
 				else if ((m_player->m_citizen == true) && (m_player->m_aresden == false))
 				{
 					play_game_sound('E', 24, 0, 0);
 					play_game_sound('C', 12, 0, 0);
 					play_game_sound('C', 13, 0, 0);
-					m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[75]->m_pMsg, 0);
-					m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[76]->m_pMsg, 0);
-					m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[77]->m_pMsg, 0);
-					m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[78]->m_pMsg, 0);
-					m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[79]->m_pMsg, 0);
-					m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[80]->m_pMsg, 0);
-					m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[81]->m_pMsg, 0);
-					m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[82]->m_pMsg, 0);
-					for (int i = text_index; i < 18; i++) m_msg_text_list[i] = std::make_unique<CMsg>(0, " ", 0);
+					on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[75]->m_pMsg, 0);
+					on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[76]->m_pMsg, 0);
+					on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[77]->m_pMsg, 0);
+					on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[78]->m_pMsg, 0);
+					on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[79]->m_pMsg, 0);
+					on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[80]->m_pMsg, 0);
+					on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[81]->m_pMsg, 0);
+					on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[82]->m_pMsg, 0);
+					for (int i = text_index; i < 18; i++) on_game()->m_msg_text_list[i] = std::make_unique<CMsg>(0, " ", 0);
 				}
 				else play_game_sound('E', 25, 0, 0);
 			}
@@ -6693,23 +6477,23 @@ void CGame::grand_magic_result(const char* map_name, int ares_crusade_points, in
 				if ((m_player->m_citizen == true) && (m_player->m_aresden == true))
 				{
 					play_game_sound('E', 23, 0, 0);
-					m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[66]->m_pMsg, 0);
-					m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[67]->m_pMsg, 0);
-					m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[68]->m_pMsg, 0);
-					for (int i = text_index; i < 18; i++) m_msg_text_list[i] = std::make_unique<CMsg>(0, " ", 0);
+					on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[66]->m_pMsg, 0);
+					on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[67]->m_pMsg, 0);
+					on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[68]->m_pMsg, 0);
+					for (int i = text_index; i < 18; i++) on_game()->m_msg_text_list[i] = std::make_unique<CMsg>(0, " ", 0);
 				}
 				else if ((m_player->m_citizen == true) && (m_player->m_aresden == false))
 				{
 					play_game_sound('E', 24, 0, 0);
-					m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[83]->m_pMsg, 0);
-					m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[84]->m_pMsg, 0);
-					m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[85]->m_pMsg, 0);
-					m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[86]->m_pMsg, 0);
-					m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[87]->m_pMsg, 0);
-					m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[88]->m_pMsg, 0);
-					m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[89]->m_pMsg, 0);
-					m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[90]->m_pMsg, 0);
-					for (int i = text_index; i < 18; i++) m_msg_text_list[i] = std::make_unique<CMsg>(0, " ", 0);
+					on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[83]->m_pMsg, 0);
+					on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[84]->m_pMsg, 0);
+					on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[85]->m_pMsg, 0);
+					on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[86]->m_pMsg, 0);
+					on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[87]->m_pMsg, 0);
+					on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[88]->m_pMsg, 0);
+					on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[89]->m_pMsg, 0);
+					on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[90]->m_pMsg, 0);
+					for (int i = text_index; i < 18; i++) on_game()->m_msg_text_list[i] = std::make_unique<CMsg>(0, " ", 0);
 				}
 				else play_game_sound('E', 25, 0, 0);
 			}
@@ -6890,8 +6674,8 @@ void CGame::show_heldenian_victory(short side)
 	get_dialog_box_manager().disable_dialog_box(DialogBoxId::Text);
 	for (int i = 0; i < game_limits::max_text_dlg_lines; i++)
 	{
-		if (m_msg_text_list[i] != 0)
-			m_msg_text_list[i].reset();
+		if (on_game()->m_msg_text_list[i] != 0)
+			on_game()->m_msg_text_list[i].reset();
 	}
 	if (m_player->m_citizen == false) player_side = 0;
 	else if (m_player->m_aresden == true) player_side = 1;
@@ -6899,36 +6683,36 @@ void CGame::show_heldenian_victory(short side)
 	switch (side) {
 	case 0:
 		play_game_sound('E', 25, 0, 0);
-		m_msg_text_list[0] = std::make_unique<CMsg>(0, "Heldenian holy war has been closed!", 0);
-		m_msg_text_list[1] = std::make_unique<CMsg>(0, " ", 0);
-		m_msg_text_list[2] = std::make_unique<CMsg>(0, "Heldenian Holy war ended", 0);
-		m_msg_text_list[3] = std::make_unique<CMsg>(0, "in a tie.", 0);
+		on_game()->m_msg_text_list[0] = std::make_unique<CMsg>(0, "Heldenian holy war has been closed!", 0);
+		on_game()->m_msg_text_list[1] = std::make_unique<CMsg>(0, " ", 0);
+		on_game()->m_msg_text_list[2] = std::make_unique<CMsg>(0, "Heldenian Holy war ended", 0);
+		on_game()->m_msg_text_list[3] = std::make_unique<CMsg>(0, "in a tie.", 0);
 		break;
 	case 1:
 		play_game_sound('E', 25, 0, 0);
-		m_msg_text_list[0] = std::make_unique<CMsg>(0, "Heldenian holy war has been closed!", 0);
-		m_msg_text_list[1] = std::make_unique<CMsg>(0, " ", 0);
-		m_msg_text_list[2] = std::make_unique<CMsg>(0, "Heldenian Holy war ended", 0);
-		m_msg_text_list[3] = std::make_unique<CMsg>(0, "in favor of Aresden.", 0);
+		on_game()->m_msg_text_list[0] = std::make_unique<CMsg>(0, "Heldenian holy war has been closed!", 0);
+		on_game()->m_msg_text_list[1] = std::make_unique<CMsg>(0, " ", 0);
+		on_game()->m_msg_text_list[2] = std::make_unique<CMsg>(0, "Heldenian Holy war ended", 0);
+		on_game()->m_msg_text_list[3] = std::make_unique<CMsg>(0, "in favor of Aresden.", 0);
 		break;
 	case 2:
 		play_game_sound('E', 25, 0, 0);
-		m_msg_text_list[0] = std::make_unique<CMsg>(0, "Heldenian holy war has been closed!", 0);
-		m_msg_text_list[1] = std::make_unique<CMsg>(0, " ", 0);
-		m_msg_text_list[2] = std::make_unique<CMsg>(0, "Heldenian Holy war ended", 0);
-		m_msg_text_list[3] = std::make_unique<CMsg>(0, "in favor of Elvine.", 0);
+		on_game()->m_msg_text_list[0] = std::make_unique<CMsg>(0, "Heldenian holy war has been closed!", 0);
+		on_game()->m_msg_text_list[1] = std::make_unique<CMsg>(0, " ", 0);
+		on_game()->m_msg_text_list[2] = std::make_unique<CMsg>(0, "Heldenian Holy war ended", 0);
+		on_game()->m_msg_text_list[3] = std::make_unique<CMsg>(0, "in favor of Elvine.", 0);
 		break;
 	}
-	m_msg_text_list[4] = std::make_unique<CMsg>(0, " ", 0);
+	on_game()->m_msg_text_list[4] = std::make_unique<CMsg>(0, " ", 0);
 
 	if (((player_side != 1) && (player_side != 2))   // Player not a normal citizen
 		|| (side == 0))								// or no winner
 	{
 		play_game_sound('E', 25, 0, 0);
-		m_msg_text_list[5] = std::make_unique<CMsg>(0, " ", 0);
-		m_msg_text_list[6] = std::make_unique<CMsg>(0, " ", 0);
-		m_msg_text_list[7] = std::make_unique<CMsg>(0, " ", 0);
-		m_msg_text_list[8] = std::make_unique<CMsg>(0, " ", 0);
+		on_game()->m_msg_text_list[5] = std::make_unique<CMsg>(0, " ", 0);
+		on_game()->m_msg_text_list[6] = std::make_unique<CMsg>(0, " ", 0);
+		on_game()->m_msg_text_list[7] = std::make_unique<CMsg>(0, " ", 0);
+		on_game()->m_msg_text_list[8] = std::make_unique<CMsg>(0, " ", 0);
 	}
 	else
 	{
@@ -6937,24 +6721,24 @@ void CGame::show_heldenian_victory(short side)
 			play_game_sound('E', 23, 0, 0);
 			play_game_sound('C', 21, 0, 0);
 			play_game_sound('C', 22, 0, 0);
-			m_msg_text_list[5] = std::make_unique<CMsg>(0, "Congratulation.", 0);
-			m_msg_text_list[6] = std::make_unique<CMsg>(0, "As cityzen of victory,", 0);
-			m_msg_text_list[7] = std::make_unique<CMsg>(0, "You will recieve a reward.", 0);
-			m_msg_text_list[8] = std::make_unique<CMsg>(0, "      ", 0);
+			on_game()->m_msg_text_list[5] = std::make_unique<CMsg>(0, "Congratulation.", 0);
+			on_game()->m_msg_text_list[6] = std::make_unique<CMsg>(0, "As cityzen of victory,", 0);
+			on_game()->m_msg_text_list[7] = std::make_unique<CMsg>(0, "You will recieve a reward.", 0);
+			on_game()->m_msg_text_list[8] = std::make_unique<CMsg>(0, "      ", 0);
 		}
 		else
 		{
 			play_game_sound('E', 24, 0, 0);
 			play_game_sound('C', 12, 0, 0);
 			play_game_sound('C', 13, 0, 0);
-			m_msg_text_list[5] = std::make_unique<CMsg>(0, "To our regret", 0);
-			m_msg_text_list[6] = std::make_unique<CMsg>(0, "As cityzen of defeat,", 0);
-			m_msg_text_list[7] = std::make_unique<CMsg>(0, "You cannot recieve any reward.", 0);
-			m_msg_text_list[8] = std::make_unique<CMsg>(0, "     ", 0);
+			on_game()->m_msg_text_list[5] = std::make_unique<CMsg>(0, "To our regret", 0);
+			on_game()->m_msg_text_list[6] = std::make_unique<CMsg>(0, "As cityzen of defeat,", 0);
+			on_game()->m_msg_text_list[7] = std::make_unique<CMsg>(0, "You cannot recieve any reward.", 0);
+			on_game()->m_msg_text_list[8] = std::make_unique<CMsg>(0, "     ", 0);
 		}
 	}
 	for (int i = 9; i < 18; i++)
-		m_msg_text_list[i] = std::make_unique<CMsg>(0, " ", 0);
+		on_game()->m_msg_text_list[i] = std::make_unique<CMsg>(0, " ", 0);
 	get_dialog_box_manager().enable_dialog_box(DialogBoxId::Text, 0, 0, 0);
 	get_dialog_box_manager().disable_crusade_dialogs();
 }

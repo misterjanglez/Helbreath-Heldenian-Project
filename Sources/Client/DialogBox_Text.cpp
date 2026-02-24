@@ -4,6 +4,7 @@
 #include "IInput.h"
 #include "GameFonts.h"
 #include "TextLibExt.h"
+#include "Screen_OnGame.h"
 using namespace hb::client::sprite_id;
 // game_limits::max_text_dlg_lines is in GameConstants.h (via Game.h)
 
@@ -18,7 +19,7 @@ int DialogBox_Text::get_total_lines() const
 	int total_lines = 0;
 	for (int i = 0; i < game_limits::max_text_dlg_lines; i++)
 	{
-		if (m_game->m_msg_text_list[i] != nullptr)
+		if (m_game->on_game()->m_msg_text_list[i] != nullptr)
 			total_lines++;
 	}
 	return total_lines;
@@ -69,9 +70,9 @@ void DialogBox_Text::on_draw()
 	short view = m_scroll_view;
 	for (int i = 0; i < 17; i++)
 	{
-		if ((i + view) < game_limits::max_text_dlg_lines && m_game->m_msg_text_list[i + view] != nullptr)
+		if ((i + view) < game_limits::max_text_dlg_lines && m_game->on_game()->m_msg_text_list[i + view] != nullptr)
 		{
-			char* pMsg = m_game->m_msg_text_list[i + view]->m_pMsg;
+			char* pMsg = m_game->on_game()->m_msg_text_list[i + view]->m_pMsg;
 			if (config_manager::get().is_dialog_transparency_enabled() == false)
 			{
 				switch (pMsg[0])

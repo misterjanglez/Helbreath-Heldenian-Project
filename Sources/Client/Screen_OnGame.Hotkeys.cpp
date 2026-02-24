@@ -175,16 +175,16 @@ bool Screen_OnGame::on_key_down(KeyCode key)
 			if ((GameModeManager::get_mode() == GameMode::MainGame) && (m_game->m_force_disconn == false))
 			{
 #ifdef _DEBUG
-				if (m_game->m_logout_count == -1 || m_game->m_logout_count > 2)
+				if (m_logout_count == -1 || m_logout_count > 2)
 				{
-					m_game->m_logout_count = 1;
-					m_game->m_logout_count_time = GameClock::get_time_ms();
+					m_logout_count = 1;
+					m_logout_count_time = GameClock::get_time_ms();
 				}
 #else
-				if (m_game->m_logout_count == -1 || m_game->m_logout_count > 11)
+				if (m_logout_count == -1 || m_logout_count > 11)
 				{
-					m_game->m_logout_count = 11;
-					m_game->m_logout_count_time = GameClock::get_time_ms();
+					m_logout_count = 11;
+					m_logout_count_time = GameClock::get_time_ms();
 				}
 #endif
 			}
@@ -297,7 +297,7 @@ bool Screen_OnGame::on_key_down(KeyCode key)
 void Screen_OnGame::hotkey_use_health_potion()
 {
 	if (m_game->m_player->m_hp <= 0) return;
-	if (m_game->m_item_using_status == true)
+	if (m_item_using_status == true)
 	{
 		m_game->add_event_list(USE_RED_POTION1, 10);
 		return;
@@ -320,7 +320,7 @@ void Screen_OnGame::hotkey_use_health_potion()
 					m_game->send_game_packet(pkt);
 				}
 				inventory_manager::get().lock_item(i);
-				m_game->m_item_using_status = true;
+				m_item_using_status = true;
 				return;
 			}
 		}
@@ -330,7 +330,7 @@ void Screen_OnGame::hotkey_use_health_potion()
 void Screen_OnGame::hotkey_use_mana_potion()
 {
 	if (m_game->m_player->m_hp <= 0) return;
-	if (m_game->m_item_using_status == true)
+	if (m_item_using_status == true)
 	{
 		m_game->add_event_list(USE_BLUE_POTION1, 10);
 		return;
@@ -353,7 +353,7 @@ void Screen_OnGame::hotkey_use_mana_potion()
 					m_game->send_game_packet(pkt);
 				}
 				inventory_manager::get().lock_item(i);
-				m_game->m_item_using_status = true;
+				m_item_using_status = true;
 				return;
 			}
 		}
@@ -390,22 +390,22 @@ void Screen_OnGame::hotkey_escape()
 			return;
 		}
 
-		if ((m_game->m_is_observer_mode == true) && (hb::shared::input::is_shift_down())) {
-			if (m_game->m_logout_count == -1) { m_game->m_logout_count = 1; m_game->m_logout_count_time = GameClock::get_time_ms(); }
+		if ((m_is_observer_mode == true) && (hb::shared::input::is_shift_down())) {
+			if (m_logout_count == -1) { m_logout_count = 1; m_logout_count_time = GameClock::get_time_ms(); }
 			get_dialog_box_manager().disable_dialog_box(DialogBoxId::SystemMenu);
 			m_game->play_game_sound('E', 14, 5);
 		}
-		else if (m_game->m_logout_count != -1) {
+		else if (m_logout_count != -1) {
 			if (m_game->m_force_disconn == false) {
-				m_game->m_logout_count = -1;
+				m_logout_count = -1;
 				m_game->add_event_list(DLGBOX_CLICK_SYSMENU2, 10);
 			}
 		}
-		if (m_game->m_is_get_pointing_mode == true) {
-			m_game->m_is_get_pointing_mode = false;
+		if (m_is_get_pointing_mode == true) {
+			m_is_get_pointing_mode = false;
 			m_game->add_event_list(COMMAND_PROCESSOR1, 10);
 		}
-		m_game->m_is_f1_help_window_enabled = false;
+		m_is_f1_help_window_enabled = false;
 	}
 }
 
@@ -432,7 +432,7 @@ void Screen_OnGame::hotkey_special_ability()
 				return;
 			}
 
-			i = (time - m_game->m_special_ability_setting_time) / 1000;
+			i = (time - m_special_ability_setting_time) / 1000;
 			i = m_game->m_player->m_special_ability_time_left_sec - i;
 			if (i < 0) i = 0;
 
@@ -617,8 +617,8 @@ void Screen_OnGame::hotkey_whisper_target()
 		tempid = std::format("/to {}", buff);
 		m_game->send_chat_message(tempid.c_str());
 	}
-	else if (m_game->m_entity_state.is_player() && (m_game->m_entity_state.m_name[0] != '\0') && (m_game->m_ilusion_owner_h == 0)
-		&& ((m_game->m_is_crusade_mode == false) || !IsHostile(m_game->m_entity_state.m_status.relationship)))
+	else if (m_game->m_entity_state.is_player() && (m_game->m_entity_state.m_name[0] != '\0') && (m_ilusion_owner_h == 0)
+		&& ((m_is_crusade_mode == false) || !IsHostile(m_game->m_entity_state.m_status.relationship)))
 	{
 		tempid = std::format("/to {}", m_game->m_entity_state.m_name.data());
 		m_game->send_chat_message(tempid.c_str());

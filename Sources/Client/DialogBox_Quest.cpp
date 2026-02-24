@@ -4,6 +4,7 @@
 #include <format>
 #include <string>
 #include "IInput.h"
+#include "Screen_OnGame.h"
 using namespace hb::client::sprite_id;
 
 DialogBox_Quest::DialogBox_Quest(CGame* game)
@@ -26,22 +27,22 @@ void DialogBox_Quest::on_draw()
 
 	switch (m_mode) {
 	case mode::details:
-		switch (m_game->m_quest.quest_type) {
+		switch (m_game->on_game()->m_quest.quest_type) {
 		case 0:
 			put_aligned_string(sX, sX + size_x, sY + 50 + 115 - 30, DRAW_DIALOGBOX_QUEST1, GameColors::UILabel);
 			break;
 
 		case 1: // Hunt
-			if (m_game->m_quest.is_quest_completed == false)
+			if (m_game->on_game()->m_quest.is_quest_completed == false)
 				put_aligned_string(sX, sX + size_x, sY + 50, DRAW_DIALOGBOX_QUEST2, GameColors::UILabel);
 			else
 				put_aligned_string(sX, sX + size_x, sY + 50, DRAW_DIALOGBOX_QUEST3, GameColors::UILabel);
 
-			txt = std::format("Rest Monster : {}", m_game->m_quest.current_count);
+			txt = std::format("Rest Monster : {}", m_game->on_game()->m_quest.current_count);
 			put_aligned_string(sX, sX + size_x, sY + 50 + 20, txt.c_str(), GameColors::UILabel);
 
 			std::memset(temp, 0, sizeof(temp));
-			switch (m_game->m_quest.who) {
+			switch (m_game->on_game()->m_quest.who) {
 			case 1:
 			case 2:
 			case 3: break;
@@ -53,38 +54,38 @@ void DialogBox_Quest::on_draw()
 			txt = std::format(DRAW_DIALOGBOX_QUEST5, temp);
 			put_aligned_string(sX, sX + size_x, sY + 50 + 45, txt.c_str(), GameColors::UILabel);
 
-			std::snprintf(temp, sizeof(temp), "%s", m_game->get_npc_config_name_by_id(m_game->m_quest.target_type));
-			txt = std::format(NPC_TALK_HANDLER16, m_game->m_quest.target_count, temp);
+			std::snprintf(temp, sizeof(temp), "%s", m_game->get_npc_config_name_by_id(m_game->on_game()->m_quest.target_type));
+			txt = std::format(NPC_TALK_HANDLER16, m_game->on_game()->m_quest.target_count, temp);
 			put_aligned_string(sX, sX + size_x, sY + 50 + 60, txt.c_str(), GameColors::UILabel);
 
-			if (m_game->m_quest.target_name.starts_with("NONE")) {
+			if (m_game->on_game()->m_quest.target_name.starts_with("NONE")) {
 				txt = DRAW_DIALOGBOX_QUEST31;
 				put_aligned_string(sX, sX + size_x, sY + 50 + 75, txt.c_str(), GameColors::UILabel);
 			}
 			else {
 				std::memset(temp, 0, sizeof(temp));
-				m_game->get_official_map_name(m_game->m_quest.target_name.c_str(), temp);
+				m_game->get_official_map_name(m_game->on_game()->m_quest.target_name.c_str(), temp);
 				txt = std::format(DRAW_DIALOGBOX_QUEST32, temp);
 				put_aligned_string(sX, sX + size_x, sY + 50 + 75, txt.c_str(), GameColors::UILabel);
 
-				if (m_game->m_quest.x != 0) {
-					txt = std::format(DRAW_DIALOGBOX_QUEST33, m_game->m_quest.x, m_game->m_quest.y, m_game->m_quest.range);
+				if (m_game->on_game()->m_quest.x != 0) {
+					txt = std::format(DRAW_DIALOGBOX_QUEST33, m_game->on_game()->m_quest.x, m_game->on_game()->m_quest.y, m_game->on_game()->m_quest.range);
 					put_aligned_string(sX, sX + size_x, sY + 50 + 90, txt.c_str(), GameColors::UILabel);
 				}
 			}
 
-			txt = std::format(DRAW_DIALOGBOX_QUEST34, m_game->m_quest.contribution);
+			txt = std::format(DRAW_DIALOGBOX_QUEST34, m_game->on_game()->m_quest.contribution);
 			put_aligned_string(sX, sX + size_x, sY + 50 + 105, txt.c_str(), GameColors::UILabel);
 			break;
 
 		case 7:
-			if (m_game->m_quest.is_quest_completed == false)
+			if (m_game->on_game()->m_quest.is_quest_completed == false)
 				put_aligned_string(sX, sX + size_x, sY + 50, DRAW_DIALOGBOX_QUEST26, GameColors::UILabel);
 			else
 				put_aligned_string(sX, sX + size_x, sY + 50, DRAW_DIALOGBOX_QUEST27, GameColors::UILabel);
 
 			std::memset(temp, 0, sizeof(temp));
-			switch (m_game->m_quest.who) {
+			switch (m_game->on_game()->m_quest.who) {
 			case 1:
 			case 2:
 			case 3: break;
@@ -98,23 +99,23 @@ void DialogBox_Quest::on_draw()
 
 			put_aligned_string(sX, sX + size_x, sY + 50 + 60, DRAW_DIALOGBOX_QUEST30, GameColors::UILabel);
 
-			if (m_game->m_quest.target_name.starts_with("NONE")) {
+			if (m_game->on_game()->m_quest.target_name.starts_with("NONE")) {
 				txt = DRAW_DIALOGBOX_QUEST31;
 				put_aligned_string(sX, sX + size_x, sY + 50 + 75, txt.c_str(), GameColors::UILabel);
 			}
 			else {
 				std::memset(temp, 0, sizeof(temp));
-				m_game->get_official_map_name(m_game->m_quest.target_name.c_str(), temp);
+				m_game->get_official_map_name(m_game->on_game()->m_quest.target_name.c_str(), temp);
 				txt = std::format(DRAW_DIALOGBOX_QUEST32, temp);
 				put_aligned_string(sX, sX + size_x, sY + 50 + 75, txt.c_str(), GameColors::UILabel);
 
-				if (m_game->m_quest.x != 0) {
-					txt = std::format(DRAW_DIALOGBOX_QUEST33, m_game->m_quest.x, m_game->m_quest.y, m_game->m_quest.range);
+				if (m_game->on_game()->m_quest.x != 0) {
+					txt = std::format(DRAW_DIALOGBOX_QUEST33, m_game->on_game()->m_quest.x, m_game->on_game()->m_quest.y, m_game->on_game()->m_quest.range);
 					put_aligned_string(sX, sX + size_x, sY + 50 + 90, txt.c_str(), GameColors::UILabel);
 				}
 			}
 
-			txt = std::format(DRAW_DIALOGBOX_QUEST34, m_game->m_quest.contribution);
+			txt = std::format(DRAW_DIALOGBOX_QUEST34, m_game->on_game()->m_quest.contribution);
 			put_aligned_string(sX, sX + size_x, sY + 50 + 105, txt.c_str(), GameColors::UILabel);
 			break;
 		}

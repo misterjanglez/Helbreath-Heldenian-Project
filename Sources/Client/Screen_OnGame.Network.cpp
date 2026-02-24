@@ -20,6 +20,10 @@
 using namespace hb::shared::net;
 using namespace hb::client::net;
 
+namespace NetworkMessageHandlers {
+	void HandlePlayerCharacterContents(CGame* game, char* data);
+}
+
 bool Screen_OnGame::on_game_msg(uint32_t msg_id, uint16_t msg_type, char* data, uint32_t msg_size)
 {
 	switch (msg_id) {
@@ -61,7 +65,7 @@ bool Screen_OnGame::on_game_msg(uint32_t msg_id, uint16_t msg_type, char* data, 
 		return true;
 
 	case MsgId::PlayerCharacterContents:
-		m_game->init_player_characteristics(data);
+		NetworkMessageHandlers::HandlePlayerCharacterContents(m_game, data);
 		return true;
 
 	case MsgId::ResponseCivilRight:

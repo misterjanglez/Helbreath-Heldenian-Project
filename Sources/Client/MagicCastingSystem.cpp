@@ -3,6 +3,7 @@
 #include "PacketSendHelpers.h"
 
 #include "lan_eng.h"
+#include "Screen_OnGame.h"
 
 using namespace hb::shared::net;
 using namespace hb::shared::action;
@@ -79,14 +80,14 @@ void magic_casting_system::begin_cast(int magic_no)
 
 	// Casting
 	if (m_game->m_player->m_hp <= 0) return;
-	if (m_game->m_is_get_pointing_mode == true) return;
+	if (m_game->on_game()->m_is_get_pointing_mode == true) return;
 	if (get_mana_cost(magic_no) > m_game->m_player->m_mp) return;
 	if (m_game->is_item_on_hand() == true)
 	{
 		m_game->add_event_list(DLGBOX_CLICK_MAGIC1, 10);
 		return;
 	}
-	if (m_game->m_skill_using_status == true)
+	if (m_game->on_game()->m_skill_using_status == true)
 	{
 		m_game->add_event_list(DLGBOX_CLICK_MAGIC2, 10);
 		return;
@@ -97,6 +98,6 @@ void magic_casting_system::begin_cast(int magic_no)
 	m_game->m_casting_magic_type = magic_no;
 	m_game->m_magic_short_cut = magic_no;
 	m_game->m_recent_short_cut = magic_no + 100;
-	m_game->m_point_command_type = magic_no + 100;
+	m_game->on_game()->m_point_command_type = magic_no + 100;
 	m_game->get_dialog_box_manager().disable_dialog_box(DialogBoxId::Magic);
 }

@@ -11,6 +11,7 @@
 #include <algorithm>
 #include <format>
 #include <string>
+#include "Screen_OnGame.h"
 
 using namespace hb::shared::net;
 namespace NetworkMessageHandlers {
@@ -48,8 +49,8 @@ void HandleParty(CGame* game, char* data)
 			break;
 
 		case 1:
-			game->m_party_status = 1;
-			game->m_total_party_member = 0;
+			game->on_game()->m_party_status = 1;
+			game->on_game()->m_total_party_member = 0;
 			game->get_dialog_box_manager().enable_dialog_box(DialogBoxId::Party, 0, 0, 0);
 			game->get_dialog_box_manager().get_dialog_as<DialogBox_Party>(DialogBoxId::Party)->m_mode = DialogBox_Party::mode::failed;
 			{
@@ -63,8 +64,8 @@ void HandleParty(CGame* game, char* data)
 		break;
 
 	case 2: //
-		game->m_party_status = 0;
-		game->m_total_party_member = 0;
+		game->on_game()->m_party_status = 0;
+		game->on_game()->m_total_party_member = 0;
 		game->get_dialog_box_manager().enable_dialog_box(DialogBoxId::Party, 0, 0, 0);
 		game->get_dialog_box_manager().get_dialog_as<DialogBox_Party>(DialogBoxId::Party)->m_mode = DialogBox_Party::mode::disbanded;
 		break;
@@ -85,7 +86,7 @@ void HandleParty(CGame* game, char* data)
 
 		case 1: //
 			if (strcmp(txt, game->m_player->m_player_name.c_str()) == 0) {
-				game->m_party_status = 2;
+				game->on_game()->m_party_status = 2;
 				game->get_dialog_box_manager().enable_dialog_box(DialogBoxId::Party, 0, 0, 0);
 				game->get_dialog_box_manager().get_dialog_as<DialogBox_Party>(DialogBoxId::Party)->m_mode = DialogBox_Party::mode::failed;
 			}
@@ -95,7 +96,7 @@ void HandleParty(CGame* game, char* data)
 				game->add_event_list(partyMsgBuf.c_str(), 10);
 			}
 
-			game->m_total_party_member++;
+			game->on_game()->m_total_party_member++;
 			game->get_dialog_box_manager().get_dialog_as<DialogBox_Party>(DialogBoxId::Party)->add_member_name(txt);
 			break;
 
@@ -106,14 +107,14 @@ void HandleParty(CGame* game, char* data)
 	break;
 
 	case 5: //
-		game->m_total_party_member = 0;
+		game->on_game()->m_total_party_member = 0;
 
 		{
 			const auto* pkt = hb::net::PacketCast<hb::net::PacketNotifyPartyList>(
 				data, sizeof(hb::net::PacketNotifyPartyList));
 			if (!pkt) return;
 			const char* names = pkt->names;
-			game->m_total_party_member = (std::min)(static_cast<int>(pkt->count), hb::shared::limits::MaxPartyMembers);
+			game->on_game()->m_total_party_member = (std::min)(static_cast<int>(pkt->count), hb::shared::limits::MaxPartyMembers);
 			game->get_dialog_box_manager().get_dialog_as<DialogBox_Party>(DialogBoxId::Party)->set_name_list(
 				pkt->count, names, hb::shared::limits::CharNameLen);
 		}
@@ -135,7 +136,7 @@ void HandleParty(CGame* game, char* data)
 
 		case 1: //
 			if (strcmp(txt, game->m_player->m_player_name.c_str()) == 0) {
-				game->m_party_status = 0;
+				game->on_game()->m_party_status = 0;
 				game->get_dialog_box_manager().enable_dialog_box(DialogBoxId::Party, 0, 0, 0);
 				game->get_dialog_box_manager().get_dialog_as<DialogBox_Party>(DialogBoxId::Party)->m_mode = DialogBox_Party::mode::withdrawn;
 			}
@@ -145,7 +146,7 @@ void HandleParty(CGame* game, char* data)
 				game->add_event_list(partyMsgBuf.c_str(), 10);
 			}
 			if (game->get_dialog_box_manager().get_dialog_as<DialogBox_Party>(DialogBoxId::Party)->remove_member_name(txt))
-					game->m_total_party_member--;
+					game->on_game()->m_total_party_member--;
 			break;
 		}
 	}
@@ -157,8 +158,8 @@ void HandleParty(CGame* game, char* data)
 		break;
 
 	case 8: //
-		game->m_party_status = 0;
-		game->m_total_party_member = 0;
+		game->on_game()->m_party_status = 0;
+		game->on_game()->m_total_party_member = 0;
 		break;
 	}
 }

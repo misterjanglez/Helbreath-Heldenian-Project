@@ -39,7 +39,7 @@ hb::shared::sprite::BoundRect CNpcRenderer::draw_stop(int indexX, int indexY, in
 	}
 
 	// Crusade FOE indicator
-	if (m_game.m_is_crusade_mode)
+	if (m_screen->m_is_crusade_mode)
 		m_screen->draw_object_foe(sX, sY, state.m_frame);
 
 	// NPC ground lights
@@ -176,7 +176,7 @@ hb::shared::sprite::BoundRect CNpcRenderer::draw_move(int indexX, int indexY, in
 		state.m_frame = state.m_frame / 2;
 
 	// Crusade FOE indicator
-	if (m_game.m_is_crusade_mode)
+	if (m_screen->m_is_crusade_mode)
 		m_screen->draw_object_foe(fix_x, fix_y, state.m_frame);
 
 	// Effect auras
@@ -296,7 +296,7 @@ hb::shared::sprite::BoundRect CNpcRenderer::draw_run(int indexX, int indexY, int
 	int fix_y = sY + dy;
 
 	// Crusade FOE indicator
-	if (m_game.m_is_crusade_mode)
+	if (m_screen->m_is_crusade_mode)
 		m_screen->draw_object_foe(fix_x, fix_y, state.m_frame);
 
 	// Effect auras
@@ -361,7 +361,7 @@ hb::shared::sprite::BoundRect CNpcRenderer::draw_attack(int indexX, int indexY, 
 	eq.calc_colors(state);
 
 	// Crusade FOE indicator
-	if (m_game.m_is_crusade_mode)
+	if (m_screen->m_is_crusade_mode)
 		m_screen->draw_object_foe(sX, sY, state.m_frame);
 
 	// Effect auras
@@ -479,7 +479,7 @@ hb::shared::sprite::BoundRect CNpcRenderer::draw_attack_move(int indexX, int ind
 	}
 
 	// Crusade FOE indicator
-	if (m_game.m_is_crusade_mode)
+	if (m_screen->m_is_crusade_mode)
 		m_screen->draw_object_foe(sX + dx, sY + dy, state.m_frame);
 
 	// Effect auras
@@ -599,7 +599,7 @@ hb::shared::sprite::BoundRect CNpcRenderer::draw_damage(int indexX, int indexY, 
 	state.m_frame = frame;
 
 	// Crusade FOE indicator
-	if (m_game.m_is_crusade_mode)
+	if (m_screen->m_is_crusade_mode)
 		m_screen->draw_object_foe(sX, sY, frame);
 
 	// Effect auras
@@ -687,7 +687,7 @@ hb::shared::sprite::BoundRect CNpcRenderer::draw_damage_move(int indexX, int ind
 	int frame = state.m_frame;
 
 	// Crusade FOE indicator
-	if (m_game.m_is_crusade_mode)
+	if (m_screen->m_is_crusade_mode)
 		m_screen->draw_object_foe(fix_x, fix_y, frame);
 
 	// Effect auras
@@ -794,7 +794,7 @@ hb::shared::sprite::BoundRect CNpcRenderer::draw_dying(int indexX, int indexY, i
 	state.m_frame = frame;
 
 	// Crusade FOE indicator
-	if (m_game.m_is_crusade_mode)
+	if (m_screen->m_is_crusade_mode)
 		m_screen->draw_object_foe(sX, sY, frame);
 
 	// Effect auras

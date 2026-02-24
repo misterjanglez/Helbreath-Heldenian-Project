@@ -5,6 +5,7 @@
 #include <string>
 #include "IInput.h"
 #include "Packet/SharedPackets.h"
+#include "Screen_OnGame.h"
 
 using namespace hb::shared::net;
 using namespace hb::client::sprite_id;
@@ -229,7 +230,7 @@ bool DialogBox_LevelUpSetting::on_click()
 	if ((mouse_x >= sX + ui_layout::left_btn_x) && (mouse_x <= sX + ui_layout::left_btn_x + ui_layout::btn_size_x) &&
 	    (mouse_y > sY + ui_layout::btn_y) && (mouse_y < sY + ui_layout::btn_y + ui_layout::btn_size_y))
 	{
-		if ((m_game->m_gizon_item_upgrade_left > 0) && (player().m_lu_point <= 0) &&
+		if ((m_game->on_game()->m_gizon_item_upgrade_left > 0) && (player().m_lu_point <= 0) &&
 		    (player().m_lu_str == 0) && (player().m_lu_vit == 0) && (player().m_lu_dex == 0) &&
 		    (player().m_lu_int == 0) && (player().m_lu_mag == 0) && (player().m_lu_char == 0))
 		{

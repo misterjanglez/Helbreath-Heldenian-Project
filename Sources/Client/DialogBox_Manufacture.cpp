@@ -16,6 +16,7 @@
 #include "Packet/SharedPackets.h"
 #include <format>
 #include <string>
+#include "Screen_OnGame.h"
 
 using namespace hb::shared::net;
 using namespace hb::shared::item;
@@ -1160,7 +1161,7 @@ bool DialogBox_Manufacture::on_enable(int type, int64_t v1, int v2, const char* 
 			m_slot_5 = -1;
 			m_slot_6 = -1;
 			m_progress = 0;
-			m_game->m_skill_using_status = true;
+			m_game->on_game()->m_skill_using_status = true;
 			m_size_x = 195;
 			m_size_y = 215;
 			disable_dialog_box(DialogBoxId::ItemDropExternal);
@@ -1183,7 +1184,7 @@ bool DialogBox_Manufacture::on_enable(int type, int64_t v1, int v2, const char* 
 			m_progress = 0;
 			m_anim_frame = 0;
 			m_recipe_valid = 0;
-			m_game->m_skill_using_status = true;
+			m_game->on_game()->m_skill_using_status = true;
 			build_item_manager::get().update_available_recipes();
 			m_size_x = 270;
 			m_size_y = 381;
@@ -1201,7 +1202,7 @@ bool DialogBox_Manufacture::on_enable(int type, int64_t v1, int v2, const char* 
 			m_result_value = v2;
 			m_size_x = 270;
 			m_size_y = 381;
-			m_game->m_skill_using_status = true;
+			m_game->on_game()->m_skill_using_status = true;
 			build_item_manager::get().update_available_recipes();
 			disable_dialog_box(DialogBoxId::ItemDropExternal);
 			disable_dialog_box(DialogBoxId::NpcActionQuery);
@@ -1222,7 +1223,7 @@ bool DialogBox_Manufacture::on_enable(int type, int64_t v1, int v2, const char* 
 			m_slot_6 = -1;
 			m_progress = 0;
 			m_anim_frame = 0;
-			m_game->m_skill_using_status = true;
+			m_game->on_game()->m_skill_using_status = true;
 			m_size_x = 195;
 			m_size_y = 215;
 			disable_dialog_box(DialogBoxId::ItemDropExternal);
@@ -1239,6 +1240,6 @@ bool DialogBox_Manufacture::on_disable()
 	auto clearItem = [](int idx) { inventory_manager::get().unlock_item(idx); };
 	clearItem(m_slot_1); clearItem(m_slot_2); clearItem(m_slot_3);
 	clearItem(m_slot_4); clearItem(m_slot_5); clearItem(m_slot_6);
-	m_game->m_skill_using_status = false;
+	m_game->on_game()->m_skill_using_status = false;
 	return true;
 }

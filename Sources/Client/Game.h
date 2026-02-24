@@ -88,6 +88,7 @@ struct char_creation_data
 namespace hb { namespace net { struct packet_base; } }
 
 class floating_text_manager;
+class Screen_OnGame;
 
 class CGame : public hb::shared::render::application
 {
@@ -103,6 +104,9 @@ public:
 
 	// Convenience accessor — routes through the active Screen_OnGame
 	DialogBoxManager& get_dialog_box_manager();
+	// Convenience accessor — routes through the active Screen_OnGame gameplay state
+	Screen_OnGame* on_game();
+
 
 	// Connect to the game server using stored connection info
 	void connect_to_game_server();
@@ -178,8 +182,7 @@ public:
 	void point_command_handler(int indexX, int indexY, char item_id = -1);
 	void add_event_list(const char* txt, char color = 0, bool dup_allow = true);
 	// shift_guild_operation_list / put_guild_operation_list REMOVED — use DialogBox_GuildOperation
-	void init_player_characteristics(char * data);
-	void init_game_settings();
+	// init_player_characteristics MOVED to NetworkMessages_Player.cpp
 	void common_event_handler(char * data);
 	// get_top_dialog_box_index, enable_dialog_box, disable_dialog_box REMOVED
 	// — use get_dialog_box_manager().get_top_id(), enable_dialog_box(), disable_dialog_box()
@@ -254,18 +257,7 @@ public:
 	GameTimer m_game_timer;
 
 
-	struct {
-		bool is_quest_completed;
-		short who, quest_type, contribution, target_type, target_count, x, y, range;
-		short current_count;
-		std::string target_name;
-	} m_quest;
 
-	struct {
-		short x, y;
-		char type;
-		char side;
-	} m_crusade_structure_info[hb::shared::limits::MaxCrusadeStructures];
 
 	class hb::shared::render::IRenderer* m_Renderer;  // Abstract renderer interface
 	std::unique_ptr<hb::shared::sprite::ISpriteFactory> m_sprite_factory;  // Sprite factory for creating sprites
@@ -292,9 +284,6 @@ public:
 	std::unique_ptr<effect_manager> m_effect_manager;
 	std::array<std::unique_ptr<CMagic>, hb::shared::limits::MaxMagicType> m_magic_cfg_list;
 	std::array<std::unique_ptr<CSkill>, hb::shared::limits::MaxSkillType> m_skill_cfg_list;
-	std::array<std::unique_ptr<CMsg>, game_limits::max_text_dlg_lines> m_msg_text_list;
-	std::array<std::unique_ptr<CMsg>, game_limits::max_text_dlg_lines> m_msg_text_list2;
-	std::array<std::unique_ptr<CMsg>, game_limits::max_text_dlg_lines> m_agree_msg_text_list;
 	std::unique_ptr<CMsg> m_ex_id;
 
 	std::array<std::unique_ptr<CCharInfo>, 4> m_char_list;
@@ -306,14 +295,9 @@ public:
 	uint32_t m_cur_time;
 	uint32_t m_check_conn_time, m_check_spr_time, m_check_chat_time;
 	uint32_t m_check_connection_time;
-	uint32_t m_logout_count_time;
 	uint32_t m_restart_count_time;
 	uint32_t m_observer_cam_time;
 	uint32_t m_damaged_time;
-	uint32_t m_special_ability_setting_time;
-	uint32_t m_commander_command_requested_time;
-	uint32_t m_top_msg_time;
-	uint32_t m_env_effect_time;
 
 	//v2.2
 	uint32_t m_monster_event_time;
@@ -324,17 +308,9 @@ public:
 
 std::array<bool, hb::shared::limits::MaxItems> m_is_item_equipped{};
 	std::array<bool, hb::shared::limits::MaxItems> m_is_item_disabled{};
-	bool m_is_get_pointing_mode;
-	bool m_wait_for_new_click;  // After magic cast, ignore held click until released
-	uint32_t m_magic_cast_time;  // Timestamp when magic was cast (for post-cast delay)
-	bool m_skill_using_status;
-	bool m_item_using_status;
-	bool m_is_observer_mode, m_is_observer_commanded;
 	bool m_is_first_conn;
 	bool m_is_server_changing = false;
-	bool m_is_crusade_mode;
 
-	bool m_is_f1_help_window_enabled;
 	bool m_hide_local_cursor;
 	bool m_mouse_initialized = false;
 
@@ -348,29 +324,19 @@ std::array<bool, hb::shared::limits::MaxItems> m_is_item_equipped{};
 	uint32_t m_last_net_recv_time;
 	uint32_t m_last_npc_event_time;
 
-	int m_fightzone_number;
-	int m_fightzone_number_temp;
 
-	int m_point_command_type;
 	int m_total_char;
 	short m_magic_short_cut;
 	int m_accnt_year, m_accnt_month, m_accnt_day;
 	int m_ip_year, m_ip_month, m_ip_day;
-	int m_down_skill_index;
 
-	int m_ilusion_owner_h;
 	short m_recent_short_cut;
 	std::array<short, 6> m_short_cut{}; // Snoopy: 6 shortcuts
-	int m_draw_flag;
 
 	int m_time_left_sec_account, m_time_left_sec_ip;
 	int m_log_server_port, m_game_server_port;
 	int m_block_year, m_block_month, m_block_day;
-	unsigned char m_top_msg_last_sec;
 	int m_net_lag_count;
-	int m_total_party_member;
-	int m_party_status;
-	int m_gizon_item_upgrade_left;
 	std::array<short, hb::shared::item::DEF_MAXITEMEQUIPPOS> m_item_equipment_status{};
 	short m_mcx, m_mcy;
 	int   m_casting_magic_type;
@@ -382,7 +348,6 @@ std::array<bool, hb::shared::limits::MaxItems> m_is_item_equipped{};
 	char m_item_order[hb::shared::limits::MaxItems];
 	static constexpr int AmountStringMaxLen = 20;
 	std::string m_amount_string;
-	int  m_logout_count;
 	int m_restart_count;
 
 	// Overlay system state
@@ -409,13 +374,11 @@ std::array<bool, hb::shared::limits::MaxItems> m_is_item_equipped{};
 	std::string m_world_server_name;
 	direction m_menu_dir;
 	char m_menu_dir_cnt, m_menu_frame;
-	char m_ilusion_owner_type;
 	std::string m_name_ie;
 	char m_loading;
 	char m_discount;
 
 	std::string m_status_map_name;
-	std::string m_top_msg;
 	std::string m_construct_map_name;
 	std::string m_game_server_name; //  Gateway
 
@@ -456,14 +419,7 @@ std::array<bool, hb::shared::limits::MaxItems> m_is_item_equipped{};
 	int  m_item_drop_cnt;
 
 	std::string m_gate_map_name;
-	int  m_gate_posit_x, m_gate_posit_y;
-	int m_heldenian_aresden_left_tower;
-	int m_heldenian_elvine_left_tower;
-	int m_heldenian_aresden_flags;
-	int m_heldenian_elvine_flags;
 	bool m_illusion_mvt;
-	bool m_is_xmas;
-	bool m_using_slate;
 
 	// Entity render state (temporary state for currently rendered entity)
 	CEntityRenderState m_entity_state;

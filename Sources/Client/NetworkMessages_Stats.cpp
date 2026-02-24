@@ -8,6 +8,7 @@
 #include <cmath>
 #include <format>
 #include <string>
+#include "Screen_OnGame.h"
 
 
 namespace NetworkMessageHandlers {
@@ -32,9 +33,9 @@ namespace NetworkMessageHandlers {
 	}
 	else
 	{
-		if ((game->m_logout_count > 0) && (game->m_force_disconn == false))
+		if ((game->on_game()->m_logout_count > 0) && (game->m_force_disconn == false))
 		{
-			game->m_logout_count = -1;
+			game->on_game()->m_logout_count = -1;
 			game->add_event_list(NOTIFYMSG_HP2, 10);
 		}
 		game->m_damaged_time = GameClock::get_time_ms();

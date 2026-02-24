@@ -9,6 +9,7 @@
 #include "IInput.h"
 #include "Packet/SharedPackets.h"
 #include "PacketSendHelpers.h"
+#include "Screen_OnGame.h"
 
 
 using namespace hb::shared::net;
@@ -81,7 +82,7 @@ void DialogBox_CityHallMenu::DrawMode0_MainMenu(short sX, short sY, short size_x
 		hb::shared::text::draw_text_aligned(GameFont::Default, sX, sY + 120, (sX + size_x) - (sX), 15, DRAW_DIALOGBOX_CITYHALL_MENU8, hb::shared::text::TextStyle::from_color(GameColors::UIDisabled), hb::shared::text::Align::TopCenter);
 
 	// Cancel quest
-	if (m_game->m_quest.quest_type != 0)
+	if (m_game->on_game()->m_quest.quest_type != 0)
 	{
 		if (mouse_in(link_cancel_quest))
 			hb::shared::text::draw_text_aligned(GameFont::Default, sX, sY + 145, (sX + size_x) - (sX), 15, DRAW_DIALOGBOX_CITYHALL_MENU11, hb::shared::text::TextStyle::from_color(GameColors::UIWhite), hb::shared::text::Align::TopCenter);
@@ -92,7 +93,7 @@ void DialogBox_CityHallMenu::DrawMode0_MainMenu(short sX, short sY, short size_x
 		hb::shared::text::draw_text_aligned(GameFont::Default, sX, sY + 145, (sX + size_x) - (sX), 15, DRAW_DIALOGBOX_CITYHALL_MENU11, hb::shared::text::TextStyle::from_color(GameColors::UIDisabled), hb::shared::text::Align::TopCenter);
 
 	// Change playmode
-	if ((m_game->m_is_crusade_mode == false) && player().m_citizen && (player().m_pk_count == 0))
+	if ((m_game->on_game()->m_is_crusade_mode == false) && player().m_citizen && (player().m_pk_count == 0))
 	{
 		if (player().m_hunter == true)
 		{
@@ -115,7 +116,7 @@ void DialogBox_CityHallMenu::DrawMode0_MainMenu(short sX, short sY, short size_x
 		hb::shared::text::draw_text_aligned(GameFont::Default, sX, sY + 170, (sX + size_x) - (sX), 15, DRAW_DIALOGBOX_CITYHALL_MENU56, hb::shared::text::TextStyle::from_color(GameColors::UIDisabled), hb::shared::text::Align::TopCenter);
 
 	// Teleport menu
-	if ((m_game->m_is_crusade_mode == false) && player().m_citizen && (player().m_pk_count == 0))
+	if ((m_game->on_game()->m_is_crusade_mode == false) && player().m_citizen && (player().m_pk_count == 0))
 	{
 		if (mouse_in(link_teleport))
 			hb::shared::text::draw_text_aligned(GameFont::Default, sX, sY + 195, (sX + size_x) - (sX), 15, DRAW_DIALOGBOX_CITYHALL_MENU69, hb::shared::text::TextStyle::from_color(GameColors::UIWhite), hb::shared::text::Align::TopCenter);
@@ -126,7 +127,7 @@ void DialogBox_CityHallMenu::DrawMode0_MainMenu(short sX, short sY, short size_x
 		hb::shared::text::draw_text_aligned(GameFont::Default, sX, sY + 195, (sX + size_x) - (sX), 15, DRAW_DIALOGBOX_CITYHALL_MENU69, hb::shared::text::TextStyle::from_color(GameColors::UIDisabled), hb::shared::text::Align::TopCenter);
 
 	// Change crusade role
-	if (m_game->m_is_crusade_mode && player().m_citizen)
+	if (m_game->on_game()->m_is_crusade_mode && player().m_citizen)
 	{
 		if (mouse_in(link_crusade_role))
 			hb::shared::text::draw_text_aligned(GameFont::Default, sX, sY + 220, (sX + size_x) - (sX), 15, DRAW_DIALOGBOX_CITYHALL_MENU14, hb::shared::text::TextStyle::from_color(GameColors::UIWhite), hb::shared::text::Align::TopCenter);
@@ -462,7 +463,7 @@ bool DialogBox_CityHallMenu::on_click_mode0(short sX, short sY)
 	// Cancel quest
 	if (mouse_in(link_cancel_quest))
 	{
-		if (m_game->m_quest.quest_type == 0) return false;
+		if (m_game->on_game()->m_quest.quest_type == 0) return false;
 		m_mode = mode::cancel_quest;
 		m_game->play_game_sound('E', 14, 5);
 		return true;
@@ -471,7 +472,7 @@ bool DialogBox_CityHallMenu::on_click_mode0(short sX, short sY)
 	// Change playmode
 	if (mouse_in(link_change_playmode))
 	{
-		if (m_game->m_is_crusade_mode) return false;
+		if (m_game->on_game()->m_is_crusade_mode) return false;
 		if (player().m_pk_count != 0) return false;
 		if (player().m_citizen == false) return false;
 		if ((player().m_level > 100) && (player().m_hunter == false)) return false;
@@ -499,7 +500,7 @@ bool DialogBox_CityHallMenu::on_click_mode0(short sX, short sY)
 	// Crusade job
 	if (mouse_in(link_crusade_role))
 	{
-		if (m_game->m_is_crusade_mode == false) return false;
+		if (m_game->on_game()->m_is_crusade_mode == false) return false;
 		m_game->get_dialog_box_manager().enable_dialog_box(DialogBoxId::CrusadeJob, 1, 0, 0);
 		m_game->play_game_sound('E', 14, 5);
 		return true;

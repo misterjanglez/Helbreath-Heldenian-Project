@@ -336,11 +336,11 @@ void Screen_OnGame::draw_objects(short pivot_x, short pivot_y, short div_x, shor
 					std::snprintf(m_game->m_entity_state.m_name.data(), m_game->m_entity_state.m_name.size(), "%s", m_game->m_map_data->m_data[dX][dY].m_owner_name.c_str());
 					ret = true;
 
-					if (m_game->m_ilusion_owner_h != 0)
+					if (m_ilusion_owner_h != 0)
 					{
 						if ((strcmp(m_game->m_entity_state.m_name.data(), m_game->m_player->m_player_name.c_str()) != 0) && (!hb::shared::owner::is_npc(m_game->m_entity_state.m_owner_type)))
 						{
-							m_game->m_entity_state.m_owner_type = m_game->m_ilusion_owner_type;
+							m_game->m_entity_state.m_owner_type = m_ilusion_owner_type;
 							m_game->m_entity_state.m_status = m_game->m_player->m_illusionStatus;
 							m_game->m_entity_state.m_appearance = m_game->m_player->m_illusionAppearance;
 						}
@@ -488,36 +488,36 @@ void Screen_OnGame::draw_objects(short pivot_x, short pivot_y, short div_x, shor
 						break;
 
 					case 370: // nuit
-						if (((time - m_game->m_env_effect_time) > 400) && (obj_spr_frame == 9) && (weather_manager::get().is_night())) m_game->m_effect_manager->add_effect(EffectType::MS_CRUSADE_CASTING, m_game->m_Camera.get_x() + ix - 16 + 30, m_game->m_Camera.get_y() + iy - 16 - 334, 0, 0, 0, 0);
-						if (((time - m_game->m_env_effect_time) > 400) && (obj_spr_frame == 11) && (weather_manager::get().is_night())) m_game->m_effect_manager->add_effect(EffectType::MS_CRUSADE_CASTING, m_game->m_Camera.get_x() + ix - 16 + 17, m_game->m_Camera.get_y() + iy - 16 - 300, 0, 0, 0, 0);
+						if (((time - m_env_effect_time) > 400) && (obj_spr_frame == 9) && (weather_manager::get().is_night())) m_game->m_effect_manager->add_effect(EffectType::MS_CRUSADE_CASTING, m_game->m_Camera.get_x() + ix - 16 + 30, m_game->m_Camera.get_y() + iy - 16 - 334, 0, 0, 0, 0);
+						if (((time - m_env_effect_time) > 400) && (obj_spr_frame == 11) && (weather_manager::get().is_night())) m_game->m_effect_manager->add_effect(EffectType::MS_CRUSADE_CASTING, m_game->m_Camera.get_x() + ix - 16 + 17, m_game->m_Camera.get_y() + iy - 16 - 300, 0, 0, 0, 0);
 						break;
 
 					case 374: // nuit
-						if (((time - m_game->m_env_effect_time) > 400) && (obj_spr_frame == 2) && (weather_manager::get().is_night())) m_game->m_effect_manager->add_effect(EffectType::MS_CRUSADE_CASTING, m_game->m_Camera.get_x() + ix - 7, m_game->m_Camera.get_y() + iy - 122, 0, 0, 0, 0);
-						if (((time - m_game->m_env_effect_time) > 400) && (obj_spr_frame == 6) && (weather_manager::get().is_night())) m_game->m_effect_manager->add_effect(EffectType::MS_CRUSADE_CASTING, m_game->m_Camera.get_x() + ix - 14, m_game->m_Camera.get_y() + iy - 321, 0, 0, 0, 0);
-						if (((time - m_game->m_env_effect_time) > 400) && (obj_spr_frame == 7) && (weather_manager::get().is_night())) m_game->m_effect_manager->add_effect(EffectType::MS_CRUSADE_CASTING, m_game->m_Camera.get_x() + ix + 7, m_game->m_Camera.get_y() + iy - 356, 0, 0, 0, 0);
+						if (((time - m_env_effect_time) > 400) && (obj_spr_frame == 2) && (weather_manager::get().is_night())) m_game->m_effect_manager->add_effect(EffectType::MS_CRUSADE_CASTING, m_game->m_Camera.get_x() + ix - 7, m_game->m_Camera.get_y() + iy - 122, 0, 0, 0, 0);
+						if (((time - m_env_effect_time) > 400) && (obj_spr_frame == 6) && (weather_manager::get().is_night())) m_game->m_effect_manager->add_effect(EffectType::MS_CRUSADE_CASTING, m_game->m_Camera.get_x() + ix - 14, m_game->m_Camera.get_y() + iy - 321, 0, 0, 0, 0);
+						if (((time - m_env_effect_time) > 400) && (obj_spr_frame == 7) && (weather_manager::get().is_night())) m_game->m_effect_manager->add_effect(EffectType::MS_CRUSADE_CASTING, m_game->m_Camera.get_x() + ix + 7, m_game->m_Camera.get_y() + iy - 356, 0, 0, 0, 0);
 						break;
 
 					case 376: // nuit
-						if (((time - m_game->m_env_effect_time) > 400) && (obj_spr_frame == 12) && (weather_manager::get().is_night())) {
+						if (((time - m_env_effect_time) > 400) && (obj_spr_frame == 12) && (weather_manager::get().is_night())) {
 							m_game->m_effect_manager->add_effect(EffectType::MS_CRUSADE_CASTING, m_game->m_Camera.get_x() + ix - 16, m_game->m_Camera.get_y() + iy - 346, 0, 0, 0, 0);
 							m_game->m_effect_manager->add_effect(EffectType::MS_CRUSADE_CASTING, m_game->m_Camera.get_x() + ix + 11, m_game->m_Camera.get_y() + iy - 308, 0, 0, 0, 0);
 						}
 						break;
 
 					case 378: // nuit
-						if (((time - m_game->m_env_effect_time) > 400) && (obj_spr_frame == 11) && (weather_manager::get().is_night())) m_game->m_effect_manager->add_effect(EffectType::MS_CRUSADE_CASTING, m_game->m_Camera.get_x() + ix, m_game->m_Camera.get_y() + iy - 91, 0, 0, 0, 0);
+						if (((time - m_env_effect_time) > 400) && (obj_spr_frame == 11) && (weather_manager::get().is_night())) m_game->m_effect_manager->add_effect(EffectType::MS_CRUSADE_CASTING, m_game->m_Camera.get_x() + ix, m_game->m_Camera.get_y() + iy - 91, 0, 0, 0, 0);
 						break;
 
 					case 382: // nuit
-						if (((time - m_game->m_env_effect_time) > 400) && (obj_spr_frame == 9) && (weather_manager::get().is_night())) {
+						if (((time - m_env_effect_time) > 400) && (obj_spr_frame == 9) && (weather_manager::get().is_night())) {
 							m_game->m_effect_manager->add_effect(EffectType::MS_CRUSADE_CASTING, m_game->m_Camera.get_x() + ix + 73, m_game->m_Camera.get_y() + iy - 264, 0, 0, 0, 0);
 							m_game->m_effect_manager->add_effect(EffectType::MS_CRUSADE_CASTING, m_game->m_Camera.get_x() + ix + 23, m_game->m_Camera.get_y() + iy - 228, 0, 0, 0, 0);
 						}
 						break;
 
 					case 429:
-						if (((time - m_game->m_env_effect_time) > 400) && (obj_spr_frame == 2)) m_game->m_effect_manager->add_effect(EffectType::MS_CRUSADE_CASTING, m_game->m_Camera.get_x() + ix - 15, m_game->m_Camera.get_y() + iy - 224, 0, 0, 0, 0);
+						if (((time - m_env_effect_time) > 400) && (obj_spr_frame == 2)) m_game->m_effect_manager->add_effect(EffectType::MS_CRUSADE_CASTING, m_game->m_Camera.get_x() + ix - 15, m_game->m_Camera.get_y() + iy - 224, 0, 0, 0, 0);
 						break;
 					}
 				}
@@ -547,7 +547,7 @@ void Screen_OnGame::draw_objects(short pivot_x, short pivot_y, short div_x, shor
 							m_game->m_tile_spr[obj_spr + 50]->draw(ix, iy, obj_spr_frame);
 							m_game->m_tile_spr[obj_spr]->draw(ix - 16, iy - 16, obj_spr_frame);
 						}
-						if (m_game->m_is_xmas == true)
+						if (m_is_xmas == true)
 						{
 							if (weather_manager::get().is_night()) // nuit
 							{
@@ -654,11 +654,11 @@ void Screen_OnGame::draw_objects(short pivot_x, short pivot_y, short div_x, shor
 		}
 	}
 
-	if ((time - m_game->m_env_effect_time) > 400) m_game->m_env_effect_time = time;
+	if ((time - m_env_effect_time) > 400) m_env_effect_time = time;
 
 	// Finalize Picking system - determines cursor type
 	EntityRelationship focusRelationship = CursorTarget::has_focused_object() ? CursorTarget::GetFocusStatus().relationship : EntityRelationship::Neutral;
-	CursorTarget::end_frame(focusRelationship, m_game->m_point_command_type, m_game->m_player->m_Controller.is_command_available(), m_game->m_is_get_pointing_mode);
+	CursorTarget::end_frame(focusRelationship, m_point_command_type, m_game->m_player->m_Controller.is_command_available(), m_is_get_pointing_mode);
 
 	// update legacy compatibility variables from Picking system
 	m_game->m_mcx = CursorTarget::get_focused_map_x();
@@ -859,7 +859,7 @@ void Screen_OnGame::draw_background(short div_x, short mod_x, short div_y, short
 		}
 	}
 
-	if (m_game->m_is_crusade_mode)
+	if (m_is_crusade_mode)
 	{
 		if (m_game->m_player->m_construct_loc_x != -1) m_game->draw_new_dialog_box(InterfaceNdCrusade, m_game->m_player->m_construct_loc_x * 32 - m_game->m_Camera.get_x(), m_game->m_player->m_construct_loc_y * 32 - m_game->m_Camera.get_y(), 41);
 		if (teleport_manager::get().get_loc_x() != -1) m_game->draw_new_dialog_box(InterfaceNdCrusade, teleport_manager::get().get_loc_x() * 32 - m_game->m_Camera.get_x(), teleport_manager::get().get_loc_y() * 32 - m_game->m_Camera.get_y(), 42);
@@ -868,14 +868,14 @@ void Screen_OnGame::draw_background(short div_x, short mod_x, short div_y, short
 
 void Screen_OnGame::draw_top_msg()
 {
-	if (m_game->m_top_msg.size() == 0) return;
+	if (m_top_msg.size() == 0) return;
 	m_game->m_Renderer->draw_rect_filled(0, 0, LOGICAL_MAX_X(), 30, hb::shared::render::Color::Black(128));
 
-	if ((((GameClock::get_time_ms() - m_game->m_top_msg_time) / 250) % 2) == 0)
-		hb::shared::text::draw_text_aligned(GameFont::Default, 0, 10, LOGICAL_MAX_X(), 15, m_game->m_top_msg.c_str(), hb::shared::text::TextStyle::from_color(GameColors::UITopMsgYellow), hb::shared::text::Align::TopCenter);
+	if ((((GameClock::get_time_ms() - m_top_msg_time) / 250) % 2) == 0)
+		hb::shared::text::draw_text_aligned(GameFont::Default, 0, 10, LOGICAL_MAX_X(), 15, m_top_msg.c_str(), hb::shared::text::TextStyle::from_color(GameColors::UITopMsgYellow), hb::shared::text::Align::TopCenter);
 
-	if (GameClock::get_time_ms() > (m_game->m_top_msg_last_sec * 1000 + m_game->m_top_msg_time)) {
-		m_game->m_top_msg.clear();
+	if (GameClock::get_time_ms() > (m_top_msg_last_sec * 1000 + m_top_msg_time)) {
+		m_top_msg.clear();
 	}
 }
 
@@ -945,8 +945,8 @@ void Screen_OnGame::draw_npc_name(short screen_x, short screen_y, short owner_ty
 	if (status.berserk) text += DRAW_OBJECT_NAME50;//" Berserk"
 	if (status.frozen) text += DRAW_OBJECT_NAME51;//" Frozen"
 	hb::shared::text::draw_text(GameFont::Default, screen_x, screen_y, text.c_str(), hb::shared::text::TextStyle::with_shadow(GameColors::UIWhite));
-	if (m_game->m_is_observer_mode == true) hb::shared::text::draw_text(GameFont::Default, screen_x, screen_y + 14, text.c_str(), hb::shared::text::TextStyle::with_shadow(GameColors::NeutralNamePlate));
-	else if (m_game->m_player->m_is_confusion || (m_game->m_ilusion_owner_h != 0))
+	if (m_is_observer_mode == true) hb::shared::text::draw_text(GameFont::Default, screen_x, screen_y + 14, text.c_str(), hb::shared::text::TextStyle::with_shadow(GameColors::NeutralNamePlate));
+	else if (m_game->m_player->m_is_confusion || (m_ilusion_owner_h != 0))
 	{
 		text = DRAW_OBJECT_NAME87;//"(Unknown)"
 		hb::shared::text::draw_text(GameFont::Default, screen_x, screen_y + 14, text.c_str(), hb::shared::text::TextStyle::with_shadow(GameColors::UIDisabled)); // v2.171
@@ -1036,9 +1036,9 @@ void Screen_OnGame::draw_object_name(short screen_x, short screen_y, const char*
 		red = 50; green = 50; blue = 255;
 	}
 
-	if (m_game->m_ilusion_owner_h == 0)
+	if (m_ilusion_owner_h == 0)
 	{
-		if (m_game->m_is_crusade_mode == false) text = name;
+		if (m_is_crusade_mode == false) text = name;
 		else
 		{
 			if (!hb::shared::object_id::is_player_id(m_game->m_entity_state.m_object_id)) text = "Barbarian";
@@ -1048,7 +1048,7 @@ void Screen_OnGame::draw_object_name(short screen_x, short screen_y, const char*
 				else text = name;
 			}
 		}
-		if (m_game->m_party_status != 0)
+		if (m_party_status != 0)
 		{
 			if (get_dialog_box_manager().get_dialog_as<DialogBox_Party>(DialogBoxId::Party)->is_party_member(name))
 				text += BGET_NPC_NAME23; // ", Party Member"
@@ -1095,7 +1095,7 @@ void Screen_OnGame::draw_object_name(short screen_x, short screen_y, const char*
 		is_citizen = status.citizen;
 		is_aresden = status.aresden;
 		is_hunter = status.hunter;
-		if (m_game->m_is_crusade_mode == false || !IsHostile(relationship))
+		if (m_is_crusade_mode == false || !IsHostile(relationship))
 		{
 			auto& gm = get_guild_manager();
 			if (gm.find_guild_name(name, m_game->m_cur_time, &guild_index) == true)

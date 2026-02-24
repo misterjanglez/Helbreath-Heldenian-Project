@@ -12,6 +12,7 @@
 #include <format>
 #include <string>
 #include "IInput.h"
+#include "Screen_OnGame.h"
 
 using namespace hb::shared::net;
 using namespace hb::shared::item;
@@ -123,7 +124,7 @@ void DialogBox_ItemUpgrade::DrawMode1_GizonUpgrade(int sX, int sY)
     hb::shared::text::draw_text_aligned(GameFont::Default, sX + 24, sY + 20 + 60, (sX + 248) - (sX + 24), 15, DRAW_DIALOGBOX_ITEMUPGRADE3, hb::shared::text::TextStyle::from_color(GameColors::UIBlack), hb::shared::text::Align::TopCenter);
     m_game->draw_new_dialog_box(InterfaceNdButton, sX + ui_layout::left_btn_x, sY + ui_layout::btn_y, 46);
 
-    txt = std::format(DRAW_DIALOGBOX_ITEMUPGRADE11, m_game->m_gizon_item_upgrade_left);
+    txt = std::format(DRAW_DIALOGBOX_ITEMUPGRADE11, m_game->on_game()->m_gizon_item_upgrade_left);
     hb::shared::text::draw_text_aligned(GameFont::Default, sX + 24, sY + 100, (sX + 248) - (sX + 24), 15, txt.c_str(), hb::shared::text::TextStyle::from_color(GameColors::UIBlack), hb::shared::text::Align::TopCenter);
 
     if (item_index != -1)
@@ -132,14 +133,14 @@ void DialogBox_ItemUpgrade::DrawMode1_GizonUpgrade(int sX, int sY)
         int value = calculate_upgrade_cost(item_index);
 
         txt = std::format(DRAW_DIALOGBOX_ITEMUPGRADE12, value);
-        if (m_game->m_gizon_item_upgrade_left < value)
+        if (m_game->on_game()->m_gizon_item_upgrade_left < value)
             hb::shared::text::draw_text_aligned(GameFont::Default, sX + 24, sY + 115, (sX + 248) - (sX + 24), 15, txt.c_str(), hb::shared::text::TextStyle::from_color(GameColors::UIWarningRed), hb::shared::text::Align::TopCenter);
         else
             hb::shared::text::draw_text_aligned(GameFont::Default, sX + 24, sY + 115, (sX + 248) - (sX + 24), 15, txt.c_str(), hb::shared::text::TextStyle::from_color(GameColors::UIBlack), hb::shared::text::Align::TopCenter);
 
         draw_item_preview(sX, sY, item_index);
 
-        if (m_game->m_gizon_item_upgrade_left < value)
+        if (m_game->on_game()->m_gizon_item_upgrade_left < value)
             m_game->draw_new_dialog_box(InterfaceNdButton, sX + ui_layout::left_btn_x, sY + ui_layout::btn_y, 46);
         else
         {
@@ -434,7 +435,7 @@ bool DialogBox_ItemUpgrade::on_click()
             && (mouse_y >= sY + ui_layout::btn_y) && (mouse_y <= sY + ui_layout::btn_y + ui_layout::btn_size_y))
         {
             int value = calculate_upgrade_cost(item_index);
-            if (m_game->m_gizon_item_upgrade_left < value) break;
+            if (m_game->on_game()->m_gizon_item_upgrade_left < value) break;
 
             m_game->play_game_sound('E', 14, 5);
             m_game->play_game_sound('E', 44, 0);
@@ -499,7 +500,7 @@ bool DialogBox_ItemUpgrade::on_click()
         if (mouse_in(link_majestic_upgrade))
         {
             m_game->play_game_sound('E', 14, 5);
-            if (m_game->m_gizon_item_upgrade_left > 0)
+            if (m_game->on_game()->m_gizon_item_upgrade_left > 0)
             {
                 m_mode = mode::gizon_upgrade;
             }

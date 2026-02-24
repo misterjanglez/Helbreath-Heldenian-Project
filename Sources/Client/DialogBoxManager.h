@@ -12,7 +12,7 @@ class CPlayer;
 
 namespace z_layer
 {
-	enum type { normal, topmost };
+	enum type { underlay, normal, topmost };
 }
 
 // Shared state for GiveItem (has no dialog class — bare shared state)
@@ -99,7 +99,8 @@ private:
 	// Dynamic dialog storage — no fixed arrays
 	std::unordered_map<int, std::unique_ptr<IDialogBox>> m_dialogs;
 
-	// Z-order (two layers: normal drawn first, topmost drawn last)
+	// Z-order (three layers: underlay drawn first, normal in middle, topmost drawn last)
+	std::vector<uint8_t> m_underlay_order;
 	std::vector<uint8_t> m_normal_order;
 	std::vector<uint8_t> m_topmost_order;
 

@@ -8,6 +8,7 @@
 #include <string>
 #include "IInput.h"
 #include "Packet/SharedPackets.h"
+#include "Screen_OnGame.h"
 
 using namespace hb::shared::net;
 using namespace hb::client::sprite_id;
@@ -73,7 +74,7 @@ void DialogBox_ChangeStatsMajestic::on_draw()
 
 	// Majestic Points Remaining (total - pending cost)
 	int pending_cost = GetPendingMajesticCost(m_game);
-	int remaining = m_game->m_gizon_item_upgrade_left - pending_cost;
+	int remaining = m_game->on_game()->m_gizon_item_upgrade_left - pending_cost;
 
 	put_string(sX + 20, sY + 85, DRAW_DIALOGBOX_LEVELUP_SETTING16, GameColors::UIBlack);
 	txt = std::format("{}", remaining);
@@ -137,7 +138,7 @@ bool DialogBox_ChangeStatsMajestic::on_click()
 	short sY = m_y;
 
 	int pending_cost = GetPendingMajesticCost(m_game);
-	int remaining = m_game->m_gizon_item_upgrade_left - pending_cost;
+	int remaining = m_game->on_game()->m_gizon_item_upgrade_left - pending_cost;
 
 	struct StatEntry {
 		int16_t* pending;
@@ -221,7 +222,7 @@ bool DialogBox_ChangeStatsMajestic::on_enable(int type, int64_t v1, int v2, cons
 	m_view = 0;
 	player().m_lu_str = player().m_lu_vit = player().m_lu_dex = 0;
 	player().m_lu_int = player().m_lu_mag = player().m_lu_char = 0;
-	m_game->m_skill_using_status = false;
+	m_game->on_game()->m_skill_using_status = false;
 	return true;
 }
 

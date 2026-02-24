@@ -213,6 +213,9 @@
     <ClInclude Include="DialogBox_HudPanel.h">
       <Filter>DialogBox</Filter>
     </ClInclude>
+    <ClInclude Include="DialogBox_StatusOverlay.h">
+      <Filter>DialogBox</Filter>
+    </ClInclude>
     <ClInclude Include="DialogBox_Inventory.h">
       <Filter>DialogBox</Filter>
     </ClInclude>
@@ -791,6 +794,9 @@
       <Filter>DialogBox</Filter>
     </ClCompile>
     <ClCompile Include="DialogBox_HudPanel.cpp">
+      <Filter>DialogBox</Filter>
+    </ClCompile>
+    <ClCompile Include="DialogBox_StatusOverlay.cpp">
       <Filter>DialogBox</Filter>
     </ClCompile>
     <ClCompile Include="DialogBox_Inventory.cpp">

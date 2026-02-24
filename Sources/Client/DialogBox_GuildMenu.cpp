@@ -9,6 +9,7 @@
 #include "IInput.h"
 #include "Packet/SharedPackets.h"
 #include "PacketSendHelpers.h"
+#include "Screen_OnGame.h"
 
 
 using namespace hb::shared::net;
@@ -184,17 +185,17 @@ void DialogBox_GuildMenu::DrawMode0_MainMenu(short sX, short sY, short size_x)
 	else put_aligned_string(sX, sX + size_x, sY + ADJY + 125, DRAW_DIALOGBOX_GUILDMENU9, GameColors::UIMagicBlue);
 
 	// Fightzone options
-	if (player().m_guild_rank == 0 && m_game->m_fightzone_number == 0) {
+	if (player().m_guild_rank == 0 && m_game->on_game()->m_fightzone_number == 0) {
 		if ((mouse_x > sX + ADJX + 72) && (mouse_x < sX + ADJX + 228) && (mouse_y > sY + ADJY + 143) && (mouse_y < sY + ADJY + 169))
 			put_aligned_string(sX, sX + size_x, sY + ADJY + 145, DRAW_DIALOGBOX_GUILDMENU11, GameColors::UIWhite);
 		else put_aligned_string(sX, sX + size_x, sY + ADJY + 145, DRAW_DIALOGBOX_GUILDMENU11, GameColors::UIMagicBlue);
 	}
-	else if (player().m_guild_rank == 0 && m_game->m_fightzone_number > 0) {
+	else if (player().m_guild_rank == 0 && m_game->on_game()->m_fightzone_number > 0) {
 		if ((mouse_x > sX + ADJX + 72) && (mouse_x < sX + ADJX + 216) && (mouse_y > sY + ADJY + 143) && (mouse_y < sY + ADJY + 169))
 			put_aligned_string(sX, sX + size_x, sY + ADJY + 145, DRAW_DIALOGBOX_GUILDMENU13, GameColors::UIWhite);
 		else put_aligned_string(sX, sX + size_x, sY + ADJY + 145, DRAW_DIALOGBOX_GUILDMENU13, GameColors::UIMagicBlue);
 	}
-	else if (m_game->m_fightzone_number < 0) {
+	else if (m_game->on_game()->m_fightzone_number < 0) {
 		put_aligned_string(sX, sX + size_x, sY + ADJY + 145, DRAW_DIALOGBOX_GUILDMENU13, GameColors::UIDisabled);
 	}
 	else put_aligned_string(sX, sX + size_x, sY + ADJY + 145, DRAW_DIALOGBOX_GUILDMENU11, GameColors::UIDisabled);
@@ -398,7 +399,7 @@ bool DialogBox_GuildMenu::on_click_mode0(short sX, short sY)
 		if (player().m_guild_rank != -1) return false;
 		if (player().m_charisma < 20) return false;
 		if (player().m_level < 20) return false;
-		if (m_game->m_is_crusade_mode) return false;
+		if (m_game->on_game()->m_is_crusade_mode) return false;
 		text_input_manager::get().end_input();
 		text_input_manager::get().start_input(sX + 75, sY + 140, 21, player().m_guild_name, false, hb::client::guild_name_allowed_chars);
 		m_mode = mode::create_guild;
@@ -409,7 +410,7 @@ bool DialogBox_GuildMenu::on_click_mode0(short sX, short sY)
 	// Disband guild
 	if ((mouse_x > sX + ADJX + 72) && (mouse_x < sX + ADJX + 222) && (mouse_y > sY + ADJY + 82) && (mouse_y < sY + ADJY + 99)) {
 		if (player().m_guild_rank != 0) return false;
-		if (m_game->m_is_crusade_mode) return false;
+		if (m_game->on_game()->m_is_crusade_mode) return false;
 		m_mode = mode::disband_confirm;
 		play_sound_effect('E', 14, 5);
 		return true;
@@ -430,10 +431,10 @@ bool DialogBox_GuildMenu::on_click_mode0(short sX, short sY)
 	}
 
 	// Fightzone
-	if (m_game->m_fightzone_number < 0) return false;
+	if (m_game->on_game()->m_fightzone_number < 0) return false;
 	if ((mouse_x > sX + ADJX + 72) && (mouse_x < sX + ADJX + 228) && (mouse_y > sY + ADJY + 143) && (mouse_y < sY + ADJY + 169)) {
 		if (player().m_guild_rank != 0) return false;
-		if (m_game->m_fightzone_number == 0)
+		if (m_game->on_game()->m_fightzone_number == 0)
 			m_mode = mode::fightzone_select;
 		else {
 			m_mode = mode::get_ticket_redirect;
@@ -590,7 +591,7 @@ bool DialogBox_GuildMenu::on_click_mode13(short sX, short sY)
 				send_game_packet(req);
 			}
 		m_mode = mode::fightzone_waiting;
-		m_game->m_fightzone_number_temp = 1;
+		m_game->on_game()->m_fightzone_number_temp = 1;
 		play_sound_effect('E', 14, 5);
 		return true;
 	}
@@ -604,7 +605,7 @@ bool DialogBox_GuildMenu::on_click_mode13(short sX, short sY)
 				send_game_packet(req);
 			}
 		m_mode = mode::fightzone_waiting;
-		m_game->m_fightzone_number_temp = 2;
+		m_game->on_game()->m_fightzone_number_temp = 2;
 		play_sound_effect('E', 14, 5);
 		return true;
 	}
@@ -618,7 +619,7 @@ bool DialogBox_GuildMenu::on_click_mode13(short sX, short sY)
 				send_game_packet(req);
 			}
 		m_mode = mode::fightzone_waiting;
-		m_game->m_fightzone_number_temp = 3;
+		m_game->on_game()->m_fightzone_number_temp = 3;
 		play_sound_effect('E', 14, 5);
 		return true;
 	}
@@ -632,7 +633,7 @@ bool DialogBox_GuildMenu::on_click_mode13(short sX, short sY)
 				send_game_packet(req);
 			}
 		m_mode = mode::fightzone_waiting;
-		m_game->m_fightzone_number_temp = 4;
+		m_game->on_game()->m_fightzone_number_temp = 4;
 		play_sound_effect('E', 14, 5);
 		return true;
 	}
@@ -646,7 +647,7 @@ bool DialogBox_GuildMenu::on_click_mode13(short sX, short sY)
 				send_game_packet(req);
 			}
 		m_mode = mode::fightzone_waiting;
-		m_game->m_fightzone_number_temp = 5;
+		m_game->on_game()->m_fightzone_number_temp = 5;
 		play_sound_effect('E', 14, 5);
 		return true;
 	}
@@ -660,7 +661,7 @@ bool DialogBox_GuildMenu::on_click_mode13(short sX, short sY)
 				send_game_packet(req);
 			}
 		m_mode = mode::fightzone_waiting;
-		m_game->m_fightzone_number_temp = 6;
+		m_game->on_game()->m_fightzone_number_temp = 6;
 		play_sound_effect('E', 14, 5);
 		return true;
 	}
@@ -674,7 +675,7 @@ bool DialogBox_GuildMenu::on_click_mode13(short sX, short sY)
 				send_game_packet(req);
 			}
 		m_mode = mode::fightzone_waiting;
-		m_game->m_fightzone_number_temp = 7;
+		m_game->on_game()->m_fightzone_number_temp = 7;
 		play_sound_effect('E', 14, 5);
 		return true;
 	}
@@ -688,7 +689,7 @@ bool DialogBox_GuildMenu::on_click_mode13(short sX, short sY)
 				send_game_packet(req);
 			}
 		m_mode = mode::fightzone_waiting;
-		m_game->m_fightzone_number_temp = 8;
+		m_game->on_game()->m_fightzone_number_temp = 8;
 		play_sound_effect('E', 14, 5);
 		return true;
 	}

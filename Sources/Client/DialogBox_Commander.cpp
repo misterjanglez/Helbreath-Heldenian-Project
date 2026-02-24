@@ -12,6 +12,7 @@
 #include "TextLibExt.h"
 #include <format>
 #include "IInput.h"
+#include "Screen_OnGame.h"
 
 using namespace hb::shared::net;
 using namespace hb::client::sprite_id;
@@ -25,11 +26,11 @@ DialogBox_Commander::DialogBox_Commander(CGame* game)
 void DialogBox_Commander::on_update()
 {
 	uint32_t time = GameClock::get_time_ms();
-	if ((time - m_game->m_commander_command_requested_time) > 1000 * 10)
+	if ((time - m_game->on_game()->m_commander_command_requested_time) > 1000 * 10)
 	{
 		m_game->request_map_status("middleland", 3);
 		m_game->request_map_status("middleland", 1);
-		m_game->m_commander_command_requested_time = time;
+		m_game->on_game()->m_commander_command_requested_time = time;
 	}
 }
 
@@ -338,26 +339,26 @@ void DialogBox_Commander::on_draw()
 		if (size_x != 0)
 		{
 			for (i = 0; i < hb::shared::limits::MaxCrusadeStructures; i++)
-				if (m_game->m_crusade_structure_info[i].type != 0)
+				if (m_game->on_game()->m_crusade_structure_info[i].type != 0)
 				{
 					v1 = static_cast<double>(MapSzX);
-					v2 = static_cast<double>(m_game->m_crusade_structure_info[i].x);
+					v2 = static_cast<double>(m_game->on_game()->m_crusade_structure_info[i].x);
 					v3 = (v2 * static_cast<double>(size_x)) / v1;
 					tX = static_cast<int>(v3);
 					v1 = static_cast<double>(MapSzY);
-					v2 = static_cast<double>(m_game->m_crusade_structure_info[i].y);
+					v2 = static_cast<double>(m_game->on_game()->m_crusade_structure_info[i].y);
 					v3 = (v2 * static_cast<double>(size_y)) / v1;
 					tY = static_cast<int>(v3);
-					switch (m_game->m_crusade_structure_info[i].type) {
+					switch (m_game->on_game()->m_crusade_structure_info[i].type) {
 					case 38:
-						if (m_game->m_crusade_structure_info[i].side == 1)
+						if (m_game->on_game()->m_crusade_structure_info[i].side == 1)
 							draw_new_dialog_box(InterfaceNdCrusade, sX + tX + 15, sY + tY + 60, 39, false, true);
 						else draw_new_dialog_box(InterfaceNdCrusade, sX + tX + 15, sY + tY + 60, 37, false, true);
 						break;
 					case 36:
 					case 37:
 					case 39:
-						if (m_game->m_crusade_structure_info[i].side == 1)
+						if (m_game->on_game()->m_crusade_structure_info[i].side == 1)
 							draw_new_dialog_box(InterfaceNdCrusade, sX + tX + 15, sY + tY + 60, 38, false, true);
 						else draw_new_dialog_box(InterfaceNdCrusade, sX + tX + 15, sY + tY + 60, 36, false, true);
 						break;
@@ -434,7 +435,7 @@ bool DialogBox_Commander::on_click()
 	short sX, sY, tX, tY;
 	double d1, d2, d3;
 
-	if (m_game->m_is_crusade_mode == false) return false;
+	if (m_game->on_game()->m_is_crusade_mode == false) return false;
 
 	sX = m_x;
 	sY = m_y;

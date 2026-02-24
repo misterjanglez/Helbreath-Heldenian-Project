@@ -19,6 +19,10 @@
 #include "PlayerStatusData.h"
 #include <cstdint>
 #include <memory>
+#include "ChatMsg.h"
+#include "GameConstants.h"
+#include "GlobalDef.h"
+#include "NetConstants.h"
 
 class CPlayer;
 
@@ -102,6 +106,58 @@ private:
     void draw_tile_grid();           // Simple dark grid lines
     void draw_patching_grid();       // Debug grid with zone colors
     void draw_spell_target_overlay(); // Spell AoE targeting overlay (debug only)
+
+public:
+    // --- Gameplay state (moved from CGame) ---
+    bool m_is_get_pointing_mode = false;
+    bool m_wait_for_new_click = false;
+    uint32_t m_magic_cast_time = 0;
+    int m_point_command_type = -1;
+    bool m_skill_using_status = false;
+    bool m_item_using_status = false;
+    bool m_using_slate = false;
+    int m_down_skill_index = -1;
+    int m_ilusion_owner_h = 0;
+    char m_ilusion_owner_type = 0;
+    int m_draw_flag = 0;
+    bool m_is_crusade_mode = false;
+    uint32_t m_env_effect_time = 0;
+    std::array<std::unique_ptr<CMsg>, game_limits::max_text_dlg_lines> m_msg_text_list;
+    std::array<std::unique_ptr<CMsg>, game_limits::max_text_dlg_lines> m_msg_text_list2;
+    std::array<std::unique_ptr<CMsg>, game_limits::max_text_dlg_lines> m_agree_msg_text_list;
+    int m_logout_count = -1;
+    uint32_t m_logout_count_time = 0;
+    int m_fightzone_number = 0;
+    int m_fightzone_number_temp = 0;
+    struct {
+        bool is_quest_completed = false;
+        short who = 0, quest_type = 0, contribution = 0, target_type = 0, target_count = 0, x = 0, y = 0, range = 0;
+        short current_count = 0;
+        std::string target_name;
+    } m_quest;
+    bool m_is_observer_mode = false;
+    bool m_is_observer_commanded = false;
+    uint32_t m_special_ability_setting_time = 0;
+    bool m_is_f1_help_window_enabled = false;
+    struct {
+        short x = 0, y = 0;
+        char type = 0;
+        char side = 0;
+    } m_crusade_structure_info[hb::shared::limits::MaxCrusadeStructures]{};
+    uint32_t m_commander_command_requested_time = 0;
+    unsigned char m_top_msg_last_sec = 0;
+    uint32_t m_top_msg_time = 0;
+    std::string m_top_msg;
+    int m_gate_posit_x = -1;
+    int m_gate_posit_y = -1;
+    int m_heldenian_aresden_left_tower = -1;
+    int m_heldenian_elvine_left_tower = -1;
+    int m_heldenian_aresden_flags = -1;
+    int m_heldenian_elvine_flags = -1;
+    bool m_is_xmas = false;
+    int m_total_party_member = 0;
+    int m_party_status = 0;
+    int m_gizon_item_upgrade_left = 0;
 
 private:
     // Screen-specific state (previously file-scope static variables)

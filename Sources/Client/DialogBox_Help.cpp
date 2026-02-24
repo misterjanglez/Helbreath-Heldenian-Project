@@ -2,6 +2,7 @@
 #include "Game.h"
 #include "lan_eng.h"
 #include "IInput.h"
+#include "Screen_OnGame.h"
 using namespace hb::client::sprite_id;
 
 DialogBox_Help::DialogBox_Help(CGame* game)
@@ -93,7 +94,7 @@ bool DialogBox_Help::on_click()
 	if (is_mouse_over_item(mouse_x, mouse_y, sX, sY, 4)) {
 		disable_dialog_box(DialogBoxId::Text);
 		enable_dialog_box(DialogBoxId::Text, 903, 0, 0);
-		m_game->m_is_f1_help_window_enabled = true;
+		m_game->on_game()->m_is_f1_help_window_enabled = true;
 		return true;
 	}
 

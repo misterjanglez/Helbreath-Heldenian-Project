@@ -13,6 +13,7 @@
 #include <ctime>
 #include <format>
 #include <string>
+#include "Screen_OnGame.h"
 using namespace hb::client::sprite_id;
 
 // Content area constants
@@ -361,7 +362,7 @@ void DialogBox_SysMenu::draw_general_tab(short sX, short sY)
 	int buttonY = contentBottom - 30;
 
 	// Log-Out / Continue button (left side)
-	if (m_game->m_logout_count == -1) {
+	if (m_game->on_game()->m_logout_count == -1) {
 		bool hover = (mouse_x >= sX + ui_layout::left_btn_x && mouse_x <= sX + ui_layout::left_btn_x + ui_layout::btn_size_x &&
 			mouse_y >= buttonY && mouse_y <= buttonY + ui_layout::btn_size_y);
 		draw_new_dialog_box(InterfaceNdButton, sX + ui_layout::left_btn_x, buttonY, hover ? 9 : 8);
@@ -1015,12 +1016,12 @@ bool DialogBox_SysMenu::on_click_general(short sX, short sY)
 	{
 		if (!m_game->m_force_disconn)
 		{
-			if (m_game->m_logout_count == -1) {
-				m_game->m_logout_count = 11;
-				m_game->m_logout_count_time = GameClock::get_time_ms();
+			if (m_game->on_game()->m_logout_count == -1) {
+				m_game->on_game()->m_logout_count = 11;
+				m_game->on_game()->m_logout_count_time = GameClock::get_time_ms();
 			}
 			else {
-				m_game->m_logout_count = -1;
+				m_game->on_game()->m_logout_count = -1;
 				add_event_list(DLGBOX_CLICK_SYSMENU2, 10);
 				disable_this_dialog();
 			}

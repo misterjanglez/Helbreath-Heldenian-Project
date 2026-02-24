@@ -13,6 +13,7 @@
 #include <string>
 #include "Packet/SharedPackets.h"
 #include "PacketSendHelpers.h"
+#include "Screen_OnGame.h"
 
 
 using namespace hb::shared::net;
@@ -177,7 +178,7 @@ bool DialogBox_Inventory::on_click()
 			add_event_list(DLGBOXCLICK_INVENTORY1, 10);
 			add_event_list(DLGBOXCLICK_INVENTORY2, 10);
 		}
-		else if (m_game->m_skill_using_status)
+		else if (m_game->on_game()->m_skill_using_status)
 		{
 			add_event_list(BDLBBOX_DOUBLE_CLICK_INVENTORY5, 10);
 			return true;
@@ -219,7 +220,7 @@ bool DialogBox_Inventory::on_double_click()
 {
 	short mouse_x = static_cast<short>(hb::shared::input::get_mouse_x());
 	short mouse_y = static_cast<short>(hb::shared::input::get_mouse_y());
-	if (m_game->m_item_using_status)
+	if (m_game->on_game()->m_item_using_status)
 	{
 		add_event_list(BDLBBOX_DOUBLE_CLICK_INVENTORY1, 10);
 		return true;
@@ -305,7 +306,7 @@ bool DialogBox_Inventory::on_double_click()
 			cfg->get_item_type() == ItemType::Eat)
 		{
 			inventory_manager::get().lock_item(item_id);
-			m_game->m_item_using_status = true;
+			m_game->on_game()->m_item_using_status = true;
 		}
 	}
 
@@ -317,7 +318,7 @@ bool DialogBox_Inventory::on_double_click()
 			add_event_list(BDLBBOX_DOUBLE_CLICK_INVENTORY4, 10);
 			return true;
 		}
-		if (m_game->m_skill_using_status)
+		if (m_game->on_game()->m_skill_using_status)
 		{
 			add_event_list(BDLBBOX_DOUBLE_CLICK_INVENTORY5, 10);
 			return true;
@@ -328,8 +329,8 @@ bool DialogBox_Inventory::on_double_click()
 		}
 		else
 		{
-			m_game->m_is_get_pointing_mode = true;
-			m_game->m_point_command_type = item_id;
+			m_game->on_game()->m_is_get_pointing_mode = true;
+			m_game->on_game()->m_point_command_type = item_id;
 			std::string txt;
 			txt = std::format(BDLBBOX_DOUBLE_CLICK_INVENTORY7, itemInfo.name.c_str());
 			add_event_list(txt.c_str(), 10);
@@ -344,7 +345,7 @@ bool DialogBox_Inventory::on_double_click()
 			add_event_list(BDLBBOX_DOUBLE_CLICK_INVENTORY4, 10);
 			return true;
 		}
-		if (m_game->m_skill_using_status)
+		if (m_game->on_game()->m_skill_using_status)
 		{
 			add_event_list(BDLBBOX_DOUBLE_CLICK_INVENTORY13, 10);
 			return true;
@@ -355,8 +356,8 @@ bool DialogBox_Inventory::on_double_click()
 		}
 		else
 		{
-			m_game->m_is_get_pointing_mode = true;
-			m_game->m_point_command_type = item_id;
+			m_game->on_game()->m_is_get_pointing_mode = true;
+			m_game->on_game()->m_point_command_type = item_id;
 			std::string txt;
 			txt = std::format(BDLBBOX_DOUBLE_CLICK_INVENTORY8, itemInfo.name.c_str());
 			add_event_list(txt.c_str(), 10);
@@ -371,7 +372,7 @@ bool DialogBox_Inventory::on_double_click()
 			add_event_list(BDLBBOX_DOUBLE_CLICK_INVENTORY4, 10);
 			return true;
 		}
-		if (m_game->m_skill_using_status)
+		if (m_game->on_game()->m_skill_using_status)
 		{
 			add_event_list(BDLBBOX_DOUBLE_CLICK_INVENTORY5, 10);
 			return true;
@@ -485,18 +486,18 @@ PressResult DialogBox_Inventory::on_press()
 
 				// Handle pointing mode (using items on other items)
 				bool handled_pointing = false;
-				if (m_game->m_is_get_pointing_mode &&
-					m_game->m_point_command_type >= 0 &&
-					m_game->m_point_command_type < 100 &&
-					player().m_item_list[m_game->m_point_command_type] != nullptr &&
-					m_game->m_point_command_type != item_id)
+				if (m_game->on_game()->m_is_get_pointing_mode &&
+					m_game->on_game()->m_point_command_type >= 0 &&
+					m_game->on_game()->m_point_command_type < 100 &&
+					player().m_item_list[m_game->on_game()->m_point_command_type] != nullptr &&
+					m_game->on_game()->m_point_command_type != item_id)
 				{
-					CItem* point_cfg = m_game->get_item_config(player().m_item_list[m_game->m_point_command_type]->m_id_num);
+					CItem* point_cfg = m_game->get_item_config(player().m_item_list[m_game->on_game()->m_point_command_type]->m_id_num);
 					if (point_cfg != nullptr &&
 						point_cfg->get_item_type() == ItemType::UseDepleteDest)
 					{
 						m_game->point_command_handler(0, 0, item_id);
-						m_game->m_is_get_pointing_mode = false;
+						m_game->on_game()->m_is_get_pointing_mode = false;
 						handled_pointing = true;
 					}
 				}
@@ -525,7 +526,7 @@ bool DialogBox_Inventory::on_item_drop()
 	if (player().m_item_list[selected_id] == nullptr) return false;
 
 	// Can't move equipped items while using a skill
-	if (m_game->m_skill_using_status && m_game->m_is_item_equipped[selected_id])
+	if (m_game->on_game()->m_skill_using_status && m_game->m_is_item_equipped[selected_id])
 	{
 		add_event_list(BITEMDROP_INVENTORY1, 10);
 		return false;

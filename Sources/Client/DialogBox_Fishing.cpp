@@ -11,6 +11,7 @@
 #include <format>
 #include <string>
 #include "IInput.h"
+#include "Screen_OnGame.h"
 
 using namespace hb::shared::net;
 using namespace hb::client::sprite_id;
@@ -87,12 +88,12 @@ bool DialogBox_Fishing::on_enable(int type, int64_t v1, int v2, const char* stri
 	m_catch_chance = static_cast<int>(v1);
 	m_fish_count = v2;
 	if (string) std::snprintf(m_fish_name, sizeof(m_fish_name), "%s", string);
-	m_game->m_skill_using_status = true;
+	m_game->on_game()->m_skill_using_status = true;
 	return true;
 }
 
 bool DialogBox_Fishing::on_disable()
 {
-	m_game->m_skill_using_status = false;
+	m_game->on_game()->m_skill_using_status = false;
 	return true;
 }

@@ -286,6 +286,7 @@
     <ClInclude Include="DialogBox_Skill.h" />
     <ClInclude Include="DialogBox_Magic.h" />
     <ClInclude Include="DialogBox_HudPanel.h" />
+    <ClInclude Include="DialogBox_StatusOverlay.h" />
     <ClInclude Include="DialogBox_GuideMap.h" />
     <ClInclude Include="DialogBox_Fishing.h" />
     <ClInclude Include="DialogBox_CrusadeJob.h" />
@@ -482,6 +483,7 @@
     <ClCompile Include="DialogBox_Skill.cpp" />
     <ClCompile Include="DialogBox_Magic.cpp" />
     <ClCompile Include="DialogBox_HudPanel.cpp" />
+    <ClCompile Include="DialogBox_StatusOverlay.cpp" />
     <ClCompile Include="DialogBox_GuideMap.cpp" />
     <ClCompile Include="DialogBox_Fishing.cpp" />
     <ClCompile Include="DialogBox_CrusadeJob.cpp" />

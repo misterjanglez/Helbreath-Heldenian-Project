@@ -12,6 +12,7 @@
 #include <cstdlib>
 #include <format>
 #include <string>
+#include "Screen_OnGame.h"
 
 using namespace hb::shared::net;
 using namespace hb::client::sprite_id;
@@ -118,31 +119,7 @@ void DialogBox_HudPanel::draw_status_icons()
 	uint32_t time = m_game->m_cur_time;
 	auto sprite = m_game->m_sprite[InterfaceNdIconPanel];
 
-	// Level up / Restart text (mutually exclusive: dead shows Restart, alive shows Level Up)
-	if (player().m_hp > 0)
-	{
-		if ((player().m_lu_point > 0) && !m_game->get_dialog_box_manager().is_enabled(DialogBoxId::LevelUpSetting))
-		{
-			int flashColor = (GameClock::get_time_ms() / 3) % 255;
-			hb::shared::text::draw_text(GameFont::Bitmap1, LEVELUP_TEXT_X(), LEVELUP_TEXT_Y(), "Level Up!", hb::shared::text::TextStyle::with_integrated_shadow(hb::shared::render::Color(flashColor, flashColor, 0)));
-		}
-	}
-	else if (m_game->m_restart_count == -1)
-	{
-		int flashColor = (GameClock::get_time_ms() / 3) % 255;
-		hb::shared::text::draw_text(GameFont::Bitmap1, LEVELUP_TEXT_X(), LEVELUP_TEXT_Y(), "Restart", hb::shared::text::TextStyle::with_integrated_shadow(hb::shared::render::Color(flashColor, flashColor, 0)));
-	}
-
-#ifdef TESTER_ONLY
-	// TESTER MENU — overlay indicator (tester builds only)
-	if (!m_game->get_dialog_box_manager().is_enabled(DialogBoxId::TesterMenu))
-	{
-		int flash = (GameClock::get_time_ms() / 3) % 255;
-		hb::shared::text::draw_text(GameFont::Bitmap1, LEVELUP_TEXT_X(), LEVELUP_TEXT_Y() - 30,
-			"Tester",
-			hb::shared::text::TextStyle::with_integrated_shadow(hb::shared::render::Color(flash, flash, 0)));
-	}
-#endif // TESTER_ONLY
+	// Level Up / Restart / Tester text moved to DialogBox_StatusOverlay
 
 	// Combat mode / Safe attack icon (only shown while in attack mode)
 	if (player().m_is_combat_mode)
@@ -164,7 +141,7 @@ void DialogBox_HudPanel::draw_status_icons()
 	}
 
 	// Crusade icon
-	if (m_game->m_is_crusade_mode && player().m_crusade_duty != 0)
+	if (m_game->on_game()->m_is_crusade_mode && player().m_crusade_duty != 0)
 	{
 		bool hover = is_in_button(BTN_CRUSADE_X1(), BTN_CRUSADE_X2());
 		if (player().m_aresden)
@@ -267,7 +244,7 @@ bool DialogBox_HudPanel::on_click()
 	// Crusade button
 	if (is_in_button(BTN_CRUSADE_X1(), BTN_CRUSADE_X2()))
 	{
-		if (!m_game->m_is_crusade_mode) return false;
+		if (!m_game->on_game()->m_is_crusade_mode) return false;
 		switch (player().m_crusade_duty)
 		{
 		case 1: enable_dialog_box(DialogBoxId::CrusadeSoldier, 0, 0, 0); break;

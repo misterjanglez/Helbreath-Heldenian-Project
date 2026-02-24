@@ -4,6 +4,7 @@
 #include "TextLibExt.h"
 #include "GameTimer.h"
 #include "lan_eng.h"
+#include "Screen_OnGame.h"
 
 event_list_manager& event_list_manager::get()
 {
@@ -121,7 +122,7 @@ void event_list_manager::show_events(uint32_t time)
 				break;
 			}
 		}
-	if (m_game->m_skill_using_status == true)
+	if (m_game->on_game()->m_skill_using_status == true)
 	{
 		int text_w = hb::shared::text::GetTextRenderer()->measure_text(SHOW_EVENT_LIST1).width;
 		int text_x = (LOGICAL_WIDTH() - text_w) / 2;

@@ -6,6 +6,7 @@
 #include <format>
 #include <string>
 #include "IInput.h"
+#include "Screen_OnGame.h"
 
 using namespace hb::shared::net;
 using namespace hb::client::sprite_id;
@@ -27,7 +28,7 @@ void DialogBox_Party::on_draw()
 
 	switch (m_mode) {
 	case mode::main_menu:
-		if (m_game->m_party_status == 0) {
+		if (m_game->on_game()->m_party_status == 0) {
 			if (mouse_in(link_create))
 				put_aligned_string(sX, sX + size_x, sY + 85, DRAW_DIALOGBOX_PARTY1, GameColors::UIWhite);
 			else
@@ -37,7 +38,7 @@ void DialogBox_Party::on_draw()
 			put_aligned_string(sX, sX + size_x, sY + 85, DRAW_DIALOGBOX_PARTY1, GameColors::UIDisabled);
 		}
 
-		if (m_game->m_party_status != 0) {
+		if (m_game->on_game()->m_party_status != 0) {
 			if (mouse_in(link_leave))
 				put_aligned_string(sX, sX + size_x, sY + 105, DRAW_DIALOGBOX_PARTY4, GameColors::UIWhite);
 			else
@@ -47,7 +48,7 @@ void DialogBox_Party::on_draw()
 			put_aligned_string(sX, sX + size_x, sY + 105, DRAW_DIALOGBOX_PARTY4, GameColors::UIDisabled);
 		}
 
-		if (m_game->m_party_status != 0) {
+		if (m_game->on_game()->m_party_status != 0) {
 			if (mouse_in(link_members))
 				put_aligned_string(sX, sX + size_x, sY + 125, DRAW_DIALOGBOX_PARTY7, GameColors::UIWhite);
 			else
@@ -57,7 +58,7 @@ void DialogBox_Party::on_draw()
 			put_aligned_string(sX, sX + size_x, sY + 125, DRAW_DIALOGBOX_PARTY7, GameColors::UIDisabled);
 		}
 
-		switch (m_game->m_party_status) {
+		switch (m_game->on_game()->m_party_status) {
 		case 0:
 			put_aligned_string(sX, sX + size_x, sY + 155, DRAW_DIALOGBOX_PARTY10);
 			put_aligned_string(sX, sX + size_x, sY + 170, DRAW_DIALOGBOX_PARTY11);
@@ -227,17 +228,17 @@ bool DialogBox_Party::on_click()
 {
 	switch (m_mode) {
 	case mode::main_menu:
-		if (m_game->m_party_status == 0) {
+		if (m_game->on_game()->m_party_status == 0) {
 			if (mouse_in(link_create)) {
 				m_mode = mode::pointing;
-				m_game->m_is_get_pointing_mode = true;
-				m_game->m_point_command_type = 200;
+				m_game->on_game()->m_is_get_pointing_mode = true;
+				m_game->on_game()->m_point_command_type = 200;
 				play_sound_effect('E', 14, 5);
 				return true;
 			}
 		}
 
-		if (m_game->m_party_status != 0) {
+		if (m_game->on_game()->m_party_status != 0) {
 			if (mouse_in(link_leave)) {
 				m_mode = mode::confirm_leave;
 				play_sound_effect('E', 14, 5);
@@ -245,7 +246,7 @@ bool DialogBox_Party::on_click()
 			}
 		}
 
-		if (m_game->m_party_status != 0) {
+		if (m_game->on_game()->m_party_status != 0) {
 			if (mouse_in(link_members)) {
 				{
 					auto pkt = hb::net::make_common_command_str(CommonType::RequestJoinParty, player().m_player_x, player().m_player_y);

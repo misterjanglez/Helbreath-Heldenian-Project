@@ -4,6 +4,7 @@
 #include "lan_eng.h"
 #include <cstdio>
 #include <cstring>
+#include "Screen_OnGame.h"
 
 namespace NetworkMessageHandlers {
 
@@ -30,10 +31,10 @@ void HandleHeldenianVictory(CGame* game, char* data)
 	if (!pkt) return;
 	side = pkt->side;
 	game->show_heldenian_victory(side);
-	game->m_heldenian_aresden_left_tower = -1;
-	game->m_heldenian_elvine_left_tower = -1;
-	game->m_heldenian_aresden_flags = -1;
-	game->m_heldenian_elvine_flags = -1;
+	game->on_game()->m_heldenian_aresden_left_tower = -1;
+	game->on_game()->m_heldenian_elvine_left_tower = -1;
+	game->on_game()->m_heldenian_aresden_flags = -1;
+	game->on_game()->m_heldenian_elvine_flags = -1;
 }
 
 void HandleHeldenianCount(CGame* game, char* data)
@@ -41,10 +42,10 @@ void HandleHeldenianCount(CGame* game, char* data)
 	const auto* pkt = hb::net::PacketCast<hb::net::PacketNotifyHeldenianCount>(
 		data, sizeof(hb::net::PacketNotifyHeldenianCount));
 	if (!pkt) return;
-	game->m_heldenian_aresden_left_tower = pkt->aresden_tower_left;
-	game->m_heldenian_elvine_left_tower = pkt->elvine_tower_left;
-	game->m_heldenian_aresden_flags = pkt->aresden_flags;
-	game->m_heldenian_elvine_flags = pkt->elvine_flags;
+	game->on_game()->m_heldenian_aresden_left_tower = pkt->aresden_tower_left;
+	game->on_game()->m_heldenian_elvine_left_tower = pkt->elvine_tower_left;
+	game->on_game()->m_heldenian_aresden_flags = pkt->aresden_flags;
+	game->on_game()->m_heldenian_elvine_flags = pkt->elvine_flags;
 }
 
 void HandleHeldenianRecall(CGame* game, char* data)

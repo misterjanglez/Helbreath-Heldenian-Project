@@ -2,6 +2,7 @@
 #include "Game.h"
 #include "IInput.h"
 #include "Packet/SharedPackets.h"
+#include "Screen_OnGame.h"
 
 using namespace hb::shared::net;
 using namespace hb::client::sprite_id;
@@ -72,6 +73,6 @@ bool DialogBox_Resurrect::on_enable(int type, int64_t v1, int v2, const char* st
 	m_y = 100;
 	m_mode = 0;
 	m_view = 0;
-	m_game->m_skill_using_status = false;
+	m_game->on_game()->m_skill_using_status = false;
 	return true;
 }

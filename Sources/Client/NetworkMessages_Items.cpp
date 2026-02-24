@@ -15,6 +15,7 @@
 #include <cmath>
 #include <format>
 #include <string>
+#include "Screen_OnGame.h"
 
 using namespace hb::shared::net;
 using namespace hb::shared::item;
@@ -432,7 +433,7 @@ namespace NetworkMessageHandlers {
 		}
 		if (!txt.empty()) game->add_event_list(txt.c_str(), 10);
 
-		if (is_use_item_result == true) game->m_item_using_status = false;
+		if (is_use_item_result == true) game->on_game()->m_item_using_status = false;
 		inventory_manager::get().erase_item(static_cast<char>(item_index));
 		build_item_manager::get().update_available_recipes();
 	}
@@ -996,7 +997,7 @@ namespace NetworkMessageHandlers {
 		const auto* pkt = hb::net::PacketCast<hb::net::PacketNotifyGizonItemUpgradeLeft>(
 			data, sizeof(hb::net::PacketNotifyGizonItemUpgradeLeft));
 		if (!pkt) return;
-		game->m_gizon_item_upgrade_left = pkt->left;
+		game->on_game()->m_gizon_item_upgrade_left = pkt->left;
 		switch (pkt->reason) {
 		case 1:
 			game->add_event_list(NOTIFY_MSG_HANDLER_GIZONITEMUPGRADELEFT1, 10);

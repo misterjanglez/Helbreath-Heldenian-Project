@@ -13,6 +13,7 @@
 #include <cmath>
 #include <format>
 #include <string>
+#include "Screen_OnGame.h"
 
 using namespace hb::shared::net;
 namespace NetworkMessageHandlers {
@@ -41,12 +42,12 @@ void HandleTimeChange(CGame* game, char* data)
 	if (!pkt) return;
 	weather_manager::get().set_ambient_light(static_cast<char>(pkt->sprite_alpha));
 	switch (weather_manager::get().get_ambient_light()) {
-	case 1:	game->m_is_xmas = false; game->play_game_sound('E', 32, 0); break;
-	case 2: game->m_is_xmas = false; game->play_game_sound('E', 31, 0); break;
+	case 1:	game->on_game()->m_is_xmas = false; game->play_game_sound('E', 32, 0); break;
+	case 2: game->on_game()->m_is_xmas = false; game->play_game_sound('E', 31, 0); break;
 	case 3: // Snoopy Special night with chrismas bulbs
-		if (weather_manager::get().is_snowing()) game->m_is_xmas = true;
-		else game->m_is_xmas = false;
-		weather_manager::get().set_xmas(game->m_is_xmas);
+		if (weather_manager::get().is_snowing()) game->on_game()->m_is_xmas = true;
+		else game->on_game()->m_is_xmas = false;
+		weather_manager::get().set_xmas(game->on_game()->m_is_xmas);
 		game->play_game_sound('E', 31, 0);
 		weather_manager::get().set_ambient_light(2); break;
 	}
@@ -80,10 +81,10 @@ void HandleForceDisconn(CGame* game, char* data)
 	if (!pkt) return;
 	const auto wpCount = pkt->seconds;
 	game->m_force_disconn = true;
-	if (game->m_logout_count < 0 || game->m_logout_count > 5)
+	if (game->on_game()->m_logout_count < 0 || game->on_game()->m_logout_count > 5)
 	{
-		game->m_logout_count = 5;
-		game->m_logout_count_time = GameClock::get_time_ms();
+		game->on_game()->m_logout_count = 5;
+		game->on_game()->m_logout_count_time = GameClock::get_time_ms();
 	}
 	game->add_event_list(NOTIFYMSG_FORCE_DISCONN1, 10);
 }
@@ -254,11 +255,11 @@ void HandleFightZoneReserve(CGame* game, char* data)
 		game->add_event_list(NOTIFY_MSG_HANDLER70, 10);
 		break;
 	case -2:
-		game->m_fightzone_number = 0;
+		game->on_game()->m_fightzone_number = 0;
 		game->add_event_list(NOTIFY_MSG_HANDLER71, 10);
 		break;
 	case -1:
-		game->m_fightzone_number = game->m_fightzone_number * -1;
+		game->on_game()->m_fightzone_number = game->on_game()->m_fightzone_number * -1;
 		game->add_event_list(NOTIFY_MSG_HANDLER72, 10);
 		break;
 	case 1:
