@@ -950,6 +950,7 @@ void ItemManager::request_purchase_item_handler(int client_h, const char* item_n
 			discount_cost = (int)tmp3;
 
 			if (discount_cost >= (cost / 2)) discount_cost = (cost / 2) - 1;
+			if (discount_cost < 0) discount_cost = 0;
 
 			if (gold_count < static_cast<uint64_t>(cost - discount_cost)) {
 				delete item;
@@ -2654,9 +2655,8 @@ void ItemManager::req_sell_item_handler(int client_h, char item_id, char sell_to
 	if (num <= 0) return;
 	if (m_game->m_client_list[client_h]->m_item_list[item_id]->m_count < static_cast<uint32_t>(num)) return;
 
-	// Can't sell gold or arrows
-	if (m_game->m_client_list[client_h]->m_item_list[item_id]->m_id_num == hb::shared::item::ItemId::Gold ||
-		m_game->m_client_list[client_h]->m_item_list[item_id]->m_id_num == hb::shared::item::ItemId::Arrow)
+	// Can't sell gold
+	if (m_game->m_client_list[client_h]->m_item_list[item_id]->m_id_num == hb::shared::item::ItemId::Gold)
 	{
 		m_game->send_notify_msg(0, client_h, Notify::CannotSellItem, item_id, 1, 0, m_game->m_client_list[client_h]->m_item_list[item_id]->m_name);
 		return;
@@ -2829,9 +2829,8 @@ void ItemManager::req_sell_item_confirm_handler(int client_h, char item_id, int 
 	if (num <= 0) return;
 	if (m_game->m_client_list[client_h]->m_item_list[item_id]->m_count < static_cast<uint32_t>(num)) return;
 
-	// Can't sell gold or arrows
-	if (m_game->m_client_list[client_h]->m_item_list[item_id]->m_id_num == hb::shared::item::ItemId::Gold ||
-		m_game->m_client_list[client_h]->m_item_list[item_id]->m_id_num == hb::shared::item::ItemId::Arrow) return;
+	// Can't sell gold
+	if (m_game->m_client_list[client_h]->m_item_list[item_id]->m_id_num == hb::shared::item::ItemId::Gold) return;
 
 	// New 18/05/2004
 	if (m_game->m_client_list[client_h]->m_is_processing_allowed == false) return;
@@ -2844,7 +2843,21 @@ void ItemManager::req_sell_item_confirm_handler(int client_h, char item_id, int 
 	if (memcmp(m_game->m_client_list[client_h]->m_location, "NONE", 4) == 0) neutral = true;
 
 	price = 0;
-	if ((item_category >= 1) && (item_category <= 10)) {
+	if (m_game->m_client_list[client_h]->m_item_list[item_id]->get_item_type() == ItemType::Arrow) {
+		// Arrows sell at 1 gold per arrow
+		price = num;
+
+		if (neutral) price = price / 2;
+		if (price <= 0) price = 1;
+		if (price > 1000000) price = 1000000;
+
+		m_game->send_notify_msg(0, client_h, Notify::ItemSold, item_id, 0, 0, 0);
+
+		item_log(ItemLogAction::Sell, client_h, (int)-1, m_game->m_client_list[client_h]->m_item_list[item_id]);
+
+		set_item_count(client_h, item_id, m_game->m_client_list[client_h]->m_item_list[item_id]->m_count - num);
+	}
+	else if ((item_category >= 1) && (item_category <= 10)) {
 		remain_life = m_game->m_client_list[client_h]->m_item_list[item_id]->m_cur_life_span;
 
 		if (remain_life <= 0) {

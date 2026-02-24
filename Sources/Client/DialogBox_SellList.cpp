@@ -261,9 +261,8 @@ bool DialogBox_SellList::on_item_drop()
 		}
 	}
 
-	// Can't sell gold or arrows
-	if (player().m_item_list[item_id]->m_id_num == hb::shared::item::ItemId::Gold ||
-		player().m_item_list[item_id]->m_id_num == hb::shared::item::ItemId::Arrow)
+	// Can't sell gold
+	if (player().m_item_list[item_id]->m_id_num == hb::shared::item::ItemId::Gold)
 	{
 		auto msg = std::format(NOTIFYMSG_CANNOT_SELL_ITEM3, player().m_item_list[item_id]->m_name);
 		add_event_list(msg.c_str(), 10);

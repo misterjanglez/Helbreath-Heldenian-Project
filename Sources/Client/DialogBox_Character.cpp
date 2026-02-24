@@ -325,17 +325,17 @@ void DialogBox_Character::on_draw()
 	put_aligned_string(sX + 180, sX + 250, sY + 257, valueBuf.c_str(), GameColors::UILabel);
 
 	// Stats with angelic bonuses
-	draw_stat(sX + 48, sX + 82, sY + 285, player().m_str, player().m_angelic_str);   // Str
-	draw_stat(sX + 48, sX + 82, sY + 302, player().m_dex, player().m_angelic_dex);   // Dex
-	draw_stat(sX + 135, sX + 167, sY + 285, player().m_int, player().m_angelic_int); // Int
-	draw_stat(sX + 135, sX + 167, sY + 302, player().m_mag, player().m_angelic_mag); // Mag
+	draw_stat(sX + 44, sX + 86, sY + 285, player().m_str, player().m_angelic_str);   // Str
+	draw_stat(sX + 48, sX + 86, sY + 304, player().m_dex, player().m_angelic_dex);   // Dex
+	draw_stat(sX + 131, sX + 171, sY + 285, player().m_int, player().m_angelic_int); // Int
+	draw_stat(sX + 131, sX + 171, sY + 304, player().m_mag, player().m_angelic_mag); // Mag
 
 	// Vit and Chr (no angelic bonus)
 	std::string vitChrBuf;
 	vitChrBuf = std::format("{}", player().m_vit);
-	put_aligned_string(sX + 218, sX + 251, sY + 285, vitChrBuf.c_str(), GameColors::UILabel);
+	put_aligned_string(sX + 214, sX + 255, sY + 285, vitChrBuf.c_str(), GameColors::UILabel);
 	vitChrBuf = std::format("{}", player().m_charisma);
-	put_aligned_string(sX + 218, sX + 251, sY + 302, vitChrBuf.c_str(), GameColors::UILabel);
+	put_aligned_string(sX + 214, sX + 255, sY + 304, vitChrBuf.c_str(), GameColors::UILabel);
 
 	// Build equipment status array
 	char equip_poi_status[DEF_MAXITEMEQUIPPOS];

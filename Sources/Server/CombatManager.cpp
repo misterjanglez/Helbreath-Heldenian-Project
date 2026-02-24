@@ -1965,21 +1965,27 @@ void CombatManager::armor_life_decrement(int attacker_h, int target_h, char owne
 {
 	int temp;
 
-	if (m_game->m_client_list[attacker_h] == 0) return;
+	hb::logger::debug<log_channel::events>("armor_life_decrement: attacker={} target={} owner_type={} value={}", attacker_h, target_h, (int)owner_type, value);
+
+	if (m_game->m_client_list[attacker_h] == 0) { hb::logger::debug<log_channel::events>("armor_life_decrement: attacker null, returning"); return; }
 	switch (owner_type) {
 	case hb::shared::owner_class::Player:
-		if (m_game->m_client_list[target_h] == 0) return;
+		if (m_game->m_client_list[target_h] == 0) { hb::logger::debug<log_channel::events>("armor_life_decrement: target null, returning"); return; }
 		break;
 
-	case hb::shared::owner_class::Npc:	return;
-	default: return;
+	case hb::shared::owner_class::Npc:
+		hb::logger::debug<log_channel::events>("armor_life_decrement: target is NPC, returning");
+		return;
+	default:
+		hb::logger::debug<log_channel::events>("armor_life_decrement: unknown owner_type={}, returning", (int)owner_type);
+		return;
 	}
 
-	if (m_game->m_client_list[attacker_h]->m_side == m_game->m_client_list[target_h]->m_side) return;
+	hb::logger::debug<log_channel::events>("armor_life_decrement: passed all guards, reducing armor for target={}", target_h);
 
 	temp = m_game->m_client_list[target_h]->m_item_equipment_status[to_int(EquipPos::Body)];
 	if ((temp != -1) && (m_game->m_client_list[target_h]->m_item_list[temp] != 0)) {
-		if ((m_game->m_client_list[target_h]->m_side != 0) && (m_game->m_client_list[target_h]->m_item_list[temp]->m_cur_life_span > 0)) {
+		if (m_game->m_client_list[target_h]->m_item_list[temp]->m_cur_life_span > 0) {
 			if (m_game->m_client_list[target_h]->m_item_list[temp]->m_cur_life_span < static_cast<uint16_t>(value))
 				m_game->m_client_list[target_h]->m_item_list[temp]->m_cur_life_span = 0;
 			else
@@ -1994,8 +2000,7 @@ void CombatManager::armor_life_decrement(int attacker_h, int target_h, char owne
 
 	temp = m_game->m_client_list[target_h]->m_item_equipment_status[to_int(EquipPos::Pants)];
 	if ((temp != -1) && (m_game->m_client_list[target_h]->m_item_list[temp] != 0)) {
-
-		if ((m_game->m_client_list[target_h]->m_side != 0) && (m_game->m_client_list[target_h]->m_item_list[temp]->m_cur_life_span > 0)) {
+		if (m_game->m_client_list[target_h]->m_item_list[temp]->m_cur_life_span > 0) {
 			if (m_game->m_client_list[target_h]->m_item_list[temp]->m_cur_life_span < static_cast<uint16_t>(value))
 				m_game->m_client_list[target_h]->m_item_list[temp]->m_cur_life_span = 0;
 			else
@@ -2010,8 +2015,7 @@ void CombatManager::armor_life_decrement(int attacker_h, int target_h, char owne
 
 	temp = m_game->m_client_list[target_h]->m_item_equipment_status[to_int(EquipPos::Leggings)];
 	if ((temp != -1) && (m_game->m_client_list[target_h]->m_item_list[temp] != 0)) {
-
-		if ((m_game->m_client_list[target_h]->m_side != 0) && (m_game->m_client_list[target_h]->m_item_list[temp]->m_cur_life_span > 0)) {
+		if (m_game->m_client_list[target_h]->m_item_list[temp]->m_cur_life_span > 0) {
 			if (m_game->m_client_list[target_h]->m_item_list[temp]->m_cur_life_span < static_cast<uint16_t>(value))
 				m_game->m_client_list[target_h]->m_item_list[temp]->m_cur_life_span = 0;
 			else
@@ -2026,8 +2030,7 @@ void CombatManager::armor_life_decrement(int attacker_h, int target_h, char owne
 
 	temp = m_game->m_client_list[target_h]->m_item_equipment_status[to_int(EquipPos::Arms)];
 	if ((temp != -1) && (m_game->m_client_list[target_h]->m_item_list[temp] != 0)) {
-
-		if ((m_game->m_client_list[target_h]->m_side != 0) && (m_game->m_client_list[target_h]->m_item_list[temp]->m_cur_life_span > 0)) {
+		if (m_game->m_client_list[target_h]->m_item_list[temp]->m_cur_life_span > 0) {
 			if (m_game->m_client_list[target_h]->m_item_list[temp]->m_cur_life_span < static_cast<uint16_t>(value))
 				m_game->m_client_list[target_h]->m_item_list[temp]->m_cur_life_span = 0;
 			else
@@ -2042,8 +2045,7 @@ void CombatManager::armor_life_decrement(int attacker_h, int target_h, char owne
 
 	temp = m_game->m_client_list[target_h]->m_item_equipment_status[to_int(EquipPos::Head)];
 	if ((temp != -1) && (m_game->m_client_list[target_h]->m_item_list[temp] != 0)) {
-
-		if ((m_game->m_client_list[target_h]->m_side != 0) && (m_game->m_client_list[target_h]->m_item_list[temp]->m_cur_life_span > 0)) {
+		if (m_game->m_client_list[target_h]->m_item_list[temp]->m_cur_life_span > 0) {
 			if (m_game->m_client_list[target_h]->m_item_list[temp]->m_cur_life_span < static_cast<uint16_t>(value))
 				m_game->m_client_list[target_h]->m_item_list[temp]->m_cur_life_span = 0;
 			else
@@ -2201,7 +2203,7 @@ bool CombatManager::calculate_endurance_decrement(short target_h, short attacker
 			break;
 		}
 	}
-	if ((m_game->m_client_list[target_h]->m_side != 0) && (m_game->m_client_list[target_h]->m_item_list[armor_type]->m_cur_life_span > 0)) {
+	if (m_game->m_client_list[target_h]->m_item_list[armor_type]->m_cur_life_span > 0) {
 		if (m_game->m_client_list[target_h]->m_item_list[armor_type]->m_cur_life_span < static_cast<uint16_t>(down_value))
 			m_game->m_client_list[target_h]->m_item_list[armor_type]->m_cur_life_span = 0;
 		else
@@ -3017,7 +3019,7 @@ uint32_t CombatManager::calculate_attack_effect(short target_h, char target_type
 
 						temp = m_game->m_client_list[target_h]->m_item_equipment_status[to_int(EquipPos::LeftHand)];
 						if ((temp != -1) && (m_game->m_client_list[target_h]->m_item_list[temp] != 0)) {
-							if ((m_game->m_client_list[target_h]->m_side != 0) && (m_game->m_client_list[target_h]->m_item_list[temp]->m_cur_life_span > 0)) {
+							if (m_game->m_client_list[target_h]->m_item_list[temp]->m_cur_life_span > 0) {
 								m_game->m_client_list[target_h]->m_item_list[temp]->m_cur_life_span--;
 								m_game->send_notify_msg(0, target_h, Notify::CurLifeSpan, temp, m_game->m_client_list[target_h]->m_item_list[temp]->m_cur_life_span, 0, 0);
 							}
@@ -3579,13 +3581,11 @@ uint32_t CombatManager::calculate_attack_effect(short target_h, char target_type
 						}
 					}
 
-					if (m_game->m_client_list[attacker_h]->m_side != 0) {
-						if (m_game->m_client_list[attacker_h]->m_item_list[weapon_index]->m_cur_life_span < wep_life_off)
-							m_game->m_client_list[attacker_h]->m_item_list[weapon_index]->m_cur_life_span = 0;
-						else m_game->m_client_list[attacker_h]->m_item_list[weapon_index]->m_cur_life_span -= wep_life_off;
+					if (m_game->m_client_list[attacker_h]->m_item_list[weapon_index]->m_cur_life_span < wep_life_off)
+						m_game->m_client_list[attacker_h]->m_item_list[weapon_index]->m_cur_life_span = 0;
+					else m_game->m_client_list[attacker_h]->m_item_list[weapon_index]->m_cur_life_span -= wep_life_off;
 
-						m_game->send_notify_msg(0, attacker_h, Notify::CurLifeSpan, weapon_index, m_game->m_client_list[attacker_h]->m_item_list[weapon_index]->m_cur_life_span, 0, 0);
-					}
+					m_game->send_notify_msg(0, attacker_h, Notify::CurLifeSpan, weapon_index, m_game->m_client_list[attacker_h]->m_item_list[weapon_index]->m_cur_life_span, 0, 0);
 
 					if (m_game->m_client_list[attacker_h]->m_item_list[weapon_index]->m_cur_life_span == 0) {
 						m_game->send_notify_msg(0, attacker_h, Notify::ItemLifeSpanEnd, m_game->m_client_list[attacker_h]->m_item_list[weapon_index]->m_equip_pos, weapon_index, 0, 0);

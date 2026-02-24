@@ -2344,11 +2344,14 @@ void MagicManager::player_magic_handler(int client_h, int dX, int dY, short type
 			break;
 
 		case hb::shared::magic::DamageAreaArmorBreak:
+			hb::logger::debug<log_channel::events>("ArmorBreak: caster={} target_area=({},{}) radius=({},{}) value10={}",
+				client_h, dX, dY, m_game->m_magic_config_list[type]->m_value_2, m_game->m_magic_config_list[type]->m_value_3, m_game->m_magic_config_list[type]->m_value_10);
 			for(int iy = dY - m_game->m_magic_config_list[type]->m_value_3; iy <= dY + m_game->m_magic_config_list[type]->m_value_3; iy++)
 				for(int ix = dX - m_game->m_magic_config_list[type]->m_value_2; ix <= dX + m_game->m_magic_config_list[type]->m_value_2; ix++) {
 					m_game->m_map_list[m_game->m_client_list[client_h]->m_map_index]->get_owner(&owner_h, &owner_type, ix, iy);
 					if (m_game->m_combat_manager->check_resisting_magic_success(m_game->m_client_list[client_h]->m_dir, owner_h, owner_type, result) == false) {
 						m_game->m_combat_manager->effect_damage_spot_damage_move(client_h, hb::shared::owner_class::Player, owner_h, owner_type, dX, dY, m_game->m_magic_config_list[type]->m_value_7, m_game->m_magic_config_list[type]->m_value_8, m_game->m_magic_config_list[type]->m_value_9 + whether_bonus, false, magic_attr);
+						hb::logger::debug<log_channel::events>("ArmorBreak: calling armor_life_decrement on owner_h={} owner_type={}", owner_h, (int)owner_type);
 						m_game->m_combat_manager->armor_life_decrement(client_h, owner_h, owner_type, m_game->m_magic_config_list[type]->m_value_10);
 					}
 

@@ -392,42 +392,54 @@ void DialogBox_Shop::draw_level_requirement(short sX, short sY, int item_index, 
     }
 }
 
+int DialogBox_Shop::get_max_quantity() const
+{
+	if (m_mode <= 0) return 1;
+	int item_index = m_mode - 1;
+	CItem* shop_item = shop_manager::get().get_item_list()[item_index].get();
+	if (shop_item != nullptr && is_true_stack_type(shop_item->get_item_type()))
+		return 9999;
+	return (50 - inventory_manager::get().get_total_item_count());
+}
+
 void DialogBox_Shop::draw_quantity_selector(short sX, short sY, short mouse_x, short mouse_y, short z)
 {
-    uint32_t time = m_game->m_cur_time;
-    char temp[255];
+    char temp[16];
+    int max_qty = get_max_quantity();
 
+    // 4 up buttons
+    m_game->m_sprite[InterfaceNdGame2]->draw(sX + 128, sY + 219, 19);
+    m_game->m_sprite[InterfaceNdGame2]->draw(sX + 142, sY + 219, 19);
     m_game->m_sprite[InterfaceNdGame2]->draw(sX + 156, sY + 219, 19);
     m_game->m_sprite[InterfaceNdGame2]->draw(sX + 170, sY + 219, 19);
-    hb::shared::text::draw_text(GameFont::Default, sX + 123 - 35, sY + 237 - 10, DRAW_DIALOGBOX_SHOP27, hb::shared::text::TextStyle::from_color(GameColors::UILabel)); // "Quantity:"
-    hb::shared::text::draw_text(GameFont::Default, sX + 124 - 35, sY + 237 - 10, DRAW_DIALOGBOX_SHOP27, hb::shared::text::TextStyle::from_color(GameColors::UILabel));
 
+    // "Quantity:" label
+    hb::shared::text::draw_text(GameFont::Default, sX + 80, sY + 227, DRAW_DIALOGBOX_SHOP27, hb::shared::text::TextStyle::from_color(GameColors::UILabel));
+    hb::shared::text::draw_text(GameFont::Default, sX + 81, sY + 227, DRAW_DIALOGBOX_SHOP27, hb::shared::text::TextStyle::from_color(GameColors::UILabel));
+
+    // Mouse wheel quantity adjustment
     if (m_game->get_dialog_box_manager().get_top_id() == DialogBoxId::SaleMenu && z != 0) {
         m_quantity = m_quantity + z / 60;
-
     }
 
-    if (m_quantity > (50 - inventory_manager::get().get_total_item_count()))
-        m_quantity = (50 - inventory_manager::get().get_total_item_count());
+    if (m_quantity > max_qty)
+        m_quantity = max_qty;
     if (m_quantity < 1)
         m_quantity = 1;
 
-    if (m_quantity >= 10) {
-        std::snprintf(temp, sizeof(temp), "%d", m_quantity);
-        temp[1] = 0;
-        hb::shared::text::draw_text(GameFont::Default, sX - 35 + 186, sY - 10 + 237, temp, hb::shared::text::TextStyle::from_color(GameColors::UILabel));
-        hb::shared::text::draw_text(GameFont::Default, sX - 35 + 187, sY - 10 + 237, temp, hb::shared::text::TextStyle::from_color(GameColors::UILabel));
-        std::snprintf(temp, sizeof(temp), "%d", m_quantity);
-        hb::shared::text::draw_text(GameFont::Default, sX - 35 + 200, sY - 10 + 237, (temp + 1), hb::shared::text::TextStyle::from_color(GameColors::UILabel));
-        hb::shared::text::draw_text(GameFont::Default, sX - 35 + 201, sY - 10 + 237, (temp + 1), hb::shared::text::TextStyle::from_color(GameColors::UILabel));
+    // Draw 4 digits (zero-padded)
+    std::snprintf(temp, sizeof(temp), "%04d", m_quantity);
+    constexpr int digit_x[] = {137, 151, 165, 179};
+    for (int i = 0; i < 4; i++)
+    {
+        char digit[2] = { temp[i], '\0' };
+        hb::shared::text::draw_text(GameFont::Default, sX + digit_x[i], sY + 227, digit, hb::shared::text::TextStyle::from_color(GameColors::UILabel));
+        hb::shared::text::draw_text(GameFont::Default, sX + digit_x[i] + 1, sY + 227, digit, hb::shared::text::TextStyle::from_color(GameColors::UILabel));
     }
-    else {
-        hb::shared::text::draw_text(GameFont::Default, sX - 35 + 186, sY - 10 + 237, "0", hb::shared::text::TextStyle::from_color(GameColors::UILabel));
-        hb::shared::text::draw_text(GameFont::Default, sX - 35 + 187, sY - 10 + 237, "0", hb::shared::text::TextStyle::from_color(GameColors::UILabel));
-        std::snprintf(temp, sizeof(temp), "%d", m_quantity);
-        hb::shared::text::draw_text(GameFont::Default, sX - 35 + 200, sY - 10 + 237, (temp), hb::shared::text::TextStyle::from_color(GameColors::UILabel));
-        hb::shared::text::draw_text(GameFont::Default, sX - 35 + 201, sY - 10 + 237, (temp), hb::shared::text::TextStyle::from_color(GameColors::UILabel));
-    }
+
+    // 4 down buttons
+    m_game->m_sprite[InterfaceNdGame2]->draw(sX + 128, sY + 244, 20);
+    m_game->m_sprite[InterfaceNdGame2]->draw(sX + 142, sY + 244, 20);
     m_game->m_sprite[InterfaceNdGame2]->draw(sX + 156, sY + 244, 20);
     m_game->m_sprite[InterfaceNdGame2]->draw(sX + 170, sY + 244, 20);
 }
@@ -471,35 +483,61 @@ bool DialogBox_Shop::on_click_item_details(short sX, short sY)
 {
     char temp[hb::shared::limits::ItemNameLen];
 
+    int max_qty = get_max_quantity();
+
+    // +1000 quantity button
+    if (mouse_in(btn_qty_up_1000)) {
+        m_quantity += 1000;
+        if (m_quantity > max_qty) m_quantity = max_qty;
+        return true;
+    }
+
+    // -1000 quantity button
+    if (mouse_in(btn_qty_down_1000)) {
+        m_quantity -= 1000;
+        if (m_quantity < 1) m_quantity = 1;
+        return true;
+    }
+
+    // +100 quantity button
+    if (mouse_in(btn_qty_up_100)) {
+        m_quantity += 100;
+        if (m_quantity > max_qty) m_quantity = max_qty;
+        return true;
+    }
+
+    // -100 quantity button
+    if (mouse_in(btn_qty_down_100)) {
+        m_quantity -= 100;
+        if (m_quantity < 1) m_quantity = 1;
+        return true;
+    }
+
     // +10 quantity button
     if (mouse_in(btn_qty_up_10)) {
         m_quantity += 10;
-        if (m_quantity >= (50 - inventory_manager::get().get_total_item_count()))
-            m_quantity = (50 - inventory_manager::get().get_total_item_count());
+        if (m_quantity > max_qty) m_quantity = max_qty;
         return true;
     }
 
     // -10 quantity button
     if (mouse_in(btn_qty_down_10)) {
         m_quantity -= 10;
-        if (m_quantity <= 1)
-            m_quantity = 1;
+        if (m_quantity < 1) m_quantity = 1;
         return true;
     }
 
     // +1 quantity button
     if (mouse_in(btn_qty_up_1)) {
         m_quantity++;
-        if (m_quantity >= (50 - inventory_manager::get().get_total_item_count()))
-            m_quantity = (50 - inventory_manager::get().get_total_item_count());
+        if (m_quantity > max_qty) m_quantity = max_qty;
         return true;
     }
 
     // -1 quantity button
     if (mouse_in(btn_qty_down_1)) {
         m_quantity--;
-        if (m_quantity <= 1)
-            m_quantity = 1;
+        if (m_quantity < 1) m_quantity = 1;
         return true;
     }
 
