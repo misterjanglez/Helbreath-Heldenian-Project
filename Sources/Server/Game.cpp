@@ -6,6 +6,7 @@
 #include "StringCompat.h"
 #include "TimeUtils.h"
 #include <filesystem>
+#include <iostream>
 #include "LoginServer.h"
 #include "EntityManager.h"
 #include "FishingManager.h"
@@ -952,67 +953,59 @@ bool CGame::init()
 
 	m_fightzone_no_force_recall = 0;
 
-	for(int i = 1; i < 1000; i++) {
-		m_level_exp_table[i] = get_level_exp(i);
-		//testcode
-		//std::snprintf(G_cTxt, sizeof(G_cTxt), "Level:%d --- Exp:%d", i, m_level_exp_table[i]);
-		//PutLogFileList(G_cTxt);
+	// Load server_config.json (balance settings, timing, combat, etc.)
+	server_config cfg;
+	if (!load_server_config("server_config.json", cfg))
+	{
+		hb::logger::error("Cannot start server: server_config.json unavailable or invalid");
+		return false;
 	}
-
-	m_level_exp_20 = m_level_exp_table[20];
+	apply_server_config(cfg);
 
 	sqlite3* configDb = nullptr;
 	std::string configDbPath;
 	bool configDbCreated = false;
-	hb::logger::log("Validating gameconfigs.db");
+	hb::logger::log("Loading game data from gamedata.db");
 	bool configDbReady = EnsureGameConfigDatabase(&configDb, configDbPath, &configDbCreated);
 	if (!configDbReady) {
-		hb::logger::error("Cannot start server: gameconfigs.db unavailable");
+		hb::logger::error("Cannot start server: gamedata.db unavailable");
 		return false;
 	}
 	if (configDbCreated) {
-		hb::logger::error("Cannot start server: gameconfigs.db missing configuration data");
+		hb::logger::error("Cannot start server: gamedata.db missing configuration data");
 		CloseGameConfigDatabase(configDb);
 		return false;
 	}
 
-	if (!HasGameConfigRows(configDb, "realmlist") || !HasGameConfigRows(configDb, "active_maps") ||
-		!LoadRealmConfig(configDb, this)) {
-		hb::logger::error("Cannot start server: program configs missing in gameconfigs.db");
+	if (!LoadFormulas(configDb, m_formula_engine))
+	{
+		hb::logger::error("Cannot start server: formula data missing in gamedata.db");
 		CloseGameConfigDatabase(configDb);
 		return false;
 	}
 
-	if (!HasGameConfigRows(configDb, "settings") || !LoadSettingsConfig(configDb, this)) {
-		hb::logger::error("Cannot start server: settings configs missing in gameconfigs.db");
+	auto vr = m_formula_engine.validate();
+	if (!vr.success)
+	{
+		hb::logger::error("Formula validation failed. Press Enter to exit...");
+		std::string dummy;
+		std::getline(std::cin, dummy);
 		CloseGameConfigDatabase(configDb);
 		return false;
 	}
 
-	// Calculate m_max_stat_value after settings are loaded
-	// Formula: base + creation + (levelup * max_level) + angelic_max(16)
-	m_max_stat_value = m_base_stat_value + m_creation_stat_bonus + (m_levelup_stat_gain * m_max_level) + 16;
-	hb::logger::log("Max stat value calculated: {}", m_max_stat_value);
+	for (int i = 1; i < 1000; i++)
+		m_level_exp_table[i] = get_level_exp(i);
+	m_level_exp_20 = m_level_exp_table[20];
 
 	if (!LoadBannedListConfig(configDb, this)) {
-		hb::logger::error("Cannot start server: banned list unavailable in gameconfigs.db");
+		hb::logger::error("Cannot start server: banned list unavailable in gamedata.db");
 		CloseGameConfigDatabase(configDb);
 		return false;
 	}
 
-	if (!LoadAdminConfig(configDb, this)) {
-		hb::logger::log("Could not load admin config from gameconfigs.db, admin list empty");
-	}
-	else {
-		hb::logger::log("Loaded {} admin(s) from gameconfigs.db.", m_admin_count);
-	}
-
-	if (!LoadCommandPermissions(configDb, this)) {
-		hb::logger::log("Could not load command permissions from gameconfigs.db");
-	}
-	else if (!m_command_permissions.empty()) {
-		hb::logger::log("Loaded {} command permission override(s) from gameconfigs.db.", (int)m_command_permissions.size());
-	}
+	LoadAdminConfig(configDb, this);
+	LoadCommandPermissions(configDb, this);
 
 	srand((unsigned)std::time(0));
 
@@ -1034,9 +1027,6 @@ bool CGame::init()
 	if (SysTime.minute >= m_nighttime_duration)
 		m_day_or_night = 2;
 	else m_day_or_night = 1;
-
-	read_notify_msg_list_file("gameconfigs/notice.txt");
-	m_notice_time = time;
 
 	m_notice_data = 0;
 	m_notice_data_size = 0;
@@ -1075,7 +1065,7 @@ bool CGame::init()
 		m_is_item_available = LoadItemConfigs(configDb, m_item_config_list, MaxItemTypes);
 	}
 	if (!m_is_item_available) {
-		hb::logger::error("Cannot start server: item configs missing in gameconfigs.db");
+		hb::logger::error("Cannot start server: item configs missing in gamedata.db");
 		CloseGameConfigDatabase(configDb);
 		return false;
 	}
@@ -1085,7 +1075,7 @@ bool CGame::init()
 		m_is_build_item_available = LoadBuildItemConfigs(configDb, this);
 	}
 	if (!m_is_build_item_available) {
-		hb::logger::error("Cannot start server: build item configs missing in gameconfigs.db");
+		hb::logger::error("Cannot start server: build item configs missing in gamedata.db");
 		CloseGameConfigDatabase(configDb);
 		return false;
 	}
@@ -1095,7 +1085,7 @@ bool CGame::init()
 		m_is_npc_available = LoadNpcConfigs(configDb, this);
 	}
 	if (!m_is_npc_available) {
-		hb::logger::error("Cannot start server: NPC configs missing in gameconfigs.db");
+		hb::logger::error("Cannot start server: NPC configs missing in gamedata.db");
 		CloseGameConfigDatabase(configDb);
 		return false;
 	}
@@ -1105,7 +1095,7 @@ bool CGame::init()
 		m_is_drop_table_available = LoadDropTables(configDb, this);
 	}
 	if (!m_is_drop_table_available) {
-		hb::logger::error("Cannot start server: drop tables missing in gameconfigs.db");
+		hb::logger::error("Cannot start server: drop tables missing in gamedata.db");
 		CloseGameConfigDatabase(configDb);
 		return false;
 	}
@@ -1128,21 +1118,12 @@ bool CGame::init()
 		}
 	}
 
-	// Load shop configurations (optional - server works without shops)
-	m_is_shop_data_available = false;
-	if (HasGameConfigRows(configDb, "npc_shop_mapping") || HasGameConfigRows(configDb, "shop_items")) {
-		LoadShopConfigs(configDb, this);
-	}
-	if (!m_is_shop_data_available) {
-		hb::logger::log("Shop data not configured, NPCs will not have shop inventories");
-	}
-
 	m_is_magic_available = false;
 	if (HasGameConfigRows(configDb, "magic_configs")) {
 		m_is_magic_available = LoadMagicConfigs(configDb, this);
 	}
 	if (!m_is_magic_available) {
-		hb::logger::error("Cannot start server: magic configs missing in gameconfigs.db");
+		hb::logger::error("Cannot start server: magic configs missing in gamedata.db");
 		CloseGameConfigDatabase(configDb);
 		return false;
 	}
@@ -1152,7 +1133,7 @@ bool CGame::init()
 		m_is_skill_available = LoadSkillConfigs(configDb, this);
 	}
 	if (!m_is_skill_available) {
-		hb::logger::error("Cannot start server: skill configs missing in gameconfigs.db");
+		hb::logger::error("Cannot start server: skill configs missing in gamedata.db");
 		CloseGameConfigDatabase(configDb);
 		return false;
 	}
@@ -1162,7 +1143,7 @@ bool CGame::init()
 		m_is_quest_available = LoadQuestConfigs(configDb, this);
 	}
 	if (!m_is_quest_available) {
-		hb::logger::error("Cannot start server: quest configs missing in gameconfigs.db");
+		hb::logger::error("Cannot start server: quest configs missing in gamedata.db");
 		CloseGameConfigDatabase(configDb);
 		return false;
 	}
@@ -1172,12 +1153,98 @@ bool CGame::init()
 		m_is_portion_available = LoadPortionConfigs(configDb, this);
 	}
 	if (!m_is_portion_available) {
-		hb::logger::error("Cannot start server: potion/crafting configs missing in gameconfigs.db");
+		hb::logger::error("Cannot start server: potion/crafting configs missing in gamedata.db");
+		CloseGameConfigDatabase(configDb);
+		return false;
+	}
+
+	// Log consolidated game data counts
+	{
+		int item_count = 0;
+		for (int i = 0; i < MaxItemTypes; i++)
+			if (m_item_config_list[i] != nullptr) item_count++;
+		int build_item_count = 0;
+		for (int i = 0; i < hb::shared::limits::MaxBuildItems; i++)
+			if (m_build_item_list[i] != nullptr) build_item_count++;
+		int npc_count = 0;
+		for (int i = 0; i < MaxNpcTypes; i++)
+			if (m_npc_config_list[i] != nullptr) npc_count++;
+		int magic_count = 0;
+		for (int i = 0; i < hb::shared::limits::MaxMagicType; i++)
+			if (m_magic_config_list[i] != nullptr) magic_count++;
+		int skill_count = 0;
+		for (int i = 0; i < hb::shared::limits::MaxSkillType; i++)
+			if (m_skill_config_list[i] != nullptr) skill_count++;
+		int quest_count = 0;
+		for (int i = 0; i < MaxQuestType; i++)
+			if (m_quest_manager->m_quest_config_list[i] != nullptr) quest_count++;
+		int potion_count = 0;
+		for (int i = 0; i < MaxPortionTypes; i++)
+			if (m_crafting_manager->m_portion_config_list[i] != nullptr) potion_count++;
+
+		hb::logger::log("- {} items, {} build items", item_count, build_item_count);
+		hb::logger::log("- {} NPCs, {} drop tables", npc_count, (int)m_drop_tables.size());
+		hb::logger::log("- {} magic, {} skills", magic_count, skill_count);
+		hb::logger::log("- {} quests, {} potions", quest_count, potion_count);
+		hb::logger::log("- {} admins, {} command permission overrides", m_admin_count, (int)m_command_permissions.size());
+	}
+
+	// Load shop configurations (optional - server works without shops)
+	m_is_shop_data_available = false;
+	if (HasGameConfigRows(configDb, "npc_shop_mapping") || HasGameConfigRows(configDb, "shop_items")) {
+		LoadShopConfigs(configDb, this);
+	}
+	if (!m_is_shop_data_available) {
+		hb::logger::warn("Shop data not configured, NPCs will not have shop inventories");
+	}
+
+	read_notify_msg_list_file("gameconfigs/notice.txt");
+	m_notice_time = time;
+
+	// Load active maps from gamedata.db (must be before map config loading below)
+	hb::logger::log("Loading active maps from gamedata.db");
+	if (!HasGameConfigRows(configDb, "active_maps") || !LoadActiveMaps(configDb, this)) {
+		hb::logger::error("Cannot start server: active_maps missing in gamedata.db");
 		CloseGameConfigDatabase(configDb);
 		return false;
 	}
 
 	CloseGameConfigDatabase(configDb);
+
+	// Load map configurations (display names, no-attack areas, static NPCs) from mapinfo.db
+	// Must be after NPC configs are loaded from gamedata.db (spawn_map_npcs needs m_npc_config_list)
+	{
+		sqlite3* mapInfoDb = nullptr;
+		std::string mapInfoDbPath;
+		bool mapInfoDbCreated = false;
+
+		if (!EnsureMapInfoDatabase(&mapInfoDb, mapInfoDbPath, &mapInfoDbCreated)) {
+			hb::logger::error("Cannot start server: mapinfo.db not available");
+			return false;
+		}
+
+		for (int i = 0; i < MaxMaps; i++)
+		{
+			if (m_map_list[i] != 0)
+			{
+				if (memcmp(m_map_list[i]->m_name, "fightzone", 9) == 0)
+					m_map_list[i]->m_is_fight_zone = true;
+				if (memcmp(m_map_list[i]->m_name, "icebound", 8) == 0)
+					m_map_list[i]->m_is_snow_enabled = true;
+
+				if (LoadMapConfig(mapInfoDb, m_map_list[i]->m_name, m_map_list[i])) {
+					m_map_list[i]->setup_no_attack_area();
+					spawn_map_npcs_from_database(mapInfoDb, i);
+				}
+				else {
+					hb::logger::warn("- Failed to load map config for: {}", m_map_list[i]->m_name);
+				}
+			}
+		}
+		CloseMapInfoDatabase(mapInfoDb);
+	}
+
+	compute_config_hashes();
 
 	return true;
 }
@@ -1716,7 +1783,7 @@ void CGame::request_init_data_handler(int client_h, char* data, char key, size_t
 
 	// Send configs FIRST so the client has item/magic/skill definitions
 	// before receiving player data that references them.
-	std::string clientItemHash, clientMagicHash, clientSkillHash, clientNpcHash, clientMapHash;
+	std::string clientItemHash, clientMagicHash, clientSkillHash, clientNpcHash, clientMapHash, clientBalanceHash;
 	if (msg_size >= sizeof(hb::net::PacketRequestInitDataEx)) {
 		const auto* exReq = reinterpret_cast<const hb::net::PacketRequestInitDataEx*>(data);
 		clientItemHash = exReq->itemConfigHash;
@@ -1724,13 +1791,15 @@ void CGame::request_init_data_handler(int client_h, char* data, char key, size_t
 		clientSkillHash = exReq->skillConfigHash;
 		clientNpcHash = exReq->npcConfigHash;
 		clientMapHash = exReq->mapConfigHash;
+		clientBalanceHash = exReq->balanceConfigHash;
 	}
 
-	bool item_cache_valid  = (!clientItemHash.empty() && clientItemHash == m_config_hash[0]);
-	bool magic_cache_valid = (!clientMagicHash.empty() && clientMagicHash == m_config_hash[1]);
-	bool skill_cache_valid = (!clientSkillHash.empty() && clientSkillHash == m_config_hash[2]);
-	bool npc_cache_valid   = (!clientNpcHash.empty() && clientNpcHash == m_config_hash[3]);
-	bool map_cache_valid   = (!clientMapHash.empty() && clientMapHash == m_config_hash[4]);
+	bool item_cache_valid    = (!clientItemHash.empty() && clientItemHash == m_config_hash[0]);
+	bool magic_cache_valid   = (!clientMagicHash.empty() && clientMagicHash == m_config_hash[1]);
+	bool skill_cache_valid   = (!clientSkillHash.empty() && clientSkillHash == m_config_hash[2]);
+	bool npc_cache_valid     = (!clientNpcHash.empty() && clientNpcHash == m_config_hash[3]);
+	bool map_cache_valid     = (!clientMapHash.empty() && clientMapHash == m_config_hash[4]);
+	bool balance_cache_valid = (!clientBalanceHash.empty() && clientBalanceHash == m_config_hash[5]);
 
 	{
 		hb::net::PacketResponseConfigCacheStatus cacheStatus{};
@@ -1741,15 +1810,17 @@ void CGame::request_init_data_handler(int client_h, char* data, char key, size_t
 		cacheStatus.skillCacheValid = skill_cache_valid ? 1 : 0;
 		cacheStatus.npcCacheValid = npc_cache_valid ? 1 : 0;
 		cacheStatus.mapCacheValid = map_cache_valid ? 1 : 0;
+		cacheStatus.balanceCacheValid = balance_cache_valid ? 1 : 0;
 		m_client_list[client_h]->m_socket->send_msg(
 			reinterpret_cast<char*>(&cacheStatus), sizeof(cacheStatus));
 	}
 
-	if (!item_cache_valid)  m_item_manager->send_client_item_configs(client_h);
-	if (!magic_cache_valid) m_magic_manager->send_client_magic_configs(client_h);
-	if (!skill_cache_valid) m_skill_manager->send_client_skill_configs(client_h);
-	if (!npc_cache_valid)   send_client_npc_configs(client_h);
-	if (!map_cache_valid)   send_client_map_configs(client_h);
+	if (!item_cache_valid)    m_item_manager->send_client_item_configs(client_h);
+	if (!magic_cache_valid)   m_magic_manager->send_client_magic_configs(client_h);
+	if (!skill_cache_valid)   m_skill_manager->send_client_skill_configs(client_h);
+	if (!npc_cache_valid)     send_client_npc_configs(client_h);
+	if (!map_cache_valid)     send_client_map_configs(client_h);
+	if (!balance_cache_valid) send_client_balance_config(client_h);
 
 	// Now send player data (configs are guaranteed loaded on client)
 	writer.Reset();
@@ -2618,7 +2689,46 @@ void CGame::compute_config_hashes()
 		m_config_hash[4] = allData.empty() ? std::string{} : hb::shared::util::sha256(allData.data(), allData.size());
 	}
 
-	hb::logger::log("Config hashes computed - Items: {}, Magic: {}, Skills: {}, Npcs: {}, Maps: {}", m_config_hash[0], m_config_hash[1], m_config_hash[2], m_config_hash[3], m_config_hash[4]);
+	compute_balance_hash();
+
+	hb::logger::log("Config hashes computed:");
+	hb::logger::log("- Items: {}", m_config_hash[0]);
+	hb::logger::log("- Magic: {}", m_config_hash[1]);
+	hb::logger::log("- Skills: {}", m_config_hash[2]);
+	hb::logger::log("- Npcs: {}", m_config_hash[3]);
+	hb::logger::log("- Maps: {}", m_config_hash[4]);
+	hb::logger::log("- Balance: {}", m_config_hash[5]);
+}
+
+void CGame::compute_balance_hash()
+{
+	auto serialized = m_formula_engine.serialize();
+	if (serialized.empty())
+	{
+		m_config_hash[5].clear();
+	}
+	else
+	{
+		m_config_hash[5] = hb::shared::util::sha256(serialized.data(), serialized.size());
+	}
+}
+
+bool CGame::send_client_balance_config(int client_h)
+{
+	if (m_client_list[client_h] == nullptr) return false;
+
+	auto serialized = m_formula_engine.serialize();
+	if (serialized.empty()) return false;
+
+	// Send as a single packet: header + serialized data
+	std::vector<char> buf(sizeof(hb::net::PacketHeader) + serialized.size(), 0);
+	auto* header = reinterpret_cast<hb::net::PacketHeader*>(buf.data());
+	header->msg_id = MsgId::BalanceConfigContents;
+	header->msg_type = MsgType::Confirm;
+	std::memcpy(buf.data() + sizeof(hb::net::PacketHeader), serialized.data(), serialized.size());
+
+	m_client_list[client_h]->m_socket->send_msg(buf.data(), static_cast<int>(buf.size()));
+	return true;
 }
 
 void CGame::fill_player_map_object(hb::net::PacketMapDataObjectPlayer& obj, short owner_h, int viewer_h)
@@ -4591,6 +4701,7 @@ int CGame::spawn_map_npcs_from_database(sqlite3* db, int map_index)
 		// Spawn the NPC
 		if (create_new_npc(npc_config_id, name, m_map_list[map_index]->m_name, 0, 0, npc_move_type, 0, 0, npc_waypoint_index, 0, 0, -1, false) == false) {
 			m_map_list[map_index]->set_naming_value_empty(naming_value);
+			hb::logger::warn("- Failed to spawn static NPC (config_id={}) for map: {}", npc_config_id, m_map_list[map_index]->m_name);
 		}
 		else {
 			npcCount++;
@@ -4598,10 +4709,6 @@ int CGame::spawn_map_npcs_from_database(sqlite3* db, int map_index)
 	}
 
 	sqlite3_finalize(stmt);
-
-	if (npcCount > 0) {
-		hb::logger::log("- Spawned {} static NPCs for map: {}", npcCount, m_map_list[map_index]->m_name);
-	}
 
 	return npcCount;
 }
@@ -5023,22 +5130,19 @@ int CGame::client_motion_attack_handler(int client_h, short sX, short sY, short 
 		if (m_client_list[client_h]->m_attack_last_action_time != 0) {
 			// Compute expected time for 7 consecutive attacks from weapon speed and status.
 			// Uses client time to avoid false positives from TCP buffering/network jitter.
-			// Must match client-side animation timing (PlayerAnim::Attack: max_frame=7, frames 0-7 = 8 durations @ 78ms base).
-			constexpr int ATTACK_FRAME_DURATIONS = 8;
-			constexpr int BASE_FRAME_TIME = 78;
-			constexpr int RUN_FRAME_TIME = 39;
 			constexpr int BATCH_TOLERANCE_MS = 100;
 
 			const auto& status = m_client_list[client_h]->m_status;
-			int attack_delay = status.attack_delay;
-			bool haste = status.haste;
-			bool frozen = status.frozen;
+			int base_swing = hb::shared::calc::swing_time(m_formula_engine,
+				hb::shared::calc::attack_delay_value{(double)status.attack_delay});
+			int frames = hb::shared::calc::swing_frames(m_formula_engine);
+			int bft = hb::shared::calc::base_frame_time(m_formula_engine);
+			int rft = hb::shared::calc::run_frame_time(m_formula_engine);
+			int effective_swing = base_swing;
+			if (status.frozen) effective_swing += frames * (bft >> 2);
+			if (status.haste)  effective_swing -= frames * static_cast<int>(rft / 2.3);
 
-			int effectiveFrameTime = BASE_FRAME_TIME + (attack_delay * 12);
-			if (frozen) effectiveFrameTime += BASE_FRAME_TIME >> 2;
-			if (haste)  effectiveFrameTime -= static_cast<int>(RUN_FRAME_TIME / 2.3);
-
-			int singleSwingTime = ATTACK_FRAME_DURATIONS * effectiveFrameTime;
+			int singleSwingTime = effective_swing;
 			int batchThreshold = 7 * singleSwingTime - BATCH_TOLERANCE_MS;
 			if (batchThreshold < 2800) batchThreshold = 2800;
 
@@ -5497,11 +5601,12 @@ void CGame::msg_process()
 				if (!reqPkt) break;
 				if (time - m_client_list[client_h]->m_last_config_request_time < 30000) break;
 				m_client_list[client_h]->m_last_config_request_time = time;
-				if (reqPkt->requestItems)  m_item_manager->send_client_item_configs(client_h);
-				if (reqPkt->requestMagic)  m_magic_manager->send_client_magic_configs(client_h);
-				if (reqPkt->requestSkills) m_skill_manager->send_client_skill_configs(client_h);
-				if (reqPkt->requestNpcs)   send_client_npc_configs(client_h);
-				if (reqPkt->requestMaps)   send_client_map_configs(client_h);
+				if (reqPkt->requestItems)   m_item_manager->send_client_item_configs(client_h);
+				if (reqPkt->requestMagic)   m_magic_manager->send_client_magic_configs(client_h);
+				if (reqPkt->requestSkills)  m_skill_manager->send_client_skill_configs(client_h);
+				if (reqPkt->requestNpcs)    send_client_npc_configs(client_h);
+				if (reqPkt->requestMaps)    send_client_map_configs(client_h);
+				if (reqPkt->requestBalance) send_client_balance_config(client_h);
 			}
 			break;
 
@@ -8896,7 +9001,7 @@ void CGame::quit()
 
 uint32_t CGame::get_level_exp(int level)
 {
-	return hb::shared::calc::CalculateLevelExp(level);
+	return hb::shared::calc::level_exp(m_formula_engine, hb::shared::calc::level{(double)level});
 }
 
 /*****************************************************************
@@ -8925,7 +9030,7 @@ bool CGame::check_level_up(int client_h)
 		if (m_client_list[client_h]->m_level < m_max_level)
 		{
 			m_client_list[client_h]->m_level++;
-			m_client_list[client_h]->m_levelup_pool += 3;
+			m_client_list[client_h]->m_levelup_pool += hb::shared::calc::levelup_stat_gain(m_formula_engine);
 //			if ( (m_client_list[client_h]->m_cLU_Str + m_client_list[client_h]->m_cLU_Vit + m_client_list[client_h]->m_cLU_Dex + 
 //	  		      m_client_list[client_h]->m_cLU_Int + m_client_list[client_h]->m_cLU_Mag + m_client_list[client_h]->m_cLU_Char) <= TotalLevelUpPoint) {
 
@@ -8998,7 +9103,7 @@ void CGame::state_change_handler(int client_h, char* data, size_t msg_size)
 		return;
 	}
 
-	int majestic_cost = total_reduction / TotalLevelUpPoint;
+	int majestic_cost = total_reduction / hb::shared::calc::levelup_stat_gain(m_formula_engine);
 	if (majestic_cost > m_client_list[client_h]->m_gizon_item_upgrade_left)
 	{
 		send_notify_msg(0, client_h, Notify::StateChangeFailed, 0, 0, 0, 0);
@@ -9013,7 +9118,9 @@ void CGame::state_change_handler(int client_h, char* data, size_t msg_size)
 	int old_mag = m_client_list[client_h]->m_mag;
 	int old_char = m_client_list[client_h]->m_charisma;
 
-	if (old_str + old_vit + old_dex + old_int + old_mag + old_char != ((m_max_level - 1) * 3 + 70))
+	int expected_stats = (m_max_level - 1) * hb::shared::calc::levelup_stat_gain(m_formula_engine)
+		+ hb::shared::calc::base_stat_total(m_formula_engine);
+	if (old_str + old_vit + old_dex + old_int + old_mag + old_char != expected_stats)
 		return;
 
 	// Each stat must stay >= 10 and <= CharPointLimit after reduction
@@ -9242,10 +9349,11 @@ void CGame::level_up_settings_handler(int client_h, char* data, size_t msg_size)
 		weapon_index = m_client_list[client_h]->m_item_equipment_status[to_int(EquipPos::TwoHand)];
 	if (weapon_index != -1 && m_client_list[client_h]->m_item_list[weapon_index] != nullptr)
 	{
-		short speed = m_client_list[client_h]->m_item_list[weapon_index]->m_speed;
-		speed -= ((m_client_list[client_h]->m_str + m_client_list[client_h]->m_angelic_str) / 13);
-		if (speed < 0) speed = 0;
-		m_client_list[client_h]->m_status.attack_delay = static_cast<uint8_t>(speed);
+		m_client_list[client_h]->m_status.attack_delay = static_cast<uint8_t>(hb::shared::calc::attack_delay(
+			m_formula_engine,
+			hb::shared::calc::weapon_speed{(double)m_client_list[client_h]->m_item_list[weapon_index]->m_speed},
+			hb::shared::calc::str{(double)m_client_list[client_h]->m_str},
+			hb::shared::calc::angelic_str{(double)m_client_list[client_h]->m_angelic_str}));
 	}
 
 	send_notify_msg(0, client_h, Notify::SettingSuccess, 0, 0, 0, 0);
@@ -9321,7 +9429,10 @@ int CGame::calc_max_load(int client_h)
 {
 	if (m_client_list[client_h] == 0) return 0;
 
-	return ((m_client_list[client_h]->m_str + m_client_list[client_h]->m_angelic_str) * 500 + m_client_list[client_h]->m_level * 500);
+	return hb::shared::calc::max_load(m_formula_engine,
+		hb::shared::calc::str{(double)m_client_list[client_h]->m_str},
+		hb::shared::calc::angelic_str{(double)m_client_list[client_h]->m_angelic_str},
+		hb::shared::calc::level{(double)m_client_list[client_h]->m_level});
 }
 
 void CGame::request_full_object_data(int client_h, char* data)
@@ -10032,7 +10143,7 @@ bool CGame::read_notify_msg_list_file(const char* fn)
 
 	file = fopen(fn, "rt");
 	if (file == 0) {
-		hb::logger::log("Notify message list file not found");
+		hb::logger::warn("Notify message list file not found");
 		return false;
 	}
 	else {
@@ -10375,11 +10486,11 @@ int CGame::get_max_hp(int client_h)
 {
 	if (m_client_list[client_h] == 0) return 0;
 
-	int ret = hb::shared::calc::CalculateMaxHP(
-		m_client_list[client_h]->m_vit,
-		m_client_list[client_h]->m_level,
-		m_client_list[client_h]->m_str,
-		m_client_list[client_h]->m_angelic_str);
+	int ret = hb::shared::calc::max_hp(m_formula_engine,
+		hb::shared::calc::vit{(double)m_client_list[client_h]->m_vit},
+		hb::shared::calc::level{(double)m_client_list[client_h]->m_level},
+		hb::shared::calc::str{(double)m_client_list[client_h]->m_str},
+		hb::shared::calc::angelic_str{(double)m_client_list[client_h]->m_angelic_str});
 
 	// Apply side effect reduction if active
 	if (m_client_list[client_h]->m_side_effect_max_hp_down != 0)
@@ -10392,22 +10503,22 @@ int CGame::get_max_mp(int client_h)
 {
 	if (m_client_list[client_h] == 0) return 0;
 
-	return hb::shared::calc::CalculateMaxMP(
-		m_client_list[client_h]->m_mag,
-		m_client_list[client_h]->m_angelic_mag,
-		m_client_list[client_h]->m_level,
-		m_client_list[client_h]->m_int,
-		m_client_list[client_h]->m_angelic_int);
+	return hb::shared::calc::max_mp(m_formula_engine,
+		hb::shared::calc::mag{(double)m_client_list[client_h]->m_mag},
+		hb::shared::calc::angelic_mag{(double)m_client_list[client_h]->m_angelic_mag},
+		hb::shared::calc::level{(double)m_client_list[client_h]->m_level},
+		hb::shared::calc::intel{(double)m_client_list[client_h]->m_int},
+		hb::shared::calc::angelic_int{(double)m_client_list[client_h]->m_angelic_int});
 }
 
 int CGame::get_max_sp(int client_h)
 {
 	if (m_client_list[client_h] == 0) return 0;
 
-	return hb::shared::calc::CalculateMaxSP(
-		m_client_list[client_h]->m_str,
-		m_client_list[client_h]->m_angelic_str,
-		m_client_list[client_h]->m_level);
+	return hb::shared::calc::max_sp(m_formula_engine,
+		hb::shared::calc::str{(double)m_client_list[client_h]->m_str},
+		hb::shared::calc::angelic_str{(double)m_client_list[client_h]->m_angelic_str},
+		hb::shared::calc::level{(double)m_client_list[client_h]->m_level});
 }
 
 void CGame::get_map_initial_point(int map_index, short* pX, short* pY, char* player_location)
@@ -11799,7 +11910,6 @@ void CGame::on_timer(char type)
 
 		// v1.41
 		if (m_is_game_started == false) {
-			hb::logger::log("Sending start message");
 			on_start_game_signal();
 			m_is_game_started = true;
 
@@ -11840,7 +11950,6 @@ void CGame::on_timer(char type)
 	m_skill_manager->set_game(this);
 	m_war_manager->set_game(this);
 	m_status_effect_manager->set_game(this);
-				hb::logger::log("EntityManager initialized");
 			}
 
 			// initialize Gathering Managers
@@ -12017,42 +12126,6 @@ void CGame::on_timer(char type)
 
 void CGame::on_start_game_signal()
 {
-	// Load map configurations from mapinfo.db
-	sqlite3* mapInfoDb = nullptr;
-	std::string mapInfoDbPath;
-	bool mapInfoDbCreated = false;
-
-	if (!EnsureMapInfoDatabase(&mapInfoDb, mapInfoDbPath, &mapInfoDbCreated)) {
-		hb::logger::error("mapinfo.db not available");
-	}
-	else {
-		hb::logger::log("Loading map configurations from mapinfo.db");
-		int mapsLoaded = 0;
-		for(int i = 0; i < MaxMaps; i++)
-		{
-			if (m_map_list[i] != 0)
-			{
-				if (memcmp(m_map_list[i]->m_name, "fightzone", 9) == 0)
-					m_map_list[i]->m_is_fight_zone = true;
-				if (memcmp(m_map_list[i]->m_name, "icebound", 8) == 0)
-					m_map_list[i]->m_is_snow_enabled = true;
-
-				if (LoadMapConfig(mapInfoDb, m_map_list[i]->m_name, m_map_list[i])) {
-					m_map_list[i]->setup_no_attack_area();
-					mapsLoaded++;
-					spawn_map_npcs_from_database(mapInfoDb, i);
-				}
-				else {
-					hb::logger::log("WARNING: Failed to load map config for: {}", m_map_list[i]->m_name);
-				}
-			}
-		}
-		hb::logger::log("Loaded {} map configurations from database.", mapsLoaded);
-		CloseMapInfoDatabase(mapInfoDb);
-	}
-
-	compute_config_hashes();
-
 	bool loadedSchedules = false;
 	sqlite3* configDb = nullptr;
 	std::string configDbPath;
@@ -12069,7 +12142,7 @@ void CGame::on_start_game_signal()
 	}
 
 	if (!loadedSchedules) {
-		hb::logger::error("Crusade/schedule configs missing in gameconfigs.db");
+		hb::logger::error("Crusade/schedule configs missing in gamedata.db");
 	}
 
 	m_war_manager->link_strike_point_map_index();
@@ -12083,6 +12156,12 @@ void CGame::on_start_game_signal()
 	m_war_manager->read_heldenian_guid_file("GameData/HeldenianGUID.txt");
 
 	hb::logger::log("Game server activated");
+
+	auto stats = CountAccountStats();
+	hb::logger::log("- Max level: {}, Max stat: {}, Stat/level: {}", m_max_level, m_max_stat_value, m_levelup_stat_gain);
+	hb::logger::log("- Accounts: {}, Characters: {}", stats.accounts, stats.characters);
+	for (const auto& [name, count] : stats.over_limit)
+		hb::logger::warn("- Account '{}' has {} characters (limit: {})", name, count, hb::shared::limits::MaxCharactersPerAccount);
 
 }
 
@@ -12564,16 +12643,11 @@ void CGame::local_update_configs(char config_type)
 	std::string configDbPath;
 	bool configDbCreated = false;
 	if (!EnsureGameConfigDatabase(&configDb, configDbPath, &configDbCreated) || configDbCreated) {
-		hb::logger::error("gameconfigs.db unavailable, cannot reload configs");
+		hb::logger::error("gamedata.db unavailable, cannot reload configs");
 		return;
 	}
 
 	bool ok = false;
-	if (config_type == 1) {
-		ok = HasGameConfigRows(configDb, "settings") && LoadSettingsConfig(configDb, this);
-		if (ok) hb::logger::log("Settings updated successfully!");
-		else hb::logger::error("Settings reload failed!");
-	}
 	if (config_type == 3) {
 		ok = LoadBannedListConfig(configDb, this);
 		if (ok) hb::logger::log("BannedList updated successfully!");
@@ -12589,7 +12663,7 @@ void CGame::reload_npc_configs()
 	bool configDbCreated = false;
 	if (!EnsureGameConfigDatabase(&configDb, configDbPath, &configDbCreated) || configDbCreated)
 	{
-		hb::logger::log("NPC config reload failed: gameconfigs.db unavailable");
+		hb::logger::log("NPC config reload failed: gamedata.db unavailable");
 		return;
 	}
 
@@ -12621,7 +12695,7 @@ void CGame::reload_shop_configs()
 	bool configDbCreated = false;
 	if (!EnsureGameConfigDatabase(&configDb, configDbPath, &configDbCreated) || configDbCreated)
 	{
-		hb::logger::log("Shop config reload failed: gameconfigs.db unavailable");
+		hb::logger::log("Shop config reload failed: gamedata.db unavailable");
 		return;
 	}
 
@@ -12643,7 +12717,7 @@ void CGame::reload_shop_configs()
 		hb::logger::log("Shop configs reloaded (no shop data found)");
 }
 
-void CGame::send_config_reload_notification(bool items, bool magic, bool skills, bool npcs)
+void CGame::send_config_reload_notification(bool items, bool magic, bool skills, bool npcs, bool balance)
 {
 	hb::net::PacketNotifyConfigReload pkt{};
 	pkt.header.msg_id = MsgId::NotifyConfigReload;
@@ -12652,6 +12726,7 @@ void CGame::send_config_reload_notification(bool items, bool magic, bool skills,
 	pkt.reloadMagic = magic ? 1 : 0;
 	pkt.reloadSkills = skills ? 1 : 0;
 	pkt.reloadNpcs = npcs ? 1 : 0;
+	pkt.reloadBalance = balance ? 1 : 0;
 
 	for(int i = 1; i < MaxClients; i++)
 	{
@@ -12660,17 +12735,18 @@ void CGame::send_config_reload_notification(bool items, bool magic, bool skills,
 	}
 }
 
-void CGame::push_config_reload_to_clients(bool items, bool magic, bool skills, bool npcs)
+void CGame::push_config_reload_to_clients(bool items, bool magic, bool skills, bool npcs, bool balance)
 {
 	int count = 0;
 	for(int i = 1; i < MaxClients; i++)
 	{
 		if (m_client_list[i] != 0 && m_client_list[i]->m_is_init_complete)
 		{
-			if (items)  m_item_manager->send_client_item_configs(i);
-			if (magic)  m_magic_manager->send_client_magic_configs(i);
-			if (skills) m_skill_manager->send_client_skill_configs(i);
-			if (npcs)   send_client_npc_configs(i);
+			if (items)   m_item_manager->send_client_item_configs(i);
+			if (magic)   m_magic_manager->send_client_magic_configs(i);
+			if (skills)  m_skill_manager->send_client_skill_configs(i);
+			if (npcs)    send_client_npc_configs(i);
+			if (balance) send_client_balance_config(i);
 			count++;
 		}
 	}
@@ -14046,3 +14122,121 @@ void CGame::get_angel_handler(int client_h, char* data, size_t msg_size)
 
 //50Cent - Repair All
 
+void CGame::apply_server_config(const server_config& cfg)
+{
+	m_server_config = cfg;
+
+	// Drop rates
+	m_primary_drop_rate = cfg.drop_rates.primary;
+	m_gold_drop_rate = cfg.drop_rates.gold;
+	m_secondary_drop_rate = cfg.drop_rates.secondary;
+	m_rep_drop_modifier = static_cast<char>(cfg.drop_rates.rep_modifier);
+
+	// Timing
+	m_client_timeout = cfg.timing.client_timeout_ms;
+	m_stamina_regen_interval = cfg.timing.stamina_regen_ms;
+	m_poison_damage_interval = cfg.timing.poison_damage_ms;
+	m_health_regen_interval = cfg.timing.health_regen_ms;
+	m_mana_regen_interval = cfg.timing.mana_regen_ms;
+	m_hunger_consume_interval = cfg.timing.hunger_consume_ms;
+	m_summon_creature_duration = cfg.timing.summon_duration_ms;
+	m_autosave_interval = cfg.timing.autosave_ms;
+	m_lag_protection_interval = cfg.timing.lag_protection_ms;
+
+	// Combat
+	m_enemy_kill_mode = (cfg.combat.enemy_kill_mode == "deathmatch");
+	m_enemy_kill_adjust = cfg.combat.enemy_kill_adjust;
+	m_slate_success_rate = static_cast<short>(cfg.combat.slate_success_rate);
+	m_minimum_hit_ratio = cfg.combat.min_hit_ratio;
+	m_maximum_hit_ratio = cfg.combat.max_hit_ratio;
+
+	// Character
+	m_base_stat_value = cfg.character.base_stat_value;
+	m_creation_stat_bonus = cfg.character.creation_stat_bonus;
+	m_levelup_stat_gain = cfg.character.levelup_stat_gain;
+	m_max_level = cfg.character.max_level;
+	m_max_stat_value = m_base_stat_value + m_creation_stat_bonus + (m_levelup_stat_gain * m_max_level) + 16;
+
+	// Gameplay
+	m_nighttime_duration = cfg.gameplay.nighttime_duration;
+	m_starting_guild_rank = cfg.gameplay.starting_guild_rank;
+	m_grand_magic_mana_consumption = cfg.gameplay.grand_magic_mana_cost;
+	m_max_construction_points = cfg.gameplay.max_construction_points;
+	m_max_summon_points = cfg.gameplay.max_summon_points;
+	m_max_war_contribution = cfg.gameplay.max_war_contribution;
+	m_max_bank_items = cfg.gameplay.max_bank_items;
+
+	// Raid schedule
+	m_raid_time_monday = cfg.raid_schedule.monday;
+	m_raid_time_tuesday = cfg.raid_schedule.tuesday;
+	m_raid_time_wednesday = cfg.raid_schedule.wednesday;
+	m_raid_time_thursday = cfg.raid_schedule.thursday;
+	m_raid_time_friday = cfg.raid_schedule.friday;
+	m_raid_time_saturday = cfg.raid_schedule.saturday;
+	m_raid_time_sunday = cfg.raid_schedule.sunday;
+
+	// Realm
+	std::snprintf(m_realm_name, sizeof(m_realm_name), "%s", cfg.realm.name.c_str());
+	std::snprintf(m_login_listen_ip, sizeof(m_login_listen_ip), "%s", cfg.realm.login_listen_ip.c_str());
+	m_login_listen_port = cfg.realm.login_listen_port;
+	std::snprintf(m_game_listen_ip, sizeof(m_game_listen_ip), "%s", cfg.realm.game_listen_ip.c_str());
+	m_game_listen_port = cfg.realm.game_listen_port;
+	if (!cfg.realm.game_connection_ip.empty())
+	{
+		std::snprintf(m_game_connection_ip, sizeof(m_game_connection_ip), "%s", cfg.realm.game_connection_ip.c_str());
+		m_game_connection_port = cfg.realm.game_connection_port;
+	}
+	else
+	{
+		m_game_connection_ip[0] = '\0';
+		m_game_connection_port = 0;
+	}
+}
+
+bool CGame::reload_server_config()
+{
+	server_config cfg;
+	if (!load_server_config("server_config.json", cfg))
+	{
+		hb::logger::error("Failed to reload server_config.json");
+		return false;
+	}
+	apply_server_config(cfg);
+	hb::logger::log("server_config.json reloaded successfully");
+	return true;
+}
+
+bool CGame::reload_formulas()
+{
+	sqlite3* db = nullptr;
+	std::string dbPath;
+	bool created = false;
+	if (!EnsureGameConfigDatabase(&db, dbPath, &created))
+	{
+		hb::logger::error("Failed to open gamedata.db for formula reload");
+		return false;
+	}
+
+	// Load into temporary engine, validate before swapping
+	hb::shared::formula_engine temp_engine;
+	bool ok = LoadFormulas(db, temp_engine);
+	CloseGameConfigDatabase(db);
+
+	if (!ok)
+	{
+		hb::logger::error("Formula reload failed (load error)");
+		return false;
+	}
+
+	auto vr = temp_engine.validate();
+	if (!vr.success)
+	{
+		hb::logger::error("Formula reload failed (validation error) — keeping current formulas");
+		return false;
+	}
+
+	m_formula_engine = std::move(temp_engine);
+	compute_balance_hash();
+	hb::logger::log("Formulas reloaded from gamedata.db (balance hash updated)");
+	return true;
+}

@@ -628,7 +628,7 @@ void SkillManager::reload_skill_configs()
 	bool configDbCreated = false;
 	if (!EnsureGameConfigDatabase(&configDb, configDbPath, &configDbCreated) || configDbCreated)
 	{
-		hb::logger::log("Skill config reload failed: gameconfigs.db unavailable");
+		hb::logger::log("Skill config reload failed: gamedata.db unavailable");
 		return;
 	}
 

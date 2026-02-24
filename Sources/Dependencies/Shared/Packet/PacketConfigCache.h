@@ -25,6 +25,7 @@ namespace net {
 		char skillConfigHash[65];
 		char npcConfigHash[65];
 		char mapConfigHash[65];
+		char balanceConfigHash[65];
 	};
 
 	struct HB_PACKED PacketResponseConfigCacheStatus {
@@ -34,6 +35,7 @@ namespace net {
 		uint8_t skillCacheValid;
 		uint8_t npcCacheValid;
 		uint8_t mapCacheValid;
+		uint8_t balanceCacheValid;
 	};
 
 	struct HB_PACKED PacketNotifyConfigReload {
@@ -43,6 +45,7 @@ namespace net {
 		uint8_t reloadSkills;
 		uint8_t reloadNpcs;
 		uint8_t reloadMaps;
+		uint8_t reloadBalance;
 	};
 
 	struct HB_PACKED PacketRequestConfigData {
@@ -52,6 +55,7 @@ namespace net {
 		uint8_t requestSkills;
 		uint8_t requestNpcs;
 		uint8_t requestMaps;
+		uint8_t requestBalance;
 	};
 
 	struct HB_PACKED PacketMapConfigHeader {

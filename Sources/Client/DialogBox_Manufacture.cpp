@@ -17,6 +17,7 @@
 #include <format>
 #include <string>
 #include "Screen_OnGame.h"
+#include "AudioManager.h"
 
 using namespace hb::shared::net;
 using namespace hb::shared::item;
@@ -243,7 +244,7 @@ void DialogBox_Manufacture::draw_alchemy_creating(short sX, short sY)
 			m_game->send_game_packet(req, false);
 		}
 		m_game->get_dialog_box_manager().disable_dialog_box(DialogBoxId::Manufacture);
-		m_game->play_game_sound('E', 42, 0);
+		audio_manager::get().play_game_sound(sound_type::effect, 42, 0);
 	}
 }
 
@@ -764,7 +765,7 @@ void DialogBox_Manufacture::draw_crafting_in_progress(short sX, short sY)
 			m_game->send_game_packet(req, false);
 		}
 		m_game->get_dialog_box_manager().disable_dialog_box(DialogBoxId::Manufacture);
-		m_game->play_game_sound('E', 42, 0);
+		audio_manager::get().play_game_sound(sound_type::effect, 42, 0);
 	}
 }
 
@@ -784,9 +785,9 @@ bool DialogBox_Manufacture::on_click()
 			m_mode = mode::alchemy_creating;
 			m_progress = 1;
 			m_anim_timer = m_game->m_cur_time;
-			m_game->play_game_sound('E', 14, 5);
+			audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 			m_game->add_event_list(DLGBOX_CLICK_SKILLDLG1, 10);
-			m_game->play_game_sound('E', 41, 0);
+			audio_manager::get().play_game_sound(sound_type::effect, 41, 0);
 			return true;
 		}
 		break;
@@ -797,16 +798,16 @@ bool DialogBox_Manufacture::on_click()
 			if (m_slot_1 == -1)
 			{
 				m_game->add_event_list(DLGBOX_CLICK_SKILLDLG2, 10);
-				m_game->play_game_sound('E', 14, 5);
+				audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 			}
 			else
 			{
 				m_mode = mode::crafting_in_progress;
 				m_anim_timer = m_game->m_cur_time;
 				m_anim_frame = 1;
-				m_game->play_game_sound('E', 14, 5);
+				audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 				m_game->add_event_list(DLGBOX_CLICK_SKILLDLG3, 10);
-				m_game->play_game_sound('E', 51, 0);
+				audio_manager::get().play_game_sound(sound_type::effect, 51, 0);
 			}
 			return true;
 		}
@@ -821,7 +822,7 @@ bool DialogBox_Manufacture::on_click()
 				if ((mouse_x >= sX + adj_x + 44) && (mouse_x <= sX + adj_x + 135 + 44) && (mouse_y >= sY + adj_y + 55 + i * 15) && (mouse_y <= sY + adj_y + 55 + 14 + i * 15)) {
 					m_mode = mode::manufacture_waiting;
 					m_progress = i + m_scroll_view;
-					m_game->play_game_sound('E', 14, 5);
+					audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 					return true;
 				}
 			}
@@ -834,7 +835,7 @@ bool DialogBox_Manufacture::on_click()
 				// Back
 				reset_item_slots();
 				m_mode = mode::manufacture_list;
-				m_game->play_game_sound('E', 14, 5);
+				audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 				return true;
 			}
 
@@ -846,8 +847,8 @@ bool DialogBox_Manufacture::on_click()
 					m_mode = mode::manufacture_in_progress;
 					m_anim_frame = 0;
 					m_anim_timer = m_game->m_cur_time;
-					m_game->play_game_sound('E', 14, 5);
-					m_game->play_game_sound('E', 44, 0);
+					audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
+					audio_manager::get().play_game_sound(sound_type::effect, 44, 0);
 				}
 				return true;
 			}
@@ -859,7 +860,7 @@ bool DialogBox_Manufacture::on_click()
 				// Back
 				reset_item_slots();
 				m_mode = mode::manufacture_list;
-				m_game->play_game_sound('E', 14, 5);
+				audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 				return true;
 			}
 		}
@@ -870,7 +871,7 @@ bool DialogBox_Manufacture::on_click()
 			// Back
 			reset_item_slots();
 			m_mode = mode::manufacture_list;
-			m_game->play_game_sound('E', 14, 5);
+			audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 			return true;
 		}
 		break;

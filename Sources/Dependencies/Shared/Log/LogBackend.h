@@ -26,7 +26,7 @@ public:
 	void close();
 
 protected:
-	virtual void write_console(int channel, int level, std::string_view formatted_line);
+	virtual void write_console(int channel, std::string_view colored_line);
 
 private:
 	std::array<std::ofstream, max_channels> m_files;

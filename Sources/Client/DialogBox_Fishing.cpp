@@ -12,6 +12,7 @@
 #include <string>
 #include "IInput.h"
 #include "Screen_OnGame.h"
+#include "AudioManager.h"
 
 using namespace hb::shared::net;
 using namespace hb::client::sprite_id;
@@ -72,7 +73,7 @@ bool DialogBox_Fishing::on_click()
 			m_game->send_game_packet(hb::net::make_common_command(CommonType::ReqGetFishThisTime, m_game->m_player->m_player_x, m_game->m_player->m_player_y));
 			m_game->add_event_list(DLGBOX_CLICK_FISH1, 10);
 			disable_dialog_box(DialogBoxId::Fishing);
-			m_game->play_game_sound('E', 14, 5);
+			audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 			return true;
 		}
 		break;

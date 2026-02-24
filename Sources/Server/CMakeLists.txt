@@ -52,6 +52,7 @@ set(SERVER_SOURCES
     GameCmdUnblock.cpp
     GameCmdWhisper.cpp
     GameConfigSqliteStore.cpp
+    ServerConfig.cpp
     GuildManager.cpp
     ItemManager.cpp
     LoginServer.cpp
@@ -83,6 +84,7 @@ set(SHARED_SOURCES
     ../Dependencies/Shared/Net/IOServicePool.cpp
     ../Dependencies/Shared/Log/LogBackend.cpp
     ../Dependencies/Shared/Util/SHA256.cpp
+    ../Dependencies/Shared/Game/FormulaEngine.cpp
 )
 
 # ---------------------------------------------------------------------------

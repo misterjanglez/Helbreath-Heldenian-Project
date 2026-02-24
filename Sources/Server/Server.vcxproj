@@ -306,6 +306,7 @@
     <ClInclude Include="Fish.h" />
     <ClInclude Include="Game.h" />
     <ClInclude Include="GameConfigSqliteStore.h" />
+    <ClInclude Include="ServerConfig.h" />
     <ClInclude Include="GlobalDef.h" />
     <ClInclude Include="MapInfoSqliteStore.h" />
     <ClInclude Include="GuildsMan.h" />
@@ -438,6 +439,7 @@
     <ClCompile Include="StatusEffectManager.cpp" />
     <ClCompile Include="Game.cpp" />
     <ClCompile Include="GameConfigSqliteStore.cpp" />
+    <ClCompile Include="ServerConfig.cpp" />
     <ClCompile Include="MapInfoSqliteStore.cpp" />
     <ClCompile Include="LoginServer.cpp" />
     <ClCompile Include="Map.cpp" />
@@ -475,6 +477,7 @@
     <ClCompile Include="..\Dependencies\Shared\Net\IOServicePool.cpp" />
     <ClCompile Include="..\Dependencies\Shared\Log\LogBackend.cpp" />
     <ClCompile Include="..\Dependencies\Shared\Util\SHA256.cpp" />
+    <ClCompile Include="..\Dependencies\Shared\Game\FormulaEngine.cpp" />
     <ClCompile Include="ServerLog.cpp" />
   </ItemGroup>
   <ItemGroup>

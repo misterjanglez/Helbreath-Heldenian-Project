@@ -260,7 +260,7 @@ void weather_manager::set_ambient_light(char level)
 void weather_manager::set_weather(bool start, char effect_type)
 {
 	// Always stop weather sounds first when changing weather
-	audio_manager::get().stop_sound(sound_type::Effect, 38);
+	audio_manager::get().stop_sound(sound_type::effect, 38);
 
 	if (start == true)
 	{
@@ -269,7 +269,7 @@ void weather_manager::set_weather(bool start, char effect_type)
 
 		// Rain sound (types 1-3)
 		if (audio_manager::get().is_sound_enabled() && (effect_type >= 1) && (effect_type <= 3))
-			audio_manager::get().play_sound_loop(sound_type::Effect, 38);
+			audio_manager::get().play_sound_loop(sound_type::effect, 38);
 
 		for (auto& p : m_particles)
 		{

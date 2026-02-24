@@ -1712,7 +1712,7 @@
 #define DEF_MSG_CHARISMA		"Charisma"
 #define DEF_MSG_HITPOINT		"Hit Point"
 #define DEF_MSG_MANAPOINT		"Mana Point"
-#define DEF_MSG_STAMINARPOINT	"Staminar Point"
+#define DEF_MSG_STAMINAPOINT	"Stamina Point"
 
 #define DEF_MSG_GETNEXTMOVEDIR	"A civilian cannot go to a dangerous area.  You have to change play mode at the cityhall."
 #define DEF_MSG_GUIDEMAP_MIN	"(-) : Minimize map"

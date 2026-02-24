@@ -10,6 +10,7 @@
 #include <climits>
 #include <format>
 #include "Screen_OnGame.h"
+#include "AudioManager.h"
 
 using namespace hb::shared::net;
 using hb::shared::item::ItemType;
@@ -313,9 +314,9 @@ void inventory_manager::equip_item(int item_id)
 		short id = m_game->m_player->m_item_list[item_id]->m_id_num;
 		if (id == hb::shared::item::ItemId::AngelicPandentSTR || id == hb::shared::item::ItemId::AngelicPandentDEX ||
 			id == hb::shared::item::ItemId::AngelicPandentINT || id == hb::shared::item::ItemId::AngelicPandentMAG)
-			m_game->play_game_sound('E', 52, 0);
+			audio_manager::get().play_game_sound(sound_type::effect, 52, 0);
 		else
-			m_game->play_game_sound('E', 28, 0);
+			audio_manager::get().play_game_sound(sound_type::effect, 28, 0);
 	}
 }
 

@@ -16,6 +16,7 @@
 #include <format>
 #include <cstring>
 #include "IInput.h"
+#include "AudioManager.h"
 
 using namespace hb::shared::net;
 using namespace hb::client::sprite_id;
@@ -645,7 +646,7 @@ bool DialogBox_ItemCreator::on_click_search(short sX, short sY, short size_x)
 			m_item_count = 1;
 			m_open_dropdown = dropdown_id::none;
 			m_page = 1;
-			play_sound_effect('E', 14, 5);
+			audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 			return true;
 		}
 	}
@@ -655,7 +656,7 @@ bool DialogBox_ItemCreator::on_click_search(short sX, short sY, short size_x)
 		(mouse_y >= sY + ui_layout::btn_y) && (mouse_y <= sY + ui_layout::btn_y + ui_layout::btn_size_y))
 	{
 		disable_this_dialog();
-		play_sound_effect('E', 14, 5);
+		audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 		return true;
 	}
 
@@ -713,7 +714,7 @@ bool DialogBox_ItemCreator::on_click_configure(short sX, short sY, short size_x)
 			&& mouse_y >= dd_y && mouse_y < dd_y + dropdown_h)
 		{
 			m_open_dropdown = dropdown_id::none;
-			play_sound_effect('E', 14, 5);
+			audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 			return true;
 		}
 
@@ -750,7 +751,7 @@ bool DialogBox_ItemCreator::on_click_configure(short sX, short sY, short size_x)
 				}
 			}
 			m_open_dropdown = dropdown_id::none;
-			play_sound_effect('E', 14, 5);
+			audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 			return true;
 		}
 
@@ -766,7 +767,7 @@ bool DialogBox_ItemCreator::on_click_configure(short sX, short sY, short size_x)
 		{
 			m_open_dropdown = id;
 			m_dropdown_scroll = 0;
-			play_sound_effect('E', 14, 5);
+			audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 			return true;
 		}
 		return false;
@@ -836,7 +837,7 @@ bool DialogBox_ItemCreator::on_click_configure(short sX, short sY, short size_x)
 				send_game_packet(pkt);
 			}
 		}
-		play_sound_effect('E', 14, 5);
+		audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 		return true;
 	}
 
@@ -850,7 +851,7 @@ bool DialogBox_ItemCreator::on_click_configure(short sX, short sY, short size_x)
 		text_input_manager::get().start_input(sX + 70, sY + layout::search_bar_y + 5, 20, m_search_text);
 		m_last_sx = sX;
 		m_last_sy = sY;
-		play_sound_effect('E', 14, 5);
+		audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 		return true;
 	}
 
@@ -859,7 +860,7 @@ bool DialogBox_ItemCreator::on_click_configure(short sX, short sY, short size_x)
 		(mouse_y >= sY + ui_layout::btn_y) && (mouse_y <= sY + ui_layout::btn_y + ui_layout::btn_size_y))
 	{
 		disable_this_dialog();
-		play_sound_effect('E', 14, 5);
+		audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 		return true;
 	}
 

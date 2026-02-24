@@ -14,6 +14,7 @@
 #include <format>
 #include <string>
 #include "Screen_OnGame.h"
+#include "AudioManager.h"
 
 
 using namespace hb::shared::action;
@@ -194,7 +195,7 @@ namespace NetworkMessageHandlers {
 
 		game->m_player->m_exp = exp;
 		game->m_player->m_enemy_kill_count = enemy_kill_count;
-		game->play_game_sound('E', 23, 0);
+		audio_manager::get().play_game_sound(sound_type::effect, 23, 0);
 
 		game->get_floating_text().remove_by_object_id(game->m_player->m_player_object_id);
 		game->get_floating_text().add_notify_text(notify_text_type::enemy_kill, "Enemy Kill!", game->m_cur_time,

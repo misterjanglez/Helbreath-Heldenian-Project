@@ -11,6 +11,7 @@
 #include "TextFieldRenderer.h"
 #include "InputStateHelper.h"
 #include "Packet/SharedPackets.h"
+#include "AudioManager.h"
 
 using namespace hb::shared::net;
 using namespace hb::client::sprite_id;
@@ -79,7 +80,7 @@ void Screen_CreateAccount::on_initialize()
     // === Buttons ===
     auto* btn_create = m_controls.add<cc::button>(BTN_CREATE, cc::rect{297, 398, 72, 20});
     btn_create->set_on_click([this](int) { submit_create_account(); });
-    btn_create->set_click_sound([this] { play_game_sound('E', 14, 5); });
+    btn_create->set_click_sound([this] { audio_manager::get().play_game_sound(sound_type::effect, 14, 5); });
     btn_create->set_render_handler([this](const cc::control& c) {
         auto sb = c.screen_bounds();
         // Only highlight when all fields are valid
@@ -94,7 +95,7 @@ void Screen_CreateAccount::on_initialize()
     });
 
     auto* btn_clear = m_controls.add<cc::button>(BTN_CLEAR, cc::rect{392, 398, 72, 20});
-    btn_clear->set_click_sound([this] { play_game_sound('E', 14, 5); });
+    btn_clear->set_click_sound([this] { audio_manager::get().play_game_sound(sound_type::effect, 14, 5); });
     btn_clear->set_on_click([this](int) {
         for (int id = TXT_ACCOUNT; id <= TXT_EMAIL; id++)
         {
@@ -111,7 +112,7 @@ void Screen_CreateAccount::on_initialize()
 
     auto* btn_cancel = m_controls.add<cc::button>(BTN_CANCEL, cc::rect{488, 398, 72, 20});
     btn_cancel->set_on_click([this](int) { m_game->change_game_mode(GameMode::MainMenu); });
-    btn_cancel->set_click_sound([this] { play_game_sound('E', 14, 5); });
+    btn_cancel->set_click_sound([this] { audio_manager::get().play_game_sound(sound_type::effect, 14, 5); });
     btn_cancel->set_render_handler([this](const cc::control& c) {
         auto sb = c.screen_bounds();
         int frame = c.is_highlighted() ? 17 : 16;

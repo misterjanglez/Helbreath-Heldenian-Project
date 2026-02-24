@@ -4,6 +4,7 @@
 #include "PacketSendHelpers.h"
 
 #include "IInput.h"
+#include "AudioManager.h"
 
 using namespace hb::shared::net;
 using namespace hb::client::sprite_id;
@@ -68,7 +69,7 @@ bool DialogBox_ConfirmExchange::on_click()
 					0;
 					send_game_packet(pkt);
 				}
-				play_sound_effect('E', 14, 5);
+				audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 				get_dialog_box_as<DialogBox_Exchange>(DialogBoxId::Exchange)->m_mode = DialogBox_Exchange::mode::confirmed;
 				m_mode = mode::waiting;
 			}
@@ -82,7 +83,7 @@ bool DialogBox_ConfirmExchange::on_click()
 			disable_dialog_box(DialogBoxId::Exchange);
 			disable_dialog_box(DialogBoxId::Map);
 			send_game_packet(hb::net::make_common_command(CommonType::cancel_exchange_item, player().m_player_x, player().m_player_y));
-			play_sound_effect('E', 14, 5);
+			audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 			return true;
 		}
 		break;

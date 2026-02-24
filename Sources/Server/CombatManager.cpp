@@ -11,6 +11,7 @@
 #include "DelayEventManager.h"
 #include "DynamicObjectManager.h"
 #include "Packet/SharedPackets.h"
+#include "SharedCalculations.h"
 #include "Log.h"
 #include "ServerLogChannels.h"
 
@@ -2113,22 +2114,19 @@ bool CombatManager::check_client_attack_frequency(int client_h, uint32_t client_
 		m_game->m_client_list[client_h]->m_attack_freq_time = client_time;
 
 		// Compute expected minimum swing time from player's weapon speed and status effects.
-		// Must match client-side animation timing (PlayerAnim::Attack: max_frame=7, frames 0-7 = 8 durations @ 78ms base).
-		constexpr int ATTACK_FRAME_DURATIONS = 8;
-		constexpr int BASE_FRAME_TIME = 78;
-		constexpr int RUN_FRAME_TIME = 39;
 		constexpr int TOLERANCE_MS = 50;
 
 		const auto& status = m_game->m_client_list[client_h]->m_status;
-		int attack_delay = status.attack_delay;  // 0 = full swing (STR meets weapon req)
-		bool haste = status.haste;
-		bool frozen = status.frozen;
+		int base_swing = hb::shared::calc::swing_time(m_game->m_formula_engine,
+			hb::shared::calc::attack_delay_value{(double)status.attack_delay});
+		int frames = hb::shared::calc::swing_frames(m_game->m_formula_engine);
+		int bft = hb::shared::calc::base_frame_time(m_game->m_formula_engine);
+		int rft = hb::shared::calc::run_frame_time(m_game->m_formula_engine);
+		int effective_swing = base_swing;
+		if (status.frozen) effective_swing += frames * (bft >> 2);
+		if (status.haste)  effective_swing -= frames * static_cast<int>(rft / 2.3);
 
-		int effectiveFrameTime = BASE_FRAME_TIME + (attack_delay * 12);
-		if (frozen) effectiveFrameTime += BASE_FRAME_TIME >> 2;
-		if (haste)  effectiveFrameTime -= static_cast<int>(RUN_FRAME_TIME / 2.3);
-
-		int expectedSwingTime = ATTACK_FRAME_DURATIONS * effectiveFrameTime;
+		int expectedSwingTime = effective_swing;
 		int threshold = expectedSwingTime - TOLERANCE_MS;
 		if (threshold < 200) threshold = 200;
 

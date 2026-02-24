@@ -454,6 +454,7 @@
     <ClInclude Include="..\Dependencies\Shared\Render\RendererFactory.h" />
     <ClInclude Include="..\Dependencies\Shared\Render\ResolutionConfig.h" />
     <ClInclude Include="..\Dependencies\Shared\Game\SharedCalculations.h" />
+    <ClInclude Include="..\Dependencies\Shared\Game\FormulaEngine.h" />
     <ClInclude Include="..\Dependencies\Shared\Render\SpriteCollection.h" />
     <ClInclude Include="..\Dependencies\Shared\Render\SpriteLoader.h" />
     <ClInclude Include="..\Dependencies\Shared\Render\SpriteTypes.h" />
@@ -615,6 +616,7 @@
     <ClCompile Include="..\Dependencies\Shared\Render\ResolutionConfig.cpp" />
     <ClCompile Include="..\Dependencies\Shared\Log\LogBackend.cpp" />
     <ClCompile Include="..\Dependencies\Shared\Util\SHA256.cpp" />
+    <ClCompile Include="..\Dependencies\Shared\Game\FormulaEngine.cpp" />
     <ClCompile Include="ClientLog.cpp" />
   </ItemGroup>
   <ItemGroup>

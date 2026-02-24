@@ -907,7 +907,7 @@ bool DialogBox_SysMenu::on_click()
 		{
 			if (m_iActiveTab != i) m_graphics_scroll_offset = 0;
 			m_iActiveTab = i;
-			play_sound_effect('E', 14, 5);
+			audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 			return true;
 		}
 	}
@@ -1025,7 +1025,7 @@ bool DialogBox_SysMenu::on_click_general(short sX, short sY)
 				add_event_list(DLGBOX_CLICK_SYSMENU2, 10);
 				disable_this_dialog();
 			}
-			play_sound_effect('E', 14, 5);
+			audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 			return true;
 		}
 	}
@@ -1042,7 +1042,7 @@ bool DialogBox_SysMenu::on_click_general(short sX, short sY)
 			std::string restartBuf;
 			restartBuf = std::format(DLGBOX_CLICK_SYSMENU1, m_game->m_restart_count);
 			add_event_list(restartBuf.c_str(), 10);
-			play_sound_effect('E', 14, 5);
+			audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 			return true;
 		}
 	}
@@ -1093,7 +1093,7 @@ bool DialogBox_SysMenu::on_click_graphics(short sX, short sY)
 				int newLimit = s_FpsOptions[clickedRegion];
 				config_manager::get().set_fps_limit(newLimit);
 				hb::shared::render::Window::get()->set_framerate_limit(newLimit);
-				play_sound_effect('E', 14, 5);
+				audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 				return true;
 			}
 		}
@@ -1112,7 +1112,7 @@ bool DialogBox_SysMenu::on_click_graphics(short sX, short sY)
 			hb::shared::render::Window::get()->set_fullscreen_stretch(new_stretch);
 			if (hb::shared::render::Renderer::get())
 				hb::shared::render::Renderer::get()->set_fullscreen_stretch(new_stretch);
-			play_sound_effect('E', 14, 5);
+			audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 			return true;
 		}
 	}
@@ -1126,7 +1126,7 @@ bool DialogBox_SysMenu::on_click_graphics(short sX, short sY)
 			bool enabled = config_manager::get().is_vsync_enabled();
 			config_manager::get().set_vsync_enabled(!enabled);
 			hb::shared::render::Window::get()->set_vsync_enabled(!enabled);
-			play_sound_effect('E', 14, 5);
+			audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 			return true;
 		}
 	}
@@ -1142,18 +1142,18 @@ bool DialogBox_SysMenu::on_click_graphics(short sX, short sY)
 			if (mouse_x < wideBoxX + regionWidth) {
 				config_manager::get().set_detail_level(0);
 				add_event_list(NOTIFY_MSG_DETAIL_LEVEL_LOW, 10);
-				play_sound_effect('E', 14, 5);
+				audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 				return true;
 			}
 			if (mouse_x < wideBoxX + (regionWidth * 2)) {
 				config_manager::get().set_detail_level(1);
 				add_event_list(NOTIFY_MSG_DETAIL_LEVEL_MEDIUM, 10);
-				play_sound_effect('E', 14, 5);
+				audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 				return true;
 			}
 			config_manager::get().set_detail_level(2);
 			add_event_list(NOTIFY_MSG_DETAIL_LEVEL_HIGH, 10);
-			play_sound_effect('E', 14, 5);
+			audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 			return true;
 		}
 	}
@@ -1166,7 +1166,7 @@ bool DialogBox_SysMenu::on_click_graphics(short sX, short sY)
 		if (is_in_toggle_area(smallBoxX, lineY)) {
 			bool enabled = config_manager::get().is_dialog_transparency_enabled();
 			config_manager::get().set_dialog_transparency_enabled(!enabled);
-			play_sound_effect('E', 14, 5);
+			audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 			return true;
 		}
 	}
@@ -1179,7 +1179,7 @@ bool DialogBox_SysMenu::on_click_graphics(short sX, short sY)
 		if (is_in_toggle_area(smallBoxX, lineY)) {
 			bool enabled = config_manager::get().is_show_fps_enabled();
 			config_manager::get().set_show_fps_enabled(!enabled);
-			play_sound_effect('E', 14, 5);
+			audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 			return true;
 		}
 	}
@@ -1192,7 +1192,7 @@ bool DialogBox_SysMenu::on_click_graphics(short sX, short sY)
 		if (is_in_toggle_area(smallBoxX, lineY)) {
 			bool enabled = config_manager::get().is_show_latency_enabled();
 			config_manager::get().set_show_latency_enabled(!enabled);
-			play_sound_effect('E', 14, 5);
+			audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 			return true;
 		}
 	}
@@ -1206,7 +1206,7 @@ bool DialogBox_SysMenu::on_click_graphics(short sX, short sY)
 			bool enabled = config_manager::get().is_background_fps_throttle_enabled();
 			config_manager::get().set_background_fps_throttle_enabled(!enabled);
 			hb::shared::render::Window::get()->set_background_fps_limit(enabled ? 0 : 5);
-			play_sound_effect('E', 14, 5);
+			audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 			return true;
 		}
 	}
@@ -1220,7 +1220,7 @@ bool DialogBox_SysMenu::on_click_graphics(short sX, short sY)
 		if (is_in_toggle_area(smallBoxX, lineY)) {
 			bool enabled = config_manager::get().is_tile_grid_enabled();
 			config_manager::get().set_tile_grid_enabled(!enabled);
-			play_sound_effect('E', 14, 5);
+			audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 			return true;
 		}
 	}
@@ -1233,7 +1233,7 @@ bool DialogBox_SysMenu::on_click_graphics(short sX, short sY)
 		if (is_in_toggle_area(smallBoxX, lineY)) {
 			bool enabled = config_manager::get().is_patching_grid_enabled();
 			config_manager::get().set_patching_grid_enabled(!enabled);
-			play_sound_effect('E', 14, 5);
+			audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 			return true;
 		}
 	}
@@ -1251,7 +1251,7 @@ bool DialogBox_SysMenu::on_click_graphics(short sX, short sY)
 			hb::shared::input::get()->set_window_active(true);
 			config_manager::get().set_fullscreen_enabled(!fullscreen);
 			config_manager::get().save();
-			play_sound_effect('E', 14, 5);
+			audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 			return true;
 		}
 	}
@@ -1268,7 +1268,7 @@ bool DialogBox_SysMenu::on_click_graphics(short sX, short sY)
 			hb::shared::render::Window::set_borderless(!borderless);
 			hb::shared::input::get()->set_window_active(true);
 			config_manager::get().save();
-			play_sound_effect('E', 14, 5);
+			audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 			return true;
 		}
 	}
@@ -1281,7 +1281,7 @@ bool DialogBox_SysMenu::on_click_graphics(short sX, short sY)
 		const int resBoxY = lineY - 2;
 		if (!fullscreen && mouse_x >= wideBoxX && mouse_x <= wideBoxX + wideBoxWidth && mouse_y >= resBoxY && mouse_y <= resBoxY + wideBoxHeight) {
 			cycle_resolution();
-			play_sound_effect('E', 14, 5);
+			audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 			add_event_list("Resolution changed.", 10);
 			return true;
 		}
@@ -1306,7 +1306,7 @@ bool DialogBox_SysMenu::on_click_audio(short sX, short sY)
 		audio_manager::get().set_master_enabled(!enabled);
 		config_manager::get().set_master_enabled(!enabled);
 		config_manager::get().save();
-		play_sound_effect('E', 14, 5);
+		audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 		return true;
 	}
 
@@ -1317,7 +1317,7 @@ bool DialogBox_SysMenu::on_click_audio(short sX, short sY)
 		audio_manager::get().set_sound_enabled(!enabled);
 		config_manager::get().set_sound_enabled(!enabled);
 		config_manager::get().save();
-		play_sound_effect('E', 14, 5);
+		audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 		return true;
 	}
 
@@ -1328,7 +1328,7 @@ bool DialogBox_SysMenu::on_click_audio(short sX, short sY)
 		audio_manager::get().set_ambient_enabled(!enabled);
 		config_manager::get().set_ambient_enabled(!enabled);
 		config_manager::get().save();
-		play_sound_effect('E', 14, 5);
+		audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 		return true;
 	}
 
@@ -1339,7 +1339,7 @@ bool DialogBox_SysMenu::on_click_audio(short sX, short sY)
 		audio_manager::get().set_ui_enabled(!enabled);
 		config_manager::get().set_ui_enabled(!enabled);
 		config_manager::get().save();
-		play_sound_effect('E', 14, 5);
+		audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 		return true;
 	}
 
@@ -1357,7 +1357,7 @@ bool DialogBox_SysMenu::on_click_audio(short sX, short sY)
 			m_game->start_bgm();
 		}
 		config_manager::get().save();
-		play_sound_effect('E', 14, 5);
+		audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 		return true;
 	}
 
@@ -1381,7 +1381,7 @@ bool DialogBox_SysMenu::on_click_system(short sX, short sY)
 			ChatManager::get().set_whisper_enabled(true);
 			add_event_list(BCHECK_LOCAL_CHAT_COMMAND6, 10);
 		}
-		play_sound_effect('E', 14, 5);
+		audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 		return true;
 	}
 
@@ -1397,7 +1397,7 @@ bool DialogBox_SysMenu::on_click_system(short sX, short sY)
 			ChatManager::get().set_shout_enabled(true);
 			add_event_list(BCHECK_LOCAL_CHAT_COMMAND8, 10);
 		}
-		play_sound_effect('E', 14, 5);
+		audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 		return true;
 	}
 
@@ -1407,7 +1407,7 @@ bool DialogBox_SysMenu::on_click_system(short sX, short sY)
 	if (is_in_toggle_area(valueX, lineY)) {
 		bool enabled = config_manager::get().is_running_mode_enabled();
 		config_manager::get().set_running_mode_enabled(!enabled);
-		play_sound_effect('E', 14, 5);
+		audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 		return true;
 	}
 
@@ -1418,7 +1418,7 @@ bool DialogBox_SysMenu::on_click_system(short sX, short sY)
 		bool enabled = config_manager::get().is_mouse_capture_enabled();
 		config_manager::get().set_mouse_capture_enabled(!enabled);
 		hb::shared::render::Window::get()->set_mouse_capture_enabled(!enabled);
-		play_sound_effect('E', 14, 5);
+		audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 		return true;
 	}
 
@@ -1430,7 +1430,7 @@ bool DialogBox_SysMenu::on_click_system(short sX, short sY)
 			disable_dialog_box(DialogBoxId::GuideMap);
 		else
 			enable_dialog_box(DialogBoxId::GuideMap, 0, 0, 0);
-		play_sound_effect('E', 14, 5);
+		audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 		return true;
 	}
 
@@ -1440,7 +1440,7 @@ bool DialogBox_SysMenu::on_click_system(short sX, short sY)
 	if (is_in_toggle_area(valueX, lineY)) {
 		bool enabled = config_manager::get().is_reduced_motion_enabled();
 		config_manager::get().set_reduced_motion_enabled(!enabled);
-		play_sound_effect('E', 14, 5);
+		audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 		return true;
 	}
 
@@ -1450,7 +1450,7 @@ bool DialogBox_SysMenu::on_click_system(short sX, short sY)
 	if (is_in_toggle_area(valueX, lineY)) {
 		bool enabled = config_manager::get().is_toggle_to_chat_enabled();
 		config_manager::get().set_toggle_to_chat_enabled(!enabled);
-		play_sound_effect('E', 14, 5);
+		audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 		return true;
 	}
 

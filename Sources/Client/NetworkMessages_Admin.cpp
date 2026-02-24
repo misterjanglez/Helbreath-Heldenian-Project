@@ -3,6 +3,7 @@
 #include "Packet/SharedPackets.h"
 #include "DialogBoxIDs.h"
 #include "DialogBox_Noticement.h"
+#include "AudioManager.h"
 #include <cstdio>
 #include <cstring>
 #include <string>
@@ -53,7 +54,7 @@ void HandleServerShutdown(CGame* game, char* data)
 		dlg->set_shutdown_info(pkt->seconds, pkt->message);
 	}
 
-	game->play_game_sound('E', 27, 0);
+	audio_manager::get().play_game_sound(sound_type::effect, 27, 0);
 }
 
 } // namespace NetworkMessageHandlers

@@ -10,6 +10,7 @@
 #include "Packet/SharedPackets.h"
 #include "PacketSendHelpers.h"
 #include "Screen_OnGame.h"
+#include "AudioManager.h"
 
 
 using namespace hb::shared::net;
@@ -403,7 +404,7 @@ bool DialogBox_GuildMenu::on_click_mode0(short sX, short sY)
 		text_input_manager::get().end_input();
 		text_input_manager::get().start_input(sX + 75, sY + 140, 21, player().m_guild_name, false, hb::client::guild_name_allowed_chars);
 		m_mode = mode::create_guild;
-		play_sound_effect('E', 14, 5);
+		audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 		return true;
 	}
 
@@ -412,21 +413,21 @@ bool DialogBox_GuildMenu::on_click_mode0(short sX, short sY)
 		if (player().m_guild_rank != 0) return false;
 		if (m_game->on_game()->m_is_crusade_mode) return false;
 		m_mode = mode::disband_confirm;
-		play_sound_effect('E', 14, 5);
+		audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 		return true;
 	}
 
 	// Admission ticket
 	if ((mouse_x > sX + ADJX + 61) && (mouse_x < sX + ADJX + 226) && (mouse_y > sY + ADJY + 103) && (mouse_y < sY + ADJY + 120)) {
 		m_mode = mode::admission_ticket;
-		play_sound_effect('E', 14, 5);
+		audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 		return true;
 	}
 
 	// Secession ticket
 	if ((mouse_x > sX + ADJX + 60) && (mouse_x < sX + ADJX + 227) && (mouse_y > sY + ADJY + 123) && (mouse_y < sY + ADJY + 139)) {
 		m_mode = mode::secession_ticket;
-		play_sound_effect('E', 14, 5);
+		audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 		return true;
 	}
 
@@ -440,7 +441,7 @@ bool DialogBox_GuildMenu::on_click_mode0(short sX, short sY)
 			m_mode = mode::get_ticket_redirect;
 			send_game_packet(hb::net::make_common_command(CommonType::ReqGetOccupyFightZoneTicket, player().m_player_x, player().m_player_y));
 		}
-		play_sound_effect('E', 14, 5);
+		audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 		return true;
 	}
 
@@ -468,7 +469,7 @@ bool DialogBox_GuildMenu::on_click_mode1(short sX, short sY)
 		}
 		m_mode = mode::creating;
 		text_input_manager::get().end_input();
-		play_sound_effect('E', 14, 5);
+		audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 		return true;
 	}
 
@@ -476,7 +477,7 @@ bool DialogBox_GuildMenu::on_click_mode1(short sX, short sY)
 	if ((mouse_x >= sX + 154) && (mouse_x <= sX + 154 + ui_layout::btn_size_x) && (mouse_y >= sY + ui_layout::btn_y) && (mouse_y <= sY + ui_layout::btn_y + ui_layout::btn_size_y)) {
 		m_mode = mode::main_menu;
 		text_input_manager::get().end_input();
-		play_sound_effect('E', 14, 5);
+		audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 		return true;
 	}
 
@@ -501,14 +502,14 @@ bool DialogBox_GuildMenu::on_click_mode5(short sX, short sY)
 			send_game_packet(req);
 		}
 		m_mode = mode::disbanding;
-		play_sound_effect('E', 14, 5);
+		audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 		return true;
 	}
 
 	// Cancel
 	if ((mouse_x >= sX + 154) && (mouse_x <= sX + 154 + ui_layout::btn_size_x) && (mouse_y >= sY + ui_layout::btn_y) && (mouse_y <= sY + ui_layout::btn_y + ui_layout::btn_size_y)) {
 		m_mode = mode::main_menu;
-		play_sound_effect('E', 14, 5);
+		audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 		return true;
 	}
 
@@ -532,14 +533,14 @@ bool DialogBox_GuildMenu::on_click_mode9(short sX, short sY)
 			send_game_packet(pkt);
 		}
 		m_mode = mode::main_menu;
-		play_sound_effect('E', 14, 5);
+		audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 		return true;
 	}
 
 	// Cancel
 	if ((mouse_x >= sX + 154) && (mouse_x <= sX + 154 + ui_layout::btn_size_x) && (mouse_y >= sY + ui_layout::btn_y) && (mouse_y <= sY + ui_layout::btn_y + ui_layout::btn_size_y)) {
 		m_mode = mode::main_menu;
-		play_sound_effect('E', 14, 5);
+		audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 		return true;
 	}
 
@@ -563,14 +564,14 @@ bool DialogBox_GuildMenu::on_click_mode11(short sX, short sY)
 			send_game_packet(pkt);
 		}
 		m_mode = mode::main_menu;
-		play_sound_effect('E', 14, 5);
+		audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 		return true;
 	}
 
 	// Cancel
 	if ((mouse_x >= sX + 154) && (mouse_x <= sX + 154 + ui_layout::btn_size_x) && (mouse_y >= sY + ui_layout::btn_y) && (mouse_y <= sY + ui_layout::btn_y + ui_layout::btn_size_y)) {
 		m_mode = mode::main_menu;
-		play_sound_effect('E', 14, 5);
+		audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 		return true;
 	}
 
@@ -592,7 +593,7 @@ bool DialogBox_GuildMenu::on_click_mode13(short sX, short sY)
 			}
 		m_mode = mode::fightzone_waiting;
 		m_game->on_game()->m_fightzone_number_temp = 1;
-		play_sound_effect('E', 14, 5);
+		audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 		return true;
 	}
 	// Fightzone 2
@@ -606,7 +607,7 @@ bool DialogBox_GuildMenu::on_click_mode13(short sX, short sY)
 			}
 		m_mode = mode::fightzone_waiting;
 		m_game->on_game()->m_fightzone_number_temp = 2;
-		play_sound_effect('E', 14, 5);
+		audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 		return true;
 	}
 	// Fightzone 3
@@ -620,7 +621,7 @@ bool DialogBox_GuildMenu::on_click_mode13(short sX, short sY)
 			}
 		m_mode = mode::fightzone_waiting;
 		m_game->on_game()->m_fightzone_number_temp = 3;
-		play_sound_effect('E', 14, 5);
+		audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 		return true;
 	}
 	// Fightzone 4
@@ -634,7 +635,7 @@ bool DialogBox_GuildMenu::on_click_mode13(short sX, short sY)
 			}
 		m_mode = mode::fightzone_waiting;
 		m_game->on_game()->m_fightzone_number_temp = 4;
-		play_sound_effect('E', 14, 5);
+		audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 		return true;
 	}
 	// Fightzone 5
@@ -648,7 +649,7 @@ bool DialogBox_GuildMenu::on_click_mode13(short sX, short sY)
 			}
 		m_mode = mode::fightzone_waiting;
 		m_game->on_game()->m_fightzone_number_temp = 5;
-		play_sound_effect('E', 14, 5);
+		audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 		return true;
 	}
 	// Fightzone 6
@@ -662,7 +663,7 @@ bool DialogBox_GuildMenu::on_click_mode13(short sX, short sY)
 			}
 		m_mode = mode::fightzone_waiting;
 		m_game->on_game()->m_fightzone_number_temp = 6;
-		play_sound_effect('E', 14, 5);
+		audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 		return true;
 	}
 	// Fightzone 7
@@ -676,7 +677,7 @@ bool DialogBox_GuildMenu::on_click_mode13(short sX, short sY)
 			}
 		m_mode = mode::fightzone_waiting;
 		m_game->on_game()->m_fightzone_number_temp = 7;
-		play_sound_effect('E', 14, 5);
+		audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 		return true;
 	}
 	// Fightzone 8
@@ -690,14 +691,14 @@ bool DialogBox_GuildMenu::on_click_mode13(short sX, short sY)
 			}
 		m_mode = mode::fightzone_waiting;
 		m_game->on_game()->m_fightzone_number_temp = 8;
-		play_sound_effect('E', 14, 5);
+		audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 		return true;
 	}
 
 	// Cancel
 	if ((mouse_x >= sX + ui_layout::right_btn_x) && (mouse_x <= sX + ui_layout::right_btn_x + ui_layout::btn_size_x) && (mouse_y > sY + ui_layout::btn_y) && (mouse_y < sY + ui_layout::btn_y + ui_layout::btn_size_y)) {
 		m_mode = mode::main_menu;
-		play_sound_effect('E', 14, 5);
+		audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 		return true;
 	}
 
@@ -710,7 +711,7 @@ bool DialogBox_GuildMenu::on_click_mode_ok_only(short sX, short sY)
 	short mouse_y = static_cast<short>(hb::shared::input::get_mouse_y());
 	if ((mouse_x >= sX + ui_layout::right_btn_x) && (mouse_x <= sX + ui_layout::right_btn_x + ui_layout::btn_size_x) && (mouse_y > sY + ui_layout::btn_y) && (mouse_y < sY + ui_layout::btn_y + ui_layout::btn_size_y)) {
 		m_mode = mode::main_menu;
-		play_sound_effect('E', 14, 5);
+		audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 		return true;
 	}
 	return false;

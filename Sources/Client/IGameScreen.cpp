@@ -53,12 +53,6 @@ void IGameScreen::draw_version()
     m_game->draw_version();
 }
 
-// ============== Audio Helpers ==============
-
-void IGameScreen::play_game_sound(char type, int num, int dist, long lPan)
-{
-    m_game->play_game_sound(type, num, dist, lPan);
-}
 
 // ============== Event/Message Helpers ==============
 

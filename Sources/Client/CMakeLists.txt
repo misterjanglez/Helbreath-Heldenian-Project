@@ -73,6 +73,7 @@ set(SHARED_SOURCES
     ../Dependencies/Shared/Render/ResolutionConfig.cpp
     ../Dependencies/Shared/Render/TextLib.cpp
     ../Dependencies/Shared/Util/SHA256.cpp
+    ../Dependencies/Shared/Game/FormulaEngine.cpp
 )
 
 # ---------------------------------------------------------------------------

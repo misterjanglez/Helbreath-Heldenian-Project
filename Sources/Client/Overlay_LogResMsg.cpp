@@ -30,7 +30,7 @@ void Overlay_LogResMsg::on_initialize()
     m_cMsgCode = m_game->m_msg[1];
 
     // stop any playing sound
-    audio_manager::get().stop_sound(sound_type::Effect, 38);
+    audio_manager::get().stop_sound(sound_type::effect, 38);
 
     int dlgX, dlgY;
     get_centered_dialog_pos(InterfaceNdGame4, 2, dlgX, dlgY);
@@ -40,7 +40,7 @@ void Overlay_LogResMsg::on_initialize()
     m_controls.set_default_button(BTN_OK);
 
     auto* btn_ok = m_controls.add<cc::button>(BTN_OK, cc::rect{dlgX + 208, dlgY + 119, ui_layout::btn_size_x, ui_layout::btn_size_y});
-    btn_ok->set_click_sound([this] { m_game->play_game_sound('E', 14, 5); });
+    btn_ok->set_click_sound([this] { audio_manager::get().play_game_sound(sound_type::effect, 14, 5); });
     btn_ok->set_on_click([this](int) {
         handle_dismiss();
     });

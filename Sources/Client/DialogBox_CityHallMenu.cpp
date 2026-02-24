@@ -10,6 +10,7 @@
 #include "Packet/SharedPackets.h"
 #include "PacketSendHelpers.h"
 #include "Screen_OnGame.h"
+#include "AudioManager.h"
 
 
 using namespace hb::shared::net;
@@ -438,7 +439,7 @@ bool DialogBox_CityHallMenu::on_click_mode0(short sX, short sY)
 	{
 		if (player().m_citizen == true) return false;
 		m_mode = mode::citizenship_warning;
-		m_game->play_game_sound('E', 14, 5);
+		audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 		return true;
 	}
 
@@ -447,7 +448,7 @@ bool DialogBox_CityHallMenu::on_click_mode0(short sX, short sY)
 	{
 		if (player().m_reward_gold <= 0) return false;
 		m_mode = mode::reward_gold;
-		m_game->play_game_sound('E', 14, 5);
+		audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 		return true;
 	}
 
@@ -456,7 +457,7 @@ bool DialogBox_CityHallMenu::on_click_mode0(short sX, short sY)
 	{
 		if (player().m_enemy_kill_count < 100) return false;
 		m_mode = mode::hero_items;
-		m_game->play_game_sound('E', 14, 5);
+		audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 		return true;
 	}
 
@@ -465,7 +466,7 @@ bool DialogBox_CityHallMenu::on_click_mode0(short sX, short sY)
 	{
 		if (m_game->on_game()->m_quest.quest_type == 0) return false;
 		m_mode = mode::cancel_quest;
-		m_game->play_game_sound('E', 14, 5);
+		audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 		return true;
 	}
 
@@ -477,7 +478,7 @@ bool DialogBox_CityHallMenu::on_click_mode0(short sX, short sY)
 		if (player().m_citizen == false) return false;
 		if ((player().m_level > 100) && (player().m_hunter == false)) return false;
 		m_mode = mode::change_play_mode;
-		m_game->play_game_sound('E', 14, 5);
+		audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 		return true;
 	}
 
@@ -493,7 +494,7 @@ bool DialogBox_CityHallMenu::on_click_mode0(short sX, short sY)
 			std::snprintf(req.name, sizeof(req.name), "%s", "William");
 			m_game->send_game_packet(req);
 		}
-		m_game->play_game_sound('E', 14, 5);
+		audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 		return true;
 	}
 
@@ -502,7 +503,7 @@ bool DialogBox_CityHallMenu::on_click_mode0(short sX, short sY)
 	{
 		if (m_game->on_game()->m_is_crusade_mode == false) return false;
 		m_game->get_dialog_box_manager().enable_dialog_box(DialogBoxId::CrusadeJob, 1, 0, 0);
-		m_game->play_game_sound('E', 14, 5);
+		audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 		return true;
 	}
 
@@ -523,7 +524,7 @@ bool DialogBox_CityHallMenu::on_click_mode1(short sX, short sY)
 			m_game->send_game_packet(req);
 		}
 		m_mode = mode::offering_citizenship;
-		m_game->play_game_sound('E', 14, 5);
+		audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 		return true;
 	}
 
@@ -531,7 +532,7 @@ bool DialogBox_CityHallMenu::on_click_mode1(short sX, short sY)
 	if ((mouse_x >= sX + ui_layout::right_btn_x) && (mouse_x <= sX + ui_layout::right_btn_x + ui_layout::btn_size_x) && (mouse_y >= sY + ui_layout::btn_y) && (mouse_y <= sY + ui_layout::btn_y + ui_layout::btn_size_y))
 	{
 		m_mode = mode::main_menu;
-		m_game->play_game_sound('E', 14, 5);
+		audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 		return true;
 	}
 
@@ -546,7 +547,7 @@ bool DialogBox_CityHallMenu::OnClickMode3_4(short sX, short sY)
 	if ((mouse_x >= sX + ui_layout::right_btn_x) && (mouse_x <= sX + ui_layout::right_btn_x + ui_layout::btn_size_x) && (mouse_y > sY + ui_layout::btn_y) && (mouse_y < sY + ui_layout::btn_y + ui_layout::btn_size_y))
 	{
 		m_mode = mode::main_menu;
-		m_game->play_game_sound('E', 14, 5);
+		audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 		return true;
 	}
 	return false;
@@ -561,7 +562,7 @@ bool DialogBox_CityHallMenu::on_click_mode5(short sX, short sY)
 	{
 		m_game->send_game_packet(hb::net::make_common_command(CommonType::ReqGetRewardMoney, m_game->m_player->m_player_x, m_game->m_player->m_player_y));
 		m_mode = mode::main_menu;
-		m_game->play_game_sound('E', 14, 5);
+		audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 		return true;
 	}
 
@@ -569,7 +570,7 @@ bool DialogBox_CityHallMenu::on_click_mode5(short sX, short sY)
 	if ((mouse_x >= sX + ui_layout::right_btn_x) && (mouse_x <= sX + ui_layout::right_btn_x + ui_layout::btn_size_x) && (mouse_y >= sY + ui_layout::btn_y) && (mouse_y <= sY + ui_layout::btn_y + ui_layout::btn_size_y))
 	{
 		m_mode = mode::main_menu;
-		m_game->play_game_sound('E', 14, 5);
+		audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 		return true;
 	}
 
@@ -593,7 +594,7 @@ bool DialogBox_CityHallMenu::on_click_mode7(short sX, short sY)
 		m_cTakeHeroItemName = DRAW_DIALOGBOX_CITYHALL_MENU47;
 		m_mode = mode::hero_item_confirm;
 		m_hero_item_id = req_hero_item_id;
-		m_game->play_game_sound('E', 14, 5);
+		audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 		return true;
 	}
 
@@ -607,7 +608,7 @@ bool DialogBox_CityHallMenu::on_click_mode7(short sX, short sY)
 		m_cTakeHeroItemName = DRAW_DIALOGBOX_CITYHALL_MENU48;
 		m_mode = mode::hero_item_confirm;
 		m_hero_item_id = req_hero_item_id;
-		m_game->play_game_sound('E', 14, 5);
+		audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 		return true;
 	}
 
@@ -621,7 +622,7 @@ bool DialogBox_CityHallMenu::on_click_mode7(short sX, short sY)
 		m_cTakeHeroItemName = DRAW_DIALOGBOX_CITYHALL_MENU49;
 		m_mode = mode::hero_item_confirm;
 		m_hero_item_id = req_hero_item_id;
-		m_game->play_game_sound('E', 14, 5);
+		audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 		return true;
 	}
 
@@ -635,7 +636,7 @@ bool DialogBox_CityHallMenu::on_click_mode7(short sX, short sY)
 		m_cTakeHeroItemName = DRAW_DIALOGBOX_CITYHALL_MENU50;
 		m_mode = mode::hero_item_confirm;
 		m_hero_item_id = req_hero_item_id;
-		m_game->play_game_sound('E', 14, 5);
+		audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 		return true;
 	}
 
@@ -649,7 +650,7 @@ bool DialogBox_CityHallMenu::on_click_mode7(short sX, short sY)
 		m_cTakeHeroItemName = DRAW_DIALOGBOX_CITYHALL_MENU51;
 		m_mode = mode::hero_item_confirm;
 		m_hero_item_id = req_hero_item_id;
-		m_game->play_game_sound('E', 14, 5);
+		audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 		return true;
 	}
 
@@ -663,7 +664,7 @@ bool DialogBox_CityHallMenu::on_click_mode7(short sX, short sY)
 		m_cTakeHeroItemName = DRAW_DIALOGBOX_CITYHALL_MENU52;
 		m_mode = mode::hero_item_confirm;
 		m_hero_item_id = req_hero_item_id;
-		m_game->play_game_sound('E', 14, 5);
+		audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 		return true;
 	}
 
@@ -677,7 +678,7 @@ bool DialogBox_CityHallMenu::on_click_mode7(short sX, short sY)
 		m_cTakeHeroItemName = DRAW_DIALOGBOX_CITYHALL_MENU53;
 		m_mode = mode::hero_item_confirm;
 		m_hero_item_id = req_hero_item_id;
-		m_game->play_game_sound('E', 14, 5);
+		audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 		return true;
 	}
 
@@ -693,7 +694,7 @@ bool DialogBox_CityHallMenu::on_click_mode8(short sX, short sY)
 	{
 		m_game->send_game_packet(hb::net::make_common_command(CommonType::RequestCancelQuest, m_game->m_player->m_player_x, m_game->m_player->m_player_y));
 		m_mode = mode::main_menu;
-		m_game->play_game_sound('E', 14, 5);
+		audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 		return true;
 	}
 
@@ -701,7 +702,7 @@ bool DialogBox_CityHallMenu::on_click_mode8(short sX, short sY)
 	if ((mouse_x >= sX + ui_layout::right_btn_x) && (mouse_x <= sX + ui_layout::right_btn_x + ui_layout::btn_size_x) && (mouse_y >= sY + ui_layout::btn_y) && (mouse_y <= sY + ui_layout::btn_y + ui_layout::btn_size_y))
 	{
 		m_mode = mode::main_menu;
-		m_game->play_game_sound('E', 14, 5);
+		audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 		return true;
 	}
 
@@ -717,7 +718,7 @@ bool DialogBox_CityHallMenu::on_click_mode9(short sX, short sY)
 	{
 		m_game->send_game_packet(hb::net::make_common_command(CommonType::RequestHuntMode, m_game->m_player->m_player_x, m_game->m_player->m_player_y));
 		m_mode = mode::main_menu;
-		m_game->play_game_sound('E', 14, 5);
+		audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 		return true;
 	}
 
@@ -725,7 +726,7 @@ bool DialogBox_CityHallMenu::on_click_mode9(short sX, short sY)
 	if ((mouse_x >= sX + ui_layout::right_btn_x) && (mouse_x <= sX + ui_layout::right_btn_x + ui_layout::btn_size_x) && (mouse_y >= sY + ui_layout::btn_y) && (mouse_y <= sY + ui_layout::btn_y + ui_layout::btn_size_y))
 	{
 		m_mode = mode::main_menu;
-		m_game->play_game_sound('E', 14, 5);
+		audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 		return true;
 	}
 
@@ -770,7 +771,7 @@ bool DialogBox_CityHallMenu::on_click_mode11(short sX, short sY)
 			m_game->send_game_packet(pkt);
 		}
 		m_mode = mode::main_menu;
-		m_game->play_game_sound('E', 14, 5);
+		audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 		return true;
 	}
 
@@ -778,7 +779,7 @@ bool DialogBox_CityHallMenu::on_click_mode11(short sX, short sY)
 	if ((mouse_x >= sX + ui_layout::right_btn_x) && (mouse_x <= sX + ui_layout::right_btn_x + ui_layout::btn_size_x) && (mouse_y >= sY + ui_layout::btn_y) && (mouse_y <= sY + ui_layout::btn_y + ui_layout::btn_size_y))
 	{
 		m_mode = mode::hero_items;
-		m_game->play_game_sound('E', 14, 5);
+		audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 		return true;
 	}
 

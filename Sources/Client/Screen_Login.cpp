@@ -15,6 +15,7 @@
 #include "TextFieldRenderer.h"
 #include "InputStateHelper.h"
 #include "Packet/SharedPackets.h"
+#include "AudioManager.h"
 
 using namespace hb::shared::net;
 using namespace hb::client::sprite_id;
@@ -67,7 +68,7 @@ void Screen_Login::on_initialize()
     // === Buttons ===
     auto* btn_login = m_controls.add<cc::button>(BTN_LOGIN, cc::rect{140, 343, 84, 20});
     btn_login->set_on_click([this](int) { submit_login(); });
-    btn_login->set_click_sound([this] { play_game_sound('E', 14, 5); });
+    btn_login->set_click_sound([this] { audio_manager::get().play_game_sound(sound_type::effect, 14, 5); });
     btn_login->set_render_handler([this](const cc::control& c) {
         // Only highlight when both fields are valid
         auto* tb_n = m_controls.find_as<cc::textbox>(TXT_NAME);
@@ -82,7 +83,7 @@ void Screen_Login::on_initialize()
 
     auto* btn_cancel = m_controls.add<cc::button>(BTN_CANCEL, cc::rect{316, 343, 76, 20});
     btn_cancel->set_on_click([this](int) { m_game->change_game_mode(GameMode::MainMenu); });
-    btn_cancel->set_click_sound([this] { play_game_sound('E', 14, 5); });
+    btn_cancel->set_click_sound([this] { audio_manager::get().play_game_sound(sound_type::effect, 14, 5); });
     btn_cancel->set_render_handler([this](const cc::control& c) {
         if (c.is_highlighted())
         {

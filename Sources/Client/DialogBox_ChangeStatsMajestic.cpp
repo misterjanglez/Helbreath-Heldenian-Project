@@ -9,6 +9,7 @@
 #include "IInput.h"
 #include "Packet/SharedPackets.h"
 #include "Screen_OnGame.h"
+#include "AudioManager.h"
 
 using namespace hb::shared::net;
 using namespace hb::client::sprite_id;
@@ -163,7 +164,7 @@ bool DialogBox_ChangeStatsMajestic::on_click()
 			if (*s.pending < 0)
 			{
 				*s.pending += POINTS_PER_MAJESTIC;
-				play_sound_effect('E', 14, 5);
+				audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 			}
 		}
 
@@ -174,7 +175,7 @@ bool DialogBox_ChangeStatsMajestic::on_click()
 			{
 				*s.pending -= POINTS_PER_MAJESTIC;
 				remaining--;
-				play_sound_effect('E', 14, 5);
+				audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 			}
 		}
 	}
@@ -197,7 +198,7 @@ bool DialogBox_ChangeStatsMajestic::on_click()
 		req.chr = static_cast<int16_t>(-player().m_lu_char);
 		send_game_packet(req);
 	}
-			play_sound_effect('E', 14, 5);
+			audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 		}
 	}
 
@@ -207,7 +208,7 @@ bool DialogBox_ChangeStatsMajestic::on_click()
 		player().m_lu_str = player().m_lu_vit = player().m_lu_dex = 0;
 		player().m_lu_int = player().m_lu_mag = player().m_lu_char = 0;
 		disable_dialog_box(DialogBoxId::ChangeStatsMajestic);
-		play_sound_effect('E', 14, 5);
+		audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 	}
 
 	return false;

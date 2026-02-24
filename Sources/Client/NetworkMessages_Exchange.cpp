@@ -5,6 +5,7 @@
 #include "lan_eng.h"
 #include "DialogBoxIDs.h"
 #include "DialogBox_Exchange.h"
+#include "AudioManager.h"
 #include <cstring>
 #include <cstdio>
 
@@ -15,12 +16,12 @@ namespace NetworkMessageHandlers {
 		game->get_dialog_box_manager().disable_dialog_box(DialogBoxId::Exchange);
 		//Snoopy: MultiTrade
 		game->get_dialog_box_manager().disable_dialog_box(DialogBoxId::ConfirmExchange);
-		game->play_game_sound('E', 23, 5);
+		audio_manager::get().play_game_sound(sound_type::effect, 23, 5);
 	}
 
 	void HandleCancelExchangeItem(CGame* game, char* data)
 	{
-		game->play_game_sound('E', 24, 5);
+		audio_manager::get().play_game_sound(sound_type::effect, 24, 5);
 		game->add_event_list(NOTIFYMSG_CANCEL_EXCHANGEITEM1, 10);
 		game->add_event_list(NOTIFYMSG_CANCEL_EXCHANGEITEM2, 10);
 

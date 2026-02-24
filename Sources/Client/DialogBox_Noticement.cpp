@@ -8,6 +8,7 @@
 #include <format>
 #include <string>
 #include "IInput.h"
+#include "AudioManager.h"
 using namespace hb::client::sprite_id;
 
 DialogBox_Noticement::DialogBox_Noticement(CGame* game)
@@ -91,7 +92,7 @@ bool DialogBox_Noticement::on_click()
 	// OK button
 	if (mouse_in(btn_ok))
 	{
-		play_sound_effect('E', 14, 5);
+		audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 		disable_this_dialog();
 		return true;
 	}

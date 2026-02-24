@@ -10,6 +10,7 @@
 #include <format>
 #include <string>
 #include "Screen_OnGame.h"
+#include "AudioManager.h"
 
 namespace NetworkMessageHandlers {
 	void HandleCrusade(CGame* game, char* data)
@@ -41,7 +42,7 @@ namespace NetworkMessageHandlers {
 				
 				if (game->m_player->m_citizen == false) game->set_top_msg(NOTIFY_MSG_CRUSADESTART_NONE, 10);
 				else if (game->m_game_msg_list[9]) game->set_top_msg(game->m_game_msg_list[9]->m_pMsg, 10);
-				game->play_game_sound('E', 25, 0, 0);
+				audio_manager::get().play_game_sound(sound_type::effect, 25, 0, 0);
 			}
 			if (v3 != 0) // Crusade finished, show XP result screen
 			{
@@ -67,7 +68,7 @@ namespace NetworkMessageHandlers {
 				{
 					game->m_player->m_crusade_duty = v2;
 					game->get_dialog_box_manager().enable_dialog_box(DialogBoxId::CrusadeJob, 2, v2, 0);
-					game->play_game_sound('E', 25, 0, 0);
+					audio_manager::get().play_game_sound(sound_type::effect, 25, 0, 0);
 				}
 			}
 			if (v4 == -1)
@@ -107,7 +108,7 @@ namespace NetworkMessageHandlers {
 		if (!pkt) return;
 		v1 = pkt->phase;
 		game->meteor_strike_coming(v1);
-		game->play_game_sound('E', 25, 0, 0);
+		audio_manager::get().play_game_sound(sound_type::effect, 25, 0, 0);
 	}
 
 	void HandleMeteorStrikeHit(CGame* game, char* data)
@@ -126,7 +127,7 @@ namespace NetworkMessageHandlers {
 		if (!pkt) return;
 		v1 = static_cast<short>(pkt->reason);
 		game->cannot_construct(v1);
-		game->play_game_sound('E', 25, 0, 0);
+		audio_manager::get().play_game_sound(sound_type::effect, 25, 0, 0);
 	}
 
 	void HandleTCLoc(CGame* game, char* data)
@@ -158,7 +159,7 @@ namespace NetworkMessageHandlers {
 					txt = std::format("{} +{}, {} +{}", game->m_game_msg_list[13]->m_pMsg, (v1 - game->m_player->m_construction_point), game->m_game_msg_list[21]->m_pMsg, (v2 - game->m_player->m_war_contribution));
 					game->set_top_msg(txt.c_str(), 5);
 				}
-				game->play_game_sound('E', 23, 0, 0);
+				audio_manager::get().play_game_sound(sound_type::effect, 23, 0, 0);
 			}
 
 			if ((v1 > game->m_player->m_construction_point) && (v2 == game->m_player->m_war_contribution)) {
@@ -167,7 +168,7 @@ namespace NetworkMessageHandlers {
 						txt = std::format("{} +{}", game->m_game_msg_list[13]->m_pMsg, v1 - game->m_player->m_construction_point);
 						game->set_top_msg(txt.c_str(), 5);
 					}
-					game->play_game_sound('E', 23, 0, 0);
+					audio_manager::get().play_game_sound(sound_type::effect, 23, 0, 0);
 				}
 			}
 
@@ -176,7 +177,7 @@ namespace NetworkMessageHandlers {
 					txt = std::format("{} +{}", game->m_game_msg_list[21]->m_pMsg, v2 - game->m_player->m_war_contribution);
 					game->set_top_msg(txt.c_str(), 5);
 				}
-				game->play_game_sound('E', 23, 0, 0);
+				audio_manager::get().play_game_sound(sound_type::effect, 23, 0, 0);
 			}
 
 			if (v1 < game->m_player->m_construction_point) {
@@ -185,7 +186,7 @@ namespace NetworkMessageHandlers {
 						txt = std::format("{} -{}", game->m_game_msg_list[13]->m_pMsg, game->m_player->m_construction_point - v1);
 						game->set_top_msg(txt.c_str(), 5);
 					}
-					game->play_game_sound('E', 25, 0, 0);
+					audio_manager::get().play_game_sound(sound_type::effect, 25, 0, 0);
 				}
 			}
 
@@ -194,7 +195,7 @@ namespace NetworkMessageHandlers {
 					txt = std::format("{} -{}", game->m_game_msg_list[21]->m_pMsg, game->m_player->m_war_contribution - v2);
 					game->set_top_msg(txt.c_str(), 5);
 				}
-				game->play_game_sound('E', 24, 0, 0);
+				audio_manager::get().play_game_sound(sound_type::effect, 24, 0, 0);
 			}
 		}
 
@@ -205,7 +206,7 @@ namespace NetworkMessageHandlers {
 	void HandleNoMoreCrusadeStructure(CGame* game, char* data)
 	{
 		if (game->m_game_msg_list[12]) game->set_top_msg(game->m_game_msg_list[12]->m_pMsg, 5);
-		game->play_game_sound('E', 25, 0, 0);
+		audio_manager::get().play_game_sound(sound_type::effect, 25, 0, 0);
 	}
 
 	void HandleEnergySphereGoalIn(CGame* game, char* data)
@@ -223,7 +224,7 @@ namespace NetworkMessageHandlers {
 
 		if (v2 == v3)
 		{
-			game->play_game_sound('E', 24, 0);
+			audio_manager::get().play_game_sound(sound_type::effect, 24, 0);
 			if (strcmp(name, game->m_player->m_player_name.c_str()) == 0)
 			{
 				game->add_event_list(NOTIFY_MSG_HANDLER33, 10);
@@ -239,19 +240,19 @@ namespace NetworkMessageHandlers {
 		}
 		else
 		{
-			game->play_game_sound('E', 23, 0);
+			audio_manager::get().play_game_sound(sound_type::effect, 23, 0);
 			if (strcmp(name, game->m_player->m_player_name.c_str()) == 0)
 			{
 				switch (game->m_player->m_player_type) {
 				case 1:
 				case 2:
 				case 3:
-					game->play_game_sound('C', 21, 0);
+					audio_manager::get().play_game_sound(sound_type::character, 21, 0);
 					break;
 				case 4:
 				case 5:
 				case 6:
-					game->play_game_sound('C', 22, 0);
+					audio_manager::get().play_game_sound(sound_type::character, 22, 0);
 					break;
 				}
 				game->add_event_list(NOTIFY_MSG_HANDLER35, 10);

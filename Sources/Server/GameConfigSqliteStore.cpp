@@ -3,8 +3,10 @@
 #include <filesystem>
 #include <cstdio>
 #include <cstring>
+#include <unordered_map>
 
 #include "Item.h"
+#include "FormulaEngine.h"
 #include "BuildItem.h"
 #include "Game.h"
 #include "ItemManager.h"
@@ -143,10 +145,10 @@ bool EnsureGameConfigDatabase(sqlite3** outDb, std::string& outPath, bool* outCr
         return false;
     }
 
-    std::string dbPath = "gameconfigs.db";
+    std::string dbPath = "gamedata.db";
     if (!std::filesystem::exists(dbPath)) {
         auto exeDir = std::filesystem::current_path();
-        dbPath = (exeDir / "gameconfigs.db").string();
+        dbPath = (exeDir / "gamedata.db").string();
     }
     outPath = dbPath;
 
@@ -172,7 +174,7 @@ bool EnsureGameConfigDatabase(sqlite3** outDb, std::string& outPath, bool* outCr
         " key TEXT PRIMARY KEY,"
         " value TEXT NOT NULL"
         ");"
-        "INSERT OR REPLACE INTO meta(key, value) VALUES('schema_version','3');"
+        "INSERT OR REPLACE INTO meta(key, value) VALUES('schema_version','5');"
         "CREATE TABLE IF NOT EXISTS items ("
         " item_id INTEGER PRIMARY KEY,"
         " name TEXT NOT NULL,"
@@ -201,24 +203,10 @@ bool EnsureGameConfigDatabase(sqlite3** outDb, std::string& outPath, bool* outCr
         " item_color INTEGER NOT NULL,"
         " display_id INTEGER NOT NULL DEFAULT -1"
         ");"
-        "CREATE TABLE IF NOT EXISTS realmlist ("
-        " id INTEGER PRIMARY KEY,"
-        " realm_name TEXT UNIQUE NOT NULL,"
-        " login_listen_ip TEXT NOT NULL DEFAULT '0.0.0.0',"
-        " login_listen_port INTEGER NOT NULL DEFAULT 2848,"
-        " game_server_listen_ip TEXT NOT NULL DEFAULT '0.0.0.0',"
-        " game_server_listen_port INTEGER NOT NULL DEFAULT 2858,"
-        " game_server_connection_ip TEXT DEFAULT NULL,"
-        " game_server_connection_port INTEGER DEFAULT NULL"
-        ");"
         "CREATE TABLE IF NOT EXISTS active_maps ("
         " map_index INTEGER PRIMARY KEY,"
         " map_name TEXT NOT NULL,"
         " active INTEGER NOT NULL DEFAULT 0"
-        ");"
-        "CREATE TABLE IF NOT EXISTS settings ("
-        " key TEXT PRIMARY KEY,"
-        " value TEXT NOT NULL"
         ");"
         "CREATE TABLE IF NOT EXISTS banned_list ("
         " ip_address TEXT PRIMARY KEY"
@@ -607,158 +595,27 @@ bool LoadItemConfigs(sqlite3* db, CItem** itemList, int maxItems)
     return true;
 }
 
-bool SaveRealmConfig(sqlite3* db, const CGame* game)
+bool LoadActiveMaps(sqlite3* db, CGame* game)
 {
     if (db == nullptr || game == nullptr) {
         return false;
     }
 
-    if (!BeginTransaction(db)) {
-        return false;
-    }
-
-    if (!ClearTable(db, "realmlist") || !ClearTable(db, "active_maps")) {
-        RollbackTransaction(db);
-        return false;
-    }
-
-    // Insert realm configuration
-    sqlite3_stmt* stmtRealm = nullptr;
-    const char* realmSql =
-        "INSERT INTO realmlist(id, realm_name, login_listen_ip, login_listen_port, "
-        "game_server_listen_ip, game_server_listen_port, game_server_connection_ip, game_server_connection_port) "
-        "VALUES(1, ?, ?, ?, ?, ?, ?, ?);";
-
-    if (sqlite3_prepare_v2(db, realmSql, -1, &stmtRealm, nullptr) != SQLITE_OK) {
-        RollbackTransaction(db);
-        return false;
-    }
-
-    bool ok = true;
-    ok &= PrepareAndBindText(stmtRealm, 1, game->m_realm_name);
-    ok &= PrepareAndBindText(stmtRealm, 2, game->m_login_listen_ip);
-    ok &= (sqlite3_bind_int(stmtRealm, 3, game->m_login_listen_port) == SQLITE_OK);
-    ok &= PrepareAndBindText(stmtRealm, 4, game->m_game_listen_ip);
-    ok &= (sqlite3_bind_int(stmtRealm, 5, game->m_game_listen_port) == SQLITE_OK);
-
-    // Optional connection IP/port (bind NULL if empty)
-    if (game->m_game_connection_ip[0] != '\0') {
-        ok &= PrepareAndBindText(stmtRealm, 6, game->m_game_connection_ip);
-        ok &= (sqlite3_bind_int(stmtRealm, 7, game->m_game_connection_port) == SQLITE_OK);
-    } else {
-        ok &= (sqlite3_bind_null(stmtRealm, 6) == SQLITE_OK);
-        ok &= (sqlite3_bind_null(stmtRealm, 7) == SQLITE_OK);
-    }
-
-    if (!ok || sqlite3_step(stmtRealm) != SQLITE_DONE) {
-        sqlite3_finalize(stmtRealm);
-        RollbackTransaction(db);
-        return false;
-    }
-    sqlite3_finalize(stmtRealm);
-
-    // Insert maps (active = 1 since we're saving currently loaded maps)
-    sqlite3_stmt* stmtMap = nullptr;
-    if (sqlite3_prepare_v2(db, "INSERT INTO active_maps(map_index, map_name, active) VALUES(?, ?, 1);", -1, &stmtMap, nullptr) != SQLITE_OK) {
-        RollbackTransaction(db);
-        return false;
-    }
-
-    int mapIndex = 0;
-    for(int i = 0; i < MaxMaps; i++) {
-        if (game->m_map_list[i] == nullptr) {
-            continue;
-        }
-        sqlite3_reset(stmtMap);
-        sqlite3_clear_bindings(stmtMap);
-        ok = (sqlite3_bind_int(stmtMap, 1, mapIndex++) == SQLITE_OK);
-        ok &= PrepareAndBindText(stmtMap, 2, game->m_map_list[i]->m_name);
-        if (!ok || sqlite3_step(stmtMap) != SQLITE_DONE) {
-            sqlite3_finalize(stmtMap);
-            RollbackTransaction(db);
-            return false;
-        }
-    }
-
-    sqlite3_finalize(stmtMap);
-
-    if (!CommitTransaction(db)) {
-        RollbackTransaction(db);
-        return false;
-    }
-    return true;
-}
-
-bool LoadRealmConfig(sqlite3* db, CGame* game)
-{
-    if (db == nullptr || game == nullptr) {
-        return false;
-    }
-
-    // Load realm configuration
     sqlite3_stmt* stmt = nullptr;
-    const char* realmSql =
-        "SELECT realm_name, login_listen_ip, login_listen_port, "
-        "game_server_listen_ip, game_server_listen_port, "
-        "game_server_connection_ip, game_server_connection_port "
-        "FROM realmlist WHERE id = 1;";
-
-    if (sqlite3_prepare_v2(db, realmSql, -1, &stmt, nullptr) != SQLITE_OK) {
-        return false;
-    }
-
-    bool realmLoaded = false;
-    if (sqlite3_step(stmt) == SQLITE_ROW) {
-        const char* realmName = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 0));
-        const char* loginIP = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 1));
-        int loginPort = sqlite3_column_int(stmt, 2);
-        const char* gameIP = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 3));
-        int gamePort = sqlite3_column_int(stmt, 4);
-        const char* connIP = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 5));
-        int connPort = sqlite3_column_int(stmt, 6);
-
-        if (realmName) {
-            std::snprintf(game->m_realm_name, sizeof(game->m_realm_name), "%s", realmName);
-        }
-        if (loginIP) {
-            std::snprintf(game->m_login_listen_ip, sizeof(game->m_login_listen_ip), "%s", loginIP);
-        }
-        game->m_login_listen_port = loginPort;
-
-        if (gameIP) {
-            std::snprintf(game->m_game_listen_ip, sizeof(game->m_game_listen_ip), "%s", gameIP);
-        }
-        game->m_game_listen_port = gamePort;
-
-        // Optional connection IP/port
-        if (connIP && connIP[0] != '\0') {
-            std::snprintf(game->m_game_connection_ip, sizeof(game->m_game_connection_ip), "%s", connIP);
-            game->m_game_connection_port = connPort;
-        } else {
-            game->m_game_connection_ip[0] = '\0';
-            game->m_game_connection_port = 0;
-        }
-
-        realmLoaded = true;
-
-        char logMsg[256] = {};
-        hb::logger::log("Loaded realm: {} (Login: {}:{}, Game: {}:{})", game->m_realm_name, game->m_login_listen_ip, game->m_login_listen_port, game->m_game_listen_ip, game->m_game_listen_port);
-    }
-
-    sqlite3_finalize(stmt);
-
-    if (!realmLoaded) {
-        hb::logger::error("No realm configuration found in realmlist table (id=1)");
-        return false;
-    }
-
-    // Load active maps only
     if (sqlite3_prepare_v2(db, "SELECT map_name FROM active_maps WHERE active = 1 ORDER BY map_index;", -1, &stmt, nullptr) != SQLITE_OK) {
         return false;
     }
 
+    // Count total maps in database
+    int totalMaps = 0;
+    sqlite3_stmt* countStmt = nullptr;
+    if (sqlite3_prepare_v2(db, "SELECT COUNT(*) FROM active_maps;", -1, &countStmt, nullptr) == SQLITE_OK) {
+        if (sqlite3_step(countStmt) == SQLITE_ROW)
+            totalMaps = sqlite3_column_int(countStmt, 0);
+        sqlite3_finalize(countStmt);
+    }
+
     int mapsLoaded = 0;
-    hb::logger::log("Loading active maps from gameconfigs.db");
     while (sqlite3_step(stmt) == SQLITE_ROW) {
         const unsigned char* nameText = sqlite3_column_text(stmt, 0);
         if (nameText == nullptr) {
@@ -766,7 +623,6 @@ bool LoadRealmConfig(sqlite3* db, CGame* game)
         }
         const char* name = reinterpret_cast<const char*>(nameText);
         if (!game->register_map(const_cast<char*>(name))) {
-            char logMsg[256] = {};
             hb::logger::error("Map load failed: {}", name);
             sqlite3_finalize(stmt);
             return false;
@@ -775,203 +631,7 @@ bool LoadRealmConfig(sqlite3* db, CGame* game)
     }
 
     sqlite3_finalize(stmt);
-    {
-        char logMsg[128] = {};
-        hb::logger::log("Loaded {} maps.", mapsLoaded);
-    }
-    return true;
-}
-
-bool SaveSettingsConfig(sqlite3* db, const CGame* game)
-{
-    if (db == nullptr || game == nullptr) {
-        return false;
-    }
-
-    if (!BeginTransaction(db)) {
-        return false;
-    }
-
-    if (!ClearTable(db, "settings")) {
-        RollbackTransaction(db);
-        return false;
-    }
-
-    sqlite3_stmt* stmt = nullptr;
-    if (sqlite3_prepare_v2(db, "INSERT INTO settings(key, value) VALUES(?, ?);", -1, &stmt, nullptr) != SQLITE_OK) {
-        RollbackTransaction(db);
-        return false;
-    }
-
-    bool ok = true;
-    ok &= InsertKeyValueFloat(stmt, "primary-drop-rate", game->m_primary_drop_rate);
-    ok &= InsertKeyValueFloat(stmt, "gold-drop-rate", game->m_gold_drop_rate);
-    ok &= InsertKeyValueFloat(stmt, "secondary-drop-rate", game->m_secondary_drop_rate);
-    ok &= InsertKeyValue(stmt, "enemy-kill-mode", game->m_enemy_kill_mode ? "deathmatch" : "classic");
-    ok &= InsertKeyValueInt(stmt, "enemy-kill-adjust", game->m_enemy_kill_adjust);
-    ok &= InsertKeyValueInt(stmt, "monday-raid-time", game->m_raid_time_monday);
-    ok &= InsertKeyValueInt(stmt, "tuesday-raid-time", game->m_raid_time_tuesday);
-    ok &= InsertKeyValueInt(stmt, "wednesday-raid-time", game->m_raid_time_wednesday);
-    ok &= InsertKeyValueInt(stmt, "thursday-raid-time", game->m_raid_time_thursday);
-    ok &= InsertKeyValueInt(stmt, "friday-raid-time", game->m_raid_time_friday);
-    ok &= InsertKeyValueInt(stmt, "saturday-raid-time", game->m_raid_time_saturday);
-    ok &= InsertKeyValueInt(stmt, "sunday-raid-time", game->m_raid_time_sunday);
-    ok &= InsertKeyValueInt(stmt, "slate-success-rate", game->m_slate_success_rate);
-    ok &= InsertKeyValueInt(stmt, "rep-drop-modifier", game->m_rep_drop_modifier);
-
-    // Timing Settings
-    ok &= InsertKeyValueInt(stmt, "client-timeout-ms", game->m_client_timeout);
-    ok &= InsertKeyValueInt(stmt, "stamina-regen-interval", game->m_stamina_regen_interval);
-    ok &= InsertKeyValueInt(stmt, "poison-damage-interval", game->m_poison_damage_interval);
-    ok &= InsertKeyValueInt(stmt, "health-regen-interval", game->m_health_regen_interval);
-    ok &= InsertKeyValueInt(stmt, "mana-regen-interval", game->m_mana_regen_interval);
-    ok &= InsertKeyValueInt(stmt, "hunger-consume-interval", game->m_hunger_consume_interval);
-    ok &= InsertKeyValueInt(stmt, "summon-creature-duration", game->m_summon_creature_duration);
-    ok &= InsertKeyValueInt(stmt, "autosave-interval", game->m_autosave_interval);
-    ok &= InsertKeyValueInt(stmt, "lag-protection-interval", game->m_lag_protection_interval);
-
-    // Character/Leveling Settings
-    ok &= InsertKeyValueInt(stmt, "base-stat-value", game->m_base_stat_value);
-    ok &= InsertKeyValueInt(stmt, "creation-stat-bonus", game->m_creation_stat_bonus);
-    ok &= InsertKeyValueInt(stmt, "levelup-stat-gain", game->m_levelup_stat_gain);
-    ok &= InsertKeyValueInt(stmt, "max-level", game->m_max_level);
-
-    // Combat Settings
-    ok &= InsertKeyValueInt(stmt, "minimum-hit-ratio", game->m_minimum_hit_ratio);
-    ok &= InsertKeyValueInt(stmt, "maximum-hit-ratio", game->m_maximum_hit_ratio);
-
-    // Gameplay Settings
-    ok &= InsertKeyValueInt(stmt, "nighttime-duration", game->m_nighttime_duration);
-    ok &= InsertKeyValueInt(stmt, "starting-guild-rank", game->m_starting_guild_rank);
-    ok &= InsertKeyValueInt(stmt, "grand-magic-mana-consumption", game->m_grand_magic_mana_consumption);
-    ok &= InsertKeyValueInt(stmt, "maximum-construction-points", game->m_max_construction_points);
-    ok &= InsertKeyValueInt(stmt, "maximum-summon-points", game->m_max_summon_points);
-    ok &= InsertKeyValueInt(stmt, "maximum-war-contribution", game->m_max_war_contribution);
-    ok &= InsertKeyValueInt(stmt, "max-bank-items", game->m_max_bank_items);
-
-    sqlite3_finalize(stmt);
-    if (!ok) {
-        RollbackTransaction(db);
-        return false;
-    }
-
-    if (!CommitTransaction(db)) {
-        RollbackTransaction(db);
-        return false;
-    }
-    return true;
-}
-
-bool LoadSettingsConfig(sqlite3* db, CGame* game)
-{
-    if (db == nullptr || game == nullptr) {
-        return false;
-    }
-
-    sqlite3_stmt* stmt = nullptr;
-    if (sqlite3_prepare_v2(db, "SELECT key, value FROM settings;", -1, &stmt, nullptr) != SQLITE_OK) {
-        return false;
-    }
-
-    while (sqlite3_step(stmt) == SQLITE_ROW) {
-        const unsigned char* keyText = sqlite3_column_text(stmt, 0);
-        const unsigned char* valueText = sqlite3_column_text(stmt, 1);
-        if (keyText == nullptr || valueText == nullptr) {
-            continue;
-        }
-        const char* key = reinterpret_cast<const char*>(keyText);
-        const char* value = reinterpret_cast<const char*>(valueText);
-
-        if (std::strcmp(key, "primary-drop-rate") == 0) {
-            game->m_primary_drop_rate = static_cast<float>(std::atof(value));
-        } else if (std::strcmp(key, "gold-drop-rate") == 0) {
-            game->m_gold_drop_rate = static_cast<float>(std::atof(value));
-        } else if (std::strcmp(key, "secondary-drop-rate") == 0) {
-            game->m_secondary_drop_rate = static_cast<float>(std::atof(value));
-        } else if (std::strcmp(key, "enemy-kill-mode") == 0) {
-            if (hb_stricmp(value, "deathmatch") == 0) {
-                game->m_enemy_kill_mode = true;
-            } else if (hb_stricmp(value, "classic") == 0) {
-                game->m_enemy_kill_mode = false;
-            } else {
-                game->m_enemy_kill_mode = (std::atoi(value) != 0);
-            }
-        } else if (std::strcmp(key, "enemy-kill-adjust") == 0) {
-            game->m_enemy_kill_adjust = std::atoi(value);
-        } else if (std::strcmp(key, "monday-raid-time") == 0) {
-            game->m_raid_time_monday = (short)std::atoi(value);
-        } else if (std::strcmp(key, "tuesday-raid-time") == 0) {
-            game->m_raid_time_tuesday = (short)std::atoi(value);
-        } else if (std::strcmp(key, "wednesday-raid-time") == 0) {
-            game->m_raid_time_wednesday = (short)std::atoi(value);
-        } else if (std::strcmp(key, "thursday-raid-time") == 0) {
-            game->m_raid_time_thursday = (short)std::atoi(value);
-        } else if (std::strcmp(key, "friday-raid-time") == 0) {
-            game->m_raid_time_friday = (short)std::atoi(value);
-        } else if (std::strcmp(key, "saturday-raid-time") == 0) {
-            game->m_raid_time_saturday = (short)std::atoi(value);
-        } else if (std::strcmp(key, "sunday-raid-time") == 0) {
-            game->m_raid_time_sunday = (short)std::atoi(value);
-        } else if (std::strcmp(key, "slate-success-rate") == 0) {
-            game->m_slate_success_rate = (short)std::atoi(value);
-        } else if (std::strcmp(key, "rep-drop-modifier") == 0) {
-            game->m_rep_drop_modifier = (char)std::atoi(value);
-        }
-        // Timing Settings
-        else if (std::strcmp(key, "client-timeout-ms") == 0) {
-            game->m_client_timeout = std::atoi(value);
-        } else if (std::strcmp(key, "stamina-regen-interval") == 0) {
-            game->m_stamina_regen_interval = std::atoi(value);
-        } else if (std::strcmp(key, "poison-damage-interval") == 0) {
-            game->m_poison_damage_interval = std::atoi(value);
-        } else if (std::strcmp(key, "health-regen-interval") == 0) {
-            game->m_health_regen_interval = std::atoi(value);
-        } else if (std::strcmp(key, "mana-regen-interval") == 0) {
-            game->m_mana_regen_interval = std::atoi(value);
-        } else if (std::strcmp(key, "hunger-consume-interval") == 0) {
-            game->m_hunger_consume_interval = std::atoi(value);
-        } else if (std::strcmp(key, "summon-creature-duration") == 0) {
-            game->m_summon_creature_duration = std::atoi(value);
-        } else if (std::strcmp(key, "autosave-interval") == 0) {
-            game->m_autosave_interval = std::atoi(value);
-        } else if (std::strcmp(key, "lag-protection-interval") == 0) {
-            game->m_lag_protection_interval = std::atoi(value);
-        }
-        // Character/Leveling Settings
-        else if (std::strcmp(key, "base-stat-value") == 0) {
-            game->m_base_stat_value = std::atoi(value);
-        } else if (std::strcmp(key, "creation-stat-bonus") == 0) {
-            game->m_creation_stat_bonus = std::atoi(value);
-        } else if (std::strcmp(key, "levelup-stat-gain") == 0) {
-            game->m_levelup_stat_gain = std::atoi(value);
-        } else if (std::strcmp(key, "max-level") == 0 || std::strcmp(key, "max-player-level") == 0) {
-            game->m_max_level = std::atoi(value);
-        }
-        // Combat Settings
-        else if (std::strcmp(key, "minimum-hit-ratio") == 0) {
-            game->m_minimum_hit_ratio = std::atoi(value);
-        } else if (std::strcmp(key, "maximum-hit-ratio") == 0) {
-            game->m_maximum_hit_ratio = std::atoi(value);
-        }
-        // Gameplay Settings
-        else if (std::strcmp(key, "nighttime-duration") == 0) {
-            game->m_nighttime_duration = std::atoi(value);
-        } else if (std::strcmp(key, "starting-guild-rank") == 0) {
-            game->m_starting_guild_rank = std::atoi(value);
-        } else if (std::strcmp(key, "grand-magic-mana-consumption") == 0) {
-            game->m_grand_magic_mana_consumption = std::atoi(value);
-        } else if (std::strcmp(key, "maximum-construction-points") == 0) {
-            game->m_max_construction_points = std::atoi(value);
-        } else if (std::strcmp(key, "maximum-summon-points") == 0) {
-            game->m_max_summon_points = std::atoi(value);
-        } else if (std::strcmp(key, "maximum-war-contribution") == 0) {
-            game->m_max_war_contribution = std::atoi(value);
-        } else if (std::strcmp(key, "max-bank-items") == 0) {
-            game->m_max_bank_items = std::atoi(value);
-        }
-    }
-
-    sqlite3_finalize(stmt);
+    hb::logger::log("- {}/{} maps active", mapsLoaded, totalMaps);
     return true;
 }
 
@@ -1427,12 +1087,13 @@ bool LoadShopConfigs(sqlite3* db, CGame* game)
     game->m_shop_data.clear();
     game->m_is_shop_data_available = false;
 
+    hb::logger::log("Loading shop configs from gamedata.db:");
+
     // Load NPC -> shop mappings
     const char* mappingSql = "SELECT npc_config_id, shop_id, description FROM npc_shop_mapping ORDER BY npc_config_id;";
     sqlite3_stmt* stmt = nullptr;
     if (sqlite3_prepare_v2(db, mappingSql, -1, &stmt, nullptr) != SQLITE_OK) {
-        char logMsg[256] = {};
-        hb::logger::log("LoadShopConfigs: Failed to prepare npc_shop_mapping query");
+        hb::logger::warn("- Failed to prepare npc_shop_mapping query");
         return false;
     }
 
@@ -1448,8 +1109,7 @@ bool LoadShopConfigs(sqlite3* db, CGame* game)
     // Load shop items
     const char* itemsSql = "SELECT shop_id, item_id FROM shop_items ORDER BY shop_id, sort_order, item_id;";
     if (sqlite3_prepare_v2(db, itemsSql, -1, &stmt, nullptr) != SQLITE_OK) {
-        char logMsg[256] = {};
-        hb::logger::log("LoadShopConfigs: Failed to prepare shop_items query");
+        hb::logger::warn("- Failed to prepare shop_items query");
         return false;
     }
 
@@ -1472,8 +1132,15 @@ bool LoadShopConfigs(sqlite3* db, CGame* game)
 
     if (mappingCount > 0 || itemCount > 0) {
         game->m_is_shop_data_available = true;
-        char logMsg[256] = {};
-        hb::logger::log("Shop configs loaded: {} NPC mappings, {} shops, {} total items", mappingCount, static_cast<int>(game->m_shop_data.size()), itemCount);
+        for (const auto& [npc_id, shop_id] : game->m_npc_shop_mappings) {
+            const char* npc_name = "Unknown";
+            if (npc_id >= 0 && npc_id < MaxNpcTypes && game->m_npc_config_list[npc_id] != nullptr)
+                npc_name = game->m_npc_config_list[npc_id]->m_npc_name;
+            auto sit = game->m_shop_data.find(shop_id);
+            int count = (sit != game->m_shop_data.end()) ? static_cast<int>(sit->second.item_ids.size()) : 0;
+            hb::logger::log("- {}: {} items", npc_name, count);
+        }
+        hb::logger::log("- Total shop items loaded: {}", itemCount);
     }
 
     return true;
@@ -2466,3 +2133,70 @@ void CloseGameConfigDatabase(sqlite3* db)
         sqlite3_close(db);
     }
 }
+
+bool LoadFormulas(sqlite3* db, hb::shared::formula_engine& engine)
+{
+    if (db == nullptr) return false;
+
+    engine.clear();
+
+    // Load formulas (expression-based, single table)
+    sqlite3_stmt* stmt = nullptr;
+    if (sqlite3_prepare_v2(db, "SELECT formula_id, expression, description FROM formulas;",
+        -1, &stmt, nullptr) != SQLITE_OK)
+    {
+        return false;
+    }
+
+    int count = 0;
+    while (sqlite3_step(stmt) == SQLITE_ROW)
+    {
+        const unsigned char* id = sqlite3_column_text(stmt, 0);
+        const unsigned char* expr = sqlite3_column_text(stmt, 1);
+        const unsigned char* desc = sqlite3_column_text(stmt, 2);
+        if (!id || !expr) continue;
+
+        std::string sid = reinterpret_cast<const char*>(id);
+        std::string sexpr = reinterpret_cast<const char*>(expr);
+        std::string sdesc = desc ? reinterpret_cast<const char*>(desc) : "";
+
+        if (!engine.add_formula(sid, sexpr, sdesc))
+        {
+            sqlite3_finalize(stmt);
+            return false;
+        }
+        ++count;
+    }
+    sqlite3_finalize(stmt);
+
+    // Load scaling profiles
+    if (sqlite3_prepare_v2(db,
+        "SELECT profile_id, bracket_min, bracket_max, multiplier FROM scaling_profiles ORDER BY profile_id, bracket_min;",
+        -1, &stmt, nullptr) != SQLITE_OK)
+    {
+        return false;
+    }
+
+    std::unordered_map<std::string, hb::shared::scaling_profile> profile_map;
+    while (sqlite3_step(stmt) == SQLITE_ROW)
+    {
+        const unsigned char* pid = sqlite3_column_text(stmt, 0);
+        if (!pid) continue;
+        std::string profile_id = reinterpret_cast<const char*>(pid);
+
+        hb::shared::scaling_bracket bracket;
+        bracket.bracket_min = sqlite3_column_int(stmt, 1);
+        bracket.bracket_max = sqlite3_column_int(stmt, 2);
+        bracket.multiplier = sqlite3_column_double(stmt, 3);
+
+        profile_map[profile_id].profile_id = profile_id;
+        profile_map[profile_id].brackets.push_back(bracket);
+    }
+    sqlite3_finalize(stmt);
+
+    for (auto& [id, profile] : profile_map)
+        engine.add_scaling_profile(profile);
+
+    return true;
+}
+

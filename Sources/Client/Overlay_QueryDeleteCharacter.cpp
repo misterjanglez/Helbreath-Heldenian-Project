@@ -13,6 +13,7 @@
 #include "GameFonts.h"
 #include "InputStateHelper.h"
 #include "Packet/SharedPackets.h"
+#include "AudioManager.h"
 
 using namespace hb::shared::net;
 using namespace hb::client::sprite_id;
@@ -27,7 +28,7 @@ void Overlay_QueryDeleteCharacter::on_initialize()
     m_dwStartTime = GameClock::get_time_ms();
 
     // Play warning sound
-    play_game_sound('E', 25, 0);
+    audio_manager::get().play_game_sound(sound_type::effect, 25, 0);
 
     int dlgX, dlgY;
     get_centered_dialog_pos(InterfaceNdGame4, 2, dlgX, dlgY);
@@ -37,7 +38,7 @@ void Overlay_QueryDeleteCharacter::on_initialize()
 
     // Yes button — confirm deletion
     auto* btn_yes = m_controls.add<cc::button>(BTN_YES, cc::rect{dlgX + 38, dlgY + 119, ui_layout::btn_size_x, ui_layout::btn_size_y});
-    btn_yes->set_click_sound([this] { m_game->play_game_sound('E', 14, 5); });
+    btn_yes->set_click_sound([this] { audio_manager::get().play_game_sound(sound_type::effect, 14, 5); });
     btn_yes->set_on_click([this](int) {
         // Build delete character packet for deferred send after connection establishes
         hb::net::DeleteCharacterRequest req{};
@@ -64,7 +65,7 @@ void Overlay_QueryDeleteCharacter::on_initialize()
 
     // No button — cancel
     auto* btn_no = m_controls.add<cc::button>(BTN_NO, cc::rect{dlgX + 208, dlgY + 119, ui_layout::btn_size_x, ui_layout::btn_size_y});
-    btn_no->set_click_sound([this] { m_game->play_game_sound('E', 14, 5); });
+    btn_no->set_click_sound([this] { audio_manager::get().play_game_sound(sound_type::effect, 14, 5); });
     btn_no->set_on_click([this](int) {
         clear_overlay();
     });

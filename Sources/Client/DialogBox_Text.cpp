@@ -5,6 +5,7 @@
 #include "GameFonts.h"
 #include "TextLibExt.h"
 #include "Screen_OnGame.h"
+#include "AudioManager.h"
 using namespace hb::client::sprite_id;
 // game_limits::max_text_dlg_lines is in GameConstants.h (via Game.h)
 
@@ -130,7 +131,7 @@ bool DialogBox_Text::on_click()
 	if (mouse_in(btn_close))
 	{
 		m_game->get_dialog_box_manager().disable_dialog_box(DialogBoxId::Text);
-		m_game->play_game_sound('E', 14, 5);
+		audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 		return true;
 	}
 

@@ -1,4 +1,5 @@
 ﻿#include "Game.h"
+#include "SharedCalculations.h"
 #include "FloatingTextManager.h"
 #include "NetworkMessageManager.h"
 #include "Packet/SharedPackets.h"
@@ -10,6 +11,7 @@
 #include <format>
 #include <string>
 #include "Screen_OnGame.h"
+#include "AudioManager.h"
 
 namespace NetworkMessageHandlers {
 	void HandleDownSkillIndexSet(CGame* game, char* data)
@@ -66,7 +68,7 @@ namespace NetworkMessageHandlers {
 		memcpy(name, pkt->magic_name, 30);
 		txt = std::format(NOTIFYMSG_MAGICSTUDY_SUCCESS1, name);
 		game->add_event_list(txt.c_str(), 10);
-		game->play_game_sound('E', 23, 0);
+		audio_manager::get().play_game_sound(sound_type::effect, 23, 0);
 	}
 
 	void HandleSkillTrainSuccess(CGame* game, char* data)
@@ -84,7 +86,7 @@ namespace NetworkMessageHandlers {
 		game->add_event_list(temp.c_str(), 10);
 		game->m_skill_cfg_list[skill_num]->m_level = skill_level;
 		game->m_player->m_skill_mastery[skill_num] = static_cast<unsigned char>(skill_level);
-		game->play_game_sound('E', 23, 0);
+		audio_manager::get().play_game_sound(sound_type::effect, 23, 0);
 	}
 
 	void HandleSkill(CGame* game, char* data)
@@ -104,7 +106,7 @@ namespace NetworkMessageHandlers {
 		{
 			txt = std::format(NOTIFYMSG_SKILL1, game->m_skill_cfg_list[skill_index]->m_name, value - game->m_skill_cfg_list[skill_index]->m_level);
 			game->add_event_list(txt.c_str(), 10);
-			game->play_game_sound('E', 23, 0);
+			audio_manager::get().play_game_sound(sound_type::effect, 23, 0);
 			txt = std::format("{} +{}%", game->m_skill_cfg_list[skill_index]->m_name, value - game->m_skill_cfg_list[skill_index]->m_level);
 			game->get_floating_text().add_notify_text(notify_text_type::skill_change, txt, game->m_cur_time,
 				game->m_player->m_player_object_id, game->m_map_data.get());
@@ -112,7 +114,7 @@ namespace NetworkMessageHandlers {
 		else if (game->m_skill_cfg_list[skill_index]->m_level > value) {
 			txt = std::format(NOTIFYMSG_SKILL2, game->m_skill_cfg_list[skill_index]->m_name, game->m_skill_cfg_list[skill_index]->m_level - value);
 			game->add_event_list(txt.c_str(), 10);
-			game->play_game_sound('E', 24, 0);
+			audio_manager::get().play_game_sound(sound_type::effect, 24, 0);
 			txt = std::format("{} -{}%", game->m_skill_cfg_list[skill_index]->m_name, value - game->m_skill_cfg_list[skill_index]->m_level);
 			game->get_floating_text().add_notify_text(notify_text_type::skill_change, txt, game->m_cur_time,
 				game->m_player->m_player_object_id, game->m_map_data.get());
@@ -376,7 +378,7 @@ namespace NetworkMessageHandlers {
 		game->m_player->m_int += game->m_player->m_lu_int;
 		game->m_player->m_mag += game->m_player->m_lu_mag;
 		game->m_player->m_charisma += game->m_player->m_lu_char;
-		game->m_player->m_lu_point = (game->m_player->m_level - 1) * 3 - ((game->m_player->m_str + game->m_player->m_vit + game->m_player->m_dex + game->m_player->m_int + game->m_player->m_mag + game->m_player->m_charisma) - 70);
+		game->m_player->m_lu_point = hb::shared::calc::level_up_points(game->m_formula_engine, hb::shared::calc::level{(double)game->m_player->m_level}, hb::shared::calc::total_stats{(double)(game->m_player->m_str + game->m_player->m_vit + game->m_player->m_dex + game->m_player->m_int + game->m_player->m_mag + game->m_player->m_charisma)});
 		game->on_game()->m_gizon_item_upgrade_left -= majestic_cost;
 		game->m_player->m_lu_str = game->m_player->m_lu_vit = game->m_player->m_lu_dex = game->m_player->m_lu_int = game->m_player->m_lu_mag = game->m_player->m_lu_char = 0;
 		game->get_dialog_box_manager().disable_dialog_box(DialogBoxId::ChangeStatsMajestic);
@@ -387,7 +389,7 @@ namespace NetworkMessageHandlers {
 	void HandleStateChangeFailed(CGame* game, char* data)
 	{
 		game->m_player->m_lu_str = game->m_player->m_lu_vit = game->m_player->m_lu_dex = game->m_player->m_lu_int = game->m_player->m_lu_mag = game->m_player->m_lu_char = 0;
-		game->m_player->m_lu_point = (game->m_player->m_level - 1) * 3 - ((game->m_player->m_str + game->m_player->m_vit + game->m_player->m_dex + game->m_player->m_int + game->m_player->m_mag + game->m_player->m_charisma) - 70);
+		game->m_player->m_lu_point = hb::shared::calc::level_up_points(game->m_formula_engine, hb::shared::calc::level{(double)game->m_player->m_level}, hb::shared::calc::total_stats{(double)(game->m_player->m_str + game->m_player->m_vit + game->m_player->m_dex + game->m_player->m_int + game->m_player->m_mag + game->m_player->m_charisma)});
 		game->get_dialog_box_manager().disable_dialog_box(DialogBoxId::ChangeStatsMajestic);
 		game->add_event_list("Your stat has not been changed.", 10);
 	}
@@ -396,7 +398,7 @@ namespace NetworkMessageHandlers {
 	{
 		game->add_event_list("Your stat has not been changed.", 10);
 		game->m_player->m_lu_str = game->m_player->m_lu_vit = game->m_player->m_lu_dex = game->m_player->m_lu_int = game->m_player->m_lu_mag = game->m_player->m_lu_char = 0;
-		game->m_player->m_lu_point = (game->m_player->m_level - 1) * 3 - ((game->m_player->m_str + game->m_player->m_vit + game->m_player->m_dex + game->m_player->m_int + game->m_player->m_mag + game->m_player->m_charisma) - 70);
+		game->m_player->m_lu_point = hb::shared::calc::level_up_points(game->m_formula_engine, hb::shared::calc::level{(double)game->m_player->m_level}, hb::shared::calc::total_stats{(double)(game->m_player->m_str + game->m_player->m_vit + game->m_player->m_dex + game->m_player->m_int + game->m_player->m_mag + game->m_player->m_charisma)});
 	}
 
 	void HandleSpecialAbilityStatus(CGame* game, char* data)
@@ -412,7 +414,7 @@ namespace NetworkMessageHandlers {
 
 		if (v1 == 1) // Use SA
 		{
-			game->play_game_sound('E', 35, 0);
+			audio_manager::get().play_game_sound(sound_type::effect, 35, 0);
 			game->add_event_list(NOTIFY_MSG_HANDLER4, 10); 
 			switch (v2) {
 			case 1: G_cTxt = std::format(NOTIFY_MSG_HANDLER5, v3); break;
@@ -436,7 +438,7 @@ namespace NetworkMessageHandlers {
 		{
 			if (game->m_player->m_special_ability_type != static_cast<int>(v2))
 			{
-				game->play_game_sound('E', 34, 0);
+				audio_manager::get().play_game_sound(sound_type::effect, 34, 0);
 				game->add_event_list(NOTIFY_MSG_HANDLER13, 10);
 				if (v3 >= 60)
 				{
@@ -494,14 +496,14 @@ namespace NetworkMessageHandlers {
 		}
 		else if (v1 == 5) // Angel
 		{
-			game->play_game_sound('E', 52, 0); 
+			audio_manager::get().play_game_sound(sound_type::effect, 52, 0); 
 		}
 	}
 
 	void HandleSpecialAbilityEnabled(CGame* game, char* data)
 	{
 		if (game->m_player->m_is_special_ability_enabled == false) {
-			game->play_game_sound('E', 30, 5);
+			audio_manager::get().play_game_sound(sound_type::effect, 30, 5);
 			game->add_event_list(NOTIFY_MSG_HANDLER32, 10);
 		}
 		game->m_player->m_is_special_ability_enabled = true;
@@ -510,6 +512,6 @@ namespace NetworkMessageHandlers {
 	void HandleSkillTrainFail(CGame* game, char* data)
 	{
 		game->add_event_list("You failed to train skill.", 10);
-		game->play_game_sound('E', 24, 0);
+		audio_manager::get().play_game_sound(sound_type::effect, 24, 0);
 	}
 }

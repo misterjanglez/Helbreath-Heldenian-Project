@@ -14,6 +14,7 @@
 #include <string>
 #include "IInput.h"
 #include "Screen_OnGame.h"
+#include "AudioManager.h"
 
 using namespace hb::shared::net;
 using namespace hb::client::sprite_id;
@@ -214,14 +215,14 @@ bool DialogBox_Soldier::on_click()
 			else
 			{
 				m_mode = mode::teleport;
-				play_sound_effect('E', 14, 5);
+				audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 			}
 		}
 		if (mouse_in(btn_right))
 		{
 			disable_dialog_box(DialogBoxId::Text);
 			enable_dialog_box(DialogBoxId::Text, 803, 0, 0);
-			play_sound_effect('E', 14, 5);
+			audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 		}
 		break;
 
@@ -230,18 +231,18 @@ bool DialogBox_Soldier::on_click()
 		{
 			send_game_packet(hb::net::make_common_command(CommonType::GuildTeleport, player().m_player_x, player().m_player_y));
 			disable_dialog_box(DialogBoxId::CrusadeSoldier);
-			play_sound_effect('E', 14, 5);
+			audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 		}
 		if (mouse_in(btn_middle))
 		{
 			m_mode = mode::overview;
-			play_sound_effect('E', 14, 5);
+			audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 		}
 		if (mouse_in(btn_right))
 		{
 			disable_dialog_box(DialogBoxId::Text);
 			enable_dialog_box(DialogBoxId::Text, 804, 0, 0);
-			play_sound_effect('E', 14, 5);
+			audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 		}
 		break;
 	}

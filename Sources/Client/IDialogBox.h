@@ -66,7 +66,6 @@ protected:
 	void draw_new_dialog_box(char type, int sX, int sY, int frame, bool is_no_color_key = false, bool is_trans = false);
 	void put_string(int iX, int iY, const char* string, const hb::shared::render::Color& color);
 	void put_aligned_string(int x1, int x2, int iY, const char* string, const hb::shared::render::Color& color = GameColors::UIBlack);
-	void play_sound_effect(char type, int num, int dist, long lPan = 0);
 	void add_event_list(const char* txt, char color = 0, bool dup_allow = true);
 	bool send_game_packet_impl(const hb::net::packet_base& pkt, size_t size, bool encrypt = true);
 

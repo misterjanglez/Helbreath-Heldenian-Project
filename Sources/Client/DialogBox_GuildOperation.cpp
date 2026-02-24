@@ -5,6 +5,7 @@
 #include "lan_eng.h"
 #include <string>
 #include "IInput.h"
+#include "AudioManager.h"
 
 using namespace hb::shared::net;
 using namespace hb::client::sprite_id;
@@ -154,7 +155,7 @@ bool DialogBox_GuildOperation::on_click()
 
 	// Approve button
 	if ((mouse_x >= sX + ui_layout::left_btn_x) && (mouse_x <= sX + ui_layout::left_btn_x + ui_layout::btn_size_x) && (mouse_y >= sY + ui_layout::btn_y) && (mouse_y <= sY + ui_layout::btn_y + ui_layout::btn_size_y)) {
-		play_sound_effect('E', 14, 5);
+		audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 
 		switch (m_op_list[0].op_mode) {
 		case 1:
@@ -182,7 +183,7 @@ bool DialogBox_GuildOperation::on_click()
 
 	// Reject button
 	if ((mouse_x >= sX + ui_layout::right_btn_x) && (mouse_x <= sX + ui_layout::right_btn_x + ui_layout::btn_size_x) && (mouse_y >= sY + ui_layout::btn_y) && (mouse_y <= sY + ui_layout::btn_y + ui_layout::btn_size_y)) {
-		play_sound_effect('E', 14, 5);
+		audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 
 		switch (m_op_list[0].op_mode) {
 		case 1:

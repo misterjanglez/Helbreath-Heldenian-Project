@@ -16,6 +16,7 @@
 #include <format>
 #include <string>
 #include "Screen_OnGame.h"
+#include "AudioManager.h"
 
 using namespace hb::shared::net;
 using namespace hb::shared::item;
@@ -150,7 +151,7 @@ namespace NetworkMessageHandlers {
 		else txt = std::format(NOTIFYMSG_ITEMOBTAINED1, count, name);
 
 		game->add_event_list(txt.c_str(), 10);
-		game->play_game_sound('E', 20, 0);
+		audio_manager::get().play_game_sound(sound_type::effect, 20, 0);
 
 		game->m_map_data->set_item(game->m_player->m_player_x, game->m_player->m_player_y, 0, 0, 0, false);
 
@@ -241,7 +242,7 @@ namespace NetworkMessageHandlers {
 		if (total_count == 1) txt = std::format(NOTIFYMSG_ITEMOBTAINED2, name);
 		else txt = std::format(NOTIFYMSG_ITEMOBTAINED1, total_count, name);
 		game->add_event_list(txt.c_str(), 10);
-		game->play_game_sound('E', 20, 0);
+		audio_manager::get().play_game_sound(sound_type::effect, 20, 0);
 
 		// Create individual items in separate slots (no Consume/Arrow merge)
 		short nX = 40, nY = 30;
@@ -323,7 +324,7 @@ namespace NetworkMessageHandlers {
 		game->m_is_item_equipped[item_index] = false;
 		game->m_player->m_item_list[item_index]->m_cur_life_span = 0;
 
-		game->play_game_sound('E', 10, 0);
+		audio_manager::get().play_game_sound(sound_type::effect, 10, 0);
 	}
 
 	void HandleItemReleased(CGame* game, char* data)
@@ -349,9 +350,9 @@ namespace NetworkMessageHandlers {
 			short id = game->m_player->m_item_list[item_index]->m_id_num;
 			if (id == hb::shared::item::ItemId::AngelicPandentSTR || id == hb::shared::item::ItemId::AngelicPandentDEX ||
 				id == hb::shared::item::ItemId::AngelicPandentINT || id == hb::shared::item::ItemId::AngelicPandentMAG)
-				game->play_game_sound('E', 53, 0);
+				audio_manager::get().play_game_sound(sound_type::effect, 53, 0);
 			else
-				game->play_game_sound('E', 29, 0);
+				audio_manager::get().play_game_sound(sound_type::effect, 29, 0);
 		}
 	}
 
@@ -414,9 +415,9 @@ namespace NetworkMessageHandlers {
 				if (is_use_item_result == true) {
 					txt = std::format(NOTIFYMSG_ITEMDEPlETED_ERASEITEM4, itemInfo3.name.c_str());
 					if ((game->m_player->m_player_type >= 1) && (game->m_player->m_player_type <= 3))
-						game->play_game_sound('C', 19, 0);
+						audio_manager::get().play_game_sound(sound_type::character, 19, 0);
 					if ((game->m_player->m_player_type >= 4) && (game->m_player->m_player_type <= 6))
-						game->play_game_sound('C', 20, 0);
+						audio_manager::get().play_game_sound(sound_type::character, 20, 0);
 				}
 			}
 			else if (cfg->get_item_type() == ItemType::UseDepleteDest) {
@@ -427,7 +428,7 @@ namespace NetworkMessageHandlers {
 			else {
 				if (is_use_item_result == true) {
 					txt = std::format(NOTIFYMSG_ITEMDEPlETED_ERASEITEM6, itemInfo3.name.c_str());
-					game->play_game_sound('E', 10, 0);
+					audio_manager::get().play_game_sound(sound_type::effect, 10, 0);
 				}
 			}
 		}
@@ -946,7 +947,7 @@ namespace NetworkMessageHandlers {
 			{
 				game->get_dialog_box_manager().get_dialog_as<DialogBox_ItemUpgrade>(DialogBoxId::ItemUpgrade)->m_mode = DialogBox_ItemUpgrade::mode::failed;
 			}
-			game->play_game_sound('E', 24, 5);
+			audio_manager::get().play_game_sound(sound_type::effect, 24, 5);
 		}
 		else
 		{
@@ -954,17 +955,17 @@ namespace NetworkMessageHandlers {
 			{
 				game->get_dialog_box_manager().get_dialog_as<DialogBox_ItemUpgrade>(DialogBoxId::ItemUpgrade)->m_mode = DialogBox_ItemUpgrade::mode::success;
 			}
-			game->play_game_sound('E', 23, 5);
+			audio_manager::get().play_game_sound(sound_type::effect, 23, 5);
 			switch (game->m_player->m_player_type) {
 			case 1:
 			case 2:
 			case 3:
-				game->play_game_sound('C', 21, 0);
+				audio_manager::get().play_game_sound(sound_type::character, 21, 0);
 				break;
 			case 4:
 			case 5:
 			case 6:
-				game->play_game_sound('C', 22, 0);
+				audio_manager::get().play_game_sound(sound_type::character, 22, 0);
 				break;
 			}
 		}
@@ -978,7 +979,7 @@ namespace NetworkMessageHandlers {
 		if (!pkt) return;
 		v1 = static_cast<short>(pkt->reason);
 		if (game->get_dialog_box_manager().is_enabled(DialogBoxId::ItemUpgrade) == false) return;
-		game->play_game_sound('E', 24, 5);
+		audio_manager::get().play_game_sound(sound_type::effect, 24, 5);
 		switch (v1) {
 		case 1:
 			game->get_dialog_box_manager().get_dialog_as<DialogBox_ItemUpgrade>(DialogBoxId::ItemUpgrade)->m_mode = DialogBox_ItemUpgrade::mode::max_upgrade;
@@ -1024,17 +1025,17 @@ namespace NetworkMessageHandlers {
 		{
 			game->get_dialog_box_manager().get_dialog_as<DialogBox_ItemUpgrade>(DialogBoxId::ItemUpgrade)->m_mode = DialogBox_ItemUpgrade::mode::success;
 		}
-		game->play_game_sound('E', 23, 5);
+		audio_manager::get().play_game_sound(sound_type::effect, 23, 5);
 		switch (game->m_player->m_player_type) {
 		case 1:
 		case 2:
 		case 3:
-			game->play_game_sound('C', 21, 0);
+			audio_manager::get().play_game_sound(sound_type::character, 21, 0);
 			break;
 		case 4:
 		case 5:
 		case 6:
-			game->play_game_sound('C', 22, 0);
+			audio_manager::get().play_game_sound(sound_type::character, 22, 0);
 			break;
 		}
 	}

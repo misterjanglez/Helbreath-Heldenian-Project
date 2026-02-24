@@ -8,6 +8,7 @@
 #include <string>
 
 #include "Client.h"
+#include "NetConstants.h"
 #include "sqlite3.h"
 #include "Log.h"
 #include "TimeUtils.h"
@@ -88,11 +89,11 @@ namespace
         std::snprintf(dest, destSize, "%s", reinterpret_cast<const char*>(text));
     }
 
-    // Load item name to ID mapping from gameconfigs.db
+    // Load item name to ID mapping from gamedata.db
     bool LoadItemNameMapping(std::map<std::string, int>& mapping)
 {
     sqlite3* configDb = nullptr;
-    if (sqlite3_open("gameconfigs.db", &configDb) != SQLITE_OK) {
+    if (sqlite3_open("gamedata.db", &configDb) != SQLITE_OK) {
         sqlite3_close(configDb);
         return false;
     }
@@ -134,7 +135,7 @@ static bool MigrateItemNamesToIds(sqlite3* db)
     // Load item mapping
     std::map<std::string, int> itemMapping;
     if (!LoadItemNameMapping(itemMapping)) {
-        hb::logger::error("SQLite: failed to load item mapping from gameconfigs.db");
+        hb::logger::error("SQLite: failed to load item mapping from gamedata.db");
         return false;
     }
 
@@ -2100,4 +2101,40 @@ bool ResolveCharacterToAccount(const char* character_name, char* outAccountName,
     }
 
     return found;
+}
+
+account_stats CountAccountStats()
+{
+    account_stats stats{0, 0};
+    std::error_code ec;
+
+    for (const auto& entry : std::filesystem::directory_iterator("accounts", ec)) {
+        if (!entry.is_regular_file() || entry.path().extension() != ".db")
+            continue;
+
+        stats.accounts++;
+
+        sqlite3* db = nullptr;
+        if (sqlite3_open(entry.path().string().c_str(), &db) != SQLITE_OK) {
+            if (db) sqlite3_close(db);
+            continue;
+        }
+
+        sqlite3_stmt* stmt = nullptr;
+        if (sqlite3_prepare_v2(db, "SELECT COUNT(*) FROM characters", -1, &stmt, nullptr) == SQLITE_OK) {
+            if (sqlite3_step(stmt) == SQLITE_ROW) {
+                int count = sqlite3_column_int(stmt, 0);
+                stats.characters += count;
+                if (count > hb::shared::limits::MaxCharactersPerAccount) {
+                    std::string name = entry.path().stem().string();
+                    stats.over_limit.emplace_back(name, count);
+                }
+            }
+            sqlite3_finalize(stmt);
+        }
+
+        sqlite3_close(db);
+    }
+
+    return stats;
 }

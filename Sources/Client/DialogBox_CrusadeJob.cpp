@@ -7,6 +7,7 @@
 #include "TextLibExt.h"
 #include "lan_eng.h"
 #include "IInput.h"
+#include "AudioManager.h"
 
 using namespace hb::shared::net;
 using namespace hb::client::sprite_id;
@@ -117,7 +118,7 @@ bool DialogBox_CrusadeJob::on_click()
 		if (!player().m_citizen)
 		{
 			disable_dialog_box(DialogBoxId::CrusadeJob);
-			m_game->play_game_sound('E', 14, 5);
+			audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 			return true;
 		}
 
@@ -132,7 +133,7 @@ bool DialogBox_CrusadeJob::on_click()
 					m_game->send_game_packet(pkt);
 				}
 				disable_dialog_box(DialogBoxId::CrusadeJob);
-				m_game->play_game_sound('E', 14, 5);
+				audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 				return true;
 			}
 		}
@@ -147,7 +148,7 @@ bool DialogBox_CrusadeJob::on_click()
 					m_game->send_game_packet(pkt);
 				}
 				disable_dialog_box(DialogBoxId::CrusadeJob);
-				m_game->play_game_sound('E', 14, 5);
+				audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 				return true;
 			}
 
@@ -162,7 +163,7 @@ bool DialogBox_CrusadeJob::on_click()
 						m_game->send_game_packet(pkt);
 					}
 					disable_dialog_box(DialogBoxId::CrusadeJob);
-					m_game->play_game_sound('E', 14, 5);
+					audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 					return true;
 				}
 			}
@@ -173,7 +174,7 @@ bool DialogBox_CrusadeJob::on_click()
 		{
 			m_game->get_dialog_box_manager().disable_dialog_box(DialogBoxId::Text);
 			m_game->get_dialog_box_manager().enable_dialog_box(DialogBoxId::Text, 813, 0, 0);
-			m_game->play_game_sound('E', 14, 5);
+			audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 			return true;
 		}
 		break;
@@ -195,7 +196,7 @@ bool DialogBox_CrusadeJob::on_click()
 		if (mouse_in(btn_ok))
 		{
 			disable_dialog_box(DialogBoxId::CrusadeJob);
-			m_game->play_game_sound('E', 14, 5);
+			audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 			return true;
 		}
 		break;

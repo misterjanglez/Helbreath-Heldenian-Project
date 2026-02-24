@@ -8,6 +8,17 @@
 
 namespace hb::logger {
 
+static const char* level_ansi(int level)
+{
+	switch (level)
+	{
+	case level::error: return "\033[1;31m"; // bright red
+	case level::warn:  return "\033[1;33m"; // bright yellow
+	case level::debug: return "\033[0;90m"; // dim gray
+	default:           return "";
+	}
+}
+
 void log_backend::init(const config& cfg)
 {
 	std::lock_guard lock(m_mutex);
@@ -47,14 +58,24 @@ void log_backend::write(int channel, int level, std::string_view message)
 	auto timestamp = std::format("{:02d}:{:02d}:{:02d}.{:03d}",
 		tm_buf.tm_hour, tm_buf.tm_min, tm_buf.tm_sec, static_cast<int>(ms.count()));
 
-	std::string line;
+	std::string tag;
 	if (channel == 0 || !m_channel_namer)
-		line = std::format("[{}] [{}] {}", timestamp, level_name(level), message);
+		tag = std::format("[{}]", level_name(level));
 	else
-		line = std::format("[{}] [{}] [{}] {}", timestamp, level_name(level),
-			m_channel_namer(channel), message);
+		tag = std::format("[{}] [{}]", level_name(level), m_channel_namer(channel));
 
-	write_console(channel, level, line);
+	std::string ts_str = std::format("[{}]", timestamp);
+	std::string line = std::format("{} {} {}", ts_str, tag, message);
+
+	// Build colored line: timestamp=muted, tag=level color, message=default
+	const char* tag_ansi = level_ansi(level);
+	std::string colored;
+	if (tag_ansi[0] != '\0')
+		colored = std::format("\033[0;90m{}\033[0m {}{}\033[0m {}", ts_str, tag_ansi, tag, message);
+	else
+		colored = std::format("\033[0;90m{}\033[0m {} {}", ts_str, tag, message);
+
+	write_console(channel, colored);
 
 	if (channel >= 0 && channel < m_channel_count && m_files[channel].is_open())
 	{
@@ -69,10 +90,10 @@ void log_backend::write(int channel, int level, std::string_view message)
 	}
 }
 
-void log_backend::write_console(int channel, int level, std::string_view formatted_line)
+void log_backend::write_console(int channel, std::string_view colored_line)
 {
 	(void)channel;
-	std::cout << formatted_line << '\n';
+	std::cout << colored_line << '\n';
 }
 
 void log_backend::close()

@@ -23,7 +23,7 @@ void Overlay_ConnectionLost::on_initialize()
     m_iFrameCount = 0;
 
     // stop sounds
-    audio_manager::get().stop_sound(sound_type::Effect, 38);
+    audio_manager::get().stop_sound(sound_type::effect, 38);
     audio_manager::get().stop_music();
 }
 
