@@ -4128,7 +4128,7 @@ void CGame::npc_talk_handler(char* packet_data)
 
 void CGame::point_command_handler(int indexX, int indexY, char item_id)
 {
-	char temp[31];
+	char temp[hb::shared::limits::ItemNameLen]{};
 	if ((on_game()->m_point_command_type >= 100) && (on_game()->m_point_command_type < 200))
 	{
 		// get target object ID for auto-aim (lag compensation)

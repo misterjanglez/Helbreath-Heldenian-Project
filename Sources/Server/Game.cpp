@@ -75,6 +75,7 @@ hb::shared::entity::PlayerAppearance CGame::build_broadcast_appearance(int clien
 	// Helper: populate item_id + display_id for one equip slot.
 	// display_id comes from the item CONFIG template (m_item_config_list),
 	// not the player's inventory item instance (which has default -1).
+	// Writes through local copies to avoid packed struct ref/ptr issues on GCC.
 	auto fill_slot = [&](EquipPos pos, int16_t& out_item_id, int16_t& out_display_id) {
 		short slot_index = client->m_item_equipment_status[to_int(pos)];
 		if (slot_index >= 0 && client->m_item_list[slot_index] != nullptr) {
@@ -88,16 +89,35 @@ hb::shared::entity::PlayerAppearance CGame::build_broadcast_appearance(int clien
 		}
 	};
 
-	fill_slot(EquipPos::Head,      appr.helm_item_id,   appr.helm_display_id);
-	fill_slot(EquipPos::Body,      appr.armor_item_id,  appr.armor_display_id);
-	fill_slot(EquipPos::FullBody,  appr.armor_item_id,  appr.armor_display_id);
-	fill_slot(EquipPos::Arms,      appr.arm_item_id,    appr.arm_display_id);
-	fill_slot(EquipPos::Pants,     appr.pants_item_id,  appr.pants_display_id);
-	fill_slot(EquipPos::Leggings,  appr.boots_item_id,  appr.boots_display_id);
-	fill_slot(EquipPos::RightHand, appr.weapon_item_id, appr.weapon_display_id);
-	fill_slot(EquipPos::TwoHand,   appr.weapon_item_id, appr.weapon_display_id);
-	fill_slot(EquipPos::LeftHand,  appr.shield_item_id, appr.shield_display_id);
-	fill_slot(EquipPos::Back,      appr.mantle_item_id, appr.mantle_display_id);
+	// Copy packed fields to locals, fill, then write back
+	int16_t helm_id = appr.helm_item_id,     helm_disp = appr.helm_display_id;
+	int16_t armor_id = appr.armor_item_id,   armor_disp = appr.armor_display_id;
+	int16_t arm_id = appr.arm_item_id,       arm_disp = appr.arm_display_id;
+	int16_t pants_id = appr.pants_item_id,   pants_disp = appr.pants_display_id;
+	int16_t boots_id = appr.boots_item_id,   boots_disp = appr.boots_display_id;
+	int16_t weapon_id = appr.weapon_item_id, weapon_disp = appr.weapon_display_id;
+	int16_t shield_id = appr.shield_item_id, shield_disp = appr.shield_display_id;
+	int16_t mantle_id = appr.mantle_item_id, mantle_disp = appr.mantle_display_id;
+
+	fill_slot(EquipPos::Head,      helm_id,   helm_disp);
+	fill_slot(EquipPos::Body,      armor_id,  armor_disp);
+	fill_slot(EquipPos::FullBody,  armor_id,  armor_disp);
+	fill_slot(EquipPos::Arms,      arm_id,    arm_disp);
+	fill_slot(EquipPos::Pants,     pants_id,  pants_disp);
+	fill_slot(EquipPos::Leggings,  boots_id,  boots_disp);
+	fill_slot(EquipPos::RightHand, weapon_id, weapon_disp);
+	fill_slot(EquipPos::TwoHand,   weapon_id, weapon_disp);
+	fill_slot(EquipPos::LeftHand,  shield_id, shield_disp);
+	fill_slot(EquipPos::Back,      mantle_id, mantle_disp);
+
+	appr.helm_item_id = helm_id;       appr.helm_display_id = helm_disp;
+	appr.armor_item_id = armor_id;     appr.armor_display_id = armor_disp;
+	appr.arm_item_id = arm_id;         appr.arm_display_id = arm_disp;
+	appr.pants_item_id = pants_id;     appr.pants_display_id = pants_disp;
+	appr.boots_item_id = boots_id;     appr.boots_display_id = boots_disp;
+	appr.weapon_item_id = weapon_id;   appr.weapon_display_id = weapon_disp;
+	appr.shield_item_id = shield_id;   appr.shield_display_id = shield_disp;
+	appr.mantle_item_id = mantle_id;   appr.mantle_display_id = mantle_disp;
 
 	// Compute is_skirt from equipped pants
 	short pants_slot = client->m_item_equipment_status[to_int(EquipPos::Pants)];
@@ -6174,7 +6194,7 @@ void CGame::client_common_handler(int client_h, char* data)
 		m_client_list[client_h]->m_socket->send_msg(
 			reinterpret_cast<char*>(&result), sizeof(result));
 		hb::logger::log<log_channel::commands>("[TesterMenu] '{}' requested map list ({} maps)",
-			m_client_list[client_h]->m_char_name, result.count);
+			m_client_list[client_h]->m_char_name, static_cast<int>(result.count));
 		break;
 	}
 
@@ -6223,7 +6243,7 @@ void CGame::client_common_handler(int client_h, char* data)
 		m_client_list[client_h]->m_socket->send_msg(
 			reinterpret_cast<char*>(&result), sizeof(result));
 		hb::logger::log<log_channel::commands>("[TesterMenu] '{}' searched items '{}' ({} results)",
-			m_client_list[client_h]->m_char_name, has_filter ? string : "(all)", result.count);
+			m_client_list[client_h]->m_char_name, has_filter ? string : "(all)", static_cast<int>(result.count));
 		break;
 	}
 
