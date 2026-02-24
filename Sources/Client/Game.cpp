@@ -52,7 +52,6 @@
 #include "TextInputManager.h"
 #include "EventListManager.h"
 #include "ChatCommandManager.h"
-#include "HotkeyManager.h"
 #include "LocalCacheManager.h"
 
 // DialogBox system
@@ -186,7 +185,6 @@ CGame::CGame(hb::shared::types::NativeInstance native_instance, int icon_resourc
 	m_io_pool = std::make_unique<hb::shared::net::IOServicePool>(0);  // 0 threads = manual poll mode
 	m_Renderer = nullptr;
 	read_settings();
-	register_hotkeys();
 
 	m_max_stats = 0;
 	m_max_level = hb::shared::limits::PlayerMaxLevel;
@@ -3432,175 +3430,21 @@ void CGame::create_screen_shot()
 
 void CGame::handle_key_up(KeyCode _key)
 {
-	// Ctrl+letter combos (Ctrl+A, Ctrl+D, etc.) still fire on key release
-	HotkeyManager::get().handle_key_up(_key);
+	auto* screen = GameModeManager::get().get_active_screen();
+	if (screen) screen->on_key_up(_key);
 }
 
 void CGame::handle_key_down(KeyCode _key)
 {
-
-	// When an overlay is active, only allow screenshot (F11)
+	// Overlay gate: only screenshot allowed
 	if (GameModeManager::get_active_overlay() != nullptr)
 	{
-		if (_key == KeyCode::F11)
-			hotkey_simple_screenshot();
+		if (_key == KeyCode::F11) create_screen_shot();
 		return;
 	}
-
-	// Potions fire repeatedly while held — allow auto-repeat with 500ms cooldown
-	if (_key == KeyCode::Insert || _key == KeyCode::Delete)
-	{
-		static uint32_t last_potion_time = 0;
-		uint32_t now = GameClock::get_time_ms();
-		if (now - last_potion_time >= 500)
-		{
-			last_potion_time = now;
-			if (_key == KeyCode::Insert) hotkey_simple_use_health_potion();
-			else hotkey_simple_use_mana_potion();
-		}
-		return;
-	}
-
-	// Ignore auto-repeat key events — only act on initial key press
-	if (!hb::shared::input::is_key_pressed(_key)) return;
-
-	// Filter out keys that have no action
-	switch (_key) {
-	case KeyCode::F10:
-	case KeyCode::PageDown:
-	case KeyCode::LWin:
-	case KeyCode::RWin:
-	case KeyCode::NumpadMultiply:
-	case KeyCode::NumpadSeparator:
-	case KeyCode::NumpadDecimal:
-	case KeyCode::NumpadDivide:
-	case KeyCode::NumLock:
-	case KeyCode::ScrollLock:
-		return;
-	default:
-		break;
-	}
-
-	// Action keys — fire on initial key press for responsive input
-	switch (_key) {
-	case KeyCode::NumpadAdd:
-		hotkey_simple_zoom_in();
-		return;
-	case KeyCode::NumpadSubtract:
-		hotkey_simple_zoom_out();
-		return;
-	case KeyCode::F1:
-		hotkey_simple_use_shortcut1();
-		return;
-	case KeyCode::F2:
-		hotkey_simple_use_shortcut2();
-		return;
-	case KeyCode::F3:
-		hotkey_simple_use_shortcut3();
-		return;
-	case KeyCode::F4:
-		if (hb::shared::input::is_alt_down())
-		{
-			// Alt+F4: trigger logout countdown (same as window close)
-			if ((GameModeManager::get_mode() == GameMode::MainGame) && (m_force_disconn == false))
-			{
-#ifdef _DEBUG
-				if (m_logout_count == -1 || m_logout_count > 2)
-				{
-					m_logout_count = 1;
-					m_logout_count_time = GameClock::get_time_ms();
-				}
-#else
-				if (m_logout_count == -1 || m_logout_count > 11)
-				{
-					m_logout_count = 11;
-					m_logout_count_time = GameClock::get_time_ms();
-				}
-#endif
-			}
-		}
-		else
-			hotkey_simple_use_magic_shortcut();
-		return;
-	case KeyCode::F5:
-		hotkey_simple_toggle_character_info();
-		return;
-	case KeyCode::F6:
-		hotkey_simple_toggle_inventory();
-		return;
-	case KeyCode::F7:
-		hotkey_simple_toggle_magic();
-		return;
-	case KeyCode::F8:
-		hotkey_simple_toggle_skill();
-		return;
-	case KeyCode::F9:
-		hotkey_simple_toggle_chat_history();
-		return;
-	case KeyCode::F11:
-		hotkey_simple_screenshot();
-		return;
-	case KeyCode::F12:
-		hotkey_simple_toggle_system_menu();
-		return;
-	case KeyCode::End:
-		hotkey_simple_load_backup_chat();
-		return;
-	case KeyCode::Up:
-		hotkey_simple_whisper_cycle_up();
-		return;
-	case KeyCode::Right:
-		hotkey_simple_arrow_right();
-		return;
-	case KeyCode::Down:
-		hotkey_simple_whisper_cycle_down();
-		return;
-	case KeyCode::Left:
-		hotkey_simple_arrow_left();
-		return;
-	case KeyCode::Tab:
-		hotkey_simple_tab_toggle_combat();
-		return;
-	case KeyCode::Home:
-		hotkey_simple_toggle_safe_attack();
-		return;
-	case KeyCode::Escape:
-		hotkey_simple_escape();
-		return;
-	case KeyCode::PageUp:
-		hotkey_simple_special_ability();
-		return;
-	default:
-		break;
-	}
-
-	if (GameModeManager::get_mode() == GameMode::MainGame)
-	{
-		if (hb::shared::input::is_ctrl_down())
-		{
-			// Ctrl+0-9 for magic views
-			switch (_key) {
-			case KeyCode::Num0: get_dialog_box_manager().enable_dialog_box(DialogBoxId::Magic, 0, 9, 0); break;
-			case KeyCode::Num1: get_dialog_box_manager().enable_dialog_box(DialogBoxId::Magic, 0, 0, 0); break;
-			case KeyCode::Num2: get_dialog_box_manager().enable_dialog_box(DialogBoxId::Magic, 0, 1, 0); break;
-			case KeyCode::Num3: get_dialog_box_manager().enable_dialog_box(DialogBoxId::Magic, 0, 2, 0); break;
-			case KeyCode::Num4: get_dialog_box_manager().enable_dialog_box(DialogBoxId::Magic, 0, 3, 0); break;
-			case KeyCode::Num5: get_dialog_box_manager().enable_dialog_box(DialogBoxId::Magic, 0, 4, 0); break;
-			case KeyCode::Num6: get_dialog_box_manager().enable_dialog_box(DialogBoxId::Magic, 0, 5, 0); break;
-			case KeyCode::Num7: get_dialog_box_manager().enable_dialog_box(DialogBoxId::Magic, 0, 6, 0); break;
-			case KeyCode::Num8: get_dialog_box_manager().enable_dialog_box(DialogBoxId::Magic, 0, 7, 0); break;
-			case KeyCode::Num9: get_dialog_box_manager().enable_dialog_box(DialogBoxId::Magic, 0, 8, 0); break;
-			default: break;
-			}
-		}
-		// Only Enter key activates chat input - not every key press
-		else if (_key == KeyCode::Enter && (text_input_manager::get().is_active() == false) && (!hb::shared::input::is_alt_down()))
-		{
-			text_input_manager::get().start_input(CHAT_INPUT_X(), CHAT_INPUT_Y(), ChatMsgMaxLen, m_chat_msg);
-			text_input_manager::get().set_chat_background(true);
-			text_input_manager::get().clear_input();
-		}
-	}
+	// Route to active screen
+	auto* screen = GameModeManager::get().get_active_screen();
+	if (screen) screen->on_key_down(_key);
 }
 
 void CGame::reserve_fightzone_response_handler(char* data)

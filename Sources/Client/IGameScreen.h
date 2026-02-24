@@ -13,6 +13,7 @@
 #include <cstdint>
 #include <string>
 
+enum class KeyCode : int;
 class CGame;
 class GameModeManager;
 
@@ -62,6 +63,11 @@ public:
     // Return true if handled (e.g. auto-activated chat input).
     // The universal on_text_char forwarding happens regardless of return value.
     virtual bool on_text_input(uint32_t codepoint) { return false; }
+
+    // Called on key press/release events routed from CGame::on_key_event.
+    // Return true if handled, false to fall through.
+    virtual bool on_key_down(KeyCode key) { return false; }
+    virtual bool on_key_up(KeyCode key) { return false; }
 
     // Called when a server response arrives in log_response_handler.
     // Return true if this screen handled the response (stops further processing),

@@ -515,7 +515,7 @@
     <ClCompile Include="DialogBox_Manufacture.cpp" />
     <ClCompile Include="performance_monitor.cpp" />
     <ClCompile Include="HotkeyManager.cpp" />
-    <ClCompile Include="Game.Hotkeys.cpp" />
+    <ClCompile Include="Screen_OnGame.Hotkeys.cpp" />
     <ClCompile Include="Game.DrawObjects.cpp" />
     <ClCompile Include="EquipmentIndices.cpp" />
     <ClCompile Include="RenderHelpers.cpp" />

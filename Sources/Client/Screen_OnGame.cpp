@@ -103,6 +103,8 @@ void Screen_OnGame::on_initialize()
 
     m_network_message_manager = std::make_unique<NetworkMessageManager>(m_game);
 
+    register_hotkeys();
+
     m_guild_manager.set_game(m_game);
     m_guild_manager.clear_name_cache();
 
