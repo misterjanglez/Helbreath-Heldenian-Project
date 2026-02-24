@@ -12,6 +12,7 @@
 #include <format>
 #include <string>
 #include "Screen_OnGame.h"
+#include "AudioManager.h"
 
 void quest_manager::handle_quest_counter(char* data)
 {
@@ -104,15 +105,15 @@ void quest_manager::handle_quest_completed(char* data)
 	case 1:
 	case 2:
 	case 3:
-		m_game->play_game_sound('C', 21, 0);
+		audio_manager::get().play_game_sound(sound_type::character, 21, 0);
 		break;
 	case 4:
 	case 5:
 	case 6:
-		m_game->play_game_sound('C', 22, 0);
+		audio_manager::get().play_game_sound(sound_type::character, 22, 0);
 		break;
 	}
-	m_game->play_game_sound('E', 23, 0);
+	audio_manager::get().play_game_sound(sound_type::effect, 23, 0);
 	m_game->add_event_list(NOTIFY_MSG_HANDLER44, 10);
 }
 

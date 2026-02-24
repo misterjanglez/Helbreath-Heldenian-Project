@@ -4,6 +4,7 @@
 #include "NetworkMessageManager.h"
 #include "Packet/SharedPackets.h"
 #include "lan_eng.h"
+#include "AudioManager.h"
 #include <algorithm>
 #include <cstdio>
 #include <cstring>
@@ -28,7 +29,7 @@ namespace NetworkMessageHandlers {
 		{
 			txt = std::format(NOTIFYMSG_CHARISMA_UP, game->m_player->m_charisma - prev_char);
 			game->add_event_list(txt.c_str(), 10);
-			game->play_game_sound('E', 21, 0);
+			audio_manager::get().play_game_sound(sound_type::effect, 21, 0);
 		}
 		else
 		{
@@ -137,7 +138,7 @@ namespace NetworkMessageHandlers {
 			if (value == 1)
 			{
 				txt = NOTIFYMSG_RATING_PLAYER1;
-				game->play_game_sound('E', 23, 0);
+				audio_manager::get().play_game_sound(sound_type::effect, 23, 0);
 			}
 		}
 		else

@@ -7,6 +7,7 @@
 #include <string>
 #include "IInput.h"
 #include "Screen_OnGame.h"
+#include "AudioManager.h"
 
 using namespace hb::shared::net;
 using namespace hb::client::sprite_id;
@@ -233,7 +234,7 @@ bool DialogBox_Party::on_click()
 				m_mode = mode::pointing;
 				m_game->on_game()->m_is_get_pointing_mode = true;
 				m_game->on_game()->m_point_command_type = 200;
-				play_sound_effect('E', 14, 5);
+				audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 				return true;
 			}
 		}
@@ -241,7 +242,7 @@ bool DialogBox_Party::on_click()
 		if (m_game->on_game()->m_party_status != 0) {
 			if (mouse_in(link_leave)) {
 				m_mode = mode::confirm_leave;
-				play_sound_effect('E', 14, 5);
+				audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 				return true;
 			}
 		}
@@ -255,7 +256,7 @@ bool DialogBox_Party::on_click()
 					send_game_packet(pkt);
 				}
 				m_mode = mode::member_list;
-				play_sound_effect('E', 14, 5);
+				audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 				return true;
 			}
 		}
@@ -275,7 +276,7 @@ bool DialogBox_Party::on_click()
 				send_game_packet(pkt);
 			}
 			m_game->get_dialog_box_manager().disable_dialog_box(DialogBoxId::Party);
-			play_sound_effect('E', 14, 5);
+			audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 			return true;
 		}
 
@@ -286,7 +287,7 @@ bool DialogBox_Party::on_click()
 				send_game_packet(pkt);
 			}
 			m_game->get_dialog_box_manager().disable_dialog_box(DialogBoxId::Party);
-			play_sound_effect('E', 14, 5);
+			audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 			return true;
 		}
 		break;
@@ -294,7 +295,7 @@ bool DialogBox_Party::on_click()
 	case mode::pointing:
 		if (mouse_in(btn_right)) {
 			m_mode = mode::main_menu;
-			play_sound_effect('E', 14, 5);
+			audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 			return true;
 		}
 		break;
@@ -309,7 +310,7 @@ bool DialogBox_Party::on_click()
 				send_game_packet(pkt);
 			}
 			m_game->get_dialog_box_manager().disable_dialog_box(DialogBoxId::Party);
-			play_sound_effect('E', 14, 5);
+			audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 			return true;
 		}
 		break;
@@ -322,7 +323,7 @@ bool DialogBox_Party::on_click()
 	case mode::disbanded:
 		if (mouse_in(btn_right)) {
 			m_mode = mode::main_menu;
-			play_sound_effect('E', 14, 5);
+			audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 			return true;
 		}
 		break;
@@ -335,13 +336,13 @@ bool DialogBox_Party::on_click()
 				send_game_packet(pkt);
 			}
 			m_mode = mode::leaving;
-			play_sound_effect('E', 14, 5);
+			audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 			return true;
 		}
 
 		if (mouse_in(btn_right)) {
 			m_mode = mode::main_menu;
-			play_sound_effect('E', 14, 5);
+			audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 			return true;
 		}
 		break;

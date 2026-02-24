@@ -36,11 +36,6 @@ void IDialogBox::put_aligned_string(int x1, int x2, int iY, const char* string, 
 	                         hb::shared::text::TextStyle::from_color(color), hb::shared::text::Align::TopCenter);
 }
 
-void IDialogBox::play_sound_effect(char type, int num, int dist, long lPan)
-{
-	m_game->play_game_sound(type, num, dist, lPan);
-}
-
 void IDialogBox::add_event_list(const char* txt, char color, bool dup_allow)
 {
 	m_game->add_event_list(txt, color, dup_allow);

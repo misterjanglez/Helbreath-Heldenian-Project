@@ -15,6 +15,7 @@
 #include <string>
 #include "IInput.h"
 #include "Screen_OnGame.h"
+#include "AudioManager.h"
 
 using namespace hb::shared::net;
 using namespace hb::client::sprite_id;
@@ -280,7 +281,7 @@ bool DialogBox_Constructor::on_click()
 			else
 			{
 				m_mode = mode::select_building;
-				play_sound_effect('E', 14, 5);
+				audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 			}
 		}
 		else if (mouse_in(btn_set_tp))
@@ -296,14 +297,14 @@ bool DialogBox_Constructor::on_click()
 			else
 			{
 				m_mode = mode::teleport;
-				play_sound_effect('E', 14, 5);
+				audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 			}
 		}
 		else if (mouse_in(btn_help_main))
 		{
 			disable_dialog_box(DialogBoxId::Text);
 			enable_dialog_box(DialogBoxId::Text, 805, 0, 0);
-			play_sound_effect('E', 14, 5);
+			audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 		}
 		break;
 
@@ -317,7 +318,7 @@ bool DialogBox_Constructor::on_click()
 				pkt.v3 = m_game->get_dialog_box_manager().get_dialog_as<DialogBox_Commander>(DialogBoxId::CrusadeCommander)->m_selected_faction;
 				send_game_packet(pkt);
 			}
-			play_sound_effect('E', 14, 5);
+			audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 			disable_dialog_box(DialogBoxId::CrusadeConstructor);
 		}
 		if (mouse_in(btn_building_2))
@@ -329,7 +330,7 @@ bool DialogBox_Constructor::on_click()
 				pkt.v3 = m_game->get_dialog_box_manager().get_dialog_as<DialogBox_Commander>(DialogBoxId::CrusadeCommander)->m_selected_faction;
 				send_game_packet(pkt);
 			}
-			play_sound_effect('E', 14, 5);
+			audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 			disable_dialog_box(DialogBoxId::CrusadeConstructor);
 		}
 		if (mouse_in(btn_building_3))
@@ -341,7 +342,7 @@ bool DialogBox_Constructor::on_click()
 				pkt.v3 = m_game->get_dialog_box_manager().get_dialog_as<DialogBox_Commander>(DialogBoxId::CrusadeCommander)->m_selected_faction;
 				send_game_packet(pkt);
 			}
-			play_sound_effect('E', 14, 5);
+			audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 			disable_dialog_box(DialogBoxId::CrusadeConstructor);
 		}
 		if (mouse_in(btn_building_4))
@@ -353,20 +354,20 @@ bool DialogBox_Constructor::on_click()
 				pkt.v3 = m_game->get_dialog_box_manager().get_dialog_as<DialogBox_Commander>(DialogBoxId::CrusadeCommander)->m_selected_faction;
 				send_game_packet(pkt);
 			}
-			play_sound_effect('E', 14, 5);
+			audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 			disable_dialog_box(DialogBoxId::CrusadeConstructor);
 		}
 
 		if (mouse_in(btn_back_build))
 		{
 			m_mode = mode::main;
-			play_sound_effect('E', 14, 5);
+			audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 		}
 		if (mouse_in(btn_help_build))
 		{
 			disable_dialog_box(DialogBoxId::Text);
 			enable_dialog_box(DialogBoxId::Text, 806, 0, 0);
-			play_sound_effect('E', 14, 5);
+			audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 		}
 		break;
 
@@ -375,18 +376,18 @@ bool DialogBox_Constructor::on_click()
 		{
 			send_game_packet(hb::net::make_common_command(CommonType::GuildTeleport, player().m_player_x, player().m_player_y));
 			disable_dialog_box(DialogBoxId::CrusadeConstructor);
-			play_sound_effect('E', 14, 5);
+			audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 		}
 		if (mouse_in(btn_back_tp))
 		{
 			m_mode = mode::main;
-			play_sound_effect('E', 14, 5);
+			audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 		}
 		if (mouse_in(btn_help_main))
 		{
 			disable_dialog_box(DialogBoxId::Text);
 			enable_dialog_box(DialogBoxId::Text, 807, 0, 0);
-			play_sound_effect('E', 14, 5);
+			audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 		}
 		break;
 	}

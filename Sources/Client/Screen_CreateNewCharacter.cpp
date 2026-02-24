@@ -4,6 +4,7 @@
 
 #include "Screen_CreateNewCharacter.h"
 #include "Game.h"
+#include "SharedCalculations.h"
 #include "Screen_OnGame.h"
 #include "GameModeManager.h"
 #include "InputStateHelper.h"
@@ -21,6 +22,7 @@
 #include "IRenderer.h"
 #include "Packet/SharedPackets.h"
 #include "CharInfo.h"
+#include "AudioManager.h"
 #include <format>
 #include <memory>
 
@@ -69,7 +71,7 @@ void Screen_CreateNewCharacter::on_initialize()
     );
 
     // === Name textbox ===
-    auto* tb = m_controls.add<cc::textbox>(TXT_NAME, cc::rect{197 + OX, 110 + OY, 82, 17}, 11);
+    auto* tb = m_controls.add<cc::textbox>(TXT_NAME, cc::rect{ 272, 167, 108, 19 }, 11);
     tb->set_character_filter(hb::client::character_name_allowed_chars);
     tb->set_validator([](const std::string& s) {
         return !s.empty() && CMisc::check_valid_name(s.c_str());
@@ -85,8 +87,8 @@ void Screen_CreateNewCharacter::on_initialize()
     // Layout: minus on left (0,0,21,13), plus on right (23,0,21,13)
     // Gender: 1-2 wrap
     auto* tog_gender = m_controls.add<cc::toggle_button>(TOG_GENDER,
-        cc::rect{236 + OX, 156 + OY, 44, 13}, cc::rect{0, 0, 21, 13}, cc::rect{23, 0, 21, 13});
-    tog_gender->set_click_sound([this] { m_game->play_game_sound('E', 14, 5); });
+        cc::rect{316, 217 + (16 * 0), 43, 15}, cc::rect{0, 0, 21, 15}, cc::rect{22, 0, 21, 15});
+    tog_gender->set_click_sound([this] { audio_manager::get().play_game_sound(sound_type::effect, 14, 5); });
     tog_gender->set_on_change([this](int, int delta) {
         m_game->m_new_char.gender += delta;
         if (m_game->m_new_char.gender < 1) m_game->m_new_char.gender = 2;
@@ -95,8 +97,8 @@ void Screen_CreateNewCharacter::on_initialize()
 
     // Skin color: 1-3 wrap
     auto* tog_skin = m_controls.add<cc::toggle_button>(TOG_SKIN,
-        cc::rect{236 + OX, 171 + OY, 44, 13}, cc::rect{0, 0, 21, 13}, cc::rect{23, 0, 21, 13});
-    tog_skin->set_click_sound([this] { m_game->play_game_sound('E', 14, 5); });
+        cc::rect{ 316, 217 + (16 * 1), 43, 15}, cc::rect{0, 0, 21, 15}, cc::rect{22, 0, 21, 15});
+    tog_skin->set_click_sound([this] { audio_manager::get().play_game_sound(sound_type::effect, 14, 5); });
     tog_skin->set_on_change([this](int, int delta) {
         m_game->m_new_char.skin_col += delta;
         if (m_game->m_new_char.skin_col < 1) m_game->m_new_char.skin_col = 3;
@@ -105,8 +107,8 @@ void Screen_CreateNewCharacter::on_initialize()
 
     // Hair style: 0-7 wrap
     auto* tog_hair_style = m_controls.add<cc::toggle_button>(TOG_HAIR_STYLE,
-        cc::rect{236 + OX, 186 + OY, 44, 13}, cc::rect{0, 0, 21, 13}, cc::rect{23, 0, 21, 13});
-    tog_hair_style->set_click_sound([this] { m_game->play_game_sound('E', 14, 5); });
+        cc::rect{ 316, 217 + (16 * 2), 43, 15 }, cc::rect{ 0, 0, 21, 15 }, cc::rect{ 22, 0, 21, 15 });
+    tog_hair_style->set_click_sound([this] { audio_manager::get().play_game_sound(sound_type::effect, 14, 5); });
     tog_hair_style->set_on_change([this](int, int delta) {
         m_game->m_new_char.hair_style += delta;
         if (m_game->m_new_char.hair_style < 0) m_game->m_new_char.hair_style = 7;
@@ -115,8 +117,8 @@ void Screen_CreateNewCharacter::on_initialize()
 
     // Hair color: 0-15 wrap
     auto* tog_hair_color = m_controls.add<cc::toggle_button>(TOG_HAIR_COLOR,
-        cc::rect{236 + OX, 201 + OY, 44, 13}, cc::rect{0, 0, 21, 13}, cc::rect{23, 0, 21, 13});
-    tog_hair_color->set_click_sound([this] { m_game->play_game_sound('E', 14, 5); });
+        cc::rect{ 316, 217 + (16 * 3), 43, 15 }, cc::rect{ 0, 0, 21, 15 }, cc::rect{ 22, 0, 21, 15 });
+    tog_hair_color->set_click_sound([this] { audio_manager::get().play_game_sound(sound_type::effect, 14, 5); });
     tog_hair_color->set_on_change([this](int, int delta) {
         m_game->m_new_char.hair_col += delta;
         if (m_game->m_new_char.hair_col < 0) m_game->m_new_char.hair_col = 15;
@@ -125,8 +127,8 @@ void Screen_CreateNewCharacter::on_initialize()
 
     // Underwear color: 0-7 wrap
     auto* tog_underwear = m_controls.add<cc::toggle_button>(TOG_UNDERWEAR,
-        cc::rect{236 + OX, 216 + OY, 44, 13}, cc::rect{0, 0, 21, 13}, cc::rect{23, 0, 21, 13});
-    tog_underwear->set_click_sound([this] { m_game->play_game_sound('E', 14, 5); });
+        cc::rect{ 316, 217 + (16 * 4), 43, 15 }, cc::rect{ 0, 0, 21, 15 }, cc::rect{ 22, 0, 21, 15 });
+    tog_underwear->set_click_sound([this] { audio_manager::get().play_game_sound(sound_type::effect, 14, 5); });
     tog_underwear->set_on_change([this](int, int delta) {
         m_game->m_new_char.under_col += delta;
         if (m_game->m_new_char.under_col < 0) m_game->m_new_char.under_col = 7;
@@ -153,22 +155,22 @@ void Screen_CreateNewCharacter::on_initialize()
     auto& nc = m_game->m_new_char;
 
     auto make_stat_toggle = [&](int id, int y, int8_t& stat) {
-        auto* tog = m_controls.add<cc::toggle_button>(id, cc::rect{236 + OX, y + OY, 44, 13},
-            cc::rect{23, 0, 21, 13}, cc::rect{0, 0, 21, 13});
-        tog->set_click_sound([this] { m_game->play_game_sound('E', 14, 5); });
+        auto* tog = m_controls.add<cc::toggle_button>(id, cc::rect{316, y, 43, 15},
+            cc::rect{ 22, 0, 21, 15 }, cc::rect{ 0, 0, 21, 15 });
+        tog->set_click_sound([this] { audio_manager::get().play_game_sound(sound_type::effect, 14, 5); });
         tog->set_on_change(make_stat_handler(stat));
     };
-    make_stat_toggle(TOG_STR, 276, nc.stat_str);
-    make_stat_toggle(TOG_VIT, 291, nc.stat_vit);
-    make_stat_toggle(TOG_DEX, 306, nc.stat_dex);
-    make_stat_toggle(TOG_INT, 321, nc.stat_int);
-    make_stat_toggle(TOG_MAG, 336, nc.stat_mag);
-    make_stat_toggle(TOG_CHR, 351, nc.stat_chr);
+    make_stat_toggle(TOG_STR, 336 + (16 * 0), nc.stat_str);
+    make_stat_toggle(TOG_VIT, 336 + (16 * 1), nc.stat_vit);
+    make_stat_toggle(TOG_DEX, 336 + (16 * 2), nc.stat_dex);
+    make_stat_toggle(TOG_INT, 336 + (16 * 3), nc.stat_int);
+    make_stat_toggle(TOG_MAG, 336 + (16 * 4), nc.stat_mag);
+    make_stat_toggle(TOG_CHR, 336 + (16 * 5), nc.stat_chr);
 
     // === Action buttons ===
     // Create button
-    auto* btn_create = m_controls.add<cc::button>(BTN_CREATE, cc::rect{384 + OX, 445 + OY, 72, 15});
-    btn_create->set_click_sound([this] { m_game->play_game_sound('E', 14, 5); });
+    auto* btn_create = m_controls.add<cc::button>(BTN_CREATE, cc::rect{464, 505, ui_layout::btn_size_x, ui_layout::btn_size_y});
+    btn_create->set_click_sound([this] { audio_manager::get().play_game_sound(sound_type::effect, 14, 5); });
     btn_create->set_on_click([this](int) {
         if (m_prev_focused != BTN_CREATE) return;
         if (!m_bNewCharFlag) return;
@@ -181,8 +183,8 @@ void Screen_CreateNewCharacter::on_initialize()
     });
 
     // Cancel button
-    auto* btn_cancel = m_controls.add<cc::button>(BTN_CANCEL, cc::rect{500 + OX, 445 + OY, 72, 15});
-    btn_cancel->set_click_sound([this] { m_game->play_game_sound('E', 14, 5); });
+    auto* btn_cancel = m_controls.add<cc::button>(BTN_CANCEL, cc::rect{580, 505, ui_layout::btn_size_x, ui_layout::btn_size_y });
+    btn_cancel->set_click_sound([this] { audio_manager::get().play_game_sound(sound_type::effect, 14, 5); });
     btn_cancel->set_on_click([this](int) {
         if (m_prev_focused != BTN_CANCEL) return;
         m_game->change_game_mode(GameMode::SelectCharacter);
@@ -193,8 +195,8 @@ void Screen_CreateNewCharacter::on_initialize()
     });
 
     // Warrior preset button
-    auto* btn_warrior = m_controls.add<cc::button>(BTN_WARRIOR, cc::rect{60 + OX, 445 + OY, 72, 15});
-    btn_warrior->set_click_sound([this] { m_game->play_game_sound('E', 14, 5); });
+    auto* btn_warrior = m_controls.add<cc::button>(BTN_WARRIOR, cc::rect{140, 505, ui_layout::btn_size_x, ui_layout::btn_size_y});
+    btn_warrior->set_click_sound([this] { audio_manager::get().play_game_sound(sound_type::effect, 14, 5); });
     btn_warrior->set_on_click([this](int) {
         if (m_prev_focused != BTN_WARRIOR) return;
         m_game->m_new_char.stat_str = 14;
@@ -215,8 +217,8 @@ void Screen_CreateNewCharacter::on_initialize()
     });
 
     // Mage preset button
-    auto* btn_mage = m_controls.add<cc::button>(BTN_MAGE, cc::rect{145 + OX, 445 + OY, 72, 15});
-    btn_mage->set_click_sound([this] { m_game->play_game_sound('E', 14, 5); });
+    auto* btn_mage = m_controls.add<cc::button>(BTN_MAGE, cc::rect{225, 505, ui_layout::btn_size_x, ui_layout::btn_size_y });
+    btn_mage->set_click_sound([this] { audio_manager::get().play_game_sound(sound_type::effect, 14, 5); });
     btn_mage->set_on_click([this](int) {
         if (m_prev_focused != BTN_MAGE) return;
         m_game->m_new_char.stat_str = 10;
@@ -237,8 +239,8 @@ void Screen_CreateNewCharacter::on_initialize()
     });
 
     // Priest preset button
-    auto* btn_priest = m_controls.add<cc::button>(BTN_MASTER, cc::rect{230 + OX, 445 + OY, 72, 15});
-    btn_priest->set_click_sound([this] { m_game->play_game_sound('E', 14, 5); });
+    auto* btn_priest = m_controls.add<cc::button>(BTN_MASTER, cc::rect{310, 505, ui_layout::btn_size_x, ui_layout::btn_size_y });
+    btn_priest->set_click_sound([this] { audio_manager::get().play_game_sound(sound_type::effect, 14, 5); });
     btn_priest->set_on_click([this](int) {
         if (m_prev_focused != BTN_MASTER) return;
         m_game->m_new_char.stat_str = 14;
@@ -469,14 +471,29 @@ void Screen_CreateNewCharacter::on_render()
 
     // === Derived stats ===
     row = 0;
+    auto& fe = m_game->m_formula_engine;
+    int preview_hp = 0, preview_mp = 0, preview_sp = 0;
+    if (fe.has_formula("max_hp"))
+    {
+        preview_hp = hb::shared::calc::max_hp(fe,
+            hb::shared::calc::vit{(double)m_game->m_new_char.stat_vit}, hb::shared::calc::level{1.0},
+            hb::shared::calc::str{(double)m_game->m_new_char.stat_str}, hb::shared::calc::angelic_str{0.0});
+        preview_mp = hb::shared::calc::max_mp(fe,
+            hb::shared::calc::mag{(double)m_game->m_new_char.stat_mag}, hb::shared::calc::angelic_mag{0.0},
+            hb::shared::calc::level{1.0}, hb::shared::calc::intel{(double)m_game->m_new_char.stat_int},
+            hb::shared::calc::angelic_int{0.0});
+        preview_sp = hb::shared::calc::max_sp(fe,
+            hb::shared::calc::str{(double)m_game->m_new_char.stat_str}, hb::shared::calc::angelic_str{0.0},
+            hb::shared::calc::level{1.0});
+    }
     hb::shared::text::draw_text(GameFont::Default, 445 + OX, 192 + OY, DEF_MSG_HITPOINT, hb::shared::text::TextStyle::from_color(GameColors::UIBlack));
-    txt = std::format("{}", m_game->m_new_char.stat_vit * 3 + 2 + m_game->m_new_char.stat_str / 2);
+    txt = std::format("{}", preview_hp);
     hb::shared::text::draw_text(GameFont::Default, 550 + OX, 192 + OY + 16 * row++, txt.c_str(), hb::shared::text::TextStyle::from_color(GameColors::UILabel));
     hb::shared::text::draw_text(GameFont::Default, 445 + OX, 208 + OY, DEF_MSG_MANAPOINT, hb::shared::text::TextStyle::from_color(GameColors::UIBlack));
-    txt = std::format("{}", m_game->m_new_char.stat_mag * 2 + 2 + m_game->m_new_char.stat_int / 2);
+    txt = std::format("{}", preview_mp);
     hb::shared::text::draw_text(GameFont::Default, 550 + OX, 192 + OY + 16 * row++, txt.c_str(), hb::shared::text::TextStyle::from_color(GameColors::UILabel));
-    hb::shared::text::draw_text(GameFont::Default, 445 + OX, 224 + OY, DEF_MSG_STAMINARPOINT, hb::shared::text::TextStyle::from_color(GameColors::UIBlack));
-    txt = std::format("{}", m_game->m_new_char.stat_str * 2 + 2);
+    hb::shared::text::draw_text(GameFont::Default, 445 + OX, 224 + OY, DEF_MSG_STAMINAPOINT, hb::shared::text::TextStyle::from_color(GameColors::UIBlack));
+    txt = std::format("{}", preview_sp);
     hb::shared::text::draw_text(GameFont::Default, 550 + OX, 192 + OY + 16 * row++, txt.c_str(), hb::shared::text::TextStyle::from_color(GameColors::UILabel));
 
     m_game->draw_version();

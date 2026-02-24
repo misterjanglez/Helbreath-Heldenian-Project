@@ -94,9 +94,6 @@ protected:
     void put_string_spr_font(int iX, int iY, const char* str, uint8_t r, uint8_t g, uint8_t b);
     void draw_version();
 
-    // Audio helpers
-    void play_game_sound(char type, int num, int dist, long lPan = 0);
-
     // Event/message helpers
     void add_event_list(const char* txt, char color = 0, bool dup_allow = true);
 

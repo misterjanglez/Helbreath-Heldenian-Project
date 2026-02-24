@@ -13,6 +13,7 @@
 #include <format>
 #include "IInput.h"
 #include "Screen_OnGame.h"
+#include "AudioManager.h"
 
 using namespace hb::shared::net;
 using namespace hb::client::sprite_id;
@@ -445,7 +446,7 @@ bool DialogBox_Commander::on_click()
 		if (mouse_in(btn_set_tp))
 		{
 			m_mode = mode::set_tp;
-			play_sound_effect('E', 14, 5);
+			audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 		}
 		else if (mouse_in(btn_use_tp))
 		{
@@ -460,25 +461,25 @@ bool DialogBox_Commander::on_click()
 			else
 			{
 				m_mode = mode::use_tp;
-				play_sound_effect('E', 14, 5);
+				audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 			}
 		}
 		else if (mouse_in(btn_summon))
 		{
 			m_mode = mode::summon;
 			m_selected_faction = 0;
-			play_sound_effect('E', 14, 5);
+			audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 		}
 		else if (mouse_in(btn_set_construct))
 		{
 			m_mode = mode::set_construct;
-			play_sound_effect('E', 14, 5);
+			audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 		}
 		else if (mouse_in(btn_help))
 		{
 			disable_dialog_box(DialogBoxId::Text);
 			enable_dialog_box(DialogBoxId::Text, 808, 0, 0);
-			play_sound_effect('E', 14, 5);
+			audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 		}
 		break;
 
@@ -505,19 +506,19 @@ bool DialogBox_Commander::on_click()
 				send_game_packet(pkt);
 			}
 			m_mode = mode::main;
-			play_sound_effect('E', 14, 5);
+			audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 			m_game->request_map_status("middleland", 1);
 		}
 		if (mouse_in(btn_back))
 		{
 			m_mode = mode::main;
-			play_sound_effect('E', 14, 5);
+			audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 		}
 		if (mouse_in(btn_help))
 		{
 			disable_dialog_box(DialogBoxId::Text);
 			enable_dialog_box(DialogBoxId::Text, 809, 0, 0);
-			play_sound_effect('E', 14, 5);
+			audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 		}
 		break;
 
@@ -526,18 +527,18 @@ bool DialogBox_Commander::on_click()
 		{
 			send_game_packet(hb::net::make_common_command(CommonType::GuildTeleport, player().m_player_x, player().m_player_y));
 			disable_dialog_box(DialogBoxId::CrusadeCommander);
-			play_sound_effect('E', 14, 5);
+			audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 		}
 		if (mouse_in(btn_back))
 		{
 			m_mode = mode::main;
-			play_sound_effect('E', 14, 5);
+			audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 		}
 		if (mouse_in(btn_help))
 		{
 			disable_dialog_box(DialogBoxId::Text);
 			enable_dialog_box(DialogBoxId::Text, 810, 0, 0);
-			play_sound_effect('E', 14, 5);
+			audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 		}
 		break;
 
@@ -555,7 +556,7 @@ bool DialogBox_Commander::on_click()
 						pkt.v3 = m_selected_faction;
 						send_game_packet(pkt);
 					}
-					play_sound_effect('E', 14, 5);
+					audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 					disable_dialog_box(DialogBoxId::CrusadeCommander);
 				}
 			}
@@ -570,7 +571,7 @@ bool DialogBox_Commander::on_click()
 						pkt.v3 = m_selected_faction;
 						send_game_packet(pkt);
 					}
-					play_sound_effect('E', 14, 5);
+					audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 					disable_dialog_box(DialogBoxId::CrusadeCommander);
 				}
 			}
@@ -585,7 +586,7 @@ bool DialogBox_Commander::on_click()
 						pkt.v3 = m_selected_faction;
 						send_game_packet(pkt);
 					}
-					play_sound_effect('E', 14, 5);
+					audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 					disable_dialog_box(DialogBoxId::CrusadeCommander);
 				}
 			}
@@ -600,7 +601,7 @@ bool DialogBox_Commander::on_click()
 						pkt.v3 = m_selected_faction;
 						send_game_packet(pkt);
 					}
-					play_sound_effect('E', 14, 5);
+					audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 					disable_dialog_box(DialogBoxId::CrusadeCommander);
 				}
 			}
@@ -618,7 +619,7 @@ bool DialogBox_Commander::on_click()
 						pkt.v3 = m_selected_faction;
 						send_game_packet(pkt);
 					}
-					play_sound_effect('E', 14, 5);
+					audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 					disable_dialog_box(DialogBoxId::CrusadeCommander);
 				}
 			}
@@ -633,7 +634,7 @@ bool DialogBox_Commander::on_click()
 						pkt.v3 = m_selected_faction;
 						send_game_packet(pkt);
 					}
-					play_sound_effect('E', 14, 5);
+					audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 					disable_dialog_box(DialogBoxId::CrusadeCommander);
 				}
 			}
@@ -648,7 +649,7 @@ bool DialogBox_Commander::on_click()
 						pkt.v3 = m_selected_faction;
 						send_game_packet(pkt);
 					}
-					play_sound_effect('E', 14, 5);
+					audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 					disable_dialog_box(DialogBoxId::CrusadeCommander);
 				}
 			}
@@ -663,7 +664,7 @@ bool DialogBox_Commander::on_click()
 						pkt.v3 = m_selected_faction;
 						send_game_packet(pkt);
 					}
-					play_sound_effect('E', 14, 5);
+					audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 					disable_dialog_box(DialogBoxId::CrusadeCommander);
 				}
 			}
@@ -671,23 +672,23 @@ bool DialogBox_Commander::on_click()
 		if (mouse_in(link_faction_1))
 		{
 			m_selected_faction = 0;
-			play_sound_effect('E', 14, 5);
+			audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 		}
 		if (mouse_in(link_faction_2))
 		{
 			m_selected_faction = 1;
-			play_sound_effect('E', 14, 5);
+			audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 		}
 		if (mouse_in(btn_back))
 		{
 			m_mode = mode::main;
-			play_sound_effect('E', 14, 5);
+			audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 		}
 		if (mouse_in(btn_help))
 		{
 			disable_dialog_box(DialogBoxId::Text);
 			enable_dialog_box(DialogBoxId::Text, 811, 0, 0);
-			play_sound_effect('E', 14, 5);
+			audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 		}
 		break;
 
@@ -714,19 +715,19 @@ bool DialogBox_Commander::on_click()
 				send_game_packet(pkt);
 			}
 			m_mode = mode::main;
-			play_sound_effect('E', 14, 5);
+			audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 			m_game->request_map_status("middleland", 1);
 		}
 		if (mouse_in(btn_back))
 		{
 			m_mode = mode::main;
-			play_sound_effect('E', 14, 5);
+			audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 		}
 		if (mouse_in(btn_help))
 		{
 			disable_dialog_box(DialogBoxId::Text);
 			enable_dialog_box(DialogBoxId::Text, 812, 0, 0);
-			play_sound_effect('E', 14, 5);
+			audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 		}
 		break;
 	}

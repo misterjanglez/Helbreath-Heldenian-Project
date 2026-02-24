@@ -10,6 +10,7 @@
 #include "TimeUtils.h"
 using namespace std;
 
+#include "SharedCalculations.h"
 #include "AccountSqliteStore.h"
 #include "sqlite3.h"
 #include "PasswordHash.h"
@@ -17,6 +18,7 @@ using namespace std;
 #include "Log.h"
 #include "Item/ItemEnums.h"
 #include "version_info.h"
+#include "Game.h"
 #include <filesystem>
 
 using namespace hb::shared::net;
@@ -129,12 +131,14 @@ void LoginServer::request_login(int h, char* data)
 	{
 	case LogIn::Ok:
 	{
+		// Send balance config BEFORE login response — login response closes the socket
+		send_balance_config(h);
+
 		char data[512] = {};
 		char* cp2 = data;
 		push(cp2, (int)chars.size());
 		get_char_list(name, cp2, chars);
 		send_login_msg(LogResMsg::Confirm, LogResMsg::Confirm, data, cp2 - data, h);
-		//PutLogList("Ok");
 		break;
 	}
 
@@ -307,7 +311,7 @@ void LoginServer::response_character(int h, char* data)
 	if (status != LogIn::Ok)
 		return;
 
-	if (chars.size() >= 4)
+	if (chars.size() >= hb::shared::limits::MaxCharactersPerAccount)
 		return;
 
 	if (!IsValidName(acc) || !IsValidName(password) || !IsValidName(name))
@@ -355,9 +359,16 @@ void LoginServer::response_character(int h, char* data)
 	std::snprintf(state.map_name, sizeof(state.map_name), "default");
 	state.map_x = -1;
 	state.map_y = -1;
-	state.hp = vit * 3 + 1 * 2 + str / 2;
-	state.mp = (mag) * 2 + 1 * 2 + (intl) / 2;
-	state.sp = 1 * 2 + str * 2;
+	state.hp = hb::shared::calc::max_hp(G_pGame->m_formula_engine,
+		hb::shared::calc::vit{(double)vit}, hb::shared::calc::level{1.0},
+		hb::shared::calc::str{(double)str}, hb::shared::calc::angelic_str{0.0});
+	state.mp = hb::shared::calc::max_mp(G_pGame->m_formula_engine,
+		hb::shared::calc::mag{(double)mag}, hb::shared::calc::angelic_mag{0.0},
+		hb::shared::calc::level{1.0}, hb::shared::calc::intel{(double)intl},
+		hb::shared::calc::angelic_int{0.0});
+	state.sp = hb::shared::calc::max_sp(G_pGame->m_formula_engine,
+		hb::shared::calc::str{(double)str}, hb::shared::calc::angelic_str{0.0},
+		hb::shared::calc::level{1.0});
 	state.level = 1;
 	state.rating = 0;
 	state.str = str;
@@ -418,7 +429,7 @@ void LoginServer::response_character(int h, char* data)
 
 	bool ok = InsertCharacterState(db, state);
 
-	// Starter item IDs from gameconfigs.db
+	// Starter item IDs from gamedata.db
 	constexpr int ITEM_DAGGER = 1;
 	constexpr int ITEM_BIG_RED_POTION = 92;    // Health potion
 	constexpr int ITEM_BIG_BLUE_POTION = 94;   // Mana potion
@@ -773,6 +784,23 @@ void LoginServer::send_login_msg(uint32_t msg_id, uint16_t msg_type, char* data,
 			return;
 		}
 	}
+}
+
+void LoginServer::send_balance_config(int h)
+{
+	if (!G_pGame->_lclients[h]) return;
+
+	auto serialized = G_pGame->m_formula_engine.serialize();
+	if (serialized.empty()) return;
+
+	// Build packet: header + serialized formula data
+	std::vector<char> buf(sizeof(hb::net::PacketHeader) + serialized.size(), 0);
+	auto* header = reinterpret_cast<hb::net::PacketHeader*>(buf.data());
+	header->msg_id = MsgId::BalanceConfigContents;
+	header->msg_type = MsgType::Confirm;
+	std::memcpy(buf.data() + sizeof(hb::net::PacketHeader), serialized.data(), serialized.size());
+
+	G_pGame->_lclients[h]->sock->send_msg(buf.data(), static_cast<int>(buf.size()));
 }
 
 void LoginServer::request_enter_game(int h, char* data)

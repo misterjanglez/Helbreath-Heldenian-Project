@@ -9,6 +9,7 @@
 #include "Effect.h"
 #include "GlobalDef.h"
 #include "Misc.h"
+#include "AudioManager.h"
 
 
 void effect_manager::update_effects_impl()
@@ -580,7 +581,7 @@ void effect_manager::update_effects_impl()
 						m_effect_list[i]->m_dest_x + 1, m_effect_list[i]->m_dest_y + 1, 0);
 					add_effect_impl(EffectType::BURST_SMALL, m_effect_list[i]->m_move_x + (rand() % 20) - 10, m_effect_list[i]->m_move_y + (rand() % 20) - 10, 0, 0, -1 * (rand() % 4));
 					lPan = -(((m_game->m_Camera.get_x() / 32) + VIEW_CENTER_TILE_X()) - m_effect_list[i]->m_dest_x) * LOGICAL_WIDTH();
-					m_game->play_game_sound('E', 1, dist, lPan);
+					audio_manager::get().play_game_sound(sound_type::effect, 1, dist, lPan);
 					add_effect_impl(EffectType::MAGIC_MISSILE_EXPLOSION, m_effect_list[i]->m_dest_x * 32, m_effect_list[i]->m_dest_y * 32, 0, 0, 0, 0);
 					delete m_effect_list[i];
 					m_effect_list[i] = 0;
@@ -601,7 +602,7 @@ void effect_manager::update_effects_impl()
 						if (abs_x > abs_y) dist = abs_x;
 						else dist = abs_y;
 						lPan = -(((m_game->m_Camera.get_x() / 32) + VIEW_CENTER_TILE_X()) - m_effect_list[i]->m_dest_x) * LOGICAL_WIDTH();
-						m_game->play_game_sound('E', 1, dist, lPan);
+						audio_manager::get().play_game_sound(sound_type::effect, 1, dist, lPan);
 					}
 					break;
 
@@ -637,7 +638,7 @@ void effect_manager::update_effects_impl()
 						if (abs_x > abs_y) dist = abs_x;
 						else dist = abs_y;
 						lPan = -(((m_game->m_Camera.get_x() / 32) + VIEW_CENTER_TILE_X()) - m_effect_list[i]->m_dest_x);
-						m_game->play_game_sound('E', 1, dist, lPan);
+						audio_manager::get().play_game_sound(sound_type::effect, 1, dist, lPan);
 					}
 					break;
 
@@ -695,7 +696,7 @@ void effect_manager::update_effects_impl()
 						if (abs_x > abs_y) dist = abs_x;
 						else dist = abs_y;
 						lPan = -(((m_game->m_Camera.get_x() / 32) + VIEW_CENTER_TILE_X()) - m_effect_list[i]->m_dest_x);
-						m_game->play_game_sound('E', 1, dist, lPan);
+						audio_manager::get().play_game_sound(sound_type::effect, 1, dist, lPan);
 					}
 					break;
 
@@ -736,7 +737,7 @@ void effect_manager::update_effects_impl()
 						if (abs_x > abs_y) dist = abs_x;
 						else dist = abs_y;
 						lPan = -(((m_game->m_Camera.get_x() / 32) + VIEW_CENTER_TILE_X()) - m_effect_list[i]->m_dest_x);
-						m_game->play_game_sound('E', 1, dist, lPan);
+						audio_manager::get().play_game_sound(sound_type::effect, 1, dist, lPan);
 					}
 					break;
 
@@ -780,7 +781,7 @@ void effect_manager::update_effects_impl()
 						if (abs_x > abs_y) dist = abs_x;
 						else dist = abs_y;
 						lPan = -(((m_game->m_Camera.get_x() / 32) + VIEW_CENTER_TILE_X()) - m_effect_list[i]->m_dest_x);
-						m_game->play_game_sound('E', 1, dist, lPan);
+						audio_manager::get().play_game_sound(sound_type::effect, 1, dist, lPan);
 					}
 					break;
 
@@ -807,7 +808,7 @@ void effect_manager::update_effects_impl()
 						if (abs_x > abs_y) dist = abs_x - 10;
 						else dist = abs_y - 10;
 						lPan = -(((m_game->m_Camera.get_x() / 32) + VIEW_CENTER_TILE_X()) - m_effect_list[i]->m_dest_x);
-						m_game->play_game_sound('E', 1, dist, lPan);
+						audio_manager::get().play_game_sound(sound_type::effect, 1, dist, lPan);
 					}
 					break;
 

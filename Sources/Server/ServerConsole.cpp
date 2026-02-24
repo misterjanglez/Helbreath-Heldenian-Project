@@ -135,6 +135,21 @@ void ServerConsole::write_line(const char* text, int color)
 	draw_input_line();
 }
 
+void ServerConsole::write_line_raw(std::string_view text)
+{
+	if (!m_init) {
+		std::fwrite(text.data(), 1, text.size(), stdout);
+		std::fputc('\n', stdout);
+		return;
+	}
+
+	clear_input_line();
+	std::fwrite(text.data(), 1, text.size(), stdout);
+	std::fputs("\033[0m", stdout);
+	std::fputc('\n', stdout);
+	draw_input_line();
+}
+
 void ServerConsole::redraw_prompt()
 {
 	if (!m_init) return;

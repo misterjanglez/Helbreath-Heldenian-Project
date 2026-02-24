@@ -7,6 +7,7 @@
 #include "lan_eng.h"
 #include "GameFonts.h"
 #include "TextLibExt.h"
+#include "AudioManager.h"
 #include <format>
 #include <string>
 
@@ -171,7 +172,7 @@ bool DialogBox_MagicShop::handle_spell_click(short sX, short sY)
 						std::snprintf(pkt.text, sizeof(pkt.text), "%s", m_game->m_magic_cfg_list[c_pivot + i]->m_name.c_str());
 						m_game->send_game_packet(pkt);
 					}
-					m_game->play_game_sound('E', 14, 5);
+					audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 				}
 				return true;
 			}

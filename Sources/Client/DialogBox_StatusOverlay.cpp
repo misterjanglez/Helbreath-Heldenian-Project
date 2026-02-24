@@ -5,6 +5,7 @@
 #include "TextLibExt.h"
 #include "IInput.h"
 #include "lan_eng.h"
+#include "AudioManager.h"
 #include <algorithm>
 #include <format>
 #include <string>
@@ -153,7 +154,7 @@ bool DialogBox_StatusOverlay::on_click()
 	if (m_show_tester && mouse_in(m_tester_btn))
 	{
 		enable_dialog_box(DialogBoxId::TesterMenu, 0, 0, 0);
-		play_sound_effect('E', 14, 5);
+		audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 		return true;
 	}
 #endif
@@ -163,7 +164,7 @@ bool DialogBox_StatusOverlay::on_click()
 		if (m_show_levelup)
 		{
 			enable_dialog_box(DialogBoxId::LevelUpSetting, 0, 0, 0);
-			play_sound_effect('E', 14, 5);
+			audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 		}
 		else if (m_show_restart)
 		{
@@ -171,7 +172,7 @@ bool DialogBox_StatusOverlay::on_click()
 			m_game->m_restart_count_time = GameClock::get_time_ms();
 			std::string txt = std::format(DLGBOX_CLICK_SYSMENU1, m_game->m_restart_count);
 			add_event_list(txt.c_str(), 10);
-			play_sound_effect('E', 14, 5);
+			audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 		}
 		return true;
 	}

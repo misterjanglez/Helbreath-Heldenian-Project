@@ -14,6 +14,7 @@
 #include "Packet/SharedPackets.h"
 #include "PacketSendHelpers.h"
 #include "Screen_OnGame.h"
+#include "AudioManager.h"
 
 
 using namespace hb::shared::net;
@@ -165,7 +166,7 @@ bool DialogBox_Inventory::on_click()
 	    (mouse_y >= sY + BTN_Y1) && (mouse_y <= sY + BTN_Y2))
 	{
 		enable_dialog_box(DialogBoxId::ItemUpgrade, 5, 0, 0);
-		play_sound_effect('E', 14, 5);
+		audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 		return true;
 	}
 
@@ -203,13 +204,13 @@ bool DialogBox_Inventory::on_click()
 				{
 					enable_dialog_box(DialogBoxId::Manufacture, 3, 0, 0);
 					add_event_list(BDLBBOX_DOUBLE_CLICK_INVENTORY12, 10);
-					play_sound_effect('E', 14, 5);
+					audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 					return true;
 				}
 			}
 			add_event_list(BDLBBOX_DOUBLE_CLICK_INVENTORY14, 10);
 		}
-		play_sound_effect('E', 14, 5);
+		audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 		return true;
 	}
 
@@ -602,9 +603,9 @@ bool DialogBox_Inventory::on_item_drop()
 			short id = player().m_item_list[selected_id]->m_id_num;
 			if (id == hb::shared::item::ItemId::AngelicPandentSTR || id == hb::shared::item::ItemId::AngelicPandentDEX ||
 				id == hb::shared::item::ItemId::AngelicPandentINT || id == hb::shared::item::ItemId::AngelicPandentMAG)
-				m_game->play_game_sound('E', 53, 0);
+				audio_manager::get().play_game_sound(sound_type::effect, 53, 0);
 			else
-				m_game->play_game_sound('E', 29, 0);
+				audio_manager::get().play_game_sound(sound_type::effect, 29, 0);
 		}
 
 		// Remove Angelic Stats

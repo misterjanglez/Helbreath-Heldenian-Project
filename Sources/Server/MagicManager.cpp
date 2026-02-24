@@ -2383,7 +2383,7 @@ void MagicManager::player_magic_handler(int client_h, int dX, int dY, short type
 				// Set Deadflag to Alive. 
 				m_game->m_client_list[owner_h]->m_is_killed = false;
 				// Player's HP becomes half of the Max HP. 
-				m_game->m_client_list[owner_h]->m_hp = ((m_game->m_client_list[owner_h]->m_level * 2) + (m_game->m_client_list[owner_h]->m_vit * 3) + ((m_game->m_client_list[owner_h]->m_str + m_game->m_client_list[owner_h]->m_angelic_str) / 2)) / 2;
+				m_game->m_client_list[owner_h]->m_hp = m_game->get_max_hp(owner_h) / 2;
 				// Send new HP to Player. 
 				m_game->send_notify_msg(0, owner_h, Notify::Hp, 0, 0, 0, 0);
 				// Make Player stand up. (Currently, by a fake damage). 
@@ -2684,7 +2684,7 @@ void MagicManager::reload_magic_configs()
 	bool configDbCreated = false;
 	if (!EnsureGameConfigDatabase(&configDb, configDbPath, &configDbCreated) || configDbCreated)
 	{
-		hb::logger::log("Magic config reload failed: gameconfigs.db unavailable");
+		hb::logger::log("Magic config reload failed: gamedata.db unavailable");
 		return;
 	}
 

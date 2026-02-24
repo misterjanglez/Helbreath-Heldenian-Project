@@ -19,6 +19,7 @@
 #include "IRenderer.h"
 #include "Packet/SharedPackets.h"
 #include "CharInfo.h"
+#include "AudioManager.h"
 #include <format>
 #include <string>
 
@@ -53,7 +54,7 @@ void Screen_SelectCharacter::on_initialize()
         int slot_id = SLOT_1 + i;
         auto* btn = m_controls.add<cc::button>(slot_id, cc::rect{100 + i * 111 + OX, 50 + OY, 110, 200});
 
-        btn->set_click_sound([this] { m_game->play_game_sound('E', 14, 5); });
+        btn->set_click_sound([this] { audio_manager::get().play_game_sound(sound_type::effect, 14, 5); });
         int capture_id = slot_id;
         btn->set_on_click([this, capture_id](int) {
             uint32_t now = GameClock::get_time_ms();
@@ -82,14 +83,14 @@ void Screen_SelectCharacter::on_initialize()
     // 5 menu buttons (NOT in focus order — hover-only highlights)
     auto* btn_enter = m_controls.add<cc::button>(BTN_ENTER, cc::rect{360 + OX, 283 + OY, 185, 32});
     btn_enter->set_on_click([this](int) { enter_game(); });
-    btn_enter->set_click_sound([this] { m_game->play_game_sound('E', 14, 5); });
+    btn_enter->set_click_sound([this] { audio_manager::get().play_game_sound(sound_type::effect, 14, 5); });
 
     auto* btn_new = m_controls.add<cc::button>(BTN_NEW, cc::rect{360 + OX, 316 + OY, 185, 29});
     btn_new->set_on_click([this](int) {
         if (m_game->m_total_char < 4)
             m_game->change_game_mode(GameMode::CreateNewCharacter);
     });
-    btn_new->set_click_sound([this] { m_game->play_game_sound('E', 14, 5); });
+    btn_new->set_click_sound([this] { audio_manager::get().play_game_sound(sound_type::effect, 14, 5); });
 
     auto* btn_delete = m_controls.add<cc::button>(BTN_DELETE, cc::rect{360 + OX, 346 + OY, 185, 29});
     btn_delete->set_on_click([this](int) {
@@ -100,15 +101,15 @@ void Screen_SelectCharacter::on_initialize()
             m_game->m_enter_game_type = slot_index + 1;
         }
     });
-    btn_delete->set_click_sound([this] { m_game->play_game_sound('E', 14, 5); });
+    btn_delete->set_click_sound([this] { audio_manager::get().play_game_sound(sound_type::effect, 14, 5); });
 
     auto* btn_change_pw = m_controls.add<cc::button>(BTN_CHANGE_PW, cc::rect{360 + OX, 376 + OY, 185, 29});
     btn_change_pw->set_on_click([this](int) { m_game->change_game_mode(GameMode::ChangePassword); });
-    btn_change_pw->set_click_sound([this] { m_game->play_game_sound('E', 14, 5); });
+    btn_change_pw->set_click_sound([this] { audio_manager::get().play_game_sound(sound_type::effect, 14, 5); });
 
     auto* btn_exit = m_controls.add<cc::button>(BTN_EXIT, cc::rect{360 + OX, 406 + OY, 185, 29});
     btn_exit->set_on_click([this](int) { m_game->change_game_mode(GameMode::MainMenu); });
-    btn_exit->set_click_sound([this] { m_game->play_game_sound('E', 14, 5); });
+    btn_exit->set_click_sound([this] { audio_manager::get().play_game_sound(sound_type::effect, 14, 5); });
 
     // Focus order: only the 4 slot buttons
     m_controls.set_focus_order({SLOT_1, SLOT_2, SLOT_3, SLOT_4});

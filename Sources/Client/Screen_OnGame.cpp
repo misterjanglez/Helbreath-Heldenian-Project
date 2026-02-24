@@ -533,8 +533,8 @@ void Screen_OnGame::on_update()
         m_logout_count = -1;
         m_game->write_settings();
         m_game->m_g_sock.reset();
-        play_game_sound('E', 14, 5);
-        audio_manager::get().stop_sound(sound_type::Effect, 38);
+        audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
+        audio_manager::get().stop_sound(sound_type::effect, 38);
         audio_manager::get().stop_music();
         m_game->change_game_mode(GameMode::MainMenu);
         return;

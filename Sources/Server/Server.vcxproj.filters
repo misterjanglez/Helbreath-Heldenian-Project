@@ -172,6 +172,9 @@
     <ClInclude Include="GameConfigSqliteStore.h">
       <Filter>Database</Filter>
     </ClInclude>
+    <ClInclude Include="ServerConfig.h">
+      <Filter>Database</Filter>
+    </ClInclude>
     <ClInclude Include="GlobalDef.h" />
     <ClInclude Include="GuildsMan.h">
       <Filter>Data Types</Filter>
@@ -541,6 +544,9 @@
     <ClCompile Include="GameConfigSqliteStore.cpp">
       <Filter>Database</Filter>
     </ClCompile>
+    <ClCompile Include="ServerConfig.cpp">
+      <Filter>Database</Filter>
+    </ClCompile>
     <ClCompile Include="LoginServer.cpp">
       <Filter>Networking</Filter>
     </ClCompile>
@@ -582,6 +588,9 @@
       <Filter>Shared\Log</Filter>
     </ClCompile>
     <ClCompile Include="..\Dependencies\Shared\Util\SHA256.cpp">
+      <Filter>Shared</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Dependencies\Shared\Game\FormulaEngine.cpp">
       <Filter>Shared</Filter>
     </ClCompile>
     <ClCompile Include="ServerLog.cpp">

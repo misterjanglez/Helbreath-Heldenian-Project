@@ -134,7 +134,6 @@ bool Screen_OnGame::on_key_down(KeyCode key)
 
 	// Filter out keys that have no action
 	switch (key) {
-	case KeyCode::F10:
 	case KeyCode::PageDown:
 	case KeyCode::LWin:
 	case KeyCode::RWin:
@@ -160,7 +159,13 @@ bool Screen_OnGame::on_key_down(KeyCode key)
 			config_manager::get().set_zoom_map_enabled(false);
 		return true;
 	case KeyCode::F1:
-		m_game->use_shortcut(1);
+		if (get_dialog_box_manager().is_enabled(DialogBoxId::Help) == false)
+			get_dialog_box_manager().enable_dialog_box(DialogBoxId::Help, 0, 0, 0);
+		else
+		{
+			get_dialog_box_manager().disable_dialog_box(DialogBoxId::Help);
+			get_dialog_box_manager().disable_dialog_box(DialogBoxId::Text);
+		}
 		return true;
 	case KeyCode::F2:
 		m_game->use_shortcut(2);
@@ -219,6 +224,11 @@ bool Screen_OnGame::on_key_down(KeyCode key)
 		if (get_dialog_box_manager().is_enabled(DialogBoxId::ChatHistory) == false)
 			get_dialog_box_manager().enable_dialog_box(DialogBoxId::ChatHistory, 0, 0, 0);
 		else get_dialog_box_manager().disable_dialog_box(DialogBoxId::ChatHistory);
+		return true;
+	case KeyCode::F10:
+		if (get_dialog_box_manager().is_enabled(DialogBoxId::SystemMenu) == false)
+			get_dialog_box_manager().enable_dialog_box(DialogBoxId::SystemMenu, 0, 0, 0);
+		else get_dialog_box_manager().disable_dialog_box(DialogBoxId::SystemMenu);
 		return true;
 	case KeyCode::F11:
 		m_game->create_screen_shot();
@@ -393,7 +403,7 @@ void Screen_OnGame::hotkey_escape()
 		if ((m_is_observer_mode == true) && (hb::shared::input::is_shift_down())) {
 			if (m_logout_count == -1) { m_logout_count = 1; m_logout_count_time = GameClock::get_time_ms(); }
 			get_dialog_box_manager().disable_dialog_box(DialogBoxId::SystemMenu);
-			m_game->play_game_sound('E', 14, 5);
+			audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 		}
 		else if (m_logout_count != -1) {
 			if (m_game->m_force_disconn == false) {
@@ -566,7 +576,7 @@ void Screen_OnGame::hotkey_toggle_sound_and_music()
 	}
 	if (audio_manager::get().is_sound_enabled())
 	{
-		audio_manager::get().stop_sound(sound_type::Effect, 38);
+		audio_manager::get().stop_sound(sound_type::effect, 38);
 		audio_manager::get().set_sound_enabled(false);
 		config_manager::get().set_sound_enabled(false);
 		m_game->add_event_list(NOTIFY_MSG_SOUND_OFF, 10);

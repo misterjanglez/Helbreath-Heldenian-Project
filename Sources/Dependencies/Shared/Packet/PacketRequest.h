@@ -114,7 +114,7 @@ namespace net {
 		int32_t v1;
 		int32_t v2;
 		int32_t v3;
-		char text[30];
+		char text[hb::shared::limits::ItemNameLen];
 		int32_t v4;
 	};
 

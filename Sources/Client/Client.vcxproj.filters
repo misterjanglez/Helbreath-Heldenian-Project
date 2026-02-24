@@ -638,6 +638,9 @@
     <ClInclude Include="..\Dependencies\Shared\Game\SharedCalculations.h">
       <Filter>Shared\Game</Filter>
     </ClInclude>
+    <ClInclude Include="..\Dependencies\Shared\Game\FormulaEngine.h">
+      <Filter>Shared\Game</Filter>
+    </ClInclude>
     <ClInclude Include="..\Dependencies\Shared\Render\SpriteCollection.h">
       <Filter>Shared\Rendering</Filter>
     </ClInclude>
@@ -1115,6 +1118,9 @@
     </ClCompile>
     <ClCompile Include="..\Dependencies\Shared\Util\SHA256.cpp">
       <Filter>Shared</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Dependencies\Shared\Game\FormulaEngine.cpp">
+      <Filter>Shared\Game</Filter>
     </ClCompile>
     <ClCompile Include="ClientLog.cpp">
       <Filter>Core</Filter>

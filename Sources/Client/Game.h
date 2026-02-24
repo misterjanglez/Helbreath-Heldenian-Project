@@ -59,6 +59,7 @@
 #include "GameConstants.h"
 #include "Application.h"
 #include "GameEvents.h"
+#include "FormulaEngine.h"
 
 // Overlay types for popup screens that render over base screens
 enum class OverlayType {
@@ -173,7 +174,6 @@ public:
 	bool is_item_on_hand();
 	void dynamic_object_handler(char * data);
 	bool check_item_by_type(hb::shared::item::ItemType type);
-	void play_game_sound(char type, int num, int dist, long lPan = 0);  // Forwards to audio_manager
 	void load_text_dlg_contents(int type);
 	int  load_text_dlg_contents2(int type);
 	void request_full_object_data(uint16_t object_id);
@@ -193,7 +193,7 @@ public:
 	void release_unused_sprites();
 	void handle_key_up(KeyCode key);
 	void change_game_mode(GameMode mode);
-	void log_recv_msg_handler(char * data);
+	void log_recv_msg_handler(char* data, uint32_t msg_size);
 	void log_response_handler(char * packet_data);
 	void on_log_socket_event();  // MODERNIZED: Polls socket instead of handling window messages
 	void on_timer();
@@ -390,6 +390,7 @@ std::array<bool, hb::shared::limits::MaxItems> m_is_item_equipped{};
 	bool cache_process_skill_config(char* data, uint32_t msg_size);
 	bool cache_process_npc_config(char* data, uint32_t msg_size);
 	bool cache_process_map_config(char* data, uint32_t msg_size);
+	bool cache_process_balance_config(char* data, uint32_t msg_size);
 
 	struct NpcConfig { short npcType = 0; std::string name; bool valid = false; };
 	std::array<NpcConfig, hb::shared::limits::MaxNpcConfigs> m_npc_config_list{};   // indexed by npc_id
@@ -406,7 +407,7 @@ std::array<bool, hb::shared::limits::MaxItems> m_is_item_equipped{};
 
 	bool ensure_config_loaded(int type);
 	bool try_replay_cache_for_config(int type);
-	void request_configs_from_server(bool items, bool magic, bool skills, bool npcs = false, bool maps = false);
+	void request_configs_from_server(bool items, bool magic, bool skills, bool npcs = false, bool maps = false, bool balance = false);
 	void check_configs_ready_and_enter_game();
 
 	bool ensure_item_configs_loaded()  { return ensure_config_loaded(0); }
@@ -431,5 +432,8 @@ std::array<bool, hb::shared::limits::MaxItems> m_is_item_equipped{};
 	short m_max_stats;
 	int m_max_level;
 	int m_max_bank_items;
+
+	// Formula engine — populated from balance config cache (sent at login + validated at enter-game)
+	hb::shared::formula_engine m_formula_engine;
 };
 

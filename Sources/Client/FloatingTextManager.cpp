@@ -95,13 +95,13 @@ int floating_text_manager::add_damage_from_value(short damage, bool last_hit, ui
 	if (damage == Sentinel::DamageImmune)
 	{
 		txt = "* Immune *";
-		audio_manager::get().play_game_sound(sound_type::Character, 17, 0, 0);
+		audio_manager::get().play_game_sound(sound_type::character, 17, 0, 0);
 		return add_damage_text(damage_text_type::Medium, txt, time, object_id, map_data);
 	}
 	if (damage == Sentinel::MagicFailed)
 	{
 		txt = "* Failed! *";
-		audio_manager::get().play_game_sound(sound_type::Character, 17, 0, 0);
+		audio_manager::get().play_game_sound(sound_type::character, 17, 0, 0);
 		return add_damage_text(damage_text_type::Medium, txt, time, object_id, map_data);
 	}
 	if (damage > 128)

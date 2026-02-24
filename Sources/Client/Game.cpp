@@ -1144,6 +1144,32 @@ bool CGame::cache_process_map_config(char* data, uint32_t msg_size)
 	return true;
 }
 
+bool CGame::cache_process_balance_config(char* data, uint32_t msg_size)
+{
+	if (msg_size <= sizeof(hb::net::PacketHeader)) return false;
+
+	const char* payload = data + sizeof(hb::net::PacketHeader);
+	uint32_t payload_size = msg_size - sizeof(hb::net::PacketHeader);
+
+	// Accumulate for cache (single packet, finalize immediately)
+	LocalCacheManager::get().accumulate_packet(ConfigCacheType::BalanceConfig, data, msg_size);
+	if (!LocalCacheManager::get().is_replaying())
+		LocalCacheManager::get().finalize_and_save(ConfigCacheType::BalanceConfig);
+
+	// Deserialize into formula engine
+	m_formula_engine.clear();
+	if (!m_formula_engine.deserialize(reinterpret_cast<const uint8_t*>(payload), payload_size))
+	{
+		hb::logger::warn<hb::log_channel::network>("Failed to deserialize balance config");
+		return false;
+	}
+
+	hb::logger::log<hb::log_channel::network>("Balance config loaded ({} bytes, {} formulas)",
+		payload_size, m_formula_engine.formula_count());
+
+	return true;
+}
+
 void CGame::game_recv_msg_handler(uint32_t msg_size, char* data)
 {
 	const auto* header = hb::net::PacketCast<hb::net::PacketHeader>(data, sizeof(hb::net::PacketHeader));
@@ -1292,8 +1318,24 @@ void CGame::game_recv_msg_handler(uint32_t msg_size, char* data)
 			need_maps = true;
 		}
 
-		if (need_items || need_magic || need_skills || need_npcs || need_maps) {
-			request_configs_from_server(need_items, need_magic, need_skills, need_npcs, need_maps);
+		bool need_balance = false;
+		if (cachePkt->balanceCacheValid) {
+			bool replay_ok = LocalCacheManager::get().replay_from_cache(ConfigCacheType::BalanceConfig,
+				[](char* p, uint32_t s, void* c) -> bool {
+					return static_cast<ReplayCtx*>(c)->game->cache_process_balance_config(p, s);
+				}, &ctx);
+			if (!replay_ok || m_formula_engine.formula_count() == 0) {
+				LocalCacheManager::get().reset_accumulator(ConfigCacheType::BalanceConfig);
+				need_balance = true;
+			}
+		}
+		else {
+			LocalCacheManager::get().reset_accumulator(ConfigCacheType::BalanceConfig);
+			need_balance = true;
+		}
+
+		if (need_items || need_magic || need_skills || need_npcs || need_maps || need_balance) {
+			request_configs_from_server(need_items, need_magic, need_skills, need_npcs, need_maps, need_balance);
 			m_config_request_time = GameClock::get_time_ms();
 		}
 		else {
@@ -1326,6 +1368,10 @@ void CGame::game_recv_msg_handler(uint32_t msg_size, char* data)
 			LocalCacheManager::get().reset_accumulator(ConfigCacheType::Maps);
 			m_map_display_names.clear();
 		}
+		if (reloadPkt->reloadBalance) {
+			LocalCacheManager::get().reset_accumulator(ConfigCacheType::BalanceConfig);
+			m_formula_engine.clear();
+		}
 
 		set_top_msg((char*)"Administration kicked off a config reload, some lag may occur.", 5);
 	}
@@ -1355,6 +1401,9 @@ void CGame::game_recv_msg_handler(uint32_t msg_size, char* data)
 		cache_process_map_config(data, msg_size);
 		m_config_retry[4] = ConfigRetryLevel::None;
 		check_configs_ready_and_enter_game();
+		break;
+	case MsgId::BalanceConfigContents:
+		cache_process_balance_config(data, msg_size);
 		break;
 	case MsgId::ResponseInitPlayer:
 		init_player_response_handler(data);
@@ -1435,6 +1484,8 @@ void CGame::init_player_response_handler(char* data)
 			LocalCacheManager::get().get_hash(ConfigCacheType::Npcs).c_str());
 		std::snprintf(req.mapConfigHash, sizeof(req.mapConfigHash), "%s",
 			LocalCacheManager::get().get_hash(ConfigCacheType::Maps).c_str());
+		std::snprintf(req.balanceConfigHash, sizeof(req.balanceConfigHash), "%s",
+			LocalCacheManager::get().get_hash(ConfigCacheType::BalanceConfig).c_str());
 		send_game_packet(req);
 		change_game_mode(GameMode::WaitingInitData);
 	}
@@ -1854,7 +1905,7 @@ void CGame::on_log_socket_event()
 
 		// Process (using the pointer directly from the packet vector)
 		if (!packet.empty()) {
-			log_recv_msg_handler(const_cast<char*>(packet.ptr()));
+			log_recv_msg_handler(const_cast<char*>(packet.ptr()), static_cast<uint32_t>(packet.size()));
 		}
 
 		// CRITICAL FIX: The handler might have closed/deleted the socket!
@@ -1883,8 +1934,16 @@ void CGame::log_response_handler(char* packet_data)
 	m_l_sock.reset();
 }
 
-void CGame::log_recv_msg_handler(char* data)
+void CGame::log_recv_msg_handler(char* data, uint32_t msg_size)
 {
+	// Intercept balance config — sent before login response, must not close socket
+	const auto* header = hb::net::PacketCast<hb::net::PacketHeader>(data, sizeof(hb::net::PacketHeader));
+	if (header && header->msg_id == MsgId::BalanceConfigContents)
+	{
+		cache_process_balance_config(data, msg_size);
+		return;
+	}
+
 	log_response_handler(data);
 }
 
@@ -2697,9 +2756,9 @@ void CGame::crusade_contribution_result(int war_contribution)
 	}
 	if (war_contribution > 0)
 	{
-		play_game_sound('E', 23, 0, 0);
-		play_game_sound('C', 21, 0, 0);
-		play_game_sound('C', 22, 0, 0);
+		audio_manager::get().play_game_sound(sound_type::effect, 23, 0, 0);
+		audio_manager::get().play_game_sound(sound_type::character, 21, 0, 0);
+		audio_manager::get().play_game_sound(sound_type::character, 22, 0, 0);
 		on_game()->m_msg_text_list[0] = std::make_unique<CMsg>(0, m_game_msg_list[22]->m_pMsg, 0); // Congratulations! Your nation
 		on_game()->m_msg_text_list[1] = std::make_unique<CMsg>(0, m_game_msg_list[23]->m_pMsg, 0); // was victory in the battle!
 		on_game()->m_msg_text_list[2] = std::make_unique<CMsg>(0, " ", 0);
@@ -2716,9 +2775,9 @@ void CGame::crusade_contribution_result(int war_contribution)
 	}
 	else if (war_contribution < 0)
 	{
-		play_game_sound('E', 24, 0, 0);
-		play_game_sound('C', 12, 0, 0);
-		play_game_sound('C', 13, 0, 0);
+		audio_manager::get().play_game_sound(sound_type::effect, 24, 0, 0);
+		audio_manager::get().play_game_sound(sound_type::character, 12, 0, 0);
+		audio_manager::get().play_game_sound(sound_type::character, 13, 0, 0);
 		on_game()->m_msg_text_list[0] = std::make_unique<CMsg>(0, m_game_msg_list[28]->m_pMsg, 0); // Unfortunately! Your country
 		on_game()->m_msg_text_list[1] = std::make_unique<CMsg>(0, m_game_msg_list[29]->m_pMsg, 0); // have lost the all out war.
 		on_game()->m_msg_text_list[2] = std::make_unique<CMsg>(0, " ", 0);
@@ -2733,7 +2792,7 @@ void CGame::crusade_contribution_result(int war_contribution)
 	}
 	else if (war_contribution == 0)
 	{
-		play_game_sound('E', 25, 0, 0);
+		audio_manager::get().play_game_sound(sound_type::effect, 25, 0, 0);
 		on_game()->m_msg_text_list[0] = std::make_unique<CMsg>(0, m_game_msg_list[50]->m_pMsg, 0); // The battle that you have participated
 		on_game()->m_msg_text_list[1] = std::make_unique<CMsg>(0, m_game_msg_list[51]->m_pMsg, 0); // is already finished;
 		on_game()->m_msg_text_list[2] = std::make_unique<CMsg>(0, m_game_msg_list[52]->m_pMsg, 0); //
@@ -2764,21 +2823,21 @@ void CGame::crusade_war_result(int winner_side)
 	{
 		switch (winner_side) {
 		case 0:
-			play_game_sound('E', 25, 0, 0);
+			audio_manager::get().play_game_sound(sound_type::effect, 25, 0, 0);
 			on_game()->m_msg_text_list[0] = std::make_unique<CMsg>(0, m_game_msg_list[35]->m_pMsg, 0); // All out war finished!
 			on_game()->m_msg_text_list[1] = std::make_unique<CMsg>(0, m_game_msg_list[36]->m_pMsg, 0); // There was a draw in the
 			on_game()->m_msg_text_list[2] = std::make_unique<CMsg>(0, m_game_msg_list[37]->m_pMsg, 0); // battle
 			on_game()->m_msg_text_list[3] = std::make_unique<CMsg>(0, " ", 0);
 			break;
 		case 1:
-			play_game_sound('E', 25, 0, 0);
+			audio_manager::get().play_game_sound(sound_type::effect, 25, 0, 0);
 			on_game()->m_msg_text_list[0] = std::make_unique<CMsg>(0, m_game_msg_list[35]->m_pMsg, 0); // All out war finished!
 			on_game()->m_msg_text_list[1] = std::make_unique<CMsg>(0, m_game_msg_list[38]->m_pMsg, 0); // Aresden was victorious
 			on_game()->m_msg_text_list[2] = std::make_unique<CMsg>(0, m_game_msg_list[39]->m_pMsg, 0); // and put an end to the war
 			on_game()->m_msg_text_list[3] = std::make_unique<CMsg>(0, " ", 0);
 			break;
 		case 2:
-			play_game_sound('E', 25, 0, 0);
+			audio_manager::get().play_game_sound(sound_type::effect, 25, 0, 0);
 			on_game()->m_msg_text_list[0] = std::make_unique<CMsg>(0, m_game_msg_list[35]->m_pMsg, 0); // All out war finished!
 			on_game()->m_msg_text_list[1] = std::make_unique<CMsg>(0, m_game_msg_list[40]->m_pMsg, 0); // Elvine was victorious
 			on_game()->m_msg_text_list[2] = std::make_unique<CMsg>(0, m_game_msg_list[41]->m_pMsg, 0); // and put an end to the war
@@ -2792,7 +2851,7 @@ void CGame::crusade_war_result(int winner_side)
 	{
 		if (winner_side == 0)
 		{
-			play_game_sound('E', 25, 0, 0);
+			audio_manager::get().play_game_sound(sound_type::effect, 25, 0, 0);
 			on_game()->m_msg_text_list[0] = std::make_unique<CMsg>(0, m_game_msg_list[35]->m_pMsg, 0); // All out war finished!
 			on_game()->m_msg_text_list[1] = std::make_unique<CMsg>(0, m_game_msg_list[36]->m_pMsg, 0); // There was a draw in the
 			on_game()->m_msg_text_list[2] = std::make_unique<CMsg>(0, m_game_msg_list[37]->m_pMsg, 0); // battle
@@ -2804,9 +2863,9 @@ void CGame::crusade_war_result(int winner_side)
 		{
 			if (winner_side == player_side)
 			{
-				play_game_sound('E', 23, 0, 0);
-				play_game_sound('C', 21, 0, 0);
-				play_game_sound('C', 22, 0, 0);
+				audio_manager::get().play_game_sound(sound_type::effect, 23, 0, 0);
+				audio_manager::get().play_game_sound(sound_type::character, 21, 0, 0);
+				audio_manager::get().play_game_sound(sound_type::character, 22, 0, 0);
 				switch (winner_side) {
 				case 1:
 					on_game()->m_msg_text_list[0] = std::make_unique<CMsg>(0, m_game_msg_list[35]->m_pMsg, 0); // All out war finished!;
@@ -2834,9 +2893,9 @@ void CGame::crusade_war_result(int winner_side)
 			}
 			else if (winner_side != player_side)
 			{
-				play_game_sound('E', 24, 0, 0);
-				play_game_sound('C', 12, 0, 0);
-				play_game_sound('C', 13, 0, 0);
+				audio_manager::get().play_game_sound(sound_type::effect, 24, 0, 0);
+				audio_manager::get().play_game_sound(sound_type::character, 12, 0, 0);
+				audio_manager::get().play_game_sound(sound_type::character, 13, 0, 0);
 				switch (winner_side) {
 				case 1:
 					on_game()->m_msg_text_list[0] = std::make_unique<CMsg>(0, m_game_msg_list[35]->m_pMsg, 0); // All out war finished!
@@ -2924,26 +2983,6 @@ void CGame::civil_right_admission_handler(char* data)
 	}
 }
 
-void CGame::play_game_sound(char type, int num, int dist, long lPan)
-{
-	// Forward to audio_manager
-	sound_type snd_type;
-	switch (type)
-	{
-	case 'C':
-		snd_type = sound_type::Character;
-		break;
-	case 'M':
-		snd_type = sound_type::Monster;
-		break;
-	case 'E':
-		snd_type = sound_type::Effect;
-		break;
-	default:
-		return;
-	}
-	audio_manager::get().play_game_sound(snd_type, num, dist, static_cast<int>(lPan));
-}
 
 bool CGame::check_item_by_type(ItemType type)
 {
@@ -3009,7 +3048,7 @@ bool CGame::is_item_on_hand() // Snoopy: Fixed to remove ShieldCast
 
 uint32_t CGame::get_level_exp(int level)
 {
-	return hb::shared::calc::CalculateLevelExp(level);
+	return hb::shared::calc::level_exp(m_formula_engine, hb::shared::calc::level{(double)level});
 }
 
 bool CGame::check_ex_id(const char* name)
@@ -3214,7 +3253,7 @@ bool CGame::try_replay_cache_for_config(int type)
 	return false;
 }
 
-void CGame::request_configs_from_server(bool items, bool magic, bool skills, bool npcs, bool maps)
+void CGame::request_configs_from_server(bool items, bool magic, bool skills, bool npcs, bool maps, bool balance)
 {
 	if (!m_g_sock) return;
 	hb::net::PacketRequestConfigData pkt{};
@@ -3225,6 +3264,7 @@ void CGame::request_configs_from_server(bool items, bool magic, bool skills, boo
 	pkt.requestSkills = skills ? 1 : 0;
 	pkt.requestNpcs = npcs ? 1 : 0;
 	pkt.requestMaps = maps ? 1 : 0;
+	pkt.requestBalance = balance ? 1 : 0;
 	m_g_sock->send_msg(reinterpret_cast<char*>(&pkt), sizeof(pkt));
 }
 
@@ -4089,7 +4129,7 @@ void CGame::npc_talk_handler(char* packet_data)
 
 void CGame::point_command_handler(int indexX, int indexY, char item_id)
 {
-	char temp[31];
+	char temp[hb::shared::limits::ItemNameLen]{};
 	if ((on_game()->m_point_command_type >= 100) && (on_game()->m_point_command_type < 200))
 	{
 		// get target object ID for auto-aim (lag compensation)
@@ -4134,13 +4174,13 @@ void CGame::point_command_handler(int indexX, int indexY, char item_id)
 		if ((m_mc_name.size() == 0) || (m_mc_name == m_player->m_player_name) || (m_mc_name[0] == '_'))
 		{
 			get_dialog_box_manager().get_dialog_as<DialogBox_Party>(DialogBoxId::Party)->m_mode = DialogBox_Party::mode::main_menu;
-			play_game_sound('E', 14, 5);
+			audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 			add_event_list(POINT_COMMAND_HANDLER1, 10);
 		}
 		else
 		{
 			get_dialog_box_manager().get_dialog_as<DialogBox_Party>(DialogBoxId::Party)->m_mode = DialogBox_Party::mode::join_requested;
-			play_game_sound('E', 14, 5);
+			audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 			std::snprintf(get_dialog_box_manager().get_dialog_as<DialogBox_Party>(DialogBoxId::Party)->m_leader_name, sizeof(DialogBox_Party::m_leader_name), "%s", m_mc_name.c_str());
 			{
 				auto pkt = hb::net::make_common_command_str(CommonType::RequestJoinParty, m_player->m_player_x, m_player->m_player_y);
@@ -4323,12 +4363,12 @@ void CGame::motion_response_handler(char* packet_data)
 		case 1:
 		case 2:
 		case 3:
-			play_game_sound('C', 12, 0);
+			audio_manager::get().play_game_sound(sound_type::character, 12, 0);
 			break;
 		case 4:
 		case 5:
 		case 6:
-			play_game_sound('C', 13, 0);
+			audio_manager::get().play_game_sound(sound_type::character, 13, 0);
 			break;
 		}
 		break;
@@ -4641,8 +4681,8 @@ void CGame::command_processor(short mouse_x, short mouse_y, short tile_x, short 
 	if ((current_time - m_player->m_Controller.get_command_time()) < 300)
 	{
 		m_g_sock.reset();
-		play_game_sound('E', 14, 5);
-		audio_manager::get().stop_sound(sound_type::Effect, 38);
+		audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
+		audio_manager::get().stop_sound(sound_type::effect, 38);
 		audio_manager::get().stop_music();
 		change_game_mode(GameMode::MainMenu);
 		return;
@@ -5768,16 +5808,17 @@ void CGame::process_motion_commands(uint16_t action_type)
 					m_player->m_Controller.get_destination_x() - m_player->m_player_x, m_player->m_Controller.get_destination_y() - m_player->m_player_y, action_type);
 				m_player->m_Controller.set_command_available(false);
 				m_player->m_Controller.set_command_time(GameClock::get_time_ms());
-				// Compute expected swing duration (must match server's bCheckClientAttackFrequency formula)
+				// Compute expected swing duration (must match server's check_client_attack_frequency formula)
 				{
-					constexpr int ATTACK_FRAME_DURATIONS = 8;
-					int baseFrameTime = PlayerAnim::Attack.m_frame_time; // 78
-					int delay = m_player->m_playerStatus.attack_delay * 12;
-					if (m_player->m_playerStatus.frozen) delay += baseFrameTime >> 2;
-					if (m_player->m_playerStatus.haste)
-						delay -= static_cast<int>(PlayerAnim::Run.m_frame_time / 2.3);
-					int expectedSwingTime = ATTACK_FRAME_DURATIONS * (baseFrameTime + delay);
-					m_player->m_Controller.set_attack_end_time(GameClock::get_time_ms() + expectedSwingTime);
+					int base_swing = hb::shared::calc::swing_time(m_formula_engine,
+						hb::shared::calc::attack_delay_value{(double)m_player->m_playerStatus.attack_delay});
+					int frames = hb::shared::calc::swing_frames(m_formula_engine);
+					int bft = hb::shared::calc::base_frame_time(m_formula_engine);
+					int rft = hb::shared::calc::run_frame_time(m_formula_engine);
+					int effective_swing = base_swing;
+					if (m_player->m_playerStatus.frozen) effective_swing += frames * (bft >> 2);
+					if (m_player->m_playerStatus.haste)  effective_swing -= frames * static_cast<int>(rft / 2.3);
+					m_player->m_Controller.set_attack_end_time(GameClock::get_time_ms() + effective_swing);
 				}
 			}
 			m_player->m_Controller.set_command(Type::stop);
@@ -5830,16 +5871,17 @@ void CGame::process_motion_commands(uint16_t action_type)
 						m_player->m_Controller.get_command(), m_player->m_Controller.get_destination_x() - m_player->m_player_x, m_player->m_Controller.get_destination_y() - m_player->m_player_y, action_type);
 					m_player->m_Controller.set_command_available(false);
 					m_player->m_Controller.set_command_time(GameClock::get_time_ms());
-					// Compute expected swing duration (must match server's bCheckClientAttackFrequency formula)
+					// Compute expected swing duration (must match server's check_client_attack_frequency formula)
 					{
-						constexpr int ATTACK_FRAME_DURATIONS = 8;
-						int baseFrameTime = PlayerAnim::Attack.m_frame_time; // 78
-						int delay = m_player->m_playerStatus.attack_delay * 12;
-						if (m_player->m_playerStatus.frozen) delay += baseFrameTime >> 2;
-						if (m_player->m_playerStatus.haste)
-							delay -= static_cast<int>(PlayerAnim::Run.m_frame_time / 2.3);
-						int expectedSwingTime = ATTACK_FRAME_DURATIONS * (baseFrameTime + delay);
-						m_player->m_Controller.set_attack_end_time(GameClock::get_time_ms() + expectedSwingTime);
+						int base_swing = hb::shared::calc::swing_time(m_formula_engine,
+							hb::shared::calc::attack_delay_value{(double)m_player->m_playerStatus.attack_delay});
+						int frames = hb::shared::calc::swing_frames(m_formula_engine);
+						int bft = hb::shared::calc::base_frame_time(m_formula_engine);
+						int rft = hb::shared::calc::run_frame_time(m_formula_engine);
+						int effective_swing = base_swing;
+						if (m_player->m_playerStatus.frozen) effective_swing += frames * (bft >> 2);
+						if (m_player->m_playerStatus.haste)  effective_swing -= frames * static_cast<int>(rft / 2.3);
+						m_player->m_Controller.set_attack_end_time(GameClock::get_time_ms() + effective_swing);
 					}
 					m_player->m_Controller.set_prev_move(m_player->m_player_x, m_player->m_player_y);
 				}
@@ -6340,7 +6382,7 @@ void CGame::grand_magic_result(const char* map_name, int ares_crusade_points, in
 		if (elv_crusade_points == 0) {
 			if ((m_player->m_citizen == true) && (m_player->m_aresden == false))
 			{
-				play_game_sound('E', 25, 0, 0);
+				audio_manager::get().play_game_sound(sound_type::effect, 25, 0, 0);
 				on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[59]->m_pMsg, 0);
 				on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[60]->m_pMsg, 0);
 				on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[61]->m_pMsg, 0);
@@ -6349,7 +6391,7 @@ void CGame::grand_magic_result(const char* map_name, int ares_crusade_points, in
 			}
 			else if ((m_player->m_citizen == true) && (m_player->m_aresden == true))
 			{
-				play_game_sound('E', 25, 0, 0);
+				audio_manager::get().play_game_sound(sound_type::effect, 25, 0, 0);
 				on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[69]->m_pMsg, 0);
 				on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[70]->m_pMsg, 0);
 				on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[71]->m_pMsg, 0);
@@ -6358,7 +6400,7 @@ void CGame::grand_magic_result(const char* map_name, int ares_crusade_points, in
 				on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[74]->m_pMsg, 0);
 				for (int i = text_index; i < 18; i++) on_game()->m_msg_text_list[i] = std::make_unique<CMsg>(0, " ", 0);
 			}
-			else play_game_sound('E', 25, 0, 0);
+			else audio_manager::get().play_game_sound(sound_type::effect, 25, 0, 0);
 		}
 		else
 		{
@@ -6366,9 +6408,9 @@ void CGame::grand_magic_result(const char* map_name, int ares_crusade_points, in
 			{
 				if ((m_player->m_citizen == true) && (m_player->m_aresden == false))
 				{
-					play_game_sound('E', 23, 0, 0);
-					play_game_sound('C', 21, 0, 0);
-					play_game_sound('C', 22, 0, 0);
+					audio_manager::get().play_game_sound(sound_type::effect, 23, 0, 0);
+					audio_manager::get().play_game_sound(sound_type::character, 21, 0, 0);
+					audio_manager::get().play_game_sound(sound_type::character, 22, 0, 0);
 					on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[63]->m_pMsg, 0);
 					on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[64]->m_pMsg, 0);
 					on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[65]->m_pMsg, 0);
@@ -6376,9 +6418,9 @@ void CGame::grand_magic_result(const char* map_name, int ares_crusade_points, in
 				}
 				else if ((m_player->m_citizen == true) && (m_player->m_aresden == true))
 				{
-					play_game_sound('E', 24, 0, 0);
-					play_game_sound('C', 12, 0, 0);
-					play_game_sound('C', 13, 0, 0);
+					audio_manager::get().play_game_sound(sound_type::effect, 24, 0, 0);
+					audio_manager::get().play_game_sound(sound_type::character, 12, 0, 0);
+					audio_manager::get().play_game_sound(sound_type::character, 13, 0, 0);
 					on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[75]->m_pMsg, 0);
 					on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[76]->m_pMsg, 0);
 					on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[77]->m_pMsg, 0);
@@ -6389,13 +6431,13 @@ void CGame::grand_magic_result(const char* map_name, int ares_crusade_points, in
 					on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[82]->m_pMsg, 0);
 					for (int i = text_index; i < 18; i++) on_game()->m_msg_text_list[i] = std::make_unique<CMsg>(0, " ", 0);
 				}
-				else play_game_sound('E', 25, 0, 0);
+				else audio_manager::get().play_game_sound(sound_type::effect, 25, 0, 0);
 			}
 			else
 			{
 				if ((m_player->m_citizen == true) && (m_player->m_aresden == false))
 				{
-					play_game_sound('E', 23, 0, 0);
+					audio_manager::get().play_game_sound(sound_type::effect, 23, 0, 0);
 					on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[66]->m_pMsg, 0);
 					on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[67]->m_pMsg, 0);
 					on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[68]->m_pMsg, 0);
@@ -6403,7 +6445,7 @@ void CGame::grand_magic_result(const char* map_name, int ares_crusade_points, in
 				}
 				else if ((m_player->m_citizen == true) && (m_player->m_aresden == true))
 				{
-					play_game_sound('E', 24, 0, 0);
+					audio_manager::get().play_game_sound(sound_type::effect, 24, 0, 0);
 					on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[83]->m_pMsg, 0);
 					on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[84]->m_pMsg, 0);
 					on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[85]->m_pMsg, 0);
@@ -6414,7 +6456,7 @@ void CGame::grand_magic_result(const char* map_name, int ares_crusade_points, in
 					on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[90]->m_pMsg, 0);
 					for (int i = text_index; i < 18; i++) on_game()->m_msg_text_list[i] = std::make_unique<CMsg>(0, " ", 0);
 				}
-				else play_game_sound('E', 25, 0, 0);
+				else audio_manager::get().play_game_sound(sound_type::effect, 25, 0, 0);
 			}
 		}
 	}
@@ -6444,7 +6486,7 @@ void CGame::grand_magic_result(const char* map_name, int ares_crusade_points, in
 		if (elv_crusade_points == 0) {
 			if ((m_player->m_citizen == true) && (m_player->m_aresden == true))
 			{
-				play_game_sound('E', 25, 0, 0);
+				audio_manager::get().play_game_sound(sound_type::effect, 25, 0, 0);
 				on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[59]->m_pMsg, 0);
 				on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[60]->m_pMsg, 0);
 				on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[61]->m_pMsg, 0);
@@ -6453,7 +6495,7 @@ void CGame::grand_magic_result(const char* map_name, int ares_crusade_points, in
 			}
 			else if ((m_player->m_citizen == true) && (m_player->m_aresden == false))
 			{
-				play_game_sound('E', 25, 0, 0);
+				audio_manager::get().play_game_sound(sound_type::effect, 25, 0, 0);
 				on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[69]->m_pMsg, 0);
 				on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[70]->m_pMsg, 0);
 				on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[71]->m_pMsg, 0);
@@ -6462,16 +6504,16 @@ void CGame::grand_magic_result(const char* map_name, int ares_crusade_points, in
 				on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[74]->m_pMsg, 0);
 				for (int i = text_index; i < 18; i++) on_game()->m_msg_text_list[i] = std::make_unique<CMsg>(0, " ", 0);
 			}
-			else play_game_sound('E', 25, 0, 0);
+			else audio_manager::get().play_game_sound(sound_type::effect, 25, 0, 0);
 		}
 		else
 		{
 			if (ares_crusade_points != 0) {
 				if ((m_player->m_citizen == true) && (m_player->m_aresden == true))
 				{
-					play_game_sound('E', 23, 0, 0);
-					play_game_sound('C', 21, 0, 0);
-					play_game_sound('C', 22, 0, 0);
+					audio_manager::get().play_game_sound(sound_type::effect, 23, 0, 0);
+					audio_manager::get().play_game_sound(sound_type::character, 21, 0, 0);
+					audio_manager::get().play_game_sound(sound_type::character, 22, 0, 0);
 					on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[63]->m_pMsg, 0);
 					on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[64]->m_pMsg, 0);
 					on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[65]->m_pMsg, 0);
@@ -6479,9 +6521,9 @@ void CGame::grand_magic_result(const char* map_name, int ares_crusade_points, in
 				}
 				else if ((m_player->m_citizen == true) && (m_player->m_aresden == false))
 				{
-					play_game_sound('E', 24, 0, 0);
-					play_game_sound('C', 12, 0, 0);
-					play_game_sound('C', 13, 0, 0);
+					audio_manager::get().play_game_sound(sound_type::effect, 24, 0, 0);
+					audio_manager::get().play_game_sound(sound_type::character, 12, 0, 0);
+					audio_manager::get().play_game_sound(sound_type::character, 13, 0, 0);
 					on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[75]->m_pMsg, 0);
 					on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[76]->m_pMsg, 0);
 					on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[77]->m_pMsg, 0);
@@ -6492,13 +6534,13 @@ void CGame::grand_magic_result(const char* map_name, int ares_crusade_points, in
 					on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[82]->m_pMsg, 0);
 					for (int i = text_index; i < 18; i++) on_game()->m_msg_text_list[i] = std::make_unique<CMsg>(0, " ", 0);
 				}
-				else play_game_sound('E', 25, 0, 0);
+				else audio_manager::get().play_game_sound(sound_type::effect, 25, 0, 0);
 			}
 			else
 			{
 				if ((m_player->m_citizen == true) && (m_player->m_aresden == true))
 				{
-					play_game_sound('E', 23, 0, 0);
+					audio_manager::get().play_game_sound(sound_type::effect, 23, 0, 0);
 					on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[66]->m_pMsg, 0);
 					on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[67]->m_pMsg, 0);
 					on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[68]->m_pMsg, 0);
@@ -6506,7 +6548,7 @@ void CGame::grand_magic_result(const char* map_name, int ares_crusade_points, in
 				}
 				else if ((m_player->m_citizen == true) && (m_player->m_aresden == false))
 				{
-					play_game_sound('E', 24, 0, 0);
+					audio_manager::get().play_game_sound(sound_type::effect, 24, 0, 0);
 					on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[83]->m_pMsg, 0);
 					on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[84]->m_pMsg, 0);
 					on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[85]->m_pMsg, 0);
@@ -6517,7 +6559,7 @@ void CGame::grand_magic_result(const char* map_name, int ares_crusade_points, in
 					on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[90]->m_pMsg, 0);
 					for (int i = text_index; i < 18; i++) on_game()->m_msg_text_list[i] = std::make_unique<CMsg>(0, " ", 0);
 				}
-				else play_game_sound('E', 25, 0, 0);
+				else audio_manager::get().play_game_sound(sound_type::effect, 25, 0, 0);
 			}
 		}
 	}
@@ -6704,21 +6746,21 @@ void CGame::show_heldenian_victory(short side)
 	else if (m_player->m_aresden == false) player_side = 2;
 	switch (side) {
 	case 0:
-		play_game_sound('E', 25, 0, 0);
+		audio_manager::get().play_game_sound(sound_type::effect, 25, 0, 0);
 		on_game()->m_msg_text_list[0] = std::make_unique<CMsg>(0, "Heldenian holy war has been closed!", 0);
 		on_game()->m_msg_text_list[1] = std::make_unique<CMsg>(0, " ", 0);
 		on_game()->m_msg_text_list[2] = std::make_unique<CMsg>(0, "Heldenian Holy war ended", 0);
 		on_game()->m_msg_text_list[3] = std::make_unique<CMsg>(0, "in a tie.", 0);
 		break;
 	case 1:
-		play_game_sound('E', 25, 0, 0);
+		audio_manager::get().play_game_sound(sound_type::effect, 25, 0, 0);
 		on_game()->m_msg_text_list[0] = std::make_unique<CMsg>(0, "Heldenian holy war has been closed!", 0);
 		on_game()->m_msg_text_list[1] = std::make_unique<CMsg>(0, " ", 0);
 		on_game()->m_msg_text_list[2] = std::make_unique<CMsg>(0, "Heldenian Holy war ended", 0);
 		on_game()->m_msg_text_list[3] = std::make_unique<CMsg>(0, "in favor of Aresden.", 0);
 		break;
 	case 2:
-		play_game_sound('E', 25, 0, 0);
+		audio_manager::get().play_game_sound(sound_type::effect, 25, 0, 0);
 		on_game()->m_msg_text_list[0] = std::make_unique<CMsg>(0, "Heldenian holy war has been closed!", 0);
 		on_game()->m_msg_text_list[1] = std::make_unique<CMsg>(0, " ", 0);
 		on_game()->m_msg_text_list[2] = std::make_unique<CMsg>(0, "Heldenian Holy war ended", 0);
@@ -6730,7 +6772,7 @@ void CGame::show_heldenian_victory(short side)
 	if (((player_side != 1) && (player_side != 2))   // Player not a normal citizen
 		|| (side == 0))								// or no winner
 	{
-		play_game_sound('E', 25, 0, 0);
+		audio_manager::get().play_game_sound(sound_type::effect, 25, 0, 0);
 		on_game()->m_msg_text_list[5] = std::make_unique<CMsg>(0, " ", 0);
 		on_game()->m_msg_text_list[6] = std::make_unique<CMsg>(0, " ", 0);
 		on_game()->m_msg_text_list[7] = std::make_unique<CMsg>(0, " ", 0);
@@ -6740,9 +6782,9 @@ void CGame::show_heldenian_victory(short side)
 	{
 		if (side == player_side)
 		{
-			play_game_sound('E', 23, 0, 0);
-			play_game_sound('C', 21, 0, 0);
-			play_game_sound('C', 22, 0, 0);
+			audio_manager::get().play_game_sound(sound_type::effect, 23, 0, 0);
+			audio_manager::get().play_game_sound(sound_type::character, 21, 0, 0);
+			audio_manager::get().play_game_sound(sound_type::character, 22, 0, 0);
 			on_game()->m_msg_text_list[5] = std::make_unique<CMsg>(0, "Congratulation.", 0);
 			on_game()->m_msg_text_list[6] = std::make_unique<CMsg>(0, "As cityzen of victory,", 0);
 			on_game()->m_msg_text_list[7] = std::make_unique<CMsg>(0, "You will recieve a reward.", 0);
@@ -6750,9 +6792,9 @@ void CGame::show_heldenian_victory(short side)
 		}
 		else
 		{
-			play_game_sound('E', 24, 0, 0);
-			play_game_sound('C', 12, 0, 0);
-			play_game_sound('C', 13, 0, 0);
+			audio_manager::get().play_game_sound(sound_type::effect, 24, 0, 0);
+			audio_manager::get().play_game_sound(sound_type::character, 12, 0, 0);
+			audio_manager::get().play_game_sound(sound_type::character, 13, 0, 0);
 			on_game()->m_msg_text_list[5] = std::make_unique<CMsg>(0, "To our regret", 0);
 			on_game()->m_msg_text_list[6] = std::make_unique<CMsg>(0, "As cityzen of defeat,", 0);
 			on_game()->m_msg_text_list[7] = std::make_unique<CMsg>(0, "You cannot recieve any reward.", 0);

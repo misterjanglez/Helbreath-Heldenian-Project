@@ -11,6 +11,7 @@
 #include <format>
 #include "GameFonts.h"
 #include "TextLibExt.h"
+#include "AudioManager.h"
 
 using namespace hb::shared::net;
 using namespace hb::shared::item;
@@ -470,7 +471,7 @@ bool DialogBox_Shop::on_click_item_list(short sX, short sY)
                 return true;
             }
 
-            m_game->play_game_sound('E', 14, 5);
+            audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
             if (shop_manager::get().get_item_list()[m_scroll_offset + i] != 0)
                 m_mode = m_scroll_offset + i + 1;
             return true;
@@ -561,7 +562,7 @@ bool DialogBox_Shop::on_click_item_details(short sX, short sY)
         }
         m_mode = 0;
         m_quantity = 1;
-        m_game->play_game_sound('E', 14, 5);
+        audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
         return true;
     }
 
@@ -569,7 +570,7 @@ bool DialogBox_Shop::on_click_item_details(short sX, short sY)
     if (mouse_in(btn_cancel)) {
         m_mode = 0;
         m_quantity = 1;
-        m_game->play_game_sound('E', 14, 5);
+        audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
         return true;
     }
 

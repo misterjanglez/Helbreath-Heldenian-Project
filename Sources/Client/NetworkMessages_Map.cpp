@@ -3,6 +3,7 @@
 #include "Packet/SharedPackets.h"
 #include "lan_eng.h"
 #include "DialogBoxIDs.h"
+#include "AudioManager.h"
 #include <cstdio>
 #include <cstring>
 #include <format>
@@ -34,7 +35,7 @@ namespace NetworkMessageHandlers {
 		std::string msgBuf;
 		msgBuf = std::format(NOTIFY_MSG_HANDLER3, v1, temp);
 		game->set_top_msg(msgBuf.c_str(), 10);
-		game->play_game_sound('E', 25, 0, 0);
+		audio_manager::get().play_game_sound(sound_type::effect, 25, 0, 0);
 	}
 
 	void HandleShowMap(CGame* game, char* data)

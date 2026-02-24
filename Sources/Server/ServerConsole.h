@@ -27,6 +27,7 @@ public:
 	~ServerConsole();
 	bool init();
 	void write_line(const char* text, int color = console_color::normal);
+	void write_line_raw(std::string_view text);
 	bool poll_input(char* out_cmd, int maxLen);
 	void redraw_prompt();
 

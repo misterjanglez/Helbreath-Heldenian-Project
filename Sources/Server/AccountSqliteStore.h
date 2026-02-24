@@ -212,3 +212,12 @@ bool ResolveCharacterToAccount(const char* character_name, char* outAccountName,
 // Global name checks - scan all account databases
 bool CharacterNameExistsGlobally(const char* character_name);
 bool AccountNameExists(const char* account_name);
+
+// Global counts - scan all account databases
+struct account_stats
+{
+    int accounts;
+    int characters;
+    std::vector<std::pair<std::string, int>> over_limit; // accounts with >4 characters
+};
+account_stats CountAccountStats();

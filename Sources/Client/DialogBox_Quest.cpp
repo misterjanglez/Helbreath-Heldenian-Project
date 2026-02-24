@@ -5,6 +5,7 @@
 #include <string>
 #include "IInput.h"
 #include "Screen_OnGame.h"
+#include "AudioManager.h"
 using namespace hb::client::sprite_id;
 
 DialogBox_Quest::DialogBox_Quest(CGame* game)
@@ -136,7 +137,7 @@ bool DialogBox_Quest::on_click()
 {
 	if (mouse_in(btn_ok)) {
 		m_game->get_dialog_box_manager().disable_dialog_box(DialogBoxId::Quest);
-		play_sound_effect('E', 14, 5);
+		audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 		return true;
 	}
 

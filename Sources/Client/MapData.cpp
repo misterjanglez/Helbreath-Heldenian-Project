@@ -10,6 +10,7 @@
 #include "Benchmark.h"
 #include "EntityMotion.h"
 #include "WeatherManager.h"
+#include "AudioManager.h"
 
 #include <algorithm>
 #include <charconv>
@@ -1838,7 +1839,7 @@ int CMapData::object_frame_counter(const std::string& player_name, short view_po
 							m_data[dX][dY].m_dynamic_object_frame = 0;
 						if (m_data[dX][dY].m_dynamic_object_frame == 1)
 						{
-							m_game->play_game_sound('E', 9, dist);
+							audio_manager::get().play_game_sound(sound_type::effect, 9, dist);
 						}
 						break;
 
@@ -1847,7 +1848,7 @@ int CMapData::object_frame_counter(const std::string& player_name, short view_po
 							m_data[dX][dY].m_dynamic_object_frame = 0;
 						if (m_data[dX][dY].m_dynamic_object_frame == 1)
 						{
-							m_game->play_game_sound('E', 9, dist);
+							audio_manager::get().play_game_sound(sound_type::effect, 9, dist);
 						}
 						if ((m_data[dX][dY].m_dynamic_object_frame % 6) == 0)
 						{
@@ -2163,7 +2164,7 @@ int CMapData::object_frame_counter(const std::string& player_name, short view_po
 						case hb::shared::owner::DarkElf: // Dark-Elf
 							if ((m_data[dX][dY].m_animation.m_current_frame == 1) || (m_data[dX][dY].m_animation.m_current_frame == 5))
 							{
-								m_game->play_game_sound('C', 8, dist, lPan);
+								audio_manager::get().play_game_sound(sound_type::character, 8, dist, lPan);
 								if ((((m_data[dX][dY].m_appearance.weapon_glare | m_data[dX][dY].m_appearance.shield_glare) != 0) || (m_data[dX][dY].m_status.gm_mode)) && (!m_data[dX][dY].m_status.invisibility))
 								{
 									total_frame = 8;
@@ -2194,216 +2195,216 @@ int CMapData::object_frame_counter(const std::string& player_name, short view_po
 
 						case hb::shared::owner::Sorceress: // Snoopy: Sorceress
 							if ((m_data[dX][dY].m_animation.m_current_frame == 1))
-								m_game->play_game_sound('M', 149, dist, lPan);
+								audio_manager::get().play_game_sound(sound_type::monster, 149, dist, lPan);
 							break;
 
 						case hb::shared::owner::ATK: // Snoopy: ATK
 							if ((m_data[dX][dY].m_animation.m_current_frame == 1))
-								m_game->play_game_sound('M', 142, dist, lPan);
+								audio_manager::get().play_game_sound(sound_type::monster, 142, dist, lPan);
 							break;
 
 						case hb::shared::owner::MasterElf: // Snoopy: MasterElf
 							if ((m_data[dX][dY].m_animation.m_current_frame == 1))
 							{
-								if (true) m_game->play_game_sound('C', 10, dist, lPan);
+								if (true) audio_manager::get().play_game_sound(sound_type::character, 10, dist, lPan);
 							}
 							break;
 
 						case hb::shared::owner::DSK: // Snoopy: DSK
 							if ((m_data[dX][dY].m_animation.m_current_frame == 1))
-								m_game->play_game_sound('M', 147, dist, lPan);
+								audio_manager::get().play_game_sound(sound_type::monster, 147, dist, lPan);
 							break;
 
 						case hb::shared::owner::Slime: // Slime
 						case hb::shared::owner::TigerWorm: // TW
 							if ((m_data[dX][dY].m_animation.m_current_frame == 1))
-								m_game->play_game_sound('M', 1, dist, lPan);
+								audio_manager::get().play_game_sound(sound_type::monster, 1, dist, lPan);
 							break;
 
 						case hb::shared::owner::Skeleton: // SKel
 							if ((m_data[dX][dY].m_animation.m_current_frame == 1))
-								m_game->play_game_sound('M', 13, dist, lPan);
+								audio_manager::get().play_game_sound(sound_type::monster, 13, dist, lPan);
 							break;
 
 						case hb::shared::owner::Cyclops: // Cyclops
 						case hb::shared::owner::HellClaw: // HC
 							if ((m_data[dX][dY].m_animation.m_current_frame == 1))
-								m_game->play_game_sound('M', 41, dist, lPan);
+								audio_manager::get().play_game_sound(sound_type::monster, 41, dist, lPan);
 							break;
 
 						case hb::shared::owner::OrcMage: // Orc
 						case hb::shared::owner::Stalker: // SK
 							if ((m_data[dX][dY].m_animation.m_current_frame == 1))
-								m_game->play_game_sound('M', 9, dist, lPan);
+								audio_manager::get().play_game_sound(sound_type::monster, 9, dist, lPan);
 							break;
 
 						case hb::shared::owner::GiantAnt: // Ant
 						case hb::shared::owner::LightWarBeetle: // LWBeetle
 							if ((m_data[dX][dY].m_animation.m_current_frame == 1))
-								m_game->play_game_sound('M', 29, dist, lPan);
+								audio_manager::get().play_game_sound(sound_type::monster, 29, dist, lPan);
 							break;
 
 						case hb::shared::owner::Scorpion: // Scorpion
 							if ((m_data[dX][dY].m_animation.m_current_frame == 1))
-								m_game->play_game_sound('M', 21, dist, lPan);
+								audio_manager::get().play_game_sound(sound_type::monster, 21, dist, lPan);
 							break;
 
 						case hb::shared::owner::Zombie: // Zombie
 							if ((m_data[dX][dY].m_animation.m_current_frame == 1))
-								m_game->play_game_sound('M', 17, dist, lPan);
+								audio_manager::get().play_game_sound(sound_type::monster, 17, dist, lPan);
 							break;
 
 						case hb::shared::owner::Amphis: // Snake
 							if ((m_data[dX][dY].m_animation.m_current_frame == 1))
-								m_game->play_game_sound('M', 25, dist, lPan);
+								audio_manager::get().play_game_sound(sound_type::monster, 25, dist, lPan);
 							break;
 
 						case hb::shared::owner::ClayGolem: // Clay-Golem
 						case hb::shared::owner::Gargoyle: // Gargoyle
 							if ((m_data[dX][dY].m_animation.m_current_frame == 1))
-								m_game->play_game_sound('M', 37, dist, lPan);
+								audio_manager::get().play_game_sound(sound_type::monster, 37, dist, lPan);
 							break;
 
 						case hb::shared::owner::Hellhound: // HH
 							if ((m_data[dX][dY].m_animation.m_current_frame == 1))
-								m_game->play_game_sound('M', 5, dist, lPan);
+								audio_manager::get().play_game_sound(sound_type::monster, 5, dist, lPan);
 							break;
 
 						case hb::shared::owner::Troll: // Troll
 						case hb::shared::owner::Minaus: // Snoopy: Ajout Minaus
 							if ((m_data[dX][dY].m_animation.m_current_frame == 1))
-								m_game->play_game_sound('M', 46, dist, lPan);
+								audio_manager::get().play_game_sound(sound_type::monster, 46, dist, lPan);
 							break;
 
 						case hb::shared::owner::Ogre: // Ogre
 							if ((m_data[dX][dY].m_animation.m_current_frame == 1))
-								m_game->play_game_sound('M', 51, dist, lPan);
+								audio_manager::get().play_game_sound(sound_type::monster, 51, dist, lPan);
 							break;
 
 						case hb::shared::owner::Liche: // Liche
 							if ((m_data[dX][dY].m_animation.m_current_frame == 1))
-								m_game->play_game_sound('M', 55, dist, lPan);
+								audio_manager::get().play_game_sound(sound_type::monster, 55, dist, lPan);
 							break;
 
 						case hb::shared::owner::Demon: // DD
 							if ((m_data[dX][dY].m_animation.m_current_frame == 1))
-								m_game->play_game_sound('M', 59, dist, lPan);
+								audio_manager::get().play_game_sound(sound_type::monster, 59, dist, lPan);
 							break;
 
 						case hb::shared::owner::Unicorn: // Uni
 						case hb::shared::owner::GodsHandKnightCK: // GHKABS
 							if ((m_data[dX][dY].m_animation.m_current_frame == 1))
-								m_game->play_game_sound('M', 63, dist, lPan);
+								audio_manager::get().play_game_sound(sound_type::monster, 63, dist, lPan);
 							break;
 
 						case hb::shared::owner::WereWolf: // WW
 							if ((m_data[dX][dY].m_animation.m_current_frame == 1))
-								m_game->play_game_sound('M', 67, dist, lPan);
+								audio_manager::get().play_game_sound(sound_type::monster, 67, dist, lPan);
 							break;
 
 						case hb::shared::owner::Bunny://Rabbit
 							if ((m_data[dX][dY].m_animation.m_current_frame == 1))
-								m_game->play_game_sound('M', 71, dist, lPan);
+								audio_manager::get().play_game_sound(sound_type::monster, 71, dist, lPan);
 							break;
 
 						case hb::shared::owner::Cat://Cat
 							if ((m_data[dX][dY].m_animation.m_current_frame == 1))
-								m_game->play_game_sound('M', 72, dist, lPan);
+								audio_manager::get().play_game_sound(sound_type::monster, 72, dist, lPan);
 							break;
 
 						case hb::shared::owner::GiantFrog://Giant-Frog
 							if ((m_data[dX][dY].m_animation.m_current_frame == 1))
-								m_game->play_game_sound('M', 73, dist, lPan);
+								audio_manager::get().play_game_sound(sound_type::monster, 73, dist, lPan);
 							break;
 
 						case hb::shared::owner::MountainGiant://Mountain Giant
 							if ((m_data[dX][dY].m_animation.m_current_frame == 1))
-								m_game->play_game_sound('M', 87, dist, lPan);
+								audio_manager::get().play_game_sound(sound_type::monster, 87, dist, lPan);
 							break;
 
 						case hb::shared::owner::Ettin://Ettin
 						case hb::shared::owner::MasterOrc: // Snoopy: MasterMageOrc
 							if ((m_data[dX][dY].m_animation.m_current_frame == 1))
-								m_game->play_game_sound('M', 91, dist, lPan);
+								audio_manager::get().play_game_sound(sound_type::monster, 91, dist, lPan);
 							break;
 
 						case hb::shared::owner::CannibalPlant://Cannibal Plant
 							if ((m_data[dX][dY].m_animation.m_current_frame == 1))
-								m_game->play_game_sound('M', 95, dist, lPan);
+								audio_manager::get().play_game_sound(sound_type::monster, 95, dist, lPan);
 							break;
 
 						case hb::shared::owner::Rudolph://Rudolph
 							if ((m_data[dX][dY].m_animation.m_current_frame == 1))
-								m_game->play_game_sound('C', 11, dist, lPan);
+								audio_manager::get().play_game_sound(sound_type::character, 11, dist, lPan);
 							break;
 
 						case hb::shared::owner::DireBoar: // DireBoar
 						case hb::shared::owner::GiantCrayfish: // Snoopy: GiantCrayFish
 						case hb::shared::owner::Barbarian: // Snoopy: Barbarian
 							if ((m_data[dX][dY].m_animation.m_current_frame == 1))
-								m_game->play_game_sound('M', 87, dist, lPan);
+								audio_manager::get().play_game_sound(sound_type::monster, 87, dist, lPan);
 							break;
 
 						case hb::shared::owner::Frost://Frost
 							if ((m_data[dX][dY].m_animation.m_current_frame == 1))
-								m_game->play_game_sound('M', 25, dist, lPan);
+								audio_manager::get().play_game_sound(sound_type::monster, 25, dist, lPan);
 							break;
 
 						case hb::shared::owner::StoneGolem: // Stone-Golem
 						case hb::shared::owner::BattleGolem: // BG
 						case hb::shared::owner::IceGolem: // Snoopy: IceGolem
 							if ((m_data[dX][dY].m_animation.m_current_frame == 1))
-								m_game->play_game_sound('M', 33, dist, lPan);
+								audio_manager::get().play_game_sound(sound_type::monster, 33, dist, lPan);
 							break;
 
 						case hb::shared::owner::FireWyvern: // Snoopy: Fite-Wyvern
 							if ((m_data[dX][dY].m_animation.m_current_frame == 1))
-								m_game->play_game_sound('M', 106, dist, lPan);
+								audio_manager::get().play_game_sound(sound_type::monster, 106, dist, lPan);
 							break;
 
 						case hb::shared::owner::Tentocle: // Snoopy: Tentocle
 							if ((m_data[dX][dY].m_animation.m_current_frame == 1))
-								m_game->play_game_sound('M', 110, dist, lPan);
+								audio_manager::get().play_game_sound(sound_type::monster, 110, dist, lPan);
 							break;
 
 						case hb::shared::owner::ClawTurtle: // Snoopy: Claw Turtle
 							if ((m_data[dX][dY].m_animation.m_current_frame == 1))
-								m_game->play_game_sound('M', 114, dist, lPan);
+								audio_manager::get().play_game_sound(sound_type::monster, 114, dist, lPan);
 							break;
 
 						case hb::shared::owner::Centaur: // Snoopy: Centaurus
 							if ((m_data[dX][dY].m_animation.m_current_frame == 1))
-								m_game->play_game_sound('M', 117, dist, lPan);
+								audio_manager::get().play_game_sound(sound_type::monster, 117, dist, lPan);
 							break;
 
 						case hb::shared::owner::GiTree: // Snoopy: Giant Tree
 							if ((m_data[dX][dY].m_animation.m_current_frame == 1))
-								m_game->play_game_sound('M', 122, dist, lPan);
+								audio_manager::get().play_game_sound(sound_type::monster, 122, dist, lPan);
 							break;
 
 						case hb::shared::owner::GiLizard: // Snoopy: Giant Lizard
 							if ((m_data[dX][dY].m_animation.m_current_frame == 1))
-								m_game->play_game_sound('M', 126, dist, lPan);
+								audio_manager::get().play_game_sound(sound_type::monster, 126, dist, lPan);
 							break;
 
 						case hb::shared::owner::Dragon: // Snoopy: Dragon
 							if ((m_data[dX][dY].m_animation.m_current_frame == 1))
-								m_game->play_game_sound('M', 130, dist, lPan);
+								audio_manager::get().play_game_sound(sound_type::monster, 130, dist, lPan);
 							break;
 
 						case hb::shared::owner::Nizie: // Snoopy: Nizie
 							if ((m_data[dX][dY].m_animation.m_current_frame == 1))
-								m_game->play_game_sound('M', 134, dist, lPan);
+								audio_manager::get().play_game_sound(sound_type::monster, 134, dist, lPan);
 							break;
 
 						case hb::shared::owner::Abaddon: // void CGame::DrawDruncncity();Abaddon
 							if ((m_data[dX][dY].m_animation.m_current_frame == 1))
-								m_game->play_game_sound('M', 136, dist, lPan);
+								audio_manager::get().play_game_sound(sound_type::monster, 136, dist, lPan);
 							break;
 
 						default:
 							if ((m_data[dX][dY].m_animation.m_current_frame == 1) || (m_data[dX][dY].m_animation.m_current_frame == 3))
-								m_game->play_game_sound('C', 8, dist, lPan);
+								audio_manager::get().play_game_sound(sound_type::character, 8, dist, lPan);
 							break;
 						}
 					} // Fin du Type::Move
@@ -2448,7 +2449,7 @@ int CMapData::object_frame_counter(const std::string& player_name, short view_po
 								{
 									m_game->m_effect_manager->add_effect(EffectType::STAR_TWINKLE, (m_pivot_x + dX) * 32 + (rand() % 15 + 10), (m_pivot_y + dY) * 32 - (rand() % 30) - 50, 0, 0, -(rand() % 8), 0);
 								}
-								m_game->play_game_sound('C', 10, dist, lPan);
+								audio_manager::get().play_game_sound(sound_type::character, 10, dist, lPan);
 							}
 							break;
 						}
@@ -2464,7 +2465,7 @@ int CMapData::object_frame_counter(const std::string& player_name, short view_po
 						case 6:
 							if (m_data[dX][dY].m_animation.m_current_frame == 2) // vu comme case 2
 							{
-								if (true) m_game->play_game_sound('C', 4, dist); //bruit fleche
+								if (true) audio_manager::get().play_game_sound(sound_type::character, 4, dist); //bruit fleche
 								total_frame = 8;
 								frame_move_dots = 32 / total_frame;
 								dx = dy = 0;
@@ -2509,7 +2510,7 @@ int CMapData::object_frame_counter(const std::string& player_name, short view_po
 									m_game->m_effect_manager->add_effect(EffectType::FOOTPRINT, (m_pivot_x + dX) * 32 + ((rand() % 20) - 10), (m_pivot_y + dY) * 32 + ((rand() % 20) - 10), 0, 0, 0, 0);
 									m_game->m_effect_manager->add_effect(EffectType::FOOTPRINT, (m_pivot_x + dX) * 32 + ((rand() % 20) - 10), (m_pivot_y + dY) * 32 + ((rand() % 20) - 10), 0, 0, 0, 0);
 								}
-								if (true) m_game->play_game_sound('C', 11, dist, lPan);
+								if (true) audio_manager::get().play_game_sound(sound_type::character, 11, dist, lPan);
 							}
 							else if (m_data[dX][dY].m_animation.m_current_frame == 5) // vu comme case 5
 							{
@@ -2518,19 +2519,19 @@ int CMapData::object_frame_counter(const std::string& player_name, short view_po
 								weapon_type = wcfg ? static_cast<int>(wcfg->m_appearance_value) : 0;
 								if ((weapon_type >= 1) && (weapon_type <= 2))
 								{
-									m_game->play_game_sound('C', 1, dist, lPan);
+									audio_manager::get().play_game_sound(sound_type::character, 1, dist, lPan);
 								}
 								else if ((weapon_type >= 3) && (weapon_type <= 19))
 								{
-									m_game->play_game_sound('C', 2, dist, lPan);
+									audio_manager::get().play_game_sound(sound_type::character, 2, dist, lPan);
 								}
 								else if ((weapon_type >= 20) && (weapon_type <= 39))
 								{
-									m_game->play_game_sound('C', 18, dist, lPan);
+									audio_manager::get().play_game_sound(sound_type::character, 18, dist, lPan);
 								}
 								else if ((weapon_type >= 40) && (weapon_type <= 59))
 								{
-									m_game->play_game_sound('C', 3, dist, lPan);
+									audio_manager::get().play_game_sound(sound_type::character, 3, dist, lPan);
 								}
 							}
 							break;
@@ -2550,7 +2551,7 @@ int CMapData::object_frame_counter(const std::string& player_name, short view_po
 							{
 								m_game->m_effect_manager->add_effect(EffectType::GATE_ROUND, m_pivot_x + m_data[dX][dY].m_v1, m_pivot_y + m_data[dX][dY].m_v2
 									, m_pivot_x + m_data[dX][dY].m_v1 + dX, m_pivot_y + m_data[dX][dY].m_v2 + dY, 0, 87);
-								//m_game->play_game_sound('E', 43, dist, lPan); // Son "wouufffff"
+								//audio_manager::get().play_game_sound(sound_type::effect, 43, dist, lPan); // Son "wouufffff"
 							}
 							break;
 						case hb::shared::owner::AGC: // void CGame::DrawDruncncity();AGT (Heldenian)
@@ -2558,7 +2559,7 @@ int CMapData::object_frame_counter(const std::string& player_name, short view_po
 							{
 								m_game->m_effect_manager->add_effect(EffectType::ARROW_FLYING, m_pivot_x + m_data[dX][dY].m_v1, m_pivot_y + m_data[dX][dY].m_v2
 									, m_pivot_x + m_data[dX][dY].m_v1 + dX, m_pivot_y + m_data[dX][dY].m_v2 + dY, 0, 89);
-								//m_game->play_game_sound('E', 43, dist, lPan); // Son "wouufffff"
+								//audio_manager::get().play_game_sound(sound_type::effect, 43, dist, lPan); // Son "wouufffff"
 							}
 							break;
 						case 1:
@@ -2578,12 +2579,12 @@ int CMapData::object_frame_counter(const std::string& player_name, short view_po
 								case 1:
 								case 2:
 								case 3:
-									if (true) m_game->play_game_sound('C', 23, dist, lPan); // Critical sound
+									if (true) audio_manager::get().play_game_sound(sound_type::character, 23, dist, lPan); // Critical sound
 									break;
 								case 4:
 								case 5:
 								case 6:
-									if (true) m_game->play_game_sound('C', 24, dist, lPan); // Critical sound
+									if (true) audio_manager::get().play_game_sound(sound_type::character, 24, dist, lPan); // Critical sound
 									break;
 								}
 							}
@@ -2596,7 +2597,7 @@ int CMapData::object_frame_counter(const std::string& player_name, short view_po
 										m_game->m_effect_manager->add_effect(static_cast<EffectType>(m_data[dX][dY].m_v3), m_pivot_x + dX, m_pivot_y + dY
 											, m_pivot_x + dX + m_data[dX][dY].m_v1, m_pivot_y + dY + m_data[dX][dY].m_v2
 											, 0, m_data[dX][dY].m_owner_type);
-										if (m_data[dX][dY].m_v3 >= 20) m_game->play_game_sound('E', 43, dist, lPan); // Son "loup�"
+										if (m_data[dX][dY].m_v3 >= 20) audio_manager::get().play_game_sound(sound_type::effect, 43, dist, lPan); // Son "loup�"
 									}
 									int16_t wid2 = m_data[dX][dY].m_appearance.weapon_item_id;
 								CItem* wcfg2 = (wid2 > 0) ? m_game->get_item_config(wid2) : nullptr;
@@ -2660,28 +2661,28 @@ int CMapData::object_frame_counter(const std::string& player_name, short view_po
 								{
 									if (m_data[dX][dY].m_animation.m_current_frame == 5)
 									{
-										m_game->play_game_sound('C', 1, dist, lPan);
+										audio_manager::get().play_game_sound(sound_type::character, 1, dist, lPan);
 									}
 								}
 								else if ((weapon_type >= 3) && (weapon_type <= 19))
 								{
 									if (m_data[dX][dY].m_animation.m_current_frame == 5)
 									{
-										m_game->play_game_sound('C', 2, dist, lPan);
+										audio_manager::get().play_game_sound(sound_type::character, 2, dist, lPan);
 									}
 								}
 								else if ((weapon_type >= 20) && (weapon_type <= 39))
 								{
 									if (m_data[dX][dY].m_animation.m_current_frame == 2)
 									{
-										m_game->play_game_sound('C', 18, dist, lPan);
+										audio_manager::get().play_game_sound(sound_type::character, 18, dist, lPan);
 									}
 								}
 								else if ((weapon_type >= 40) && (weapon_type <= 59))
 								{
 									if (m_data[dX][dY].m_animation.m_current_frame == 3)
 									{
-										m_game->play_game_sound('C', 3, dist, lPan);
+										audio_manager::get().play_game_sound(sound_type::character, 3, dist, lPan);
 									}
 								}
 							}
@@ -2689,58 +2690,58 @@ int CMapData::object_frame_counter(const std::string& player_name, short view_po
 
 						case hb::shared::owner::ATK: // Snoopy: ATK
 							if (m_data[dX][dY].m_animation.m_current_frame == 1)
-								m_game->play_game_sound('M', 140, dist, lPan);
+								audio_manager::get().play_game_sound(sound_type::monster, 140, dist, lPan);
 							break;
 
 						case hb::shared::owner::MasterElf: // Snoopy: MasterElf
 							if (m_data[dX][dY].m_animation.m_current_frame == 1)
-								m_game->play_game_sound('C', 8, dist, lPan);
+								audio_manager::get().play_game_sound(sound_type::character, 8, dist, lPan);
 							break;
 
 						case hb::shared::owner::DSK: // Snoopy: DSK
 							if (m_data[dX][dY].m_animation.m_current_frame == 1)
-								m_game->play_game_sound('M', 145, dist, lPan);
+								audio_manager::get().play_game_sound(sound_type::monster, 145, dist, lPan);
 							break;
 
 						case hb::shared::owner::Beholder: // Beholder
 							if (m_data[dX][dY].m_animation.m_current_frame == 1)
-								m_game->play_game_sound('E', 46, dist, lPan);
+								audio_manager::get().play_game_sound(sound_type::effect, 46, dist, lPan);
 							break;
 
 						case hb::shared::owner::DarkElf: // DE
 							if (m_data[dX][dY].m_animation.m_current_frame == 1)
 							{
-								if (true) m_game->play_game_sound('C', 3, dist, lPan);
+								if (true) audio_manager::get().play_game_sound(sound_type::character, 3, dist, lPan);
 							}
 							break;
 
 						case hb::shared::owner::TigerWorm: // TW
 							if (m_data[dX][dY].m_animation.m_current_frame == 1)
 							{
-								if (true) m_game->play_game_sound('C', 1, dist, lPan);
+								if (true) audio_manager::get().play_game_sound(sound_type::character, 1, dist, lPan);
 							}
 							break;
 
 						case hb::shared::owner::Slime: // Slime
 							if (m_data[dX][dY].m_animation.m_current_frame == 1)
-								m_game->play_game_sound('M', 2, dist, lPan);
+								audio_manager::get().play_game_sound(sound_type::monster, 2, dist, lPan);
 							break;
 
 						case hb::shared::owner::Skeleton: // Skell
 							if (m_data[dX][dY].m_animation.m_current_frame == 1)
-								m_game->play_game_sound('M', 14, dist, lPan);
+								audio_manager::get().play_game_sound(sound_type::monster, 14, dist, lPan);
 							break;
 
 						case hb::shared::owner::StoneGolem: // Stone-Golem
 						case hb::shared::owner::IceGolem: // ICeGolem
 							if (m_data[dX][dY].m_animation.m_current_frame == 1)
-								m_game->play_game_sound('M', 34, dist, lPan);
+								audio_manager::get().play_game_sound(sound_type::monster, 34, dist, lPan);
 							break;
 
 						case hb::shared::owner::Cyclops: // Cyclops
 						case hb::shared::owner::HellClaw: // HC
 							if (m_data[dX][dY].m_animation.m_current_frame == 1)
-								m_game->play_game_sound('M', 42, dist, lPan);
+								audio_manager::get().play_game_sound(sound_type::monster, 42, dist, lPan);
 							break;
 
 						case hb::shared::owner::GodsHandKnight: // GHK
@@ -2749,207 +2750,207 @@ int CMapData::object_frame_counter(const std::string& player_name, short view_po
 						case hb::shared::owner::Gargoyle: // GG
 							if (m_data[dX][dY].m_animation.m_current_frame == 1)
 							{
-								if (true) m_game->play_game_sound('C', 2, dist, lPan);
+								if (true) audio_manager::get().play_game_sound(sound_type::character, 2, dist, lPan);
 							}
 							break;
 
 						case hb::shared::owner::OrcMage: // orc
 						case hb::shared::owner::Stalker: // SK
 							if (m_data[dX][dY].m_animation.m_current_frame == 1)
-								m_game->play_game_sound('M', 10, dist, lPan);
+								audio_manager::get().play_game_sound(sound_type::monster, 10, dist, lPan);
 							break;
 
 						case hb::shared::owner::GiantAnt: // Ant
 						case hb::shared::owner::LightWarBeetle: // LWB
 							if (m_data[dX][dY].m_animation.m_current_frame == 1)
-								m_game->play_game_sound('M', 30, dist, lPan);
+								audio_manager::get().play_game_sound(sound_type::monster, 30, dist, lPan);
 							break;
 
 						case hb::shared::owner::Scorpion: // Scorpion
 							if (m_data[dX][dY].m_animation.m_current_frame == 1)
-								m_game->play_game_sound('M', 22, dist, lPan);
+								audio_manager::get().play_game_sound(sound_type::monster, 22, dist, lPan);
 							break;
 
 						case hb::shared::owner::Zombie: // Zombie
 							if (m_data[dX][dY].m_animation.m_current_frame == 1)
-								m_game->play_game_sound('M', 18, dist, lPan);
+								audio_manager::get().play_game_sound(sound_type::monster, 18, dist, lPan);
 							break;
 
 						case hb::shared::owner::Amphis: // Snake
 							if (m_data[dX][dY].m_animation.m_current_frame == 1)
-								m_game->play_game_sound('M', 26, dist, lPan);
+								audio_manager::get().play_game_sound(sound_type::monster, 26, dist, lPan);
 							break;
 
 						case hb::shared::owner::ClayGolem: // Clay-Golem
 							if (m_data[dX][dY].m_animation.m_current_frame == 1)
-								m_game->play_game_sound('M', 38, dist, lPan);
+								audio_manager::get().play_game_sound(sound_type::monster, 38, dist, lPan);
 							break;
 
 						case hb::shared::owner::Hellhound: // HH
 							if (m_data[dX][dY].m_animation.m_current_frame == 1)
-								m_game->play_game_sound('M', 6, dist, lPan);
+								audio_manager::get().play_game_sound(sound_type::monster, 6, dist, lPan);
 							break;
 
 						case hb::shared::owner::Troll: // Troll
 							if (m_data[dX][dY].m_animation.m_current_frame == 1)
-								m_game->play_game_sound('M', 47, dist, lPan);
+								audio_manager::get().play_game_sound(sound_type::monster, 47, dist, lPan);
 							break;
 
 						case hb::shared::owner::Ogre: // Ogre
 							if (m_data[dX][dY].m_animation.m_current_frame == 1)
-								m_game->play_game_sound('M', 52, dist, lPan);
+								audio_manager::get().play_game_sound(sound_type::monster, 52, dist, lPan);
 							break;
 
 						case hb::shared::owner::Liche: // Liche
 							if (m_data[dX][dY].m_animation.m_current_frame == 1)
-								m_game->play_game_sound('M', 56, dist, lPan);
+								audio_manager::get().play_game_sound(sound_type::monster, 56, dist, lPan);
 							break;
 
 						case hb::shared::owner::Demon: // DD
 							if (m_data[dX][dY].m_animation.m_current_frame == 1)
-								m_game->play_game_sound('M', 60, dist, lPan);
+								audio_manager::get().play_game_sound(sound_type::monster, 60, dist, lPan);
 							break;
 
 						case hb::shared::owner::Unicorn: // Uni
 							if (m_data[dX][dY].m_animation.m_current_frame == 1)
-								m_game->play_game_sound('M', 64, dist, lPan);
+								audio_manager::get().play_game_sound(sound_type::monster, 64, dist, lPan);
 							break;
 
 						case hb::shared::owner::WereWolf: // WW
 							if (m_data[dX][dY].m_animation.m_current_frame == 1)
-								m_game->play_game_sound('M', 68, dist, lPan);
+								audio_manager::get().play_game_sound(sound_type::monster, 68, dist, lPan);
 							break;
 
 						case hb::shared::owner::Bunny://Rabbit
 							if ((m_data[dX][dY].m_animation.m_current_frame == 1))
-								m_game->play_game_sound('M', 75, dist, lPan);
+								audio_manager::get().play_game_sound(sound_type::monster, 75, dist, lPan);
 							break;
 
 						case hb::shared::owner::Cat://Cat
 							if ((m_data[dX][dY].m_animation.m_current_frame == 1))
-								m_game->play_game_sound('M', 76, dist, lPan);
+								audio_manager::get().play_game_sound(sound_type::monster, 76, dist, lPan);
 							break;
 
 						case hb::shared::owner::GiantFrog://Giant-Frog
 							if ((m_data[dX][dY].m_animation.m_current_frame == 1))
-								m_game->play_game_sound('M', 77, dist, lPan);
+								audio_manager::get().play_game_sound(sound_type::monster, 77, dist, lPan);
 							break;
 
 						case hb::shared::owner::MountainGiant://Mountain Giant
 							if ((m_data[dX][dY].m_animation.m_current_frame == 1))
-								m_game->play_game_sound('M', 88, dist, lPan);
+								audio_manager::get().play_game_sound(sound_type::monster, 88, dist, lPan);
 							break;
 
 						case hb::shared::owner::Ettin://Ettin
 							if ((m_data[dX][dY].m_animation.m_current_frame == 1))
-								m_game->play_game_sound('M', 92, dist, lPan);
+								audio_manager::get().play_game_sound(sound_type::monster, 92, dist, lPan);
 							break;
 
 						case hb::shared::owner::CannibalPlant://Cannibal Plant
 							if ((m_data[dX][dY].m_animation.m_current_frame == 1))
-								m_game->play_game_sound('M', 96, dist, lPan);
+								audio_manager::get().play_game_sound(sound_type::monster, 96, dist, lPan);
 							break;
 
 						case hb::shared::owner::Rudolph://Rudolph
 							if ((m_data[dX][dY].m_animation.m_current_frame == 1))
 							{
-								if (true) m_game->play_game_sound('M', 38, dist, lPan);
+								if (true) audio_manager::get().play_game_sound(sound_type::monster, 38, dist, lPan);
 							}
 							break;
 
 						case hb::shared::owner::DireBoar://DireBoar
 							if ((m_data[dX][dY].m_animation.m_current_frame == 1))
-								m_game->play_game_sound('M', 68, dist, lPan);
+								audio_manager::get().play_game_sound(sound_type::monster, 68, dist, lPan);
 							break;
 
 						case hb::shared::owner::Frost://Frost
 							if ((m_data[dX][dY].m_animation.m_current_frame == 1))
 							{
-								if (true) m_game->play_game_sound('C', 4, dist, lPan);
+								if (true) audio_manager::get().play_game_sound(sound_type::character, 4, dist, lPan);
 							}
 							break;
 
 						case hb::shared::owner::MasterOrc: // Snoopy: Master MageOrc
 						case hb::shared::owner::Barbarian: // Snoopy: Barbarian
 							if ((m_data[dX][dY].m_animation.m_current_frame == 1))
-								m_game->play_game_sound('M', 78, dist, lPan);
+								audio_manager::get().play_game_sound(sound_type::monster, 78, dist, lPan);
 							break;
 
 						case hb::shared::owner::GiantCrayfish: // Snoopy: GiantCrayFish
 							if ((m_data[dX][dY].m_animation.m_current_frame == 1))
-								m_game->play_game_sound('M', 100, dist, lPan);
+								audio_manager::get().play_game_sound(sound_type::monster, 100, dist, lPan);
 							break;
 
 						case hb::shared::owner::FireWyvern: // Snoopy: Fire Wyvern
 							if ((m_data[dX][dY].m_animation.m_current_frame == 1))
-								m_game->play_game_sound('M', 107, dist, lPan);
+								audio_manager::get().play_game_sound(sound_type::monster, 107, dist, lPan);
 							break;
 
 						case hb::shared::owner::Tentocle: // Snoopy: Tentocle
 							if ((m_data[dX][dY].m_animation.m_current_frame == 1))
-								m_game->play_game_sound('M', 111, dist, lPan);
+								audio_manager::get().play_game_sound(sound_type::monster, 111, dist, lPan);
 							break;
 
 						case hb::shared::owner::Abaddon: // Snoopy: Abaddon
 							if ((m_data[dX][dY].m_animation.m_current_frame == 1))
-								m_game->play_game_sound('M', 137, dist, lPan);
+								audio_manager::get().play_game_sound(sound_type::monster, 137, dist, lPan);
 							break;
 
 						case hb::shared::owner::ClawTurtle: // Snoopy: Claw-Turtle
 							if ((m_data[dX][dY].m_animation.m_current_frame == 1))
-								m_game->play_game_sound('M', 115, dist, lPan);
+								audio_manager::get().play_game_sound(sound_type::monster, 115, dist, lPan);
 							break;
 
 						case hb::shared::owner::Centaur: // Snoopy: Centaurus
 							if ((m_data[dX][dY].m_animation.m_current_frame == 1))
-								m_game->play_game_sound('M', 119, dist, lPan);
+								audio_manager::get().play_game_sound(sound_type::monster, 119, dist, lPan);
 							break;
 
 						case hb::shared::owner::GiTree: // Snoopy: Giant-Tree
 							if ((m_data[dX][dY].m_animation.m_current_frame == 1))
-								m_game->play_game_sound('M', 123, dist, lPan);
+								audio_manager::get().play_game_sound(sound_type::monster, 123, dist, lPan);
 							break;
 
 						case hb::shared::owner::GiLizard: // Snoopy: GiantLizard
 							if ((m_data[dX][dY].m_animation.m_current_frame == 1))
-								m_game->play_game_sound('M', 127, dist, lPan);
+								audio_manager::get().play_game_sound(sound_type::monster, 127, dist, lPan);
 							break;
 
 						case hb::shared::owner::Dragon: // Snoopy: Dragon
 							if ((m_data[dX][dY].m_animation.m_current_frame == 1))
-								m_game->play_game_sound('M', 131, dist, lPan);
+								audio_manager::get().play_game_sound(sound_type::monster, 131, dist, lPan);
 							break;
 
 						case hb::shared::owner::Nizie: //Snoopy:  Nizie
 							if ((m_data[dX][dY].m_animation.m_current_frame == 1))
-								m_game->play_game_sound('M', 135, dist, lPan);
+								audio_manager::get().play_game_sound(sound_type::monster, 135, dist, lPan);
 							break;
 
 						case hb::shared::owner::Minaus: // Snoopy: Minaus
 							if ((m_data[dX][dY].m_animation.m_current_frame == 1))
-								m_game->play_game_sound('M', 104, dist, lPan);
+								audio_manager::get().play_game_sound(sound_type::monster, 104, dist, lPan);
 							break;
 
 						case hb::shared::owner::HBT: // Snoopy: Heavy BattleTank
 							if ((m_data[dX][dY].m_animation.m_current_frame == 1))
-								m_game->play_game_sound('M', 151, dist, lPan);
+								audio_manager::get().play_game_sound(sound_type::monster, 151, dist, lPan);
 							break;
 
 						case hb::shared::owner::CT: // Snoopy: Crosbow Turret
 							if ((m_data[dX][dY].m_animation.m_current_frame == 1))
-								m_game->play_game_sound('M', 153, dist, lPan);
+								audio_manager::get().play_game_sound(sound_type::monster, 153, dist, lPan);
 							break;
 
 						case hb::shared::owner::AGC: // Snoopy: Cannon Turret
 							if ((m_data[dX][dY].m_animation.m_current_frame == 1))
-								m_game->play_game_sound('M', 155, dist, lPan);
+								audio_manager::get().play_game_sound(sound_type::monster, 155, dist, lPan);
 							break;
 
 						case hb::shared::owner::Dummy: // Dummy
 						case hb::shared::owner::EnergySphere: // Snoopy: EnergySphere
 						default:
 							if (m_data[dX][dY].m_animation.m_current_frame == 2) {
-								if (true) m_game->play_game_sound('C', 2, dist, lPan);
+								if (true) audio_manager::get().play_game_sound(sound_type::character, 2, dist, lPan);
 							}
 							break;
 						}
@@ -2977,12 +2978,12 @@ int CMapData::object_frame_counter(const std::string& player_name, short view_po
 								else if ((m_data[dX][dY].m_v2 >= 40) && (m_data[dX][dY].m_v2 <= 59))
 									sound_index = 7;
 								else sound_index = 5;
-								if (true) m_game->play_game_sound('C', sound_index, dist, lPan);
+								if (true) audio_manager::get().play_game_sound(sound_type::character, sound_index, dist, lPan);
 								m_game->m_effect_manager->add_effect(EffectType::NORMAL_HIT, m_pivot_x + dX, m_pivot_y + dY, 0, 0, 0, 4);
 							}
 							if (m_data[dX][dY].m_animation.m_current_frame == 5)
 							{
-								if (true) m_game->play_game_sound('C', 12, dist, lPan);
+								if (true) audio_manager::get().play_game_sound(sound_type::character, 12, dist, lPan);
 							}
 							break;
 						case 4:
@@ -3001,12 +3002,12 @@ int CMapData::object_frame_counter(const std::string& player_name, short view_po
 								else if ((m_data[dX][dY].m_v2 >= 40) && (m_data[dX][dY].m_v2 <= 59))
 									sound_index = 7;
 								else sound_index = 5;
-								if (true) m_game->play_game_sound('C', sound_index, dist, lPan);
+								if (true) audio_manager::get().play_game_sound(sound_type::character, sound_index, dist, lPan);
 								m_game->m_effect_manager->add_effect(EffectType::NORMAL_HIT, m_pivot_x + dX, m_pivot_y + dY, 0, 0, 0, 4);
 							}
 							if (m_data[dX][dY].m_animation.m_current_frame == 5)
 							{
-								if (true) m_game->play_game_sound('C', 13, dist, lPan);
+								if (true) audio_manager::get().play_game_sound(sound_type::character, 13, dist, lPan);
 							}
 							break;
 
@@ -3025,7 +3026,7 @@ int CMapData::object_frame_counter(const std::string& player_name, short view_po
 									sound_index = 7; // Arrow hit
 								else sound_index = 5;
 
-								if (true) m_game->play_game_sound('C', sound_index, dist, lPan);
+								if (true) audio_manager::get().play_game_sound(sound_type::character, sound_index, dist, lPan);
 								if (sound_index == 7) // Change the effect for Arrows hitting (no more at fixed heigh with arrow flying but on damage)
 								{
 									m_game->m_effect_manager->add_effect(EffectType::FOOTPRINT, (m_pivot_x + dX) * 32, (m_pivot_y + dY) * 32, 0, 0, 0, m_data[dX][dY].m_owner_type);
@@ -3038,176 +3039,176 @@ int CMapData::object_frame_counter(const std::string& player_name, short view_po
 
 							switch (m_data[dX][dY].m_owner_type) {
 							case hb::shared::owner::Barbarian: // Snoopy: Barbarian
-								if (m_data[dX][dY].m_animation.m_current_frame == 1 && true) m_game->play_game_sound('M', 144, dist, lPan);
+								if (m_data[dX][dY].m_animation.m_current_frame == 1 && true) audio_manager::get().play_game_sound(sound_type::monster, 144, dist, lPan);
 								break;
 
 							case hb::shared::owner::ATK: // Snoopy: ATK
-								if (m_data[dX][dY].m_animation.m_current_frame == 1 && true) m_game->play_game_sound('M', 143, dist, lPan);
+								if (m_data[dX][dY].m_animation.m_current_frame == 1 && true) audio_manager::get().play_game_sound(sound_type::monster, 143, dist, lPan);
 								break;
 
 							case hb::shared::owner::MasterElf: // Snoopy: MasterElf
-								if (m_data[dX][dY].m_animation.m_current_frame == 1) m_game->play_game_sound('C', 7, dist, lPan);
+								if (m_data[dX][dY].m_animation.m_current_frame == 1) audio_manager::get().play_game_sound(sound_type::character, 7, dist, lPan);
 								break;
 
 							case hb::shared::owner::DSK: // Snoopy: DSK
-								if (m_data[dX][dY].m_animation.m_current_frame == 1) m_game->play_game_sound('M', 148, dist, lPan);
+								if (m_data[dX][dY].m_animation.m_current_frame == 1) audio_manager::get().play_game_sound(sound_type::monster, 148, dist, lPan);
 								break;
 
 							case hb::shared::owner::DarkElf: // DE
-								if (m_data[dX][dY].m_animation.m_current_frame == 5 && true) m_game->play_game_sound('C', 13, dist, lPan);
+								if (m_data[dX][dY].m_animation.m_current_frame == 5 && true) audio_manager::get().play_game_sound(sound_type::character, 13, dist, lPan);
 								break;
 
 							case hb::shared::owner::Slime: // Slime
 							case hb::shared::owner::Beholder: // BB
-								if (m_data[dX][dY].m_animation.m_current_frame == 5) m_game->play_game_sound('M', 3, dist, lPan);
+								if (m_data[dX][dY].m_animation.m_current_frame == 5) audio_manager::get().play_game_sound(sound_type::monster, 3, dist, lPan);
 								break;
 
 							case hb::shared::owner::Skeleton: // Skell
-								if (m_data[dX][dY].m_animation.m_current_frame == 5) m_game->play_game_sound('M', 15, dist, lPan);
+								if (m_data[dX][dY].m_animation.m_current_frame == 5) audio_manager::get().play_game_sound(sound_type::monster, 15, dist, lPan);
 								break;
 
 							case hb::shared::owner::StoneGolem: // Stone-Golem
 							case hb::shared::owner::IceGolem: // IceGolem
-								if (m_data[dX][dY].m_animation.m_current_frame == 5) m_game->play_game_sound('M', 35, dist, lPan);
+								if (m_data[dX][dY].m_animation.m_current_frame == 5) audio_manager::get().play_game_sound(sound_type::monster, 35, dist, lPan);
 								break;
 
 							case hb::shared::owner::Cyclops: // Cyclops
 							case hb::shared::owner::HellClaw: // HC
 							case hb::shared::owner::Gargoyle: // GG
-								if (m_data[dX][dY].m_animation.m_current_frame == 5) m_game->play_game_sound('M', 43, dist, lPan);
+								if (m_data[dX][dY].m_animation.m_current_frame == 5) audio_manager::get().play_game_sound(sound_type::monster, 43, dist, lPan);
 								break;
 
 							case hb::shared::owner::OrcMage: // Orc
 							case hb::shared::owner::Stalker: // SK
-								if (m_data[dX][dY].m_animation.m_current_frame == 5) m_game->play_game_sound('M', 11, dist, lPan);
+								if (m_data[dX][dY].m_animation.m_current_frame == 5) audio_manager::get().play_game_sound(sound_type::monster, 11, dist, lPan);
 								break;
 
 							case hb::shared::owner::GiantAnt: // Ant
 							case hb::shared::owner::LightWarBeetle: // LWB
-								if (m_data[dX][dY].m_animation.m_current_frame == 5) m_game->play_game_sound('M', 31, dist, lPan);
+								if (m_data[dX][dY].m_animation.m_current_frame == 5) audio_manager::get().play_game_sound(sound_type::monster, 31, dist, lPan);
 								break;
 
 							case hb::shared::owner::Scorpion: // Scorp
-								if (m_data[dX][dY].m_animation.m_current_frame == 5) m_game->play_game_sound('M', 23, dist, lPan);
+								if (m_data[dX][dY].m_animation.m_current_frame == 5) audio_manager::get().play_game_sound(sound_type::monster, 23, dist, lPan);
 								break;
 
 							case hb::shared::owner::Zombie: // Zombie
-								if (m_data[dX][dY].m_animation.m_current_frame == 5) m_game->play_game_sound('M', 19, dist, lPan);
+								if (m_data[dX][dY].m_animation.m_current_frame == 5) audio_manager::get().play_game_sound(sound_type::monster, 19, dist, lPan);
 								break;
 
 							case hb::shared::owner::Amphis: // Snake
-								if (m_data[dX][dY].m_animation.m_current_frame == 5) m_game->play_game_sound('M', 27, dist, lPan);
+								if (m_data[dX][dY].m_animation.m_current_frame == 5) audio_manager::get().play_game_sound(sound_type::monster, 27, dist, lPan);
 								break;
 
 							case hb::shared::owner::ClayGolem: // Clay-Golem
-								if (m_data[dX][dY].m_animation.m_current_frame == 5) m_game->play_game_sound('M', 39, dist, lPan);
+								if (m_data[dX][dY].m_animation.m_current_frame == 5) audio_manager::get().play_game_sound(sound_type::monster, 39, dist, lPan);
 								break;
 
 							case hb::shared::owner::Hellhound: // HH
-								if (m_data[dX][dY].m_animation.m_current_frame == 5) m_game->play_game_sound('M', 7, dist, lPan);
+								if (m_data[dX][dY].m_animation.m_current_frame == 5) audio_manager::get().play_game_sound(sound_type::monster, 7, dist, lPan);
 								break;
 
 							case hb::shared::owner::Troll: // Troll
-								if (m_data[dX][dY].m_animation.m_current_frame == 5) m_game->play_game_sound('M', 48, dist, lPan);
+								if (m_data[dX][dY].m_animation.m_current_frame == 5) audio_manager::get().play_game_sound(sound_type::monster, 48, dist, lPan);
 								break;
 
 							case hb::shared::owner::Ogre: // Ogre
-								if (m_data[dX][dY].m_animation.m_current_frame == 5) m_game->play_game_sound('M', 53, dist, lPan);
+								if (m_data[dX][dY].m_animation.m_current_frame == 5) audio_manager::get().play_game_sound(sound_type::monster, 53, dist, lPan);
 								break;
 
 							case hb::shared::owner::Liche: // Liche
-								if (m_data[dX][dY].m_animation.m_current_frame == 5) m_game->play_game_sound('M', 57, dist, lPan);
+								if (m_data[dX][dY].m_animation.m_current_frame == 5) audio_manager::get().play_game_sound(sound_type::monster, 57, dist, lPan);
 								break;
 
 							case hb::shared::owner::Demon: // DD
-								if (m_data[dX][dY].m_animation.m_current_frame == 5) m_game->play_game_sound('M', 61, dist, lPan);
+								if (m_data[dX][dY].m_animation.m_current_frame == 5) audio_manager::get().play_game_sound(sound_type::monster, 61, dist, lPan);
 								break;
 
 							case hb::shared::owner::Unicorn: // Uni
-								if (m_data[dX][dY].m_animation.m_current_frame == 5) m_game->play_game_sound('M', 65, dist, lPan);
+								if (m_data[dX][dY].m_animation.m_current_frame == 5) audio_manager::get().play_game_sound(sound_type::monster, 65, dist, lPan);
 								break;
 
 							case hb::shared::owner::WereWolf: // WW
-								if (m_data[dX][dY].m_animation.m_current_frame == 5) m_game->play_game_sound('M', 69, dist, lPan);
+								if (m_data[dX][dY].m_animation.m_current_frame == 5) audio_manager::get().play_game_sound(sound_type::monster, 69, dist, lPan);
 								break;
 
 							case hb::shared::owner::Dummy: // dummy
 							case hb::shared::owner::EnergySphere: // Snoopy: EnergyBall
-								if (m_data[dX][dY].m_animation.m_current_frame == 5) m_game->play_game_sound('M', 2, dist, lPan);
+								if (m_data[dX][dY].m_animation.m_current_frame == 5) audio_manager::get().play_game_sound(sound_type::monster, 2, dist, lPan);
 								break;
 
 							case hb::shared::owner::Bunny://Rabbit
-								if ((m_data[dX][dY].m_animation.m_current_frame == 1)) m_game->play_game_sound('M', 79, dist, lPan);
+								if ((m_data[dX][dY].m_animation.m_current_frame == 1)) audio_manager::get().play_game_sound(sound_type::monster, 79, dist, lPan);
 								break;
 
 							case hb::shared::owner::Cat://Cat
-								if ((m_data[dX][dY].m_animation.m_current_frame == 1)) m_game->play_game_sound('M', 80, dist, lPan);
+								if ((m_data[dX][dY].m_animation.m_current_frame == 1)) audio_manager::get().play_game_sound(sound_type::monster, 80, dist, lPan);
 								break;
 
 							case hb::shared::owner::GiantFrog://Giant-Frog
-								if ((m_data[dX][dY].m_animation.m_current_frame == 1)) m_game->play_game_sound('M', 81, dist, lPan);
+								if ((m_data[dX][dY].m_animation.m_current_frame == 1)) audio_manager::get().play_game_sound(sound_type::monster, 81, dist, lPan);
 								break;
 
 							case hb::shared::owner::MountainGiant: // Mountain Giant
 							case hb::shared::owner::MasterOrc: // Snoopy: MasterMageOrc
-								if ((m_data[dX][dY].m_animation.m_current_frame == 1)) m_game->play_game_sound('M', 89, dist, lPan);
+								if ((m_data[dX][dY].m_animation.m_current_frame == 1)) audio_manager::get().play_game_sound(sound_type::monster, 89, dist, lPan);
 								break;
 
 							case hb::shared::owner::Ettin://Ettin
-								if ((m_data[dX][dY].m_animation.m_current_frame == 1)) m_game->play_game_sound('M', 93, dist, lPan);
+								if ((m_data[dX][dY].m_animation.m_current_frame == 1)) audio_manager::get().play_game_sound(sound_type::monster, 93, dist, lPan);
 								break;
 							case hb::shared::owner::CannibalPlant://Cannabl Plant
-								if ((m_data[dX][dY].m_animation.m_current_frame == 1)) m_game->play_game_sound('M', 97, dist, lPan);
+								if ((m_data[dX][dY].m_animation.m_current_frame == 1)) audio_manager::get().play_game_sound(sound_type::monster, 97, dist, lPan);
 								break;
 							case hb::shared::owner::Rudolph://Rudolph
-								if ((m_data[dX][dY].m_animation.m_current_frame == 1)) m_game->play_game_sound('M', 69, dist, lPan);
+								if ((m_data[dX][dY].m_animation.m_current_frame == 1)) audio_manager::get().play_game_sound(sound_type::monster, 69, dist, lPan);
 								break;
 							case hb::shared::owner::DireBoar://DireBoar
-								if ((m_data[dX][dY].m_animation.m_current_frame == 1)) m_game->play_game_sound('M', 78, dist, lPan);
+								if ((m_data[dX][dY].m_animation.m_current_frame == 1)) audio_manager::get().play_game_sound(sound_type::monster, 78, dist, lPan);
 								break;
 							case hb::shared::owner::Frost://Frost
-								if (m_data[dX][dY].m_animation.m_current_frame == 1) m_game->play_game_sound('C', 13, dist, lPan);
+								if (m_data[dX][dY].m_animation.m_current_frame == 1) audio_manager::get().play_game_sound(sound_type::character, 13, dist, lPan);
 								break;
 
 							case hb::shared::owner::GiantCrayfish: // Snoopy: Giant CrayFish
-								if ((m_data[dX][dY].m_animation.m_current_frame == 1)) m_game->play_game_sound('M', 101, dist, lPan);
+								if ((m_data[dX][dY].m_animation.m_current_frame == 1)) audio_manager::get().play_game_sound(sound_type::monster, 101, dist, lPan);
 								break;
 
 							case hb::shared::owner::Minaus: // Snoopy: Minaus
-								if ((m_data[dX][dY].m_animation.m_current_frame == 1)) m_game->play_game_sound('M', 102, dist, lPan);
+								if ((m_data[dX][dY].m_animation.m_current_frame == 1)) audio_manager::get().play_game_sound(sound_type::monster, 102, dist, lPan);
 								break;
 
 							case hb::shared::owner::Tentocle: // Snoopy: Tentocle
-								if ((m_data[dX][dY].m_animation.m_current_frame == 1)) m_game->play_game_sound('M', 108, dist, lPan);
+								if ((m_data[dX][dY].m_animation.m_current_frame == 1)) audio_manager::get().play_game_sound(sound_type::monster, 108, dist, lPan);
 								break;
 
 							case hb::shared::owner::Abaddon: // Snoopy: Abaddon
-								if ((m_data[dX][dY].m_animation.m_current_frame == 1)) m_game->play_game_sound('M', 138, dist, lPan);
+								if ((m_data[dX][dY].m_animation.m_current_frame == 1)) audio_manager::get().play_game_sound(sound_type::monster, 138, dist, lPan);
 								break;
 
 							case hb::shared::owner::ClawTurtle: // Snoopy: ClawTurtle
-								if ((m_data[dX][dY].m_animation.m_current_frame == 1)) m_game->play_game_sound('M', 112, dist, lPan);
+								if ((m_data[dX][dY].m_animation.m_current_frame == 1)) audio_manager::get().play_game_sound(sound_type::monster, 112, dist, lPan);
 								break;
 
 							case hb::shared::owner::Centaur: // Snoopy: Centaurus
 							case hb::shared::owner::Sorceress: // Snoopy: Sorceress
-								if ((m_data[dX][dY].m_animation.m_current_frame == 1)) m_game->play_game_sound('M', 116, dist, lPan);
+								if ((m_data[dX][dY].m_animation.m_current_frame == 1)) audio_manager::get().play_game_sound(sound_type::monster, 116, dist, lPan);
 								break;
 
 							case hb::shared::owner::GiTree: // Snoopy: GiantTree
-								if ((m_data[dX][dY].m_animation.m_current_frame == 1)) m_game->play_game_sound('M', 120, dist, lPan);
+								if ((m_data[dX][dY].m_animation.m_current_frame == 1)) audio_manager::get().play_game_sound(sound_type::monster, 120, dist, lPan);
 								break;
 
 							case hb::shared::owner::GiLizard: // Snoopy: GiantLizard
-								if ((m_data[dX][dY].m_animation.m_current_frame == 1)) m_game->play_game_sound('M', 124, dist, lPan);
+								if ((m_data[dX][dY].m_animation.m_current_frame == 1)) audio_manager::get().play_game_sound(sound_type::monster, 124, dist, lPan);
 								break;
 
 							case hb::shared::owner::Dragon: // Snoopy: Dragon
-								if ((m_data[dX][dY].m_animation.m_current_frame == 1)) m_game->play_game_sound('M', 128, dist, lPan);
+								if ((m_data[dX][dY].m_animation.m_current_frame == 1)) audio_manager::get().play_game_sound(sound_type::monster, 128, dist, lPan);
 								break;
 
 							case hb::shared::owner::Nizie: // Snoopy: Nizie
-								if ((m_data[dX][dY].m_animation.m_current_frame == 1)) m_game->play_game_sound('M', 132, dist, lPan);
+								if ((m_data[dX][dY].m_animation.m_current_frame == 1)) audio_manager::get().play_game_sound(sound_type::monster, 132, dist, lPan);
 								break;
 							}
 							break;
@@ -3233,12 +3234,12 @@ int CMapData::object_frame_counter(const std::string& player_name, short view_po
 									sound_index = 7;
 								else sound_index = 5;
 
-								if (true) m_game->play_game_sound('C', sound_index, dist, lPan);
+								if (true) audio_manager::get().play_game_sound(sound_type::character, sound_index, dist, lPan);
 								m_game->m_effect_manager->add_effect(EffectType::NORMAL_HIT, m_pivot_x + dX, m_pivot_y + dY, 0, 0, 0, 4);
 							}
 							if (m_data[dX][dY].m_animation.m_current_frame == 2)
 							{
-								if (true) m_game->play_game_sound('C', 12, dist, lPan);
+								if (true) audio_manager::get().play_game_sound(sound_type::character, 12, dist, lPan);
 							}
 							break;
 
@@ -3258,12 +3259,12 @@ int CMapData::object_frame_counter(const std::string& player_name, short view_po
 								else if ((m_data[dX][dY].m_v2 >= 40) && (m_data[dX][dY].m_v2 <= 59))
 									sound_index = 7;
 								else sound_index = 5;
-								if (true) m_game->play_game_sound('C', sound_index, dist, lPan);
+								if (true) audio_manager::get().play_game_sound(sound_type::character, sound_index, dist, lPan);
 								m_game->m_effect_manager->add_effect(EffectType::NORMAL_HIT, m_pivot_x + dX, m_pivot_y + dY, 0, 0, 0, 4);
 							}
 							if (m_data[dX][dY].m_animation.m_current_frame == 2)
 							{
-								if (true) m_game->play_game_sound('C', 13, dist, lPan);
+								if (true) audio_manager::get().play_game_sound(sound_type::character, 13, dist, lPan);
 							}
 							break;
 
@@ -3281,204 +3282,204 @@ int CMapData::object_frame_counter(const std::string& player_name, short view_po
 								else if ((m_data[dX][dY].m_v2 >= 40) && (m_data[dX][dY].m_v2 <= 59))
 									sound_index = 7;
 								else sound_index = 5;
-								if (true) m_game->play_game_sound('C', sound_index, dist, lPan);
+								if (true) audio_manager::get().play_game_sound(sound_type::character, sound_index, dist, lPan);
 								m_game->m_effect_manager->add_effect(EffectType::NORMAL_HIT, m_pivot_x + dX, m_pivot_y + dY, 0, 0, 0, 4);
 							}
 
 							switch (m_data[dX][dY].m_owner_type) {
 							case hb::shared::owner::ATK: //Snoopy:  ATK
 								if (m_data[dX][dY].m_animation.m_current_frame == 1)
-									m_game->play_game_sound('M', 143, dist, lPan);
+									audio_manager::get().play_game_sound(sound_type::monster, 143, dist, lPan);
 								break;
 							case hb::shared::owner::MasterElf: // Snoopy: MasterElf
 								if (m_data[dX][dY].m_animation.m_current_frame == 1)
-									m_game->play_game_sound('C', 7, dist, lPan);
+									audio_manager::get().play_game_sound(sound_type::character, 7, dist, lPan);
 								break;
 							case hb::shared::owner::Barbarian: // Snoopy: Barbarian
 								if (m_data[dX][dY].m_animation.m_current_frame == 1)
-									m_game->play_game_sound('M', 144, dist, lPan);
+									audio_manager::get().play_game_sound(sound_type::monster, 144, dist, lPan);
 								break;
 							case hb::shared::owner::DSK: // Snoopy: DSK
 								if (m_data[dX][dY].m_animation.m_current_frame == 1)
-									m_game->play_game_sound('M', 148, dist, lPan);
+									audio_manager::get().play_game_sound(sound_type::monster, 148, dist, lPan);
 								break;
 
 							case hb::shared::owner::Slime: // Slime
 								if (m_data[dX][dY].m_animation.m_current_frame == 2)
-									m_game->play_game_sound('M', 3, dist, lPan);
+									audio_manager::get().play_game_sound(sound_type::monster, 3, dist, lPan);
 								break;
 
 							case hb::shared::owner::Skeleton: // Skell
 								if (m_data[dX][dY].m_animation.m_current_frame == 2)
-									m_game->play_game_sound('M', 15, dist, lPan);
+									audio_manager::get().play_game_sound(sound_type::monster, 15, dist, lPan);
 								break;
 
 							case hb::shared::owner::StoneGolem: // Stone Golem
 							case hb::shared::owner::IceGolem: // IceGolem
 								if (m_data[dX][dY].m_animation.m_current_frame == 2)
-									m_game->play_game_sound('M', 35, dist, lPan);
+									audio_manager::get().play_game_sound(sound_type::monster, 35, dist, lPan);
 								break;
 
 							case hb::shared::owner::Cyclops: // Cyclops
 								if (m_data[dX][dY].m_animation.m_current_frame == 2)
-									m_game->play_game_sound('M', 43, dist, lPan);
+									audio_manager::get().play_game_sound(sound_type::monster, 43, dist, lPan);
 								break;
 
 							case hb::shared::owner::OrcMage: // Orc
 							case hb::shared::owner::Stalker: // SK
 								if (m_data[dX][dY].m_animation.m_current_frame == 2)
-									m_game->play_game_sound('M', 11, dist, lPan);
+									audio_manager::get().play_game_sound(sound_type::monster, 11, dist, lPan);
 								break;
 
 							case hb::shared::owner::GiantAnt: // Ant
 							case hb::shared::owner::LightWarBeetle: // LWB
 								if (m_data[dX][dY].m_animation.m_current_frame == 2)
-									m_game->play_game_sound('M', 31, dist, lPan);
+									audio_manager::get().play_game_sound(sound_type::monster, 31, dist, lPan);
 								break;
 
 							case hb::shared::owner::Scorpion: // Scorpion
 								if (m_data[dX][dY].m_animation.m_current_frame == 2)
-									m_game->play_game_sound('M', 23, dist, lPan);
+									audio_manager::get().play_game_sound(sound_type::monster, 23, dist, lPan);
 								break;
 
 							case hb::shared::owner::Zombie: // Zombie
 								if (m_data[dX][dY].m_animation.m_current_frame == 2)
-									m_game->play_game_sound('M', 19, dist, lPan);
+									audio_manager::get().play_game_sound(sound_type::monster, 19, dist, lPan);
 								break;
 
 							case hb::shared::owner::Amphis: // Snake
 								if (m_data[dX][dY].m_animation.m_current_frame == 2)
-									m_game->play_game_sound('M', 27, dist, lPan);
+									audio_manager::get().play_game_sound(sound_type::monster, 27, dist, lPan);
 								break;
 
 							case hb::shared::owner::ClayGolem: // Clay-Golem
 								if (m_data[dX][dY].m_animation.m_current_frame == 2)
-									m_game->play_game_sound('M', 39, dist, lPan);
+									audio_manager::get().play_game_sound(sound_type::monster, 39, dist, lPan);
 								break;
 
 							case hb::shared::owner::Hellhound: // HH
 								if (m_data[dX][dY].m_animation.m_current_frame == 2)
-									m_game->play_game_sound('M', 7, dist, lPan);
+									audio_manager::get().play_game_sound(sound_type::monster, 7, dist, lPan);
 								break;
 
 							case hb::shared::owner::Troll: // Troll
 								if (m_data[dX][dY].m_animation.m_current_frame == 2)
-									m_game->play_game_sound('M', 48, dist, lPan);
+									audio_manager::get().play_game_sound(sound_type::monster, 48, dist, lPan);
 								break;
 
 							case hb::shared::owner::Ogre: // Ogre
 								if (m_data[dX][dY].m_animation.m_current_frame == 2)
-									m_game->play_game_sound('M', 53, dist, lPan);
+									audio_manager::get().play_game_sound(sound_type::monster, 53, dist, lPan);
 								break;
 
 							case hb::shared::owner::Liche: // Liche
 								if (m_data[dX][dY].m_animation.m_current_frame == 2)
-									m_game->play_game_sound('M', 57, dist, lPan);
+									audio_manager::get().play_game_sound(sound_type::monster, 57, dist, lPan);
 								break;
 
 							case hb::shared::owner::Demon: // DD
 								if (m_data[dX][dY].m_animation.m_current_frame == 2)
-									m_game->play_game_sound('M', 61, dist, lPan);
+									audio_manager::get().play_game_sound(sound_type::monster, 61, dist, lPan);
 								break;
 
 							case hb::shared::owner::Unicorn: // Uni
 								if (m_data[dX][dY].m_animation.m_current_frame == 2)
-									m_game->play_game_sound('M', 65, dist, lPan);
+									audio_manager::get().play_game_sound(sound_type::monster, 65, dist, lPan);
 								break;
 
 							case hb::shared::owner::WereWolf: // WW
 								if (m_data[dX][dY].m_animation.m_current_frame == 2)
-									m_game->play_game_sound('M', 69, dist, lPan);
+									audio_manager::get().play_game_sound(sound_type::monster, 69, dist, lPan);
 								break;
 							case hb::shared::owner::Bunny://Rabbit
 								if ((m_data[dX][dY].m_animation.m_current_frame == 1))
-									m_game->play_game_sound('M', 79, dist, lPan);
+									audio_manager::get().play_game_sound(sound_type::monster, 79, dist, lPan);
 								break;
 
 							case hb::shared::owner::Cat://Cat
 								if ((m_data[dX][dY].m_animation.m_current_frame == 1))
-									m_game->play_game_sound('M', 80, dist, lPan);
+									audio_manager::get().play_game_sound(sound_type::monster, 80, dist, lPan);
 								break;
 
 							case hb::shared::owner::GiantFrog://Giant-Frog
 								if ((m_data[dX][dY].m_animation.m_current_frame == 1))
-									m_game->play_game_sound('M', 81, dist, lPan);
+									audio_manager::get().play_game_sound(sound_type::monster, 81, dist, lPan);
 								break;
 
 							case hb::shared::owner::MountainGiant://Mountain Giant
 							case hb::shared::owner::MasterOrc: // Snoopy: MasterMageOrc
 								if ((m_data[dX][dY].m_animation.m_current_frame == 1))
-									m_game->play_game_sound('M', 89, dist, lPan);
+									audio_manager::get().play_game_sound(sound_type::monster, 89, dist, lPan);
 								break;
 
 							case hb::shared::owner::Ettin://Ettin
 								if ((m_data[dX][dY].m_animation.m_current_frame == 1))
-									m_game->play_game_sound('M', 93, dist, lPan);
+									audio_manager::get().play_game_sound(sound_type::monster, 93, dist, lPan);
 								break;
 
 							case hb::shared::owner::CannibalPlant://Cannibal Plant
 								if ((m_data[dX][dY].m_animation.m_current_frame == 1))
-									m_game->play_game_sound('M', 97, dist, lPan);
+									audio_manager::get().play_game_sound(sound_type::monster, 97, dist, lPan);
 								break;
 
 							case hb::shared::owner::Rudolph://Rudolph
 								if ((m_data[dX][dY].m_animation.m_current_frame == 1))
-									m_game->play_game_sound('M', 69, dist, lPan);
+									audio_manager::get().play_game_sound(sound_type::monster, 69, dist, lPan);
 								break;
 							case hb::shared::owner::DireBoar://DireBoar
 								if ((m_data[dX][dY].m_animation.m_current_frame == 1))
-									m_game->play_game_sound('M', 78, dist, lPan);
+									audio_manager::get().play_game_sound(sound_type::monster, 78, dist, lPan);
 								break;
 
 							case hb::shared::owner::GiantCrayfish: //Snoopy:  GiantCrayFish
 								if ((m_data[dX][dY].m_animation.m_current_frame == 1))
-									m_game->play_game_sound('M', 101, dist, lPan);
+									audio_manager::get().play_game_sound(sound_type::monster, 101, dist, lPan);
 								break;
 
 							case hb::shared::owner::Minaus: // Snoopy: Minos
 								if ((m_data[dX][dY].m_animation.m_current_frame == 1))
-									m_game->play_game_sound('M', 101, dist, lPan);
+									audio_manager::get().play_game_sound(sound_type::monster, 101, dist, lPan);
 								break;
 
 							case hb::shared::owner::Tentocle: // Snoopy: Tentocle
 								if ((m_data[dX][dY].m_animation.m_current_frame == 1))
-									m_game->play_game_sound('M', 108, dist, lPan);
+									audio_manager::get().play_game_sound(sound_type::monster, 108, dist, lPan);
 								break;
 
 							case hb::shared::owner::Abaddon: // Snoopy: Abaddon
 								if ((m_data[dX][dY].m_animation.m_current_frame == 1))
-									m_game->play_game_sound('M', 138, dist, lPan);
+									audio_manager::get().play_game_sound(sound_type::monster, 138, dist, lPan);
 								break;
 
 							case hb::shared::owner::ClawTurtle: // Snoopy: ClawTurtle
 								if ((m_data[dX][dY].m_animation.m_current_frame == 1))
-									m_game->play_game_sound('M', 112, dist, lPan);
+									audio_manager::get().play_game_sound(sound_type::monster, 112, dist, lPan);
 								break;
 
 							case hb::shared::owner::Centaur: // Snoopy: Centaurus
 							case hb::shared::owner::Sorceress: // Snoopy: Sorceress
 								if ((m_data[dX][dY].m_animation.m_current_frame == 1))
-									m_game->play_game_sound('M', 116, dist, lPan);
+									audio_manager::get().play_game_sound(sound_type::monster, 116, dist, lPan);
 								break;
 
 							case hb::shared::owner::GiTree: // Snoopy: GiantTree
 								if ((m_data[dX][dY].m_animation.m_current_frame == 1))
-									m_game->play_game_sound('M', 120, dist, lPan);
+									audio_manager::get().play_game_sound(sound_type::monster, 120, dist, lPan);
 								break;
 
 							case hb::shared::owner::GiLizard: // Snoopy: GiantLizard
 								if ((m_data[dX][dY].m_animation.m_current_frame == 1))
-									m_game->play_game_sound('M', 124, dist, lPan);
+									audio_manager::get().play_game_sound(sound_type::monster, 124, dist, lPan);
 								break;
 
 							case hb::shared::owner::Dragon: // Snoopy: Dragon
 								if ((m_data[dX][dY].m_animation.m_current_frame == 1))
-									m_game->play_game_sound('M', 128, dist, lPan);
+									audio_manager::get().play_game_sound(sound_type::monster, 128, dist, lPan);
 								break;
 
 							case hb::shared::owner::Nizie: // Snoopy: Nizie
 								if ((m_data[dX][dY].m_animation.m_current_frame == 1))
-									m_game->play_game_sound('M', 132, dist, lPan);
+									audio_manager::get().play_game_sound(sound_type::monster, 132, dist, lPan);
 								break;
 
 							default:
@@ -3499,7 +3500,7 @@ int CMapData::object_frame_counter(const std::string& player_name, short view_po
 						case 6:
 							if (m_data[dX][dY].m_animation.m_current_frame == 1)
 							{
-								if (true) m_game->play_game_sound('C', 16, dist, lPan);
+								if (true) audio_manager::get().play_game_sound(sound_type::character, 16, dist, lPan);
 								if ((((m_data[dX][dY].m_appearance.weapon_glare | m_data[dX][dY].m_appearance.shield_glare) != 0) || (m_data[dX][dY].m_status.gm_mode)) && (!m_data[dX][dY].m_status.invisibility))
 								{
 									m_game->m_effect_manager->add_effect(EffectType::STAR_TWINKLE, (m_pivot_x + dX) * 32 + (rand() % 20 - 10), (m_pivot_y + dY) * 32 - (rand() % 50) - 5, 0, 0, -(rand() % 8), 0);
@@ -3550,12 +3551,12 @@ int CMapData::object_frame_counter(const std::string& player_name, short view_po
 								else if ((m_data[dX][dY].m_v2 >= 40) && (m_data[dX][dY].m_v2 <= 59))
 									sound_index = 7;
 								else sound_index = 5;
-								if (true) m_game->play_game_sound('C', sound_index, dist, lPan);
+								if (true) audio_manager::get().play_game_sound(sound_type::character, sound_index, dist, lPan);
 								m_game->m_effect_manager->add_effect(EffectType::NORMAL_HIT, m_pivot_x + dX, m_pivot_y + dY, 0, 0, 0, 12);
 							}
 							if (m_data[dX][dY].m_animation.m_current_frame == 7)
 							{
-								if (true) m_game->play_game_sound('C', 14, dist, lPan);
+								if (true) audio_manager::get().play_game_sound(sound_type::character, 14, dist, lPan);
 							}
 							break;
 
@@ -3576,12 +3577,12 @@ int CMapData::object_frame_counter(const std::string& player_name, short view_po
 								else if ((m_data[dX][dY].m_v2 >= 40) && (m_data[dX][dY].m_v2 <= 59))
 									sound_index = 7;
 								else sound_index = 5;
-								if (true) m_game->play_game_sound('C', sound_index, dist, lPan);
+								if (true) audio_manager::get().play_game_sound(sound_type::character, sound_index, dist, lPan);
 								m_game->m_effect_manager->add_effect(EffectType::NORMAL_HIT, m_pivot_x + dX, m_pivot_y + dY, 0, 0, 0, 12);
 							}
 							if (m_data[dX][dY].m_animation.m_current_frame == 7)
 							{
-								if (true) m_game->play_game_sound('C', 15, dist, lPan);
+								if (true) audio_manager::get().play_game_sound(sound_type::character, 15, dist, lPan);
 							}
 							break;
 
@@ -3599,113 +3600,113 @@ int CMapData::object_frame_counter(const std::string& player_name, short view_po
 								else if ((m_data[dX][dY].m_v2 >= 40) && (m_data[dX][dY].m_v2 <= 59))
 									sound_index = 7;
 								else sound_index = 5;
-								if (true) m_game->play_game_sound('C', sound_index, dist, lPan);
+								if (true) audio_manager::get().play_game_sound(sound_type::character, sound_index, dist, lPan);
 								m_game->m_effect_manager->add_effect(EffectType::NORMAL_HIT, m_pivot_x + dX, m_pivot_y + dY, 0, 0, 0, 12);
 							}
 
 							switch (m_data[dX][dY].m_owner_type) {
 							case hb::shared::owner::Beholder: // BB
 								if (m_data[dX][dY].m_animation.m_current_frame == 5)
-									m_game->play_game_sound('M', 39, dist, lPan);
+									audio_manager::get().play_game_sound(sound_type::monster, 39, dist, lPan);
 								break;
 
 							case hb::shared::owner::Slime: // Slime
 							case hb::shared::owner::Dummy: // Dummy
 							case hb::shared::owner::EnergySphere: // Snoopy: EnergyBall
 								if (m_data[dX][dY].m_animation.m_current_frame == 5)
-									m_game->play_game_sound('M', 4, dist, lPan);
+									audio_manager::get().play_game_sound(sound_type::monster, 4, dist, lPan);
 								break;
 
 							case hb::shared::owner::Skeleton: // Skell
 								if (m_data[dX][dY].m_animation.m_current_frame == 5)
-									m_game->play_game_sound('M', 16, dist, lPan);
+									audio_manager::get().play_game_sound(sound_type::monster, 16, dist, lPan);
 								break;
 
 							case hb::shared::owner::StoneGolem: // Stone-Golem
 							case hb::shared::owner::BattleGolem: // BG
 								if (m_data[dX][dY].m_animation.m_current_frame == 5)
-									m_game->play_game_sound('M', 36, dist, lPan);
+									audio_manager::get().play_game_sound(sound_type::monster, 36, dist, lPan);
 								break;
 
 							case hb::shared::owner::IceGolem: // IceGolem
 								if (m_data[dX][dY].m_animation.m_current_frame == 5) {
 									m_game->m_effect_manager->add_effect(EffectType::AURA_EFFECT_2, (m_pivot_x + dX) * 32, (m_pivot_y + dY) * 32, 0, 0, 0);
-									m_game->play_game_sound('M', 36, dist, lPan);
+									audio_manager::get().play_game_sound(sound_type::monster, 36, dist, lPan);
 								}
 								break;
 
 							case hb::shared::owner::Cyclops: // Cyclops
 							case hb::shared::owner::HellClaw: // HC
 								if (m_data[dX][dY].m_animation.m_current_frame == 5)
-									m_game->play_game_sound('M', 44, dist, lPan);
+									audio_manager::get().play_game_sound(sound_type::monster, 44, dist, lPan);
 								break;
 
 							case hb::shared::owner::OrcMage: // Orc
 							case hb::shared::owner::Stalker: // SK
 								if (m_data[dX][dY].m_animation.m_current_frame == 5)
-									m_game->play_game_sound('M', 12, dist, lPan);
+									audio_manager::get().play_game_sound(sound_type::monster, 12, dist, lPan);
 								break;
 
 							case hb::shared::owner::GiantAnt: // Ant
 							case hb::shared::owner::LightWarBeetle: // LWB
 								if (m_data[dX][dY].m_animation.m_current_frame == 5)
-									m_game->play_game_sound('M', 32, dist, lPan);
+									audio_manager::get().play_game_sound(sound_type::monster, 32, dist, lPan);
 								break;
 
 							case hb::shared::owner::Scorpion: // Scorp
 								if (m_data[dX][dY].m_animation.m_current_frame == 5)
-									m_game->play_game_sound('M', 24, dist, lPan);
+									audio_manager::get().play_game_sound(sound_type::monster, 24, dist, lPan);
 								break;
 
 							case hb::shared::owner::Zombie: // Zombie
 								if (m_data[dX][dY].m_animation.m_current_frame == 5)
-									m_game->play_game_sound('M', 20, dist, lPan);
+									audio_manager::get().play_game_sound(sound_type::monster, 20, dist, lPan);
 								break;
 
 							case hb::shared::owner::Amphis: // Snake
 								if (m_data[dX][dY].m_animation.m_current_frame == 5)
-									m_game->play_game_sound('M', 28, dist, lPan);
+									audio_manager::get().play_game_sound(sound_type::monster, 28, dist, lPan);
 								break;
 
 							case hb::shared::owner::ClayGolem: // Clay-Golem
 								if (m_data[dX][dY].m_animation.m_current_frame == 5)
-									m_game->play_game_sound('M', 40, dist, lPan);
+									audio_manager::get().play_game_sound(sound_type::monster, 40, dist, lPan);
 								break;
 
 							case hb::shared::owner::Hellhound: // HH
 								if (m_data[dX][dY].m_animation.m_current_frame == 5)
-									m_game->play_game_sound('M', 8, dist, lPan);
+									audio_manager::get().play_game_sound(sound_type::monster, 8, dist, lPan);
 								break;
 
 							case hb::shared::owner::Troll: // Troll
 								if (m_data[dX][dY].m_animation.m_current_frame == 5)
-									m_game->play_game_sound('M', 49, dist, lPan);
+									audio_manager::get().play_game_sound(sound_type::monster, 49, dist, lPan);
 								break;
 
 							case hb::shared::owner::Ogre: // Ogre
 								if (m_data[dX][dY].m_animation.m_current_frame == 5)
-									m_game->play_game_sound('M', 54, dist, lPan);
+									audio_manager::get().play_game_sound(sound_type::monster, 54, dist, lPan);
 								break;
 
 							case hb::shared::owner::Liche: // Liche
 							case hb::shared::owner::TigerWorm: // TW
 								if (m_data[dX][dY].m_animation.m_current_frame == 5)
-									m_game->play_game_sound('M', 58, dist, lPan);
+									audio_manager::get().play_game_sound(sound_type::monster, 58, dist, lPan);
 								break;
 
 							case hb::shared::owner::Demon: // DD
 								if (m_data[dX][dY].m_animation.m_current_frame == 5)
-									m_game->play_game_sound('M', 62, dist, lPan);
+									audio_manager::get().play_game_sound(sound_type::monster, 62, dist, lPan);
 								break;
 
 							case hb::shared::owner::Unicorn: // Uni
 								if (m_data[dX][dY].m_animation.m_current_frame == 5)
-									m_game->play_game_sound('M', 66, dist, lPan);
+									audio_manager::get().play_game_sound(sound_type::monster, 66, dist, lPan);
 								break;
 
 							case hb::shared::owner::WereWolf: // WW
 								if (m_data[dX][dY].m_animation.m_current_frame == 5)
-									m_game->play_game_sound('M', 70, dist, lPan);
+									audio_manager::get().play_game_sound(sound_type::monster, 70, dist, lPan);
 								break;
 
 							case hb::shared::owner::ArrowGuardTower: // AGT
@@ -3743,7 +3744,7 @@ int CMapData::object_frame_counter(const std::string& player_name, short view_po
 									m_game->m_effect_manager->add_effect(EffectType::MS_CRUSADE_CASTING, (m_pivot_x + dX) * 32 + 30 - (rand() % 60), (m_pivot_y + dY) * 32 + 30 - (rand() % 60), 0, 0, -1 * (rand() % 2));
 								}
 								if (m_data[dX][dY].m_animation.m_current_frame == 1)
-									m_game->play_game_sound('M', 154, dist, lPan);
+									audio_manager::get().play_game_sound(sound_type::monster, 154, dist, lPan);
 								break;
 
 							case hb::shared::owner::AGC: // Snoopy: CannonTurret
@@ -3760,7 +3761,7 @@ int CMapData::object_frame_counter(const std::string& player_name, short view_po
 									m_game->m_effect_manager->add_effect(EffectType::MS_CRUSADE_CASTING, (m_pivot_x + dX) * 32 + 30 - (rand() % 60), (m_pivot_y + dY) * 32 + 30 - (rand() % 60), 0, 0, -1 * (rand() % 2));
 								}
 								if (m_data[dX][dY].m_animation.m_current_frame == 1)
-									m_game->play_game_sound('M', 156, dist, lPan);
+									audio_manager::get().play_game_sound(sound_type::monster, 156, dist, lPan);
 								break;
 
 							case hb::shared::owner::Catapult: // CP
@@ -3781,7 +3782,7 @@ int CMapData::object_frame_counter(const std::string& player_name, short view_po
 							case hb::shared::owner::Gargoyle: // GG
 								if (m_data[dX][dY].m_animation.m_current_frame == 5)
 								{
-									m_game->play_game_sound('M', 44, dist, lPan);
+									audio_manager::get().play_game_sound(sound_type::monster, 44, dist, lPan);
 								}
 								if (m_data[dX][dY].m_animation.m_current_frame == 11)
 								{
@@ -3800,127 +3801,127 @@ int CMapData::object_frame_counter(const std::string& player_name, short view_po
 
 							case hb::shared::owner::Bunny:// Rabbit
 								if ((m_data[dX][dY].m_animation.m_current_frame == 1))
-									m_game->play_game_sound('M', 83, dist, lPan);
+									audio_manager::get().play_game_sound(sound_type::monster, 83, dist, lPan);
 								break;
 
 							case hb::shared::owner::Cat: // Cat
 								if ((m_data[dX][dY].m_animation.m_current_frame == 1))
-									m_game->play_game_sound('M', 84, dist, lPan);
+									audio_manager::get().play_game_sound(sound_type::monster, 84, dist, lPan);
 								break;
 
 							case hb::shared::owner::GiantFrog://Giant-Frog
 								if ((m_data[dX][dY].m_animation.m_current_frame == 1))
-									m_game->play_game_sound('M', 85, dist, lPan);
+									audio_manager::get().play_game_sound(sound_type::monster, 85, dist, lPan);
 								break;
 
 							case hb::shared::owner::MountainGiant://Mountain Giant
 							case hb::shared::owner::MasterOrc: // Snoopy: MasterMageOrc
 								if ((m_data[dX][dY].m_animation.m_current_frame == 1))
-									m_game->play_game_sound('M', 90, dist, lPan);
+									audio_manager::get().play_game_sound(sound_type::monster, 90, dist, lPan);
 								break;
 
 							case hb::shared::owner::Ettin://Ettin
 							case hb::shared::owner::Barbarian: // Snoopy: Barbarian
 								if ((m_data[dX][dY].m_animation.m_current_frame == 1))
-									m_game->play_game_sound('M', 94, dist, lPan);
+									audio_manager::get().play_game_sound(sound_type::monster, 94, dist, lPan);
 								break;
 
 							case hb::shared::owner::ATK: // Snoopy: ATK
 								if ((m_data[dX][dY].m_animation.m_current_frame == 1))
-									m_game->play_game_sound('M', 141, dist, lPan);
+									audio_manager::get().play_game_sound(sound_type::monster, 141, dist, lPan);
 								break;
 
 							case hb::shared::owner::DSK: // Snoopy: DSK
 								if ((m_data[dX][dY].m_animation.m_current_frame == 1))
-									m_game->play_game_sound('M', 146, dist, lPan);
+									audio_manager::get().play_game_sound(sound_type::monster, 146, dist, lPan);
 								break;
 
 							case hb::shared::owner::Rudolph://Rudolph
 								if ((m_data[dX][dY].m_animation.m_current_frame == 1))
-									m_game->play_game_sound('M', 65, dist, lPan);
+									audio_manager::get().play_game_sound(sound_type::monster, 65, dist, lPan);
 								break;
 
 							case hb::shared::owner::DireBoar://DireBoar
 								if ((m_data[dX][dY].m_animation.m_current_frame == 1))
-									m_game->play_game_sound('M', 94, dist, lPan);
+									audio_manager::get().play_game_sound(sound_type::monster, 94, dist, lPan);
 								break;
 
 							case hb::shared::owner::Wyvern: // Wyvern
 								if ((m_data[dX][dY].m_animation.m_current_frame == 1))
-									m_game->play_game_sound('E', 7, dist, lPan);
+									audio_manager::get().play_game_sound(sound_type::effect, 7, dist, lPan);
 								break;
 
 							case hb::shared::owner::Dragon: // Snoopy: Dragon
 								if ((m_data[dX][dY].m_animation.m_current_frame == 1))
-									m_game->play_game_sound('M', 129, dist, lPan);
+									audio_manager::get().play_game_sound(sound_type::monster, 129, dist, lPan);
 								break;
 
 							case hb::shared::owner::Centaur: // Snoopy: Centaur
 							case hb::shared::owner::Sorceress: // Snoopy: Sorceress
 								if ((m_data[dX][dY].m_animation.m_current_frame == 1))
-									m_game->play_game_sound('M', 129, dist, lPan);
+									audio_manager::get().play_game_sound(sound_type::monster, 129, dist, lPan);
 								break;
 
 							case hb::shared::owner::ClawTurtle: // Snoopy: ClawTurtle
 								if ((m_data[dX][dY].m_animation.m_current_frame == 1))
-									m_game->play_game_sound('M', 113, dist, lPan);
+									audio_manager::get().play_game_sound(sound_type::monster, 113, dist, lPan);
 								break;
 
 							case hb::shared::owner::FireWyvern: // Snoopy: FireWyvern
 								if ((m_data[dX][dY].m_animation.m_current_frame == 1))
-									m_game->play_game_sound('M', 105, dist, lPan);
+									audio_manager::get().play_game_sound(sound_type::monster, 105, dist, lPan);
 								break;
 
 
 							case hb::shared::owner::CannibalPlant: // Cannibal Plant
 							case hb::shared::owner::GiantCrayfish: // Snoopy: GiantGrayFish
 								if ((m_data[dX][dY].m_animation.m_current_frame == 1))
-									m_game->play_game_sound('M', 98, dist, lPan);
+									audio_manager::get().play_game_sound(sound_type::monster, 98, dist, lPan);
 								break;
 
 							case hb::shared::owner::GiLizard: //Snoopy:
 								if ((m_data[dX][dY].m_animation.m_current_frame == 1))
-									m_game->play_game_sound('M', 125, dist, lPan);
+									audio_manager::get().play_game_sound(sound_type::monster, 125, dist, lPan);
 								break;
 
 							case hb::shared::owner::GiTree: // Snoopy:
 								if ((m_data[dX][dY].m_animation.m_current_frame == 1))
-									m_game->play_game_sound('M', 121, dist, lPan);
+									audio_manager::get().play_game_sound(sound_type::monster, 121, dist, lPan);
 								break;
 
 							case hb::shared::owner::Minaus: // Snoopy:
 								if ((m_data[dX][dY].m_animation.m_current_frame == 1))
-									m_game->play_game_sound('M', 103, dist, lPan);
+									audio_manager::get().play_game_sound(sound_type::monster, 103, dist, lPan);
 								break;
 
 							case hb::shared::owner::Nizie: // Snoopy:
 								if ((m_data[dX][dY].m_animation.m_current_frame == 1))
-									m_game->play_game_sound('M', 133, dist, lPan);
+									audio_manager::get().play_game_sound(sound_type::monster, 133, dist, lPan);
 								break;
 
 							case hb::shared::owner::Tentocle: //Snoopy: Tentocle
 								if ((m_data[dX][dY].m_animation.m_current_frame == 1))
-									m_game->play_game_sound('M', 109, dist, lPan);
+									audio_manager::get().play_game_sound(sound_type::monster, 109, dist, lPan);
 								break;
 
 							case hb::shared::owner::Abaddon: // Snoopy: Abaddon
 								if ((m_data[dX][dY].m_animation.m_current_frame == 1))
-									m_game->play_game_sound('M', 139, dist, lPan);
+									audio_manager::get().play_game_sound(sound_type::monster, 139, dist, lPan);
 								break;
 
 							case hb::shared::owner::MasterElf: // Snoopy: MasterElf
 								if ((m_data[dX][dY].m_animation.m_current_frame == 1))
-									m_game->play_game_sound('M', 150, dist, lPan);
+									audio_manager::get().play_game_sound(sound_type::monster, 150, dist, lPan);
 								break;
 
 							case hb::shared::owner::HBT: // Snoopy: HBT
 								if ((m_data[dX][dY].m_animation.m_current_frame == 1))
-									m_game->play_game_sound('M', 152, dist, lPan);
+									audio_manager::get().play_game_sound(sound_type::monster, 152, dist, lPan);
 								break;
 
 							default:
 								if (m_data[dX][dY].m_animation.m_current_frame == 5)
-									m_game->play_game_sound('C', 15, dist, lPan);
+									audio_manager::get().play_game_sound(sound_type::character, 15, dist, lPan);
 								break;
 
 							case hb::shared::owner::Frost: // Frost
@@ -3971,7 +3972,7 @@ bool CMapData::set_item(short sX, short sY, short i_dnum, char item_color, uint3
 	{
 		if (drop_effect == true)
 		{
-			m_game->play_game_sound('E', 11, dist);
+			audio_manager::get().play_game_sound(sound_type::effect, 11, dist);
 			m_game->m_effect_manager->add_effect(EffectType::FOOTPRINT, (m_pivot_x + dX) * 32, (m_pivot_y + dY) * 32, 0, 0, 0, 0);
 			m_game->m_effect_manager->add_effect(EffectType::FOOTPRINT, (m_pivot_x + dX) * 32 + (10 - (rand() % 20)), (m_pivot_y + dY) * 32 + (10 - (rand() % 20)), 0, 0, (rand() % 2), 0);
 			m_game->m_effect_manager->add_effect(EffectType::FOOTPRINT, (m_pivot_x + dX) * 32 + (10 - (rand() % 20)), (m_pivot_y + dY) * 32 + (10 - (rand() % 20)), 0, 0, (rand() % 2), 0);

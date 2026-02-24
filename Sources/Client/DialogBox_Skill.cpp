@@ -8,6 +8,7 @@
 #include <format>
 #include <string>
 #include "Screen_OnGame.h"
+#include "AudioManager.h"
 
 using namespace hb::shared::net;
 using namespace hb::client::sprite_id;
@@ -169,7 +170,7 @@ bool DialogBox_Skill::on_click()
 							}
 							m_game->on_game()->m_skill_using_status = true;
 							disable_this_dialog();
-							play_sound_effect('E', 14, 5);
+							audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 							return true;
 						case 1:
 							{
@@ -178,7 +179,7 @@ bool DialogBox_Skill::on_click()
 								send_game_packet(pkt);
 							}
 							m_game->on_game()->m_skill_using_status = true;
-							play_sound_effect('E', 14, 5);
+							audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 							return true;
 						}
 					}
@@ -192,7 +193,7 @@ bool DialogBox_Skill::on_click()
 							pkt.v1 = i + m_scroll_position;
 							send_game_packet(pkt);
 						}
-						play_sound_effect('E', 14, 5);
+						audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 						m_is_down_skill_pending = true;
 						return true;
 					}

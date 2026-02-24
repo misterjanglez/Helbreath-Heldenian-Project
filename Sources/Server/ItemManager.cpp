@@ -19,6 +19,7 @@
 #include "ObjectIDRange.h"
 #include "Skill.h"
 #include "GameConfigSqliteStore.h"
+#include "SharedCalculations.h"
 #include "Log.h"
 #include "ServerLogChannels.h"
 #include "StringCompat.h"
@@ -818,10 +819,11 @@ bool ItemManager::equip_item_handler(int client_h, short item_index, bool notify
 
 	// Weapon-specific: compute attack delay and reset combo
 	if (equip_pos == EquipPos::RightHand || equip_pos == EquipPos::TwoHand) {
-		int speed = m_game->m_client_list[client_h]->m_item_list[item_index]->m_speed;
-		speed -= ((m_game->m_client_list[client_h]->m_str + m_game->m_client_list[client_h]->m_angelic_str) / 13);
-		if (speed < 0) speed = 0;
-		m_game->m_client_list[client_h]->m_status.attack_delay = static_cast<uint8_t>(speed);
+		m_game->m_client_list[client_h]->m_status.attack_delay = static_cast<uint8_t>(hb::shared::calc::attack_delay(
+			m_game->m_formula_engine,
+			hb::shared::calc::weapon_speed{(double)m_game->m_client_list[client_h]->m_item_list[item_index]->m_speed},
+			hb::shared::calc::str{(double)m_game->m_client_list[client_h]->m_str},
+			hb::shared::calc::angelic_str{(double)m_game->m_client_list[client_h]->m_angelic_str}));
 		m_game->m_client_list[client_h]->m_combo_attack_count = 0;
 	}
 
@@ -5620,7 +5622,7 @@ void ItemManager::reload_item_configs()
 	bool configDbCreated = false;
 	if (!EnsureGameConfigDatabase(&configDb, configDbPath, &configDbCreated) || configDbCreated)
 	{
-		hb::logger::log("Item config reload failed: gameconfigs.db unavailable");
+		hb::logger::log("Item config reload failed: gamedata.db unavailable");
 		return;
 	}
 

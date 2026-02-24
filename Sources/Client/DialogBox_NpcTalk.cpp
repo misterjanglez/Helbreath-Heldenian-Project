@@ -6,6 +6,7 @@
 #include "NetMessages.h"
 #include "PacketSendHelpers.h"
 #include "Screen_OnGame.h"
+#include "AudioManager.h"
 
 
 
@@ -138,7 +139,7 @@ bool DialogBox_NpcTalk::on_click()
 		if (mouse_in(btn_right))
 		{
 			m_game->get_dialog_box_manager().disable_dialog_box(DialogBoxId::NpcTalk);
-			m_game->play_game_sound('E', 14, 5);
+			audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 			return true;
 		}
 		break;
@@ -149,14 +150,14 @@ bool DialogBox_NpcTalk::on_click()
 			// Accept
 			m_game->send_game_packet(hb::net::make_common_command(CommonType::QuestAccepted, m_game->m_player->m_player_x, m_game->m_player->m_player_y));
 			m_game->get_dialog_box_manager().disable_dialog_box(DialogBoxId::NpcTalk);
-			m_game->play_game_sound('E', 14, 5);
+			audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 			return true;
 		}
 		if (mouse_in(btn_right))
 		{
 			// Decline
 			m_game->get_dialog_box_manager().disable_dialog_box(DialogBoxId::NpcTalk);
-			m_game->play_game_sound('E', 14, 5);
+			audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 			return true;
 		}
 		break;
@@ -165,7 +166,7 @@ bool DialogBox_NpcTalk::on_click()
 		if (mouse_in(btn_right))
 		{
 			m_game->get_dialog_box_manager().disable_dialog_box(DialogBoxId::NpcTalk);
-			m_game->play_game_sound('E', 14, 5);
+			audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 			return true;
 		}
 		break;

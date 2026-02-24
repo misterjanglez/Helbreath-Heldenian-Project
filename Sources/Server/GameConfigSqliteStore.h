@@ -9,10 +9,7 @@ class CGame;
 bool EnsureGameConfigDatabase(sqlite3** outDb, std::string& outPath, bool* outCreated);
 bool SaveItemConfigs(sqlite3* db, CItem* const* itemList, int maxItems);
 bool LoadItemConfigs(sqlite3* db, CItem** itemList, int maxItems);
-bool SaveRealmConfig(sqlite3* db, const CGame* game);
-bool LoadRealmConfig(sqlite3* db, CGame* game);
-bool SaveSettingsConfig(sqlite3* db, const CGame* game);
-bool LoadSettingsConfig(sqlite3* db, CGame* game);
+bool LoadActiveMaps(sqlite3* db, CGame* game);
 bool SaveBannedListConfig(sqlite3* db, const CGame* game);
 bool LoadBannedListConfig(sqlite3* db, CGame* game);
 bool SaveAdminConfig(sqlite3* db, const CGame* game);
@@ -39,3 +36,6 @@ bool SaveScheduleConfig(sqlite3* db, const CGame* game);
 bool LoadScheduleConfig(sqlite3* db, CGame* game);
 bool HasGameConfigRows(sqlite3* db, const char* tableName);
 void CloseGameConfigDatabase(sqlite3* db);
+
+namespace hb::shared { class formula_engine; }
+bool LoadFormulas(sqlite3* db, hb::shared::formula_engine& engine);

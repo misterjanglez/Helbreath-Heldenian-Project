@@ -8,6 +8,7 @@
 #include "TextLibExt.h"
 #include "lan_eng.h"
 #include "WeatherManager.h"
+#include "AudioManager.h"
 #include <format>
 #include <string>
 
@@ -229,7 +230,7 @@ bool DialogBox_Magic::on_click()
 			if ((mouse_x >= sX + 30) && (mouse_x <= sX + 240) && (mouse_y >= sY + 70 + yloc) && (mouse_y <= sY + 70 + 18 + yloc))
 			{
 				magic_casting_system::get().begin_cast(c_pivot + i);
-				play_sound_effect('E', 14, 5);
+				audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 				return true;
 			}
 			yloc += 18;
@@ -260,13 +261,13 @@ bool DialogBox_Magic::on_click()
 				{
 					enable_dialog_box(DialogBoxId::Manufacture, 1, 0, 0, 0);
 					add_event_list(BDLBBOX_DOUBLE_CLICK_INVENTORY10, 10);
-					play_sound_effect('E', 14, 5);
+					audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 					return true;
 				}
 			}
 			add_event_list(BDLBBOX_DOUBLE_CLICK_INVENTORY15, 10);
 		}
-		play_sound_effect('E', 14, 5);
+		audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 	}
 	return false;
 }

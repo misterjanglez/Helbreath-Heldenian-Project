@@ -13,6 +13,7 @@
 #include <string>
 #include "IInput.h"
 #include "Screen_OnGame.h"
+#include "AudioManager.h"
 
 using namespace hb::shared::net;
 using namespace hb::shared::item;
@@ -253,7 +254,7 @@ void DialogBox_ItemUpgrade::DrawMode4_Failed(int sX, int sY)
     // Check if item was destroyed
     if ((item_index != -1) && (player().m_item_list[item_index] == 0))
     {
-        m_game->play_game_sound('E', 24, 0, 0);
+        audio_manager::get().play_game_sound(sound_type::effect, 24, 0, 0);
         m_mode = mode::item_lost;
         return;
     }
@@ -437,8 +438,8 @@ bool DialogBox_ItemUpgrade::on_click()
             int value = calculate_upgrade_cost(item_index);
             if (m_game->on_game()->m_gizon_item_upgrade_left < value) break;
 
-            m_game->play_game_sound('E', 14, 5);
-            m_game->play_game_sound('E', 44, 0);
+            audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
+            audio_manager::get().play_game_sound(sound_type::effect, 44, 0);
             m_mode = mode::in_progress;
             m_upgrade_start_time = m_game->m_cur_time;
             return true;
@@ -446,7 +447,7 @@ bool DialogBox_ItemUpgrade::on_click()
         if ((mouse_x >= sX + ui_layout::right_btn_x) && (mouse_x <= sX + ui_layout::right_btn_x + ui_layout::btn_size_x)
             && (mouse_y >= sY + ui_layout::btn_y) && (mouse_y <= sY + ui_layout::btn_y + ui_layout::btn_size_y))
         {
-            m_game->play_game_sound('E', 14, 5);
+            audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
             m_game->get_dialog_box_manager().disable_dialog_box(DialogBoxId::ItemUpgrade);
             return true;
         }
@@ -462,7 +463,7 @@ bool DialogBox_ItemUpgrade::on_click()
         if ((mouse_x >= sX + ui_layout::right_btn_x) && (mouse_x <= sX + ui_layout::right_btn_x + ui_layout::btn_size_x)
             && (mouse_y > sY + ui_layout::btn_y) && (mouse_y < sY + ui_layout::btn_y + ui_layout::btn_size_y))
         {
-            m_game->play_game_sound('E', 14, 5);
+            audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
             m_game->get_dialog_box_manager().disable_dialog_box(DialogBoxId::ItemUpgrade);
             return true;
         }
@@ -472,7 +473,7 @@ bool DialogBox_ItemUpgrade::on_click()
         // Normal item upgrade (Stone)
         if (mouse_in(link_normal_upgrade))
         {
-            m_game->play_game_sound('E', 14, 5);
+            audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
             int so_x = 0, so_m = 0;
             for (int i = 0; i < hb::shared::limits::MaxItems; i++)
                 if (player().m_item_list[i] != 0)
@@ -499,7 +500,7 @@ bool DialogBox_ItemUpgrade::on_click()
         // Majestic item upgrade (Gizon)
         if (mouse_in(link_majestic_upgrade))
         {
-            m_game->play_game_sound('E', 14, 5);
+            audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
             if (m_game->on_game()->m_gizon_item_upgrade_left > 0)
             {
                 m_mode = mode::gizon_upgrade;
@@ -515,7 +516,7 @@ bool DialogBox_ItemUpgrade::on_click()
         if ((mouse_x >= sX + ui_layout::right_btn_x) && (mouse_x <= sX + ui_layout::right_btn_x + ui_layout::btn_size_x)
             && (mouse_y >= sY + ui_layout::btn_y) && (mouse_y <= sY + ui_layout::btn_y + ui_layout::btn_size_y))
         {
-            m_game->play_game_sound('E', 14, 5);
+            audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
             m_game->get_dialog_box_manager().disable_dialog_box(DialogBoxId::ItemUpgrade);
             return true;
         }
@@ -525,8 +526,8 @@ bool DialogBox_ItemUpgrade::on_click()
         if ((item_index != -1) && (mouse_x >= sX + ui_layout::left_btn_x) && (mouse_x <= sX + ui_layout::left_btn_x + ui_layout::btn_size_x)
             && (mouse_y >= sY + ui_layout::btn_y) && (mouse_y <= sY + ui_layout::btn_y + ui_layout::btn_size_y))
         {
-            m_game->play_game_sound('E', 14, 5);
-            m_game->play_game_sound('E', 44, 0);
+            audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
+            audio_manager::get().play_game_sound(sound_type::effect, 44, 0);
             m_mode = mode::in_progress;
             m_upgrade_start_time = m_game->m_cur_time;
             return true;
@@ -534,7 +535,7 @@ bool DialogBox_ItemUpgrade::on_click()
         if ((mouse_x >= sX + ui_layout::right_btn_x) && (mouse_x <= sX + ui_layout::right_btn_x + ui_layout::btn_size_x)
             && (mouse_y >= sY + ui_layout::btn_y) && (mouse_y <= sY + ui_layout::btn_y + ui_layout::btn_size_y))
         {
-            m_game->play_game_sound('E', 14, 5);
+            audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
             m_game->get_dialog_box_manager().disable_dialog_box(DialogBoxId::ItemUpgrade);
             return true;
         }
@@ -558,14 +559,14 @@ bool DialogBox_ItemUpgrade::on_item_drop()
 		inventory_manager::get().unlock_item(m_selected_item_index);
 		m_selected_item_index = item_id;
 		inventory_manager::get().lock_item(item_id);
-		m_game->play_game_sound('E', 29, 0);
+		audio_manager::get().play_game_sound(sound_type::effect, 29, 0);
 		break;
 
 	case mode::stone_upgrade:
 		inventory_manager::get().unlock_item(m_selected_item_index);
 		m_selected_item_index = item_id;
 		inventory_manager::get().lock_item(item_id);
-		m_game->play_game_sound('E', 29, 0);
+		audio_manager::get().play_game_sound(sound_type::effect, 29, 0);
 		break;
 	}
 

@@ -15,6 +15,7 @@
 #include "TextFieldRenderer.h"
 #include "InputStateHelper.h"
 #include "Packet/SharedPackets.h"
+#include "AudioManager.h"
 #include <string>
 
 using namespace hb::shared::net;
@@ -82,7 +83,7 @@ void Overlay_ChangePassword::on_initialize()
 
     // === Buttons ===
     auto* btn_ok = m_controls.add<cc::button>(BTN_OK, cc::rect{dlgX + 44, dlgY + 208, ui_layout::btn_size_x, ui_layout::btn_size_y});
-    btn_ok->set_click_sound([this] { m_game->play_game_sound('E', 14, 5); });
+    btn_ok->set_click_sound([this] { audio_manager::get().play_game_sound(sound_type::effect, 14, 5); });
     btn_ok->set_on_click([this](int) {
         handle_submit();
     });
@@ -101,7 +102,7 @@ void Overlay_ChangePassword::on_initialize()
     });
 
     auto* btn_cancel = m_controls.add<cc::button>(BTN_CANCEL, cc::rect{dlgX + 217, dlgY + 208, ui_layout::btn_size_x, ui_layout::btn_size_y});
-    btn_cancel->set_click_sound([this] { m_game->play_game_sound('E', 14, 5); });
+    btn_cancel->set_click_sound([this] { audio_manager::get().play_game_sound(sound_type::effect, 14, 5); });
     btn_cancel->set_on_click([this](int) {
         clear_overlay();
     });

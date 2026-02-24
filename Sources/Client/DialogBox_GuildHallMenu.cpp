@@ -13,6 +13,7 @@
 #include "Packet/SharedPackets.h"
 #include "PacketSendHelpers.h"
 #include "Screen_OnGame.h"
+#include "AudioManager.h"
 
 
 using namespace hb::shared::net;
@@ -195,25 +196,25 @@ bool DialogBox_GuildHallMenu::on_click()
 			std::snprintf(req.name, sizeof(req.name), "%s", "Gail");
 			send_game_packet(req);
 		}
-			play_sound_effect('E', 14, 5);
+			audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 			return true;
 		}
 		if (mouse_in(link_2))
 		{
 			m_mode = mode::hire_soldier;
-			play_sound_effect('E', 14, 5);
+			audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 			return true;
 		}
 		if (mouse_in(link_3))
 		{
 			m_mode = mode::take_flag;
-			play_sound_effect('E', 14, 5);
+			audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 			return true;
 		}
 		if (mouse_in(link_4))
 		{
 			m_mode = mode::tutelary_angel;
-			play_sound_effect('E', 14, 5);
+			audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 			return true;
 		}
 		break;
@@ -251,7 +252,7 @@ bool DialogBox_GuildHallMenu::on_click()
 				req.item_id = 875;
 				send_game_packet(req);
 			}
-			play_sound_effect('E', 14, 5);
+			audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 		}
 		if (mouse_in(link_2)
 			&& (player().m_construction_point >= 3000) && (m_game->on_game()->m_is_crusade_mode == false))
@@ -264,7 +265,7 @@ bool DialogBox_GuildHallMenu::on_click()
 				req.item_id = 876;
 				send_game_packet(req);
 			}
-			play_sound_effect('E', 14, 5);
+			audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 		}
 		if (mouse_in(link_3)
 			&& (player().m_construction_point >= 1500) && (m_game->on_game()->m_is_crusade_mode == false))
@@ -277,7 +278,7 @@ bool DialogBox_GuildHallMenu::on_click()
 				req.item_id = 877;
 				send_game_packet(req);
 			}
-			play_sound_effect('E', 14, 5);
+			audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 		}
 		if (mouse_in(link_4)
 			&& (player().m_construction_point >= 3000) && (m_game->on_game()->m_is_crusade_mode == false))
@@ -290,7 +291,7 @@ bool DialogBox_GuildHallMenu::on_click()
 				req.item_id = 878;
 				send_game_packet(req);
 			}
-			play_sound_effect('E', 14, 5);
+			audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 		}
 		if (mouse_in(link_5)
 			&& (player().m_construction_point >= 4000) && (m_game->on_game()->m_is_crusade_mode == false))
@@ -303,7 +304,7 @@ bool DialogBox_GuildHallMenu::on_click()
 				req.item_id = 879;
 				send_game_packet(req);
 			}
-			play_sound_effect('E', 14, 5);
+			audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 		}
 		if (mouse_in(link_6)
 			&& (player().m_construction_point >= 3000) && (m_game->on_game()->m_is_crusade_mode == false))
@@ -316,7 +317,7 @@ bool DialogBox_GuildHallMenu::on_click()
 				req.item_id = 880;
 				send_game_packet(req);
 			}
-			play_sound_effect('E', 14, 5);
+			audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 		}
 		break;
 
@@ -325,7 +326,7 @@ bool DialogBox_GuildHallMenu::on_click()
 			&& (player().m_enemy_kill_count >= 3))
 		{
 			send_game_packet(hb::net::make_common_command(CommonType::ReqGetOccupyFlag, player().m_player_x, player().m_player_y));
-			play_sound_effect('E', 14, 5);
+			audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 		}
 		break;
 
@@ -341,7 +342,7 @@ bool DialogBox_GuildHallMenu::on_click()
 				req.angel_id = 1;
 				send_game_packet(req);
 			}
-			play_sound_effect('E', 14, 5);
+			audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 		}
 		if (mouse_in(link_angel_dex)
 			&& (m_game->on_game()->m_gizon_item_upgrade_left >= 5))
@@ -354,7 +355,7 @@ bool DialogBox_GuildHallMenu::on_click()
 				req.angel_id = 2;
 				send_game_packet(req);
 			}
-			play_sound_effect('E', 14, 5);
+			audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 		}
 		if (mouse_in(link_angel_int)
 			&& (m_game->on_game()->m_gizon_item_upgrade_left >= 5))
@@ -367,7 +368,7 @@ bool DialogBox_GuildHallMenu::on_click()
 				req.angel_id = 3;
 				send_game_packet(req);
 			}
-			play_sound_effect('E', 14, 5);
+			audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 		}
 		if (mouse_in(link_angel_mag)
 			&& (m_game->on_game()->m_gizon_item_upgrade_left >= 5))
@@ -380,7 +381,7 @@ bool DialogBox_GuildHallMenu::on_click()
 				req.angel_id = 4;
 				send_game_packet(req);
 			}
-			play_sound_effect('E', 14, 5);
+			audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 		}
 		break;
 	}

@@ -13,6 +13,7 @@
 #include <format>
 #include <string>
 #include "Screen_OnGame.h"
+#include "AudioManager.h"
 
 using namespace hb::shared::net;
 using namespace hb::client::sprite_id;
@@ -46,7 +47,7 @@ void DialogBox_HudPanel::toggle_dialog_with_sound(DialogBoxId::Type dialogId)
 		m_game->get_dialog_box_manager().disable_dialog_box(dialogId);
 	else
 		enable_dialog_box(dialogId, 0, 0, 0);
-	m_game->play_game_sound('E', 14, 5);
+	audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 }
 
 void DialogBox_HudPanel::draw_gauge_bars()
@@ -56,8 +57,9 @@ void DialogBox_HudPanel::draw_gauge_bars()
 	auto sprite = m_game->m_sprite[InterfaceNdIconPanel];
 
 	// HP bar
-	max_point = hb::shared::calc::CalculateMaxHP(player().m_vit, player().m_level,
-	                           player().m_str, player().m_angelic_str);
+	max_point = hb::shared::calc::max_hp(m_game->m_formula_engine,
+		hb::shared::calc::vit{(double)player().m_vit}, hb::shared::calc::level{(double)player().m_level},
+		hb::shared::calc::str{(double)player().m_str}, hb::shared::calc::angelic_str{(double)player().m_angelic_str});
 	if (max_point <= 0) max_point = 1;
 	display_value = std::min(player().m_hp, max_point);
 	bar_width = HP_MP_BAR_WIDTH - (display_value * HP_MP_BAR_WIDTH) / max_point;
@@ -82,8 +84,10 @@ void DialogBox_HudPanel::draw_gauge_bars()
 	}
 
 	// MP bar
-	max_point = hb::shared::calc::CalculateMaxMP(player().m_mag, player().m_angelic_mag,
-	                           player().m_level, player().m_int, player().m_angelic_int);
+	max_point = hb::shared::calc::max_mp(m_game->m_formula_engine,
+		hb::shared::calc::mag{(double)player().m_mag}, hb::shared::calc::angelic_mag{(double)player().m_angelic_mag},
+		hb::shared::calc::level{(double)player().m_level}, hb::shared::calc::intel{(double)player().m_int},
+		hb::shared::calc::angelic_int{(double)player().m_angelic_int});
 	if (max_point <= 0) max_point = 1;
 	display_value = std::min(player().m_mp, max_point);
 	bar_width = HP_MP_BAR_WIDTH - (display_value * HP_MP_BAR_WIDTH) / max_point;
@@ -97,7 +101,9 @@ void DialogBox_HudPanel::draw_gauge_bars()
 	hb::shared::text::draw_text(GameFont::Numbers, HP_NUM_X(), MP_NUM_Y(), statBuf.c_str(), hb::shared::text::TextStyle::from_color(GameColors::UIWhite));
 
 	// SP bar
-	max_point = hb::shared::calc::CalculateMaxSP(player().m_str, player().m_angelic_str, player().m_level);
+	max_point = hb::shared::calc::max_sp(m_game->m_formula_engine,
+		hb::shared::calc::str{(double)player().m_str}, hb::shared::calc::angelic_str{(double)player().m_angelic_str},
+		hb::shared::calc::level{(double)player().m_level});
 	if (max_point <= 0) max_point = 1;
 	display_value = std::min(player().m_sp, max_point);
 	bar_width = SP_BAR_WIDTH - (display_value * SP_BAR_WIDTH) / max_point;
@@ -252,7 +258,7 @@ bool DialogBox_HudPanel::on_click()
 		case 3: enable_dialog_box(DialogBoxId::CrusadeCommander, 0, 0, 0); break;
 		default: return false;
 		}
-		m_game->play_game_sound('E', 14, 5);
+		audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 		return true;
 	}
 
@@ -260,7 +266,7 @@ bool DialogBox_HudPanel::on_click()
 	if (is_in_button(BTN_COMBAT_X1(), BTN_COMBAT_X2()))
 	{
 		m_game->send_game_packet(hb::net::make_common_command(CommonType::ToggleCombatMode, m_game->m_player->m_player_x, m_game->m_player->m_player_y));
-		m_game->play_game_sound('E', 14, 5);
+		audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 		return true;
 	}
 

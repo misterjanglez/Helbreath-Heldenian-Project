@@ -7,6 +7,7 @@
 #include "lan_eng.h"
 #include "DialogBoxIDs.h"
 #include "DialogBox_Fishing.h"
+#include "AudioManager.h"
 #include <cstdio>
 #include <cstring>
 
@@ -69,18 +70,18 @@ void fishing_manager::handle_fish_success(char* data)
 {
 	if (!m_game) return;
 	m_game->add_event_list(NOTIFY_MSG_HANDLER55, 10);
-	m_game->play_game_sound('E', 23, 5);
-	m_game->play_game_sound('E', 17, 5);
+	audio_manager::get().play_game_sound(sound_type::effect, 23, 5);
+	audio_manager::get().play_game_sound(sound_type::effect, 17, 5);
 	switch (m_game->m_player->m_player_type) {
 	case 1:
 	case 2:
 	case 3:
-		m_game->play_game_sound('C', 21, 0);
+		audio_manager::get().play_game_sound(sound_type::character, 21, 0);
 		break;
 	case 4:
 	case 5:
 	case 6:
-		m_game->play_game_sound('C', 22, 0);
+		audio_manager::get().play_game_sound(sound_type::character, 22, 0);
 		break;
 	}
 }
@@ -89,5 +90,5 @@ void fishing_manager::handle_fish_fail(char* data)
 {
 	if (!m_game) return;
 	m_game->add_event_list(NOTIFY_MSG_HANDLER56, 10);
-	m_game->play_game_sound('E', 24, 5);
+	audio_manager::get().play_game_sound(sound_type::effect, 24, 5);
 }

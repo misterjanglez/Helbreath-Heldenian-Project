@@ -3,6 +3,7 @@
 #include "lan_eng.h"
 #include "IInput.h"
 #include "Screen_OnGame.h"
+#include "AudioManager.h"
 using namespace hb::client::sprite_id;
 
 DialogBox_Help::DialogBox_Help(CGame* game)
@@ -155,7 +156,7 @@ bool DialogBox_Help::on_click()
 	// Close button
 	if ((mouse_x >= sX + ui_layout::right_btn_x) && (mouse_x <= sX + ui_layout::right_btn_x + ui_layout::btn_size_x) &&
 	    (mouse_y > sY + ui_layout::btn_y) && (mouse_y < sY + ui_layout::btn_y + ui_layout::btn_size_y)) {
-		play_sound_effect('E', 14, 5);
+		audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 		disable_this_dialog();
 		return true;
 	}

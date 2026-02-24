@@ -14,6 +14,7 @@
 #include <format>
 #include <string>
 #include "IInput.h"
+#include "AudioManager.h"
 
 using namespace hb::shared::net;
 using namespace hb::shared::item;
@@ -315,10 +316,19 @@ void DialogBox_Character::on_draw()
 	put_aligned_string(sX + 180, sX + 250, sY + 142, statBuf.c_str(), GameColors::UILabel);
 
 	// Calculate max stats
-	int max_hp = hb::shared::calc::CalculateMaxHP(player().m_vit, player().m_level, player().m_str, player().m_angelic_str);
-	int max_mp = hb::shared::calc::CalculateMaxMP(player().m_mag, player().m_angelic_mag, player().m_level, player().m_int, player().m_angelic_int);
-	int max_sp = hb::shared::calc::CalculateMaxSP(player().m_str, player().m_angelic_str, player().m_level);
-	int max_load = hb::shared::calc::CalculateMaxLoad(player().m_str, player().m_angelic_str, player().m_level);
+	int max_hp = hb::shared::calc::max_hp(m_game->m_formula_engine,
+		hb::shared::calc::vit{(double)player().m_vit}, hb::shared::calc::level{(double)player().m_level},
+		hb::shared::calc::str{(double)player().m_str}, hb::shared::calc::angelic_str{(double)player().m_angelic_str});
+	int max_mp = hb::shared::calc::max_mp(m_game->m_formula_engine,
+		hb::shared::calc::mag{(double)player().m_mag}, hb::shared::calc::angelic_mag{(double)player().m_angelic_mag},
+		hb::shared::calc::level{(double)player().m_level}, hb::shared::calc::intel{(double)player().m_int},
+		hb::shared::calc::angelic_int{(double)player().m_angelic_int});
+	int max_sp = hb::shared::calc::max_sp(m_game->m_formula_engine,
+		hb::shared::calc::str{(double)player().m_str}, hb::shared::calc::angelic_str{(double)player().m_angelic_str},
+		hb::shared::calc::level{(double)player().m_level});
+	int max_load = hb::shared::calc::max_load(m_game->m_formula_engine,
+		hb::shared::calc::str{(double)player().m_str}, hb::shared::calc::angelic_str{(double)player().m_angelic_str},
+		hb::shared::calc::level{(double)player().m_level});
 
 	// HP, MP, SP
 	std::string valueBuf;
@@ -455,21 +465,21 @@ bool DialogBox_Character::on_click()
 	if (mouse_in(btn_quest)) {
 		enable_dialog_box(DialogBoxId::Quest, 1, 0, 0);
 		disable_this_dialog();
-		play_sound_effect('E', 14, 5);
+		audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 		return true;
 	}
 	// Party button
 	if (mouse_in(btn_party)) {
 		enable_dialog_box(DialogBoxId::Party, 0, 0, 0);
 		disable_this_dialog();
-		play_sound_effect('E', 14, 5);
+		audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 		return true;
 	}
 	// LevelUp button
 	if (mouse_in(btn_levelup)) {
 		enable_dialog_box(DialogBoxId::LevelUpSetting, 0, 0, 0);
 		disable_this_dialog();
-		play_sound_effect('E', 14, 5);
+		audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 		return true;
 	}
 
@@ -535,9 +545,9 @@ bool DialogBox_Character::on_double_click()
 				short id = item->m_id_num;
 				if (id == hb::shared::item::ItemId::AngelicPandentSTR || id == hb::shared::item::ItemId::AngelicPandentDEX ||
 					id == hb::shared::item::ItemId::AngelicPandentINT || id == hb::shared::item::ItemId::AngelicPandentMAG)
-					m_game->play_game_sound('E', 53, 0);
+					audio_manager::get().play_game_sound(sound_type::effect, 53, 0);
 				else
-					m_game->play_game_sound('E', 29, 0);
+					audio_manager::get().play_game_sound(sound_type::effect, 29, 0);
 			}
 
 			// Remove Angelic Stats

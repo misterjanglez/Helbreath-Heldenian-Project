@@ -1,4 +1,5 @@
 ﻿#include "Game.h"
+#include "SharedCalculations.h"
 #include "FloatingTextManager.h"
 #include "GameModeManager.h"
 #include "AudioManager.h"
@@ -42,13 +43,13 @@ void HandleTimeChange(CGame* game, char* data)
 	if (!pkt) return;
 	weather_manager::get().set_ambient_light(static_cast<char>(pkt->sprite_alpha));
 	switch (weather_manager::get().get_ambient_light()) {
-	case 1:	game->on_game()->m_is_xmas = false; game->play_game_sound('E', 32, 0); break;
-	case 2: game->on_game()->m_is_xmas = false; game->play_game_sound('E', 31, 0); break;
+	case 1:	game->on_game()->m_is_xmas = false; audio_manager::get().play_game_sound(sound_type::effect, 32, 0); break;
+	case 2: game->on_game()->m_is_xmas = false; audio_manager::get().play_game_sound(sound_type::effect, 31, 0); break;
 	case 3: // Snoopy Special night with chrismas bulbs
 		if (weather_manager::get().is_snowing()) game->on_game()->m_is_xmas = true;
 		else game->on_game()->m_is_xmas = false;
 		weather_manager::get().set_xmas(game->on_game()->m_is_xmas);
-		game->play_game_sound('E', 31, 0);
+		audio_manager::get().play_game_sound(sound_type::effect, 31, 0);
 		weather_manager::get().set_ambient_light(2); break;
 	}
 }
@@ -108,7 +109,7 @@ void HandleSettingSuccess(CGame* game, char* data)
 	txt = "Your stat has been changed.";
 	game->add_event_list(txt.c_str(), 10);
 	// CLEROTH - LU
-	game->m_player->m_lu_point = (game->m_player->m_level - 1) * 3 - ((game->m_player->m_str + game->m_player->m_vit + game->m_player->m_dex + game->m_player->m_int + game->m_player->m_mag + game->m_player->m_charisma) - 70);
+	game->m_player->m_lu_point = hb::shared::calc::level_up_points(game->m_formula_engine, hb::shared::calc::level{(double)game->m_player->m_level}, hb::shared::calc::total_stats{(double)(game->m_player->m_str + game->m_player->m_vit + game->m_player->m_dex + game->m_player->m_int + game->m_player->m_mag + game->m_player->m_charisma)});
 	game->m_player->m_lu_str = game->m_player->m_lu_vit = game->m_player->m_lu_dex = game->m_player->m_lu_int = game->m_player->m_lu_mag = game->m_player->m_lu_char = 0;
 }
 

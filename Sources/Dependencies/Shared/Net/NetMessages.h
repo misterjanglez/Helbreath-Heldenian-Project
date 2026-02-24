@@ -41,6 +41,7 @@ namespace MsgId
 		SkillConfigContents                     = 0x0FA314E1,
 		NpcConfigContents                       = 0x0FA314E4,
 		MapConfigContents                       = 0x0FA314E6,
+		BalanceConfigContents                   = 0x0FA314E7,
 		RequestConfigData                       = 0x0FA314E3,
 		NotifyConfigReload                      = 0x0FA314E5,
 		PlayerItemListContents                  = 0x0FA314DD,

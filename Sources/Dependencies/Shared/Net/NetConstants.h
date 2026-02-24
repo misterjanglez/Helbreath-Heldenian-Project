@@ -26,6 +26,7 @@ namespace hb::shared::limits
 	constexpr int MaxGuildsmen         = 128;
 	constexpr int MaxBuildItems        = 300;
 	constexpr int MaxPartyMembers      = 9;
+	constexpr int MaxCharactersPerAccount = 4;
 	constexpr int MaxCrusadeStructures = 300;
 } // namespace hb::shared::limits
 

@@ -46,6 +46,8 @@ extern bool G_bRunning;
 #include "PartyManager.h"
 #include "IOServicePool.h"
 #include "ConcurrentMsgQueue.h"
+#include "ServerConfig.h"
+#include "FormulaEngine.h"
 
 namespace hb::server::config
 {
@@ -276,8 +278,11 @@ public:
 
 	void reload_npc_configs();
 	void reload_shop_configs();
-	void send_config_reload_notification(bool items, bool magic, bool skills, bool npcs);
-	void push_config_reload_to_clients(bool items, bool magic, bool skills, bool npcs);
+	void send_config_reload_notification(bool items, bool magic, bool skills, bool npcs, bool balance = false);
+	void push_config_reload_to_clients(bool items, bool magic, bool skills, bool npcs, bool balance = false);
+	void apply_server_config(const server_config& cfg);
+	bool reload_server_config();
+	bool reload_formulas();
 
 
 	
@@ -470,7 +475,7 @@ public:
 	CGame();
 	virtual ~CGame();
 
-	// Realm configuration (from realmlist table)
+	// Realm configuration (from server_config.json)
 	char m_realm_name[32];
 	char m_login_listen_ip[16];
 	int  m_login_listen_port;
@@ -524,8 +529,10 @@ public:
 	class CSkill  * m_skill_config_list[hb::shared::limits::MaxSkillType];
 	//class CTeleport * m_pTeleportConfigList[DEF_MAXTELEPORTTYPE];
 
-	std::string m_config_hash[5];
+	std::string m_config_hash[6];
 	void compute_config_hashes();
+	void compute_balance_hash();
+	bool send_client_balance_config(int client_h);
 
 	class hb::shared::net::ASIOSocket* _lsock;
 
@@ -741,8 +748,11 @@ public:
 	char m_rep_drop_modifier;
 
 	// ============================================================================
-	// Configurable Settings (loaded from gameconfigs.db)
+	// Configurable Settings (loaded from server_config.json)
 	// ============================================================================
+
+	server_config m_server_config;
+	hb::shared::formula_engine m_formula_engine;
 
 	// Timing Settings (milliseconds)
 	int m_client_timeout;           // client-timeout-ms

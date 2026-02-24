@@ -12,6 +12,7 @@
 #include <string>
 #include "IInput.h"
 #include "Packet/SharedPackets.h"
+#include "AudioManager.h"
 
 using namespace hb::shared::net;
 using namespace hb::shared::item;
@@ -63,7 +64,7 @@ void DialogBox_Slates::on_draw()
 		break;
 
 	case mode::casting:
-		m_game->play_game_sound('E', 16, 0);
+		audio_manager::get().play_game_sound(sound_type::effect, 16, 0);
 		if (m_anim_amplitude != 0)
 		{
 			sX = m_x + adj_x + (m_anim_amplitude - (rand() % (m_anim_amplitude * 2)));
@@ -114,7 +115,7 @@ bool DialogBox_Slates::on_click()
 		if ((m_slot_ul != -1) && (m_slot_ll != -1) && (m_slot_ur != -1) && (m_slot_lr != -1)) {
 			if (mouse_in(link_cast)) {
 				m_mode = mode::casting;
-				play_sound_effect('E', 14, 5);
+				audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 			}
 		}
 		break;

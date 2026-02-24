@@ -13,6 +13,7 @@
 #include <format>
 #include <cstring>
 #include "IInput.h"
+#include "AudioManager.h"
 
 using namespace hb::shared::net;
 using namespace hb::client::sprite_id;
@@ -246,13 +247,13 @@ bool DialogBox_TesterMenu::on_click_main_menu(short sX, short sY)
 		{
 			m_selected_level = player().m_level;
 			m_page = 1;
-			play_sound_effect('E', 14, 5);
+			audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 			return true;
 		}
 		if (row == 8) // Create item
 		{
 			m_game->get_dialog_box_manager().enable_dialog_box(DialogBoxId::ItemCreator, 0, 0, 0);
-			play_sound_effect('E', 14, 5);
+			audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 			return true;
 		}
 		if (row == 9) // Teleport
@@ -261,7 +262,7 @@ bool DialogBox_TesterMenu::on_click_main_menu(short sX, short sY)
 			m_map_scroll = 0;
 			m_map_count = 0;
 			send_game_packet(hb::net::make_common_command(CommonType::TesterMapList, player().m_player_x, player().m_player_y));
-			play_sound_effect('E', 14, 5);
+			audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 			return true;
 		}
 
@@ -270,7 +271,7 @@ bool DialogBox_TesterMenu::on_click_main_menu(short sX, short sY)
 			pkt.v1 = row;
 			send_game_packet(pkt);
 		}
-		play_sound_effect('E', 14, 5);
+		audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 		return true;
 	}
 
@@ -279,7 +280,7 @@ bool DialogBox_TesterMenu::on_click_main_menu(short sX, short sY)
 		(mouse_y >= sY + ui_layout::btn_y) && (mouse_y <= sY + ui_layout::btn_y + ui_layout::btn_size_y))
 	{
 		disable_this_dialog();
-		play_sound_effect('E', 14, 5);
+		audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 		return true;
 	}
 
@@ -305,7 +306,7 @@ bool DialogBox_TesterMenu::on_click_level_picker(short sX, short sY)
 		if (mouse_x >= bx && mouse_x <= bx + btn_w && mouse_y >= btn_y && mouse_y <= btn_y + 18)
 		{
 			m_selected_level = std::clamp(m_selected_level + deltas[i], 1, 180);
-			play_sound_effect('E', 14, 5);
+			audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 			return true;
 		}
 	}
@@ -321,7 +322,7 @@ bool DialogBox_TesterMenu::on_click_level_picker(short sX, short sY)
 			send_game_packet(pkt);
 		}
 		m_page = 0;
-		play_sound_effect('E', 14, 5);
+		audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 		return true;
 	}
 
@@ -330,7 +331,7 @@ bool DialogBox_TesterMenu::on_click_level_picker(short sX, short sY)
 	if (mouse_x >= back_x && mouse_x <= back_x + 50 && mouse_y >= back_y && mouse_y <= back_y + 18)
 	{
 		m_page = 0;
-		play_sound_effect('E', 14, 5);
+		audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 		return true;
 	}
 
@@ -356,7 +357,7 @@ bool DialogBox_TesterMenu::on_click_teleport(short sX, short sY)
 				send_game_packet(pkt);
 			}
 			m_page = 0;
-			play_sound_effect('E', 14, 5);
+			audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 			return true;
 		}
 	}
@@ -366,7 +367,7 @@ bool DialogBox_TesterMenu::on_click_teleport(short sX, short sY)
 	if (mouse_x >= back_x && mouse_x <= back_x + 50 && mouse_y >= back_y && mouse_y <= back_y + 18)
 	{
 		m_page = 0;
-		play_sound_effect('E', 14, 5);
+		audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 		return true;
 	}
 

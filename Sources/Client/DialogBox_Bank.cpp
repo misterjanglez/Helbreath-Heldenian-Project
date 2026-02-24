@@ -12,6 +12,7 @@
 #include "TextInputManager.h"
 #include "Packet/SharedPackets.h"
 #include "PacketSendHelpers.h"
+#include "AudioManager.h"
 
 
 using namespace hb::shared::net;
@@ -235,7 +236,7 @@ bool DialogBox_Bank::on_click()
 			send_game_packet(req);
 		}
 					m_mode = mode::waiting;
-					play_sound_effect('E', 14, 5);
+					audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 				}
 				return true;
 			}
