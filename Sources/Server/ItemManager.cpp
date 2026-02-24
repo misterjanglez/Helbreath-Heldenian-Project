@@ -19,12 +19,14 @@
 #include "ObjectIDRange.h"
 #include "Skill.h"
 #include "GameConfigSqliteStore.h"
+#include "SharedCalculations.h"
 #include "Log.h"
 #include "ServerLogChannels.h"
 #include "StringCompat.h"
 #include "TimeUtils.h"
 
 using namespace hb::shared::net;
+using namespace hb::shared::direction;
 
 using hb::log_channel;
 using namespace hb::shared::action;
@@ -45,9 +47,9 @@ static std::string format_item_info(CItem* item)
 {
 	if (item == nullptr) return "(null)";
 	char buf[256];
-	std::snprintf(buf, sizeof(buf), "%s(count=%u attr=0x%08X touch=%d:%d:%d:%d)",
+	std::snprintf(buf, sizeof(buf), "%s(count=%llu attr=0x%08X touch=%d:%d:%d:%d)",
 		item->m_name,
-		item->m_count,
+		static_cast<unsigned long long>(item->m_count),
 		item->m_attribute,
 		item->m_touch_effect_type,
 		item->m_touch_effect_value1,
@@ -148,8 +150,6 @@ bool ItemManager::send_client_item_configs(int client_h)
 			entry.effectValue6 = item->m_item_effect_value6;
 			entry.maxLifeSpan = item->m_max_life_span;
 			entry.specialEffect = item->m_special_effect;
-			entry.sprite = item->m_sprite;
-			entry.spriteFrame = item->m_sprite_frame;
 			entry.price = item->m_is_for_sale ? static_cast<int32_t>(item->m_price) : -static_cast<int32_t>(item->m_price);
 			entry.weight = item->m_weight;
 			entry.apprValue = item->m_appearance_value;
@@ -161,6 +161,7 @@ bool ItemManager::send_client_item_configs(int client_h)
 			entry.relatedSkill = item->m_related_skill;
 			entry.category = item->m_category;
 			entry.itemColor = item->m_item_color;
+			entry.displayId = item->m_display_id;
 
 			entriesInPacket++;
 		}
@@ -243,8 +244,6 @@ bool ItemManager::init_item_attr(CItem* item, const char* item_name)
 				item->m_cur_life_span = item->m_max_life_span;
 				item->m_special_effect = m_game->m_item_config_list[i]->m_special_effect;
 
-				item->m_sprite = m_game->m_item_config_list[i]->m_sprite;
-				item->m_sprite_frame = m_game->m_item_config_list[i]->m_sprite_frame;
 				item->m_price = m_game->m_item_config_list[i]->m_price;
 				item->m_weight = m_game->m_item_config_list[i]->m_weight;
 				item->m_appearance_value = m_game->m_item_config_list[i]->m_appearance_value;
@@ -290,8 +289,6 @@ bool ItemManager::init_item_attr(CItem* item, int item_id)
 	item->m_max_life_span = config->m_max_life_span;
 	item->m_cur_life_span = item->m_max_life_span;
 	item->m_special_effect = config->m_special_effect;
-	item->m_sprite = config->m_sprite;
-	item->m_sprite_frame = config->m_sprite_frame;
 	item->m_price = config->m_price;
 	item->m_weight = config->m_weight;
 	item->m_appearance_value = config->m_appearance_value;
@@ -323,11 +320,11 @@ void ItemManager::drop_item_handler(int client_h, short item_index, int amount, 
 	if (((m_game->m_client_list[client_h]->m_item_list[item_index]->get_item_type() == ItemType::Consume) ||
 		(m_game->m_client_list[client_h]->m_item_list[item_index]->get_item_type() == ItemType::Arrow)) &&
 		(amount == -1))
-		amount = m_game->m_client_list[client_h]->m_item_list[item_index]->m_count;
+		amount = static_cast<int>(m_game->m_client_list[client_h]->m_item_list[item_index]->m_count);
 
 	if (((m_game->m_client_list[client_h]->m_item_list[item_index]->get_item_type() == ItemType::Consume) ||
 		(m_game->m_client_list[client_h]->m_item_list[item_index]->get_item_type() == ItemType::Arrow)) &&
-		(((int)m_game->m_client_list[client_h]->m_item_list[item_index]->m_count - amount) > 0)) {
+		(m_game->m_client_list[client_h]->m_item_list[item_index]->m_count > static_cast<uint64_t>(amount))) {
 		item = new CItem;
 		if (init_item_attr(item, m_game->m_client_list[client_h]->m_item_list[item_index]->m_name) == false) {
 			delete item;
@@ -338,10 +335,10 @@ void ItemManager::drop_item_handler(int client_h, short item_index, int amount, 
 				delete item;
 				return;
 			}
-			item->m_count = (uint32_t)amount;
+			item->m_count = amount;
 		}
 
-		if ((uint32_t)amount > m_game->m_client_list[client_h]->m_item_list[item_index]->m_count) {
+		if (static_cast<uint64_t>(amount) > m_game->m_client_list[client_h]->m_item_list[item_index]->m_count) {
 			delete item;
 			return;
 		}
@@ -412,7 +409,7 @@ void ItemManager::drop_item_handler(int client_h, short item_index, int amount, 
 	m_game->calc_total_weight(client_h);
 }
 
-int ItemManager::client_motion_get_item_handler(int client_h, short sX, short sY, char dir)
+int ItemManager::client_motion_get_item_handler(int client_h, short sX, short sY, direction dir)
 {
 	char  remain_item_color;
 	int   ret, erase_req;
@@ -507,7 +504,7 @@ bool ItemManager::add_client_item_list(int client_h, CItem* item, int* del_req)
 	if (item == 0) return false;
 
 	if ((item->get_item_type() == ItemType::Consume) || (item->get_item_type() == ItemType::Arrow)) {
-		if ((m_game->m_client_list[client_h]->m_cur_weight_load + get_item_weight(item, item->m_count)) > m_game->calc_max_load(client_h))
+		if ((m_game->m_client_list[client_h]->m_cur_weight_load + get_item_weight(item, static_cast<int>(item->m_count))) > m_game->calc_max_load(client_h))
 			return false;
 	}
 	else {
@@ -613,8 +610,6 @@ int ItemManager::add_client_bulk_item_list(int client_h, const char* item_name, 
 		pkt.gender_limit = first_item->m_gender_limit;
 		pkt.cur_lifespan = first_item->m_cur_life_span;
 		pkt.weight = first_item->m_weight;
-		pkt.sprite = first_item->m_sprite;
-		pkt.sprite_frame = first_item->m_sprite_frame;
 		pkt.item_color = first_item->m_item_color;
 		pkt.spec_value2 = static_cast<uint8_t>(first_item->m_item_special_effect_value2);
 		pkt.attribute = first_item->m_attribute;
@@ -799,18 +794,36 @@ bool ItemManager::equip_item_handler(int client_h, short item_index, bool notify
 	m_game->m_client_list[client_h]->m_item_equipment_status[to_int(equip_pos)] = item_index;
 	m_game->m_client_list[client_h]->m_is_item_equipped[item_index] = true;
 
-	hb::shared::entity::ApplyEquipAppearance(
-		m_game->m_client_list[client_h]->m_appearance,
-		equip_pos,
-		m_game->m_client_list[client_h]->m_item_list[item_index]->m_appearance_value,
-		m_game->m_client_list[client_h]->m_item_list[item_index]->m_item_color);
+	// Set item color and armor visibility for this equip slot
+	{
+		auto& appr = m_game->m_client_list[client_h]->m_appearance;
+		auto* item = m_game->m_client_list[client_h]->m_item_list[item_index];
+		uint8_t color = static_cast<uint8_t>(item->m_item_color);
+		switch (equip_pos) {
+		case EquipPos::Head:      appr.helm_color = color; break;
+		case EquipPos::Body:
+			appr.armor_color = color;
+			appr.hide_armor = (item->m_appearance_value >= 100);
+			break;
+		case EquipPos::Arms:      appr.arm_color = color; break;
+		case EquipPos::Pants:     appr.pants_color = color; break;
+		case EquipPos::Leggings:  appr.boots_color = color; break;
+		case EquipPos::LeftHand:  appr.shield_color = color; break;
+		case EquipPos::RightHand:
+		case EquipPos::TwoHand:   appr.weapon_color = color; break;
+		case EquipPos::Back:      appr.mantle_color = color; break;
+		case EquipPos::FullBody:  appr.mantle_color = 0; break;
+		default: break;
+		}
+	}
 
 	// Weapon-specific: compute attack delay and reset combo
 	if (equip_pos == EquipPos::RightHand || equip_pos == EquipPos::TwoHand) {
-		int speed = m_game->m_client_list[client_h]->m_item_list[item_index]->m_speed;
-		speed -= ((m_game->m_client_list[client_h]->m_str + m_game->m_client_list[client_h]->m_angelic_str) / 13);
-		if (speed < 0) speed = 0;
-		m_game->m_client_list[client_h]->m_status.attack_delay = static_cast<uint8_t>(speed);
+		m_game->m_client_list[client_h]->m_status.attack_delay = static_cast<uint8_t>(hb::shared::calc::attack_delay(
+			m_game->m_formula_engine,
+			hb::shared::calc::weapon_speed{(double)m_game->m_client_list[client_h]->m_item_list[item_index]->m_speed},
+			hb::shared::calc::str{(double)m_game->m_client_list[client_h]->m_str},
+			hb::shared::calc::angelic_str{(double)m_game->m_client_list[client_h]->m_angelic_str}));
 		m_game->m_client_list[client_h]->m_combo_attack_count = 0;
 	}
 
@@ -858,7 +871,8 @@ bool ItemManager::equip_item_handler(int client_h, short item_index, bool notify
 void ItemManager::request_purchase_item_handler(int client_h, const char* item_name, int num, int item_id)
 {
 	CItem* item;
-	uint32_t gold_count, item_count;
+	uint64_t gold_count;
+	uint32_t item_count;
 	uint16_t temp_price;
 	int   ret, erase_req, gold_weight;
 	int   cost, discount_ratio, discount_cost;
@@ -918,7 +932,7 @@ void ItemManager::request_purchase_item_handler(int client_h, const char* item_n
 
 			item->m_count = item_count;
 
-			cost = item->m_price * item->m_count;
+			cost = static_cast<int>(item->m_price * item->m_count);
 
 			gold_count = get_item_count_by_id(client_h, hb::shared::item::ItemId::Gold);
 
@@ -936,8 +950,9 @@ void ItemManager::request_purchase_item_handler(int client_h, const char* item_n
 			discount_cost = (int)tmp3;
 
 			if (discount_cost >= (cost / 2)) discount_cost = (cost / 2) - 1;
+			if (discount_cost < 0) discount_cost = 0;
 
-			if (gold_count < (uint32_t)(cost - discount_cost)) {
+			if (gold_count < static_cast<uint64_t>(cost - discount_cost)) {
 				delete item;
 
 				{
@@ -1019,7 +1034,7 @@ void ItemManager::give_item_handler(int client_h, short item_index, int amount, 
 
 	if (((m_game->m_client_list[client_h]->m_item_list[item_index]->get_item_type() == ItemType::Consume) ||
 		(m_game->m_client_list[client_h]->m_item_list[item_index]->get_item_type() == ItemType::Arrow)) &&
-		(m_game->m_client_list[client_h]->m_item_list[item_index]->m_count > (uint32_t)amount)) {
+		(m_game->m_client_list[client_h]->m_item_list[item_index]->m_count > static_cast<uint64_t>(amount))) {
 
 		item = new CItem;
 		if (init_item_attr(item, m_game->m_client_list[client_h]->m_item_list[item_index]->m_name) == false) {
@@ -1138,15 +1153,13 @@ void ItemManager::give_item_handler(int client_h, short item_index, int amount, 
 					}
 				}
 				else {
-					// NPC       .
-					m_game->m_map_list[m_game->m_client_list[client_h]->m_map_index]->set_item(m_game->m_client_list[client_h]->m_x, m_game->m_client_list[client_h]->m_y, item);
-
-					// v1.411  
-					item_log(ItemLogAction::Drop, client_h, 0, item);
-
-					m_game->send_event_to_near_client_type_b(MsgId::EventCommon, CommonType::ItemDrop, m_game->m_client_list[client_h]->m_map_index,
-						m_game->m_client_list[client_h]->m_x, m_game->m_client_list[client_h]->m_y,
-						item->m_id_num, 0, item->m_item_color, item->m_attribute); // v1.4 color
+					// NPC cannot receive items — restore count and reject
+					m_game->m_client_list[client_h]->m_item_list[item_index]->m_count += amount;
+					set_item_count(client_h, item_index, m_game->m_client_list[client_h]->m_item_list[item_index]->m_count);
+					m_game->send_notify_msg(0, client_h, Notify::CannotGiveItem, item_index, amount, 0, char_name);
+					delete item;
+					m_game->calc_total_weight(client_h);
+					return;
 				}
 			}
 		}
@@ -1199,6 +1212,8 @@ void ItemManager::give_item_handler(int client_h, short item_index, int amount, 
 		else {
 			// . @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 
+			bool guild_item_handled = false;
+
 			if (owner_type == hb::shared::owner_class::Player) {
 				memcpy(char_name, m_game->m_client_list[owner_h]->m_char_name, hb::shared::limits::CharNameLen - 1);
 				item = m_game->m_client_list[client_h]->m_item_list[item_index];
@@ -1216,11 +1231,11 @@ void ItemManager::give_item_handler(int client_h, short item_index, int amount, 
 
 						item_log(ItemLogAction::Deplete, client_h, (int)-1, item);
 
-						goto REMOVE_ITEM_PROCEDURE;
+						guild_item_handled = true;
 					}
 				}
 
-				if ((m_game->m_is_crusade_mode == false) && (m_game->m_client_list[client_h]->m_item_list[item_index]->m_id_num == 89)) {
+				if (!guild_item_handled && (m_game->m_is_crusade_mode == false) && (m_game->m_client_list[client_h]->m_item_list[item_index]->m_id_num == 89)) {
 
 					// client_h  owner_h   .
 					// owner_h  client_h    client_h
@@ -1232,51 +1247,53 @@ void ItemManager::give_item_handler(int client_h, short item_index, int amount, 
 
 						item_log(ItemLogAction::Deplete, client_h, (int)-1, item);
 
-						goto REMOVE_ITEM_PROCEDURE;
+						guild_item_handled = true;
 					}
 				}
 
-				if (add_client_item_list(owner_h, item, &erase_req)) {
+				if (!guild_item_handled) {
+					if (add_client_item_list(owner_h, item, &erase_req)) {
 
-					item_log(ItemLogAction::Give, client_h, owner_h, item);
+						item_log(ItemLogAction::Give, client_h, owner_h, item);
 
-					ret = send_item_notify_msg(owner_h, Notify::ItemObtained, item, 0);
-					switch (ret) {
-					case sock::Event::QueueFull:
-					case sock::Event::SocketError:
-					case sock::Event::CriticalError:
-					case sock::Event::SocketClosed:
-						m_game->delete_client(owner_h, true, true);
-						break;
+						ret = send_item_notify_msg(owner_h, Notify::ItemObtained, item, 0);
+						switch (ret) {
+						case sock::Event::QueueFull:
+						case sock::Event::SocketError:
+						case sock::Event::CriticalError:
+						case sock::Event::SocketClosed:
+							m_game->delete_client(owner_h, true, true);
+							break;
+						}
 					}
-				}
-				else {
-					m_game->m_map_list[m_game->m_client_list[client_h]->m_map_index]->set_item(m_game->m_client_list[client_h]->m_x,
-						m_game->m_client_list[client_h]->m_y,
-						m_game->m_client_list[client_h]->m_item_list[item_index]);
-					item_log(ItemLogAction::Drop, client_h, 0, m_game->m_client_list[client_h]->m_item_list[item_index]);
+					else {
+						m_game->m_map_list[m_game->m_client_list[client_h]->m_map_index]->set_item(m_game->m_client_list[client_h]->m_x,
+							m_game->m_client_list[client_h]->m_y,
+							m_game->m_client_list[client_h]->m_item_list[item_index]);
+						item_log(ItemLogAction::Drop, client_h, 0, m_game->m_client_list[client_h]->m_item_list[item_index]);
 
-					m_game->send_event_to_near_client_type_b(MsgId::EventCommon, CommonType::ItemDrop, m_game->m_client_list[client_h]->m_map_index,
-						m_game->m_client_list[client_h]->m_x, m_game->m_client_list[client_h]->m_y,
-						m_game->m_client_list[client_h]->m_item_list[item_index]->m_id_num,
-						0,
-						m_game->m_client_list[client_h]->m_item_list[item_index]->m_item_color,
-						m_game->m_client_list[client_h]->m_item_list[item_index]->m_attribute); // v1.4 color
+						m_game->send_event_to_near_client_type_b(MsgId::EventCommon, CommonType::ItemDrop, m_game->m_client_list[client_h]->m_map_index,
+							m_game->m_client_list[client_h]->m_x, m_game->m_client_list[client_h]->m_y,
+							m_game->m_client_list[client_h]->m_item_list[item_index]->m_id_num,
+							0,
+							m_game->m_client_list[client_h]->m_item_list[item_index]->m_item_color,
+							m_game->m_client_list[client_h]->m_item_list[item_index]->m_attribute); // v1.4 color
 
-					{
-						ret = send_item_notify_msg(owner_h, Notify::CannotCarryMoreItem, 0, 0);
+						{
+							ret = send_item_notify_msg(owner_h, Notify::CannotCarryMoreItem, 0, 0);
+						}
+
+						switch (ret) {
+						case sock::Event::QueueFull:
+						case sock::Event::SocketError:
+						case sock::Event::CriticalError:
+						case sock::Event::SocketClosed:
+							m_game->delete_client(owner_h, true, true);
+							break;
+						}
+
+						std::memset(char_name, 0, sizeof(char_name));
 					}
-
-					switch (ret) {
-					case sock::Event::QueueFull:
-					case sock::Event::SocketError:
-					case sock::Event::CriticalError:
-					case sock::Event::SocketClosed:
-						m_game->delete_client(owner_h, true, true);
-						break;
-					}
-
-					std::memset(char_name, 0, sizeof(char_name));
 				}
 			}
 			else {
@@ -1338,30 +1355,50 @@ void ItemManager::give_item_handler(int client_h, short item_index, int amount, 
 
 					}
 				}
+				else if (m_game->m_npc_list[owner_h]->m_type == 26) { // Kennedy (GuildHall Officer)
+					if ((m_game->m_is_crusade_mode == false) && (m_game->m_client_list[client_h]->m_item_list[item_index]->m_id_num == hb::shared::item::ItemId::GuildSecessionTicket)) {
+
+						if ((m_game->m_client_list[client_h]->m_guild_rank == 0) || (m_game->m_client_list[client_h]->m_guild_rank == -1)) {
+							// Guild master cannot leave via ticket (must disband), guildless players can't use it
+							m_game->send_notify_msg(0, client_h, Notify::CannotGiveItem, item_index, amount, 0, char_name);
+							m_game->calc_total_weight(client_h);
+							return;
+						}
+
+						m_game->send_notify_msg(client_h, client_h, CommonType::DismissGuildApprove, 0, 0, 0, 0);
+
+						std::memset(m_game->m_client_list[client_h]->m_guild_name, 0, sizeof(m_game->m_client_list[client_h]->m_guild_name));
+						memcpy(m_game->m_client_list[client_h]->m_guild_name, "NONE", 4);
+						m_game->m_client_list[client_h]->m_guild_rank = -1;
+						m_game->m_client_list[client_h]->m_guild_guid = -1;
+
+						m_game->send_event_to_near_client_type_a(client_h, hb::shared::owner_class::Player, MsgId::EventMotion, Type::NullAction, 0, 0, 0);
+
+						m_game->m_client_list[client_h]->m_exp -= 300;
+						if (m_game->m_client_list[client_h]->m_exp < 0) m_game->m_client_list[client_h]->m_exp = 0;
+						m_game->send_notify_msg(0, client_h, Notify::Exp, 0, 0, 0, 0);
+
+						delete m_game->m_client_list[client_h]->m_item_list[item_index];
+					}
+					else {
+						// Kennedy only accepts secession tickets — reject other items
+						m_game->send_notify_msg(0, client_h, Notify::CannotGiveItem, item_index, amount, 0, char_name);
+						m_game->calc_total_weight(client_h);
+						return;
+					}
+				}
 				else {
-					// NPC       .
-
-					m_game->m_map_list[m_game->m_client_list[client_h]->m_map_index]->set_item(m_game->m_client_list[client_h]->m_x,
-						m_game->m_client_list[client_h]->m_y,
-						m_game->m_client_list[client_h]->m_item_list[item_index]);
-
-					item_log(ItemLogAction::Drop, client_h, 0, m_game->m_client_list[client_h]->m_item_list[item_index]);
-
-					m_game->send_event_to_near_client_type_b(MsgId::EventCommon, CommonType::ItemDrop, m_game->m_client_list[client_h]->m_map_index,
-						m_game->m_client_list[client_h]->m_x, m_game->m_client_list[client_h]->m_y,
-						m_game->m_client_list[client_h]->m_item_list[item_index]->m_id_num,
-						0,
-						m_game->m_client_list[client_h]->m_item_list[item_index]->m_item_color,
-						m_game->m_client_list[client_h]->m_item_list[item_index]->m_attribute); // v1.4 color
-
-					std::memset(char_name, 0, sizeof(char_name));
+					// NPC cannot receive items — reject and keep item in inventory
+					m_game->send_notify_msg(0, client_h, Notify::CannotGiveItem, item_index, amount, 0, char_name);
+					m_game->calc_total_weight(client_h);
+					return;
 				}
 			}
 
-			m_game->send_notify_msg(0, client_h, Notify::GiveItemFinEraseItem, item_index, amount, 0, char_name);
+			if (!guild_item_handled) {
+				m_game->send_notify_msg(0, client_h, Notify::GiveItemFinEraseItem, item_index, amount, 0, char_name);
+			}
 		}
-
-	REMOVE_ITEM_PROCEDURE:
 
 		if (m_game->m_client_list[client_h] == 0) return;
 
@@ -1375,7 +1412,7 @@ void ItemManager::give_item_handler(int client_h, short item_index, int amount, 
 	m_game->calc_total_weight(client_h);
 }
 
-int ItemManager::set_item_count(int client_h, int item_index, uint32_t count)
+int ItemManager::set_item_count(int client_h, int item_index, uint64_t count)
 {
 	uint16_t weight;
 
@@ -1395,7 +1432,7 @@ int ItemManager::set_item_count(int client_h, int item_index, uint32_t count)
 	return weight;
 }
 
-uint32_t ItemManager::get_item_count_by_id(int client_h, short item_id)
+uint64_t ItemManager::get_item_count_by_id(int client_h, short item_id)
 {
 	if (m_game->m_client_list[client_h] == nullptr) return 0;
 
@@ -1409,7 +1446,7 @@ uint32_t ItemManager::get_item_count_by_id(int client_h, short item_id)
 	return 0;
 }
 
-int ItemManager::set_item_count_by_id(int client_h, short item_id, uint32_t count)
+int ItemManager::set_item_count_by_id(int client_h, short item_id, uint64_t count)
 {
 	if (m_game->m_client_list[client_h] == nullptr) return -1;
 
@@ -1459,57 +1496,38 @@ void ItemManager::release_item_handler(int client_h, short item_index, bool noti
 		}
 	}
 
-	// Appr .
+	// Clear color and flags for unequipped slot
 	switch (equip_pos) {
 	case EquipPos::RightHand:
-		m_game->m_client_list[client_h]->m_appearance.weapon_type = 0;
 		m_game->m_client_list[client_h]->m_appearance.weapon_color = 0;
 		m_game->m_client_list[client_h]->m_status.attack_delay = 0;
 		break;
-
 	case EquipPos::LeftHand:
-		m_game->m_client_list[client_h]->m_appearance.shield_type = 0;
 		m_game->m_client_list[client_h]->m_appearance.shield_color = 0;
 		break;
-
 	case EquipPos::TwoHand:
-		m_game->m_client_list[client_h]->m_appearance.weapon_type = 0;
 		m_game->m_client_list[client_h]->m_appearance.weapon_color = 0;
 		break;
-
 	case EquipPos::Body:
-		m_game->m_client_list[client_h]->m_appearance.armor_type = 0;
 		m_game->m_client_list[client_h]->m_appearance.hide_armor = false;
 		m_game->m_client_list[client_h]->m_appearance.armor_color = 0;
 		break;
-
 	case EquipPos::Back:
-		m_game->m_client_list[client_h]->m_appearance.mantle_type = 0;
 		m_game->m_client_list[client_h]->m_appearance.mantle_color = 0;
 		break;
-
 	case EquipPos::Arms:
-		m_game->m_client_list[client_h]->m_appearance.arm_armor_type = 0;
 		m_game->m_client_list[client_h]->m_appearance.arm_color = 0;
 		break;
-
 	case EquipPos::Pants:
-		m_game->m_client_list[client_h]->m_appearance.pants_type = 0;
 		m_game->m_client_list[client_h]->m_appearance.pants_color = 0;
 		break;
-
 	case EquipPos::Leggings:
-		m_game->m_client_list[client_h]->m_appearance.boots_type = 0;
 		m_game->m_client_list[client_h]->m_appearance.boots_color = 0;
 		break;
-
 	case EquipPos::Head:
-		m_game->m_client_list[client_h]->m_appearance.helm_type = 0;
 		m_game->m_client_list[client_h]->m_appearance.helm_color = 0;
 		break;
-
 	case EquipPos::FullBody:
-		m_game->m_client_list[client_h]->m_appearance.armor_type = 0;
 		m_game->m_client_list[client_h]->m_appearance.mantle_color = 0;
 		break;
 	}
@@ -1568,7 +1586,7 @@ void ItemManager::request_retrieve_item_handler(int client_h, char* data)
 		else item_weight = get_item_weight(m_game->m_client_list[client_h]->m_item_in_bank_list[bank_item_index], 1); //m_game->m_client_list[client_h]->m_item_in_bank_list[bank_item_index]->m_weight;
 		*/
 		// v1.432
-		item_weight = get_item_weight(m_game->m_client_list[client_h]->m_item_in_bank_list[bank_item_index], m_game->m_client_list[client_h]->m_item_in_bank_list[bank_item_index]->m_count);
+		item_weight = get_item_weight(m_game->m_client_list[client_h]->m_item_in_bank_list[bank_item_index], static_cast<int>(m_game->m_client_list[client_h]->m_item_in_bank_list[bank_item_index]->m_count));
 
 		if ((item_weight + m_game->m_client_list[client_h]->m_cur_weight_load) > m_game->calc_max_load(client_h)) {
 		// Notify cannot carry more items.
@@ -1627,10 +1645,9 @@ void ItemManager::request_retrieve_item_handler(int client_h, char* data)
 					return;
 				}
 
-			goto RRIH_NOQUANTITY;
 		}
-		else {
-		RRIH_NOQUANTITY:
+
+		{
 			for(int i = 0; i < hb::shared::limits::MaxItems; i++)
 				if (m_game->m_client_list[client_h]->m_item_list[i] == 0) {
 					m_game->m_client_list[client_h]->m_item_list[i] = m_game->m_client_list[client_h]->m_item_in_bank_list[bank_item_index];
@@ -1727,8 +1744,6 @@ bool ItemManager::set_item_to_bank_item(int client_h, short item_index)
 				pkt.gender_limit = item->m_gender_limit;
 				pkt.cur_lifespan = item->m_cur_life_span;
 				pkt.weight = item->m_weight;
-				pkt.sprite = item->m_sprite;
-				pkt.sprite_frame = item->m_sprite_frame;
 				pkt.item_color = item->m_item_color;
 				pkt.item_effect_value2 = item->m_item_effect_value2;
 				pkt.attribute = item->m_attribute;
@@ -2099,8 +2114,9 @@ void ItemManager::use_item_handler(int client_h, short item_index, short dX, sho
 
 			if (m_game->m_client_list[client_h]->m_is_poisoned) {
 				m_game->m_client_list[client_h]->m_is_poisoned = false;
-				m_game->m_status_effect_manager->set_poison_flag(client_h, hb::shared::owner_class::Player, false); // removes poison aura when using a revitalizing potion
+				m_game->m_status_effect_manager->set_poison_flag(client_h, hb::shared::owner_class::Player, false);
 				m_game->send_notify_msg(0, client_h, Notify::MagicEffectOff, hb::shared::magic::Poison, 0, 0, 0);
+				m_game->send_notify_msg(0, client_h, Notify::NoticeMsg, 0, 0, 0, "Poison has been cured.");
 			}
 			break;
 
@@ -2261,38 +2277,126 @@ void ItemManager::use_item_handler(int client_h, short item_index, short dX, sho
 				break;
 
 			case 4:
-				temp_short = m_game->m_client_list[client_h]->m_appearance.helm_type;
-				if (temp_short == 0) {
-					// temp_short 0  , ,     .    .
-					if (m_game->m_client_list[client_h]->m_sex == 1)
-						m_game->m_client_list[client_h]->m_sex = 2;
-					else m_game->m_client_list[client_h]->m_sex = 1;
+			{
+				auto* client = m_game->m_client_list[client_h];
 
-					// Appearance , .
-					if (m_game->m_client_list[client_h]->m_sex == 1) {
-						tmp_type = 1;
-					}
-					else if (m_game->m_client_list[client_h]->m_sex == 2) {
-						tmp_type = 4;
-					}
+				// Toggle sex
+				if (client->m_sex == 1)
+					client->m_sex = 2;
+				else
+					client->m_sex = 1;
 
-					switch (m_game->m_client_list[client_h]->m_skin) {
-					case 1:
-						break;
-					case 2:
-						tmp_type += 1;
-						break;
-					case 3:
-						tmp_type += 2;
-						break;
-					}
-
-					m_game->m_client_list[client_h]->m_type = tmp_type;
-					m_game->m_client_list[client_h]->m_appearance.hair_style = m_game->m_client_list[client_h]->m_hair_style;
-					m_game->m_client_list[client_h]->m_appearance.hair_color = m_game->m_client_list[client_h]->m_hair_color;
-					m_game->m_client_list[client_h]->m_appearance.underwear_type = m_game->m_client_list[client_h]->m_underwear;
+				// Update character type based on new sex + skin
+				tmp_type = (client->m_sex == 1) ? 1 : 4;
+				switch (client->m_skin)
+				{
+				case 2: tmp_type += 1; break;
+				case 3: tmp_type += 2; break;
 				}
+				client->m_type = tmp_type;
+				client->m_appearance.hair_style = client->m_hair_style;
+				client->m_appearance.hair_color = client->m_hair_color;
+				client->m_appearance.underwear_type = client->m_underwear;
+
+				// Swap all gendered hero items (403-426) to the correct sex variant.
+				// Covers inventory (including equipped) and warehouse.
+				bool is_female = (client->m_sex == 2);
+				constexpr int gendered_first = ItemId::AresdenHeroHelmM;
+				constexpr int gendered_last = ItemId::ElvineHeroLeggingsW;
+				constexpr int group_size = 4;
+
+				auto swap_hero_item = [&](CItem* item) -> bool
+				{
+					if (item == nullptr) return false;
+					if (item->m_id_num < gendered_first || item->m_id_num > gendered_last) return false;
+
+					int group_base = gendered_first
+						+ ((item->m_id_num - gendered_first) / group_size) * group_size;
+					int current_offset = item->m_id_num - group_base;
+					int side_offset = (current_offset >= 2) ? 2 : 0;
+					int sex_offset = is_female ? 1 : 0;
+					int new_id = group_base + side_offset + sex_offset;
+
+					if (new_id == item->m_id_num) return false;
+
+					CItem* config = m_game->m_item_config_list[new_id];
+					if (config == nullptr) return false;
+
+					std::memcpy(item->m_name, config->m_name, sizeof(item->m_name));
+					item->m_id_num = config->m_id_num;
+					item->m_gender_limit = config->m_gender_limit;
+					item->m_appearance_value = config->m_appearance_value;
+					return true;
+				};
+
+				// Swap inventory items and notify client in-place (preserves positions)
+				for (int i = 0; i < hb::shared::limits::MaxItems; i++)
+				{
+					if (swap_hero_item(client->m_item_list[i]))
+					{
+						CItem* item = client->m_item_list[i];
+						m_game->send_notify_msg(
+							0, client_h, Notify::GizoneItemChange,
+							i, item->m_item_type, item->m_cur_life_span, item->m_name,
+							0, 0,
+							item->m_item_color, item->m_item_special_effect_value2,
+							item->m_attribute, item->m_id_num);
+					}
+				}
+
+				// Swap bank items and notify client per-item
+				for (int i = 0; i < hb::shared::limits::MaxBankItems; i++)
+				{
+					if (swap_hero_item(client->m_item_in_bank_list[i]))
+					{
+						CItem* item = client->m_item_in_bank_list[i];
+						hb::net::PacketNotifyItemToBank pkt{};
+						pkt.header.msg_id = MsgId::Notify;
+						pkt.header.msg_type = Notify::ItemToBank;
+						pkt.bank_index = static_cast<uint8_t>(i);
+						pkt.is_new = 0;
+						std::memcpy(pkt.name, item->m_name, sizeof(pkt.name));
+						pkt.count = item->m_count;
+						pkt.item_type = item->m_item_type;
+						pkt.equip_pos = item->m_equip_pos;
+						pkt.is_equipped = 0;
+						pkt.level_limit = item->m_level_limit;
+						pkt.gender_limit = item->m_gender_limit;
+						pkt.cur_lifespan = item->m_cur_life_span;
+						pkt.weight = item->m_weight;
+						pkt.item_color = item->m_item_color;
+						pkt.item_effect_value2 = item->m_item_effect_value2;
+						pkt.attribute = item->m_attribute;
+						pkt.spec_effect_value2 = static_cast<uint8_t>(item->m_item_special_effect_value2);
+						pkt.item_id = item->m_id_num;
+						pkt.max_lifespan = item->m_max_life_span;
+						client->m_socket->send_msg(
+							reinterpret_cast<char*>(&pkt), sizeof(pkt));
+					}
+				}
+
+				// Unequip all non-hero equipped items (except neck, rings, angels)
+				// so the client refreshes their sprites with the new gender.
+				// Hero items are already swapped above. Accessories have no gender sprites.
+				for (int i = 0; i < hb::shared::limits::MaxItems; i++)
+				{
+					if (client->m_item_list[i] == nullptr) continue;
+					if (client->m_is_item_equipped[i] == false) continue;
+
+					// Skip hero items (already handled by swap above)
+					int id = client->m_item_list[i]->m_id_num;
+					if (id >= gendered_first && id <= gendered_last) continue;
+
+					// Skip accessories: neck, rings, angel pendants
+					EquipPos pos = client->m_item_list[i]->get_equip_pos();
+					if (pos == EquipPos::Neck || pos == EquipPos::RightFinger || pos == EquipPos::LeftFinger) continue;
+
+					release_item_handler(client_h, static_cast<short>(i), false);
+					m_game->send_notify_msg(0, client_h, Notify::ItemReleased, static_cast<int>(pos), i, 0, 0);
+				}
+
 				break;
+			}
 			}
 
 			m_game->send_event_to_near_client_type_a(client_h, hb::shared::owner_class::Player, MsgId::EventMotion, Type::NullAction, 0, 0, 0);
@@ -2425,8 +2529,6 @@ bool ItemManager::set_item_to_bank_item(int client_h, CItem* item)
 				pkt.gender_limit = item->m_gender_limit;
 				pkt.cur_lifespan = item->m_cur_life_span;
 				pkt.weight = item->m_weight;
-				pkt.sprite = item->m_sprite;
-				pkt.sprite_frame = item->m_sprite_frame;
 				pkt.item_color = item->m_item_color;
 				pkt.item_effect_value2 = item->m_item_effect_value2;
 				pkt.attribute = item->m_attribute;
@@ -2552,6 +2654,13 @@ void ItemManager::req_sell_item_handler(int client_h, char item_id, char sell_to
 	if (m_game->m_client_list[client_h]->m_item_list[item_id] == 0) return;
 	if (num <= 0) return;
 	if (m_game->m_client_list[client_h]->m_item_list[item_id]->m_count < static_cast<uint32_t>(num)) return;
+
+	// Can't sell gold
+	if (m_game->m_client_list[client_h]->m_item_list[item_id]->m_id_num == hb::shared::item::ItemId::Gold)
+	{
+		m_game->send_notify_msg(0, client_h, Notify::CannotSellItem, item_id, 1, 0, m_game->m_client_list[client_h]->m_item_list[item_id]->m_name);
+		return;
+	}
 
 	m_game->calc_total_weight(client_h);
 
@@ -2720,6 +2829,9 @@ void ItemManager::req_sell_item_confirm_handler(int client_h, char item_id, int 
 	if (num <= 0) return;
 	if (m_game->m_client_list[client_h]->m_item_list[item_id]->m_count < static_cast<uint32_t>(num)) return;
 
+	// Can't sell gold
+	if (m_game->m_client_list[client_h]->m_item_list[item_id]->m_id_num == hb::shared::item::ItemId::Gold) return;
+
 	// New 18/05/2004
 	if (m_game->m_client_list[client_h]->m_is_processing_allowed == false) return;
 
@@ -2731,7 +2843,21 @@ void ItemManager::req_sell_item_confirm_handler(int client_h, char item_id, int 
 	if (memcmp(m_game->m_client_list[client_h]->m_location, "NONE", 4) == 0) neutral = true;
 
 	price = 0;
-	if ((item_category >= 1) && (item_category <= 10)) {
+	if (m_game->m_client_list[client_h]->m_item_list[item_id]->get_item_type() == ItemType::Arrow) {
+		// Arrows sell at 1 gold per arrow
+		price = num;
+
+		if (neutral) price = price / 2;
+		if (price <= 0) price = 1;
+		if (price > 1000000) price = 1000000;
+
+		m_game->send_notify_msg(0, client_h, Notify::ItemSold, item_id, 0, 0, 0);
+
+		item_log(ItemLogAction::Sell, client_h, (int)-1, m_game->m_client_list[client_h]->m_item_list[item_id]);
+
+		set_item_count(client_h, item_id, m_game->m_client_list[client_h]->m_item_list[item_id]->m_count - num);
+	}
+	else if ((item_category >= 1) && (item_category <= 10)) {
 		remain_life = m_game->m_client_list[client_h]->m_item_list[item_id]->m_cur_life_span;
 
 		if (remain_life <= 0) {
@@ -2922,7 +3048,7 @@ void ItemManager::req_sell_item_confirm_handler(int client_h, char item_id, int 
 void ItemManager::req_repair_item_handler(int client_h, char item_id, char repair_whom, const char* string)
 {
 	char item_category;
-	short remain_life, price;
+	int32_t remain_life, price;
 	double d1, d2, d3;
 
 	if (m_game->m_client_list[client_h] == 0) return;
@@ -2959,7 +3085,7 @@ void ItemManager::req_repair_item_handler(int client_h, char item_id, char repai
 	}
 	else if (((item_category >= 43) && (item_category <= 50)) || ((item_category >= 11) && (item_category <= 12))) {
 
-		if (repair_whom != 15) {
+		if (repair_whom != 24) {
 			m_game->send_notify_msg(0, client_h, Notify::CannotRepairItem, item_id, 2, 0, m_game->m_client_list[client_h]->m_item_list[item_id]->m_name);
 			return;
 		}
@@ -2989,10 +3115,10 @@ void ItemManager::req_repair_item_handler(int client_h, char item_id, char repai
 
 void ItemManager::req_repair_item_cofirm_handler(int client_h, char item_id, const char* string)
 {
-	short    remain_life, price;
+	int32_t  remain_life, price;
 	char item_category;
 	double   d1, d2, d3;
-	uint32_t gold_count;
+	uint64_t gold_count;
 	int      ret, gold_weight;
 
 	if (m_game->m_client_list[client_h] == 0) return;
@@ -3031,7 +3157,7 @@ void ItemManager::req_repair_item_cofirm_handler(int client_h, char item_id, con
 		// price         .
 		gold_count = get_item_count_by_id(client_h, hb::shared::item::ItemId::Gold);
 
-		if (gold_count < (uint32_t)price) {
+		if (gold_count < static_cast<uint64_t>(price)) {
 			// Gold     .   .
 			{
 				hb::net::PacketNotifyNotEnoughGold pkt{};
@@ -3715,7 +3841,6 @@ bool ItemManager::deplete_dest_type_item_use_effect(int client_h, int dX, int dY
 void ItemManager::get_hero_mantle_handler(int client_h, int item_id, const char* string)
 {
 	int   num, ret, erase_req;
-	char item_name[hb::shared::limits::ItemNameLen];
 	CItem* item;
 
 	if (m_game->m_client_list[client_h] == 0) return;
@@ -3808,14 +3933,34 @@ void ItemManager::get_hero_mantle_handler(int client_h, int item_id, const char*
 		break;
 	}
 
-	std::memset(item_name, 0, sizeof(item_name));
-	memcpy(item_name, m_game->m_item_config_list[item_id]->m_name, hb::shared::limits::ItemNameLen - 1);
-	// ReqPurchaseItemHandler
+	// Server-authoritative correction for all hero items.
+	// Don't trust the client's item_id — derive the correct variant
+	// from the server's own m_side and m_sex.
+	bool is_elvine = (m_game->m_client_list[client_h]->m_side == 2);
+	bool is_female = (m_game->m_client_list[client_h]->m_sex == 2);
+
+	// Cape (400-401): [Aresden, Elvine] — no sex variant
+	if (item_id == ItemId::AresdenHeroCape || item_id == ItemId::ElvineHeroCape)
+	{
+		item_id = is_elvine ? ItemId::ElvineHeroCape : ItemId::AresdenHeroCape;
+	}
+	// Gendered items (403-426): groups of 4 [Aresden M, Aresden W, Elvine M, Elvine W]
+	else if (item_id >= ItemId::AresdenHeroHelmM && item_id <= ItemId::ElvineHeroLeggingsW)
+	{
+		constexpr int gendered_first = ItemId::AresdenHeroHelmM;
+		constexpr int group_size = 4;
+		int group_base = gendered_first
+			+ ((item_id - gendered_first) / group_size) * group_size;
+		int side_offset = is_elvine ? 2 : 0;
+		int sex_offset = is_female ? 1 : 0;
+		item_id = group_base + side_offset + sex_offset;
+	}
+
 	num = 1;
 	for(int i = 1; i <= num; i++)
 	{
 		item = new CItem;
-		if (init_item_attr(item, item_name) == false)
+		if (init_item_attr(item, item_id) == false)
 		{
 			delete item;
 		}
@@ -3824,7 +3969,7 @@ void ItemManager::get_hero_mantle_handler(int client_h, int item_id, const char*
 			if (add_client_item_list(client_h, item, &erase_req)) {
 				if (m_game->m_client_list[client_h]->m_cur_weight_load < 0) m_game->m_client_list[client_h]->m_cur_weight_load = 0;
 
-				hb::logger::log<log_channel::events>("get HeroItem : Char({}) Player-EK({}) Player-Contr({}) Hero Obtained({})", m_game->m_client_list[client_h]->m_char_name, m_game->m_client_list[client_h]->m_enemy_kill_count, m_game->m_client_list[client_h]->m_contribution, item_name);
+				hb::logger::log<log_channel::events>("get HeroItem : Char({}) Player-EK({}) Player-Contr({}) Hero Obtained({})", m_game->m_client_list[client_h]->m_char_name, m_game->m_client_list[client_h]->m_enemy_kill_count, m_game->m_client_list[client_h]->m_contribution, item->m_name);
 
 				item->set_touch_effect_type(TouchEffectType::UniqueOwner);
 				item->m_touch_effect_value1 = m_game->m_client_list[client_h]->m_char_id_num1;
@@ -3845,6 +3990,7 @@ void ItemManager::get_hero_mantle_handler(int client_h, int item_id, const char*
 				}
 
 				m_game->send_notify_msg(0, client_h, Notify::EnemyKills, m_game->m_client_list[client_h]->m_enemy_kill_count, 0, 0, 0);
+				m_game->send_notify_msg(0, client_h, Notify::Contribution, m_game->m_client_list[client_h]->m_contribution, 0, 0, 0);
 			}
 			else
 			{
@@ -3985,16 +4131,16 @@ void ItemManager::exchange_item_handler(int client_h, short item_index, int amou
 				strcpy(m_game->m_client_list[owner_h]->m_exchange_name, m_game->m_client_list[client_h]->m_char_name);
 
 				m_game->m_client_list[client_h]->exchange_count++;
-				m_game->send_notify_msg(client_h, client_h, Notify::OpenExchangeWindow, item_index + 1000, m_game->m_client_list[client_h]->m_item_list[item_index]->m_sprite,
-					m_game->m_client_list[client_h]->m_item_list[item_index]->m_sprite_frame, m_game->m_client_list[client_h]->m_item_list[item_index]->m_name, amount, m_game->m_client_list[client_h]->m_item_list[item_index]->m_item_color,
+				m_game->send_notify_msg(client_h, client_h, Notify::OpenExchangeWindow, item_index + 1000, 0,
+					0, m_game->m_client_list[client_h]->m_item_list[item_index]->m_name, amount, m_game->m_client_list[client_h]->m_item_list[item_index]->m_item_color,
 					m_game->m_client_list[client_h]->m_item_list[item_index]->m_cur_life_span,
 					m_game->m_client_list[client_h]->m_item_list[item_index]->m_max_life_span,
 					m_game->m_client_list[client_h]->m_item_list[item_index]->m_item_special_effect_value2 + 100,
 					m_game->m_client_list[client_h]->m_item_list[item_index]->m_attribute,
 					reinterpret_cast<char*>(static_cast<intptr_t>(m_game->m_client_list[client_h]->m_item_list[item_index]->m_id_num)));
 
-				m_game->send_notify_msg(client_h, owner_h, Notify::OpenExchangeWindow, item_index, m_game->m_client_list[client_h]->m_item_list[item_index]->m_sprite,
-					m_game->m_client_list[client_h]->m_item_list[item_index]->m_sprite_frame, m_game->m_client_list[client_h]->m_item_list[item_index]->m_name, amount, m_game->m_client_list[client_h]->m_item_list[item_index]->m_item_color,
+				m_game->send_notify_msg(client_h, owner_h, Notify::OpenExchangeWindow, item_index, 0,
+					0, m_game->m_client_list[client_h]->m_item_list[item_index]->m_name, amount, m_game->m_client_list[client_h]->m_item_list[item_index]->m_item_color,
 					m_game->m_client_list[client_h]->m_item_list[item_index]->m_cur_life_span,
 					m_game->m_client_list[client_h]->m_item_list[item_index]->m_max_life_span,
 					m_game->m_client_list[client_h]->m_item_list[item_index]->m_item_special_effect_value2 + 100,
@@ -4043,16 +4189,16 @@ void ItemManager::set_exchange_item(int client_h, int item_index, int amount)
 			m_game->m_client_list[client_h]->m_exchange_item_id[m_game->m_client_list[client_h]->exchange_count] = m_game->m_client_list[client_h]->m_item_list[item_index]->m_id_num;
 
 			m_game->m_client_list[client_h]->exchange_count++;
-			m_game->send_notify_msg(client_h, client_h, Notify::set_exchange_item, item_index + 1000, m_game->m_client_list[client_h]->m_item_list[item_index]->m_sprite,
-				m_game->m_client_list[client_h]->m_item_list[item_index]->m_sprite_frame, m_game->m_client_list[client_h]->m_item_list[item_index]->m_name, amount, m_game->m_client_list[client_h]->m_item_list[item_index]->m_item_color,
+			m_game->send_notify_msg(client_h, client_h, Notify::set_exchange_item, item_index + 1000, 0,
+				0, m_game->m_client_list[client_h]->m_item_list[item_index]->m_name, amount, m_game->m_client_list[client_h]->m_item_list[item_index]->m_item_color,
 				m_game->m_client_list[client_h]->m_item_list[item_index]->m_cur_life_span,
 				m_game->m_client_list[client_h]->m_item_list[item_index]->m_max_life_span,
 				m_game->m_client_list[client_h]->m_item_list[item_index]->m_item_special_effect_value2 + 100,
 				m_game->m_client_list[client_h]->m_item_list[item_index]->m_attribute,
 				reinterpret_cast<char*>(static_cast<intptr_t>(m_game->m_client_list[client_h]->m_item_list[item_index]->m_id_num)));
 
-			m_game->send_notify_msg(client_h, ex_h, Notify::set_exchange_item, item_index, m_game->m_client_list[client_h]->m_item_list[item_index]->m_sprite,
-				m_game->m_client_list[client_h]->m_item_list[item_index]->m_sprite_frame, m_game->m_client_list[client_h]->m_item_list[item_index]->m_name, amount, m_game->m_client_list[client_h]->m_item_list[item_index]->m_item_color,
+			m_game->send_notify_msg(client_h, ex_h, Notify::set_exchange_item, item_index, 0,
+				0, m_game->m_client_list[client_h]->m_item_list[item_index]->m_name, amount, m_game->m_client_list[client_h]->m_item_list[item_index]->m_item_color,
 				m_game->m_client_list[client_h]->m_item_list[item_index]->m_cur_life_span,
 				m_game->m_client_list[client_h]->m_item_list[item_index]->m_max_life_span,
 				m_game->m_client_list[client_h]->m_item_list[item_index]->m_item_special_effect_value2 + 100,
@@ -4197,7 +4343,7 @@ void ItemManager::confirm_exchange_item(int client_h)
 						item_bcopy[i] = 0;
 						if ((m_game->m_client_list[ex_h]->m_item_list[m_game->m_client_list[ex_h]->m_exchange_item_index[i]]->get_item_type() == ItemType::Consume) ||
 							(m_game->m_client_list[ex_h]->m_item_list[m_game->m_client_list[ex_h]->m_exchange_item_index[i]]->get_item_type() == ItemType::Arrow)) {
-							amount_left = (int)m_game->m_client_list[ex_h]->m_item_list[m_game->m_client_list[ex_h]->m_exchange_item_index[i]]->m_count - m_game->m_client_list[ex_h]->m_exchange_item_amount[i];
+							amount_left = static_cast<int>(m_game->m_client_list[ex_h]->m_item_list[m_game->m_client_list[ex_h]->m_exchange_item_index[i]]->m_count) - m_game->m_client_list[ex_h]->m_exchange_item_amount[i];
 							if (amount_left < 0) amount_left = 0;
 							// v1.41 !!!
 							set_item_count(ex_h, m_game->m_client_list[ex_h]->m_exchange_item_index[i], amount_left);
@@ -4218,7 +4364,7 @@ void ItemManager::confirm_exchange_item(int client_h)
 
 						if ((m_game->m_client_list[client_h]->m_item_list[m_game->m_client_list[client_h]->m_exchange_item_index[i]]->get_item_type() == ItemType::Consume) ||
 							(m_game->m_client_list[client_h]->m_item_list[m_game->m_client_list[client_h]->m_exchange_item_index[i]]->get_item_type() == ItemType::Arrow)) {
-							amount_left = (int)m_game->m_client_list[client_h]->m_item_list[m_game->m_client_list[client_h]->m_exchange_item_index[i]]->m_count - m_game->m_client_list[client_h]->m_exchange_item_amount[i];
+							amount_left = static_cast<int>(m_game->m_client_list[client_h]->m_item_list[m_game->m_client_list[client_h]->m_exchange_item_index[i]]->m_count) - m_game->m_client_list[client_h]->m_exchange_item_amount[i];
 							if (amount_left < 0) amount_left = 0;
 							// v1.41 !!!
 							set_item_count(client_h, m_game->m_client_list[client_h]->m_exchange_item_index[i], amount_left);
@@ -4323,8 +4469,6 @@ int ItemManager::send_item_notify_msg(int client_h, uint16_t msg_type, CItem* it
 		pkt.gender_limit = item->m_gender_limit;
 		pkt.cur_lifespan = item->m_cur_life_span;
 		pkt.weight = item->m_weight;
-		pkt.sprite = item->m_sprite;
-		pkt.sprite_frame = item->m_sprite_frame;
 		pkt.item_color = item->m_item_color;
 		pkt.spec_value2 = static_cast<uint8_t>(item->m_item_special_effect_value2);
 		pkt.attribute = item->m_attribute;
@@ -4349,8 +4493,6 @@ int ItemManager::send_item_notify_msg(int client_h, uint16_t msg_type, CItem* it
 		pkt.gender_limit = item->m_gender_limit;
 		pkt.cur_lifespan = item->m_cur_life_span;
 		pkt.weight = item->m_weight;
-		pkt.sprite = item->m_sprite;
-		pkt.sprite_frame = item->m_sprite_frame;
 		pkt.item_color = item->m_item_color;
 		pkt.cost = static_cast<uint16_t>(v1);
 		pkt.item_id = item->m_id_num;
@@ -4378,7 +4520,7 @@ bool ItemManager::check_item_receive_condition(int client_h, CItem* item)
 
 	if (m_game->m_client_list[client_h] == 0) return false;
 
-	if (m_game->m_client_list[client_h]->m_cur_weight_load + get_item_weight(item, item->m_count) > m_game->calc_max_load(client_h))
+	if (m_game->m_client_list[client_h]->m_cur_weight_load + get_item_weight(item, static_cast<int>(item->m_count)) > m_game->calc_max_load(client_h))
 		return false;
 
 	for(int i = 0; i < hb::shared::limits::MaxItems; i++)
@@ -4455,7 +4597,7 @@ void ItemManager::build_item_handler(int client_h, char* data)
 
 				for (x = 0; x < hb::shared::limits::MaxItems; x++)
 					if (m_game->m_client_list[client_h]->m_item_list[x] != 0)
-						item_count[x] = m_game->m_client_list[client_h]->m_item_list[x]->m_count;
+						item_count[x] = static_cast<int>(m_game->m_client_list[client_h]->m_item_list[x]->m_count);
 					else item_count[x] = 0;
 
 				match = 0;
@@ -4483,10 +4625,9 @@ void ItemManager::build_item_handler(int client_h, char* data)
 									match++;
 									item_flag[z] = true;
 
-									goto BIH_LOOPBREAK;
+									break;
 								}
 							}
-					BIH_LOOPBREAK:;
 					}
 				}
 
@@ -4593,7 +4734,7 @@ void ItemManager::build_item_handler(int client_h, char* data)
 							hb::logger::log<log_channel::events>("(?) Char({}) ElementItemID({})", m_game->m_client_list[client_h]->m_char_name, element_item_id[x]);
 						}
 						else {
-							count = m_game->m_client_list[client_h]->m_item_list[element_item_id[x]]->m_count - m_game->m_build_item_list[i]->m_material_item_count[x];
+							count = static_cast<int>(m_game->m_client_list[client_h]->m_item_list[element_item_id[x]]->m_count) - m_game->m_build_item_list[i]->m_material_item_count[x];
 							if (count < 0) count = 0;
 							set_item_count(client_h, element_item_id[x], count);
 						}
@@ -4864,8 +5005,7 @@ int ItemManager::get_item_weight(CItem* item, int count)
 {
 	int weight;
 
-	// . Gold   20 1
-	weight = (item->m_weight);
+	weight = item->get_effective_weight();
 	if (count < 0) count = 1;
 	weight = weight * count;
 	if (item->m_id_num == 90) weight = weight / 20;
@@ -4895,9 +5035,6 @@ bool ItemManager::copy_item_contents(CItem* copy, CItem* original)
 	//short m_sSM_HitRatio, m_sL_HitRatio;
 	copy->m_special_effect_value1 = original->m_special_effect_value1;
 	copy->m_special_effect_value2 = original->m_special_effect_value2;
-
-	copy->m_sprite = original->m_sprite;
-	copy->m_sprite_frame = original->m_sprite_frame;
 
 	copy->m_appearance_value = original->m_appearance_value;
 	copy->m_speed = original->m_speed;
@@ -5485,7 +5622,7 @@ void ItemManager::reload_item_configs()
 	bool configDbCreated = false;
 	if (!EnsureGameConfigDatabase(&configDb, configDbPath, &configDbCreated) || configDbCreated)
 	{
-		hb::logger::log("Item config reload failed: gameconfigs.db unavailable");
+		hb::logger::log("Item config reload failed: gamedata.db unavailable");
 		return;
 	}
 
@@ -5685,8 +5822,8 @@ void ItemManager::request_item_upgrade_handler(int client_h, int item_index)
 
 				m_game->send_notify_msg(0, client_h, Notify::GizoneItemChange, item_index, m_game->m_client_list[client_h]->m_item_list[item_index]->m_item_type,
 					m_game->m_client_list[client_h]->m_item_list[item_index]->m_cur_life_span, m_game->m_client_list[client_h]->m_item_list[item_index]->m_name,
-					m_game->m_client_list[client_h]->m_item_list[item_index]->m_sprite,
-					m_game->m_client_list[client_h]->m_item_list[item_index]->m_sprite_frame,
+					0,
+					0,
 					m_game->m_client_list[client_h]->m_item_list[item_index]->m_item_color,
 					m_game->m_client_list[client_h]->m_item_list[item_index]->m_item_special_effect_value2,
 					m_game->m_client_list[client_h]->m_item_list[item_index]->m_attribute,
@@ -5728,8 +5865,8 @@ void ItemManager::request_item_upgrade_handler(int client_h, int item_index)
 					m_game->m_client_list[client_h]->m_item_list[item_index]->m_item_type,
 					m_game->m_client_list[client_h]->m_item_list[item_index]->m_cur_life_span,
 					m_game->m_client_list[client_h]->m_item_list[item_index]->m_name,
-					m_game->m_client_list[client_h]->m_item_list[item_index]->m_sprite,
-					m_game->m_client_list[client_h]->m_item_list[item_index]->m_sprite_frame,
+					0,
+					0,
 					m_game->m_client_list[client_h]->m_item_list[item_index]->m_item_color,
 					m_game->m_client_list[client_h]->m_item_list[item_index]->m_item_special_effect_value2,
 					m_game->m_client_list[client_h]->m_item_list[item_index]->m_attribute,
@@ -5771,8 +5908,8 @@ void ItemManager::request_item_upgrade_handler(int client_h, int item_index)
 					m_game->m_client_list[client_h]->m_item_list[item_index]->m_item_type,
 					m_game->m_client_list[client_h]->m_item_list[item_index]->m_cur_life_span,
 					m_game->m_client_list[client_h]->m_item_list[item_index]->m_name,
-					m_game->m_client_list[client_h]->m_item_list[item_index]->m_sprite,
-					m_game->m_client_list[client_h]->m_item_list[item_index]->m_sprite_frame,
+					0,
+					0,
 					m_game->m_client_list[client_h]->m_item_list[item_index]->m_item_color,
 					m_game->m_client_list[client_h]->m_item_list[item_index]->m_item_special_effect_value2,
 					m_game->m_client_list[client_h]->m_item_list[item_index]->m_attribute,
@@ -5814,8 +5951,8 @@ void ItemManager::request_item_upgrade_handler(int client_h, int item_index)
 					m_game->m_client_list[client_h]->m_item_list[item_index]->m_item_type,
 					m_game->m_client_list[client_h]->m_item_list[item_index]->m_cur_life_span,
 					m_game->m_client_list[client_h]->m_item_list[item_index]->m_name,
-					m_game->m_client_list[client_h]->m_item_list[item_index]->m_sprite,
-					m_game->m_client_list[client_h]->m_item_list[item_index]->m_sprite_frame,
+					0,
+					0,
 					m_game->m_client_list[client_h]->m_item_list[item_index]->m_item_color,
 					m_game->m_client_list[client_h]->m_item_list[item_index]->m_item_special_effect_value2,
 					m_game->m_client_list[client_h]->m_item_list[item_index]->m_attribute,
@@ -6114,8 +6251,8 @@ void ItemManager::request_item_upgrade_handler(int client_h, int item_index)
 
 				m_game->send_notify_msg(0, client_h, Notify::GizoneItemChange, item_index, m_game->m_client_list[client_h]->m_item_list[item_index]->m_item_type,
 					m_game->m_client_list[client_h]->m_item_list[item_index]->m_cur_life_span, m_game->m_client_list[client_h]->m_item_list[item_index]->m_name,
-					m_game->m_client_list[client_h]->m_item_list[item_index]->m_sprite,
-					m_game->m_client_list[client_h]->m_item_list[item_index]->m_sprite_frame,
+					0,
+					0,
 					m_game->m_client_list[client_h]->m_item_list[item_index]->m_item_color,
 					m_game->m_client_list[client_h]->m_item_list[item_index]->m_item_special_effect_value2,
 					m_game->m_client_list[client_h]->m_item_list[item_index]->m_attribute,
@@ -6155,8 +6292,8 @@ void ItemManager::request_item_upgrade_handler(int client_h, int item_index)
 
 				m_game->send_notify_msg(0, client_h, Notify::GizoneItemChange, item_index, m_game->m_client_list[client_h]->m_item_list[item_index]->m_item_type,
 					m_game->m_client_list[client_h]->m_item_list[item_index]->m_cur_life_span, m_game->m_client_list[client_h]->m_item_list[item_index]->m_name,
-					m_game->m_client_list[client_h]->m_item_list[item_index]->m_sprite,
-					m_game->m_client_list[client_h]->m_item_list[item_index]->m_sprite_frame,
+					0,
+					0,
 					m_game->m_client_list[client_h]->m_item_list[item_index]->m_item_color,
 					m_game->m_client_list[client_h]->m_item_list[item_index]->m_item_special_effect_value2,
 					m_game->m_client_list[client_h]->m_item_list[item_index]->m_attribute,
@@ -6196,8 +6333,8 @@ void ItemManager::request_item_upgrade_handler(int client_h, int item_index)
 
 				m_game->send_notify_msg(0, client_h, Notify::GizoneItemChange, item_index, m_game->m_client_list[client_h]->m_item_list[item_index]->m_item_type,
 					m_game->m_client_list[client_h]->m_item_list[item_index]->m_cur_life_span, m_game->m_client_list[client_h]->m_item_list[item_index]->m_name,
-					m_game->m_client_list[client_h]->m_item_list[item_index]->m_sprite,
-					m_game->m_client_list[client_h]->m_item_list[item_index]->m_sprite_frame,
+					0,
+					0,
 					m_game->m_client_list[client_h]->m_item_list[item_index]->m_item_color,
 					m_game->m_client_list[client_h]->m_item_list[item_index]->m_item_special_effect_value2,
 					m_game->m_client_list[client_h]->m_item_list[item_index]->m_attribute,
@@ -6325,8 +6462,8 @@ void ItemManager::request_item_upgrade_handler(int client_h, int item_index)
 
 				m_game->send_notify_msg(0, client_h, Notify::GizoneItemChange, item_index, m_game->m_client_list[client_h]->m_item_list[item_index]->m_item_type,
 					m_game->m_client_list[client_h]->m_item_list[item_index]->m_cur_life_span, m_game->m_client_list[client_h]->m_item_list[item_index]->m_name,
-					m_game->m_client_list[client_h]->m_item_list[item_index]->m_sprite,
-					m_game->m_client_list[client_h]->m_item_list[item_index]->m_sprite_frame,
+					0,
+					0,
 					m_game->m_client_list[client_h]->m_item_list[item_index]->m_item_color,
 					m_game->m_client_list[client_h]->m_item_list[item_index]->m_item_special_effect_value2,
 					m_game->m_client_list[client_h]->m_item_list[item_index]->m_attribute,
@@ -6513,7 +6650,7 @@ void ItemManager::request_repair_all_items_handler(int client_h)
 					d3 = (double)((d1 / d2) * 0.5f);
 					d2 = (double)(m_game->m_client_list[client_h]->m_item_list[i]->m_price);
 					d3 = (d3 * d2);
-					price = ((m_game->m_client_list[client_h]->m_item_list[i]->m_price / 2) - (short)(d3));
+					price = ((m_game->m_client_list[client_h]->m_item_list[i]->m_price / 2) - static_cast<int32_t>(d3));
 				}
 				m_game->m_client_list[client_h]->m_repair_all[m_game->m_client_list[client_h]->total_item_repair].index = i;
 				m_game->m_client_list[client_h]->m_repair_all[m_game->m_client_list[client_h]->total_item_repair].price = price;
@@ -6549,7 +6686,7 @@ void ItemManager::request_repair_all_items_confirm_handler(int client_h)
 		totalPrice += m_game->m_client_list[client_h]->m_repair_all[i].price;
 	}
 
-	if (get_item_count_by_id(client_h, hb::shared::item::ItemId::Gold) < (uint32_t)totalPrice)
+	if (get_item_count_by_id(client_h, hb::shared::item::ItemId::Gold) < static_cast<uint64_t>(totalPrice))
 	{
 		{
 			hb::net::PacketNotifyNotEnoughGold pkt{};

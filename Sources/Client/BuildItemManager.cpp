@@ -1,4 +1,5 @@
 ﻿#include "BuildItemManager.h"
+#include "DialogBox_Manufacture.h"
 #include "Game.h"
 #include <fstream>
 #include <string>
@@ -75,143 +76,36 @@ bool build_item_manager::update_available_recipes()
 
 				// ItemCount
 				for (j = 0; j < hb::shared::limits::MaxItems; j++)
-					if (m_game->m_item_list[j] != 0)
-						item_count[j] = m_game->m_item_list[j]->m_count;
+					if (m_game->m_player->m_item_list[j] != 0)
+						item_count[j] = static_cast<int>(m_game->m_player->m_item_list[j]->m_count);
 					else item_count[j] = 0;
 
-				// Element1
-				std::snprintf(temp_name, sizeof(temp_name), "%s", m_recipes[i]->m_element_name_1.c_str());
-				count = m_recipes[i]->m_element_count[1];
-				if (count == 0) match++;
-				else
+				for (int elem = 1; elem <= 6; elem++)
 				{
+					std::snprintf(temp_name, sizeof(temp_name), "%s", m_recipes[i]->get_element_name(elem).c_str());
+					count = m_recipes[i]->m_element_count[elem];
+					if (count == 0)
+					{
+						match++;
+						continue;
+					}
 					for (j = 0; j < hb::shared::limits::MaxItems; j++)
-						if (m_game->m_item_list[j] != 0) {
-							CItem* cfg_j = m_game->get_item_config(m_game->m_item_list[j]->m_id_num);
-							if (cfg_j && (memcmp(cfg_j->m_name, temp_name, hb::shared::limits::ItemNameLen - 1) == 0) && (m_game->m_item_list[j]->m_count >= static_cast<uint32_t>(count)) &&
-								(item_count[j] > 0))
-							{
-								match++;
-								m_display_recipes[index]->m_element_flag[1] = true;
-								item_count[j] -= count;
-								goto CBIS_STEP2;
-							}
-						}
-				}
-
-			CBIS_STEP2:;
-				// Element2
-				std::snprintf(temp_name, sizeof(temp_name), "%s", m_recipes[i]->m_element_name_2.c_str());
-				count = m_recipes[i]->m_element_count[2];
-				if (count == 0) match++;
-				else
-				{
-					for (j = 0; j < hb::shared::limits::MaxItems; j++)
-						if (m_game->m_item_list[j] != 0)
+					{
+						if (m_game->m_player->m_item_list[j] != 0)
 						{
-							CItem* cfg_j = m_game->get_item_config(m_game->m_item_list[j]->m_id_num);
-							if (cfg_j && (memcmp(cfg_j->m_name, temp_name, hb::shared::limits::ItemNameLen - 1) == 0) && (m_game->m_item_list[j]->m_count >= static_cast<uint32_t>(count)) &&
+							CItem* cfg_j = m_game->get_item_config(m_game->m_player->m_item_list[j]->m_id_num);
+							if (cfg_j && (memcmp(cfg_j->m_name, temp_name, hb::shared::limits::ItemNameLen - 1) == 0) &&
+								(m_game->m_player->m_item_list[j]->m_count >= static_cast<uint32_t>(count)) &&
 								(item_count[j] > 0))
 							{
 								match++;
-								m_display_recipes[index]->m_element_flag[2] = true;
+								m_display_recipes[index]->m_element_flag[elem] = true;
 								item_count[j] -= count;
-								goto CBIS_STEP3;
+								break;
 							}
 						}
+					}
 				}
-
-			CBIS_STEP3:;
-				// Element3
-				std::snprintf(temp_name, sizeof(temp_name), "%s", m_recipes[i]->m_element_name_3.c_str());
-				count = m_recipes[i]->m_element_count[3];
-				if (count == 0) match++;
-				else
-				{
-					for (j = 0; j < hb::shared::limits::MaxItems; j++)
-						if (m_game->m_item_list[j] != 0)
-						{
-							CItem* cfg_j = m_game->get_item_config(m_game->m_item_list[j]->m_id_num);
-							if (cfg_j && (memcmp(cfg_j->m_name, temp_name, hb::shared::limits::ItemNameLen - 1) == 0) && (m_game->m_item_list[j]->m_count >= static_cast<uint32_t>(count)) &&
-								(item_count[j] > 0))
-							{
-								match++;
-								m_display_recipes[index]->m_element_flag[3] = true;
-								item_count[j] -= count;
-								goto CBIS_STEP4;
-							}
-						}
-				}
-
-			CBIS_STEP4:;
-				// Element4 �˻�
-				std::snprintf(temp_name, sizeof(temp_name), "%s", m_recipes[i]->m_element_name_4.c_str());
-				count = m_recipes[i]->m_element_count[4];
-				if (count == 0) match++;
-				else
-				{
-					for (j = 0; j < hb::shared::limits::MaxItems; j++)
-						if (m_game->m_item_list[j] != 0)
-						{
-							CItem* cfg_j = m_game->get_item_config(m_game->m_item_list[j]->m_id_num);
-							if (cfg_j && (memcmp(cfg_j->m_name, temp_name, hb::shared::limits::ItemNameLen - 1) == 0) && (m_game->m_item_list[j]->m_count >= static_cast<uint32_t>(count)) &&
-								(item_count[j] > 0))
-							{
-								match++;
-								m_display_recipes[index]->m_element_flag[4] = true;
-								item_count[j] -= count;
-								goto CBIS_STEP5;
-							}
-						}
-				}
-
-			CBIS_STEP5:;
-
-				// Element5
-				std::snprintf(temp_name, sizeof(temp_name), "%s", m_recipes[i]->m_element_name_5.c_str());
-				count = m_recipes[i]->m_element_count[5];
-				if (count == 0) match++;
-				else
-				{
-					for (j = 0; j < hb::shared::limits::MaxItems; j++)
-						if (m_game->m_item_list[j] != 0)
-						{
-							CItem* cfg_j = m_game->get_item_config(m_game->m_item_list[j]->m_id_num);
-							if (cfg_j && (memcmp(cfg_j->m_name, temp_name, hb::shared::limits::ItemNameLen - 1) == 0) && (m_game->m_item_list[j]->m_count >= static_cast<uint32_t>(count)) &&
-								(item_count[j] > 0))
-							{
-								match++;
-								m_display_recipes[index]->m_element_flag[5] = true;
-								item_count[j] -= count;
-								goto CBIS_STEP6;
-							}
-						}
-				}
-
-			CBIS_STEP6:;
-
-				// Element6
-				std::snprintf(temp_name, sizeof(temp_name), "%s", m_recipes[i]->m_element_name_6.c_str());
-				count = m_recipes[i]->m_element_count[6];
-				if (count == 0) match++;
-				else
-				{
-					for (j = 0; j < hb::shared::limits::MaxItems; j++)
-						if (m_game->m_item_list[j] != 0)
-						{
-							CItem* cfg_j = m_game->get_item_config(m_game->m_item_list[j]->m_id_num);
-							if (cfg_j && (memcmp(cfg_j->m_name, temp_name, hb::shared::limits::ItemNameLen - 1) == 0) && (m_game->m_item_list[j]->m_count >= static_cast<uint32_t>(count)) &&
-								(item_count[j] > 0))
-							{
-								match++;
-								m_display_recipes[index]->m_element_flag[6] = true;
-								item_count[j] -= count;
-								goto CBIS_STEP7;
-							}
-						}
-				}
-
-			CBIS_STEP7:;
 
 				if (match == 6) m_display_recipes[index]->m_build_enabled = true;
 				index++;
@@ -352,168 +246,51 @@ bool build_item_manager::validate_current_recipe()
 	char temp_name[hb::shared::limits::ItemNameLen];
 	bool item_flag[7];
 
-	index = m_game->m_dialog_box_manager.Info(DialogBoxId::Manufacture).m_str[0];
+	auto* mfg = m_game->get_dialog_box_manager().get_dialog_as<DialogBox_Manufacture>(DialogBoxId::Manufacture);
+	if (!mfg) return false;
+	index = mfg->m_progress;
 	if (index < 0 || index >= hb::shared::limits::MaxBuildItems) return false;
 
 	if (m_display_recipes[index] == 0) return false;
 
-	item_index[1] = m_game->m_dialog_box_manager.Info(DialogBoxId::Manufacture).m_v1;
-	item_index[2] = m_game->m_dialog_box_manager.Info(DialogBoxId::Manufacture).m_v2;
-	item_index[3] = m_game->m_dialog_box_manager.Info(DialogBoxId::Manufacture).m_v3;
-	item_index[4] = m_game->m_dialog_box_manager.Info(DialogBoxId::Manufacture).m_v4;
-	item_index[5] = m_game->m_dialog_box_manager.Info(DialogBoxId::Manufacture).m_v5;
-	item_index[6] = m_game->m_dialog_box_manager.Info(DialogBoxId::Manufacture).m_v6;
+	item_index[1] = mfg->m_slot_1;
+	item_index[2] = mfg->m_slot_2;
+	item_index[3] = mfg->m_slot_3;
+	item_index[4] = mfg->m_slot_4;
+	item_index[5] = mfg->m_slot_5;
+	item_index[6] = mfg->m_slot_6;
 
 	for (i = 1; i <= 6; i++)
 		if (item_index[i] != -1)
-			item_count[i] = m_game->m_item_list[item_index[i]]->m_count;
+			item_count[i] = static_cast<int>(m_game->m_player->m_item_list[item_index[i]]->m_count);
 		else item_count[i] = 0;
 	match = 0;
 	for (i = 1; i <= 6; i++) item_flag[i] = false;
 
-	// Element1
-	std::snprintf(temp_name, sizeof(temp_name), "%s", m_display_recipes[index]->m_element_name_1.c_str());
-	count = m_display_recipes[index]->m_element_count[1];
-	if (count == 0) match++;
-	else
+	for (int elem = 1; elem <= 6; elem++)
 	{
+		std::snprintf(temp_name, sizeof(temp_name), "%s", m_display_recipes[index]->get_element_name(elem).c_str());
+		count = m_display_recipes[index]->m_element_count[elem];
+		if (count == 0)
+		{
+			match++;
+			continue;
+		}
 		for (i = 1; i <= 6; i++)
 		{
 			if (item_index[i] == -1) continue;
-			CItem* cfg_bi = m_game->get_item_config(m_game->m_item_list[item_index[i]]->m_id_num);
+			CItem* cfg_bi = m_game->get_item_config(m_game->m_player->m_item_list[item_index[i]]->m_id_num);
 			if (cfg_bi && (memcmp(cfg_bi->m_name, temp_name, hb::shared::limits::ItemNameLen - 1) == 0) &&
-				(m_game->m_item_list[item_index[i]]->m_count >= static_cast<uint32_t>(count)) &&
+				(m_game->m_player->m_item_list[item_index[i]]->m_count >= static_cast<uint32_t>(count)) &&
 				(item_count[i] > 0) && (item_flag[i] == false))
 			{
 				match++;
 				item_count[i] -= count;
 				item_flag[i] = true;
-				goto CCBIS_STEP2;
+				break;
 			}
 		}
 	}
-
-CCBIS_STEP2:;
-
-	// Element2
-	std::snprintf(temp_name, sizeof(temp_name), "%s", m_display_recipes[index]->m_element_name_2.c_str());
-	count = m_display_recipes[index]->m_element_count[2];
-	if (count == 0) match++;
-	else
-	{
-		for (i = 1; i <= 6; i++)
-		{
-			if (item_index[i] == -1) continue;
-			CItem* cfg_bi = m_game->get_item_config(m_game->m_item_list[item_index[i]]->m_id_num);
-			if (cfg_bi && (memcmp(cfg_bi->m_name, temp_name, hb::shared::limits::ItemNameLen - 1) == 0) &&
-				(m_game->m_item_list[item_index[i]]->m_count >= static_cast<uint32_t>(count)) &&
-				(item_count[i] > 0) && (item_flag[i] == false))
-			{
-				match++;
-				item_count[i] -= count;
-				item_flag[i] = true;
-				goto CCBIS_STEP3;
-			}
-		}
-	}
-
-CCBIS_STEP3:;
-
-	// Element3
-	std::snprintf(temp_name, sizeof(temp_name), "%s", m_display_recipes[index]->m_element_name_3.c_str());
-	count = m_display_recipes[index]->m_element_count[3];
-	if (count == 0) match++;
-	else
-	{
-		for (i = 1; i <= 6; i++)
-		{
-			if (item_index[i] == -1) continue;
-			CItem* cfg_bi = m_game->get_item_config(m_game->m_item_list[item_index[i]]->m_id_num);
-			if (cfg_bi && (memcmp(cfg_bi->m_name, temp_name, hb::shared::limits::ItemNameLen - 1) == 0) &&
-				(m_game->m_item_list[item_index[i]]->m_count >= static_cast<uint32_t>(count)) &&
-				(item_count[i] > 0) && (item_flag[i] == false))
-			{
-				match++;
-				item_count[i] -= count;
-				item_flag[i] = true;
-				goto CCBIS_STEP4;
-			}
-		}
-	}
-
-CCBIS_STEP4:;
-
-	// Element4
-	std::snprintf(temp_name, sizeof(temp_name), "%s", m_display_recipes[index]->m_element_name_4.c_str());
-	count = m_display_recipes[index]->m_element_count[4];
-	if (count == 0) match++;
-	else
-	{
-		for (i = 1; i <= 6; i++)
-		{
-			if (item_index[i] == -1) continue;
-			CItem* cfg_bi = m_game->get_item_config(m_game->m_item_list[item_index[i]]->m_id_num);
-			if (cfg_bi && (memcmp(cfg_bi->m_name, temp_name, hb::shared::limits::ItemNameLen - 1) == 0) &&
-				(m_game->m_item_list[item_index[i]]->m_count >= static_cast<uint32_t>(count)) &&
-				(item_count[i] > 0) && (item_flag[i] == false))
-			{
-				match++;
-				item_count[i] -= count;
-				item_flag[i] = true;
-				goto CCBIS_STEP5;
-			}
-		}
-	}
-
-CCBIS_STEP5:;
-
-	// Element5
-	std::snprintf(temp_name, sizeof(temp_name), "%s", m_display_recipes[index]->m_element_name_5.c_str());
-	count = m_display_recipes[index]->m_element_count[5];
-	if (count == 0) match++;
-	else
-	{
-		for (i = 1; i <= 6; i++)
-		{
-			if (item_index[i] == -1) continue;
-			CItem* cfg_bi = m_game->get_item_config(m_game->m_item_list[item_index[i]]->m_id_num);
-			if (cfg_bi && (memcmp(cfg_bi->m_name, temp_name, hb::shared::limits::ItemNameLen - 1) == 0) &&
-				(m_game->m_item_list[item_index[i]]->m_count >= static_cast<uint32_t>(count)) &&
-				(item_count[i] > 0) && (item_flag[i] == false))
-			{
-				match++;
-				item_count[i] -= count;
-				item_flag[i] = true;
-				goto CCBIS_STEP6;
-			}
-		}
-	}
-
-CCBIS_STEP6:;
-
-	// Element6
-	std::snprintf(temp_name, sizeof(temp_name), "%s", m_display_recipes[index]->m_element_name_6.c_str());
-	count = m_display_recipes[index]->m_element_count[6];
-	if (count == 0) match++;
-	else
-	{
-		for (i = 1; i <= 6; i++)
-		{
-			if (item_index[i] == -1) continue;
-			CItem* cfg_bi = m_game->get_item_config(m_game->m_item_list[item_index[i]]->m_id_num);
-			if (cfg_bi && (memcmp(cfg_bi->m_name, temp_name, hb::shared::limits::ItemNameLen - 1) == 0) &&
-				(m_game->m_item_list[item_index[i]]->m_count >= static_cast<uint32_t>(count)) &&
-				(item_count[i] > 0) && (item_flag[i] == false))
-			{
-				match++;
-				item_count[i] -= count;
-				item_flag[i] = true;
-				goto CCBIS_STEP7;
-			}
-		}
-	}
-
-CCBIS_STEP7:;
 
 	count = 0;
 	for (i = 1; i <= 6; i++)

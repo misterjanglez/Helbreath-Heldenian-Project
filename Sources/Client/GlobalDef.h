@@ -18,10 +18,17 @@
 *****************************************************************/
 
 /*** Put here global data for your server ***/
-#include "Version.h"
+#include "version_info.h"
 
 constexpr const char* NAME_WORLDNAME1 = "WS1";
-constexpr const char* DEF_SERVER_IP = "199.187.160.239";//"192.168.1.140"; //"199.187.160.239";
+
+//#define DEF_TEST_SERVER // Comment this out to use local IP instead of public test server
+
+#ifdef DEF_TEST_SERVER
+constexpr const char* DEF_SERVER_IP = "199.187.160.239";
+#else
+constexpr const char* DEF_SERVER_IP = "127.0.0.1";
+#endif
 constexpr const int DEF_SERVER_PORT = 2500;
 constexpr const int DEF_GSERVER_PORT = 9907;
 

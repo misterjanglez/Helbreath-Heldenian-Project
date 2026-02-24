@@ -5,34 +5,35 @@
 #include "CommonTypes.h"
 #include "GameGeometry.h"
 #include "DirectionHelpers.h"
+using hb::shared::direction::direction;
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
 namespace CMisc
 {
-	static inline char get_next_move_dir(short sX, short sY, short dX, short dY)
+	static inline direction get_next_move_dir(short sX, short sY, short dX, short dY)
 	{
 		short absX, absY;
-		char  ret = 0;
+		direction ret = direction{};
 
 		absX = sX - dX;
 		absY = sY - dY;
 
-		if ((absX == 0) && (absY == 0)) ret = 0;
+		if ((absX == 0) && (absY == 0)) ret = direction{};
 
 		if (absX == 0) {
-			if (absY > 0) ret = 1;
-			if (absY < 0) ret = 5;
+			if (absY > 0) ret = direction::north;
+			if (absY < 0) ret = direction::south;
 		}
 		if (absY == 0) {
-			if (absX > 0) ret = 7;
-			if (absX < 0) ret = 3;
+			if (absX > 0) ret = direction::west;
+			if (absX < 0) ret = direction::east;
 		}
-		if ( (absX > 0)	&& (absY > 0) ) ret = 8;
-		if ( (absX < 0)	&& (absY > 0) ) ret = 2;
-		if ( (absX > 0)	&& (absY < 0) ) ret = 6;
-		if ( (absX < 0)	&& (absY < 0) ) ret = 4;
+		if ( (absX > 0)	&& (absY > 0) ) ret = direction::northwest;
+		if ( (absX < 0)	&& (absY > 0) ) ret = direction::northeast;
+		if ( (absX > 0)	&& (absY < 0) ) ret = direction::southwest;
+		if ( (absX < 0)	&& (absY < 0) ) ret = direction::southeast;
 
 		return ret;
 	}
@@ -88,7 +89,7 @@ namespace CMisc
 					result_y += y_inc;
 				}
 				result_x += x_inc;
-				goto CALC_OK;
+				break;
 			}
 		}
 		else
@@ -102,11 +103,9 @@ namespace CMisc
 					result_x += x_inc;
 				}
 				result_y += y_inc;
-				goto CALC_OK;
+				break;
 			}
 		}
-
-	CALC_OK:;
 
 		*pX = result_x;
 		*pY = result_y;
@@ -119,7 +118,7 @@ namespace CMisc
 		hb::shared::geometry::GetPoint2(x0, y0, x1, y1, pX, pY, error_acc, count);
 	}
 
-	static inline void GetDirPoint(char dir, int * pX, int * pY)
+	static inline void GetDirPoint(direction dir, int * pX, int * pY)
 	{
 		hb::shared::direction::ApplyOffset(dir, *pX, *pY);
 	}

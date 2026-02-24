@@ -9,8 +9,8 @@
 #   ./build_client_linux.sh clean release   Clean then rebuild Release
 #
 # Output mirrors the Windows layout:
-#   Sources/Debug/HelbreathClient    (debug build)
-#   Sources/Release/HelbreathClient  (release build)
+#   Sources/Debug/Game_x64_linux    (debug build, x64)
+#   Sources/Release/Game_x64_linux  (release build, x64)
 #
 # Prerequisites (Ubuntu/Debian):
 #   sudo apt install cmake g++ libx11-dev libxrandr-dev libxcursor-dev \
@@ -64,13 +64,23 @@ if [ ! -f CMakeCache.txt ]; then
     cmake "$SCRIPT_DIR/Client" -DCMAKE_BUILD_TYPE="$BUILD_TYPE"
 fi
 
+# Generate version header
+python3 "$SCRIPT_DIR/version_gen.py"
+
 echo "Building (${BUILD_TYPE})..."
 make -j$(nproc)
 
 # Copy binary to Sources/Debug or Sources/Release to mirror Windows layout
 OUTPUT_DIR="$SCRIPT_DIR/$BUILD_TYPE"
 mkdir -p "$OUTPUT_DIR"
-cp "$BUILD_DIR/HelbreathClient" "$OUTPUT_DIR/HelbreathClient"
+# Find the output binary (name depends on arch detected by CMake)
+EXE_NAME=$(find "$BUILD_DIR" -maxdepth 1 -name "Game_*_linux" -type f | head -1)
+if [ -z "$EXE_NAME" ]; then
+    echo "ERROR: Could not find Game_*_linux binary in $BUILD_DIR"
+    exit 1
+fi
+EXE_BASENAME=$(basename "$EXE_NAME")
+cp "$EXE_NAME" "$OUTPUT_DIR/$EXE_BASENAME"
 
 echo ""
-echo "Build complete: $OUTPUT_DIR/HelbreathClient"
+echo "Build complete: $OUTPUT_DIR/$EXE_BASENAME"

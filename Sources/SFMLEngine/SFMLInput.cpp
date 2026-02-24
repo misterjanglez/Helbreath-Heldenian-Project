@@ -7,6 +7,8 @@
 
 #include "SFMLInput.h"
 #include <SFML/Graphics/RenderWindow.hpp>
+#include <SFML/Window/Clipboard.hpp>
+#include <SFML/System/String.hpp>
 #include <cstring>
 
 // Global input instance pointer (owned by RendererFactory)
@@ -267,6 +269,30 @@ void SFMLInput::set_window_active(bool active)
     {
         ClearAllKeys();
     }
+}
+
+// ============== Clipboard ==============
+
+std::string SFMLInput::get_clipboard_text() const
+{
+    return sf::Clipboard::getString().toAnsiString();
+}
+
+void SFMLInput::set_clipboard_text(const std::string& text)
+{
+    sf::Clipboard::setString(sf::String(text));
+}
+
+// ============== Typed Character Buffer ==============
+
+void SFMLInput::on_text_char(uint32_t codepoint)
+{
+    m_typed_chars.push_back(codepoint);
+}
+
+std::vector<uint32_t> SFMLInput::take_typed_chars()
+{
+    return std::move(m_typed_chars);
 }
 
 void SFMLInput::ClearAllKeys()

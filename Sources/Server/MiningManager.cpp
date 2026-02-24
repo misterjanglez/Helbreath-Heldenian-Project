@@ -142,7 +142,7 @@ void MiningManager::check_mining_action(int client_h, int dX, int dY)
 	switch (type) {
 	case dynamic_object::Mineral1:
 	case dynamic_object::Mineral2:
-		weapon_type = m_game->m_client_list[client_h]->m_appearance.weapon_type;
+		weapon_type = m_game->m_client_list[client_h]->get_equipped_weapon_type();
 		if (weapon_type == 25) {
 		}
 		else return;

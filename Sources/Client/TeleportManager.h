@@ -1,6 +1,7 @@
-﻿#pragma once
+#pragma once
 
 #include <array>
+#include <cstdint>
 #include <cstring>
 #include <string>
 
@@ -13,6 +14,14 @@ struct TeleportEntry
 	int x = 0;
 	int y = 0;
 	int cost = 0;
+};
+
+enum class teleport_state : uint8_t {
+	idle,            // No teleport in progress
+	awaiting_auth,   // Pre-auth sent, waiting for server response
+	fading_out,      // Approved, fading screen to black
+	awaiting_data,   // Black screen, RequestTeleport sent, waiting for ResponseInitData
+	transitioning    // Map loaded, GameModeManager handling fade-in
 };
 
 class teleport_manager
@@ -45,6 +54,17 @@ public:
 	bool is_requested() const { return m_is_requested; }
 	void set_requested(bool val) { m_is_requested = val; }
 
+	// Pre-auth + fade state machine
+	void request_auth(short player_x, short player_y);
+	void on_auth_approved();
+	void on_auth_rejected();
+	void on_map_loaded();
+	void update();
+	float get_fade_alpha() const { return m_fade_alpha; }
+	bool is_active() const { return m_state != teleport_state::idle; }
+	teleport_state get_state() const { return m_state; }
+	bool is_rejected_tile(short x, short y) const { return m_rejected_x == x && m_rejected_y == y; }
+
 private:
 	teleport_manager();
 	~teleport_manager();
@@ -56,4 +76,13 @@ private:
 	int m_loc_x = -1;
 	int m_loc_y = -1;
 	std::string m_map_name;
+
+	// Pre-auth fade state
+	teleport_state m_state = teleport_state::idle;
+	float m_fade_alpha = 0.0f;
+	uint32_t m_fade_start_time = 0;
+	short m_rejected_x = -1;
+	short m_rejected_y = -1;
+	static constexpr float FADE_DURATION_MS = 150.0f;
+	static constexpr uint32_t AUTH_TIMEOUT_MS = 2000;
 };

@@ -72,7 +72,7 @@ void Overlay_Connecting::on_update()
             m_game->m_menu_dir++;
             m_game->m_menu_dir_cnt = 1;
         }
-        if (m_game->m_menu_dir > 8) m_game->m_menu_dir = 1;
+        if (m_game->m_menu_dir > direction::northwest) m_game->m_menu_dir = direction::north;
         m_game->m_menu_frame = 0;
     }
 }

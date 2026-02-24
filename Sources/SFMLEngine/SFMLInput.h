@@ -55,6 +55,14 @@ public:
     virtual void set_suppressed(bool suppressed) override;
     virtual bool is_suppressed() const override;
 
+    // Clipboard
+    virtual std::string get_clipboard_text() const override;
+    virtual void set_clipboard_text(const std::string& text) override;
+
+    // Typed character buffer
+    virtual void on_text_char(uint32_t codepoint) override;
+    virtual std::vector<uint32_t> take_typed_chars() override;
+
     // Input events (called by SFMLWindow with logical coordinates)
     virtual void on_key_down(KeyCode key) override;
     virtual void on_key_up(KeyCode key) override;
@@ -84,4 +92,7 @@ private:
     bool m_keyDown[kKeyCount];
     bool m_keyPressed[kKeyCount];
     bool m_keyReleased[kKeyCount];
+
+    // Typed character buffer (Unicode codepoints, filled by on_text_char)
+    std::vector<uint32_t> m_typed_chars;
 };

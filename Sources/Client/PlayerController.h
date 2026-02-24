@@ -1,5 +1,8 @@
 #pragma once
 #include <cstdint>
+#include "DirectionHelpers.h"
+
+using hb::shared::direction::direction;
 
 class CMapData;
 
@@ -46,9 +49,9 @@ public:
 	void set_player_turn(char turn) { m_player_turn = turn; }
 
 	// Pending stop direction (for right-click stop while moving)
-	char get_pending_stop_dir() const { return m_pending_stop_dir; }
-	void set_pending_stop_dir(char dir) { m_pending_stop_dir = dir; }
-	void clear_pending_stop_dir() { m_pending_stop_dir = 0; }
+	direction get_pending_stop_dir() const { return m_pending_stop_dir; }
+	void set_pending_stop_dir(direction dir) { m_pending_stop_dir = dir; }
+	void clear_pending_stop_dir() { m_pending_stop_dir = direction{}; }
 
 	// Attack animation cooldown (time-based minimum to match server validation)
 	uint32_t get_attack_end_time() const { return m_attack_end_time; }
@@ -58,7 +61,7 @@ public:
 	// Returns direction 1-8 to move from (sX,sY) toward (dstX,dstY), or 0 if no valid move
 	// move_check: if true, considers previously blocked moves
 	// mim: if true, reverses source/destination for direction calculation (illusion movement)
-	char get_next_move_dir(short sX, short sY, short dstX, short dstY,
+	direction get_next_move_dir(short sX, short sY, short dstX, short dstY,
 	                    CMapData* map_data, bool move_check = false, bool mim = false);
 
 	// Calculates optimal turn direction (clockwise vs counter-clockwise) to reach destination
@@ -87,7 +90,7 @@ private:
 	char m_player_turn;
 
 	// Pending stop direction (applied when movement ends)
-	char m_pending_stop_dir;
+	direction m_pending_stop_dir;
 
 	// Earliest time player can act after an attack (prevents false positive server disconnects)
 	uint32_t m_attack_end_time;

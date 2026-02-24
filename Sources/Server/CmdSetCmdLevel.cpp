@@ -1,26 +1,26 @@
 #include "CmdSetCmdLevel.h"
+#include "ServerConsole.h"
 #include "Game.h"
 #include "GameConfigSqliteStore.h"
 #include <cstring>
-#include <cstdio>
 #include <cstdlib>
 #include "Log.h"
+#include "ServerLogChannels.h"
 
 void CmdSetCmdLevel::execute(CGame* game, const char* args)
 {
 	if (args == nullptr || args[0] == '\0')
 	{
-		hb::logger::log("Usage: setcmdlevel <command> <level>");
+		hb::console::error("Usage: setcmdlevel <command> <level>");
 		if (!game->m_command_permissions.empty())
 		{
-			hb::logger::log("Current command permissions:");
+			hb::console::info("Current command permissions:");
 			for (const auto& pair : game->m_command_permissions)
 			{
-				char buf[256];
 				if (pair.second.description.empty())
-					std::snprintf(buf, sizeof(buf), "  /%s -> level %d", pair.first.c_str(), pair.second.admin_level);
+					hb::console::write("  /{} -> level {}", pair.first, pair.second.admin_level);
 				else
-				hb::logger::log("/{} -> level {} ({})", pair.first.c_str(), pair.second.admin_level, pair.second.description.c_str());
+					hb::console::write("  /{} -> level {} ({})", pair.first, pair.second.admin_level, pair.second.description);
 			}
 		}
 		return;
@@ -45,11 +45,11 @@ void CmdSetCmdLevel::execute(CGame* game, const char* args)
 		auto it = game->m_command_permissions.find(cmd_name);
 		if (it != game->m_command_permissions.end())
 		{
-			hb::logger::log("Command '/{}' requires admin level {}", cmd_name, it->second.admin_level);
+			hb::console::write("Command '/{}' requires admin level {}", cmd_name, it->second.admin_level);
 		}
 		else
 		{
-			hb::logger::log("Command '/{}' not found in permissions table", cmd_name);
+			hb::console::error("Command '/{}' not found in permissions table", cmd_name);
 		}
 		return;
 	}
@@ -57,7 +57,7 @@ void CmdSetCmdLevel::execute(CGame* game, const char* args)
 	int level = std::atoi(p);
 	if (level < 0)
 	{
-		hb::logger::log("Level must be >= 0.");
+		hb::console::error("Level must be >= 0.");
 		return;
 	}
 
@@ -83,5 +83,6 @@ void CmdSetCmdLevel::execute(CGame* game, const char* args)
 		CloseGameConfigDatabase(configDb);
 	}
 
-	hb::logger::log("Command '/{}' now requires admin level {}", cmd_name, level);
+	hb::console::success("Command '/{}' now requires admin level {}", cmd_name, level);
+	hb::logger::log<hb::log_channel::commands>("setcmdlevel: /{} set to level {}", cmd_name, level);
 }

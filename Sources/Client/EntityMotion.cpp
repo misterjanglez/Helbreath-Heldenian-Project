@@ -9,13 +9,14 @@
 
 
 using namespace hb::shared::action;
+using namespace hb::shared::direction;
 
 //=============================================================================
 // start_move - Begin movement interpolation in a direction
 //=============================================================================
-void EntityMotion::start_move(int8_t direction, uint32_t currentTime, uint32_t duration)
+void EntityMotion::start_move(direction dir, uint32_t currentTime, uint32_t duration)
 {
-    m_direction = direction;
+    m_direction = dir;
     m_start_time = currentTime;
     m_duration = duration;
     m_progress = 0.0f;
@@ -24,7 +25,7 @@ void EntityMotion::start_move(int8_t direction, uint32_t currentTime, uint32_t d
     // get starting offset based on direction
     // Entity is moving TO this tile FROM the neighboring tile
     int16_t startX, startY;
-    get_direction_start_offset(direction, startX, startY);
+    get_direction_start_offset(dir, startX, startY);
     m_start_offset_x = static_cast<float>(startX);
     m_start_offset_y = static_cast<float>(startY);
 
@@ -38,9 +39,9 @@ void EntityMotion::start_move(int8_t direction, uint32_t currentTime, uint32_t d
 // Used for seamless tile transitions during continuous movement
 // The starting offset can be outside normal [-32, 0] range to ensure visual continuity
 //=============================================================================
-void EntityMotion::start_move_with_offset(int8_t direction, uint32_t currentTime, uint32_t duration, float offsetX, float offsetY)
+void EntityMotion::start_move_with_offset(direction dir, uint32_t currentTime, uint32_t duration, float offsetX, float offsetY)
 {
-    m_direction = direction;
+    m_direction = dir;
     m_start_time = currentTime;
     m_is_moving = true;
 
@@ -71,10 +72,10 @@ void EntityMotion::start_move_with_offset(int8_t direction, uint32_t currentTime
 //=============================================================================
 // queue_move - Queue a follow-up movement for seamless chaining
 //=============================================================================
-void EntityMotion::queue_move(int8_t direction, uint32_t duration)
+void EntityMotion::queue_move(direction dir, uint32_t duration)
 {
     m_has_pending = true;
-    m_pending_direction = direction;
+    m_pending_direction = dir;
     m_pending_duration = duration;
 }
 
@@ -102,7 +103,7 @@ void EntityMotion::update(uint32_t currentTime)
             // Chain into next movement seamlessly
             // Overshoot time carries into next movement
             uint32_t overshoot = elapsed - m_duration;
-            int8_t pendDir = m_pending_direction;
+            direction pendDir = m_pending_direction;
             uint32_t pendDur = m_pending_duration;
             m_has_pending = false;
             start_move(pendDir, currentTime - overshoot, pendDur);
@@ -158,7 +159,7 @@ void EntityMotion::bump()
 void EntityMotion::reset()
 {
     m_is_moving = false;
-    m_direction = 0;
+    m_direction = direction{};
     m_progress = 0.0f;
     m_start_time = 0;
     m_duration = 0;
@@ -167,7 +168,7 @@ void EntityMotion::reset()
     m_current_offset_x = 0.0f;
     m_current_offset_y = 0.0f;
     m_has_pending = false;
-    m_pending_direction = 0;
+    m_pending_direction = direction{};
     m_pending_duration = 0;
 }
 
@@ -188,40 +189,40 @@ void EntityMotion::reset()
 //   7 = West      (entity came from East)     -> offset (+32, 0)
 //   8 = NorthWest (entity came from SouthEast)-> offset (+32, +32)
 //=============================================================================
-void EntityMotion::get_direction_start_offset(int8_t direction, int16_t& outX, int16_t& outY)
+void EntityMotion::get_direction_start_offset(direction dir, int16_t& outX, int16_t& outY)
 {
     constexpr int16_t T = MovementTiming::TILE_SIZE;
 
-    switch (direction) {
-        case 1: // North - came from South
+    switch (dir) {
+        case north: // North - came from South
             outX = 0;
             outY = T;
             break;
-        case 2: // NorthEast - came from SouthWest
+        case northeast: // NorthEast - came from SouthWest
             outX = -T;
             outY = T;
             break;
-        case 3: // East - came from West
+        case east: // East - came from West
             outX = -T;
             outY = 0;
             break;
-        case 4: // SouthEast - came from NorthWest
+        case southeast: // SouthEast - came from NorthWest
             outX = -T;
             outY = -T;
             break;
-        case 5: // South - came from North
+        case south: // South - came from North
             outX = 0;
             outY = -T;
             break;
-        case 6: // SouthWest - came from NorthEast
+        case southwest: // SouthWest - came from NorthEast
             outX = T;
             outY = -T;
             break;
-        case 7: // West - came from East
+        case west: // West - came from East
             outX = T;
             outY = 0;
             break;
-        case 8: // NorthWest - came from SouthEast
+        case northwest: // NorthWest - came from SouthEast
             outX = T;
             outY = T;
             break;

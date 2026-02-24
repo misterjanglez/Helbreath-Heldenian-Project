@@ -39,19 +39,9 @@ private:
     void LoadStage_Monsters4();      // Stage 36: More monsters
     void LoadStage_Monsters5();      // Stage 40: More monsters
     void LoadStage_Monsters6();      // Stage 44: NPCs, new monsters
-    void LoadStage_MaleUndies();     // Stage 48: Male underwear, Gail, Gate
-    void LoadStage_MaleArmor();      // Stage 52: Male hair, armor, shirts
-    void LoadStage_MaleLegs();       // Stage 56: Male pants, shoes, swords
-    void LoadStage_MaleSwords();     // Stage 60: Male weapons continued
-    void LoadStage_MaleWeapons();    // Stage 64: Male axes, hammers, staves
-    void LoadStage_MaleBows();       // Stage 68: Male bows, shields, mantles
-    void LoadStage_FemaleBase();     // Stage 72: Female underwear, hair
-    void LoadStage_FemaleArmor();    // Stage 76: Female armor, shirts
-    void LoadStage_FemaleLegs();     // Stage 80: Female pants, shoes, swords
-    void LoadStage_FemaleSwords();   // Stage 84: Female weapons continued
-    void LoadStage_FemaleWeapons();  // Stage 88: Female axes, staves
-    void LoadStage_FemaleMantles();  // Stage 92: Female mantles, helms
-    void LoadStage_FemaleBows();     // Stage 96: Female bows, shields
+    void LoadStage_CosmeticsMale();   // Stage 48: gail, gate, male underwear, hair
+    void LoadStage_CosmeticsFemale(); // Stage 52: female underwear, hair
+    void LoadStage_EquipmentBatch();  // Stages 56-96: per-item equipment from metadata
     void LoadStage_Effects();        // Stage 100: Effects, sounds, finish
 
     // Sprite loading helpers
@@ -60,4 +50,5 @@ private:
     void make_effect_spr(const char* FileName, short start, short count, bool alpha_effect);
 
     int m_iLoadingStage = 0;
+    int m_equip_load_cursor = 0;
 };

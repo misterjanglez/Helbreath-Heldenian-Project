@@ -44,9 +44,7 @@ constexpr int InterfaceGuideMap             = 420;
 constexpr int InterfaceNdPartyStatus        = 80;
 
 // Item pivot points
-constexpr int ItemGroundPivotPoint          = 100;
 constexpr int ItemEquipPivotPoint           = 200;
-constexpr int ItemPackPivotPoint            = 300;
 constexpr int ItemDynamicPivotPoint         = 400;
 
 // Mob base sprite ID
@@ -57,27 +55,28 @@ constexpr int UndiesM                       = 1400;
 constexpr int UndiesW                       = 11400;
 constexpr int HairM                         = 1600;
 constexpr int HairW                         = 11600;
-constexpr int BodyArmorM                    = 1800;
-constexpr int BodyArmorW                    = 11800;
-constexpr int BerkM                         = 2100;
-constexpr int BerkW                         = 12100;
-constexpr int LeggM                         = 2300;
-constexpr int LeggW                         = 12300;
-constexpr int BootM                         = 2500;
-constexpr int BootW                         = 12500;
-constexpr int MantleM                       = 2600;
-constexpr int MantleW                       = 12600;
-constexpr int HeadM                         = 2800;
-constexpr int HeadW                         = 12800;
-constexpr int WeaponM                       = 3000;
-constexpr int WeaponW                       = 13000;
-constexpr int ShieldM                       = 6500;
-constexpr int ShieldW                       = 16500;
 
 // Angels
 constexpr int TutelaryAngelsPivotPoint      = 10800;
+
+// Holiday tile variants (stored at offset from normal tile index)
+constexpr int HolidayTileOffset             = 10000;
 
 // Splash screen
 constexpr int SplashScreen                  = 18491;
 
 } // namespace hb::client::sprite_id
+
+// Equipment sprite index calculation for the new per-item pak system.
+// Each equippable item gets 12 sprites per gender (one per body pose).
+// Male sprites occupy [0, female_base), female sprites occupy [female_base, ...).
+namespace equip_sprite {
+	constexpr int sprites_per_item = 12;
+	constexpr int male_base = 0;
+	constexpr int female_base = 10000;
+
+	inline int index(bool female, int16_t display_id, int pose) {
+		if (display_id < 0) return -1;
+		return (female ? female_base : male_base) + display_id * sprites_per_item + pose;
+	}
+}

@@ -1,33 +1,37 @@
-﻿#pragma once
+#pragma once
 
-#include "NativeTypes.h"
+#include "control_collection.h"
 #include <string>
+#include <string_view>
 #include <cstdint>
+
+namespace cc { class textbox; }
 
 class text_input_manager
 {
 public:
 	static text_input_manager& get();
 
-	void start_input(int x, int y, unsigned char maxLen, std::string& buffer, bool hidden = false);
+	void start_input(int x, int y, unsigned char max_len, std::string& buffer,
+	                 bool hidden = false, std::string_view char_filter = {});
 	void end_input();
 	void clear_input();
+	void update(uint32_t time_ms);
+	void render();
 	void show_input();
-	std::string get_input_string() const { return m_buffer ? *m_buffer : std::string(); }
-	bool handle_char(hb::shared::types::NativeWindowHandle hWnd, uint32_t msg, uintptr_t wparam, intptr_t lparam);
 
+	std::string get_input_string() const;
 	bool is_active() const { return m_is_active; }
 
+	void set_chat_background(bool show) { m_show_chat_bg = show; }
+	bool shows_chat_background() const { return m_show_chat_bg; }
+
 private:
-	text_input_manager() = default;
-	~text_input_manager() = default;
+	text_input_manager();
 
-	int get_char_kind(const std::string& str, int index);
-
+	cc::control_collection m_controls;
+	cc::textbox* m_active_textbox = nullptr;
 	std::string* m_buffer = nullptr;
-	unsigned char m_max_len = 0;
-	int m_input_x = 0;
-	int m_input_y = 0;
 	bool m_is_active = false;
-	bool m_is_hidden = false;
+	bool m_show_chat_bg = false;
 };

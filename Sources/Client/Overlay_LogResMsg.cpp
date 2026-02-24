@@ -11,12 +11,10 @@
 #include "AudioManager.h"
 #include "TextLibExt.h"
 #include "GameFonts.h"
+#include "InputStateHelper.h"
 #include <format>
 #include <string>
 using namespace hb::client::sprite_id;
-
-
-namespace MouseButton = hb::shared::input::MouseButton;
 
 Overlay_LogResMsg::Overlay_LogResMsg(CGame* game)
     : IGameScreen(game)
@@ -27,21 +25,43 @@ Overlay_LogResMsg::Overlay_LogResMsg(CGame* game)
 
 void Overlay_LogResMsg::on_initialize()
 {
-    m_dwStartTime = GameClock::get_time_ms();
-    m_dwAnimTime = m_dwStartTime;
-
     // Read parameters from CGame (set before change_game_mode call)
-    // m_msg[0] = return destination, m_msg[1] = message code
     m_cReturnDest = m_game->m_msg[0];
     m_cMsgCode = m_game->m_msg[1];
 
     // stop any playing sound
-    audio_manager::get().stop_sound(sound_type::Effect, 38);
+    audio_manager::get().stop_sound(sound_type::effect, 38);
+
+    int dlgX, dlgY;
+    get_centered_dialog_pos(InterfaceNdGame4, 2, dlgX, dlgY);
+
+    m_controls.set_screen_size(LOGICAL_WIDTH(), LOGICAL_HEIGHT());
+    m_controls.set_hover_focus(false);
+    m_controls.set_default_button(BTN_OK);
+
+    auto* btn_ok = m_controls.add<cc::button>(BTN_OK, cc::rect{dlgX + 208, dlgY + 119, ui_layout::btn_size_x, ui_layout::btn_size_y});
+    btn_ok->set_click_sound([this] { audio_manager::get().play_game_sound(sound_type::effect, 14, 5); });
+    btn_ok->set_on_click([this](int) {
+        handle_dismiss();
+    });
+    btn_ok->set_render_handler([this](const cc::control& c) {
+        auto sb = c.screen_bounds();
+        int frame = c.is_highlighted() ? 1 : 0;
+        m_game->m_sprite[InterfaceNdButton]->draw(sb.x, sb.y, frame);
+    });
+
+    m_controls.set_focus_order({BTN_OK});
+    m_controls.set_focus(BTN_OK);
+
+    // Discard stale key state so Enter held from the previous screen
+    // doesn't immediately fire the OK button on the first frame.
+    cc::input_state init_input;
+    hb::client::fill_input_state(init_input);
+    m_controls.discard_pending_input(init_input);
 }
 
 void Overlay_LogResMsg::on_uninitialize()
 {
-    // Nothing to clean up
 }
 
 void Overlay_LogResMsg::handle_dismiss()
@@ -95,44 +115,15 @@ void Overlay_LogResMsg::handle_dismiss()
 
 void Overlay_LogResMsg::on_update()
 {
-    uint32_t time = GameClock::get_time_ms();
+    cc::input_state input;
+    hb::client::fill_input_state(input);
+    m_controls.update(input, GameClock::get_time_ms());
 
-    int dlgX, dlgY;
-    get_centered_dialog_pos(InterfaceNdGame4, 2, dlgX, dlgY);
-
-    // ESC or Enter dismisses the message
-    if (hb::shared::input::is_key_pressed(KeyCode::Escape) || hb::shared::input::is_key_pressed(KeyCode::Enter))
+    // ESC also dismisses
+    if (m_controls.escape_pressed())
     {
         handle_dismiss();
         return;
-    }
-
-    // Check for OK button click
-    if (hb::shared::input::is_mouse_button_pressed(MouseButton::Left))
-    {
-        if (hb::shared::input::is_mouse_in_rect(dlgX + 208, dlgY + 119, ui_layout::btn_size_x, ui_layout::btn_size_y))
-        {
-            handle_dismiss();
-            return;
-        }
-    }
-
-    // Animation frame updates
-    if ((time - m_dwAnimTime) > 100)
-    {
-        m_game->m_menu_frame++;
-        m_dwAnimTime = time;
-    }
-    if (m_game->m_menu_frame >= 8)
-    {
-        m_game->m_menu_dir_cnt++;
-        if (m_game->m_menu_dir_cnt > 8)
-        {
-            m_game->m_menu_dir++;
-            m_game->m_menu_dir_cnt = 1;
-        }
-        if (m_game->m_menu_dir > 8) m_game->m_menu_dir = 1;
-        m_game->m_menu_frame = 0;
     }
 }
 
@@ -289,20 +280,15 @@ void Overlay_LogResMsg::render_message(int dlgX, int dlgY)
 
 void Overlay_LogResMsg::on_render()
 {
-    int mouse_x = hb::shared::input::get_mouse_x();
-    int mouse_y = hb::shared::input::get_mouse_y();
-
     int dlgX, dlgY;
     get_centered_dialog_pos(InterfaceNdGame4, 2, dlgX, dlgY);
 
     // draw dialog box
     draw_new_dialog_box(InterfaceNdGame4, dlgX, dlgY, 2);
 
-    // draw OK button with hover effect
-    bool hover = (mouse_x >= dlgX + 208) && (mouse_x <= dlgX + 208 + ui_layout::btn_size_x) &&
-                  (mouse_y >= dlgY + 119) && (mouse_y <= dlgY + 119 + ui_layout::btn_size_y);
-    draw_new_dialog_box(InterfaceNdButton, dlgX + 208, dlgY + 119, hover ? 1 : 0);
-
     // render the appropriate message
     render_message(dlgX, dlgY);
+
+    // OK button
+    m_controls.render();
 }

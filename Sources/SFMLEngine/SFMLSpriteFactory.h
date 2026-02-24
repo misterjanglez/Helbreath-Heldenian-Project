@@ -24,7 +24,11 @@ public:
 
     // Sprite creation
     hb::shared::sprite::ISprite* create_sprite(const std::string& pakName, int spriteIndex, bool alphaEffect = true) override;
-    hb::shared::sprite::ISprite* create_sprite_from_data(const PAKLib::sprite& spriteData, bool alphaEffect = true) override;
+    hb::shared::sprite::ISprite* create_sprite_from_metadata(
+        const std::vector<PAKLib::sprite_rect>& frames,
+        const std::string& pakFilePath,
+        int spriteIndex,
+        bool alphaEffect = true) override;
 
     // Sprite destruction
     void destroy_sprite(hb::shared::sprite::ISprite* sprite) override;

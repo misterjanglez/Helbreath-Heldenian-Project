@@ -7,7 +7,9 @@
 #pragma once
 
 #include "IGameScreen.h"
+#include "control_collection.h"
 #include <cstdint>
+#include <memory>
 
 class Screen_SelectCharacter : public IGameScreen
 {
@@ -21,25 +23,42 @@ public:
     void on_uninitialize() override;
     void on_update() override;
     void on_render() override;
-
-    // Static helper for drawing the character selection background
-    // Used by this screen and other screens (ChangePassword, QueryForceLogin, etc.)
-    // to maintain the background visual context.
-    static void draw_background(CGame* game, short sX, short sY, short mouse_x, short mouse_y, bool ignore_focus);
+    bool on_net_response(uint16_t response_type, char* data) override;
 
     bool enter_game();
 
 private:
-    // Screen-specific state (migrated from file-scope statics and member vars)
+    void activate_slot(int slot_id);
+    void render_character_previews();
+    void render_tooltip_text();
+    void render_account_info();
+
+    // CControls
+    cc::control_collection m_controls;
+    int m_last_clicked_slot = -1;
+    uint32_t m_last_click_time = 0;
+    bool m_enter_edge = false;
+    bool m_was_suppressed = false;
+    cc::input_state m_prev_input{};
+
+    // Double-click window for slot activation
+    static constexpr uint32_t DOUBLE_CLICK_MS = 400;
+
+    // Animation timer
     uint32_t m_dwSelCharCTime;
-    short m_sSelCharMsX;
-    short m_sSelCharMsY;
-    
-    // Focus state (local to screen)
-    int m_cur_focus;
-    int m_max_focus;
 
     // Offset for centering 640x480 content in 800x600 base resolution
     static constexpr short OX = 80;
     static constexpr short OY = 60;
+
+    // Control IDs
+    static constexpr int SLOT_1 = 1;
+    static constexpr int SLOT_2 = 2;
+    static constexpr int SLOT_3 = 3;
+    static constexpr int SLOT_4 = 4;
+    static constexpr int BTN_ENTER = 10;
+    static constexpr int BTN_NEW = 11;
+    static constexpr int BTN_DELETE = 12;
+    static constexpr int BTN_CHANGE_PW = 13;
+    static constexpr int BTN_EXIT = 14;
 };

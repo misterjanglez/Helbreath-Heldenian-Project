@@ -2,6 +2,8 @@
 
 #include <cstdint>
 #include "EntityRelationship.h"
+#include "DirectionHelpers.h"
+using hb::shared::direction::direction;
 
 class CGame;
 
@@ -15,7 +17,7 @@ public:
 
 	// Core attack calculation
 	uint32_t calculate_attack_effect(short target_h, char target_type, short attacker_h, char attacker_type, int tdX, int tdY, int attack_mode, bool near_attack = false, bool is_dash = false, bool arrow_use = false);
-	bool calculate_endurance_decrement(short target_h, short attacker_h, char target_type, int armor_type);
+	bool calculate_endurance_decrement(short target_h, short attacker_h, char attacker_type, char target_type, int armor_type);
 
 	// Damage application
 	void effect_damage_spot(short attacker_h, char attacker_type, short target_h, char target_type, short v1, short v2, short v3, bool exp, int attr = 0);
@@ -25,8 +27,8 @@ public:
 	void effect_sp_down_spot(short attacker_h, char attacker_type, short target_h, char target_type, short v1, short v2, short v3);
 
 	// Resistance checks
-	bool check_resisting_magic_success(char attacker_dir, short target_h, char target_type, int hit_ratio);
-	bool check_resisting_ice_success(char attacker_dir, short target_h, char target_type, int hit_ratio);
+	bool check_resisting_magic_success(direction attacker_dir, short target_h, char target_type, int hit_ratio);
+	bool check_resisting_ice_success(direction attacker_dir, short target_h, char target_type, int hit_ratio);
 	bool check_resisting_poison_success(short owner_h, char owner_type);
 
 	// Kill handler

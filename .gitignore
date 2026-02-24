@@ -327,6 +327,33 @@ DocProject/Help/html
 *- [Bb]ackup ([0-9]).rdl
 *- [Bb]ackup ([0-9][0-9]).rdl
 
+###########################
+# GCC / CMake / Linux     #
+###########################
+# CMake build directories
+**/build/
+**/cmake-build-*/
+**/CMakeFiles/
+**/CMakeCache.txt
+**/cmake_install.cmake
+**/Makefile
+**/compile_commands.json
+
+# GCC/Clang precompiled headers and dependency files
+**/*.d
+**/*.dwo
+
+# Shared libraries
+**/*.so
+**/*.so.*
+
+# Static libraries (except Dependencies)
+**/*.a
+!**/Dependencies/**/*.a
+
+# FetchContent downloads
+**/_deps/
+
 ########################
 # Project-specific     #
 ########################
@@ -337,6 +364,8 @@ PLANS/
 !**/README.md
 !/CLAUDE*.md
 !/CHANGELOG.md
+!/CODING_STANDARDS.md
+!/VERSION_STANDARDS.md
 
 # Game logs and runtime data
 **/GameLogs/
@@ -345,6 +374,9 @@ PLANS/
 tmpclaude*cwd
 nul
 !/Scripts
+
+# Installer staging folder
+tools/InstallerCreator/Helbreath/
 
 # Backup checkpoints (bak.py)
 **/*.bak_*

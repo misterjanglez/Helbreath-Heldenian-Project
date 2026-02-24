@@ -120,7 +120,7 @@ static inline void GetPoint2(int x0, int y0, int x1, int y1, int* pX, int* pY, i
             result_x += x_inc;
             cnt++;
             if (cnt >= count)
-                goto GP2_DONE;
+                break;
         }
     }
     else {
@@ -133,11 +133,9 @@ static inline void GetPoint2(int x0, int y0, int x1, int y1, int* pX, int* pY, i
             result_y += y_inc;
             cnt++;
             if (cnt >= count)
-                goto GP2_DONE;
+                break;
         }
     }
-
-GP2_DONE:;
 
     *pX = result_x;
     *pY = result_y;

@@ -1,12 +1,13 @@
 // Overlay_VersionNotMatch.h: Version mismatch error overlay
 //
-// Displays version mismatch error. Any input closes the application.
+// Displays version mismatch error. OK button or ESC/Enter closes the application.
 //
 //////////////////////////////////////////////////////////////////////
 
 #pragma once
 
 #include "IGameScreen.h"
+#include "CControls.h"
 
 class Overlay_VersionNotMatch : public IGameScreen
 {
@@ -22,5 +23,9 @@ public:
     void on_render() override;
 
 private:
-    int m_iFrameCount = 0;
+    void close_app();
+
+    static constexpr int BTN_OK = 1;
+
+    cc::control_collection m_controls;
 };

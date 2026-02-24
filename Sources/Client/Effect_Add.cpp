@@ -10,6 +10,7 @@
 #include "GlobalDef.h"
 #include "Misc.h"
 #include "ConfigManager.h"
+#include "AudioManager.h"
 
 
 void effect_manager::add_effect_impl(EffectType type, int sX, int sY, int dX, int dY, char start_frame, int v1)
@@ -69,20 +70,20 @@ void effect_manager::add_effect_impl(EffectType type, int sX, int sY, int dX, in
 				m_effect_list[i]->m_max_frame = 0;
 				m_effect_list[i]->m_frame_time = 10;
 				m_effect_list[i]->m_dir = CMisc::calc_direction(sX, sY, dX, dY);
-				m_game->play_game_sound('C', 4, dist);
+				audio_manager::get().play_game_sound(sound_type::character, 4, dist);
 				break;
 
 			case EffectType::GOLD_DROP: // Gold
 				m_effect_list[i]->m_move_x = sX * 32;
 				m_effect_list[i]->m_move_y = sY * 32;
-				m_effect_list[i]->m_max_frame = 12;
+				m_effect_list[i]->m_max_frame = 3;
 				m_effect_list[i]->m_frame_time = 100;
 				abs_x = abs(((m_game->m_Camera.get_x() / 32) + fixx) - sX);
 				abs_y = abs(((m_game->m_Camera.get_y() / 32) + fixy) - sY);
 				if (abs_x > abs_y) dist = abs_x;
 				else dist = abs_y;
 				lPan = -(((m_game->m_Camera.get_x() / 32) + fixx) - sX) * fixpan;
-				m_game->play_game_sound('E', 12, dist, lPan);
+				audio_manager::get().play_game_sound(sound_type::effect, 12, dist, lPan);
 				break;
 
 			case EffectType::FIREBALL_EXPLOSION: // FireBall Fire Explosion
@@ -96,7 +97,7 @@ void effect_manager::add_effect_impl(EffectType type, int sX, int sY, int dX, in
 				else dist = abs_y;
 				dist = dist / 32;
 				lPan = -(((m_game->m_Camera.get_x() / 32) + fixx) - sX) * fixpan;
-				m_game->play_game_sound('E', 4, dist, lPan);
+				audio_manager::get().play_game_sound(sound_type::effect, 4, dist, lPan);
 				m_game->set_camera_shaking_effect(dist);
 				break;
 
@@ -112,7 +113,7 @@ void effect_manager::add_effect_impl(EffectType type, int sX, int sY, int dX, in
 				else dist = abs_y;
 				dist = dist / 32;
 				lPan = -(((m_game->m_Camera.get_x() / 32) + fixx) - sX) * fixpan;
-				m_game->play_game_sound('E', 2, dist, lPan);
+				audio_manager::get().play_game_sound(sound_type::effect, 2, dist, lPan);
 				m_game->set_camera_shaking_effect(dist);
 				break;
 
@@ -127,7 +128,7 @@ void effect_manager::add_effect_impl(EffectType type, int sX, int sY, int dX, in
 				else dist = abs_y;
 				dist = dist / 32;
 				lPan = -(((m_game->m_Camera.get_x() / 32) + fixx) - sX) * fixpan;
-				m_game->play_game_sound('E', 3, dist, lPan);
+				audio_manager::get().play_game_sound(sound_type::effect, 3, dist, lPan);
 				break;
 
 			case EffectType::BURST_SMALL: // Burst
@@ -250,7 +251,7 @@ void effect_manager::add_effect_impl(EffectType type, int sX, int sY, int dX, in
 				else dist = abs_y;
 				dist = dist / 32;
 				lPan = -(((m_game->m_Camera.get_x() / 32) + fixx) - sX) * fixpan;
-				m_game->play_game_sound('E', 4, dist, lPan);
+				audio_manager::get().play_game_sound(sound_type::effect, 4, dist, lPan);
 				m_game->set_camera_shaking_effect(dist * 2);
 				break;
 
@@ -266,7 +267,7 @@ void effect_manager::add_effect_impl(EffectType type, int sX, int sY, int dX, in
 				else dist = abs_y;
 				dist = dist / 32;
 				lPan = -(((m_game->m_Camera.get_x() / 32) + fixx) - sX) * fixpan;
-				m_game->play_game_sound('E', 4, dist, lPan);
+				audio_manager::get().play_game_sound(sound_type::effect, 4, dist, lPan);
 				m_game->set_camera_shaking_effect(dist);
 				break;
 
@@ -291,11 +292,6 @@ void effect_manager::add_effect_impl(EffectType type, int sX, int sY, int dX, in
 				m_effect_list[i]->m_error = 0;
 				m_effect_list[i]->m_max_frame = 0;
 				m_effect_list[i]->m_frame_time = 20;
-				abs_x = abs(x - (sX - m_game->m_Camera.get_x()));
-				abs_y = abs(y - (sY - m_game->m_Camera.get_y()));
-				if (abs_x > abs_y) dist = abs_x;
-				else dist = abs_y;
-				dist = dist / 32;
 				m_game->set_camera_shaking_effect(dist);
 				break;
 
@@ -310,7 +306,7 @@ void effect_manager::add_effect_impl(EffectType type, int sX, int sY, int dX, in
 				else dist = abs_y;
 				dist = dist / 32;
 				lPan = -(((m_game->m_Camera.get_x() / 32) + fixx) - sX) * fixpan;
-				m_game->play_game_sound('E', 4, dist, lPan);
+				audio_manager::get().play_game_sound(sound_type::effect, 4, dist, lPan);
 				m_game->set_camera_shaking_effect(dist * 2);
 				break;
 
@@ -325,7 +321,7 @@ void effect_manager::add_effect_impl(EffectType type, int sX, int sY, int dX, in
 				else dist = abs_y;
 				dist = dist / 32;
 				lPan = -(((m_game->m_Camera.get_x() / 32) + fixx) - sX) * fixpan;
-				m_game->play_game_sound('E', 4, dist, lPan);
+				audio_manager::get().play_game_sound(sound_type::effect, 4, dist, lPan);
 				m_game->set_camera_shaking_effect(dist);
 				break;
 
@@ -340,7 +336,7 @@ void effect_manager::add_effect_impl(EffectType type, int sX, int sY, int dX, in
 				else dist = abs_y;
 				dist = dist / 32;
 				lPan = ((sX - m_game->m_Camera.get_x()) - x) * 30;
-				m_game->play_game_sound('E', 45, dist, lPan);
+				audio_manager::get().play_game_sound(sound_type::effect, 45, dist, lPan);
 				break;
 
 			case EffectType::ICE_STRIKE_VARIANT_1: // Large Type 1, 2, 3, 4
@@ -360,7 +356,7 @@ void effect_manager::add_effect_impl(EffectType type, int sX, int sY, int dX, in
 				else dist = abs_y;
 				dist = dist / 32;
 				lPan = ((sX - m_game->m_Camera.get_x()) - x) * 30;
-				m_game->play_game_sound('E', 46, dist, lPan);
+				audio_manager::get().play_game_sound(sound_type::effect, 46, dist, lPan);
 				break;
 
 			case EffectType::BLIZZARD_VARIANT_1: // Blizzard
@@ -377,7 +373,7 @@ void effect_manager::add_effect_impl(EffectType type, int sX, int sY, int dX, in
 				else dist = abs_y;
 				dist = dist / 32;
 				lPan = ((sX - m_game->m_Camera.get_x()) - x) * 30;
-				m_game->play_game_sound('E', 46, dist, lPan);
+				audio_manager::get().play_game_sound(sound_type::effect, 46, dist, lPan);
 				break;
 
 			case EffectType::SMOKE_DUST: //
@@ -392,7 +388,7 @@ void effect_manager::add_effect_impl(EffectType type, int sX, int sY, int dX, in
 				dist = dist / 32;
 				lPan = ((sX - m_game->m_Camera.get_x()) - x) * 30;
 				if ((rand() % 4) == 1) m_game->set_camera_shaking_effect(dist);
-				m_game->play_game_sound('E', 47, dist, lPan);
+				audio_manager::get().play_game_sound(sound_type::effect, 47, dist, lPan);
 				break;
 
 			case EffectType::SPARKLE_SMALL:
@@ -413,7 +409,7 @@ void effect_manager::add_effect_impl(EffectType type, int sX, int sY, int dX, in
 				else dist = abs_y;
 				dist = dist / 32;
 				lPan = ((sX - m_game->m_Camera.get_x()) - x) * 30;
-				m_game->play_game_sound('E', 5, dist, lPan);
+				audio_manager::get().play_game_sound(sound_type::effect, 5, dist, lPan);
 				break;
 
 			case EffectType::HOLD_TWIST: // Hold twist
@@ -427,7 +423,7 @@ void effect_manager::add_effect_impl(EffectType type, int sX, int sY, int dX, in
 				else dist = abs_y;
 				dist = dist / 32;
 				lPan = ((sX - m_game->m_Camera.get_x()) - x) * 30;
-				m_game->play_game_sound('E', 5, dist, lPan);
+				audio_manager::get().play_game_sound(sound_type::effect, 5, dist, lPan);
 				break;
 
 			case EffectType::STAR_TWINKLE: // star twingkling (effect armes brillantes)
@@ -449,7 +445,7 @@ void effect_manager::add_effect_impl(EffectType type, int sX, int sY, int dX, in
 				else dist = abs_y;
 				dist = dist / 32;
 				lPan = ((sX - m_game->m_Camera.get_x()) - x) * 30;
-				m_game->play_game_sound('E', 45, dist, lPan);
+				audio_manager::get().play_game_sound(sound_type::effect, 45, dist, lPan);
 				break;
 
 			case EffectType::BUFF_EFFECT_LIGHT: //
@@ -477,7 +473,7 @@ void effect_manager::add_effect_impl(EffectType type, int sX, int sY, int dX, in
 				else dist = abs_y;
 				dist = dist / 32;
 				lPan = -(((m_game->m_Camera.get_x() / 32) + fixx) - sX) * fixpan;
-				m_game->play_game_sound('E', 4, dist, lPan);
+				audio_manager::get().play_game_sound(sound_type::effect, 4, dist, lPan);
 				m_game->set_camera_shaking_effect(dist, 2);
 				break;
 
@@ -520,7 +516,7 @@ void effect_manager::add_effect_impl(EffectType type, int sX, int sY, int dX, in
 				else dist = abs_y;
 				dist = dist / 32;
 				lPan = -(((m_game->m_Camera.get_x() / 32) + fixx) - sX) * fixpan;
-				m_game->play_game_sound('E', 4, dist, lPan);
+				audio_manager::get().play_game_sound(sound_type::effect, 4, dist, lPan);
 				m_game->set_camera_shaking_effect(dist, 2);
 				break;
 
@@ -542,7 +538,7 @@ void effect_manager::add_effect_impl(EffectType type, int sX, int sY, int dX, in
 				else dist = abs_y;
 				dist = dist / 32;
 				lPan = -(((m_game->m_Camera.get_x() / 32) + fixx) - sX) * fixpan;
-				m_game->play_game_sound('E', 4, dist, lPan);
+				audio_manager::get().play_game_sound(sound_type::effect, 4, dist, lPan);
 				m_effect_list[i]->m_value1 = dist;
 				break;
 
@@ -557,7 +553,7 @@ void effect_manager::add_effect_impl(EffectType type, int sX, int sY, int dX, in
 				else dist = abs_y;
 				dist = dist / 32;
 				lPan = -(((m_game->m_Camera.get_x() / 32) + fixx) - sX) * fixpan;
-				m_game->play_game_sound('E', 42, dist, lPan);
+				audio_manager::get().play_game_sound(sound_type::effect, 42, dist, lPan);
 				break;
 
 			case EffectType::LIGHT_EFFECT_2: // identtique au cas 69
@@ -571,7 +567,7 @@ void effect_manager::add_effect_impl(EffectType type, int sX, int sY, int dX, in
 				else dist = abs_y;
 				dist = dist / 32;
 				lPan = -(((m_game->m_Camera.get_x() / 32) + fixx) - sX) * fixpan;
-				m_game->play_game_sound('E', 42, dist, lPan);
+				audio_manager::get().play_game_sound(sound_type::effect, 42, dist, lPan);
 				break;
 
 			case EffectType::BLIZZARD_PROJECTILE: //
@@ -580,11 +576,6 @@ void effect_manager::add_effect_impl(EffectType type, int sX, int sY, int dX, in
 				m_effect_list[i]->m_error = 0;
 				m_effect_list[i]->m_max_frame = 0;
 				m_effect_list[i]->m_frame_time = 20;
-				abs_x = abs(x - (sX - m_game->m_Camera.get_x()));
-				abs_y = abs(y - (sY - m_game->m_Camera.get_y()));
-				if (abs_x > abs_y) dist = abs_x;
-				else dist = abs_y;
-				dist = dist / 32;
 				m_game->set_camera_shaking_effect(dist);
 				break;
 
@@ -600,7 +591,7 @@ void effect_manager::add_effect_impl(EffectType type, int sX, int sY, int dX, in
 				dist = dist / 32;
 				lPan = ((sX - m_game->m_Camera.get_x()) - x) * 30;
 				if ((rand() % 4) == 1) m_game->set_camera_shaking_effect(dist);
-				m_game->play_game_sound('E', 47, dist, lPan);
+				audio_manager::get().play_game_sound(sound_type::effect, 47, dist, lPan);
 				break;
 
 			case EffectType::AURA_EFFECT_1:
@@ -678,7 +669,7 @@ void effect_manager::add_effect_impl(EffectType type, int sX, int sY, int dX, in
 				m_effect_list[i]->m_max_frame = 0;
 				m_effect_list[i]->m_frame_time = 20;
 				lPan = -(((m_game->m_Camera.get_x() / 32) + fixx) - sX) * fixpan;
-				m_game->play_game_sound('E', 1, dist, lPan);
+				audio_manager::get().play_game_sound(sound_type::effect, 1, dist, lPan);
 				break;
 
 			case EffectType::HEAL: // Heal
@@ -689,7 +680,7 @@ void effect_manager::add_effect_impl(EffectType type, int sX, int sY, int dX, in
 				m_effect_list[i]->m_max_frame = 14;
 				m_effect_list[i]->m_frame_time = 80;
 				lPan = -(((m_game->m_Camera.get_x() / 32) + fixx) - sX) * fixpan;
-				m_game->play_game_sound('E', 5, dist, lPan);
+				audio_manager::get().play_game_sound(sound_type::effect, 5, dist, lPan);
 				break;
 
 			case EffectType::CREATE_FOOD: // CreateFood
@@ -706,7 +697,7 @@ void effect_manager::add_effect_impl(EffectType type, int sX, int sY, int dX, in
 				m_effect_list[i]->m_max_frame = 13;
 				m_effect_list[i]->m_frame_time = 120;
 				lPan = -(((m_game->m_Camera.get_x() / 32) + fixx) - sX) * fixpan;
-				m_game->play_game_sound('E', 5, dist, lPan);
+				audio_manager::get().play_game_sound(sound_type::effect, 5, dist, lPan);
 				break;
 
 			case EffectType::ENERGY_BOLT_FLYING: // Energy-Bolt
@@ -716,7 +707,7 @@ void effect_manager::add_effect_impl(EffectType type, int sX, int sY, int dX, in
 				m_effect_list[i]->m_max_frame = 0;
 				m_effect_list[i]->m_frame_time = 20;
 				lPan = -(((m_game->m_Camera.get_x() / 32) + fixx) - sX) * fixpan;
-				m_game->play_game_sound('E', 1, dist, lPan);
+				audio_manager::get().play_game_sound(sound_type::effect, 1, dist, lPan);
 				break;
 
 			case EffectType::RECALL: // Recall
@@ -726,7 +717,7 @@ void effect_manager::add_effect_impl(EffectType type, int sX, int sY, int dX, in
 				m_effect_list[i]->m_max_frame = 12;
 				m_effect_list[i]->m_frame_time = 80;
 				lPan = -(((m_game->m_Camera.get_x() / 32) + fixx) - sX) * fixpan;
-				m_game->play_game_sound('E', 5, dist, lPan);
+				audio_manager::get().play_game_sound(sound_type::effect, 5, dist, lPan);
 				break;
 
 			case EffectType::DEFENSE_SHIELD: // Defense-Shield
@@ -734,7 +725,7 @@ void effect_manager::add_effect_impl(EffectType type, int sX, int sY, int dX, in
 				m_effect_list[i]->m_max_frame = 12;
 				m_effect_list[i]->m_frame_time = 120;
 				lPan = -(((m_game->m_Camera.get_x() / 32) + fixx) - sX) * fixpan;
-				m_game->play_game_sound('E', 5, dist, lPan);
+				audio_manager::get().play_game_sound(sound_type::effect, 5, dist, lPan);
 				break;
 
 			case EffectType::CELEBRATING_LIGHT: // Celebrating Light
@@ -753,7 +744,7 @@ void effect_manager::add_effect_impl(EffectType type, int sX, int sY, int dX, in
 				m_effect_list[i]->m_frame_time = 20;
 				m_effect_list[i]->m_dir = CMisc::calc_direction(sX, sY, dX, dY);
 				lPan = -(((m_game->m_Camera.get_x() / 32) + fixx) - sX) * fixpan;
-				m_game->play_game_sound('E', 1, dist, lPan);
+				audio_manager::get().play_game_sound(sound_type::effect, 1, dist, lPan);
 				break;
 
 			case EffectType::PROTECT_FROM_NM: // Protect form N.M
@@ -775,12 +766,12 @@ void effect_manager::add_effect_impl(EffectType type, int sX, int sY, int dX, in
 				m_effect_list[i]->m_frame_time = 20;
 				m_effect_list[i]->m_dir = CMisc::calc_direction(sX, sY, dX, dY);
 				lPan = -(((m_game->m_Camera.get_x() / 32) + fixx) - sX) * fixpan;
-				m_game->play_game_sound('E', 1, dist, lPan);
+				audio_manager::get().play_game_sound(sound_type::effect, 1, dist, lPan);
 				break;
 
 			case EffectType::TREMOR: // Tremor.
 				lPan = -(((m_game->m_Camera.get_x() / 32) + fixx) - sX) * fixpan;
-				m_game->play_game_sound('E', 4, dist, lPan);
+				audio_manager::get().play_game_sound(sound_type::effect, 4, dist, lPan);
 				m_game->set_camera_shaking_effect(dist, 2);
 				add_effect_impl( EffectType::FOOTPRINT, dX * 32 + (rand() % 120) - 60, dY * 32 + (rand() % 80) - 40, 0, 0, 0, 0);
 				add_effect_impl( EffectType::FOOTPRINT, dX * 32 + (rand() % 120) - 60, dY * 32 + (rand() % 80) - 40, 0, 0, 0, 0);
@@ -810,7 +801,7 @@ void effect_manager::add_effect_impl(EffectType type, int sX, int sY, int dX, in
 				m_effect_list[i]->m_max_frame = 7;
 				m_effect_list[i]->m_frame_time = 10;
 				lPan = -(((m_game->m_Camera.get_x() / 32) + fixx) - sX) * fixpan;
-				m_game->play_game_sound('E', 40, dist, lPan);
+				audio_manager::get().play_game_sound(sound_type::effect, 40, dist, lPan);
 				break;
 
 			case EffectType::CHILL_WIND: // ChillWind
@@ -832,7 +823,7 @@ void effect_manager::add_effect_impl(EffectType type, int sX, int sY, int dX, in
 				m_effect_list[i]->m_max_frame = 11;
 				m_effect_list[i]->m_frame_time = 100;
 				lPan = -(((m_game->m_Camera.get_x() / 32) + fixx) - sX) * fixpan;
-				m_game->play_game_sound('E', 5, dist, lPan);
+				audio_manager::get().play_game_sound(sound_type::effect, 5, dist, lPan);
 				break;
 
 			case EffectType::LIGHTNING_BOLT: // LightningBolt
@@ -844,7 +835,7 @@ void effect_manager::add_effect_impl(EffectType type, int sX, int sY, int dX, in
 				m_effect_list[i]->m_max_frame = 10;
 				m_effect_list[i]->m_frame_time = 10;
 				lPan = -(((m_game->m_Camera.get_x() / 32) + fixx) - sX) * fixpan;
-				m_game->play_game_sound('E', 40, dist, lPan);
+				audio_manager::get().play_game_sound(sound_type::effect, 40, dist, lPan);
 				break;
 
 			case EffectType::MASS_LIGHTNING_ARROW: // Mass-Ligtning-Arrow
@@ -871,7 +862,7 @@ void effect_manager::add_effect_impl(EffectType type, int sX, int sY, int dX, in
 				m_effect_list[i]->m_frame_time = 20;
 				m_effect_list[i]->m_dir = CMisc::calc_direction(sX, sY, dX, dY);
 				lPan = -(((m_game->m_Camera.get_x() / 32) + fixx) - sX) * fixpan;
-				m_game->play_game_sound('E', 1, dist, lPan);
+				audio_manager::get().play_game_sound(sound_type::effect, 1, dist, lPan);
 				break;
 
 			case EffectType::MASS_CHILL_WIND_SPELL: // Mass-Chill-Wind
@@ -881,7 +872,7 @@ void effect_manager::add_effect_impl(EffectType type, int sX, int sY, int dX, in
 
 			case EffectType::WORM_BITE_MASS: // worm-bite
 				lPan = -(((m_game->m_Camera.get_x() / 32) + fixx) - sX) * fixpan;
-				m_game->play_game_sound('E', 4, dist, lPan);
+				audio_manager::get().play_game_sound(sound_type::effect, 4, dist, lPan);
 				add_effect_impl( EffectType::FOOTPRINT, dX * 32 + (rand() % 120) - 60, dY * 32 + (rand() % 80) - 40, 0, 0, 0, 0);
 				add_effect_impl( EffectType::FOOTPRINT, dX * 32 + (rand() % 120) - 60, dY * 32 + (rand() % 80) - 40, 0, 0, 0, 0);
 				add_effect_impl( EffectType::FOOTPRINT, dX * 32 + (rand() % 120) - 60, dY * 32 + (rand() % 80) - 40, 0, 0, 0, 0);
@@ -905,14 +896,14 @@ void effect_manager::add_effect_impl(EffectType type, int sX, int sY, int dX, in
 				m_effect_list[i]->m_max_frame = 21;
 				m_effect_list[i]->m_frame_time = 70;
 				lPan = -(((m_game->m_Camera.get_x() / 32) + fixx) - sX) * fixpan;
-				m_game->play_game_sound('E', 5, dist, lPan);
+				audio_manager::get().play_game_sound(sound_type::effect, 5, dist, lPan);
 				break;
 
 			case EffectType::ARMOR_BREAK: // Armor Break
 				m_effect_list[i]->m_max_frame = 13;
 				m_effect_list[i]->m_frame_time = 80;
 				lPan = -(((m_game->m_Camera.get_x() / 32) + fixx) - sX) * fixpan;
-				m_game->play_game_sound('E', 5, dist, lPan);
+				audio_manager::get().play_game_sound(sound_type::effect, 5, dist, lPan);
 				break;
 
 			case EffectType::BLOODY_SHOCK_WAVE: // Bloody-Shock-Wave
@@ -935,7 +926,7 @@ void effect_manager::add_effect_impl(EffectType type, int sX, int sY, int dX, in
 				m_effect_list[i]->m_frame_time = 60;
 				dist = dist / 32;
 				lPan = -(((m_game->m_Camera.get_x() / 32) + fixx) - sX) * fixpan;
-				m_game->play_game_sound('E', 5, dist, lPan);
+				audio_manager::get().play_game_sound(sound_type::effect, 5, dist, lPan);
 				break;
 
 			case EffectType::METEOR_STRIKE_DESCENDING: // MS
@@ -952,7 +943,7 @@ void effect_manager::add_effect_impl(EffectType type, int sX, int sY, int dX, in
 				m_effect_list[i]->m_max_frame = 0;
 				m_effect_list[i]->m_frame_time = 20;
 				lPan = -(((m_game->m_Camera.get_x() / 32) + fixx) - sX) * fixpan;
-				m_game->play_game_sound('E', 1, dist, lPan);
+				audio_manager::get().play_game_sound(sound_type::effect, 1, dist, lPan);
 				break;
 
 			case EffectType::MASS_MM_AURA_CASTER: // Snoopy: Moved for new spells: Caster aura for Mass MagicMissile
@@ -991,11 +982,6 @@ void effect_manager::add_effect_impl(EffectType type, int sX, int sY, int dX, in
 				m_effect_list[i]->m_error = 0;
 				m_effect_list[i]->m_max_frame = 30;
 				m_effect_list[i]->m_frame_time = 25;
-				abs_x = abs(x - (sX - m_game->m_Camera.get_x()));
-				abs_y = abs(y - (sY - m_game->m_Camera.get_y()));
-				if (abs_x > abs_y) dist = abs_x;
-				else dist = abs_y;
-				dist = dist / 32;
 				m_game->set_camera_shaking_effect(dist);
 				break;
 			case EffectType::SHOTSTAR_FALL_1: //

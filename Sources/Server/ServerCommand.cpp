@@ -1,4 +1,5 @@
 #include "ServerCommand.h"
+#include "ServerConsole.h"
 #include "CmdHelp.h"
 #include "CmdShowChat.h"
 #include "CmdBroadcast.h"
@@ -6,10 +7,11 @@
 #include "CmdReload.h"
 #include "CmdSetAdmin.h"
 #include "CmdSetCmdLevel.h"
+#include "CmdSaveAll.h"
+#include "CmdShutdown.h"
 #include "Game.h"
 #include <cstring>
 #include <cstdio>
-#include "Log.h"
 #include "StringCompat.h"
 
 ServerCommandManager& ServerCommandManager::get()
@@ -68,7 +70,8 @@ bool ServerCommandManager::process_command(const char* input)
 		}
 	}
 
-	hb::logger::log("Unknown command: '{}'. Type 'help' for a list of commands.", cmdStart);
+	hb::console::error("Unknown command: '{}'. Type 'help' for a list of commands.",
+		std::string(cmdStart, cmdLen));
 	return false;
 }
 
@@ -81,4 +84,6 @@ void ServerCommandManager::register_built_in_commands()
 	register_command(std::make_unique<CmdReload>());
 	register_command(std::make_unique<CmdSetAdmin>());
 	register_command(std::make_unique<CmdSetCmdLevel>());
+	register_command(std::make_unique<CmdSaveAll>());
+	register_command(std::make_unique<CmdShutdown>());
 }

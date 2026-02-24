@@ -32,7 +32,7 @@ extern bool G_bRunning;
 #include "Skill.h"
 #include "DynamicObject.h"
 #include "DelayEvent.h"
-#include "Version.h"
+#include "version_info.h"
 #include "Fish.h"
 #include "DynamicObject.h"
 #include "DynamicObjectID.h"
@@ -46,6 +46,8 @@ extern bool G_bRunning;
 #include "PartyManager.h"
 #include "IOServicePool.h"
 #include "ConcurrentMsgQueue.h"
+#include "ServerConfig.h"
+#include "FormulaEngine.h"
 
 namespace hb::server::config
 {
@@ -153,7 +155,7 @@ struct DropTable
 // Shop system structures
 struct NpcShopMapping
 {
-	int npc_type;                    // NPC type (15=ShopKeeper, 24=Blacksmith)
+	int npc_config_id;               // NPC config ID from npc_configs table
 	int shop_id;                     // Which shop inventory to use
 	char description[64];           // For documentation
 };
@@ -258,6 +260,7 @@ public:
 
 	void request_noticement_handler(int client_h);
 	bool send_client_npc_configs(int client_h);
+	bool send_client_map_configs(int client_h);
 
 	LoginClient* _lclients[hb::server::config::MaxClientLoginSock];
 
@@ -274,8 +277,12 @@ public:
 	void local_update_configs(char config_type);
 
 	void reload_npc_configs();
-	void send_config_reload_notification(bool items, bool magic, bool skills, bool npcs);
-	void push_config_reload_to_clients(bool items, bool magic, bool skills, bool npcs);
+	void reload_shop_configs();
+	void send_config_reload_notification(bool items, bool magic, bool skills, bool npcs, bool balance = false);
+	void push_config_reload_to_clients(bool items, bool magic, bool skills, bool npcs, bool balance = false);
+	void apply_server_config(const server_config& cfg);
+	bool reload_server_config();
+	bool reload_formulas();
 
 
 	
@@ -351,6 +358,7 @@ public:
 	void special_event_handler();
 	
 	int force_player_disconnect(int num);
+	int save_all_players();
 	int get_map_index(char * map_name);
 	void weather_processor();
 	int calc_player_num(char map_index, short dX, short dY, char radius);
@@ -382,15 +390,17 @@ public:
 	void quit();
 	void release_follow_mode(short owner_h, char owner_type);
 	void request_teleport_handler(int client_h, const char * data, const char * map_name = 0, int dX = -1, int dY = -1);
+	void request_teleport_auth_handler(int client_h, const char * data);
 	void toggle_combat_mode_handler(int client_h);
 	void time_hit_points_up(int client_h);
 	void on_start_game_signal();
 	uint32_t dice(uint32_t iThrow, uint32_t range);
 	bool init_npc_attr(class CNpc * npc, int npc_config_id, short sClass, char sa);
 	int get_npc_config_id_by_name(const char * npc_name) const;
-	void send_notify_msg(int from_h, int to_h, uint16_t msg_type, uint32_t v1, uint32_t v2, uint32_t v3, const char * string, uint32_t v4 = 0, uint32_t v5 = 0, uint32_t v6 = 0, uint32_t v7 = 0, uint32_t v8 = 0, uint32_t v9 = 0, const char * string2 = 0);
+	void send_notify_msg(int from_h, int to_h, uint16_t msg_type, uint32_t v1, uint64_t v2, uint32_t v3, const char * string, uint32_t v4 = 0, uint32_t v5 = 0, uint32_t v6 = 0, uint32_t v7 = 0, uint32_t v8 = 0, uint32_t v9 = 0, const char * string2 = 0);
+
 	void broadcast_server_message(const char* message);
-	int  client_motion_stop_handler(int client_h, short sX, short sY, char dir);
+	int  client_motion_stop_handler(int client_h, short sX, short sY, direction dir);
 
 	
 	void client_common_handler(int client_h, char * data);
@@ -399,8 +409,8 @@ public:
 	bool put_msg_queue(char cFrom, char * data, size_t msg_size, int index, char key);
 	//int  calculate_attack_effect(short target_h, char target_type, short attacker_h, char attacker_type, int tdX, int tdY, int attack_mode, bool near_attack = false);
 	bool get_empty_position(short * pX, short * pY, char map_index);
-	char get_next_move_dir(short sX, short sY, short dstX, short dstY, char map_index, char turn, int * error_acc);
-	int  client_motion_attack_handler(int client_h, short sX, short sY, short dX, short dY, short type, char dir, uint16_t target_object_id, uint32_t client_time, bool response = true, bool is_dash = false);
+	direction get_next_move_dir(short sX, short sY, short dstX, short dstY, char map_index, char turn, int * error_acc);
+	int  client_motion_attack_handler(int client_h, short sX, short sY, short dX, short dY, short type, direction dir, uint16_t target_object_id, uint32_t client_time, bool response = true, bool is_dash = false);
 	void chat_msg_handler(int client_h, char * data, size_t msg_size);
 	bool is_blocked_by(int sender_h, int receiver_h) const;
 	void npc_process();
@@ -413,7 +423,7 @@ public:
 	void response_player_data_handler(char * data, uint32_t size);
 	void check_client_response_time();
 	void on_timer(char type);
-	int compose_move_map_data(short sX, short sY, int client_h, char dir, char * data);
+	int compose_move_map_data(short sX, short sY, int client_h, direction dir, char * data);
 	void send_event_to_near_client_type_b(uint32_t msg_id, uint16_t msg_type, char map_index, short sX, short sY, short v1, short v2, short v3, short v4 = 0);
 	void send_event_to_near_client_type_b(uint32_t msg_id, uint16_t msg_type, char map_index, short sX, short sY, short v1, short v2, short v3, uint32_t v4 = 0);
 	void send_event_to_near_client_type_a(short owner_h, char owner_type, uint32_t msg_id, uint16_t msg_type, short v1, short v2, short v3);
@@ -423,7 +433,7 @@ public:
 	void fill_npc_map_object(hb::net::PacketMapDataObjectNpc& obj, short owner_h, int viewer_h);
 	void request_init_data_handler(int client_h, char * data, char key, size_t msg_size = 0);
 	void request_init_player_handler(int client_h, char * data, char key);
-	int client_motion_move_handler(int client_h, short sX, short sY, char dir, char move_type);
+	int client_motion_move_handler(int client_h, short sX, short sY, direction dir, char move_type);
 	void client_motion_handler(int client_h, char * data);
 	void on_client_read(int client_h);
 	bool init();
@@ -465,7 +475,7 @@ public:
 	CGame();
 	virtual ~CGame();
 
-	// Realm configuration (from realmlist table)
+	// Realm configuration (from server_config.json)
 	char m_realm_name[32];
 	char m_login_listen_ip[16];
 	int  m_login_listen_port;
@@ -511,7 +521,7 @@ public:
 
 	// Shop system - server sends shop contents to client by item IDs
 	bool m_is_shop_data_available;
-	std::map<int, int> m_npc_shop_mappings;        // npc_type  shop_id
+	std::map<int, int> m_npc_shop_mappings;        // npc_config_id  shop_id
 	std::map<int, ShopData> m_shop_data;          // shop_id  ShopData
 	CItem   * m_item_config_list[hb::server::config::MaxItemTypes];
 	class CNpc    * m_npc_config_list[hb::server::config::MaxNpcTypes];
@@ -519,8 +529,10 @@ public:
 	class CSkill  * m_skill_config_list[hb::shared::limits::MaxSkillType];
 	//class CTeleport * m_pTeleportConfigList[DEF_MAXTELEPORTTYPE];
 
-	uint32_t m_config_hash[4]{};
+	std::string m_config_hash[6];
 	void compute_config_hashes();
+	void compute_balance_hash();
+	bool send_client_balance_config(int client_h);
 
 	class hb::shared::net::ASIOSocket* _lsock;
 
@@ -540,6 +552,12 @@ public:
 
 	bool  m_on_exit_process;
 	uint32_t m_exit_process_time;
+
+	uint32_t m_shutdown_start_time;          // When scheduled shutdown was requested (0 = not scheduled)
+	uint32_t m_shutdown_delay_ms;            // Total delay in ms from m_shutdown_start_time
+	std::vector<int> m_shutdown_milestones;  // Countdown display points in seconds (descending)
+	int m_shutdown_next_milestone;           // Index into m_shutdown_milestones
+	char m_shutdown_message[128];            // Custom message for noticement dialog
 
 	uint32_t m_weather_time, m_game_time_1, m_game_time_2, m_game_time_3, m_game_time_4, m_game_time_5, m_game_time_6;
 	
@@ -730,8 +748,11 @@ public:
 	char m_rep_drop_modifier;
 
 	// ============================================================================
-	// Configurable Settings (loaded from gameconfigs.db)
+	// Configurable Settings (loaded from server_config.json)
 	// ============================================================================
+
+	server_config m_server_config;
+	hb::shared::formula_engine m_formula_engine;
 
 	// Timing Settings (milliseconds)
 	int m_client_timeout;           // client-timeout-ms
@@ -782,6 +803,8 @@ public:
 	void check_force_recall_time(int client_h);
 	void set_playing_status(int client_h);
 	void force_change_play_mode(int client_h, bool notify);
+	hb::shared::entity::PlayerAppearance build_broadcast_appearance(int client_h);
+
 	void show_version(int client_h);
 	void show_client_msg(int client_h, char* pMsg);
 	void request_resurrect_player(int client_h, bool resurrect);

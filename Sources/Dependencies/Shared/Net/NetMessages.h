@@ -40,6 +40,8 @@ namespace MsgId
 		MagicConfigContents                     = 0x0FA314E0,
 		SkillConfigContents                     = 0x0FA314E1,
 		NpcConfigContents                       = 0x0FA314E4,
+		MapConfigContents                       = 0x0FA314E6,
+		BalanceConfigContents                   = 0x0FA314E7,
 		RequestConfigData                       = 0x0FA314E3,
 		NotifyConfigReload                      = 0x0FA314E5,
 		PlayerItemListContents                  = 0x0FA314DD,
@@ -70,6 +72,7 @@ namespace MsgId
 		ResponseRetrieveItem                    = 0x0DF30752,
 		request_full_object_data                   = 0x0DF40000,
 		RequestTeleport                         = 0x0EA03201,
+		RequestTeleportAuth                     = 0x0EA03203,
 		RequestHeldenianScroll                  = 0x3D001244,
 		LevelUpSettings                         = 0x11A01000,
 		DynamicObject                           = 0x12A01001,
@@ -152,6 +155,13 @@ namespace CommonType
 		EnchantItem                             = 0x0A73,
 		UpgradeEnchant                          = 0x0A74,
 		DisenchantItem                          = 0x0A75,
+#ifdef TESTER_ONLY
+		// TESTER MENU — tester-only commands
+		TesterAction                            = 0x0A76,
+		TesterItemSearch                        = 0x0A77,
+		TesterCreateItem                        = 0x0A78,
+		TesterMapList                           = 0x0A79,
+#endif // TESTER_ONLY
 		ReqRepairAll                            = 0x0F10,
 		ReqRepairAllDelete                      = 0x0F12,
 		ReqRepairAllConfirm                     = 0x0F13,
@@ -340,8 +350,15 @@ namespace Notify
 		SpellSkill                              = 0x0BF6,
 		SpellInterrupted                        = 0x0BF7,
 		ItemObtainedBulk                        = 0x0BF8,
+		TeleportApproved                        = 0x0BF9,
 		RepairAllPrices                         = 0x0F11,
 		MobKills                                = 0x0A68,
+#ifdef TESTER_ONLY
+		// TESTER MENU — tester-only notifications
+		Contribution                            = 0x0A69,
+		TesterItemSearchResult                  = 0x0A6A,
+		TesterMapListResult                     = 0x0A6B,
+#endif // TESTER_ONLY
 	};
 }
 
@@ -373,6 +390,7 @@ namespace LogResMsg
 		ForceChangePassword                     = 0x0A05,
 		InvalidKoreanSsn                        = 0x0A06,
 		LessThenFifteen                         = 0x0A07,
+		VersionMismatch                         = 0x0A08,
 	};
 }
 

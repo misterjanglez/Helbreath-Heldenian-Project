@@ -128,8 +128,6 @@ namespace net {
 		int16_t item_index;
 		uint8_t item_type;
 		int16_t cur_lifespan;
-		int16_t sprite;
-		int16_t sprite_frame;
 		uint8_t item_color;
 		uint8_t spec_value2;
 		uint32_t attribute;
@@ -260,6 +258,8 @@ namespace net {
 	struct HB_PACKED PacketNotifyServerShutdown {
 		PacketHeader header;
 		uint8_t mode;
+		uint16_t seconds;
+		char message[128];
 	};
 
 	struct HB_PACKED PacketNotifyFishCanceled {
@@ -338,7 +338,7 @@ namespace net {
 		PacketHeader header;
 		uint8_t is_new;
 		char name[hb::shared::limits::ItemNameLen];
-		uint32_t count;
+		uint64_t count;
 		uint8_t item_type;
 		uint8_t equip_pos;
 		uint8_t is_equipped;
@@ -346,8 +346,6 @@ namespace net {
 		uint8_t gender_limit;
 		uint16_t cur_lifespan;
 		uint16_t weight;
-		int16_t sprite;
-		int16_t sprite_frame;
 		uint8_t item_color;
 		uint8_t spec_value2;
 		uint32_t attribute;
@@ -359,7 +357,7 @@ namespace net {
 		PacketHeader header;
 		uint8_t is_new;
 		char name[hb::shared::limits::ItemNameLen];
-		uint32_t count;
+		uint64_t count;
 		uint8_t item_type;
 		uint8_t equip_pos;
 		uint8_t is_equipped;
@@ -367,8 +365,6 @@ namespace net {
 		uint8_t gender_limit;
 		uint16_t cur_lifespan;
 		uint16_t weight;
-		int16_t sprite;
-		int16_t sprite_frame;
 		uint8_t item_color;
 		uint16_t cost;
 		int16_t item_id;           // Item ID for config lookup
@@ -380,7 +376,7 @@ namespace net {
 		uint8_t bank_index;
 		uint8_t is_new;
 		char name[hb::shared::limits::ItemNameLen];
-		uint32_t count;
+		uint64_t count;
 		uint8_t item_type;
 		uint8_t equip_pos;
 		uint8_t is_equipped;
@@ -388,8 +384,6 @@ namespace net {
 		uint8_t gender_limit;
 		uint16_t cur_lifespan;
 		uint16_t weight;
-		int16_t sprite;
-		int16_t sprite_frame;
 		uint8_t item_color;
 		int16_t item_effect_value2;
 		uint32_t attribute;
@@ -451,7 +445,7 @@ namespace net {
 	struct HB_PACKED PacketNotifySetItemCount {
 		PacketHeader header;
 		uint16_t item_index;
-		uint32_t count;
+		uint64_t count;
 		uint8_t notify;
 	};
 
@@ -508,7 +502,7 @@ namespace net {
 		int16_t who;
 		int16_t quest_type;
 		int16_t contribution;
-		int16_t target_type;
+		int16_t target_config_id;
 		int16_t target_count;
 		int16_t x;
 		int16_t y;
@@ -667,8 +661,6 @@ namespace net {
 	struct HB_PACKED PacketNotifyExchangeItem {
 		PacketHeader header;
 		int16_t dir;
-		int16_t sprite;
-		int16_t sprite_frame;
 		int32_t amount;
 		uint8_t color;
 		int16_t cur_life;
@@ -751,7 +743,7 @@ namespace net {
 		int16_t response;
 		int16_t amount;
 		int16_t contribution;
-		int16_t target_type;
+		int16_t target_config_id;
 		int16_t target_count;
 		int16_t x;
 		int16_t y;
@@ -811,8 +803,6 @@ namespace net {
 	struct HB_PACKED PacketNotifyEventFishMode {
 		PacketHeader header;
 		uint16_t price;
-		uint16_t sprite;
-		uint16_t sprite_frame;
 		char name[hb::shared::limits::NpcNameLen];
 	};
 
@@ -942,6 +932,31 @@ namespace net {
 		char name[hb::shared::limits::ItemNameLen];
 		uint8_t padding[2];
 	};
+
+#ifdef TESTER_ONLY
+	// TESTER MENU — tester-only packet structs
+	struct HB_PACKED TesterItemSearchEntry {
+		int16_t item_id;
+		int16_t effect_type;  // ItemEffectType — determines valid prefixes
+		char name[hb::shared::limits::ItemNameLen];
+	};
+
+	struct HB_PACKED PacketNotifyTesterItemSearchResult {
+		PacketHeader header;
+		int16_t count;
+		TesterItemSearchEntry entries[50];
+	};
+
+	struct HB_PACKED TesterMapEntry {
+		char name[11];
+	};
+
+	struct HB_PACKED PacketNotifyTesterMapListResult {
+		PacketHeader header;
+		int16_t count;
+		TesterMapEntry entries[100];
+	};
+#endif // TESTER_ONLY
 	HB_PACK_END
 }
 }

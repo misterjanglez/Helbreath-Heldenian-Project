@@ -8,6 +8,8 @@
 #include "GameGeometry.h"
 #include "Appearance.h"
 #include "PlayerStatusData.h"
+#include "DirectionHelpers.h"
+using hb::shared::direction::direction;
 
 namespace hb::server::npc
 {
@@ -62,7 +64,7 @@ public:
 	int   m_tmp_error;
 	hb::shared::geometry::GameRectangle  m_random_area;	// MOVETYPE_RANDOMAREA
 
-	char  m_dir;
+	direction m_dir;
 	char  m_action;
 	char  m_turn;
 

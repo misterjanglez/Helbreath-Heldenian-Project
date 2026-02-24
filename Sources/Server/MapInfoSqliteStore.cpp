@@ -98,12 +98,13 @@ bool EnsureMapInfoDatabase(sqlite3** outDb, std::string& outPath, bool* outCreat
 		" key TEXT PRIMARY KEY,"
 		" value TEXT NOT NULL"
 		");"
-		"INSERT OR REPLACE INTO meta(key, value) VALUES('schema_version','2');"
+		"INSERT OR REPLACE INTO meta(key, value) VALUES('schema_version','3');"
 
 		// Core map settings
 		"CREATE TABLE IF NOT EXISTS maps ("
 		" map_name TEXT PRIMARY KEY CHECK(length(map_name) <= 10),"
 		" location_name TEXT NOT NULL DEFAULT '' CHECK(length(location_name) <= 10),"
+		" display_name TEXT NOT NULL DEFAULT '' CHECK(length(display_name) <= 30),"
 		" maximum_object INTEGER NOT NULL DEFAULT 1000,"
 		" level_limit INTEGER NOT NULL DEFAULT 0,"
 		" upper_level_limit INTEGER NOT NULL DEFAULT 0,"
@@ -381,6 +382,25 @@ bool EnsureMapInfoDatabase(sqlite3** outDb, std::string& outPath, bool* outCreat
 		return false;
 	}
 
+	// Migration: add display_name column if missing (v2 -> v3)
+	{
+		sqlite3_stmt* ti = nullptr;
+		bool has_display_name = false;
+		if (sqlite3_prepare_v2(db, "PRAGMA table_info(maps);", -1, &ti, nullptr) == SQLITE_OK) {
+			while (sqlite3_step(ti) == SQLITE_ROW) {
+				const char* col_name = reinterpret_cast<const char*>(sqlite3_column_text(ti, 1));
+				if (col_name && std::strcmp(col_name, "display_name") == 0) {
+					has_display_name = true;
+					break;
+				}
+			}
+			sqlite3_finalize(ti);
+		}
+		if (!has_display_name) {
+			ExecSql(db, "ALTER TABLE maps ADD COLUMN display_name TEXT NOT NULL DEFAULT '';");
+		}
+	}
+
 	*outDb = db;
 	if (outCreated != nullptr) {
 		*outCreated = created;
@@ -431,7 +451,7 @@ bool LoadMapBaseSettings(sqlite3* db, const char* map_name, CMap* map)
 		" max_fish, max_mineral, fixed_day_mode, recall_impossible,"
 		" apocalypse_map, apocalypse_mob_gen_type, citizen_limit, is_fight_zone,"
 		" heldenian_map, heldenian_mode_map, mob_event_amount, energy_sphere_auto_creation, pk_mode,"
-		" attack_enabled"
+		" attack_enabled, display_name"
 		" FROM maps WHERE map_name = ? COLLATE NOCASE;";
 
 	sqlite3_stmt* stmt = nullptr;
@@ -467,6 +487,7 @@ bool LoadMapBaseSettings(sqlite3* db, const char* map_name, CMap* map)
 		map->m_is_energy_sphere_auto_creation = sqlite3_column_int(stmt, col++) != 0;
 		col++; // pk_mode - read but no direct member
 		map->m_is_attack_enabled = sqlite3_column_int(stmt, col++) != 0;
+		CopyColumnText(stmt, col++, map->m_display_name, sizeof(map->m_display_name));
 		ok = true;
 	}
 
@@ -505,7 +526,7 @@ bool LoadMapTeleportLocations(sqlite3* db, const char* map_name, CMap* map)
 		CopyColumnText(stmt, 3, tele->m_dest_map_name, sizeof(tele->m_dest_map_name));
 		tele->m_dest_x = static_cast<short>(sqlite3_column_int(stmt, 4));
 		tele->m_dest_y = static_cast<short>(sqlite3_column_int(stmt, 5));
-		tele->m_dir = static_cast<char>(sqlite3_column_int(stmt, 6));
+		tele->m_dir = static_cast<direction>(sqlite3_column_int(stmt, 6));
 	}
 
 	sqlite3_finalize(stmt);
@@ -968,7 +989,7 @@ bool LoadMapHeldenianGateDoors(sqlite3* db, const char* map_name, CMap* map)
 		int idx = sqlite3_column_int(stmt, 0);
 		if (idx < 0 || idx >= hb::server::map::MaxHeldenianDoor) continue;
 
-		map->m_heldenian_gate_door[idx].dir = static_cast<char>(sqlite3_column_int(stmt, 1));
+		map->m_heldenian_gate_door[idx].dir = static_cast<direction>(sqlite3_column_int(stmt, 1));
 		map->m_heldenian_gate_door[idx].x = static_cast<short>(sqlite3_column_int(stmt, 2));
 		map->m_heldenian_gate_door[idx].y = static_cast<short>(sqlite3_column_int(stmt, 3));
 	}

@@ -1,8 +1,11 @@
 ﻿#include "RenderHelpers.h"
 #include "Game.h"
+#include "Screen_OnGame.h"
+#include "FloatingTextManager.h"
 #include "CommonTypes.h"
 #include "ConfigManager.h"
 #include <algorithm>
+using namespace hb::shared::direction;
 
 // -----------------------------------------------------------------------
 // Drawing order arrays (moved from Game.cpp file scope)
@@ -33,45 +36,46 @@ static bool ShouldSkipShadow(short owner_type)
 }
 
 // -----------------------------------------------------------------------
-void draw_equip_layer(CGame& game, int spriteIndex, int sX, int sY, int frame,
+void draw_equip_layer(hb::shared::sprite::SpriteCollection& sprites, int spriteIndex, int sX, int sY, int frame,
                     bool inv, int colorIndex)
 {
 	if (spriteIndex == -1) return;
 
 	if (inv)
 	{
-		game.m_sprite[spriteIndex]->draw(sX, sY, frame, hb::shared::sprite::DrawParams::alpha_blend(0.25f));
+		sprites[spriteIndex]->draw(sX, sY, frame, hb::shared::sprite::DrawParams::alpha_blend(0.25f));
 	}
 	else if (colorIndex == 0)
 	{
-		game.m_sprite[spriteIndex]->draw(sX, sY, frame);
+		sprites[spriteIndex]->draw(sX, sY, frame);
 	}
 	else
 	{
 		auto c = GameColors::Items[colorIndex];
-		game.m_sprite[spriteIndex]->draw(sX, sY, frame,
+		sprites[spriteIndex]->draw(sX, sY, frame,
 			hb::shared::sprite::DrawParams::tint(c.r, c.g, c.b));
 	}
 }
 
 // -----------------------------------------------------------------------
-void draw_weapon(CGame& game, const EquipmentIndices& eq, int sX, int sY,
+void draw_weapon(CGame& game, hb::shared::sprite::SpriteCollection& sprites,
+                const EquipmentIndices& eq, int sX, int sY,
                 int weaponFrame, bool inv)
 {
 	if (eq.m_weapon_index == -1) return;
 
 	if (inv)
 	{
-		game.m_sprite[eq.m_weapon_index]->draw(sX, sY, weaponFrame, hb::shared::sprite::DrawParams::alpha_blend(0.25f));
+		sprites[eq.m_weapon_index]->draw(sX, sY, weaponFrame, hb::shared::sprite::DrawParams::alpha_blend(0.25f));
 	}
 	else if (eq.m_weapon_color == 0)
 	{
-		game.m_sprite[eq.m_weapon_index]->draw(sX, sY, weaponFrame);
+		sprites[eq.m_weapon_index]->draw(sX, sY, weaponFrame);
 	}
 	else
 	{
 		auto c = GameColors::Weapons[eq.m_weapon_color];
-		game.m_sprite[eq.m_weapon_index]->draw(sX, sY, weaponFrame,
+		sprites[eq.m_weapon_index]->draw(sX, sY, weaponFrame,
 			hb::shared::sprite::DrawParams::tint(c.r, c.g, c.b));
 	}
 
@@ -79,49 +83,51 @@ void draw_weapon(CGame& game, const EquipmentIndices& eq, int sX, int sY,
 	// Shader adds a flat color offset to every pixel before additive blending:
 	//   dest += clamp(src + (r, g, b))
 	int weaponGlare = eq.m_weapon_glare;
-	game.dk_glare(eq.m_weapon_color, eq.m_weapon_index, &weaponGlare);
-	if (weaponGlare != 0)
+	if (auto* on_game = GameModeManager::get_active_screen_as<Screen_OnGame>())
+		on_game->dk_glare(eq.m_weapon_color, eq.m_weapon_item_id, &weaponGlare);
+	if (weaponGlare != 0 && game.on_game())
 	{
-		int f = game.m_draw_flag;
+		int f = game.on_game()->m_draw_flag;
 		switch (weaponGlare) {
-		case 1: game.m_sprite[eq.m_weapon_index]->draw(sX, sY, weaponFrame, hb::shared::sprite::DrawParams::additive_tinted(f, 0, 0)); break;
-		case 2: game.m_sprite[eq.m_weapon_index]->draw(sX, sY, weaponFrame, hb::shared::sprite::DrawParams::additive_tinted(0, f, 0)); break;
-		case 3: game.m_sprite[eq.m_weapon_index]->draw(sX, sY, weaponFrame, hb::shared::sprite::DrawParams::additive_tinted(0, 0, f)); break;
+		case 1: sprites[eq.m_weapon_index]->draw(sX, sY, weaponFrame, hb::shared::sprite::DrawParams::additive_tinted(f, 0, 0)); break;
+		case 2: sprites[eq.m_weapon_index]->draw(sX, sY, weaponFrame, hb::shared::sprite::DrawParams::additive_tinted(0, f, 0)); break;
+		case 3: sprites[eq.m_weapon_index]->draw(sX, sY, weaponFrame, hb::shared::sprite::DrawParams::additive_tinted(0, 0, f)); break;
 		}
 	}
 }
 
 // -----------------------------------------------------------------------
-void draw_shield(CGame& game, const EquipmentIndices& eq, int sX, int sY,
+void draw_shield(CGame& game, hb::shared::sprite::SpriteCollection& sprites,
+                const EquipmentIndices& eq, int sX, int sY,
                 int frame, bool inv)
 {
 	if (eq.m_shield_index == -1) return;
 
 	if (inv)
 	{
-		game.m_sprite[eq.m_shield_index]->draw(sX, sY, frame, hb::shared::sprite::DrawParams::alpha_blend(0.25f));
+		sprites[eq.m_shield_index]->draw(sX, sY, frame, hb::shared::sprite::DrawParams::alpha_blend(0.25f));
 	}
 	else if (eq.m_shield_color == 0)
 	{
-		game.m_sprite[eq.m_shield_index]->draw(sX, sY, frame);
+		sprites[eq.m_shield_index]->draw(sX, sY, frame);
 	}
 	else
 	{
 		auto c = GameColors::Items[eq.m_shield_color];
-		game.m_sprite[eq.m_shield_index]->draw(sX, sY, frame,
+		sprites[eq.m_shield_index]->draw(sX, sY, frame,
 			hb::shared::sprite::DrawParams::tint(c.r, c.g, c.b));
 	}
 
 	// Shield glare — single-pass shader matching DDraw PutTransSpriteRGB
-	if (eq.m_shield_glare != 0)
+	if (eq.m_shield_glare != 0 && game.on_game())
 	{
-		int sf = game.m_draw_flag;
+		int sf = game.on_game()->m_draw_flag;
 		switch (eq.m_shield_glare) {
 		case 1:
 			// GM sprite (m_effect_sprites[45]) is only drawn by draw_gm_effect when gm_mode is true
 			// fallthrough to case 2 for green offset shield glare
-		case 2: game.m_sprite[eq.m_shield_index]->draw(sX, sY, frame, hb::shared::sprite::DrawParams::additive_tinted(0, sf, 0)); break;
-		case 3: game.m_sprite[eq.m_shield_index]->draw(sX, sY, frame, hb::shared::sprite::DrawParams::additive_tinted(0, 0, sf)); break;
+		case 2: sprites[eq.m_shield_index]->draw(sX, sY, frame, hb::shared::sprite::DrawParams::additive_tinted(0, sf, 0)); break;
+		case 3: sprites[eq.m_shield_index]->draw(sX, sY, frame, hb::shared::sprite::DrawParams::additive_tinted(0, 0, sf)); break;
 		}
 	}
 }
@@ -180,50 +186,61 @@ static void DrawEquipmentStack(CGame& game, const EquipmentIndices& eq,
 	int frame = state.m_frame;
 	int dirFrame = (dir - 1) * equipFrameMul + frame;
 
+	// Equipment draws from m_equip_sprites, cosmetics from m_sprite
+	auto& equip = game.m_equip_sprites;
+	auto& cosmetic = game.m_sprite;
+
 	// Mantle behind body (order 0)
 	if (eq.m_mantle_index != -1 && mantleOrder[dir] == 0)
-		draw_equip_layer(game, eq.m_mantle_index, sX, sY, dirFrame, inv, eq.m_mantle_color);
+		draw_equip_layer(equip, eq.m_mantle_index, sX, sY, dirFrame, inv, eq.m_mantle_color);
 
-	// Undies
-	draw_equip_layer(game, eq.m_undies_index, sX, sY, dirFrame, inv, 0);
+	// Undies (cosmetic — from m_sprite)
+	draw_equip_layer(cosmetic, eq.m_undies_index, sX, sY, dirFrame, inv, 0);
 
-	// Hair (only if no helm)
+	// Hair (cosmetic — from m_sprite, only if no helm)
 	if (eq.m_hair_index != -1 && eq.m_helm_index == -1)
 	{
-		const auto& hc = GameColors::Hair[state.m_appearance.hair_color];
-		game.m_sprite[eq.m_hair_index]->draw(sX, sY, dirFrame, hb::shared::sprite::DrawParams::tint(hc.r, hc.g, hc.b));
+		if (inv)
+		{
+			cosmetic[eq.m_hair_index]->draw(sX, sY, dirFrame, hb::shared::sprite::DrawParams::alpha_blend(0.25f));
+		}
+		else
+		{
+			const auto& hc = GameColors::Hair[state.m_appearance.hair_color];
+			cosmetic[eq.m_hair_index]->draw(sX, sY, dirFrame, hb::shared::sprite::DrawParams::tint(hc.r, hc.g, hc.b));
+		}
 	}
 
 	// Boots before pants if wearing skirt
 	if (eq.m_skirt_draw == 1)
-		draw_equip_layer(game, eq.m_boots_index, sX, sY, dirFrame, inv, eq.m_boots_color);
+		draw_equip_layer(equip, eq.m_boots_index, sX, sY, dirFrame, inv, eq.m_boots_color);
 
 	// Pants
-	draw_equip_layer(game, eq.m_pants_index, sX, sY, dirFrame, inv, eq.m_pants_color);
+	draw_equip_layer(equip, eq.m_pants_index, sX, sY, dirFrame, inv, eq.m_pants_color);
 
 	// Arm armor
-	draw_equip_layer(game, eq.m_arm_armor_index, sX, sY, dirFrame, inv, eq.m_arm_color);
+	draw_equip_layer(equip, eq.m_arm_armor_index, sX, sY, dirFrame, inv, eq.m_arm_color);
 
 	// Boots after pants if not wearing skirt
 	if (eq.m_skirt_draw == 0)
-		draw_equip_layer(game, eq.m_boots_index, sX, sY, dirFrame, inv, eq.m_boots_color);
+		draw_equip_layer(equip, eq.m_boots_index, sX, sY, dirFrame, inv, eq.m_boots_color);
 
 	// Body armor
-	draw_equip_layer(game, eq.m_body_armor_index, sX, sY, dirFrame, inv, eq.m_armor_color);
+	draw_equip_layer(equip, eq.m_body_armor_index, sX, sY, dirFrame, inv, eq.m_armor_color);
 
 	// Helm
-	draw_equip_layer(game, eq.m_helm_index, sX, sY, dirFrame, inv, eq.m_helm_color);
+	draw_equip_layer(equip, eq.m_helm_index, sX, sY, dirFrame, inv, eq.m_helm_color);
 
 	// Mantle over armor (order 2)
 	if (eq.m_mantle_index != -1 && mantleOrder[dir] == 2)
-		draw_equip_layer(game, eq.m_mantle_index, sX, sY, dirFrame, inv, eq.m_mantle_color);
+		draw_equip_layer(equip, eq.m_mantle_index, sX, sY, dirFrame, inv, eq.m_mantle_color);
 
-	// Shield + glare
-	draw_shield(game, eq, sX, sY, dirFrame, inv);
+	// Shield + glare (from m_equip_sprites)
+	draw_shield(game, equip, eq, sX, sY, dirFrame, inv);
 
 	// Mantle in front (order 1)
 	if (eq.m_mantle_index != -1 && mantleOrder[dir] == 1)
-		draw_equip_layer(game, eq.m_mantle_index, sX, sY, dirFrame, inv, eq.m_mantle_color);
+		draw_equip_layer(equip, eq.m_mantle_index, sX, sY, dirFrame, inv, eq.m_mantle_color);
 }
 
 // -----------------------------------------------------------------------
@@ -235,11 +252,12 @@ void draw_player_layers(CGame& game, const EquipmentIndices& eq,
 	int dir = state.m_dir;
 	int frame = state.m_frame;
 	int bodyDirIndex = eq.m_body_index + (dir - 1);
+	int weaponDirFrame = (dir - 1) * equipFrameMul + frame;
 
 	if (weapon_draw_order[dir] == 1)
 	{
-		// Weapon before body
-		draw_weapon(game, eq, sX, sY, frame, inv);
+		// Weapon before body (from m_equip_sprites, direction now in frame)
+		draw_weapon(game, game.m_equip_sprites, eq, sX, sY, weaponDirFrame, inv);
 		draw_shadow(game, bodyDirIndex, sX, sY, frame, inv, state.m_owner_type);
 
 		// Energy sphere light
@@ -259,7 +277,7 @@ void draw_player_layers(CGame& game, const EquipmentIndices& eq,
 
 		draw_body(game, bodyDirIndex, sX, sY, frame, inv, state.m_owner_type, state.m_status.frozen, admin_invis);
 		DrawEquipmentStack(game, eq, state, sX, sY, inv, mantleOrder, equipFrameMul);
-		draw_weapon(game, eq, sX, sY, frame, inv);
+		draw_weapon(game, game.m_equip_sprites, eq, sX, sY, weaponDirFrame, inv);
 	}
 }
 
@@ -314,24 +332,24 @@ void apply_direction_override(CEntityRenderState& state)
 {
 	switch (state.m_owner_type) {
 	case hb::shared::owner::AirElemental:
-		state.m_dir = 1;
+		state.m_dir = direction::north;
 		break;
 	case hb::shared::owner::Gate:
-		if (state.m_dir <= 3) state.m_dir = 3;
-		else state.m_dir = 5;
+		if (state.m_dir <= direction::east) state.m_dir = direction::east;
+		else state.m_dir = direction::south;
 		break;
 	}
 }
 
 // -----------------------------------------------------------------------
-void draw_name(CGame& game, const CEntityRenderState& state, int sX, int sY)
+void draw_name(Screen_OnGame& screen, const CEntityRenderState& state, int sX, int sY)
 {
 	if (state.m_name[0] != '\0')
 	{
 		if (state.is_player())
-			game.draw_object_name(sX, sY, state.m_name.data(), state.m_status, state.m_object_id);
+			screen.draw_object_name(sX, sY, state.m_name.data(), state.m_status, state.m_object_id);
 		else
-			game.draw_npc_name(sX, sY, state.m_owner_type, state.m_status, state.m_npc_config_id);
+			screen.draw_npc_name(sX, sY, state.m_owner_type, state.m_status, state.m_npc_config_id);
 	}
 }
 
@@ -341,9 +359,9 @@ void update_chat(CGame& game, const CEntityRenderState& state,
 {
 	if (state.m_chat_index == 0) return;
 
-	if (game.m_floating_text.is_valid(state.m_chat_index, state.m_object_id))
+	if (game.get_floating_text().is_valid(state.m_chat_index, state.m_object_id))
 	{
-		game.m_floating_text.update_position(state.m_chat_index, static_cast<short>(sX), static_cast<short>(sY));
+		game.get_floating_text().update_position(state.m_chat_index, static_cast<short>(sX), static_cast<short>(sY));
 	}
 	else
 	{

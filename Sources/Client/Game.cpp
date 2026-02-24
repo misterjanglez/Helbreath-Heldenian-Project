@@ -6,12 +6,15 @@
 #include "GameFonts.h"
 #include "TextLibExt.h"
 #include "Benchmark.h"
-#include "FrameTiming.h"
+#include "performance_monitor.h"
 #include "lan_eng.h"
 #include "Packet/SharedPackets.h"
+#include "PacketSendHelpers.h"
+
 #include "SharedCalculations.h"
 #include "Log.h"
 #include "ClientLogChannels.h"
+#include "ItemSpriteMetadata.h"
 
 #include <algorithm>
 #include <charconv>
@@ -24,6 +27,7 @@
 #include <string>
 
 #include "platform_headers.h"
+#include "embedded_icon.h"
 
 #ifdef _WIN32
 #include <windowsx.h>
@@ -48,7 +52,6 @@
 #include "TextInputManager.h"
 #include "EventListManager.h"
 #include "ChatCommandManager.h"
-#include "HotkeyManager.h"
 #include "LocalCacheManager.h"
 
 // DialogBox system
@@ -87,11 +90,27 @@
 #include "Overlay_Msg.h"
 #include "Overlay_WaitInitData.h"
 
+// Dialog boxes
+#include "DialogBox_CityHallMenu.h"
+#include "DialogBox_NpcTalk.h"
+#include "DialogBox_Skill.h"
+#include "DialogBox_Bank.h"
+#include "DialogBox_Magic.h"
+#include "DialogBox_GuildMenu.h"
+#include "DialogBox_GuildOperation.h"
+#include "DialogBox_SellList.h"
+#include "DialogBox_Party.h"
+#include "DialogBox_ItemDropAmount.h"
+#include "DialogBox_Slates.h"
+#include "DialogBox_NpcActionQuery.h"
+#include "DialogBox_Manufacture.h"
+
 
 using namespace hb::shared::net;
 using namespace hb::client::net;
 namespace sock = hb::shared::net::socket;
 using namespace hb::shared::action;
+using namespace hb::shared::direction;
 
 using namespace hb::shared::item;
 using namespace hb::client::config;
@@ -160,15 +179,10 @@ void CGame::write_settings()
 CGame::CGame(hb::shared::types::NativeInstance native_instance, int icon_resource_id)
 	: m_native_instance(native_instance)
 	, m_icon_resource_id(icon_resource_id)
-	, m_player_renderer(*this)
-	, m_npc_renderer(*this)
 {
 	m_io_pool = std::make_unique<hb::shared::net::IOServicePool>(0);  // 0 threads = manual poll mode
 	m_Renderer = nullptr;
-	m_dialog_box_manager.initialize(this);
-	m_dialog_box_manager.initialize_dialog_boxes();
 	read_settings();
-	register_hotkeys();
 
 	m_max_stats = 0;
 	m_max_level = hb::shared::limits::PlayerMaxLevel;
@@ -176,42 +190,27 @@ CGame::CGame(hb::shared::types::NativeInstance native_instance, int icon_resourc
 	m_loading = 0;
 	m_is_first_conn = true;
 	m_item_drop_cnt = 0;
-	std::fill(std::begin(m_item_drop_id), std::end(m_item_drop_id), short{0});
+	std::fill(std::begin(m_item_drop_id), std::end(m_item_drop_id), short{ 0 });
 	m_item_drop = false;
 
-	// initialize CPlayer first since it's used below
-	m_player = std::make_unique<CPlayer>();
-	combat_system::get().set_player(*m_player);
+	combat_system::get().set_game(*this);
 	inventory_manager::get().set_game(this);
 	magic_casting_system::get().set_game(this);
 	build_item_manager::get().set_game(this);
 	shop_manager::get().set_game(this);
 	teleport_manager::get().set_game(this);
 	event_list_manager::get().set_game(this);
-	m_player->m_player_x = 0;
-	m_player->m_player_y = 0;
-	m_player->m_Controller.reset_command_count();
-	m_player->m_Controller.set_command_time(0); //v2.15 SpeedHack
 	// Camera is initialized via its default constructor (calls reset())
 	m_vdl_x = 0;
 	m_vdl_y = 0;
 	m_comm_object_id = 0;
 	m_last_attack_target_id = 0;
 	m_enter_game_type = 0;
-	m_player->m_Controller.set_command(Type::stop);
-	m_is_observer_mode = false;
 
 	// initialize Managers (Networking v4) - using make_unique
 	m_effect_manager = std::make_unique<effect_manager>(this);
-	m_network_message_manager = std::make_unique<NetworkMessageManager>(this);
-	m_fishing_manager.set_game(this);
-	m_crafting_manager.set_game(this);
-	m_quest_manager.set_game(this);
-	m_guild_manager.set_game(this);
-
 	// All pointer arrays (std::array<std::unique_ptr<T>, N>) default to nullptr
 	// Dialog box order initialization
-	for (int i = 0; i < 61; i++) m_dialog_box_manager.set_order_at(i, 0);
 
 	// Previous cursor status tracking removed
 	CursorTarget::reset_selection_click_time();
@@ -248,22 +247,25 @@ bool CGame::on_initialize()
 
 	// Configure window params via staged setters (no OS window yet)
 	auto* window = get_window();
-	window->set_title("Helbreath");
+	window->set_title(std::format("Helbreath {}", hb::version::client::display_version).c_str());
 	window->set_size(config_manager::get().get_window_width(),
-	                 config_manager::get().get_window_height());
+		config_manager::get().get_window_height());
 	window->set_borderless(config_manager::get().is_borderless_enabled());
 	window->set_mouse_capture_enabled(config_manager::get().is_mouse_capture_enabled());
 	window->set_native_instance(m_native_instance);
 	window->set_icon_resource_id(m_icon_resource_id);
 
 	// initialize game systems that don't need the OS window
-	m_player->m_Controller.set_command_available(true);
 	m_time = GameClock::get_time_ms();
 
 	audio_manager::get().initialize();
 	ChatCommandManager::get().initialize(this);
 	GameModeManager::initialize(this);
+#ifdef _DEBUG
+	GameModeManager::set_screen<Screen_Loading>();
+#else
 	GameModeManager::set_screen<Screen_Splash>();
+#endif
 	m_hide_local_cursor = false;
 
 	m_log_server_addr = DEF_SERVER_IP;
@@ -271,16 +273,8 @@ bool CGame::on_initialize()
 	m_game_server_port = DEF_GSERVER_PORT;
 
 	m_map_data = std::make_unique<CMapData>(this);
-	m_player->m_player_name.clear();
-	m_player->m_account_name.clear();
-	m_player->m_account_password.clear();
 
-	m_player->m_player_type = 2;
-	m_player->m_Controller.set_player_turn(0);
-	m_dialog_box_manager.set_order_at(60, DialogBoxId::HudPanel);
-	m_dialog_box_manager.set_order_at(59, DialogBoxId::HudPanel);
-
-	m_menu_dir = 4;
+	m_menu_dir = direction::southeast;
 	m_menu_dir_cnt = 0;
 	m_menu_frame = 0;
 
@@ -299,6 +293,10 @@ bool CGame::on_initialize()
 // Called by application::run() AFTER the OS window is created.
 bool CGame::on_start()
 {
+	// Set window icon from embedded pixel data (cross-platform — on Windows the .rc
+	// resource handles the exe icon, but this sets it for the SFML window on Linux/macOS).
+	get_window()->set_icon(hb::embedded_icon::width, hb::embedded_icon::height, hb::embedded_icon::pixels);
+
 	FrameTiming::initialize();
 
 	// Create and initialize the renderer
@@ -332,6 +330,8 @@ bool CGame::on_start()
 	hb::shared::render::Window::get()->set_vsync_enabled(config_manager::get().is_vsync_enabled());
 	hb::shared::render::Window::get()->set_framerate_limit(config_manager::get().get_fps_limit());
 	hb::shared::render::Window::get()->set_fullscreen_stretch(config_manager::get().is_fullscreen_stretch_enabled());
+	hb::shared::render::Window::get()->set_background_fps_limit(
+		config_manager::get().is_background_fps_throttle_enabled() ? 5 : 0);
 	if (hb::shared::render::Renderer::get())
 		hb::shared::render::Renderer::get()->set_fullscreen_stretch(config_manager::get().is_fullscreen_stretch_enabled());
 
@@ -358,49 +358,30 @@ void CGame::on_uninitialize()
 	write_settings();
 	change_game_mode(GameMode::Null);
 
-	// shutdown manager singletons
+	// Shutdown manager singletons — they outlive CGame (static storage),
+	// so their destructors run too late for orderly cleanup.
 	weather_manager::get().shutdown();
 	ChatManager::get().shutdown();
 	audio_manager::get().shutdown();
 	config_manager::get().shutdown();
 
-	// clear all unique_ptr arrays using range-based for loops
-	for (auto& item : m_item_config_list) item.reset();
-
+	// Release SFML graphics resources before renderer/window destruction.
+	// SpriteCollections hold SFML textures that reference the RenderWindow;
+	// the factory holds a renderer pointer. Both must go before Destroy().
 	m_sprite.clear();
 	m_tile_spr.clear();
 	m_effect_sprites.clear();
-
-	// Clean up sprite factory
 	hb::shared::sprite::Sprites::set_factory(nullptr);
-	if (m_sprite_factory) {
-		m_sprite_factory.reset();
-	}
-
-	for (auto& ch : m_char_list) ch.reset();
-	for (auto& item : m_item_list) item.reset();
-	for (auto& item : m_bank_list) item.reset();
-	m_floating_text.clear_all();
-	for (auto& magic : m_magic_cfg_list) magic.reset();
-	for (auto& skill : m_skill_cfg_list) skill.reset();
-	for (auto& msg : m_msg_text_list) msg.reset();
-	for (auto& msg : m_msg_text_list2) msg.reset();
-	for (auto& msg : m_agree_msg_text_list) msg.reset();
-	m_ex_id.reset();
-	for (auto& msg : m_game_msg_list) msg.reset();
-
-	// Clean up single pointers (unique_ptr handles null checks automatically)
-	m_map_data.reset();
-	m_g_sock.reset();
-	m_l_sock.reset();
-	m_effect_manager.reset();
-	m_network_message_manager.reset();
+	m_sprite_factory.reset();
 
 	// Destroy renderer BEFORE Window::destroy() runs in application::run().
 	// The renderer holds SFML resources that reference the RenderWindow —
 	// destroying it after the window is gone causes a crash on close.
 	hb::shared::render::Renderer::Destroy();
 	m_Renderer = nullptr;
+
+	// All remaining members (unique_ptr arrays, sockets, managers, etc.)
+	// are cleaned up by CGame's destructor via RAII.
 }
 
 // on_event: Discrete event handler — window lifecycle events routed by application base class
@@ -414,11 +395,17 @@ void CGame::on_event(const hb::shared::render::event& e)
 		{
 			// In main game, start logout countdown instead of closing immediately
 #ifdef _DEBUG
-			if (m_logout_count == -1 || m_logout_count > 2)
-				m_logout_count = 1;
+			if (on_game()->m_logout_count == -1 || on_game()->m_logout_count > 2)
+			{
+				on_game()->m_logout_count = 1;
+				on_game()->m_logout_count_time = GameClock::get_time_ms();
+			}
 #else
-			if (m_logout_count == -1 || m_logout_count > 11)
-				m_logout_count = 11;
+			if (on_game()->m_logout_count == -1 || on_game()->m_logout_count > 11)
+			{
+				on_game()->m_logout_count = 11;
+				on_game()->m_logout_count_time = GameClock::get_time_ms();
+			}
 #endif
 		}
 		else if (GameModeManager::get_mode() == GameMode::MainMenu)
@@ -458,15 +445,14 @@ void CGame::on_key_event(KeyCode key, bool pressed)
 {
 	// Skip modifier keys — handled purely through IInput polling
 	if (key == KeyCode::Shift || key == KeyCode::Control || key == KeyCode::Alt ||
-	    key == KeyCode::LShift || key == KeyCode::RShift ||
-	    key == KeyCode::LControl || key == KeyCode::RControl ||
-	    key == KeyCode::LAlt || key == KeyCode::RAlt)
+		key == KeyCode::LShift || key == KeyCode::RShift ||
+		key == KeyCode::LControl || key == KeyCode::RControl ||
+		key == KeyCode::LAlt || key == KeyCode::RAlt)
 		return;
 
 	if (pressed)
 	{
-		// Enter and Escape are handled in handle_key_up, not handle_key_down
-		if (key != KeyCode::Enter && key != KeyCode::Escape)
+		if (key != KeyCode::Enter)
 			handle_key_down(key);
 	}
 	else
@@ -477,7 +463,7 @@ void CGame::on_key_event(KeyCode key, bool pressed)
 	}
 }
 
-// on_native_message: Platform-specific message handling (absorbs GameWindowHandler::on_custom_message)
+// on_native_message: Platform-specific message handling
 bool CGame::on_native_message(uint32_t message, uintptr_t wparam, intptr_t lparam)
 {
 #ifdef _WIN32
@@ -510,11 +496,22 @@ bool CGame::on_native_message(uint32_t message, uintptr_t wparam, intptr_t lpara
 	return false;
 }
 
-// on_text_input: Text/IME input handling (absorbs GameWindowHandler::on_text_input)
+// on_text_input: Text/IME input handling
 bool CGame::on_text_input(hb::shared::types::NativeWindowHandle hwnd,
-                           uint32_t message, uintptr_t wparam, intptr_t lparam)
+	uint32_t message, uintptr_t wparam, intptr_t lparam)
 {
-	return text_input_manager::get().handle_char(hwnd, message, wparam, lparam) != 0;
+	if (message != 0x0102 /*WM_CHAR*/)
+		return false;
+
+	uint32_t codepoint = static_cast<uint32_t>(wparam);
+
+	// Let the active screen handle screen-specific text input behavior
+	IGameScreen* screen = GameModeManager::get_active_screen();
+	if (screen) screen->on_text_input(codepoint);
+
+	// All chars go through engine input system for CControls consumption
+	hb::shared::input::on_text_char(codepoint);
+	return true;
 }
 
 // UpdateScreen and DrawScreen removed - all modes now handled by Screen/Overlay system via GameModeManager
@@ -538,13 +535,13 @@ void CGame::draw_cursor()
 		m_mouse_initialized = true;
 	}
 
-	// Determine cursor frame based on game mode from manager (source of truth)
-	int cursor_frame = 0;  // Default arrow cursor
+	// Determine cursor type based on game mode from manager (source of truth)
+	cursor_type cursor = cursor_type::arrow;
 
 	switch (GameModeManager::get_mode()) {
 	case GameMode::MainGame:
 		// In-game uses context-sensitive cursor from CursorTarget
-		if (m_is_observer_mode) {
+		if (on_game()->m_is_observer_mode) {
 			// Observer mode shows a small crosshair instead of cursor sprite
 			m_Renderer->draw_pixel(mouse_x, mouse_y, hb::shared::render::Color::White());
 			m_Renderer->draw_pixel(mouse_x + 1, mouse_y, hb::shared::render::Color::White());
@@ -553,25 +550,42 @@ void CGame::draw_cursor()
 			m_Renderer->draw_pixel(mouse_x, mouse_y - 1, hb::shared::render::Color::White());
 			return;
 		}
-		cursor_frame = CursorTarget::get_cursor_frame();
+		cursor = CursorTarget::get_cursor_type();
 		break;
 
 	case GameMode::Connecting:
 	case GameMode::WaitingResponse:
 	case GameMode::WaitingInitData:
-		// Waiting/connecting states use hourglass cursor (frame 8)
-		cursor_frame = 8;
+		cursor = cursor_type::hourglass;
 		break;
 
 	default:
-		// All other modes use default arrow cursor (frame 0)
-		cursor_frame = 0;
+		cursor = cursor_type::arrow;
 		break;
 	}
 
 	// draw the cursor sprite
 	if (m_sprite[MouseCursor])
-		m_sprite[MouseCursor]->draw(mouse_x, mouse_y, cursor_frame);
+	{
+		int frame = static_cast<int>(cursor);
+
+		// Item targeting cursor: ignore baked pivot offset and center on
+		// the mouse point so the grow/shrink animation scales symmetrically.
+		if (cursor >= cursor_type::item_target && cursor <= cursor_type::item_target_3)
+		{
+			auto rect = m_sprite[MouseCursor]->GetFrameRect(frame);
+			hb::shared::sprite::DrawParams params;
+			params.m_ignore_pivot = true;
+			m_sprite[MouseCursor]->draw(
+				mouse_x - rect.width / 2,
+				mouse_y - rect.height / 2,
+				frame, params);
+		}
+		else
+		{
+			m_sprite[MouseCursor]->draw(mouse_x, mouse_y, frame);
+		}
+	}
 }
 
 
@@ -592,11 +606,31 @@ void CGame::on_update()
 	// update game mode transition state (fade in/out progress)
 	GameModeManager::update();
 
+	// update teleport pre-auth fade state machine
+	teleport_manager::get().update();
+
+	// Swap holiday tile variants if month changed
+	update_holiday_tiles();
+
 	// update game screens/overlays
 	FrameTiming::begin_profile(ProfileStage::update);
 	GameModeManager::update_screens();
 	FrameTiming::end_profile(ProfileStage::update);
 
+}
+
+void CGame::update_holiday_tiles()
+{
+	bool is_xmas = weather_manager::get().is_xmas();
+
+	if (is_xmas != m_holiday_tiles_active)
+	{
+		for (int i = 0; i < 16; i++)
+		{
+			m_tile_spr.swap_indices(406 + i, hb::client::sprite_id::HolidayTileOffset + 406 + i);
+		}
+		m_holiday_tiles_active = is_xmas;
+	}
 }
 
 // on_render: render only — gated by engine frame limiting
@@ -629,57 +663,22 @@ void CGame::on_render()
 		m_Renderer->draw_rect_filled(0, 0, m_Renderer->get_width(), m_Renderer->get_height(), hb::shared::render::Color::Black(static_cast<uint8_t>(alpha * 255.0f)));
 	}
 
-	// HUD metrics — drawn on all screens, on top of fade overlay
-	{
-		std::string G_cTxt;
-		int display_y = 100;
-
-		// FPS (engine-tracked, counted at actual present)
-		if (config_manager::get().is_show_fps_enabled())
-		{
-			G_cTxt = std::format("fps : {}", m_Renderer->get_fps());
-			hb::shared::text::draw_text(GameFont::Default, 10, display_y, G_cTxt.c_str(), hb::shared::text::TextStyle::from_color(GameColors::UIWhite));
-			display_y += 14;
-		}
-
-		// Latency
-		if (config_manager::get().is_show_latency_enabled())
-		{
-			if (m_latency_ms >= 0)
-				G_cTxt = std::format("latency : {} ms", m_latency_ms);
-			else
-				G_cTxt = "latency : -- ms";
-			hb::shared::text::draw_text(GameFont::Default, 10, display_y, G_cTxt.c_str(), hb::shared::text::TextStyle::from_color(GameColors::UIWhite));
-			display_y += 14;
-		}
-
-		// Profiling stage breakdown
-		if (FrameTiming::is_profiling_enabled())
-		{
-			display_y += 4;
-			hb::shared::text::draw_text(GameFont::Default, 10, display_y, "--- Profile (avg ms) ---", hb::shared::text::TextStyle::from_color(GameColors::UIProfileYellow));
-			display_y += 14;
-
-			for (int i = 0; i < static_cast<int>(ProfileStage::COUNT); i++)
-			{
-				ProfileStage stage = static_cast<ProfileStage>(i);
-				double avgMs = FrameTiming::get_profile_avg_time_ms(stage);
-				int wholePart = static_cast<int>(avgMs);
-				int fracPart = static_cast<int>((avgMs - wholePart) * 100);
-				G_cTxt = std::format("{:<12}: {:3}.{:02}", FrameTiming::get_stage_name(stage), wholePart, fracPart);
-				hb::shared::text::draw_text(GameFont::Default, 10, display_y, G_cTxt.c_str(), hb::shared::text::TextStyle::from_color(GameColors::UINearWhite));
-				display_y += 12;
-			}
-		}
+	// draw teleport fade overlay (fading to/from black during teleport transitions)
+	float tp_alpha = teleport_manager::get().get_fade_alpha();
+	if (tp_alpha > 0.0f) {
+		m_Renderer->draw_rect_filled(0, 0, m_Renderer->get_width(), m_Renderer->get_height(),
+			hb::shared::render::Color::Black(static_cast<uint8_t>(tp_alpha * 255.0f)));
 	}
+
+	// Performance monitor overlay — top bar with FPS, latency, frame timing
+	performance_monitor::get().render(m_Renderer, m_latency_ms);
 
 	// Cursor always on top - drawn LAST after everything including fade overlay
 	draw_cursor();
 
 	// Flip to show the drawn content
 	FrameTiming::begin_profile(ProfileStage::Flip);
-	if (m_Renderer->end_frame_check_lost_surface())
-		restore_sprites();
+	m_Renderer->end_frame_check_lost_surface();
 	FrameTiming::end_profile(ProfileStage::Flip);
 
 	// reset scroll delta now that dialogs have consumed it this frame
@@ -691,652 +690,155 @@ void CGame::on_render()
 // MODERNIZED: v4 Networking Architecture (Drain -> Queue -> Process)
 void CGame::on_game_socket_event()
 {
-    if (m_g_sock == 0) return;
+	if (m_g_sock == 0) return;
 
-    // 1. Check for socket state changes (Connect, Close, Error)
-    int ret = m_g_sock->Poll();
+	// 1. Check for socket state changes (Connect, Close, Error)
+	int ret = m_g_sock->Poll();
 
-    switch (ret) {
-    case sock::Event::SocketClosed:
-        change_game_mode(GameMode::ConnectionLost);
-        m_g_sock.reset();
-        return;
-    case sock::Event::SocketError:
-        printf("[ERROR] Game socket error\n");
-        change_game_mode(GameMode::ConnectionLost);
-        m_g_sock.reset();
-        return;
+	switch (ret) {
+	case sock::Event::SocketClosed:
+		change_game_mode(GameMode::ConnectionLost);
+		m_g_sock.reset();
+		return;
+	case sock::Event::SocketError:
+		printf("[ERROR] Game socket error\n");
+		change_game_mode(GameMode::ConnectionLost);
+		m_g_sock.reset();
+		return;
 
-    case sock::Event::ConnectionEstablish:
-        connection_establish_handler(static_cast<int>(ServerType::Game));
-        break;
-    }
-
-    // 2. Drain all available data from TCP buffer to the Queue
-    // Only drain if socket is connected (m_is_available is set on FD_CONNECT)
-    if (!m_g_sock->m_is_available) {
-        return; // Still connecting, don't try to read yet
-    }
-
-    // If Poll() completed a packet, queue it before drain_to_queue() overwrites the buffer
-    if (ret == sock::Event::ReadComplete) {
-        size_t size = 0;
-        char* data = m_g_sock->get_rcv_data_pointer(&size);
-        if (data != nullptr && size > 0) {
-            m_g_sock->queue_completed_packet(data, size);
-        }
-    }
-
-    int drained = m_g_sock->drain_to_queue();
-
-    if (drained < 0) {
-        printf("[ERROR] Game socket drain_to_queue failed: %d\n", drained);
-        change_game_mode(GameMode::ConnectionLost);
-        m_g_sock.reset();
-        return;
-    }
-
-    // 3. Process the queue with a Time Budget
-    //    We process as many packets as possible within the budget to keep the game responsive.
-    constexpr int MAX_PACKETS_PER_FRAME = 120; // Safety limit
-    constexpr uint32_t MAX_TIME_MS = 3;        // 3ms budget for network processing
-
-    uint32_t start_time = GameClock::get_time_ms();
-    int processed = 0;
-
-    hb::shared::net::NetworkPacket packet;
-    while (processed < MAX_PACKETS_PER_FRAME) {
-
-        // Check budget
-        if (GameClock::get_time_ms() - start_time > MAX_TIME_MS) {
-            break;
-        }
-
-        // Peek next packet
-        if (!m_g_sock->peek_packet(packet)) {
-            break; // Queue empty
-        }
-
-        // update functionality timestamps (legacy requirement)
-        m_last_net_recv_time = GameClock::get_time_ms();
-        m_time = GameClock::get_time_ms();
-
-        // Process (using the pointer directly from the packet vector)
-        if (!packet.empty()) {
-             game_recv_msg_handler(static_cast<uint32_t>(packet.size()), 
-                                const_cast<char*>(packet.ptr()));
-        }
-
-        // CRITICAL FIX: The handler might have closed/deleted the socket!
-        if (m_g_sock == nullptr) return;
-
-        // pop logic (remove from queue)
-        m_g_sock->pop_packet();
-        processed++;
-    }
-}
-
-
-void CGame::restore_sprites()
-{
-	for (auto& [idx, spr] : m_sprite)
-	{
-		spr->Restore();
-	}
-}
-
-bool CGame::send_command(uint32_t message_id, uint16_t command, char direction, int value1, int value2, int value3, const char* text, int value4)
-{
-	int result = 0;
-
-	if ((m_g_sock == 0) && (m_l_sock == 0)) return false;
-	uint32_t current_time = GameClock::get_time_ms();
-	uint8_t key = static_cast<uint8_t>(rand() % 255) + 1;
-
-	switch (message_id) {
-
-	case MsgId::RequestAngel:	// to Game Server
-	{
-		hb::net::PacketRequestAngel req{};
-		req.header.msg_id = message_id;
-		req.header.msg_type = 0;
-		if (text != nullptr) {
-			std::size_t name_len = std::strlen(text);
-			if (name_len >= sizeof(req.name)) name_len = sizeof(req.name) - 1;
-			std::memcpy(req.name, text, name_len);
-		}
-		req.angel_id = value1;
-		result = m_g_sock->send_msg(reinterpret_cast<char*>(&req), sizeof(req), key);
-	}
-	break;
-
-	case MsgId::RequestResurrectYes: // By snoopy
-	case MsgId::RequestResurrectNo:  // By snoopy
-	{
-		hb::net::PacketRequestHeaderOnly req{};
-		req.header.msg_id = message_id;
-		req.header.msg_type = 0;
-		result = m_g_sock->send_msg(reinterpret_cast<char*>(&req), sizeof(req), key);
-	}
-	break;
-
-	case MsgId::RequestHeldenianScroll:// By snoopy
-	{
-		hb::net::PacketRequestHeldenianScroll req{};
-		req.header.msg_id = message_id;
-		req.header.msg_type = 0;
-		if (text != nullptr) {
-			std::size_t name_len = std::strlen(text);
-			if (name_len >= sizeof(req.name)) name_len = sizeof(req.name) - 1;
-			std::memcpy(req.name, text, name_len);
-		}
-		req.item_id = command;
-		result = m_g_sock->send_msg(reinterpret_cast<char*>(&req), sizeof(req), key);
-	}
-	break;
-
-	case ClientMsgId::RequestTeleportList:
-	{
-		hb::net::PacketRequestName20 req{};
-		req.header.msg_id = message_id;
-		req.header.msg_type = 0;
-		std::snprintf(req.name, sizeof(req.name), "%s", "William");
-		result = m_g_sock->send_msg(reinterpret_cast<char*>(&req), sizeof(req), key);
-	}
-	break;
-
-	case ClientMsgId::RequestHeldenianTpList: // Snoopy: Heldenian TP
-	{
-		hb::net::PacketRequestName20 req{};
-		req.header.msg_id = message_id;
-		req.header.msg_type = 0;
-		std::snprintf(req.name, sizeof(req.name), "%s", "Gail");
-		result = m_g_sock->send_msg(reinterpret_cast<char*>(&req), sizeof(req), key);
-	}
-	break;
-
-	case ClientMsgId::RequestHeldenianTp: // Snoopy: Heldenian TP
-	case ClientMsgId::RequestChargedTeleport:
-	{
-		hb::net::PacketRequestTeleportId req{};
-		req.header.msg_id = message_id;
-		req.header.msg_type = 0;
-		req.teleport_id = value1;
-		result = m_g_sock->send_msg(reinterpret_cast<char*>(&req), sizeof(req), key);
-	}
-	break;
-
-	case MsgId::RequestSellItemList:
-	{
-		hb::net::PacketRequestSellItemList req{};
-		req.header.msg_id = message_id;
-		req.header.msg_type = 0;
-		for (int i = 0; i < game_limits::max_sell_list; i++) {
-			req.entries[i].index = static_cast<uint8_t>(m_sell_item_list[i].index);
-			req.entries[i].amount = m_sell_item_list[i].amount;
-		}
-		result = m_g_sock->send_msg(reinterpret_cast<char*>(&req), sizeof(req), key);
-	}
-	break;
-
-	case MsgId::RequestRestart:
-	{
-		hb::net::PacketRequestHeaderOnly req{};
-		req.header.msg_id = message_id;
-		req.header.msg_type = 0;
-		result = m_g_sock->send_msg(reinterpret_cast<char*>(&req), sizeof(req), key);
-	}
-	break;
-
-	case MsgId::RequestPanning:
-	{
-		hb::net::PacketRequestPanning req{};
-		req.header.msg_id = message_id;
-		req.header.msg_type = 0;
-		req.dir = static_cast<uint8_t>(direction);
-		result = m_g_sock->send_msg(reinterpret_cast<char*>(&req), sizeof(req), key);
-	}
-	break;
-
-
-	case ClientMsgId::GetMinimumLoadGateway:
-	case MsgId::request_login:
-		// to Log Server
-	{
-		hb::net::LoginRequest req{};
-		req.header.msg_id = message_id;
-		req.header.msg_type = 0;
-		std::snprintf(req.account_name, sizeof(req.account_name), "%s", m_player->m_account_name.c_str());
-		std::snprintf(req.password, sizeof(req.password), "%s", m_player->m_account_password.c_str());
-		std::snprintf(req.world_name, sizeof(req.world_name), "%s", m_world_server_name.c_str());
-		result = m_l_sock->send_msg(reinterpret_cast<char*>(&req), sizeof(req), key);
-	}
-
-	break;
-
-	case MsgId::RequestCreateNewCharacter:
-		// to Log Server
-	{
-		hb::net::CreateCharacterRequest req{};
-		req.header.msg_id = message_id;
-		req.header.msg_type = 0;
-		std::snprintf(req.character_name, sizeof(req.character_name), "%s", m_player->m_player_name.c_str());
-		std::snprintf(req.account_name, sizeof(req.account_name), "%s", m_player->m_account_name.c_str());
-		std::snprintf(req.password, sizeof(req.password), "%s", m_player->m_account_password.c_str());
-		std::snprintf(req.world_name, sizeof(req.world_name), "%s", m_world_server_name.c_str());
-		req.gender = static_cast<uint8_t>(m_player->m_gender);
-		req.skin = static_cast<uint8_t>(m_player->m_skin_col);
-		req.hairstyle = static_cast<uint8_t>(m_player->m_hair_style);
-		req.haircolor = static_cast<uint8_t>(m_player->m_hair_col);
-		req.underware = static_cast<uint8_t>(m_player->m_under_col);
-		req.str = static_cast<uint8_t>(m_player->m_stat_mod_str);
-		req.vit = static_cast<uint8_t>(m_player->m_stat_mod_vit);
-		req.dex = static_cast<uint8_t>(m_player->m_stat_mod_dex);
-		req.intl = static_cast<uint8_t>(m_player->m_stat_mod_int);
-		req.mag = static_cast<uint8_t>(m_player->m_stat_mod_mag);
-		req.chr = static_cast<uint8_t>(m_player->m_stat_mod_chr);
-		result = m_l_sock->send_msg(reinterpret_cast<char*>(&req), sizeof(req), key);
-	}
-	break;
-
-	case MsgId::request_enter_game:
-		// to Log Server
-	{
-		hb::net::EnterGameRequestFull req{};
-		req.header.msg_id = message_id;
-		req.header.msg_type = static_cast<uint16_t>(m_enter_game_type);
-		std::snprintf(req.character_name, sizeof(req.character_name), "%s", m_player->m_player_name.c_str());
-		std::snprintf(req.map_name, sizeof(req.map_name), "%s", m_map_name.c_str());
-		std::snprintf(req.account_name, sizeof(req.account_name), "%s", m_player->m_account_name.c_str());
-		std::snprintf(req.password, sizeof(req.password), "%s", m_player->m_account_password.c_str());
-		req.level = m_player->m_level;
-		std::snprintf(req.world_name, sizeof(req.world_name), "%s", m_world_server_name.c_str());
-		result = m_l_sock->send_msg(reinterpret_cast<char*>(&req), sizeof(req), key);
-	}
-	break;
-
-	case MsgId::RequestDeleteCharacter:
-		// to Log Server
-	{
-		hb::net::DeleteCharacterRequest req{};
-		req.header.msg_id = message_id;
-		req.header.msg_type = static_cast<uint16_t>(m_enter_game_type);
-		std::snprintf(req.character_name, sizeof(req.character_name), "%s", m_char_list[m_enter_game_type - 1]->m_name.c_str());
-		std::snprintf(req.account_name, sizeof(req.account_name), "%s", m_player->m_account_name.c_str());
-		std::snprintf(req.password, sizeof(req.password), "%s", m_player->m_account_password.c_str());
-		std::snprintf(req.world_name, sizeof(req.world_name), "%s", m_world_server_name.c_str());
-		result = m_l_sock->send_msg(reinterpret_cast<char*>(&req), sizeof(req), key);
-	}
-	break;
-
-	case MsgId::RequestSetItemPos:
-		// to Game Server
-	{
-		hb::net::PacketRequestSetItemPos req{};
-		req.header.msg_id = message_id;
-		req.header.msg_type = 0;
-		req.dir = static_cast<uint8_t>(direction);
-		req.x = static_cast<int16_t>(value1);
-		req.y = static_cast<int16_t>(value2);
-		result = m_g_sock->send_msg(reinterpret_cast<char*>(&req), sizeof(req));
-	}
-	break;
-
-	case MsgId::CommandCheckConnection:
-	{
-		hb::net::PacketCommandCheckConnection req{};
-		req.header.msg_id = message_id;
-		req.header.msg_type = 0;
-		req.time_ms = current_time;
-		result = m_g_sock->send_msg(reinterpret_cast<char*>(&req), sizeof(req), key);
-	}
-
-	break;
-
-	case MsgId::RequestInitData:
-	{
-		hb::net::PacketRequestInitDataEx req{};
-		req.header.msg_id = message_id;
-		req.header.msg_type = 0;
-		std::snprintf(req.player, sizeof(req.player), "%s", m_player->m_player_name.c_str());
-		std::snprintf(req.account, sizeof(req.account), "%s", m_player->m_account_name.c_str());
-		std::snprintf(req.password, sizeof(req.password), "%s", m_player->m_account_password.c_str());
-		req.is_observer = static_cast<uint8_t>(m_is_observer_mode);
-		std::snprintf(req.server, sizeof(req.server), "%s", m_game_server_name.c_str());
-		req.padding = 0;
-		req.itemConfigHash = LocalCacheManager::get().get_hash(ConfigCacheType::Items);
-		req.magicConfigHash = LocalCacheManager::get().get_hash(ConfigCacheType::Magic);
-		req.skillConfigHash = LocalCacheManager::get().get_hash(ConfigCacheType::Skills);
-		req.npcConfigHash = LocalCacheManager::get().get_hash(ConfigCacheType::Npcs);
-		result = m_g_sock->send_msg(reinterpret_cast<char*>(&req), sizeof(req), key);
-	}
-	break;
-
-	case MsgId::RequestInitPlayer:
-	{
-		hb::net::PacketRequestInitPlayer req{};
-		req.header.msg_id = message_id;
-		req.header.msg_type = 0;
-		std::snprintf(req.player, sizeof(req.player), "%s", m_player->m_player_name.c_str());
-		std::snprintf(req.account, sizeof(req.account), "%s", m_player->m_account_name.c_str());
-		std::snprintf(req.password, sizeof(req.password), "%s", m_player->m_account_password.c_str());
-		req.is_observer = static_cast<uint8_t>(m_is_observer_mode);
-		std::snprintf(req.server, sizeof(req.server), "%s", m_game_server_name.c_str());
-		req.padding = 0;
-		result = m_g_sock->send_msg(reinterpret_cast<char*>(&req), sizeof(req), key);
-	}
-	break;
-	case MsgId::LevelUpSettings:
-	{
-		hb::net::PacketRequestLevelUpSettings req{};
-		req.header.msg_id = message_id;
-		req.header.msg_type = 0;
-		req.str = m_player->m_lu_str;
-		req.vit = m_player->m_lu_vit;
-		req.dex = m_player->m_lu_dex;
-		req.intel = m_player->m_lu_int;
-		req.mag = m_player->m_lu_mag;
-		req.chr = m_player->m_lu_char;
-		result = m_g_sock->send_msg(reinterpret_cast<char*>(&req), sizeof(req), key);
-	}
-	break;
-
-	case MsgId::CommandChatMsg:
-		if (teleport_manager::get().is_requested()) return false;
-		if (text == 0) return false;
-
-		// to Game Server
-		{
-			hb::net::PacketCommandChatMsgHeader req{};
-			req.header.msg_id = message_id;
-			req.header.msg_type = 0;
-			req.x = m_player->m_player_x;
-			req.y = m_player->m_player_y;
-			std::snprintf(req.name, sizeof(req.name), "%s", m_player->m_player_name.c_str());
-			req.chat_type = static_cast<uint8_t>(value1);
-			if (check_local_chat_command(text) == true) return false;
-			std::size_t text_len = std::strlen(text);
-			char message[300]{};
-			std::memset(message, 0, sizeof(message));
-			std::memcpy(message, &req, sizeof(req));
-			std::memcpy(message + sizeof(req), text, text_len + 1);
-			result = m_g_sock->send_msg(message, static_cast<int>(sizeof(req) + text_len + 1));
-		}
+	case sock::Event::ConnectionEstablish:
+		connection_establish_handler(static_cast<int>(ServerType::Game));
 		break;
+	}
 
-	case MsgId::CommandCommon:
-		if (teleport_manager::get().is_requested()) return false;
-		switch (command) {
-		case CommonType::BuildItem:
-		{
-			hb::net::PacketCommandCommonBuild req{};
-			req.base.header.msg_id = message_id;
-			req.base.header.msg_type = command;
-			req.base.x = m_player->m_player_x;
-			req.base.y = m_player->m_player_y;
-			req.base.dir = static_cast<uint8_t>(direction);
-			if (text != 0) {
-				std::size_t name_len = std::strlen(text);
-				if (name_len > sizeof(req.name)) name_len = sizeof(req.name);
-				std::memcpy(req.name, text, name_len);
-			}
-			req.item_ids[0] = static_cast<uint8_t>(m_dialog_box_manager.Info(DialogBoxId::Manufacture).m_v1);
-			req.item_ids[1] = static_cast<uint8_t>(m_dialog_box_manager.Info(DialogBoxId::Manufacture).m_v2);
-			req.item_ids[2] = static_cast<uint8_t>(m_dialog_box_manager.Info(DialogBoxId::Manufacture).m_v3);
-			req.item_ids[3] = static_cast<uint8_t>(m_dialog_box_manager.Info(DialogBoxId::Manufacture).m_v4);
-			req.item_ids[4] = static_cast<uint8_t>(m_dialog_box_manager.Info(DialogBoxId::Manufacture).m_v5);
-			req.item_ids[5] = static_cast<uint8_t>(m_dialog_box_manager.Info(DialogBoxId::Manufacture).m_v6);
-			result = m_g_sock->send_msg(reinterpret_cast<char*>(&req), sizeof(req));
+	// 2. Drain all available data from TCP buffer to the Queue
+	// Only drain if socket is connected (m_is_available is set on FD_CONNECT)
+	if (!m_g_sock->m_is_available) {
+		return; // Still connecting, don't try to read yet
+	}
+
+	// If Poll() completed a packet, queue it before drain_to_queue() overwrites the buffer
+	if (ret == sock::Event::ReadComplete) {
+		size_t size = 0;
+		char* data = m_g_sock->get_rcv_data_pointer(&size);
+		if (data != nullptr && size > 0) {
+			m_g_sock->queue_completed_packet(data, size);
 		}
-		break;
+	}
 
-		case CommonType::ReqCreatePortion:
-		{
-			hb::net::PacketCommandCommonItems req{};
-			req.base.header.msg_id = message_id;
-			req.base.header.msg_type = command;
-			req.base.x = m_player->m_player_x;
-			req.base.y = m_player->m_player_y;
-			req.base.dir = static_cast<uint8_t>(direction);
-			req.item_ids[0] = static_cast<uint8_t>(m_dialog_box_manager.Info(DialogBoxId::Manufacture).m_v1);
-			req.item_ids[1] = static_cast<uint8_t>(m_dialog_box_manager.Info(DialogBoxId::Manufacture).m_v2);
-			req.item_ids[2] = static_cast<uint8_t>(m_dialog_box_manager.Info(DialogBoxId::Manufacture).m_v3);
-			req.item_ids[3] = static_cast<uint8_t>(m_dialog_box_manager.Info(DialogBoxId::Manufacture).m_v4);
-			req.item_ids[4] = static_cast<uint8_t>(m_dialog_box_manager.Info(DialogBoxId::Manufacture).m_v5);
-			req.item_ids[5] = static_cast<uint8_t>(m_dialog_box_manager.Info(DialogBoxId::Manufacture).m_v6);
-			req.padding = 0;
-			result = m_g_sock->send_msg(reinterpret_cast<char*>(&req), sizeof(req));
-		}
-		break;
+	int drained = m_g_sock->drain_to_queue();
 
-		//Crafting
-		case CommonType::CraftItem:
-		{
-			hb::net::PacketCommandCommonBuild req{};
-			req.base.header.msg_id = message_id;
-			req.base.header.msg_type = command;
-			req.base.x = m_player->m_player_x;
-			req.base.y = m_player->m_player_y;
-			req.base.dir = static_cast<uint8_t>(direction);
-			std::memset(req.name, ' ', sizeof(req.name));
-			req.item_ids[0] = static_cast<uint8_t>(m_dialog_box_manager.Info(DialogBoxId::Manufacture).m_v1);
-			req.item_ids[1] = static_cast<uint8_t>(m_dialog_box_manager.Info(DialogBoxId::Manufacture).m_v2);
-			req.item_ids[2] = static_cast<uint8_t>(m_dialog_box_manager.Info(DialogBoxId::Manufacture).m_v3);
-			req.item_ids[3] = static_cast<uint8_t>(m_dialog_box_manager.Info(DialogBoxId::Manufacture).m_v4);
-			req.item_ids[4] = static_cast<uint8_t>(m_dialog_box_manager.Info(DialogBoxId::Manufacture).m_v5);
-			req.item_ids[5] = static_cast<uint8_t>(m_dialog_box_manager.Info(DialogBoxId::Manufacture).m_v6);
-			result = m_g_sock->send_msg(reinterpret_cast<char*>(&req), sizeof(req));
-		}
-		break;
+	if (drained < 0) {
+		printf("[ERROR] Game socket drain_to_queue failed: %d\n", drained);
+		change_game_mode(GameMode::ConnectionLost);
+		m_g_sock.reset();
+		return;
+	}
 
-		// Create Slate Request - Diuuude
-		case CommonType::ReqCreateSlate:
-		{
-			hb::net::PacketCommandCommonItems req{};
-			req.base.header.msg_id = message_id;
-			req.base.header.msg_type = command;
-			req.base.x = m_player->m_player_x;
-			req.base.y = m_player->m_player_y;
-			req.base.dir = static_cast<uint8_t>(direction);
-			req.item_ids[0] = static_cast<uint8_t>(m_dialog_box_manager.Info(DialogBoxId::Slates).m_v1);
-			req.item_ids[1] = static_cast<uint8_t>(m_dialog_box_manager.Info(DialogBoxId::Slates).m_v2);
-			req.item_ids[2] = static_cast<uint8_t>(m_dialog_box_manager.Info(DialogBoxId::Slates).m_v3);
-			req.item_ids[3] = static_cast<uint8_t>(m_dialog_box_manager.Info(DialogBoxId::Slates).m_v4);
-			req.item_ids[4] = static_cast<uint8_t>(m_dialog_box_manager.Info(DialogBoxId::Slates).m_v5);
-			req.item_ids[5] = static_cast<uint8_t>(m_dialog_box_manager.Info(DialogBoxId::Slates).m_v6);
-			req.padding = 0;
-			result = m_g_sock->send_msg(reinterpret_cast<char*>(&req), sizeof(req));
-		}
-		break;
+	// 3. Process the queue with a Time Budget
+	//    We process as many packets as possible within the budget to keep the game responsive.
+	constexpr int MAX_PACKETS_PER_FRAME = 120; // Safety limit
+	constexpr uint32_t MAX_TIME_MS = 3;        // 3ms budget for network processing
 
-		// Magic spell casting - uses time_ms field to carry target object ID for auto-aim
-		case CommonType::Magic:
-		{
-			hb::net::PacketCommandCommonWithTime req{};
-			req.base.header.msg_id = message_id;
-			req.base.header.msg_type = command;
-			req.base.x = m_player->m_player_x;
-			req.base.y = m_player->m_player_y;
-			req.base.dir = static_cast<uint8_t>(direction);
-			req.v1 = value1;  // target X
-			req.v2 = value2;  // target Y
-			req.v3 = value3;  // magic type (100-199)
-			req.time_ms = static_cast<uint32_t>(value4);  // target object ID (0 = tile-based, >0 = entity tracking)
-			result = m_g_sock->send_msg(reinterpret_cast<char*>(&req), sizeof(req));
-		}
-		break;
+	uint32_t start_time = GameClock::get_time_ms();
+	int processed = 0;
 
-		default:
-			if (text == 0)
-			{
-				hb::net::PacketCommandCommonWithTime req{};
-				req.base.header.msg_id = message_id;
-				req.base.header.msg_type = command;
-				req.base.x = m_player->m_player_x;
-				req.base.y = m_player->m_player_y;
-				req.base.dir = static_cast<uint8_t>(direction);
-				req.v1 = value1;
-				req.v2 = value2;
-				req.v3 = value3;
-				req.time_ms = current_time;
-				result = m_g_sock->send_msg(reinterpret_cast<char*>(&req), sizeof(req));
-			}
-			else
-			{
-				hb::net::PacketCommandCommonWithString req{};
-				req.base.header.msg_id = message_id;
-				req.base.header.msg_type = command;
-				req.base.x = m_player->m_player_x;
-				req.base.y = m_player->m_player_y;
-				req.base.dir = static_cast<uint8_t>(direction);
-				req.v1 = value1;
-				req.v2 = value2;
-				req.v3 = value3;
-				std::memset(req.text, 0, sizeof(req.text));
-				std::size_t text_len = std::strlen(text);
-				if (text_len > sizeof(req.text)) text_len = sizeof(req.text);
-				std::memcpy(req.text, text, text_len);
-				req.v4 = value4;
-				result = m_g_sock->send_msg(reinterpret_cast<char*>(&req), sizeof(req));
-			}
+	hb::shared::net::NetworkPacket packet;
+	while (processed < MAX_PACKETS_PER_FRAME) {
+
+		// Check budget
+		if (GameClock::get_time_ms() - start_time > MAX_TIME_MS) {
 			break;
 		}
 
-		break;
-
-	case MsgId::request_create_new_guild:
-	case MsgId::request_disband_guild:
-		// to Game Server
-	{
-		hb::net::PacketRequestGuildAction req{};
-		req.header.msg_id = message_id;
-		req.header.msg_type = MsgType::Confirm;
-		std::snprintf(req.player, sizeof(req.player), "%s", m_player->m_player_name.c_str());
-		std::snprintf(req.account, sizeof(req.account), "%s", m_player->m_account_name.c_str());
-		std::snprintf(req.password, sizeof(req.password), "%s", m_player->m_account_password.c_str());
-		std::snprintf(req.guild, sizeof(req.guild), "%s", m_player->m_guild_name.c_str());
-		CMisc::replace_string(req.guild, ' ', '_');
-		result = m_g_sock->send_msg(reinterpret_cast<char*>(&req), sizeof(req), key);
-	}
-	break;
-
-	case MsgId::RequestTeleport:
-	{
-		hb::net::PacketRequestHeaderOnly req{};
-		req.header.msg_id = message_id;
-		req.header.msg_type = MsgType::Confirm;
-		result = m_g_sock->send_msg(reinterpret_cast<char*>(&req), sizeof(req));
-	}
-
-	teleport_manager::get().set_requested(true);
-	break;
-
-	case MsgId::RequestCivilRight:
-	{
-		hb::net::PacketRequestHeaderOnly req{};
-		req.header.msg_id = message_id;
-		req.header.msg_type = MsgType::Confirm;
-		result = m_g_sock->send_msg(reinterpret_cast<char*>(&req), sizeof(req));
-	}
-	break;
-
-	case MsgId::RequestRetrieveItem:
-	{
-		hb::net::PacketRequestRetrieveItem req{};
-		req.header.msg_id = message_id;
-		req.header.msg_type = MsgType::Confirm;
-		req.item_slot = static_cast<uint8_t>(value1);
-		result = m_g_sock->send_msg(reinterpret_cast<char*>(&req), sizeof(req));
-	}
-	break;
-
-	case MsgId::RequestNoticement:
-	{
-		hb::net::PacketRequestNoticement req{};
-		req.header.msg_id = message_id;
-		req.header.msg_type = 0;
-		req.value = value1;
-		result = m_g_sock->send_msg(reinterpret_cast<char*>(&req), sizeof(req), key);
-	}
-	break;
-
-	case  MsgId::RequestFightZoneReserve:
-	{
-		hb::net::PacketRequestFightzoneReserve req{};
-		req.header.msg_id = message_id;
-		req.header.msg_type = 0;
-		req.fightzone = value1;
-		result = m_g_sock->send_msg(reinterpret_cast<char*>(&req), sizeof(req));
-	}
-	break;
-
-	case MsgId::StateChangePoint:
-	{
-		hb::net::PacketRequestStateChange req{};
-		req.header.msg_id = message_id;
-		req.header.msg_type = 0;
-		req.str = static_cast<int16_t>(-m_player->m_lu_str);
-		req.vit = static_cast<int16_t>(-m_player->m_lu_vit);
-		req.dex = static_cast<int16_t>(-m_player->m_lu_dex);
-		req.intel = static_cast<int16_t>(-m_player->m_lu_int);
-		req.mag = static_cast<int16_t>(-m_player->m_lu_mag);
-		req.chr = static_cast<int16_t>(-m_player->m_lu_char);
-		result = m_g_sock->send_msg(reinterpret_cast<char*>(&req), sizeof(req));
-	}
-	break;
-
-	default:
-		if (teleport_manager::get().is_requested()) return false;
-		if ((command == Type::Attack) || (command == Type::AttackMove))
-		{
-			hb::net::PacketCommandMotionAttack req{};
-			req.base.header.msg_id = message_id;
-			req.base.header.msg_type = command;
-			req.base.x = m_player->m_player_x;
-			req.base.y = m_player->m_player_y;
-			req.base.dir = static_cast<uint8_t>(direction);
-			req.base.dx = static_cast<int16_t>(value1);
-			req.base.dy = static_cast<int16_t>(value2);
-			req.base.type = static_cast<int16_t>(value3);
-			req.target_id = static_cast<uint16_t>(value4);
-			req.time_ms = current_time;
-			result = m_g_sock->send_msg(reinterpret_cast<char*>(&req), sizeof(req));
+		// Peek next packet
+		if (!m_g_sock->peek_packet(packet)) {
+			break; // Queue empty
 		}
-		else
-		{
-			hb::net::PacketCommandMotionSimple req{};
-			req.base.header.msg_id = message_id;
-			req.base.header.msg_type = command;
-			req.base.x = m_player->m_player_x;
-			req.base.y = m_player->m_player_y;
-			req.base.dir = static_cast<uint8_t>(direction);
-			req.base.dx = static_cast<int16_t>(value1);
-			req.base.dy = static_cast<int16_t>(value2);
-			req.base.type = static_cast<int16_t>(value3);
-			req.time_ms = current_time;
-			result = m_g_sock->send_msg(reinterpret_cast<char*>(&req), sizeof(req)); //v2.171
+
+		// update functionality timestamps (legacy requirement)
+		m_last_net_recv_time = GameClock::get_time_ms();
+		m_time = GameClock::get_time_ms();
+
+		// Process (using the pointer directly from the packet vector)
+		if (!packet.empty()) {
+			game_recv_msg_handler(static_cast<uint32_t>(packet.size()),
+				const_cast<char*>(packet.ptr()));
 		}
-		m_player->m_Controller.increment_command_count();
-		break;
+
+		// CRITICAL FIX: The handler might have closed/deleted the socket!
+		if (m_g_sock == nullptr) return;
+
+		// pop logic (remove from queue)
+		m_g_sock->pop_packet();
+		processed++;
 	}
+}
+
+
+bool CGame::check_send_result(int result)
+{
 	switch (result) {
 	case sock::Event::SocketClosed:
 	case sock::Event::SocketError:
 	case sock::Event::QueueFull:
 		change_game_mode(GameMode::ConnectionLost);
-	m_g_sock.reset();
-	break;
+		m_g_sock.reset();
+		return false;
 
 	case sock::Event::CriticalError:
-	m_g_sock.reset();
-	hb::shared::render::Window::close();
-	break;
+		m_g_sock.reset();
+		hb::shared::render::Window::close();
+		return false;
 	}
 	return true;
 }
 
+bool CGame::send_game_packet_impl(const hb::net::packet_base& pkt, size_t size, bool encrypt)
+{
+	if (!m_g_sock) return false;
+	uint8_t key = encrypt ? (static_cast<uint8_t>(rand() % 255) + 1) : 0;
+	int result = m_g_sock->send_msg(const_cast<char*>(reinterpret_cast<const char*>(&pkt)), static_cast<uint32_t>(size), key);
+	return check_send_result(result);
+}
 
-bool CGame::decode_item_config_file_contents(char* data, uint32_t msg_size)
+bool CGame::send_game_packet_raw(const char* data, uint32_t size, bool encrypt)
+{
+	if (!m_g_sock) return false;
+	uint8_t key = encrypt ? (static_cast<uint8_t>(rand() % 255) + 1) : 0;
+	int result = m_g_sock->send_msg(const_cast<char*>(data), size, key);
+	return check_send_result(result);
+}
+
+bool CGame::send_chat_message(const char* text)
+{
+	if (teleport_manager::get().is_requested()) return false;
+	if (!text) return false;
+	if (check_local_chat_command(text)) return false;
+
+	hb::net::PacketCommandChatMsgHeader req{};
+	req.header.msg_id = MsgId::CommandChatMsg;
+	req.header.msg_type = 0;
+	req.x = m_player->m_player_x;
+	req.y = m_player->m_player_y;
+	std::snprintf(req.name, sizeof(req.name), "%s", m_player->m_player_name.c_str());
+	req.chat_type = 0;
+
+	std::size_t text_len = std::strlen(text);
+	char message[300]{};
+	std::memcpy(message, &req, sizeof(req));
+	std::memcpy(message + sizeof(req), text, text_len + 1);
+	return send_game_packet_raw(message, static_cast<uint32_t>(sizeof(req) + text_len + 1));
+}
+
+void CGame::set_pending_login_packet_impl(const hb::net::packet_base& pkt, size_t size)
+{
+	const char* p = reinterpret_cast<const char*>(&pkt);
+	m_pending_login_packet.assign(p, p + size);
+}
+
+
+bool CGame::cache_process_item_config(char* data, uint32_t msg_size)
 {
 	LocalCacheManager::get().accumulate_packet(ConfigCacheType::Items, data, msg_size);
 
@@ -1387,8 +889,6 @@ bool CGame::decode_item_config_file_contents(char* data, uint32_t msg_size)
 		item->m_item_effect_value6 = entry.effectValue6;
 		item->m_max_life_span = entry.maxLifeSpan;
 		item->m_special_effect = entry.specialEffect;
-		item->m_sprite = entry.sprite;
-		item->m_sprite_frame = entry.spriteFrame;
 		item->m_is_for_sale = (entry.price >= 0);
 		item->m_price = static_cast<uint32_t>(entry.price >= 0 ? entry.price : -entry.price);
 		item->m_weight = entry.weight;
@@ -1401,6 +901,7 @@ bool CGame::decode_item_config_file_contents(char* data, uint32_t msg_size)
 		item->m_related_skill = entry.relatedSkill;
 		item->m_category = entry.category;
 		item->m_item_color = entry.itemColor;
+		item->m_display_id = entry.displayId;
 	}
 
 	// Log total count on last packet
@@ -1410,14 +911,15 @@ bool CGame::decode_item_config_file_contents(char* data, uint32_t msg_size)
 	}
 	if (totalLoaded >= totalItems && !LocalCacheManager::get().is_replaying()) {
 		if (LocalCacheManager::get().finalize_and_save(ConfigCacheType::Items)) {
-		} else {
+		}
+		else {
 		}
 	}
 
 	return true;
 }
 
-bool CGame::decode_magic_config_file_contents(char* data, uint32_t msg_size)
+bool CGame::cache_process_magic_config(char* data, uint32_t msg_size)
 {
 	LocalCacheManager::get().accumulate_packet(ConfigCacheType::Magic, data, msg_size);
 
@@ -1471,14 +973,15 @@ bool CGame::decode_magic_config_file_contents(char* data, uint32_t msg_size)
 	}
 	if (totalLoaded >= totalMagics && !LocalCacheManager::get().is_replaying()) {
 		if (LocalCacheManager::get().finalize_and_save(ConfigCacheType::Magic)) {
-		} else {
+		}
+		else {
 		}
 	}
 
 	return true;
 }
 
-bool CGame::decode_skill_config_file_contents(char* data, uint32_t msg_size)
+bool CGame::cache_process_skill_config(char* data, uint32_t msg_size)
 {
 	LocalCacheManager::get().accumulate_packet(ConfigCacheType::Skills, data, msg_size);
 
@@ -1527,14 +1030,15 @@ bool CGame::decode_skill_config_file_contents(char* data, uint32_t msg_size)
 	}
 	if (totalLoaded >= totalSkills && !LocalCacheManager::get().is_replaying()) {
 		if (LocalCacheManager::get().finalize_and_save(ConfigCacheType::Skills)) {
-		} else {
+		}
+		else {
 		}
 	}
 
 	return true;
 }
 
-bool CGame::decode_npc_config_file_contents(char* data, uint32_t msg_size)
+bool CGame::cache_process_npc_config(char* data, uint32_t msg_size)
 {
 	LocalCacheManager::get().accumulate_packet(ConfigCacheType::Npcs, data, msg_size);
 
@@ -1567,10 +1071,7 @@ bool CGame::decode_npc_config_file_contents(char* data, uint32_t msg_size)
 			m_npc_config_list[npcId].valid = true;
 		}
 
-		// update type->name reverse map (last config per type wins)
-		if (npcType >= 0 && npcType < 120) {
-			m_npc_name_by_type[npcType] = entry.name;
-		}
+		// (type-based reverse map removed — use config_id for all name lookups)
 	}
 
 	// Track raw entries received across packets
@@ -1579,19 +1080,12 @@ bool CGame::decode_npc_config_file_contents(char* data, uint32_t msg_size)
 
 	if (m_npc_configs_received >= totalNpcs && !LocalCacheManager::get().is_replaying()) {
 		if (LocalCacheManager::get().finalize_and_save(ConfigCacheType::Npcs)) {
-		} else {
+		}
+		else {
 		}
 	}
 
 	return true;
-}
-
-const char* CGame::get_npc_config_name(short type) const
-{
-	if (type >= 0 && type < 120 && !m_npc_name_by_type[type].empty()) {
-		return m_npc_name_by_type[type].c_str();
-	}
-	return "Unknown";
 }
 
 const char* CGame::get_npc_config_name_by_id(short npcConfigId) const
@@ -1609,6 +1103,72 @@ short CGame::resolve_npc_type(short npcConfigId) const
 	return 0;
 }
 
+bool CGame::cache_process_map_config(char* data, uint32_t msg_size)
+{
+	LocalCacheManager::get().accumulate_packet(ConfigCacheType::Maps, data, msg_size);
+
+	constexpr size_t headerSize = sizeof(hb::net::PacketMapConfigHeader);
+	constexpr size_t entrySize = sizeof(hb::net::PacketMapConfigEntry);
+
+	if (msg_size < headerSize) {
+		return false;
+	}
+
+	const auto* pktHeader = reinterpret_cast<const hb::net::PacketMapConfigHeader*>(data);
+	uint16_t mapCount = pktHeader->mapCount;
+	uint16_t totalMaps = pktHeader->totalMaps;
+
+	if (msg_size < headerSize + (mapCount * entrySize)) {
+		return false;
+	}
+
+	const auto* entries = reinterpret_cast<const hb::net::PacketMapConfigEntry*>(data + headerSize);
+
+	for (uint16_t i = 0; i < mapCount; i++) {
+		const auto& entry = entries[i];
+		std::string map_name(entry.map_name, strnlen(entry.map_name, sizeof(entry.map_name)));
+		std::string display_name(entry.display_name, strnlen(entry.display_name, sizeof(entry.display_name)));
+		if (!map_name.empty() && !display_name.empty()) {
+			m_map_display_names[map_name] = display_name;
+		}
+	}
+
+	if (pktHeader->packetIndex == 0) m_map_configs_received = 0;
+	m_map_configs_received += mapCount;
+
+	if (m_map_configs_received >= totalMaps && !LocalCacheManager::get().is_replaying()) {
+		LocalCacheManager::get().finalize_and_save(ConfigCacheType::Maps);
+	}
+
+	return true;
+}
+
+bool CGame::cache_process_balance_config(char* data, uint32_t msg_size)
+{
+	if (msg_size <= sizeof(hb::net::PacketHeader)) return false;
+
+	const char* payload = data + sizeof(hb::net::PacketHeader);
+	uint32_t payload_size = msg_size - sizeof(hb::net::PacketHeader);
+
+	// Accumulate for cache (single packet, finalize immediately)
+	LocalCacheManager::get().accumulate_packet(ConfigCacheType::BalanceConfig, data, msg_size);
+	if (!LocalCacheManager::get().is_replaying())
+		LocalCacheManager::get().finalize_and_save(ConfigCacheType::BalanceConfig);
+
+	// Deserialize into formula engine
+	m_formula_engine.clear();
+	if (!m_formula_engine.deserialize(reinterpret_cast<const uint8_t*>(payload), payload_size))
+	{
+		hb::logger::warn<hb::log_channel::network>("Failed to deserialize balance config");
+		return false;
+	}
+
+	hb::logger::log<hb::log_channel::network>("Balance config loaded ({} bytes, {} formulas)",
+		payload_size, m_formula_engine.formula_count());
+
+	return true;
+}
+
 void CGame::game_recv_msg_handler(uint32_t msg_size, char* data)
 {
 	const auto* header = hb::net::PacketCast<hb::net::PacketHeader>(data, sizeof(hb::net::PacketHeader));
@@ -1616,6 +1176,11 @@ void CGame::game_recv_msg_handler(uint32_t msg_size, char* data)
 	m_last_net_msg_id = header->msg_id;
 	m_last_net_msg_time = GameClock::get_time_ms();
 	m_last_net_msg_size = msg_size;
+
+	IGameScreen* screen = GameModeManager::get_active_screen();
+	if (screen && screen->on_game_msg(header->msg_id, header->msg_type, data, msg_size))
+		return;
+
 	switch (header->msg_id) {
 	case MSGID_RESPONSE_CONFIGCACHESTATUS:
 	{
@@ -1636,7 +1201,7 @@ void CGame::game_recv_msg_handler(uint32_t msg_size, char* data)
 		if (cachePkt->itemCacheValid) {
 			bool replay_ok = LocalCacheManager::get().replay_from_cache(ConfigCacheType::Items,
 				[](char* p, uint32_t s, void* c) -> bool {
-					return static_cast<ReplayCtx*>(c)->game->decode_item_config_file_contents(p, s);
+					return static_cast<ReplayCtx*>(c)->game->cache_process_item_config(p, s);
 				}, &ctx);
 			// Verify items actually loaded
 			bool has_items = false;
@@ -1645,12 +1210,14 @@ void CGame::game_recv_msg_handler(uint32_t msg_size, char* data)
 			}
 			if (replay_ok && has_items) {
 				m_config_retry[0] = ConfigRetryLevel::None;
-			} else {
+			}
+			else {
 				LocalCacheManager::get().reset_accumulator(ConfigCacheType::Items);
 				m_config_retry[0] = ConfigRetryLevel::ServerRequested;
 				need_items = true;
 			}
-		} else {
+		}
+		else {
 			LocalCacheManager::get().reset_accumulator(ConfigCacheType::Items);
 			m_config_retry[0] = ConfigRetryLevel::ServerRequested;
 			need_items = true;
@@ -1659,7 +1226,7 @@ void CGame::game_recv_msg_handler(uint32_t msg_size, char* data)
 		if (cachePkt->magicCacheValid) {
 			bool replay_ok = LocalCacheManager::get().replay_from_cache(ConfigCacheType::Magic,
 				[](char* p, uint32_t s, void* c) -> bool {
-					return static_cast<ReplayCtx*>(c)->game->decode_magic_config_file_contents(p, s);
+					return static_cast<ReplayCtx*>(c)->game->cache_process_magic_config(p, s);
 				}, &ctx);
 			bool has_magic = false;
 			if (replay_ok) {
@@ -1667,12 +1234,14 @@ void CGame::game_recv_msg_handler(uint32_t msg_size, char* data)
 			}
 			if (replay_ok && has_magic) {
 				m_config_retry[1] = ConfigRetryLevel::None;
-			} else {
+			}
+			else {
 				LocalCacheManager::get().reset_accumulator(ConfigCacheType::Magic);
 				m_config_retry[1] = ConfigRetryLevel::ServerRequested;
 				need_magic = true;
 			}
-		} else {
+		}
+		else {
 			LocalCacheManager::get().reset_accumulator(ConfigCacheType::Magic);
 			m_config_retry[1] = ConfigRetryLevel::ServerRequested;
 			need_magic = true;
@@ -1681,7 +1250,7 @@ void CGame::game_recv_msg_handler(uint32_t msg_size, char* data)
 		if (cachePkt->skillCacheValid) {
 			bool replay_ok = LocalCacheManager::get().replay_from_cache(ConfigCacheType::Skills,
 				[](char* p, uint32_t s, void* c) -> bool {
-					return static_cast<ReplayCtx*>(c)->game->decode_skill_config_file_contents(p, s);
+					return static_cast<ReplayCtx*>(c)->game->cache_process_skill_config(p, s);
 				}, &ctx);
 			bool has_skills = false;
 			if (replay_ok) {
@@ -1689,12 +1258,14 @@ void CGame::game_recv_msg_handler(uint32_t msg_size, char* data)
 			}
 			if (replay_ok && has_skills) {
 				m_config_retry[2] = ConfigRetryLevel::None;
-			} else {
+			}
+			else {
 				LocalCacheManager::get().reset_accumulator(ConfigCacheType::Skills);
 				m_config_retry[2] = ConfigRetryLevel::ServerRequested;
 				need_skills = true;
 			}
-		} else {
+		}
+		else {
 			LocalCacheManager::get().reset_accumulator(ConfigCacheType::Skills);
 			m_config_retry[2] = ConfigRetryLevel::ServerRequested;
 			need_skills = true;
@@ -1703,7 +1274,7 @@ void CGame::game_recv_msg_handler(uint32_t msg_size, char* data)
 		if (cachePkt->npcCacheValid) {
 			bool replay_ok = LocalCacheManager::get().replay_from_cache(ConfigCacheType::Npcs,
 				[](char* p, uint32_t s, void* c) -> bool {
-					return static_cast<ReplayCtx*>(c)->game->decode_npc_config_file_contents(p, s);
+					return static_cast<ReplayCtx*>(c)->game->cache_process_npc_config(p, s);
 				}, &ctx);
 			bool has_npcs = false;
 			if (replay_ok) {
@@ -1711,25 +1282,65 @@ void CGame::game_recv_msg_handler(uint32_t msg_size, char* data)
 			}
 			if (replay_ok && has_npcs) {
 				m_config_retry[3] = ConfigRetryLevel::None;
-			} else {
+			}
+			else {
 				LocalCacheManager::get().reset_accumulator(ConfigCacheType::Npcs);
 				m_config_retry[3] = ConfigRetryLevel::ServerRequested;
 				need_npcs = true;
 			}
-		} else {
+		}
+		else {
 			LocalCacheManager::get().reset_accumulator(ConfigCacheType::Npcs);
 			m_config_retry[3] = ConfigRetryLevel::ServerRequested;
 			need_npcs = true;
 		}
 
-		if (need_items || need_magic || need_skills || need_npcs) {
-			request_configs_from_server(need_items, need_magic, need_skills, need_npcs);
+		bool need_maps = false;
+		m_map_display_names.clear();
+		if (cachePkt->mapCacheValid) {
+			bool replay_ok = LocalCacheManager::get().replay_from_cache(ConfigCacheType::Maps,
+				[](char* p, uint32_t s, void* c) -> bool {
+					return static_cast<ReplayCtx*>(c)->game->cache_process_map_config(p, s);
+				}, &ctx);
+			if (replay_ok && !m_map_display_names.empty()) {
+				m_config_retry[4] = ConfigRetryLevel::None;
+			}
+			else {
+				LocalCacheManager::get().reset_accumulator(ConfigCacheType::Maps);
+				m_config_retry[4] = ConfigRetryLevel::ServerRequested;
+				need_maps = true;
+			}
+		}
+		else {
+			LocalCacheManager::get().reset_accumulator(ConfigCacheType::Maps);
+			m_config_retry[4] = ConfigRetryLevel::ServerRequested;
+			need_maps = true;
+		}
+
+		bool need_balance = false;
+		if (cachePkt->balanceCacheValid) {
+			bool replay_ok = LocalCacheManager::get().replay_from_cache(ConfigCacheType::BalanceConfig,
+				[](char* p, uint32_t s, void* c) -> bool {
+					return static_cast<ReplayCtx*>(c)->game->cache_process_balance_config(p, s);
+				}, &ctx);
+			if (!replay_ok || m_formula_engine.formula_count() == 0) {
+				LocalCacheManager::get().reset_accumulator(ConfigCacheType::BalanceConfig);
+				need_balance = true;
+			}
+		}
+		else {
+			LocalCacheManager::get().reset_accumulator(ConfigCacheType::BalanceConfig);
+			need_balance = true;
+		}
+
+		if (need_items || need_magic || need_skills || need_npcs || need_maps || need_balance) {
+			request_configs_from_server(need_items, need_magic, need_skills, need_npcs, need_maps, need_balance);
 			m_config_request_time = GameClock::get_time_ms();
-		} else {
+		}
+		else {
 			m_configs_ready = true;
 			if (m_init_data_ready) {
-				GameModeManager::set_screen<Screen_OnGame>();
-				m_init_data_ready = false;
+				GameModeManager::clear_overlay();
 			}
 		}
 	}
@@ -1752,120 +1363,53 @@ void CGame::game_recv_msg_handler(uint32_t msg_size, char* data)
 			m_npc_config_list.fill({});
 			m_npc_configs_received = 0;
 		}
+		if (reloadPkt->reloadMaps) {
+			LocalCacheManager::get().reset_accumulator(ConfigCacheType::Maps);
+			m_map_display_names.clear();
+		}
+		if (reloadPkt->reloadBalance) {
+			LocalCacheManager::get().reset_accumulator(ConfigCacheType::BalanceConfig);
+			m_formula_engine.clear();
+		}
 
 		set_top_msg((char*)"Administration kicked off a config reload, some lag may occur.", 5);
 	}
 	break;
 
 	case MsgId::ItemConfigContents:
-		decode_item_config_file_contents(data, msg_size);
+		cache_process_item_config(data, msg_size);
 		m_config_retry[0] = ConfigRetryLevel::None;
 		check_configs_ready_and_enter_game();
 		break;
 	case MsgId::MagicConfigContents:
-		decode_magic_config_file_contents(data, msg_size);
+		cache_process_magic_config(data, msg_size);
 		m_config_retry[1] = ConfigRetryLevel::None;
 		check_configs_ready_and_enter_game();
 		break;
 	case MsgId::SkillConfigContents:
-		decode_skill_config_file_contents(data, msg_size);
+		cache_process_skill_config(data, msg_size);
 		m_config_retry[2] = ConfigRetryLevel::None;
 		check_configs_ready_and_enter_game();
 		break;
 	case MsgId::NpcConfigContents:
-		decode_npc_config_file_contents(data, msg_size);
+		cache_process_npc_config(data, msg_size);
 		m_config_retry[3] = ConfigRetryLevel::None;
 		check_configs_ready_and_enter_game();
 		break;
-	case ClientMsgId::ResponseChargedTeleport:
-		teleport_manager::get().handle_charged_teleport(data);
+	case MsgId::MapConfigContents:
+		cache_process_map_config(data, msg_size);
+		m_config_retry[4] = ConfigRetryLevel::None;
+		check_configs_ready_and_enter_game();
 		break;
-
-	case ClientMsgId::ResponseTeleportList:
-		teleport_manager::get().handle_teleport_list(data);
+	case MsgId::BalanceConfigContents:
+		cache_process_balance_config(data, msg_size);
 		break;
-
-	case ClientMsgId::ResponseHeldenianTpList: // Snoopy Heldenian TP
-		teleport_manager::get().handle_heldenian_teleport_list(data);
-		break;
-
-	case MsgId::ResponseNoticement:
-		noticement_handler(data);
-		break;
-
-	case MsgId::DynamicObject:
-		dynamic_object_handler(data);
-		break;
-
 	case MsgId::ResponseInitPlayer:
 		init_player_response_handler(data);
 		break;
 
 	case MsgId::ResponseInitData:
 		init_data_response_handler(data);
-		break;
-
-	case MsgId::ResponseMotion:
-		motion_response_handler(data);
-		break;
-
-	case MsgId::EventCommon:
-		common_event_handler(data);
-		break;
-
-	case MsgId::EventMotion:
-		motion_event_handler(data);
-		break;
-
-	case MsgId::EventLog:
-		log_event_handler(data);
-		break;
-
-	case MsgId::CommandChatMsg:
-		chat_msg_handler(data);
-		break;
-
-	case MsgId::PlayerItemListContents:
-		init_item_list(data);
-		break;
-
-	case MsgId::Notify:
-		if (m_network_message_manager) {
-
-			m_network_message_manager->process_message(MsgId::Notify, data, msg_size);
-		}
-		break;
-
-	case MsgId::ResponseCreateNewGuild:
-		create_new_guild_response_handler(data);
-		break;
-
-	case MsgId::ResponseDisbandGuild:
-		disband_guild_response_handler(data);
-		break;
-
-	case MsgId::PlayerCharacterContents:
-		init_player_characteristics(data);
-		break;
-
-	case MsgId::ResponseCivilRight:
-		civil_right_admission_handler(data);
-		break;
-
-	case MsgId::ResponseRetrieveItem:
-		retrieve_item_handler(data);
-		break;
-
-	case MsgId::ResponsePanning:
-		response_panning_handler(data);
-		break;
-
-	case MsgId::ResponseFightZoneReserve:
-		reserve_fightzone_response_handler(data);
-		break;
-
-	case MSGID_RESPONSE_SHOP_CONTENTS:
-		shop_manager::get().handle_response(data);
 		break;
 
 	case MsgId::CommandCheckConnection:
@@ -1890,29 +1434,21 @@ void CGame::connection_establish_handler(char where)
 
 	switch (where) {
 	case static_cast<int>(ServerType::Game):
-		send_command(MsgId::RequestInitPlayer, 0, 0, 0, 0, 0, 0);
+	{
+		hb::net::PacketRequestInitPlayer req{};
+		req.header.msg_id = MsgId::RequestInitPlayer;
+		req.header.msg_type = 0;
+		std::snprintf(req.player, sizeof(req.player), "%s", m_selected_char_name.c_str());
+		std::snprintf(req.account, sizeof(req.account), "%s", m_account_name.c_str());
+		std::snprintf(req.password, sizeof(req.password), "%s", m_account_password.c_str());
+		req.is_observer = static_cast<uint8_t>(on_game()->m_is_observer_mode);
+		std::snprintf(req.server, sizeof(req.server), "%s", m_game_server_name.c_str());
+		req.padding = 0;
+		send_game_packet(req);
 		break;
+	}
 
 	case static_cast<int>(ServerType::Log):
-		switch (m_connect_mode) {
-		case MsgId::request_login:
-			send_command(MsgId::request_login, 0, 0, 0, 0, 0, 0);
-			break;
-		case MsgId::RequestCreateNewCharacter:
-			send_command(MsgId::RequestCreateNewCharacter, 0, 0, 0, 0, 0, 0);
-			break;
-		case MsgId::request_enter_game:
-			send_command(MsgId::request_enter_game, 0, 0, 0, 0, 0, 0);
-			break;
-		case MsgId::RequestDeleteCharacter:
-			send_command(MsgId::RequestDeleteCharacter, 0, 0, 0, 0, 0, 0);
-			break;
-		case MsgId::RequestInputKeyCode:
-			send_command(MsgId::RequestInputKeyCode, 0, 0, 0, 0, 0, 0);
-			break;
-		}
-
-		// Send any pending packet built directly by a screen/overlay
 		if (!m_pending_login_packet.empty()) {
 			char key = static_cast<char>(rand() % 255) + 1;
 			m_l_sock->send_msg(m_pending_login_packet.data(), static_cast<uint32_t>(m_pending_login_packet.size()), key);
@@ -1929,8 +1465,29 @@ void CGame::init_player_response_handler(char* data)
 	if (!header) return;
 	switch (header->msg_type) {
 	case MsgType::Confirm:
-		send_command(MsgId::RequestInitData, 0, 0, 0, 0, 0, 0);
+	{
+		hb::net::PacketRequestInitDataEx req{};
+		req.header.msg_id = MsgId::RequestInitData;
+		std::snprintf(req.player, sizeof(req.player), "%s", m_selected_char_name.c_str());
+		std::snprintf(req.account, sizeof(req.account), "%s", m_account_name.c_str());
+		std::snprintf(req.password, sizeof(req.password), "%s", m_account_password.c_str());
+		req.is_observer = static_cast<uint8_t>(on_game()->m_is_observer_mode);
+		std::snprintf(req.server, sizeof(req.server), "%s", m_game_server_name.c_str());
+		std::snprintf(req.itemConfigHash, sizeof(req.itemConfigHash), "%s",
+			LocalCacheManager::get().get_hash(ConfigCacheType::Items).c_str());
+		std::snprintf(req.magicConfigHash, sizeof(req.magicConfigHash), "%s",
+			LocalCacheManager::get().get_hash(ConfigCacheType::Magic).c_str());
+		std::snprintf(req.skillConfigHash, sizeof(req.skillConfigHash), "%s",
+			LocalCacheManager::get().get_hash(ConfigCacheType::Skills).c_str());
+		std::snprintf(req.npcConfigHash, sizeof(req.npcConfigHash), "%s",
+			LocalCacheManager::get().get_hash(ConfigCacheType::Npcs).c_str());
+		std::snprintf(req.mapConfigHash, sizeof(req.mapConfigHash), "%s",
+			LocalCacheManager::get().get_hash(ConfigCacheType::Maps).c_str());
+		std::snprintf(req.balanceConfigHash, sizeof(req.balanceConfigHash), "%s",
+			LocalCacheManager::get().get_hash(ConfigCacheType::BalanceConfig).c_str());
+		send_game_packet(req);
 		change_game_mode(GameMode::WaitingInitData);
+	}
 		break;
 
 	case MsgType::Reject:
@@ -1946,7 +1503,7 @@ void CGame::on_timer()
 	uint32_t time = GameClock::get_time_ms();
 
 	if (GameModeManager::get_mode() != GameMode::Loading) {
-		if ((time - m_check_spr_time) > 8000)
+		if ((time - m_check_spr_time) > 30000)
 		{
 			m_check_spr_time = time;
 			release_unused_sprites();
@@ -1955,7 +1512,16 @@ void CGame::on_timer()
 		{
 			m_check_connection_time = time;
 			if ((m_g_sock != 0) && (m_g_sock->m_is_available == true))
-				send_command(MsgId::CommandCheckConnection, MsgType::Confirm, 0, 0, 0, 0, 0);
+			{
+				hb::net::PacketCommandCheckConnection pkt{};
+				pkt.header.msg_id = MsgId::CommandCheckConnection;
+				pkt.time_ms = GameClock::get_time_ms();
+				pkt.client_major = static_cast<uint8_t>(hb::version::client::major);
+				pkt.client_minor = static_cast<uint8_t>(hb::version::client::minor);
+				pkt.client_patch = static_cast<uint8_t>(hb::version::client::patch);
+				pkt.client_build = static_cast<uint16_t>(hb::version::client::build_number);
+				send_game_packet(pkt);
+			}
 		}
 	}
 
@@ -1964,13 +1530,13 @@ void CGame::on_timer()
 		if ((time - m_check_conn_time) > 5000)
 		{
 			m_check_conn_time = time;
-			if ((m_is_crusade_mode) && (m_player->m_crusade_duty == 0)) m_dialog_box_manager.enable_dialog_box(DialogBoxId::CrusadeJob, 1, 0, 0);
+			if ((on_game()->m_is_crusade_mode) && (m_player->m_crusade_duty == 0)) get_dialog_box_manager().enable_dialog_box(DialogBoxId::CrusadeJob, 1, 0, 0);
 		}
 
 		if ((time - m_check_chat_time) > 2000)
 		{
 			m_check_chat_time = time;
-			m_floating_text.release_expired(time);
+			get_floating_text().release_expired(time);
 			if (m_player->m_Controller.get_command_count() >= 6)
 			{
 				m_net_lag_count++;
@@ -1983,158 +1549,6 @@ void CGame::on_timer()
 			}
 			else m_net_lag_count = 0;
 		}
-	}
-}
-
-void CGame::item_drop_external_screen(char item_id, short mouse_x, short mouse_y)
-{
-	std::string name;
-	short owner_type, dialog_x, dialog_y;
-	hb::shared::entity::PlayerStatus status;
-
-	if (inventory_manager::get().check_item_operation_enabled(item_id) == false) return;
-
-	if ((m_mcx != 0) && (m_mcy != 0) && (abs(m_player->m_player_x - m_mcx) <= 8) && (abs(m_player->m_player_y - m_mcy) <= 8))
-	{
-		name.clear();
-		m_map_data->get_owner(m_mcx, m_mcy, name, &owner_type, &status, &m_comm_object_id);
-		if (m_player->m_player_name == name)
-		{
-		}
-		else
-		{
-			CItem* cfg = get_item_config(m_item_list[item_id]->m_id_num);
-			if (cfg && ((cfg->get_item_type() == ItemType::Consume) || (cfg->get_item_type() == ItemType::Arrow))
-				&& (m_item_list[item_id]->m_count > 1))
-			{
-				m_dialog_box_manager.Info(DialogBoxId::ItemDropExternal).m_x = mouse_x - 140;
-				m_dialog_box_manager.Info(DialogBoxId::ItemDropExternal).m_y = mouse_y - 70;
-				if (m_dialog_box_manager.Info(DialogBoxId::ItemDropExternal).m_y < 0) m_dialog_box_manager.Info(DialogBoxId::ItemDropExternal).m_y = 0;
-				m_dialog_box_manager.Info(DialogBoxId::ItemDropExternal).m_v1 = m_mcx;
-				m_dialog_box_manager.Info(DialogBoxId::ItemDropExternal).m_v2 = m_mcy;
-				m_dialog_box_manager.Info(DialogBoxId::ItemDropExternal).m_v3 = owner_type;
-				m_dialog_box_manager.Info(DialogBoxId::ItemDropExternal).m_v4 = m_comm_object_id;
-				std::memset(m_dialog_box_manager.Info(DialogBoxId::ItemDropExternal).m_str, 0, sizeof(m_dialog_box_manager.Info(DialogBoxId::ItemDropExternal).m_str));
-				if (owner_type < 10)
-					std::snprintf(m_dialog_box_manager.Info(DialogBoxId::ItemDropExternal).m_str, sizeof(m_dialog_box_manager.Info(DialogBoxId::ItemDropExternal).m_str), "%s", name.c_str());
-				else
-				{
-					std::snprintf(m_dialog_box_manager.Info(DialogBoxId::ItemDropExternal).m_str, sizeof(m_dialog_box_manager.Info(DialogBoxId::ItemDropExternal).m_str), "%s", get_npc_config_name(owner_type));
-				}
-				m_dialog_box_manager.enable_dialog_box(DialogBoxId::ItemDropExternal, item_id, m_item_list[item_id]->m_count, 0);
-			}
-			else
-			{
-				switch (owner_type) {
-				case 1:
-				case 2:
-				case 3:
-				case 4:
-				case 5:
-				case 6:
-					m_dialog_box_manager.enable_dialog_box(DialogBoxId::NpcActionQuery, 1, item_id, owner_type);
-					m_dialog_box_manager.Info(DialogBoxId::NpcActionQuery).m_v3 = 1;
-					m_dialog_box_manager.Info(DialogBoxId::NpcActionQuery).m_v4 = m_comm_object_id;
-					m_dialog_box_manager.Info(DialogBoxId::NpcActionQuery).m_v5 = m_mcx;
-					m_dialog_box_manager.Info(DialogBoxId::NpcActionQuery).m_v6 = m_mcy;
-
-					dialog_x = mouse_x - 117;
-					dialog_y = mouse_y - 50;
-					if (dialog_x < 0) dialog_x = 0;
-					if ((dialog_x + 235) > LOGICAL_MAX_X()) dialog_x = LOGICAL_MAX_X() - 235;
-					if (dialog_y < 0) dialog_y = 0;
-					if ((dialog_y + 100) > LOGICAL_MAX_Y()) dialog_y = LOGICAL_MAX_Y() - 100;
-					m_dialog_box_manager.Info(DialogBoxId::NpcActionQuery).m_x = dialog_x;
-					m_dialog_box_manager.Info(DialogBoxId::NpcActionQuery).m_y = dialog_y;
-
-					std::snprintf(m_dialog_box_manager.Info(DialogBoxId::NpcActionQuery).m_str, sizeof(m_dialog_box_manager.Info(DialogBoxId::NpcActionQuery).m_str), "%s", name.c_str());
-					//send_command(MsgId::CommandCommon, CommonType::GiveItemToChar, item_id, 1, m_mcx, m_mcy, m_item_list[item_id]->m_name); //v1.4
-					break;
-
-				case hb::shared::owner::Howard: // Howard
-					m_dialog_box_manager.enable_dialog_box(DialogBoxId::NpcActionQuery, 3, item_id, owner_type);
-					m_dialog_box_manager.Info(DialogBoxId::NpcActionQuery).m_v3 = 1;
-					m_dialog_box_manager.Info(DialogBoxId::NpcActionQuery).m_v4 = m_comm_object_id; // v1.4
-					m_dialog_box_manager.Info(DialogBoxId::NpcActionQuery).m_v5 = m_mcx;
-					m_dialog_box_manager.Info(DialogBoxId::NpcActionQuery).m_v6 = m_mcy;
-
-					dialog_x = mouse_x - 117;
-					dialog_y = mouse_y - 50;
-					if (dialog_x < 0) dialog_x = 0;
-					if ((dialog_x + 235) > LOGICAL_MAX_X()) dialog_x = LOGICAL_MAX_X() - 235;
-					if (dialog_y < 0) dialog_y = 0;
-					if ((dialog_y + 100) > LOGICAL_MAX_Y()) dialog_y = LOGICAL_MAX_Y() - 100;
-					m_dialog_box_manager.Info(DialogBoxId::NpcActionQuery).m_x = dialog_x;
-					m_dialog_box_manager.Info(DialogBoxId::NpcActionQuery).m_y = dialog_y;
-
-					std::snprintf(m_dialog_box_manager.Info(DialogBoxId::NpcActionQuery).m_str, hb::shared::limits::NpcNameLen, "%s", get_npc_config_name(owner_type));
-					break;
-
-				case hb::shared::owner::ShopKeeper: // ShopKeeper-W
-				case hb::shared::owner::Tom: // Tom
-					m_dialog_box_manager.enable_dialog_box(DialogBoxId::NpcActionQuery, 2, item_id, owner_type);
-					m_dialog_box_manager.Info(DialogBoxId::NpcActionQuery).m_v3 = 1;
-					m_dialog_box_manager.Info(DialogBoxId::NpcActionQuery).m_v4 = m_comm_object_id; // v1.4
-					m_dialog_box_manager.Info(DialogBoxId::NpcActionQuery).m_v5 = m_mcx;
-					m_dialog_box_manager.Info(DialogBoxId::NpcActionQuery).m_v6 = m_mcy;
-
-					dialog_x = mouse_x - 117;
-					dialog_y = mouse_y - 50;
-					if (dialog_x < 0) dialog_x = 0;
-					if ((dialog_x + 235) > LOGICAL_MAX_X()) dialog_x = LOGICAL_MAX_X() - 235;
-					if (dialog_y < 0) dialog_y = 0;
-					if ((dialog_y + 100) > LOGICAL_MAX_Y()) dialog_y = LOGICAL_MAX_Y() - 100;
-					m_dialog_box_manager.Info(DialogBoxId::NpcActionQuery).m_x = dialog_x;
-					m_dialog_box_manager.Info(DialogBoxId::NpcActionQuery).m_y = dialog_y;
-
-					std::snprintf(m_dialog_box_manager.Info(DialogBoxId::NpcActionQuery).m_str, hb::shared::limits::NpcNameLen, "%s", get_npc_config_name(owner_type));
-					break;
-
-				default:
-					if (cfg) send_command(MsgId::CommandCommon, CommonType::GiveItemToChar, item_id, 1, m_mcx, m_mcy, cfg->m_name);
-					break;
-				}
-			}
-			m_is_item_disabled[item_id] = true;
-		}
-	}
-	else
-	{
-		CItem* cfg2 = get_item_config(m_item_list[item_id]->m_id_num);
-		if (cfg2 && ((cfg2->get_item_type() == ItemType::Consume) || (cfg2->get_item_type() == ItemType::Arrow))
-			&& (m_item_list[item_id]->m_count > 1))
-		{
-			m_dialog_box_manager.Info(DialogBoxId::ItemDropExternal).m_x = mouse_x - 140;
-			m_dialog_box_manager.Info(DialogBoxId::ItemDropExternal).m_y = mouse_y - 70;
-			if (m_dialog_box_manager.Info(DialogBoxId::ItemDropExternal).m_y < 0)		m_dialog_box_manager.Info(DialogBoxId::ItemDropExternal).m_y = 0;
-			m_dialog_box_manager.Info(DialogBoxId::ItemDropExternal).m_v1 = 0;
-			m_dialog_box_manager.Info(DialogBoxId::ItemDropExternal).m_v2 = 0;
-			m_dialog_box_manager.Info(DialogBoxId::ItemDropExternal).m_v3 = 0;
-			m_dialog_box_manager.Info(DialogBoxId::ItemDropExternal).m_v4 = 0;
-			std::memset(m_dialog_box_manager.Info(DialogBoxId::ItemDropExternal).m_str, 0, sizeof(m_dialog_box_manager.Info(DialogBoxId::ItemDropExternal).m_str));
-			m_dialog_box_manager.enable_dialog_box(DialogBoxId::ItemDropExternal, item_id, m_item_list[item_id]->m_count, 0);
-		}
-		else
-		{
-			if (item_drop_history(m_item_list[item_id]->m_id_num))
-			{
-				m_dialog_box_manager.Info(DialogBoxId::ItemDropConfirm).m_x = mouse_x - 140;
-				m_dialog_box_manager.Info(DialogBoxId::ItemDropConfirm).m_y = mouse_y - 70;
-				if (m_dialog_box_manager.Info(DialogBoxId::ItemDropConfirm).m_y < 0)	m_dialog_box_manager.Info(DialogBoxId::ItemDropConfirm).m_y = 0;
-				m_dialog_box_manager.Info(DialogBoxId::ItemDropConfirm).m_v1 = 0;
-				m_dialog_box_manager.Info(DialogBoxId::ItemDropConfirm).m_v2 = 0;
-				m_dialog_box_manager.Info(DialogBoxId::ItemDropConfirm).m_v3 = 1;
-				m_dialog_box_manager.Info(DialogBoxId::ItemDropConfirm).m_v4 = 0;
-				m_dialog_box_manager.Info(DialogBoxId::ItemDropConfirm).m_v5 = item_id;
-				std::memset(m_dialog_box_manager.Info(DialogBoxId::ItemDropConfirm).m_str, 0, sizeof(m_dialog_box_manager.Info(DialogBoxId::ItemDropConfirm).m_str));
-				m_dialog_box_manager.enable_dialog_box(DialogBoxId::ItemDropConfirm, item_id, m_item_list[item_id]->m_count, 0);
-			}
-			else
-			{
-				if (cfg2) send_command(MsgId::CommandCommon, CommonType::ItemDrop, 0, item_id, 1, 0, cfg2->m_name);
-			}
-		}
-		m_is_item_disabled[item_id] = true;
 	}
 }
 
@@ -2160,7 +1574,7 @@ void CGame::common_event_handler(char* data)
 		if (!pkt) return;
 		dw_v4 = pkt->v4;
 	}
-	if ((v1 == 6) && (v2 == 0)) {
+	if ((v1 == hb::shared::item::ItemId::Gold) && (v2 == 0)) {
 		m_effect_manager->add_effect(EffectType::GOLD_DROP, sX, sY, 0, 0, 0);
 	}
 	m_map_data->set_item(sX, sY, v1, static_cast<char>(v3), dw_v4);
@@ -2185,353 +1599,25 @@ void CGame::common_event_handler(char* data)
 	break;
 
 	case CommonType::ClearGuildName:
-		clear_guild_name_list();
+		if (auto* on_game = GameModeManager::get_active_screen_as<Screen_OnGame>())
+			on_game->get_guild_manager().clear_name_cache();
 		break;
 	}
 }
 
-void CGame::clear_guild_name_list()
+
+Screen_OnGame* CGame::on_game()
 {
-	for (int i = 0; i < game_limits::max_guild_names; i++) {
-		m_guild_name_cache[i].ref_time = 0;
-		m_guild_name_cache[i].guild_rank = -1;
-	}
+	return get_active_screen_as<Screen_OnGame>();
 }
 
-void CGame::init_game_settings()
-{
+// create_new_guild_response_handler MOVED to Screen_OnGame.Network.cpp
+// init_player_characteristics MOVED to NetworkMessages_Player.cpp
+// disband_guild_response_handler MOVED to Screen_OnGame.Network.cpp
 
-	m_player->m_force_attack = false;
-	m_player->m_Controller.set_command_time(0);
-	m_check_connection_time = 0;
+// put_guild_operation_list / shift_guild_operation_list REMOVED — use DialogBox_GuildOperation::put/shift
 
-
-	m_Camera.set_shake(0);
-
-	m_player->m_Controller.set_command(Type::stop);
-	m_player->m_Controller.reset_command_count();
-
-	m_is_get_pointing_mode = false;
-	m_wait_for_new_click = false;
-	m_magic_cast_time = 0;
-	m_point_command_type = -1; //v2.15 0 -> -1
-
-	for (int r = 0; r < 4; r++) m_config_retry[r] = ConfigRetryLevel::None;
-	m_config_request_time = 0;
-	m_init_data_ready = false;
-	m_configs_ready = false;
-
-	m_player->m_is_combat_mode = false;
-
-	// Previous cursor status tracking removed
-	CursorTarget::reset_selection_click_time();
-
-	m_skill_using_status = false;
-	m_item_using_status = false;
-	m_using_slate = false;
-
-
-	m_down_skill_index = -1;
-	m_dialog_box_manager.Info(DialogBoxId::Skill).m_flag = false;
-
-	m_player->m_is_confusion = false;
-
-	m_ilusion_owner_h = 0;
-	m_ilusion_owner_type = 0;
-
-	m_draw_flag = 0;
-	m_is_crusade_mode = false;
-	m_player->m_crusade_duty = 0;
-
-	m_net_lag_count = 0;
-	m_latency_ms = -1;
-	m_last_net_msg_id = 0;
-	m_last_net_msg_time = 0;
-	m_last_net_msg_size = 0;
-	m_last_net_recv_time = 0;
-	m_last_npc_event_time = 0;
-
-	m_env_effect_time = GameClock::get_time_ms();
-
-	for (int i = 0; i < game_limits::max_guild_names; i++) {
-		m_guild_name_cache[i].ref_time = 0;
-		m_guild_name_cache[i].guild_rank = -1;
-	}
-	//Snoopy: 61
-	for (int i = 0; i < 61; i++)
-		m_dialog_box_manager.set_enabled(i, false);
-
-	//Snoopy: 58 because 2 last ones alreaddy defined
-	for (int i = 0; i < 58; i++)
-		m_dialog_box_manager.set_order_at(i, 0);
-	m_dialog_box_manager.set_order_at(60, DialogBoxId::HudPanel);
-	m_dialog_box_manager.set_order_at(59, DialogBoxId::HudPanel);
-	m_dialog_box_manager.set_enabled(DialogBoxId::HudPanel, true);
-
-	if (m_effect_manager) m_effect_manager->clear_all_effects();
-
-	m_floating_text.clear_all();
-
-	ChatManager::get().clear_messages();
-
-	ChatManager::get().clear_whispers();
-
-
-	m_player->m_guild_rank = -1;
-
-	for (int i = 0; i < 100; i++) {
-		m_guild_op_list[i].op_mode = 0;
-	}
-
-
-
-	for (int i = 0; i < 41; i++) {
-		m_dialog_box_manager.Info(i).m_flag = false;
-		m_dialog_box_manager.Info(i).m_view = 0;
-		m_dialog_box_manager.Info(i).m_is_scroll_selected = false;
-	}
-
-	for (int i = 0; i < hb::shared::limits::MaxItems; i++)
-		if (m_item_list[i] != 0) {
-			m_item_list[i].reset();
-		}
-
-	for (int i = 0; i < game_limits::max_sell_list; i++) {
-		m_sell_item_list[i].index = -1;
-		m_sell_item_list[i].amount = 0;
-	}
-
-	for (int i = 0; i < hb::shared::limits::MaxBankItems; i++)
-		if (m_bank_list[i] != 0) {
-			m_bank_list[i].reset();
-		}
-
-	for (int i = 0; i < hb::shared::limits::MaxMagicType; i++)
-		m_player->m_magic_mastery[i] = 0;
-
-	for (int i = 0; i < hb::shared::limits::MaxSkillType; i++)
-		m_player->m_skill_mastery[i] = 0;
-
-	for (int i = 0; i < game_limits::max_text_dlg_lines; i++) {
-		if (m_msg_text_list[i] != 0)
-			m_msg_text_list[i].reset();
-
-		if (m_msg_text_list2[i] != 0)
-			m_msg_text_list2[i].reset();
-
-		if (m_agree_msg_text_list[i] != 0)
-			m_agree_msg_text_list[i].reset();
-	}
-
-	for (int i = 0; i < hb::shared::limits::MaxPartyMembers; i++) {
-		m_party_member[i].status = 0;
-	}
-
-	m_player->m_lu_point = 0;
-	m_player->m_lu_str = m_player->m_lu_vit = m_player->m_lu_dex = m_player->m_lu_int = m_player->m_lu_mag = m_player->m_lu_char = 0;
-	m_logout_count = -1;
-	m_logout_count_time = 0;
-	m_player->m_super_attack_left = 0;
-	m_player->m_super_attack_mode = false;
-	m_fightzone_number = 0;
-	m_quest.who = 0;
-	m_quest.quest_type = 0;
-	m_quest.contribution = 0;
-	m_quest.target_type = 0;
-	m_quest.target_count = 0;
-	m_quest.current_count = 0;
-	m_quest.x = 0;
-	m_quest.y = 0;
-	m_quest.range = 0;
-	m_quest.is_quest_completed = false;
-	m_is_observer_mode = false;
-	m_is_observer_commanded = false;
-	m_player->m_is_poisoned = false;
-	m_player->m_Controller.set_prev_move_blocked(false);
-	m_player->m_Controller.set_prev_move(-1, -1);
-	m_player->m_damage_move = 0;
-	m_player->m_damage_move_amount = 0;
-	m_force_disconn = false;
-	m_player->m_is_special_ability_enabled = false;
-	m_player->m_special_ability_type = 0;
-	m_special_ability_setting_time = 0;
-	m_player->m_special_ability_time_left_sec = 0;
-	CursorTarget::clear_selection();
-	m_is_f1_help_window_enabled = false;
-	for (int i = 0; i < hb::shared::limits::MaxCrusadeStructures; i++)
-	{
-		m_crusade_structure_info[i].type = 0;
-		m_crusade_structure_info[i].side = 0;
-		m_crusade_structure_info[i].x = 0;
-		m_crusade_structure_info[i].y = 0;
-	}
-	m_commander_command_requested_time = 0;
-	m_top_msg_last_sec = 0;
-	m_top_msg_time = 0;
-	m_player->m_construction_point = 0;
-	m_player->m_war_contribution = 0;
-	teleport_manager::get().reset();
-	m_player->m_construct_loc_x = m_player->m_construct_loc_y = -1;
-
-	//Snoopy: Apocalypse Gate
-	m_gate_posit_x = m_gate_posit_y = -1;
-	m_heldenian_aresden_left_tower = -1;
-	m_heldenian_elvine_left_tower = -1;
-	m_heldenian_aresden_flags = -1;
-	m_heldenian_elvine_flags = -1;
-	m_is_xmas = false;
-	m_total_party_member = 0;
-	m_party_status = 0;
-	m_gizon_item_upgrade_left = 0;
-	m_dialog_box_manager.enable_dialog_box(DialogBoxId::GuideMap, 0, 0, 0);
-}
-
-void CGame::create_new_guild_response_handler(char* data)
-{
-	const auto* header = hb::net::PacketCast<hb::net::PacketHeader>(
-		data, sizeof(hb::net::PacketHeader));
-	if (!header) return;
-	switch (header->msg_type) {
-	case MsgType::Confirm:
-		m_player->m_guild_rank = 0;
-		m_dialog_box_manager.Info(DialogBoxId::GuildMenu).m_mode = 3;
-		break;
-	case MsgType::Reject:
-		m_player->m_guild_rank = -1;
-		m_dialog_box_manager.Info(DialogBoxId::GuildMenu).m_mode = 4;
-		break;
-	}
-}
-
-void CGame::init_player_characteristics(char* data)
-{
-	// Snoopy: Angels
-	m_player->m_angelic_str = 0;
-	m_player->m_angelic_dex = 0;
-	m_player->m_angelic_int = 0;
-	m_player->m_angelic_mag = 0;
-
-	const auto* pkt = hb::net::PacketCast<hb::net::PacketResponsePlayerCharacterContents>(
-		data, sizeof(hb::net::PacketResponsePlayerCharacterContents));
-	if (!pkt) return;
-
-	m_player->m_hp = pkt->hp;
-	m_player->m_mp = pkt->mp;
-	m_player->m_sp = pkt->sp;
-	m_player->m_ac = pkt->ac;		//? m_iDefenseRatio
-	m_player->m_thac0 = pkt->thac0;    //? m_iHitRatio
-	m_player->m_level = pkt->level;
-	m_player->m_str = pkt->str;
-	m_player->m_int = pkt->intel;
-	m_player->m_vit = pkt->vit;
-	m_player->m_dex = pkt->dex;
-	m_player->m_mag = pkt->mag;
-	m_player->m_charisma = pkt->chr;
-
-	// CLEROTH - LU
-	m_player->m_lu_point = pkt->lu_point;
-
-	m_player->m_exp = pkt->exp;
-	m_player->m_enemy_kill_count = pkt->enemy_kills;
-	m_player->m_pk_count = pkt->pk_count;
-	m_player->m_reward_gold = pkt->reward_gold;
-
-	m_location.assign(pkt->location, strnlen(pkt->location, sizeof(pkt->location)));
-	if (m_location.starts_with("aresden"))
-	{
-		m_player->m_aresden = true;
-		m_player->m_citizen = true;
-		m_player->m_hunter = false;
-	}
-	else if (m_location.starts_with("arehunter"))
-	{
-		m_player->m_aresden = true;
-		m_player->m_citizen = true;
-		m_player->m_hunter = true;
-	}
-	else if (m_location.starts_with("elvine"))
-	{
-		m_player->m_aresden = false;
-		m_player->m_citizen = true;
-		m_player->m_hunter = false;
-	}
-	else if (m_location.starts_with("elvhunter"))
-	{
-		m_player->m_aresden = false;
-		m_player->m_citizen = true;
-		m_player->m_hunter = true;
-	}
-	else
-	{
-		m_player->m_aresden = true;
-		m_player->m_citizen = false;
-		m_player->m_hunter = true;
-	}
-
-	m_player->m_guild_name.assign(pkt->guild_name, strnlen(pkt->guild_name, sizeof(pkt->guild_name)));
-
-	if (m_player->m_guild_name == "NONE")
-
-	std::replace(m_player->m_guild_name.begin(), m_player->m_guild_name.end(), '_', ' ');
-	m_player->m_guild_rank = pkt->guild_rank;
-	m_player->m_super_attack_left = pkt->super_attack_left;
-	m_fightzone_number = pkt->fightzone_number;
-	m_max_stats = pkt->max_stats;
-	m_max_level = pkt->max_level;
-	m_max_bank_items = pkt->max_bank_items;
-}
-
-void CGame::disband_guild_response_handler(char* data)
-{
-	const auto* header = hb::net::PacketCast<hb::net::PacketHeader>(
-		data, sizeof(hb::net::PacketHeader));
-	if (!header) return;
-	switch (header->msg_type) {
-	case MsgType::Confirm:
-		m_player->m_guild_rank = -1;
-		m_dialog_box_manager.Info(DialogBoxId::GuildMenu).m_mode = 7;
-		break;
-	case MsgType::Reject:
-		m_dialog_box_manager.Info(DialogBoxId::GuildMenu).m_mode = 8;
-		break;
-	}
-}
-
-void CGame::put_guild_operation_list(char* name, char op_mode)
-{
-	int i;
-	for (i = 0; i < 100; i++)
-		if (m_guild_op_list[i].op_mode == 0)
-		{
-			m_guild_op_list[i].op_mode = op_mode;
-			m_guild_op_list[i].name.assign(name, strnlen(name, 20));
-			return;
-		}
-}
-
-void CGame::shift_guild_operation_list()
-{
-	int i;
-	m_guild_op_list[0].op_mode = 0;
-
-	for (i = 1; i < 100; i++)
-		if ((m_guild_op_list[i - 1].op_mode == 0) && (m_guild_op_list[i].op_mode != 0)) {
-			m_guild_op_list[i - 1].op_mode = m_guild_op_list[i].op_mode;
-			m_guild_op_list[i - 1].name = m_guild_op_list[i].name;
-
-			m_guild_op_list[i].op_mode = 0;
-		}
-}
-
-void CGame::enable_dialog_box(int box_id, int type, int v1, int v2, char* string)
-{
-	m_dialog_box_manager.enable_dialog_box(box_id, type, v1, v2, string);
-}
-
-void CGame::disable_dialog_box(int box_id)
-{
-	m_dialog_box_manager.disable_dialog_box(box_id);
-}
+// enable_dialog_box / disable_dialog_box wrappers REMOVED — callers use get_dialog_box_manager() directly
 
 void CGame::add_event_list(const char* txt, char color, bool dup_allow)
 {
@@ -2565,7 +1651,8 @@ void CGame::request_full_object_data(uint16_t object_id)
 
 void CGame::read_map_data(short pivot_x, short pivot_y, const char* packet_data)
 {
-	char header_byte = 0, direction = 0, item_color = 0;
+	char header_byte = 0, item_color = 0;
+	direction move_dir = direction{};
 	std::string name;
 	short total_entries = 0, map_x = 0, map_y = 0, owner_type = 0, dynamic_type = 0;
 	short npc_config_id = -1;
@@ -2602,7 +1689,7 @@ void CGame::read_map_data(short pivot_x, short pivot_y, const char* packet_data)
 				if (!obj) return;
 				object_id = obj->base.object_id;
 				owner_type = obj->type;
-				direction = static_cast<char>(obj->dir);
+				move_dir = static_cast<direction>(obj->dir);
 				appearance = obj->appearance;
 				status = obj->status;
 				name.clear();
@@ -2616,14 +1703,16 @@ void CGame::read_map_data(short pivot_x, short pivot_y, const char* packet_data)
 				object_id = obj->base.object_id;
 				npc_config_id = obj->config_id;
 				owner_type = resolve_npc_type(npc_config_id);
-				direction = static_cast<char>(obj->dir);
+				move_dir = static_cast<direction>(obj->dir);
 				appearance.SetFromNpcAppearance(obj->appearance);
 				status.SetFromEntityStatus(obj->status);
 				name.clear();
 				name.assign(obj->name, strnlen(obj->name, sizeof(obj->name)));
 				cursor += sizeof(hb::net::PacketMapDataObjectNpc);
 			}
-			{ m_map_data->set_owner(object_id, pivot_x + map_x, pivot_y + map_y, owner_type, direction, appearance, status, name, Type::stop, 0, 0, 0, 0, 0, npc_config_id); }
+			{
+				m_map_data->set_owner(object_id, pivot_x + map_x, pivot_y + map_y, owner_type, move_dir, appearance, status, name, Type::stop, 0, 0, 0, 0, 0, npc_config_id);
+			}
 		}
 		if (header_byte & 0x02) // object ID
 		{
@@ -2635,7 +1724,7 @@ void CGame::read_map_data(short pivot_x, short pivot_y, const char* packet_data)
 				if (!obj) return;
 				object_id = obj->base.object_id;
 				owner_type = obj->type;
-				direction = static_cast<char>(obj->dir);
+				move_dir = static_cast<direction>(obj->dir);
 				appearance = obj->appearance;
 				status = obj->status;
 				name.clear();
@@ -2649,14 +1738,14 @@ void CGame::read_map_data(short pivot_x, short pivot_y, const char* packet_data)
 				object_id = obj->base.object_id;
 				npc_config_id = obj->config_id;
 				owner_type = resolve_npc_type(npc_config_id);
-				direction = static_cast<char>(obj->dir);
+				move_dir = static_cast<direction>(obj->dir);
 				appearance.SetFromNpcAppearance(obj->appearance);
 				status.SetFromEntityStatus(obj->status);
 				name.clear();
 				name.assign(obj->name, strnlen(obj->name, sizeof(obj->name)));
 				cursor += sizeof(hb::net::PacketMapDataObjectNpc);
 			}
-			{ m_map_data->set_dead_owner(object_id, pivot_x + map_x, pivot_y + map_y, owner_type, direction, appearance, status, name, npc_config_id); }
+			{ m_map_data->set_dead_owner(object_id, pivot_x + map_x, pivot_y + map_y, owner_type, move_dir, appearance, status, name, npc_config_id); }
 		}
 		if (header_byte & 0x04)
 		{
@@ -2686,7 +1775,7 @@ void CGame::log_event_handler(char* data)
 	short sX, sY, type;
 	short npcConfigId = -1;
 	hb::shared::entity::PlayerStatus status;
-	char dir;
+	direction dir;
 	std::string name;
 	hb::shared::entity::PlayerAppearance playerAppearance;
 
@@ -2702,7 +1791,7 @@ void CGame::log_event_handler(char* data)
 		const auto* pkt = hb::net::PacketCast<hb::net::PacketEventLogPlayer>(data, sizeof(hb::net::PacketEventLogPlayer));
 		if (!pkt) return;
 		type = pkt->type;
-		dir = static_cast<char>(pkt->dir);
+		dir = static_cast<direction>(pkt->dir);
 		name.assign(pkt->name, strnlen(pkt->name, sizeof(pkt->name)));
 		playerAppearance = pkt->appearance;
 		status = pkt->status;
@@ -2713,7 +1802,7 @@ void CGame::log_event_handler(char* data)
 		if (!pkt) return;
 		npcConfigId = pkt->config_id;
 		type = resolve_npc_type(npcConfigId);
-		dir = static_cast<char>(pkt->dir);
+		dir = static_cast<direction>(pkt->dir);
 		name.assign(pkt->name, strnlen(pkt->name, sizeof(pkt->name)));
 		playerAppearance.SetFromNpcAppearance(pkt->appearance);
 		status.SetFromEntityStatus(pkt->status);
@@ -2721,389 +1810,139 @@ void CGame::log_event_handler(char* data)
 
 	switch (event_type) {
 	case MsgType::Confirm:
-		{ m_map_data->set_owner(object_id, sX, sY, type, dir, playerAppearance, status, name, Type::stop, 0, 0, 0, 0, 0, npcConfigId); }
-		switch (type) {
-		case hb::shared::owner::LightWarBeetle: // LWB
-		case hb::shared::owner::GodsHandKnight: // GHK
-		case hb::shared::owner::GodsHandKnightCK: // GHKABS
-		case hb::shared::owner::TempleKnight: // TK
-		case hb::shared::owner::BattleGolem: // BG
-			m_effect_manager->add_effect(EffectType::WHITE_HALO, (sX) * 32, (sY) * 32, 0, 0, 0);
-			break;
-		}
-		break;
-
-	case MsgType::Reject:
-		{ m_map_data->set_owner(object_id, -1, -1, type, dir, playerAppearance, status, name, Type::stop, 0, 0, 0, 0, 0, npcConfigId); }
+	{ m_map_data->set_owner(object_id, sX, sY, type, dir, playerAppearance, status, name, Type::stop, 0, 0, 0, 0, 0, npcConfigId); }
+	switch (type) {
+	case hb::shared::owner::LightWarBeetle: // LWB
+	case hb::shared::owner::GodsHandKnight: // GHK
+	case hb::shared::owner::GodsHandKnightCK: // GHKABS
+	case hb::shared::owner::TempleKnight: // TK
+	case hb::shared::owner::BattleGolem: // BG
+		m_effect_manager->add_effect(EffectType::WHITE_HALO, (sX) * 32, (sY) * 32, 0, 0, 0);
 		break;
 	}
+	break;
 
-	m_floating_text.remove_by_object_id(object_id);
+	case MsgType::Reject:
+	{ m_map_data->set_owner(object_id, -1, -1, type, dir, playerAppearance, status, name, Type::stop, 0, 0, 0, 0, 0, npcConfigId); }
+	break;
+	}
+
+	get_floating_text().remove_by_object_id(object_id);
 }
 
 // MODERNIZED: No longer a window message handler - polls socket directly
 // MODERNIZED: v4 Networking Architecture (Drain -> Queue -> Process) for Login Socket
 void CGame::on_log_socket_event()
 {
-    if (m_l_sock == 0) return;
+	if (m_l_sock == 0) return;
 
-    // 1. Check for socket state changes (Connect, Close, Error)
-    int ret = m_l_sock->Poll();
+	// 1. Check for socket state changes (Connect, Close, Error)
+	int ret = m_l_sock->Poll();
 
-    switch (ret) {
-    case sock::Event::SocketClosed:
-        change_game_mode(GameMode::ConnectionLost);
-        m_l_sock.reset();
-        return;
-    case sock::Event::SocketError:
-        printf("[ERROR] Login socket error\n");
-        change_game_mode(GameMode::ConnectionLost);
-        m_l_sock.reset();
-        return;
+	switch (ret) {
+	case sock::Event::SocketClosed:
+		change_game_mode(GameMode::ConnectionLost);
+		m_l_sock.reset();
+		return;
+	case sock::Event::SocketError:
+		printf("[ERROR] Login socket error\n");
+		change_game_mode(GameMode::ConnectionLost);
+		m_l_sock.reset();
+		return;
 
-    case sock::Event::ConnectionEstablish:
-        connection_establish_handler(static_cast<int>(ServerType::Log));
-        break;
-    }
+	case sock::Event::ConnectionEstablish:
+		connection_establish_handler(static_cast<int>(ServerType::Log));
+		break;
+	}
 
-    // 2. Drain all available data from TCP buffer to the Queue
-    // Only drain if socket is connected (m_is_available is set on FD_CONNECT)
-    if (!m_l_sock->m_is_available) {
-        return; // Still connecting, don't try to read yet
-    }
+	// 2. Drain all available data from TCP buffer to the Queue
+	// Only drain if socket is connected (m_is_available is set on FD_CONNECT)
+	if (!m_l_sock->m_is_available) {
+		return; // Still connecting, don't try to read yet
+	}
 
-    // If Poll() completed a packet, queue it before drain_to_queue() overwrites the buffer
-    if (ret == sock::Event::ReadComplete) {
-        size_t size = 0;
-        char* data = m_l_sock->get_rcv_data_pointer(&size);
-        if (data != nullptr && size > 0) {
-            m_l_sock->queue_completed_packet(data, size);
-        }
-    }
+	// If Poll() completed a packet, queue it before drain_to_queue() overwrites the buffer
+	if (ret == sock::Event::ReadComplete) {
+		size_t size = 0;
+		char* data = m_l_sock->get_rcv_data_pointer(&size);
+		if (data != nullptr && size > 0) {
+			m_l_sock->queue_completed_packet(data, size);
+		}
+	}
 
-    int drained = m_l_sock->drain_to_queue();
+	int drained = m_l_sock->drain_to_queue();
 
-    if (drained < 0) {
-        printf("[ERROR] Login socket drain_to_queue failed: %d\n", drained);
-        change_game_mode(GameMode::ConnectionLost);
-        m_l_sock.reset();
-        return;
-    }
+	if (drained < 0) {
+		printf("[ERROR] Login socket drain_to_queue failed: %d\n", drained);
+		change_game_mode(GameMode::ConnectionLost);
+		m_l_sock.reset();
+		return;
+	}
 
-    // 3. Process the queue with a Time Budget
-    constexpr int MAX_PACKETS_PER_FRAME = 120; // Safety limit
-    constexpr uint32_t MAX_TIME_MS = 3;        // 3ms budget for network processing
+	// 3. Process the queue with a Time Budget
+	constexpr int MAX_PACKETS_PER_FRAME = 120; // Safety limit
+	constexpr uint32_t MAX_TIME_MS = 3;        // 3ms budget for network processing
 
-    uint32_t start_time = GameClock::get_time_ms();
-    int processed = 0;
+	uint32_t start_time = GameClock::get_time_ms();
+	int processed = 0;
 
-    hb::shared::net::NetworkPacket packet;
-    while (processed < MAX_PACKETS_PER_FRAME) {
+	hb::shared::net::NetworkPacket packet;
+	while (processed < MAX_PACKETS_PER_FRAME) {
 
-        // Check budget
-        if (GameClock::get_time_ms() - start_time > MAX_TIME_MS) {
-            break;
-        }
+		// Check budget
+		if (GameClock::get_time_ms() - start_time > MAX_TIME_MS) {
+			break;
+		}
 
-        // Peek next packet
-        if (!m_l_sock->peek_packet(packet)) {
-            break; // Queue empty
-        }
+		// Peek next packet
+		if (!m_l_sock->peek_packet(packet)) {
+			break; // Queue empty
+		}
 
-        // update timestamps
-        m_last_net_recv_time = GameClock::get_time_ms();
+		// update timestamps
+		m_last_net_recv_time = GameClock::get_time_ms();
 
-        // Process (using the pointer directly from the packet vector)
-        if (!packet.empty()) {
-             log_recv_msg_handler(const_cast<char*>(packet.ptr()));
-        }
+		// Process (using the pointer directly from the packet vector)
+		if (!packet.empty()) {
+			log_recv_msg_handler(const_cast<char*>(packet.ptr()), static_cast<uint32_t>(packet.size()));
+		}
 
-        // CRITICAL FIX: The handler might have closed/deleted the socket!
-        if (m_l_sock == nullptr) return;
+		// CRITICAL FIX: The handler might have closed/deleted the socket!
+		if (m_l_sock == nullptr) return;
 
-        // pop logic (remove from queue)
-        m_l_sock->pop_packet();
-        processed++;
-    }
+		// pop logic (remove from queue)
+		m_l_sock->pop_packet();
+		processed++;
+	}
 }
 
 void CGame::log_response_handler(char* packet_data)
 {
-	uint16_t response = 0;
-	char char_name[12]{};
-
 	const auto* header = hb::net::PacketCast<hb::net::PacketHeader>(packet_data, sizeof(hb::net::PacketHeader));
 	if (!header) return;
-	response = header->msg_type;
+	uint16_t response = header->msg_type;
 
-	// Route to the active screen first — if it handles the response, we're done.
+	// Route to the active screen — all log responses are handled by screens
 	IGameScreen* screen = GameModeManager::get_active_screen();
 	if (screen && screen->on_net_response(response, packet_data)) {
+		m_l_sock.reset();
 		return;
 	}
 
-	switch (response) {
-	case LogResMsg::CharacterDeleted:
-	{
-		const auto* list = hb::net::PacketCast<hb::net::PacketLogCharacterListHeader>(
-			packet_data, sizeof(hb::net::PacketLogCharacterListHeader));
-		if (!list) return;
-		m_total_char = std::min(static_cast<int>(list->total_chars), 4);
-		for (int i = 0; i < 4; i++)
-			if (m_char_list[i] != 0)
-			{
-				m_char_list[i].reset();
-			}
-
-		const auto* entries = reinterpret_cast<const hb::net::PacketLogCharacterEntry*>(
-			packet_data + sizeof(hb::net::PacketLogCharacterListHeader));
-		for (int i = 0; i < m_total_char; i++) {
-			const auto& entry = entries[i];
-			m_char_list[i] = std::make_unique<CCharInfo>();
-			m_char_list[i]->m_name.assign(entry.name, strnlen(entry.name, sizeof(entry.name)));
-			m_char_list[i]->m_appearance = entry.appearance;
-			m_char_list[i]->m_sex = entry.sex;
-			m_char_list[i]->m_skin_color = entry.skin;
-			m_char_list[i]->m_level = entry.level;
-			m_char_list[i]->m_exp = entry.exp;
-
-			m_char_list[i]->m_map_name.assign(entry.map_name, strnlen(entry.map_name, sizeof(entry.map_name)));
-		}
-		std::snprintf(m_msg, sizeof(m_msg), "%s", "3A");
-		change_game_mode(GameMode::LogResMsg);
-	}
-	break;
-
-	case LogResMsg::Confirm:
-	{
-		const auto* list = hb::net::PacketCast<hb::net::PacketLogCharacterListHeader>(
-			packet_data, sizeof(hb::net::PacketLogCharacterListHeader));
-		if (!list) return;
-		m_accnt_year = 0;
-		m_accnt_month = 0;
-		m_accnt_day = 0;
-		m_ip_year = 0;
-		m_ip_month = 0;
-		m_ip_day = 0;
-		m_total_char = std::min(static_cast<int>(list->total_chars), 4);
-		for (int i = 0; i < 4; i++)
-			if (m_char_list[i] != 0)
-			{
-				m_char_list[i].reset();
-			}
-
-		const auto* entries = reinterpret_cast<const hb::net::PacketLogCharacterEntry*>(
-			packet_data + sizeof(hb::net::PacketLogCharacterListHeader));
-		for (int i = 0; i < m_total_char; i++)
-		{
-			const auto& entry = entries[i];
-			m_char_list[i] = std::make_unique<CCharInfo>();
-			m_char_list[i]->m_name.assign(entry.name, strnlen(entry.name, sizeof(entry.name)));
-			m_char_list[i]->m_appearance = entry.appearance;
-			m_char_list[i]->m_sex = entry.sex;
-			m_char_list[i]->m_skin_color = entry.skin;
-			m_char_list[i]->m_level = entry.level;
-			m_char_list[i]->m_exp = entry.exp;
-
-			m_char_list[i]->m_map_name.assign(entry.map_name, strnlen(entry.map_name, sizeof(entry.map_name)));
-		}
-		change_game_mode(GameMode::SelectCharacter);
-	}
-	break;
-
-	case LogResMsg::Reject:
-	{
-		const auto* pkt = hb::net::PacketCast<hb::net::PacketLogResponseReject>(packet_data, sizeof(hb::net::PacketLogResponseReject));
-		if (!pkt) return;
-		m_block_year = pkt->block_year;
-		m_block_month = pkt->block_month;
-		m_block_day = pkt->block_day;
-
-		std::snprintf(m_msg, sizeof(m_msg), "%s", "7H");
-		change_game_mode(GameMode::LogResMsg);
-	}
-	break;
-
-	case LogResMsg::NotEnoughPoint:
-		std::snprintf(m_msg, sizeof(m_msg), "%s", "7I");
-		change_game_mode(GameMode::LogResMsg);
-		break;
-
-	case LogResMsg::AccountLocked:
-		std::snprintf(m_msg, sizeof(m_msg), "%s", "7K");
-		change_game_mode(GameMode::LogResMsg);
-		break;
-
-	case LogResMsg::ServiceNotAvailable:
-		std::snprintf(m_msg, sizeof(m_msg), "%s", "7L");
-		change_game_mode(GameMode::LogResMsg);
-		break;
-
-	case LogResMsg::PasswordChangeSuccess:
-		std::snprintf(m_msg, sizeof(m_msg), "%s", "6B");
-		change_game_mode(GameMode::LogResMsg);
-		break;
-
-	case LogResMsg::PasswordChangeFail:
-		std::snprintf(m_msg, sizeof(m_msg), "%s", "6C");
-		change_game_mode(GameMode::LogResMsg);
-		break;
-
-	case LogResMsg::PasswordMismatch:
-		std::snprintf(m_msg, sizeof(m_msg), "%s", "11");
-		change_game_mode(GameMode::LogResMsg);
-		break;
-
-	case LogResMsg::NotExistingAccount:
-		std::snprintf(m_msg, sizeof(m_msg), "%s", "12");
-		change_game_mode(GameMode::LogResMsg);
-		break;
-
-	case LogResMsg::NewAccountCreated:
-		std::snprintf(m_msg, sizeof(m_msg), "%s", "54");
-		change_game_mode(GameMode::LogResMsg);
-		break;
-
-	case LogResMsg::NewAccountFailed:
-		std::snprintf(m_msg, sizeof(m_msg), "%s", "05");
-		change_game_mode(GameMode::LogResMsg);
-		break;
-
-	case LogResMsg::AlreadyExistingAccount:
-		std::snprintf(m_msg, sizeof(m_msg), "%s", "06");
-		change_game_mode(GameMode::LogResMsg);
-		break;
-
-	case LogResMsg::NotExistingCharacter:
-		std::snprintf(m_msg, sizeof(m_msg), "%s", "Not existing character!");
-		change_game_mode(GameMode::Msg);
-		break;
-
-	case LogResMsg::NewCharacterCreated:
-	{
-		const auto* list = hb::net::PacketCast<hb::net::PacketLogNewCharacterCreatedHeader>(
-			packet_data, sizeof(hb::net::PacketLogNewCharacterCreatedHeader));
-		if (!list) return;
-		memcpy(char_name, list->character_name, sizeof(list->character_name));
-
-		m_total_char = std::min(static_cast<int>(list->total_chars), 4);
-		for (int i = 0; i < 4; i++)
-			if (m_char_list[i] != 0) m_char_list[i].reset();
-
-		const auto* entries = reinterpret_cast<const hb::net::PacketLogCharacterEntry*>(
-			packet_data + sizeof(hb::net::PacketLogNewCharacterCreatedHeader));
-		for (int i = 0; i < m_total_char; i++) {
-			const auto& entry = entries[i];
-			m_char_list[i] = std::make_unique<CCharInfo>();
-			m_char_list[i]->m_name.assign(entry.name, strnlen(entry.name, sizeof(entry.name)));
-			m_char_list[i]->m_appearance = entry.appearance;
-			m_char_list[i]->m_sex = entry.sex;
-			m_char_list[i]->m_skin_color = entry.skin;
-			m_char_list[i]->m_level = entry.level;
-			m_char_list[i]->m_exp = entry.exp;
-	
-			m_char_list[i]->m_map_name.assign(entry.map_name, strnlen(entry.map_name, sizeof(entry.map_name)));
-		}
-		std::snprintf(m_msg, sizeof(m_msg), "%s", "47");
-		change_game_mode(GameMode::LogResMsg);
-	}
-	break;
-
-	case LogResMsg::NewCharacterFailed:
-		std::snprintf(m_msg, sizeof(m_msg), "%s", "28");
-		change_game_mode(GameMode::LogResMsg);
-		break;
-
-	case LogResMsg::AlreadyExistingCharacter:
-		std::snprintf(m_msg, sizeof(m_msg), "%s", "29");
-		change_game_mode(GameMode::LogResMsg);
-		break;
-
-	case EnterGameRes::Playing:
-		change_game_mode(GameMode::QueryForceLogin);
-		break;
-
-	case EnterGameRes::Confirm:
-	{
-		const auto* pkt = hb::net::PacketCast<hb::net::PacketLogEnterGameConfirm>(
-			packet_data, sizeof(hb::net::PacketLogEnterGameConfirm));
-		if (!pkt) return;
-		int game_server_port = pkt->game_server_port;
-		char game_server_addr[16]{};
-		memcpy(game_server_addr, pkt->game_server_addr, sizeof(pkt->game_server_addr));
-		m_game_server_name.assign(pkt->game_server_name, strnlen(pkt->game_server_name, sizeof(pkt->game_server_name)));
-		(void)game_server_port;
-
-		m_g_sock = std::make_unique<hb::shared::net::ASIOSocket>(m_io_pool->get_context(), game_limits::socket_block_limit);
-		m_g_sock->connect(m_log_server_addr.c_str(), m_game_server_port);
-		m_g_sock->init_buffer_size(hb::shared::limits::MsgBufferSize);
-	}
-	break;
-
-	case EnterGameRes::Reject:
-	{
-		const auto* pkt = hb::net::PacketCast<hb::net::PacketLogResponseCode>(packet_data, sizeof(hb::net::PacketLogResponseCode));
-		if (!pkt) return;
-		std::memset(m_msg, 0, sizeof(m_msg));
-		switch (pkt->code) {
-		case 1:	std::snprintf(m_msg, sizeof(m_msg), "%s", "3E"); break;
-		case 2:	std::snprintf(m_msg, sizeof(m_msg), "%s", "3F"); break;
-		case 3:	std::snprintf(m_msg, sizeof(m_msg), "%s", "33"); break;
-		case 4: std::snprintf(m_msg, sizeof(m_msg), "%s", "3D"); break;
-		case 5: std::snprintf(m_msg, sizeof(m_msg), "%s", "3G"); break;
-		case 6: std::snprintf(m_msg, sizeof(m_msg), "%s", "3Z"); break;
-		case 7: std::snprintf(m_msg, sizeof(m_msg), "%s", "3J"); break;
-		}
-		change_game_mode(GameMode::LogResMsg);
-	}
-	break;
-
-	case EnterGameRes::ForceDisconn:
-		std::snprintf(m_msg, sizeof(m_msg), "%s", "3X");
-		change_game_mode(GameMode::LogResMsg);
-		break;
-
-	case LogResMsg::NotExistingWorldServer:
-		std::snprintf(m_msg, sizeof(m_msg), "%s", "1Y");
-		change_game_mode(GameMode::LogResMsg);
-		break;
-
-	case LogResMsg::InputKeyCode:
-	{
-		const auto* pkt = hb::net::PacketCast<hb::net::PacketLogResponseCode>(packet_data, sizeof(hb::net::PacketLogResponseCode));
-		if (!pkt) return;
-		std::memset(m_msg, 0, sizeof(m_msg));
-		switch (pkt->code) {
-		case 1:	std::snprintf(m_msg, sizeof(m_msg), "%s", "8U"); break; //MainMenu, Keycode registration success
-		case 2:	std::snprintf(m_msg, sizeof(m_msg), "%s", "82"); break; //MainMenu, Not existing Account
-		case 3:	std::snprintf(m_msg, sizeof(m_msg), "%s", "81"); break; //MainMenu, Password wrong
-		case 4: std::snprintf(m_msg, sizeof(m_msg), "%s", "8V"); break; //MainMenu, Invalid Keycode
-		case 5: std::snprintf(m_msg, sizeof(m_msg), "%s", "8W"); break; //MainMenu, Already Used Keycode
-		}
-		change_game_mode(GameMode::LogResMsg);
-	}
-	break;
-
-	case LogResMsg::ForceChangePassword:
-		std::snprintf(m_msg, sizeof(m_msg), "%s", "6M");
-		change_game_mode(GameMode::LogResMsg);
-		break;
-
-	case LogResMsg::InvalidKoreanSsn:
-		std::snprintf(m_msg, sizeof(m_msg), "%s", "1a");
-		change_game_mode(GameMode::LogResMsg);
-		break;
-
-	case LogResMsg::LessThenFifteen:
-		std::snprintf(m_msg, sizeof(m_msg), "%s", "1b");
-		change_game_mode(GameMode::LogResMsg);
-		break;
-	}
+	hb::logger::warn("Unhandled log response {} — no active screen claimed it", response);
 	m_l_sock.reset();
 }
 
-void CGame::log_recv_msg_handler(char* data)
+void CGame::log_recv_msg_handler(char* data, uint32_t msg_size)
 {
+	// Intercept balance config — sent before login response, must not close socket
+	const auto* header = hb::net::PacketCast<hb::net::PacketHeader>(data, sizeof(hb::net::PacketHeader));
+	if (header && header->msg_id == MsgId::BalanceConfigContents)
+	{
+		cache_process_balance_config(data, msg_size);
+		return;
+	}
+
 	log_response_handler(data);
 }
 
@@ -3147,7 +1986,7 @@ void CGame::change_game_mode(GameMode mode)
 
 	// Route to new Screen system or legacy system
 	switch (mode) {
-	// Full screens
+		// Full screens
 	case GameMode::MainMenu:
 		GameModeManager::set_screen<Screen_MainMenu>();
 		break;
@@ -3170,7 +2009,7 @@ void CGame::change_game_mode(GameMode mode)
 		GameModeManager::set_screen<Screen_Loading>();
 		break;
 
-	// Overlays - displayed on top of current base screen
+		// Overlays - displayed on top of current base screen
 	case GameMode::Connecting:
 		GameModeManager::set_overlay<Overlay_Connecting>();
 		break;
@@ -3224,15 +2063,15 @@ void CGame::release_unused_sprites()
 	{
 		if (spr->IsLoaded() && !spr->IsInUse())
 		{
-			if (GameClock::get_time_ms() - spr->GetLastAccessTime() > 60000)
+			if (GameClock::get_time_ms() - spr->GetLastAccessTime() > 30000)
 				spr->Unload();
 		}
 	}
-	for(auto& [idx, spr] : m_tile_spr)
+	for (auto& [idx, spr] : m_tile_spr)
 	{
 		if (spr->IsLoaded() && !spr->IsInUse())
 		{
-			if (GameClock::get_time_ms() - spr->GetLastAccessTime() > 60000)
+			if (GameClock::get_time_ms() - spr->GetLastAccessTime() > 30000)
 				spr->Unload();
 		}
 	}
@@ -3240,7 +2079,7 @@ void CGame::release_unused_sprites()
 	{
 		if (spr->IsLoaded() && !spr->IsInUse())
 		{
-			if (GameClock::get_time_ms() - spr->GetLastAccessTime() > 60000)
+			if (GameClock::get_time_ms() - spr->GetLastAccessTime() > 30000)
 				spr->Unload();
 		}
 	}
@@ -3338,63 +2177,200 @@ void CGame::chat_msg_handler(char* packet_data)
 
 	m_Renderer->end_text_batch();
 
-	m_floating_text.remove_by_object_id(object_id);
+	get_floating_text().remove_by_object_id(object_id);
 
 	const char* cp = packet_data + sizeof(hb::net::PacketCommandChatMsgHeader);
-	int chat_slot = m_floating_text.add_chat_text(cp, current_time, object_id, m_map_data.get(), map_x, map_y);
+	int chat_slot = get_floating_text().add_chat_text(cp, current_time, object_id, m_map_data.get(), map_x, map_y);
 	if (chat_slot != 0 || msg_type == 20 || msg_type == 10) {
-			if ((msg_type != 0) && (m_dialog_box_manager.is_enabled(DialogBoxId::ChatHistory) != true)) {
-				head_msg = std::format("{}:{}", name, cp);
-				if (msg_type == 10) {
-					event_list_manager::get().add_event_top(head_msg.c_str(), msg_type);
-				} else {
-					add_event_list(head_msg.c_str(), msg_type);
-				}
+		if ((msg_type != 0) && (get_dialog_box_manager().is_enabled(DialogBoxId::ChatHistory) != true)) {
+			head_msg = std::format("{}:{}", name, cp);
+			if (msg_type == 10) {
+				event_list_manager::get().add_event_top(head_msg.c_str(), msg_type);
 			}
-			return;
+			else {
+				add_event_list(head_msg.c_str(), msg_type);
+			}
 		}
+		return;
+	}
 }
 
-void CGame::draw_background(short div_x, short mod_x, short div_y, short mod_y)
+// Equipment sprite indices for character rendering (menu only)
+struct MenuCharEquipment {
+	int body, undies, hair, bodyArmor, armArmor, pants, boots, weapon, shield, mantle, helm;
+	int weaponColor, shieldColor, armorColor, mantleColor, armColor, pantsColor, bootsColor, helmColor;
+	bool skirtDraw;
+};
+
+// Calculate equipment indices for human characters (male/female) in menu
+static void CalcHumanEquipment(const CEntityRenderState& state, bool female, MenuCharEquipment& eq)
 {
-	if (div_x < 0 || div_y < 0) return;
+	const auto& appr = state.m_appearance;
 
-	// Tile-based loop constants
-	constexpr int TILE_SIZE = 32;
-	const int visibleTilesX = (LOGICAL_WIDTH() / TILE_SIZE) + 2;   // +2 for partial tiles on edges
-	const int visibleTilesY = (LOGICAL_HEIGHT() / TILE_SIZE) + 2;
+	// Walking uses pose 3, standing uses pose 2
+	bool walking = appr.is_walking;
+	int pose = walking ? 3 : 2;
 
-	// Map pivot for tile array access
-	const short pivotX = m_map_data->m_pivot_x;
-	const short pivotY = m_map_data->m_pivot_y;
+	// Body index (still from m_sprite)
+	eq.body = 500 + (state.m_owner_type - 1) * 8 * 15 + (pose * 8);
 
-	// draw tiles directly to backbuffer (no caching)
-	for (int tileY = 0; tileY < visibleTilesY; tileY++)
-	{
-		int indexY = div_y + pivotY + tileY;
-		int iy = tileY * TILE_SIZE - mod_y;
+	// Cosmetics — still from m_sprite with old base IDs
+	int UNDIES = female ? UndiesW : UndiesM;
+	int HAIR   = female ? HairW  : HairM;
+	eq.undies = UNDIES + appr.underwear_type * 15 + pose;
+	eq.hair   = HAIR + appr.hair_style * 15 + pose;
 
-		for (int tileX = 0; tileX < visibleTilesX; tileX++)
-		{
-			int indexX = div_x + pivotX + tileX;
-			int ix = tileX * TILE_SIZE - mod_x;
+	// Equipment — from m_equip_sprites via equip_sprite::index()
+	eq.bodyArmor = (!appr.hide_armor && appr.armor_item_id > 0)  ? equip_sprite::index(female, appr.armor_display_id, pose)   : -1;
+	eq.armArmor  = (appr.arm_item_id > 0)    ? equip_sprite::index(female, appr.arm_display_id, pose)    : -1;
+	eq.pants     = (appr.pants_item_id > 0)   ? equip_sprite::index(female, appr.pants_display_id, pose)  : -1;
+	eq.boots     = (appr.boots_item_id > 0)   ? equip_sprite::index(female, appr.boots_display_id, pose)  : -1;
+	eq.mantle    = (appr.mantle_item_id > 0)  ? equip_sprite::index(female, appr.mantle_display_id, pose) : -1;
+	eq.helm      = (appr.helm_item_id > 0)    ? equip_sprite::index(female, appr.helm_display_id, pose)   : -1;
+	eq.weapon    = (appr.weapon_item_id > 0)  ? equip_sprite::index(female, appr.weapon_display_id, pose) : -1;
+	eq.shield    = (appr.shield_item_id > 0)  ? equip_sprite::index(female, appr.shield_display_id, pose) : -1;
 
-			// Bounds check for tile array (752x752)
-			if (indexX >= 0 && indexX < 752 && indexY >= 0 && indexY < 752)
-			{
-				short spr = m_map_data->m_tile[indexX][indexY].m_sTileSprite;
-				short spr_frame = m_map_data->m_tile[indexX][indexY].m_sTileSpriteFrame;
-				m_tile_spr[spr]->draw(ix - 16, iy - 16, spr_frame, hb::shared::sprite::DrawParams::no_color_key());
-			}
-		}
-	}
-
-	if (m_is_crusade_mode)
-	{
-		if (m_player->m_construct_loc_x != -1) draw_new_dialog_box(InterfaceNdCrusade, m_player->m_construct_loc_x * 32 - m_Camera.get_x(), m_player->m_construct_loc_y * 32 - m_Camera.get_y(), 41);
-		if (teleport_manager::get().get_loc_x() != -1) draw_new_dialog_box(InterfaceNdCrusade, teleport_manager::get().get_loc_x() * 32 - m_Camera.get_x(), teleport_manager::get().get_loc_y() * 32 - m_Camera.get_y(), 42);
-	}
+	// Female skirt check — from is_skirt flag computed at broadcast time
+	eq.skirtDraw = female && appr.is_skirt;
 }
+
+hb::shared::sprite::BoundRect CGame::draw_object_on_move_for_menu(int indexX, int indexY, int sX, int sY, bool trans, uint32_t time, bool draw_shadow)
+{
+	if (m_entity_state.m_dir < 1 || m_entity_state.m_dir > 8) return {};
+
+	// Extract equipment colors from packed appearance color
+	MenuCharEquipment eq = {};
+	eq.weaponColor = m_entity_state.m_appearance.weapon_color;
+	eq.shieldColor = m_entity_state.m_appearance.shield_color;
+	eq.armorColor  = m_entity_state.m_appearance.armor_color;
+	eq.mantleColor = m_entity_state.m_appearance.mantle_color;
+	eq.armColor    = m_entity_state.m_appearance.arm_color;
+	eq.pantsColor  = m_entity_state.m_appearance.pants_color;
+	eq.bootsColor  = m_entity_state.m_appearance.boots_color;
+	eq.helmColor   = m_entity_state.m_appearance.helm_color;
+
+	// Calculate equipment indices based on character type
+	bool mob = false;
+	switch (m_entity_state.m_owner_type) {
+	case 1: case 2: case 3:  // Male
+		CalcHumanEquipment(m_entity_state, false, eq);
+		break;
+	case 4: case 5: case 6:  // Female
+		CalcHumanEquipment(m_entity_state, true, eq);
+		break;
+	default:  // Mob/NPC
+		if (m_entity_state.m_owner_type < 10) return {};
+		eq.body = Mob + (m_entity_state.m_owner_type - 10) * 8 * 7 + (1 * 8);
+		eq.undies = eq.hair = eq.bodyArmor = eq.armArmor = -1;
+		eq.boots = eq.pants = eq.weapon = eq.shield = eq.helm = eq.mantle = -1;
+		mob = true;
+		break;
+	}
+	// Helper lambdas for drawing with optional color tint
+	int dirFrame = (m_entity_state.m_dir - 1) * 8 + m_entity_state.m_frame;
+	int hairColor = m_entity_state.m_appearance.hair_color;
+
+	// Equipment draws from m_equip_sprites, cosmetics from m_sprite
+	auto drawCosmeticLayer = [&](int idx, int color) {
+		if (idx == -1) return;
+		if (color == 0)
+			m_sprite[idx]->draw(sX, sY, dirFrame);
+		else
+			m_sprite[idx]->draw(sX, sY, dirFrame, hb::shared::sprite::DrawParams::tint(GameColors::Items[color].r, GameColors::Items[color].g, GameColors::Items[color].b));
+	};
+
+	auto drawEquipLayer = [&](int idx, int color) {
+		if (idx == -1) return;
+		if (color == 0)
+			m_equip_sprites[idx]->draw(sX, sY, dirFrame);
+		else
+			m_equip_sprites[idx]->draw(sX, sY, dirFrame, hb::shared::sprite::DrawParams::tint(GameColors::Items[color].r, GameColors::Items[color].g, GameColors::Items[color].b));
+	};
+
+	auto drawWeapon = [&]() {
+		if (eq.weapon == -1) return;
+		if (eq.weaponColor == 0)
+			m_equip_sprites[eq.weapon]->draw(sX, sY, dirFrame);
+		else
+			m_equip_sprites[eq.weapon]->draw(sX, sY, dirFrame, hb::shared::sprite::DrawParams::tint(GameColors::Weapons[eq.weaponColor].r, GameColors::Weapons[eq.weaponColor].g, GameColors::Weapons[eq.weaponColor].b));
+	};
+
+	auto drawMantle = [&](int order) {
+		if (eq.mantle != -1 && mantle_draw_order[m_entity_state.m_dir] == order)
+			drawEquipLayer(eq.mantle, eq.mantleColor);
+	};
+
+	// Check if mob type should skip shadow
+	auto shouldSkipShadow = [&]() {
+		switch (m_entity_state.m_owner_type) {
+		case hb::shared::owner::Slime: case hb::shared::owner::EnergySphere: case hb::shared::owner::TigerWorm: case hb::shared::owner::Catapult: case hb::shared::owner::CannibalPlant: case hb::shared::owner::IceGolem: case hb::shared::owner::Abaddon: case hb::shared::owner::Gate:
+			return true;
+		default:
+			return false;
+		}
+	};
+
+	// draw body shadow
+	if (draw_shadow && !shouldSkipShadow() && config_manager::get().get_detail_level() != 0 && !mob)
+		m_sprite[eq.body + (m_entity_state.m_dir - 1)]->draw(sX, sY, m_entity_state.m_frame, hb::shared::sprite::DrawParams::shadow());
+
+	// draw weapon first if drawing order is 1
+	if (weapon_draw_order[m_entity_state.m_dir] == 1)
+		drawWeapon();
+
+	// draw body
+	if (mob)
+		m_sprite[eq.body + (m_entity_state.m_dir - 1)]->draw(sX, sY, m_entity_state.m_frame, hb::shared::sprite::DrawParams::alpha_blend(0.5f));
+	else
+		m_sprite[eq.body + (m_entity_state.m_dir - 1)]->draw(sX, sY, m_entity_state.m_frame);
+
+	// draw equipment layers (back-to-front order)
+	drawMantle(0);  // Mantle behind body
+	drawCosmeticLayer(eq.undies, 0);  // Undies from m_sprite
+
+	// Hair (cosmetic, from m_sprite, only if no helm)
+	if (eq.hair != -1 && eq.helm == -1)
+	{
+		const auto& hc = GameColors::Hair[hairColor];
+		m_sprite[eq.hair]->draw(sX, sY, dirFrame, hb::shared::sprite::DrawParams::tint(hc.r, hc.g, hc.b));
+	}
+
+	// Boots before pants if wearing skirt
+	if (eq.skirtDraw)
+		drawEquipLayer(eq.boots, eq.bootsColor);
+
+	drawEquipLayer(eq.pants, eq.pantsColor);
+	drawEquipLayer(eq.armArmor, eq.armColor);
+
+	// Boots after pants if not wearing skirt
+	if (!eq.skirtDraw)
+		drawEquipLayer(eq.boots, eq.bootsColor);
+
+	drawEquipLayer(eq.bodyArmor, eq.armorColor);
+	drawEquipLayer(eq.helm, eq.helmColor);
+	drawMantle(2);  // Mantle over armor
+	drawEquipLayer(eq.shield, eq.shieldColor);
+	drawMantle(1);  // Mantle in front
+
+	// draw weapon last if drawing order is not 1
+	if (weapon_draw_order[m_entity_state.m_dir] != 1)
+		drawWeapon();
+
+	// Chat message
+	if (m_entity_state.m_chat_index != 0)
+	{
+		if (get_floating_text().is_occupied(m_entity_state.m_chat_index))
+			get_floating_text().draw_single(m_entity_state.m_chat_index, sX, sY, m_cur_time, m_Renderer);
+		else
+			m_map_data->clear_chat_msg(indexX, indexY);
+	}
+
+	m_entity_state.m_move_offset_x = 0;
+	m_entity_state.m_move_offset_y = 0;
+	return m_sprite[eq.body + (m_entity_state.m_dir - 1)]->GetBoundRect();
+}
+
+// draw_background moved to Screen_OnGame.DrawObjects.cpp
 
 void CGame::init_item_list(char* packet_data)
 {
@@ -3407,8 +2383,7 @@ void CGame::init_item_list(char* packet_data)
 	for (int i = 0; i < DEF_MAXITEMEQUIPPOS; i++)
 		m_item_equipment_status[i] = -1;
 
-	for (int i = 0; i < hb::shared::limits::MaxItems; i++)
-		m_is_item_disabled[i] = false;
+	inventory_manager::get().unlock_all();
 
 	const auto* header = hb::net::PacketCast<hb::net::PacketResponseItemListHeader>(
 		packet_data, sizeof(hb::net::PacketResponseItemListHeader));
@@ -3416,26 +2391,26 @@ void CGame::init_item_list(char* packet_data)
 	total_items = header->item_count;
 
 	for (int i = 0; i < hb::shared::limits::MaxItems; i++)
-		if (m_item_list[i] != 0)
+		if (m_player->m_item_list[i] != 0)
 		{
-			m_item_list[i].reset();
+			m_player->m_item_list[i].reset();
 		}
 
 	for (int i = 0; i < hb::shared::limits::MaxBankItems; i++)
-		if (m_bank_list[i] != 0)
+		if (m_player->m_bank_list[i] != 0)
 		{
-			m_bank_list[i].reset();
+			m_player->m_bank_list[i].reset();
 		}
 
 	const auto* itemEntries = reinterpret_cast<const hb::net::PacketResponseItemListEntry*>(header + 1);
 	for (int i = 0; i < total_items; i++)
 	{
 		const auto& entry = itemEntries[i];
-		m_item_list[i] = std::make_unique<CItem>();
-		m_item_list[i]->m_id_num = entry.item_id;
-		m_item_list[i]->m_count = entry.count;
-		m_item_list[i]->m_x = 40;
-		m_item_list[i]->m_y = 30;
+		m_player->m_item_list[i] = std::make_unique<CItem>();
+		m_player->m_item_list[i]->m_id_num = entry.item_id;
+		m_player->m_item_list[i]->m_count = entry.count;
+		m_player->m_item_list[i]->m_x = 40;
+		m_player->m_item_list[i]->m_y = 30;
 		if (entry.is_equipped == 0) m_is_item_equipped[i] = false;
 		else m_is_item_equipped[i] = true;
 		CItem* cfg = get_item_config(entry.item_id);
@@ -3443,24 +2418,24 @@ void CGame::init_item_list(char* packet_data)
 		{
 			m_item_equipment_status[cfg->m_equip_pos] = i;
 		}
-		m_item_list[i]->m_cur_life_span = entry.cur_lifespan;
-		m_item_list[i]->m_item_color = entry.item_color;
-		m_item_list[i]->m_item_special_effect_value2 = static_cast<short>(entry.spec_value2); // v1.41
-		m_item_list[i]->m_attribute = entry.attribute;
+		m_player->m_item_list[i]->m_cur_life_span = entry.cur_lifespan;
+		m_player->m_item_list[i]->m_item_color = entry.item_color;
+		m_player->m_item_list[i]->m_item_special_effect_value2 = static_cast<short>(entry.spec_value2); // v1.41
+		m_player->m_item_list[i]->m_attribute = entry.attribute;
 		m_item_order[i] = i;
 		// Snoopy: Add Angelic Stats
 		if (cfg && (cfg->get_item_type() == ItemType::Equip)
 			&& (m_is_item_equipped[i] == true)
 			&& (cfg->m_equip_pos >= 11))
 		{
-			angel_value = (m_item_list[i]->m_attribute & 0xF0000000) >> 28;
-			if (m_item_list[i]->m_id_num == hb::shared::item::ItemId::AngelicPandentSTR)
+			angel_value = (m_player->m_item_list[i]->m_attribute & 0xF0000000) >> 28;
+			if (m_player->m_item_list[i]->m_id_num == hb::shared::item::ItemId::AngelicPandentSTR)
 				m_player->m_angelic_str = 1 + angel_value;
-			else if (m_item_list[i]->m_id_num == hb::shared::item::ItemId::AngelicPandentDEX)
+			else if (m_player->m_item_list[i]->m_id_num == hb::shared::item::ItemId::AngelicPandentDEX)
 				m_player->m_angelic_dex = 1 + angel_value;
-			else if (m_item_list[i]->m_id_num == hb::shared::item::ItemId::AngelicPandentINT)
+			else if (m_player->m_item_list[i]->m_id_num == hb::shared::item::ItemId::AngelicPandentINT)
 				m_player->m_angelic_int = 1 + angel_value;
-			else if (m_item_list[i]->m_id_num == hb::shared::item::ItemId::AngelicPandentMAG)
+			else if (m_player->m_item_list[i]->m_id_num == hb::shared::item::ItemId::AngelicPandentMAG)
 				m_player->m_angelic_mag = 1 + angel_value;
 		}
 	}
@@ -3469,24 +2444,24 @@ void CGame::init_item_list(char* packet_data)
 	total_items = bank_header->bank_item_count;
 
 	for (int i = 0; i < hb::shared::limits::MaxBankItems; i++)
-		if (m_bank_list[i] != 0)
+		if (m_player->m_bank_list[i] != 0)
 		{
-			m_bank_list[i].reset();
+			m_player->m_bank_list[i].reset();
 		}
 
 	const auto* bankEntries = reinterpret_cast<const hb::net::PacketResponseBankItemEntry*>(bank_header + 1);
 	for (int i = 0; i < total_items; i++)
 	{
 		const auto& entry = bankEntries[i];
-		m_bank_list[i] = std::make_unique<CItem>();
-		m_bank_list[i]->m_id_num = entry.item_id;
-		m_bank_list[i]->m_count = entry.count;
-		m_bank_list[i]->m_x = 40;
-		m_bank_list[i]->m_y = 30;
-		m_bank_list[i]->m_cur_life_span = entry.cur_lifespan;
-		m_bank_list[i]->m_item_color = entry.item_color;
-		m_bank_list[i]->m_item_special_effect_value2 = static_cast<short>(entry.spec_value2); // v1.41
-		m_bank_list[i]->m_attribute = entry.attribute;
+		m_player->m_bank_list[i] = std::make_unique<CItem>();
+		m_player->m_bank_list[i]->m_id_num = entry.item_id;
+		m_player->m_bank_list[i]->m_count = entry.count;
+		m_player->m_bank_list[i]->m_x = 40;
+		m_player->m_bank_list[i]->m_y = 30;
+		m_player->m_bank_list[i]->m_cur_life_span = entry.cur_lifespan;
+		m_player->m_bank_list[i]->m_item_color = entry.item_color;
+		m_player->m_bank_list[i]->m_item_special_effect_value2 = static_cast<short>(entry.spec_value2); // v1.41
+		m_player->m_bank_list[i]->m_attribute = entry.attribute;
 	}
 
 	const auto* mastery = reinterpret_cast<const hb::net::PacketResponseMasteryData*>(bankEntries + total_items);
@@ -3503,266 +2478,26 @@ void CGame::init_item_list(char* packet_data)
 
 	// Diagnostic: count what was loaded
 	int nItems = 0, nBank = 0, nMagic = 0, nSkills = 0;
-	for (int i = 0; i < hb::shared::limits::MaxItems; i++) if (m_item_list[i]) nItems++;
-	for (int i = 0; i < hb::shared::limits::MaxBankItems; i++) if (m_bank_list[i]) nBank++;
+	for (int i = 0; i < hb::shared::limits::MaxItems; i++) if (m_player->m_item_list[i]) nItems++;
+	for (int i = 0; i < hb::shared::limits::MaxBankItems; i++) if (m_player->m_bank_list[i]) nBank++;
 	for (int i = 0; i < hb::shared::limits::MaxMagicType; i++) if (m_player->m_magic_mastery[i] != 0) nMagic++;
 	for (int i = 0; i < hb::shared::limits::MaxSkillType; i++) if (m_player->m_skill_mastery[i] != 0) nSkills++;
 }
 
-void CGame::draw_dialog_boxs(short mouse_x, short mouse_y, short mouse_z, char left_button)
-{
-	if (m_is_observer_mode == true) return;
-	// Note: Dialogs that handle scroll should read hb::shared::input::get_mouse_wheel_delta() and clear it after processing
-	//Snoopy: 41->61
-	bool icon_panel_drawn = false;
-	for (int i = 0; i < 61; i++)
-		if (m_dialog_box_manager.order_at(i) != 0)
-		{
-			switch (m_dialog_box_manager.order_at(i)) {
-			case DialogBoxId::CharacterInfo:
-				if (auto* dlg = m_dialog_box_manager.get_dialog_box(DialogBoxId::CharacterInfo))
-					dlg->on_draw(mouse_x, mouse_y, mouse_z, left_button);
-				break;
-			case DialogBoxId::Inventory:
-				if (auto* dlg = m_dialog_box_manager.get_dialog_box(DialogBoxId::Inventory))
-					dlg->on_draw(mouse_x, mouse_y, mouse_z, left_button);
-				break;
-			case DialogBoxId::Magic:
-				if (auto* dlg = m_dialog_box_manager.get_dialog_box(DialogBoxId::Magic))
-					dlg->on_draw(mouse_x, mouse_y, mouse_z, left_button);
-				break;
-			case DialogBoxId::ItemDropConfirm:
-				if (auto* dlg = m_dialog_box_manager.get_dialog_box(DialogBoxId::ItemDropConfirm))
-					dlg->on_draw(mouse_x, mouse_y, mouse_z, left_button);
-				break;
-			case DialogBoxId::WarningBattleArea:
-				if (auto* dlg = m_dialog_box_manager.get_dialog_box(DialogBoxId::WarningBattleArea))
-					dlg->on_draw(mouse_x, mouse_y, mouse_z, left_button);
-				break;
-			case DialogBoxId::GuildMenu:
-				if (auto* dlg = m_dialog_box_manager.get_dialog_box(DialogBoxId::GuildMenu))
-					dlg->on_draw(mouse_x, mouse_y, mouse_z, left_button);
-				break;
-			case DialogBoxId::GuildOperation:
-				if (auto* dlg = m_dialog_box_manager.get_dialog_box(DialogBoxId::GuildOperation))
-					dlg->on_draw(mouse_x, mouse_y, mouse_z, left_button);
-				break;
-			case DialogBoxId::GuideMap:
-				if (auto* dlg = m_dialog_box_manager.get_dialog_box(DialogBoxId::GuideMap))
-					dlg->on_draw(mouse_x, mouse_y, mouse_z, left_button);
-				break;
-			case DialogBoxId::ChatHistory:
-				if (auto* dlg = m_dialog_box_manager.get_dialog_box(DialogBoxId::ChatHistory))
-					dlg->on_draw(mouse_x, mouse_y, mouse_z, left_button);
-				break;
-			case DialogBoxId::SaleMenu:
-				if (auto* dlg = m_dialog_box_manager.get_dialog_box(DialogBoxId::SaleMenu))
-					dlg->on_draw(mouse_x, mouse_y, mouse_z, left_button);
-				break;
-			case DialogBoxId::LevelUpSetting:
-				if (auto* dlg = m_dialog_box_manager.get_dialog_box(DialogBoxId::LevelUpSetting))
-					dlg->on_draw(mouse_x, mouse_y, mouse_z, left_button);
-				break;
-			case DialogBoxId::CityHallMenu:
-				if (auto* dlg = m_dialog_box_manager.get_dialog_box(DialogBoxId::CityHallMenu))
-					dlg->on_draw(mouse_x, mouse_y, mouse_z, left_button);
-				break;
-			case DialogBoxId::Bank:
-				if (auto* dlg = m_dialog_box_manager.get_dialog_box(DialogBoxId::Bank))
-					dlg->on_draw(mouse_x, mouse_y, mouse_z, left_button);
-				break;
-			case DialogBoxId::Skill:
-				if (auto* dlg = m_dialog_box_manager.get_dialog_box(DialogBoxId::Skill))
-					dlg->on_draw(mouse_x, mouse_y, mouse_z, left_button);
-				break;
-			case DialogBoxId::MagicShop:
-				if (auto* dlg = m_dialog_box_manager.get_dialog_box(DialogBoxId::MagicShop))
-					dlg->on_draw(mouse_x, mouse_y, mouse_z, left_button);
-				break;
-			case DialogBoxId::ItemDropExternal:
-				if (auto* dlg = m_dialog_box_manager.get_dialog_box(DialogBoxId::ItemDropExternal))
-					dlg->on_draw(mouse_x, mouse_y, mouse_z, left_button);
-				break;
-			case DialogBoxId::Text:
-				if (auto* dlg = m_dialog_box_manager.get_dialog_box(DialogBoxId::Text))
-					dlg->on_draw(mouse_x, mouse_y, mouse_z, left_button);
-				break;
-			case DialogBoxId::SystemMenu:
-				if (auto* dlg = m_dialog_box_manager.get_dialog_box(DialogBoxId::SystemMenu))
-					dlg->on_draw(mouse_x, mouse_y, mouse_z, left_button);
-				break;
-			case DialogBoxId::NpcActionQuery:
-				if (auto* dlg = m_dialog_box_manager.get_dialog_box(DialogBoxId::NpcActionQuery))
-					dlg->on_draw(mouse_x, mouse_y, mouse_z, left_button);
-				break;
-			case DialogBoxId::NpcTalk:
-				if (auto* dlg = m_dialog_box_manager.get_dialog_box(DialogBoxId::NpcTalk))
-					dlg->on_draw(mouse_x, mouse_y, mouse_z, left_button);
-				break;
-			case DialogBoxId::Map:
-				if (auto* dlg = m_dialog_box_manager.get_dialog_box(DialogBoxId::Map))
-					dlg->on_draw(mouse_x, mouse_y, mouse_z, left_button);
-				break;
-			case DialogBoxId::SellOrRepair:
-				if (auto* dlg = m_dialog_box_manager.get_dialog_box(DialogBoxId::SellOrRepair))
-					dlg->on_draw(mouse_x, mouse_y, mouse_z, left_button);
-				break;
-			case DialogBoxId::Fishing:
-				if (auto* dlg = m_dialog_box_manager.get_dialog_box(DialogBoxId::Fishing))
-					dlg->on_draw(mouse_x, mouse_y, mouse_z, left_button);
-				break;
-			case DialogBoxId::Noticement:
-				if (auto* dlg = m_dialog_box_manager.get_dialog_box(DialogBoxId::Noticement))
-					dlg->on_draw(mouse_x, mouse_y, mouse_z, left_button);
-				break;
-			case DialogBoxId::Manufacture:
-				if (auto* dlg = m_dialog_box_manager.get_dialog_box(DialogBoxId::Manufacture))
-					dlg->on_draw(mouse_x, mouse_y, mouse_z, left_button);
-				break;
-			case DialogBoxId::Exchange:
-				if (auto* dlg = m_dialog_box_manager.get_dialog_box(DialogBoxId::Exchange))
-					dlg->on_draw(mouse_x, mouse_y, mouse_z, left_button);
-				break;
-			case DialogBoxId::Quest:
-				if (auto* dlg = m_dialog_box_manager.get_dialog_box(DialogBoxId::Quest))
-					dlg->on_draw(mouse_x, mouse_y, mouse_z, left_button);
-				break;
-			case DialogBoxId::HudPanel:
-				if (auto* dlg = m_dialog_box_manager.get_dialog_box(DialogBoxId::HudPanel))
-					dlg->on_draw(mouse_x, mouse_y, mouse_z, left_button);
-				icon_panel_drawn = true;
-				break;
-			case DialogBoxId::SellList:
-				if (auto* dlg = m_dialog_box_manager.get_dialog_box(DialogBoxId::SellList))
-					dlg->on_draw(mouse_x, mouse_y, mouse_z, left_button);
-				break;
-			case DialogBoxId::Party:
-				if (auto* dlg = m_dialog_box_manager.get_dialog_box(DialogBoxId::Party))
-					dlg->on_draw(mouse_x, mouse_y, mouse_z, left_button);
-				break;
-			case DialogBoxId::CrusadeJob:
-				if (auto* dlg = m_dialog_box_manager.get_dialog_box(DialogBoxId::CrusadeJob))
-					dlg->on_draw(mouse_x, mouse_y, mouse_z, left_button);
-				break;
-			case DialogBoxId::ItemUpgrade:
-				if (auto* dlg = m_dialog_box_manager.get_dialog_box(DialogBoxId::ItemUpgrade))
-					dlg->on_draw(mouse_x, mouse_y, mouse_z, left_button);
-				break;
-			case DialogBoxId::Help:
-				if (auto* dlg = m_dialog_box_manager.get_dialog_box(DialogBoxId::Help))
-					dlg->on_draw(mouse_x, mouse_y, mouse_z, left_button);
-				break;
-			case DialogBoxId::CrusadeCommander:
-				if (auto* dlg = m_dialog_box_manager.get_dialog_box(DialogBoxId::CrusadeCommander))
-					dlg->on_draw(mouse_x, mouse_y, mouse_z, left_button);
-				break;
-			case DialogBoxId::CrusadeConstructor:
-				if (auto* dlg = m_dialog_box_manager.get_dialog_box(DialogBoxId::CrusadeConstructor))
-					dlg->on_draw(mouse_x, mouse_y, mouse_z, left_button);
-				break;
-			case DialogBoxId::CrusadeSoldier:
-				if (auto* dlg = m_dialog_box_manager.get_dialog_box(DialogBoxId::CrusadeSoldier))
-					dlg->on_draw(mouse_x, mouse_y, mouse_z, left_button);
-				break;
-			case DialogBoxId::Slates:
-				if (auto* dlg = m_dialog_box_manager.get_dialog_box(DialogBoxId::Slates))
-					dlg->on_draw(mouse_x, mouse_y, mouse_z, left_button);
-				break;
-			case DialogBoxId::ConfirmExchange:	//Snoopy: Confirmation Exchange
-				if (auto* dlg = m_dialog_box_manager.get_dialog_box(DialogBoxId::ConfirmExchange))
-					dlg->on_draw(mouse_x, mouse_y, mouse_z, left_button);
-				break;
-			case DialogBoxId::ChangeStatsMajestic:
-				if (auto* dlg = m_dialog_box_manager.get_dialog_box(DialogBoxId::ChangeStatsMajestic))
-					dlg->on_draw(mouse_x, mouse_y, mouse_z, left_button);
-				break;
-			case DialogBoxId::Resurrect: // Snoopy: Resurection?
-				if (auto* dlg = m_dialog_box_manager.get_dialog_box(DialogBoxId::Resurrect))
-					dlg->on_draw(mouse_x, mouse_y, mouse_z, left_button);
-				break;
-			case DialogBoxId::GuildHallMenu: // Gail
-				if (auto* dlg = m_dialog_box_manager.get_dialog_box(DialogBoxId::GuildHallMenu))
-					dlg->on_draw(mouse_x, mouse_y, mouse_z, left_button);
-				break;
-			case DialogBoxId::RepairAll: //50Cent - Repair All
-				if (auto* dlg = m_dialog_box_manager.get_dialog_box(DialogBoxId::RepairAll))
-					dlg->on_draw(mouse_x, mouse_y, mouse_z, left_button);
-				break;
-			}
-		}
-	if (icon_panel_drawn == false)
-	{
-		if (auto* dlg = m_dialog_box_manager.get_dialog_box(DialogBoxId::HudPanel))
-			dlg->on_draw(mouse_x, mouse_y, mouse_z, left_button);
-	}
-	if (m_player->m_super_attack_left > 0)
-	{
-		std::string G_cTxt;
-		int resx = (LOGICAL_WIDTH() - 640) / 2;
-		int resy = LOGICAL_HEIGHT() - 480;
-		// Combat icon position (same as HudPanel's COMBAT_ICON_X/Y)
-		int iconX = 368 + resx;
-		int iconY = 440 + resy;
-		// Combat button area for text alignment
-		int btnX = 362 + resx;
-		int btnY = 434 + resy;
-		int btnW = 42;
-		int btnH = 41;
+// draw_dialog_boxs REMOVED — rendering moved to DialogBoxManager::draw_all()
+// Super attack overlay moved to DialogBox_HudPanel::draw_super_attack_overlay()
 
-		bool mastered = (m_player->m_skill_mastery[combat_system::get().get_weapon_skill_type()] == 100);
+// draw_character_body REMOVED — moved to Screen_OnGame::draw_character_body (static)
 
-		// draw additive overlay sprite at combat icon position only when ALT is held
-		if (hb::shared::input::is_alt_down() && mastered)
-			m_sprite[InterfaceNdIconPanel]->draw(iconX, iconY, 3, hb::shared::sprite::DrawParams::additive(0.7f));
-
-		// draw super attack count text at bottom-right of combat button area
-		G_cTxt = std::format("{}", m_player->m_super_attack_left);
-		if (mastered)
-			hb::shared::text::draw_text_aligned(GameFont::Bitmap1, btnX, btnY, btnW, btnH, G_cTxt.c_str(), hb::shared::text::TextStyle::with_integrated_shadow(hb::shared::render::Color(255, 255, 255)), hb::shared::text::Align::BottomRight);
-		else
-			hb::shared::text::draw_text_aligned(GameFont::Bitmap1, btnX, btnY, btnW, btnH, G_cTxt.c_str(), hb::shared::text::TextStyle::with_highlight(GameColors::BmpBtnActive), hb::shared::text::Align::BottomRight);
-	}
-}
-
-void CGame::draw_character_body(short sX, short sY, short type)
-{
-	uint32_t time = m_cur_time;
-
-	if (type <= 3)
-	{
-		m_sprite[ItemEquipPivotPoint + 0]->draw(sX, sY, type - 1);
-		const auto& hcM = GameColors::Hair[m_entity_state.m_appearance.hair_color];
-		m_sprite[ItemEquipPivotPoint + 18]->draw(sX, sY, m_entity_state.m_appearance.hair_style, hb::shared::sprite::DrawParams::tint(hcM.r, hcM.g, hcM.b));
-
-		m_sprite[ItemEquipPivotPoint + 19]->draw(sX, sY, m_entity_state.m_appearance.underwear_type);
-	}
-	else
-	{
-		m_sprite[ItemEquipPivotPoint + 40]->draw(sX, sY, type - 4);
-		const auto& hcF = GameColors::Hair[m_entity_state.m_appearance.hair_color];
-		m_sprite[ItemEquipPivotPoint + 18 + 40]->draw(sX, sY, m_entity_state.m_appearance.hair_style, hb::shared::sprite::DrawParams::tint(hcF.r, hcF.g, hcF.b));
-		m_sprite[ItemEquipPivotPoint + 19 + 40]->draw(sX, sY, m_entity_state.m_appearance.underwear_type);
-	}
-}
-
-int CGame::get_top_dialog_box_index()
-{
-	int i;
-	//Snoopy: 38->58
-	for (i = 58; i >= 0; i--)
-		if (m_dialog_box_manager.order_at(i) != 0)
-			return m_dialog_box_manager.order_at(i);
-
-	return 0;
-}
+// get_top_dialog_box_index REMOVED — use get_dialog_box_manager().get_top_id()
 
 
 void CGame::load_text_dlg_contents(int type)
 {
 	for (int i = 0; i < game_limits::max_text_dlg_lines; i++)
 	{
-		if (m_msg_text_list[i] != 0)
-			m_msg_text_list[i].reset();
+		if (on_game()->m_msg_text_list[i] != 0)
+			on_game()->m_msg_text_list[i].reset();
 	}
 
 	std::string fileName = std::format("contents/contents{}.txt", type);
@@ -3776,7 +2511,7 @@ void CGame::load_text_dlg_contents(int type)
 	{
 		if (!line.empty())
 		{
-			m_msg_text_list[index] = std::make_unique<CMsg>(0, line.c_str(), 0);
+			on_game()->m_msg_text_list[index] = std::make_unique<CMsg>(0, line.c_str(), 0);
 			index++;
 		}
 	}
@@ -3786,8 +2521,8 @@ int CGame::load_text_dlg_contents2(int type)
 {
 	for (int i = 0; i < game_limits::max_text_dlg_lines; i++)
 	{
-		if (m_msg_text_list2[i] != 0)
-			m_msg_text_list2[i].reset();
+		if (on_game()->m_msg_text_list2[i] != 0)
+			on_game()->m_msg_text_list2[i].reset();
 	}
 
 	std::string fileName = std::format("contents/contents{}.txt", type);
@@ -3801,7 +2536,7 @@ int CGame::load_text_dlg_contents2(int type)
 	{
 		if (!line.empty())
 		{
-			m_msg_text_list2[index] = std::make_unique<CMsg>(0, line.c_str(), 0);
+			on_game()->m_msg_text_list2[index] = std::make_unique<CMsg>(0, line.c_str(), 0);
 			index++;
 		}
 	}
@@ -3846,7 +2581,12 @@ void CGame::load_game_msg_text_contents()
 
 void CGame::request_map_status(const char* map_name, int mode)
 {
-	send_command(MsgId::CommandCommon, CommonType::RequestMapStatus, 0, mode, 0, 0, map_name);
+	{
+		auto pkt = hb::net::make_common_command_str(CommonType::RequestMapStatus, m_player->m_player_x, m_player->m_player_y);
+		pkt.v1 = mode;
+		std::snprintf(pkt.text, sizeof(pkt.text), "%s", map_name);
+		send_game_packet(pkt);
+	}
 }
 
 void CGame::add_map_status_info(const char* data, bool is_last_data)
@@ -3866,10 +2606,10 @@ void CGame::add_map_status_info(const char* data, bool is_last_data)
 	const auto* entries = reinterpret_cast<const hb::net::PacketNotifyMapStatusEntry*>(header + 1);
 
 	for (i = 1; i <= total; i++) {
-		m_crusade_structure_info[index].type = entries->type;
-		m_crusade_structure_info[index].x = entries->x;
-		m_crusade_structure_info[index].y = entries->y;
-		m_crusade_structure_info[index].side = entries->side;
+		on_game()->m_crusade_structure_info[index].type = entries->type;
+		on_game()->m_crusade_structure_info[index].x = entries->x;
+		on_game()->m_crusade_structure_info[index].y = entries->y;
+		on_game()->m_crusade_structure_info[index].side = entries->side;
 		entries++;
 
 		index++;
@@ -3877,10 +2617,10 @@ void CGame::add_map_status_info(const char* data, bool is_last_data)
 
 	if (is_last_data == true) {
 		while (index < hb::shared::limits::MaxCrusadeStructures) {
-			m_crusade_structure_info[index].type = 0;
-			m_crusade_structure_info[index].x = 0;
-			m_crusade_structure_info[index].y = 0;
-			m_crusade_structure_info[index].side = 0;
+			on_game()->m_crusade_structure_info[index].type = 0;
+			on_game()->m_crusade_structure_info[index].x = 0;
+			on_game()->m_crusade_structure_info[index].y = 0;
+			on_game()->m_crusade_structure_info[index].side = 0;
 			index++;
 		}
 	}
@@ -3900,6 +2640,8 @@ void CGame::draw_new_dialog_box(char type, int sX, int sY, int frame, bool is_no
 
 void CGame::set_camera_shaking_effect(short dist, int mul)
 {
+	if (config_manager::get().is_reduced_motion_enabled()) return;
+
 	int degree = 5 - dist;
 	if (degree <= 0) degree = 0;
 	degree *= 2;
@@ -3929,33 +2671,17 @@ void CGame::meteor_strike_coming(int code)
 	}
 }
 
-void CGame::draw_object_foe(int ix, int iy, int frame)
-{
-	if (IsHostile(m_entity_state.m_status.relationship)) // red crusade circle
-	{
-		if (frame <= 4) m_effect_sprites[38]->draw(ix, iy, frame, hb::shared::sprite::DrawParams::alpha_blend(0.5f));
-	}
-}
+// draw_object_foe REMOVED — moved to Screen_OnGame
 
 void CGame::set_top_msg(const char* string, unsigned char last_sec)
 {
-	m_top_msg = string;
+	on_game()->m_top_msg = string;
 
-	m_top_msg_last_sec = last_sec;
-	m_top_msg_time = GameClock::get_time_ms();
+	on_game()->m_top_msg_last_sec = last_sec;
+	on_game()->m_top_msg_time = GameClock::get_time_ms();
 }
 
-void CGame::draw_top_msg()
-{
-	if (m_top_msg.size() == 0) return;
-	m_Renderer->draw_rect_filled(0, 0, LOGICAL_MAX_X(), 30, hb::shared::render::Color::Black(128));
-
-	if ((((GameClock::get_time_ms() - m_top_msg_time) / 250) % 2) == 0)
-		hb::shared::text::draw_text_aligned(GameFont::Default, 0, 10, LOGICAL_MAX_X(), 15, m_top_msg.c_str(), hb::shared::text::TextStyle::from_color(GameColors::UITopMsgYellow), hb::shared::text::Align::TopCenter);
-
-	if (GameClock::get_time_ms() > (m_top_msg_last_sec * 1000 + m_top_msg_time)) {
-	}
-}
+// draw_top_msg moved to Screen_OnGame.DrawObjects.cpp
 
 void CGame::cannot_construct(int code)
 {
@@ -3980,7 +2706,26 @@ void CGame::cannot_construct(int code)
 	}
 }
 
-std::string CGame::format_comma_number(uint32_t value)
+DialogBoxManager& CGame::get_dialog_box_manager()
+{
+	auto* screen = get_active_screen_as<Screen_OnGame>();
+	return screen->get_dialog_box_manager();
+}
+
+floating_text_manager& CGame::get_floating_text()
+{
+	auto* screen = get_active_screen_as<Screen_OnGame>();
+	return screen->get_floating_text();
+}
+
+void CGame::connect_to_game_server()
+{
+	m_g_sock = std::make_unique<hb::shared::net::ASIOSocket>(m_io_pool->get_context(), game_limits::socket_block_limit);
+	m_g_sock->connect(m_log_server_addr.c_str(), m_game_server_port);
+	m_g_sock->init_buffer_size(hb::shared::limits::MsgBufferSize);
+}
+
+std::string CGame::format_comma_number(uint64_t value)
 {
 	auto numStr = std::format("{}", value);
 #ifdef DEF_COMMA_GOLD
@@ -4002,73 +2747,73 @@ std::string CGame::format_comma_number(uint32_t value)
 void CGame::crusade_contribution_result(int war_contribution)
 {
 	char temp[120]{};
-	m_dialog_box_manager.disable_dialog_box(DialogBoxId::Text);
+	get_dialog_box_manager().disable_dialog_box(DialogBoxId::Text);
 	for (int i = 0; i < game_limits::max_text_dlg_lines; i++)
 	{
-		if (m_msg_text_list[i] != 0)
-			m_msg_text_list[i].reset();
+		if (on_game()->m_msg_text_list[i] != 0)
+			on_game()->m_msg_text_list[i].reset();
 	}
 	if (war_contribution > 0)
 	{
-		play_game_sound('E', 23, 0, 0);
-		play_game_sound('C', 21, 0, 0);
-		play_game_sound('C', 22, 0, 0);
-		m_msg_text_list[0] = std::make_unique<CMsg>(0, m_game_msg_list[22]->m_pMsg, 0); // Congratulations! Your nation
-		m_msg_text_list[1] = std::make_unique<CMsg>(0, m_game_msg_list[23]->m_pMsg, 0); // was victory in the battle!
-		m_msg_text_list[2] = std::make_unique<CMsg>(0, " ", 0);
-		m_msg_text_list[3] = std::make_unique<CMsg>(0, m_game_msg_list[24]->m_pMsg, 0); // As a victorious citizen
-		m_msg_text_list[4] = std::make_unique<CMsg>(0, m_game_msg_list[25]->m_pMsg, 0); // You will receive
-		m_msg_text_list[5] = std::make_unique<CMsg>(0, m_game_msg_list[26]->m_pMsg, 0); // a prize
-		m_msg_text_list[6] = std::make_unique<CMsg>(0, " ", 0);
-		m_msg_text_list[7] = std::make_unique<CMsg>(0, m_game_msg_list[27]->m_pMsg, 0); // Experience point of the battle contribution:
+		audio_manager::get().play_game_sound(sound_type::effect, 23, 0, 0);
+		audio_manager::get().play_game_sound(sound_type::character, 21, 0, 0);
+		audio_manager::get().play_game_sound(sound_type::character, 22, 0, 0);
+		on_game()->m_msg_text_list[0] = std::make_unique<CMsg>(0, m_game_msg_list[22]->m_pMsg, 0); // Congratulations! Your nation
+		on_game()->m_msg_text_list[1] = std::make_unique<CMsg>(0, m_game_msg_list[23]->m_pMsg, 0); // was victory in the battle!
+		on_game()->m_msg_text_list[2] = std::make_unique<CMsg>(0, " ", 0);
+		on_game()->m_msg_text_list[3] = std::make_unique<CMsg>(0, m_game_msg_list[24]->m_pMsg, 0); // As a victorious citizen
+		on_game()->m_msg_text_list[4] = std::make_unique<CMsg>(0, m_game_msg_list[25]->m_pMsg, 0); // You will receive
+		on_game()->m_msg_text_list[5] = std::make_unique<CMsg>(0, m_game_msg_list[26]->m_pMsg, 0); // a prize
+		on_game()->m_msg_text_list[6] = std::make_unique<CMsg>(0, " ", 0);
+		on_game()->m_msg_text_list[7] = std::make_unique<CMsg>(0, m_game_msg_list[27]->m_pMsg, 0); // Experience point of the battle contribution:
 		std::snprintf(temp, sizeof(temp), "+%d exp Points!", war_contribution);
-		m_msg_text_list[8] = std::make_unique<CMsg>(0, temp, 0);
+		on_game()->m_msg_text_list[8] = std::make_unique<CMsg>(0, temp, 0);
 		for (int i = 9; i < 18; i++)
-			m_msg_text_list[i] = std::make_unique<CMsg>(0, " ", 0);
+			on_game()->m_msg_text_list[i] = std::make_unique<CMsg>(0, " ", 0);
 
 	}
 	else if (war_contribution < 0)
 	{
-		play_game_sound('E', 24, 0, 0);
-		play_game_sound('C', 12, 0, 0);
-		play_game_sound('C', 13, 0, 0);
-		m_msg_text_list[0] = std::make_unique<CMsg>(0, m_game_msg_list[28]->m_pMsg, 0); // Unfortunately! Your country
-		m_msg_text_list[1] = std::make_unique<CMsg>(0, m_game_msg_list[29]->m_pMsg, 0); // have lost the all out war.
-		m_msg_text_list[2] = std::make_unique<CMsg>(0, " ", 0);
-		m_msg_text_list[3] = std::make_unique<CMsg>(0, m_game_msg_list[30]->m_pMsg, 0); // As a losser citizen;
-		m_msg_text_list[4] = std::make_unique<CMsg>(0, m_game_msg_list[31]->m_pMsg, 0); // the prize that accomplishes
-		m_msg_text_list[5] = std::make_unique<CMsg>(0, m_game_msg_list[32]->m_pMsg, 0); // will not be given.
-		m_msg_text_list[6] = std::make_unique<CMsg>(0, " ", 0);
-		m_msg_text_list[7] = std::make_unique<CMsg>(0, m_game_msg_list[33]->m_pMsg, 0); // I hope you to win
-		m_msg_text_list[8] = std::make_unique<CMsg>(0, m_game_msg_list[34]->m_pMsg, 0); // in the next battle
+		audio_manager::get().play_game_sound(sound_type::effect, 24, 0, 0);
+		audio_manager::get().play_game_sound(sound_type::character, 12, 0, 0);
+		audio_manager::get().play_game_sound(sound_type::character, 13, 0, 0);
+		on_game()->m_msg_text_list[0] = std::make_unique<CMsg>(0, m_game_msg_list[28]->m_pMsg, 0); // Unfortunately! Your country
+		on_game()->m_msg_text_list[1] = std::make_unique<CMsg>(0, m_game_msg_list[29]->m_pMsg, 0); // have lost the all out war.
+		on_game()->m_msg_text_list[2] = std::make_unique<CMsg>(0, " ", 0);
+		on_game()->m_msg_text_list[3] = std::make_unique<CMsg>(0, m_game_msg_list[30]->m_pMsg, 0); // As a losser citizen;
+		on_game()->m_msg_text_list[4] = std::make_unique<CMsg>(0, m_game_msg_list[31]->m_pMsg, 0); // the prize that accomplishes
+		on_game()->m_msg_text_list[5] = std::make_unique<CMsg>(0, m_game_msg_list[32]->m_pMsg, 0); // will not be given.
+		on_game()->m_msg_text_list[6] = std::make_unique<CMsg>(0, " ", 0);
+		on_game()->m_msg_text_list[7] = std::make_unique<CMsg>(0, m_game_msg_list[33]->m_pMsg, 0); // I hope you to win
+		on_game()->m_msg_text_list[8] = std::make_unique<CMsg>(0, m_game_msg_list[34]->m_pMsg, 0); // in the next battle
 		for (int i = 9; i < 18; i++)
-			m_msg_text_list[i] = std::make_unique<CMsg>(0, " ", 0);
+			on_game()->m_msg_text_list[i] = std::make_unique<CMsg>(0, " ", 0);
 	}
 	else if (war_contribution == 0)
 	{
-		play_game_sound('E', 25, 0, 0);
-		m_msg_text_list[0] = std::make_unique<CMsg>(0, m_game_msg_list[50]->m_pMsg, 0); // The battle that you have participated
-		m_msg_text_list[1] = std::make_unique<CMsg>(0, m_game_msg_list[51]->m_pMsg, 0); // is already finished;
-		m_msg_text_list[2] = std::make_unique<CMsg>(0, m_game_msg_list[52]->m_pMsg, 0); //
-		m_msg_text_list[3] = std::make_unique<CMsg>(0, " ", 0);
-		m_msg_text_list[4] = std::make_unique<CMsg>(0, m_game_msg_list[53]->m_pMsg, 0); // You must connect after finishing
-		m_msg_text_list[5] = std::make_unique<CMsg>(0, m_game_msg_list[54]->m_pMsg, 0); // the previous and before starting
-		m_msg_text_list[6] = std::make_unique<CMsg>(0, m_game_msg_list[55]->m_pMsg, 0); // the next battle so you can receive
-		m_msg_text_list[7] = std::make_unique<CMsg>(0, m_game_msg_list[56]->m_pMsg, 0); // the prize
+		audio_manager::get().play_game_sound(sound_type::effect, 25, 0, 0);
+		on_game()->m_msg_text_list[0] = std::make_unique<CMsg>(0, m_game_msg_list[50]->m_pMsg, 0); // The battle that you have participated
+		on_game()->m_msg_text_list[1] = std::make_unique<CMsg>(0, m_game_msg_list[51]->m_pMsg, 0); // is already finished;
+		on_game()->m_msg_text_list[2] = std::make_unique<CMsg>(0, m_game_msg_list[52]->m_pMsg, 0); //
+		on_game()->m_msg_text_list[3] = std::make_unique<CMsg>(0, " ", 0);
+		on_game()->m_msg_text_list[4] = std::make_unique<CMsg>(0, m_game_msg_list[53]->m_pMsg, 0); // You must connect after finishing
+		on_game()->m_msg_text_list[5] = std::make_unique<CMsg>(0, m_game_msg_list[54]->m_pMsg, 0); // the previous and before starting
+		on_game()->m_msg_text_list[6] = std::make_unique<CMsg>(0, m_game_msg_list[55]->m_pMsg, 0); // the next battle so you can receive
+		on_game()->m_msg_text_list[7] = std::make_unique<CMsg>(0, m_game_msg_list[56]->m_pMsg, 0); // the prize
 		for (int i = 8; i < 18; i++)
-			m_msg_text_list[i] = std::make_unique<CMsg>(0, " ", 0);
+			on_game()->m_msg_text_list[i] = std::make_unique<CMsg>(0, " ", 0);
 	}
-	m_dialog_box_manager.enable_dialog_box(DialogBoxId::Text, 0, 0, 0);
+	get_dialog_box_manager().enable_dialog_box(DialogBoxId::Text, 0, 0, 0);
 }
 
 void CGame::crusade_war_result(int winner_side)
 {
 	int player_side = 0;
-	m_dialog_box_manager.disable_dialog_box(DialogBoxId::Text);
+	get_dialog_box_manager().disable_dialog_box(DialogBoxId::Text);
 	for (int i = 0; i < game_limits::max_text_dlg_lines; i++)
 	{
-		if (m_msg_text_list[i] != 0)
-			m_msg_text_list[i].reset();
+		if (on_game()->m_msg_text_list[i] != 0)
+			on_game()->m_msg_text_list[i].reset();
 	}
 	if (m_player->m_citizen == false) player_side = 0;
 	else if (m_player->m_aresden == true) player_side = 1;
@@ -4077,110 +2822,108 @@ void CGame::crusade_war_result(int winner_side)
 	{
 		switch (winner_side) {
 		case 0:
-			play_game_sound('E', 25, 0, 0);
-			m_msg_text_list[0] = std::make_unique<CMsg>(0, m_game_msg_list[35]->m_pMsg, 0); // All out war finished!
-			m_msg_text_list[1] = std::make_unique<CMsg>(0, m_game_msg_list[36]->m_pMsg, 0); // There was a draw in the
-			m_msg_text_list[2] = std::make_unique<CMsg>(0, m_game_msg_list[37]->m_pMsg, 0); // battle
-			m_msg_text_list[3] = std::make_unique<CMsg>(0, " ", 0);
+			audio_manager::get().play_game_sound(sound_type::effect, 25, 0, 0);
+			on_game()->m_msg_text_list[0] = std::make_unique<CMsg>(0, m_game_msg_list[35]->m_pMsg, 0); // All out war finished!
+			on_game()->m_msg_text_list[1] = std::make_unique<CMsg>(0, m_game_msg_list[36]->m_pMsg, 0); // There was a draw in the
+			on_game()->m_msg_text_list[2] = std::make_unique<CMsg>(0, m_game_msg_list[37]->m_pMsg, 0); // battle
+			on_game()->m_msg_text_list[3] = std::make_unique<CMsg>(0, " ", 0);
 			break;
 		case 1:
-			play_game_sound('E', 25, 0, 0);
-			m_msg_text_list[0] = std::make_unique<CMsg>(0, m_game_msg_list[35]->m_pMsg, 0); // All out war finished!
-			m_msg_text_list[1] = std::make_unique<CMsg>(0, m_game_msg_list[38]->m_pMsg, 0); // Aresden was victorious
-			m_msg_text_list[2] = std::make_unique<CMsg>(0, m_game_msg_list[39]->m_pMsg, 0); // and put an end to the war
-			m_msg_text_list[3] = std::make_unique<CMsg>(0, " ", 0);
+			audio_manager::get().play_game_sound(sound_type::effect, 25, 0, 0);
+			on_game()->m_msg_text_list[0] = std::make_unique<CMsg>(0, m_game_msg_list[35]->m_pMsg, 0); // All out war finished!
+			on_game()->m_msg_text_list[1] = std::make_unique<CMsg>(0, m_game_msg_list[38]->m_pMsg, 0); // Aresden was victorious
+			on_game()->m_msg_text_list[2] = std::make_unique<CMsg>(0, m_game_msg_list[39]->m_pMsg, 0); // and put an end to the war
+			on_game()->m_msg_text_list[3] = std::make_unique<CMsg>(0, " ", 0);
 			break;
 		case 2:
-			play_game_sound('E', 25, 0, 0);
-			m_msg_text_list[0] = std::make_unique<CMsg>(0, m_game_msg_list[35]->m_pMsg, 0); // All out war finished!
-			m_msg_text_list[1] = std::make_unique<CMsg>(0, m_game_msg_list[40]->m_pMsg, 0); // Elvine was victorious
-			m_msg_text_list[2] = std::make_unique<CMsg>(0, m_game_msg_list[41]->m_pMsg, 0); // and put an end to the war
-			m_msg_text_list[3] = std::make_unique<CMsg>(0, " ", 0);
+			audio_manager::get().play_game_sound(sound_type::effect, 25, 0, 0);
+			on_game()->m_msg_text_list[0] = std::make_unique<CMsg>(0, m_game_msg_list[35]->m_pMsg, 0); // All out war finished!
+			on_game()->m_msg_text_list[1] = std::make_unique<CMsg>(0, m_game_msg_list[40]->m_pMsg, 0); // Elvine was victorious
+			on_game()->m_msg_text_list[2] = std::make_unique<CMsg>(0, m_game_msg_list[41]->m_pMsg, 0); // and put an end to the war
+			on_game()->m_msg_text_list[3] = std::make_unique<CMsg>(0, " ", 0);
 			break;
 		}
 		for (int i = 4; i < 18; i++)
-			m_msg_text_list[i] = std::make_unique<CMsg>(0, " ", 0);
+			on_game()->m_msg_text_list[i] = std::make_unique<CMsg>(0, " ", 0);
 	}
 	else
 	{
 		if (winner_side == 0)
 		{
-			play_game_sound('E', 25, 0, 0);
-			m_msg_text_list[0] = std::make_unique<CMsg>(0, m_game_msg_list[35]->m_pMsg, 0); // All out war finished!
-			m_msg_text_list[1] = std::make_unique<CMsg>(0, m_game_msg_list[36]->m_pMsg, 0); // There was a draw in the
-			m_msg_text_list[2] = std::make_unique<CMsg>(0, m_game_msg_list[37]->m_pMsg, 0); // battle
-			m_msg_text_list[3] = std::make_unique<CMsg>(0, " ", 0);
+			audio_manager::get().play_game_sound(sound_type::effect, 25, 0, 0);
+			on_game()->m_msg_text_list[0] = std::make_unique<CMsg>(0, m_game_msg_list[35]->m_pMsg, 0); // All out war finished!
+			on_game()->m_msg_text_list[1] = std::make_unique<CMsg>(0, m_game_msg_list[36]->m_pMsg, 0); // There was a draw in the
+			on_game()->m_msg_text_list[2] = std::make_unique<CMsg>(0, m_game_msg_list[37]->m_pMsg, 0); // battle
+			on_game()->m_msg_text_list[3] = std::make_unique<CMsg>(0, " ", 0);
 			for (int i = 4; i < 18; i++)
-				m_msg_text_list[i] = std::make_unique<CMsg>(0, " ", 0);
+				on_game()->m_msg_text_list[i] = std::make_unique<CMsg>(0, " ", 0);
 		}
 		else
 		{
 			if (winner_side == player_side)
 			{
-				play_game_sound('E', 23, 0, 0);
-				play_game_sound('C', 21, 0, 0);
-				play_game_sound('C', 22, 0, 0);
+				audio_manager::get().play_game_sound(sound_type::effect, 23, 0, 0);
+				audio_manager::get().play_game_sound(sound_type::character, 21, 0, 0);
+				audio_manager::get().play_game_sound(sound_type::character, 22, 0, 0);
 				switch (winner_side) {
 				case 1:
-					m_msg_text_list[0] = std::make_unique<CMsg>(0, m_game_msg_list[35]->m_pMsg, 0); // All out war finished!;
-					m_msg_text_list[1] = std::make_unique<CMsg>(0, m_game_msg_list[38]->m_pMsg, 0); // Aresden was victorious;
-					m_msg_text_list[2] = std::make_unique<CMsg>(0, m_game_msg_list[39]->m_pMsg, 0); // and put an end to the war
-					m_msg_text_list[3] = std::make_unique<CMsg>(0, " ", 0);
-					m_msg_text_list[4] = std::make_unique<CMsg>(0, m_game_msg_list[42]->m_pMsg, 0); // Congratulations!
-					m_msg_text_list[5] = std::make_unique<CMsg>(0, m_game_msg_list[43]->m_pMsg, 0); // As a victorious citizen
-					m_msg_text_list[6] = std::make_unique<CMsg>(0, m_game_msg_list[44]->m_pMsg, 0); // You will receive
-					m_msg_text_list[7] = std::make_unique<CMsg>(0, m_game_msg_list[45]->m_pMsg, 0); // a prize
+					on_game()->m_msg_text_list[0] = std::make_unique<CMsg>(0, m_game_msg_list[35]->m_pMsg, 0); // All out war finished!;
+					on_game()->m_msg_text_list[1] = std::make_unique<CMsg>(0, m_game_msg_list[38]->m_pMsg, 0); // Aresden was victorious;
+					on_game()->m_msg_text_list[2] = std::make_unique<CMsg>(0, m_game_msg_list[39]->m_pMsg, 0); // and put an end to the war
+					on_game()->m_msg_text_list[3] = std::make_unique<CMsg>(0, " ", 0);
+					on_game()->m_msg_text_list[4] = std::make_unique<CMsg>(0, m_game_msg_list[42]->m_pMsg, 0); // Congratulations!
+					on_game()->m_msg_text_list[5] = std::make_unique<CMsg>(0, m_game_msg_list[43]->m_pMsg, 0); // As a victorious citizen
+					on_game()->m_msg_text_list[6] = std::make_unique<CMsg>(0, m_game_msg_list[44]->m_pMsg, 0); // You will receive
+					on_game()->m_msg_text_list[7] = std::make_unique<CMsg>(0, m_game_msg_list[45]->m_pMsg, 0); // a prize
 					break;
 				case 2:
-					m_msg_text_list[0] = std::make_unique<CMsg>(0, m_game_msg_list[35]->m_pMsg, 0); // All out war finished!
-					m_msg_text_list[1] = std::make_unique<CMsg>(0, m_game_msg_list[40]->m_pMsg, 0); // Elvine was victorious
-					m_msg_text_list[2] = std::make_unique<CMsg>(0, m_game_msg_list[41]->m_pMsg, 0); // and put an end to the war
-					m_msg_text_list[3] = std::make_unique<CMsg>(0, " ", 0);
-					m_msg_text_list[4] = std::make_unique<CMsg>(0, m_game_msg_list[42]->m_pMsg, 0); // Congratulations!
-					m_msg_text_list[5] = std::make_unique<CMsg>(0, m_game_msg_list[43]->m_pMsg, 0); // As a victorious citizen
-					m_msg_text_list[6] = std::make_unique<CMsg>(0, m_game_msg_list[44]->m_pMsg, 0); // You will receive
-					m_msg_text_list[7] = std::make_unique<CMsg>(0, m_game_msg_list[45]->m_pMsg, 0); // a prize
+					on_game()->m_msg_text_list[0] = std::make_unique<CMsg>(0, m_game_msg_list[35]->m_pMsg, 0); // All out war finished!
+					on_game()->m_msg_text_list[1] = std::make_unique<CMsg>(0, m_game_msg_list[40]->m_pMsg, 0); // Elvine was victorious
+					on_game()->m_msg_text_list[2] = std::make_unique<CMsg>(0, m_game_msg_list[41]->m_pMsg, 0); // and put an end to the war
+					on_game()->m_msg_text_list[3] = std::make_unique<CMsg>(0, " ", 0);
+					on_game()->m_msg_text_list[4] = std::make_unique<CMsg>(0, m_game_msg_list[42]->m_pMsg, 0); // Congratulations!
+					on_game()->m_msg_text_list[5] = std::make_unique<CMsg>(0, m_game_msg_list[43]->m_pMsg, 0); // As a victorious citizen
+					on_game()->m_msg_text_list[6] = std::make_unique<CMsg>(0, m_game_msg_list[44]->m_pMsg, 0); // You will receive
+					on_game()->m_msg_text_list[7] = std::make_unique<CMsg>(0, m_game_msg_list[45]->m_pMsg, 0); // a prize
 					break;
 				}
 				for (int i = 8; i < 18; i++)
-					m_msg_text_list[i] = std::make_unique<CMsg>(0, " ", 0);
+					on_game()->m_msg_text_list[i] = std::make_unique<CMsg>(0, " ", 0);
 			}
 			else if (winner_side != player_side)
 			{
-				play_game_sound('E', 24, 0, 0);
-				play_game_sound('C', 12, 0, 0);
-				play_game_sound('C', 13, 0, 0);
+				audio_manager::get().play_game_sound(sound_type::effect, 24, 0, 0);
+				audio_manager::get().play_game_sound(sound_type::character, 12, 0, 0);
+				audio_manager::get().play_game_sound(sound_type::character, 13, 0, 0);
 				switch (winner_side) {
 				case 1:
-					m_msg_text_list[0] = std::make_unique<CMsg>(0, m_game_msg_list[35]->m_pMsg, 0); // All out war finished!
-					m_msg_text_list[1] = std::make_unique<CMsg>(0, m_game_msg_list[38]->m_pMsg, 0); // Aresden was victorious;
-					m_msg_text_list[2] = std::make_unique<CMsg>(0, m_game_msg_list[39]->m_pMsg, 0); // and put an end to the war
-					m_msg_text_list[3] = std::make_unique<CMsg>(0, " ", 0);
-					m_msg_text_list[4] = std::make_unique<CMsg>(0, m_game_msg_list[46]->m_pMsg, 0); // Unfortunately,
-					m_msg_text_list[5] = std::make_unique<CMsg>(0, m_game_msg_list[47]->m_pMsg, 0); // As a losser citizen
-					m_msg_text_list[6] = std::make_unique<CMsg>(0, m_game_msg_list[48]->m_pMsg, 0); // the prize that accomplishes
-					m_msg_text_list[7] = std::make_unique<CMsg>(0, m_game_msg_list[49]->m_pMsg, 0); // will not be given.
+					on_game()->m_msg_text_list[0] = std::make_unique<CMsg>(0, m_game_msg_list[35]->m_pMsg, 0); // All out war finished!
+					on_game()->m_msg_text_list[1] = std::make_unique<CMsg>(0, m_game_msg_list[38]->m_pMsg, 0); // Aresden was victorious;
+					on_game()->m_msg_text_list[2] = std::make_unique<CMsg>(0, m_game_msg_list[39]->m_pMsg, 0); // and put an end to the war
+					on_game()->m_msg_text_list[3] = std::make_unique<CMsg>(0, " ", 0);
+					on_game()->m_msg_text_list[4] = std::make_unique<CMsg>(0, m_game_msg_list[46]->m_pMsg, 0); // Unfortunately,
+					on_game()->m_msg_text_list[5] = std::make_unique<CMsg>(0, m_game_msg_list[47]->m_pMsg, 0); // As a losser citizen
+					on_game()->m_msg_text_list[6] = std::make_unique<CMsg>(0, m_game_msg_list[48]->m_pMsg, 0); // the prize that accomplishes
+					on_game()->m_msg_text_list[7] = std::make_unique<CMsg>(0, m_game_msg_list[49]->m_pMsg, 0); // will not be given.
 					break;
 				case 2:
-					m_msg_text_list[0] = std::make_unique<CMsg>(0, m_game_msg_list[35]->m_pMsg, 0); // All out war finished!
-					m_msg_text_list[1] = std::make_unique<CMsg>(0, m_game_msg_list[40]->m_pMsg, 0); // Elvine was victorious
-					m_msg_text_list[2] = std::make_unique<CMsg>(0, m_game_msg_list[41]->m_pMsg, 0); // and put an end to the war
-					m_msg_text_list[3] = std::make_unique<CMsg>(0, " ", 0);
-					m_msg_text_list[4] = std::make_unique<CMsg>(0, m_game_msg_list[46]->m_pMsg, 0); // Unfortunately,
-					m_msg_text_list[5] = std::make_unique<CMsg>(0, m_game_msg_list[47]->m_pMsg, 0); // As a losser citizen
-					m_msg_text_list[6] = std::make_unique<CMsg>(0, m_game_msg_list[48]->m_pMsg, 0); // the prize that accomplishes
-					m_msg_text_list[7] = std::make_unique<CMsg>(0, m_game_msg_list[49]->m_pMsg, 0); // will not be given.
+					on_game()->m_msg_text_list[0] = std::make_unique<CMsg>(0, m_game_msg_list[35]->m_pMsg, 0); // All out war finished!
+					on_game()->m_msg_text_list[1] = std::make_unique<CMsg>(0, m_game_msg_list[40]->m_pMsg, 0); // Elvine was victorious
+					on_game()->m_msg_text_list[2] = std::make_unique<CMsg>(0, m_game_msg_list[41]->m_pMsg, 0); // and put an end to the war
+					on_game()->m_msg_text_list[3] = std::make_unique<CMsg>(0, " ", 0);
+					on_game()->m_msg_text_list[4] = std::make_unique<CMsg>(0, m_game_msg_list[46]->m_pMsg, 0); // Unfortunately,
+					on_game()->m_msg_text_list[5] = std::make_unique<CMsg>(0, m_game_msg_list[47]->m_pMsg, 0); // As a losser citizen
+					on_game()->m_msg_text_list[6] = std::make_unique<CMsg>(0, m_game_msg_list[48]->m_pMsg, 0); // the prize that accomplishes
+					on_game()->m_msg_text_list[7] = std::make_unique<CMsg>(0, m_game_msg_list[49]->m_pMsg, 0); // will not be given.
 					break;
 				}
 				for (int i = 8; i < 18; i++)
-					m_msg_text_list[i] = std::make_unique<CMsg>(0, " ", 0);
+					on_game()->m_msg_text_list[i] = std::make_unique<CMsg>(0, " ", 0);
 			}
 		}
 	}
-	m_dialog_box_manager.enable_dialog_box(DialogBoxId::Text, 0, 0, 0);
-	m_dialog_box_manager.disable_dialog_box(DialogBoxId::CrusadeCommander);
-	m_dialog_box_manager.disable_dialog_box(DialogBoxId::CrusadeConstructor);
-	m_dialog_box_manager.disable_dialog_box(DialogBoxId::CrusadeSoldier);
+	get_dialog_box_manager().enable_dialog_box(DialogBoxId::Text, 0, 0, 0);
+	get_dialog_box_manager().disable_crusade_dialogs();
 }
 
 
@@ -4196,11 +2939,11 @@ void CGame::civil_right_admission_handler(char* data)
 
 	switch (result) {
 	case 0:
-		m_dialog_box_manager.Info(DialogBoxId::CityHallMenu).m_mode = 4;
+		get_dialog_box_manager().get_dialog_as<DialogBox_CityHallMenu>(DialogBoxId::CityHallMenu)->m_mode = DialogBox_CityHallMenu::mode::citizenship_failed;
 		break;
 
 	case 1:
-		m_dialog_box_manager.Info(DialogBoxId::CityHallMenu).m_mode = 3;
+		get_dialog_box_manager().get_dialog_as<DialogBox_CityHallMenu>(DialogBoxId::CityHallMenu)->m_mode = DialogBox_CityHallMenu::mode::citizenship_success;
 		const auto* pkt = hb::net::PacketCast<hb::net::PacketResponseCivilRight>(
 			data, sizeof(hb::net::PacketResponseCivilRight));
 		if (!pkt) return;
@@ -4239,34 +2982,14 @@ void CGame::civil_right_admission_handler(char* data)
 	}
 }
 
-void CGame::play_game_sound(char type, int num, int dist, long lPan)
-{
-	// Forward to audio_manager
-	sound_type snd_type;
-	switch (type)
-	{
-	case 'C':
-		snd_type = sound_type::Character;
-		break;
-	case 'M':
-		snd_type = sound_type::Monster;
-		break;
-	case 'E':
-		snd_type = sound_type::Effect;
-		break;
-	default:
-		return;
-	}
-	audio_manager::get().play_game_sound(snd_type, num, dist, static_cast<int>(lPan));
-}
 
 bool CGame::check_item_by_type(ItemType type)
 {
 	int i;
 
 	for (i = 0; i < hb::shared::limits::MaxItems; i++)
-		if (m_item_list[i] != 0) {
-			CItem* cfg = get_item_config(m_item_list[i]->m_id_num);
+		if (m_player->m_item_list[i] != 0) {
+			CItem* cfg = get_item_config(m_player->m_item_list[i]->m_id_num);
 			if (cfg && cfg->get_item_type() == type) return true;
 		}
 
@@ -4299,24 +3022,23 @@ void CGame::dynamic_object_handler(char* data)
 bool CGame::is_item_on_hand() // Snoopy: Fixed to remove ShieldCast
 {
 	int i;
-	uint16_t weapon_type;
 	for (i = 0; i < hb::shared::limits::MaxItems; i++)
-		if ((m_item_list[i] != 0) && (m_is_item_equipped[i] == true))
+		if ((m_player->m_item_list[i] != 0) && (m_is_item_equipped[i] == true))
 		{
-			CItem* cfg = get_item_config(m_item_list[i]->m_id_num);
+			CItem* cfg = get_item_config(m_player->m_item_list[i]->m_id_num);
 			if (cfg && ((cfg->get_equip_pos() == EquipPos::LeftHand)
 				|| (cfg->get_equip_pos() == EquipPos::TwoHand)))
 				return true;
 		}
 	for (i = 0; i < hb::shared::limits::MaxItems; i++)
-		if ((m_item_list[i] != 0) && (m_is_item_equipped[i] == true))
+		if ((m_player->m_item_list[i] != 0) && (m_is_item_equipped[i] == true))
 		{
-			CItem* cfg = get_item_config(m_item_list[i]->m_id_num);
+			CItem* cfg = get_item_config(m_player->m_item_list[i]->m_id_num);
 			if (cfg && cfg->get_equip_pos() == EquipPos::RightHand)
 			{
-				weapon_type = m_player->m_playerAppearance.weapon_type;
-				// Snoopy 34 for all wands.
-				if ((weapon_type >= 34) && (weapon_type < 40)) return false;
+				// Wands (appearance_value 34-39) don't count as "item on hand" for combat
+				uint8_t appr_val = static_cast<uint8_t>(cfg->m_appearance_value);
+				if ((appr_val >= 34) && (appr_val < 40)) return false;
 				else return true;
 			}
 		}
@@ -4325,7 +3047,7 @@ bool CGame::is_item_on_hand() // Snoopy: Fixed to remove ShieldCast
 
 uint32_t CGame::get_level_exp(int level)
 {
-	return hb::shared::calc::CalculateLevelExp(level);
+	return hb::shared::calc::level_exp(m_formula_engine, hb::shared::calc::level{(double)level});
 }
 
 bool CGame::check_ex_id(const char* name)
@@ -4387,6 +3109,56 @@ CItem* CGame::get_item_config(int item_id) const
 	return m_item_config_list[item_id].get();
 }
 
+item_draw_ref CGame::get_item_draw(int16_t display_id, int atlas_type, bool is_female)
+{
+	if (display_id >= 0)
+	{
+		const auto* entry = item_sprite_manager::get().find(display_id);
+		if (entry != nullptr)
+		{
+			auto* atlas_spr = m_item_sprites.get(static_cast<size_t>(atlas_type));
+			if (atlas_spr != nullptr)
+			{
+				int16_t frame = 0;
+				if (entry->is_equippable)
+				{
+					const auto& gd = is_female ? entry->female : entry->male;
+					switch (atlas_type)
+					{
+					case item_atlas::equip:  frame = gd.equip_frame;  break;
+					case item_atlas::ground: frame = gd.ground_frame; break;
+					case item_atlas::pack:   frame = gd.pack_frame;   break;
+					}
+				}
+				else
+				{
+					// Non-equippable items (accessories, potions, etc.) have no equip
+					// sprite — redirect equip requests to the pack atlas instead.
+					if (atlas_type == item_atlas::equip)
+						atlas_spr = m_item_sprites.get(static_cast<size_t>(item_atlas::pack));
+
+					switch (atlas_type)
+					{
+					case item_atlas::ground: frame = entry->ground_frame;    break;
+					default:                 frame = entry->inventory_frame; break;
+					}
+				}
+				item_draw_ref ref;
+				ref.sprite = atlas_spr;
+				ref.frame = frame;
+				return ref;
+			}
+		}
+	}
+
+	// No atlas entry — return null sprite
+	hb::logger::warn("get_item_draw: unmapped display_id={} atlas_type={}", display_id, atlas_type);
+	item_draw_ref ref;
+	ref.sprite = hb::shared::sprite::GetNullSprite();
+	ref.frame = 0;
+	return ref;
+}
+
 bool CGame::ensure_config_loaded(int type)
 {
 	// Fast path: check if a representative config entry exists
@@ -4404,6 +3176,9 @@ bool CGame::ensure_config_loaded(int type)
 	case 3: // Npcs
 		for (int i = 0; i < hb::shared::limits::MaxNpcConfigs; i++) { if (m_npc_config_list[i].valid) { loaded = true; break; } }
 		break;
+	case 4: // Maps
+		loaded = !m_map_display_names.empty();
+		break;
 	}
 
 	if (loaded) {
@@ -4411,7 +3186,7 @@ bool CGame::ensure_config_loaded(int type)
 		return true;
 	}
 
-	const char* configNames[] = { "ITEMCFG", "MAGICCFG", "SKILLCFG", "NPCCFG" };
+	const char* configNames[] = { "ITEMCFG", "MAGICCFG", "SKILLCFG", "NPCCFG", "MAPCFG" };
 
 	switch (m_config_retry[type]) {
 	case ConfigRetryLevel::None:
@@ -4422,7 +3197,7 @@ bool CGame::ensure_config_loaded(int type)
 		return false;
 
 	case ConfigRetryLevel::CacheTried:
-		request_configs_from_server(type == 0, type == 1, type == 2, type == 3);
+		request_configs_from_server(type == 0, type == 1, type == 2, type == 3, type == 4);
 		m_config_retry[type] = ConfigRetryLevel::ServerRequested;
 		m_config_request_time = GameClock::get_time_ms();
 		return false;
@@ -4451,28 +3226,33 @@ bool CGame::try_replay_cache_for_config(int type)
 	case 0:
 		return LocalCacheManager::get().replay_from_cache(cacheType,
 			[](char* p, uint32_t s, void* c) -> bool {
-				return static_cast<ReplayCtx*>(c)->game->decode_item_config_file_contents(p, s);
+				return static_cast<ReplayCtx*>(c)->game->cache_process_item_config(p, s);
 			}, &ctx);
 	case 1:
 		return LocalCacheManager::get().replay_from_cache(cacheType,
 			[](char* p, uint32_t s, void* c) -> bool {
-				return static_cast<ReplayCtx*>(c)->game->decode_magic_config_file_contents(p, s);
+				return static_cast<ReplayCtx*>(c)->game->cache_process_magic_config(p, s);
 			}, &ctx);
 	case 2:
 		return LocalCacheManager::get().replay_from_cache(cacheType,
 			[](char* p, uint32_t s, void* c) -> bool {
-				return static_cast<ReplayCtx*>(c)->game->decode_skill_config_file_contents(p, s);
+				return static_cast<ReplayCtx*>(c)->game->cache_process_skill_config(p, s);
 			}, &ctx);
 	case 3:
 		return LocalCacheManager::get().replay_from_cache(cacheType,
 			[](char* p, uint32_t s, void* c) -> bool {
-				return static_cast<ReplayCtx*>(c)->game->decode_npc_config_file_contents(p, s);
+				return static_cast<ReplayCtx*>(c)->game->cache_process_npc_config(p, s);
+			}, &ctx);
+	case 4:
+		return LocalCacheManager::get().replay_from_cache(cacheType,
+			[](char* p, uint32_t s, void* c) -> bool {
+				return static_cast<ReplayCtx*>(c)->game->cache_process_map_config(p, s);
 			}, &ctx);
 	}
 	return false;
 }
 
-void CGame::request_configs_from_server(bool items, bool magic, bool skills, bool npcs)
+void CGame::request_configs_from_server(bool items, bool magic, bool skills, bool npcs, bool maps, bool balance)
 {
 	if (!m_g_sock) return;
 	hb::net::PacketRequestConfigData pkt{};
@@ -4482,6 +3262,8 @@ void CGame::request_configs_from_server(bool items, bool magic, bool skills, boo
 	pkt.requestMagic = magic ? 1 : 0;
 	pkt.requestSkills = skills ? 1 : 0;
 	pkt.requestNpcs = npcs ? 1 : 0;
+	pkt.requestMaps = maps ? 1 : 0;
+	pkt.requestBalance = balance ? 1 : 0;
 	m_g_sock->send_msg(reinterpret_cast<char*>(&pkt), sizeof(pkt));
 }
 
@@ -4489,18 +3271,18 @@ void CGame::check_configs_ready_and_enter_game()
 {
 	if (m_configs_ready) return;
 
-	// Check if all four config types have at least one entry loaded
+	// Check if all five config types have at least one entry loaded
 	bool has_items = false, has_magic = false, has_skills = false, has_npcs = false;
 	for (int i = 1; i < 5000; i++) { if (m_item_config_list[i]) { has_items = true; break; } }
 	for (int i = 0; i < hb::shared::limits::MaxMagicType; i++) { if (m_magic_cfg_list[i]) { has_magic = true; break; } }
 	for (int i = 0; i < hb::shared::limits::MaxSkillType; i++) { if (m_skill_cfg_list[i]) { has_skills = true; break; } }
 	for (int i = 0; i < hb::shared::limits::MaxNpcConfigs; i++) { if (m_npc_config_list[i].valid) { has_npcs = true; break; } }
+	bool has_maps = !m_map_display_names.empty();
 
-	if (has_items && has_magic && has_skills && has_npcs) {
+	if (has_items && has_magic && has_skills && has_npcs && has_maps) {
 		m_configs_ready = true;
 		if (m_init_data_ready) {
-			GameModeManager::set_screen<Screen_OnGame>();
-			m_init_data_ready = false;
+			GameModeManager::clear_overlay();
 		}
 	}
 }
@@ -4533,53 +3315,54 @@ void CGame::noticement_handler(char* data)
 			if (!file) return;
 			file << pkt->text;
 		}
-		m_dialog_box_manager.Info(DialogBoxId::Text).m_x = 20;
-		m_dialog_box_manager.Info(DialogBoxId::Text).m_y = 65;
-		m_dialog_box_manager.enable_dialog_box(DialogBoxId::Text, 1000, 0, 0);
+		get_dialog_box_manager().get_dialog_box(DialogBoxId::Text)->m_x = 20;
+		get_dialog_box_manager().get_dialog_box(DialogBoxId::Text)->m_y = 65;
+		get_dialog_box_manager().enable_dialog_box(DialogBoxId::Text, 1000, 0, 0);
 		break;
 	}
 	add_event_list("Press F1 for news and help.", 10);
-	m_dialog_box_manager.enable_dialog_box(DialogBoxId::Help, 0, 0, 0);
+	get_dialog_box_manager().enable_dialog_box(DialogBoxId::Help, 0, 0, 0);
 }
 
 void CGame::set_ilusion_effect(int owner_h)
 {
-	char dir;
+	direction dir;
 
-	m_ilusion_owner_h = owner_h;
+	on_game()->m_ilusion_owner_h = owner_h;
 
 	std::string nameBuf_IE;
-	m_map_data->get_owner_status_by_object_id(owner_h, &m_ilusion_owner_type, &dir, &m_player->m_illusionAppearance, &m_player->m_illusionStatus, nameBuf_IE);
-	m_name_ie = nameBuf_IE;
+	m_map_data->get_owner_status_by_object_id(owner_h, &on_game()->m_ilusion_owner_type, &dir, &m_player->m_illusionAppearance, &m_player->m_illusionStatus, nameBuf_IE);
+	(void)nameBuf_IE; // Unused
 }
 
 void CGame::response_panning_handler(char* data)
 {
-	char dir;
+	direction dir;
 	short sX, sY;
 	const auto* pkt = hb::net::PacketCast<hb::net::PacketResponsePanningHeader>(
 		data, sizeof(hb::net::PacketResponsePanningHeader));
 	if (!pkt) return;
 	sX = pkt->x;
 	sY = pkt->y;
-	dir = static_cast<char>(pkt->dir);
+	dir = static_cast<direction>(pkt->dir);
 
 	switch (dir) {
-	case 1: m_Camera.move_destination(0, -32); m_player->m_player_y--; break;
-	case 2: m_Camera.move_destination(32, -32); m_player->m_player_y--; m_player->m_player_x++; break;
-	case 3: m_Camera.move_destination(32, 0); m_player->m_player_x++; break;
-	case 4: m_Camera.move_destination(32, 32); m_player->m_player_y++; m_player->m_player_x++; break;
-	case 5: m_Camera.move_destination(0, 32); m_player->m_player_y++; break;
-	case 6: m_Camera.move_destination(-32, 32); m_player->m_player_y++; m_player->m_player_x--; break;
-	case 7: m_Camera.move_destination(-32, 0); m_player->m_player_x--; break;
-	case 8: m_Camera.move_destination(-32, -32); m_player->m_player_y--; m_player->m_player_x--; break;
+	case direction::north: m_Camera.move_destination(0, -32); m_player->m_player_y--; break;
+	case direction::northeast: m_Camera.move_destination(32, -32); m_player->m_player_y--; m_player->m_player_x++; break;
+	case direction::east: m_Camera.move_destination(32, 0); m_player->m_player_x++; break;
+	case direction::southeast: m_Camera.move_destination(32, 32); m_player->m_player_y++; m_player->m_player_x++; break;
+	case direction::south: m_Camera.move_destination(0, 32); m_player->m_player_y++; break;
+	case direction::southwest: m_Camera.move_destination(-32, 32); m_player->m_player_y++; m_player->m_player_x--; break;
+	case direction::west: m_Camera.move_destination(-32, 0); m_player->m_player_x--; break;
+	case direction::northwest: m_Camera.move_destination(-32, -32); m_player->m_player_y--; m_player->m_player_x--; break;
+	default: break;
 	}
 
 	m_map_data->shift_map_data(dir);
 	const char* mapData = reinterpret_cast<const char*>(data) + sizeof(hb::net::PacketResponsePanningHeader);
 	read_map_data(sX, sY, mapData);
 
-	m_is_observer_commanded = false;
+	on_game()->m_is_observer_commanded = false;
 }
 
 /*********************************************************************************************************************
@@ -4628,196 +3411,21 @@ void CGame::create_screen_shot()
 
 void CGame::handle_key_up(KeyCode _key)
 {
-	if (HotkeyManager::get().handle_key_up(_key)) {
-		return;
-	}
-
-	// When an overlay is active, only allow certain hotkeys (like screenshot)
-	// Block most hotkeys to prevent interaction with base screen
-	if (GameModeManager::get_active_overlay() != nullptr)
-	{
-		// Only allow screenshot hotkey when overlay is visible
-		if (_key == KeyCode::F11) {
-			hotkey_simple_screenshot();
-		}
-		return;
-	}
-
-	switch (_key) {
-	case KeyCode::NumpadAdd:      // Numpad +
-		hotkey_simple_zoom_in();
-		break;
-	case KeyCode::NumpadSubtract: // Numpad -
-		hotkey_simple_zoom_out();
-		break;
-
-	case KeyCode::F2:
-		hotkey_simple_use_shortcut2();
-		break;
-
-	case KeyCode::F3:
-		hotkey_simple_use_shortcut3();
-		break;
-
-	case KeyCode::Insert:
-		hotkey_simple_use_health_potion();
-		break;
-
-	case KeyCode::Delete:
-		hotkey_simple_use_mana_potion();
-		break;
-
-	case KeyCode::End:
-		hotkey_simple_load_backup_chat();
-		break;
-
-	case KeyCode::F4:
-		hotkey_simple_use_magic_shortcut();
-		break;
-
-	case KeyCode::F5:
-		hotkey_simple_toggle_character_info();
-		break;
-
-	case KeyCode::F6:
-		hotkey_simple_toggle_inventory();
-		break;
-
-	case KeyCode::F7:
-		hotkey_simple_toggle_magic();
-		break;
-
-	case KeyCode::F8:
-		hotkey_simple_toggle_skill();
-		break;
-
-	case KeyCode::F9:
-		hotkey_simple_toggle_chat_history();
-		break;
-
-	case KeyCode::F12:
-		hotkey_simple_toggle_system_menu();
-		break;
-
-	case KeyCode::F1:
-		hotkey_simple_use_shortcut1();
-		break;
-
-	case KeyCode::Up:
-		hotkey_simple_whisper_cycle_up();
-		break;
-
-	case KeyCode::Right:
-		hotkey_simple_arrow_right();
-		break;
-
-	case KeyCode::Down:
-		hotkey_simple_whisper_cycle_down();
-		break;
-
-	case KeyCode::Left:
-		hotkey_simple_arrow_left();
-		break;
-
-	case KeyCode::Tab:
-		hotkey_simple_tab_toggle_combat();
-		break;
-
-	case KeyCode::Home:
-		hotkey_simple_toggle_safe_attack();
-		break;
-
-	case KeyCode::Escape:
-		hotkey_simple_escape();
-		break;
-
-	case KeyCode::PageUp:
-		hotkey_simple_special_ability();
-		break;
-
-	case KeyCode::F11:
-		hotkey_simple_screenshot();
-		break;
-
-	default:
-		return;
-	}
+	auto* screen = GameModeManager::get().get_active_screen();
+	if (screen) screen->on_key_up(_key);
 }
 
 void CGame::handle_key_down(KeyCode _key)
 {
-
-	// When an overlay is active, block all on_key_down actions
-	// Overlays handle their own input in on_update()
+	// Overlay gate: only screenshot allowed
 	if (GameModeManager::get_active_overlay() != nullptr)
 	{
+		if (_key == KeyCode::F11) create_screen_shot();
 		return;
 	}
-
-	// Filter out keys that should not trigger any action in on_key_down
-	// These are handled in on_key_up or elsewhere
-	switch (_key) {
-	case KeyCode::Insert:
-	case KeyCode::Delete:
-	case KeyCode::Tab:
-	case KeyCode::Escape:
-	case KeyCode::End:
-	case KeyCode::Home:
-	case KeyCode::F1:
-	case KeyCode::F2:
-	case KeyCode::F3:
-	case KeyCode::F4:
-	case KeyCode::F5:
-	case KeyCode::F6:
-	case KeyCode::F7:
-	case KeyCode::F8:
-	case KeyCode::F9:
-	case KeyCode::F10:
-	case KeyCode::F11:
-	case KeyCode::F12:
-	case KeyCode::PageUp:
-	case KeyCode::PageDown:
-	case KeyCode::LWin:
-	case KeyCode::RWin:
-	case KeyCode::NumpadMultiply:
-	case KeyCode::NumpadAdd:
-	case KeyCode::NumpadSeparator:
-	case KeyCode::NumpadSubtract:
-	case KeyCode::NumpadDecimal:
-	case KeyCode::NumpadDivide:
-	case KeyCode::NumLock:
-	case KeyCode::ScrollLock:
-		return;
-	default:
-		break;
-	}
-
-	if (GameModeManager::get_mode() == GameMode::MainGame)
-	{
-		if (hb::shared::input::is_ctrl_down())
-		{
-			// Ctrl+0-9 for magic views
-			switch (_key) {
-			case KeyCode::Num0: m_dialog_box_manager.enable_dialog_box(DialogBoxId::Magic, 0, 0, 0); m_dialog_box_manager.Info(DialogBoxId::Magic).m_view = 9; break;
-			case KeyCode::Num1: m_dialog_box_manager.enable_dialog_box(DialogBoxId::Magic, 0, 0, 0); m_dialog_box_manager.Info(DialogBoxId::Magic).m_view = 0; break;
-			case KeyCode::Num2: m_dialog_box_manager.enable_dialog_box(DialogBoxId::Magic, 0, 0, 0); m_dialog_box_manager.Info(DialogBoxId::Magic).m_view = 1; break;
-			case KeyCode::Num3: m_dialog_box_manager.enable_dialog_box(DialogBoxId::Magic, 0, 0, 0); m_dialog_box_manager.Info(DialogBoxId::Magic).m_view = 2; break;
-			case KeyCode::Num4: m_dialog_box_manager.enable_dialog_box(DialogBoxId::Magic, 0, 0, 0); m_dialog_box_manager.Info(DialogBoxId::Magic).m_view = 3; break;
-			case KeyCode::Num5: m_dialog_box_manager.enable_dialog_box(DialogBoxId::Magic, 0, 0, 0); m_dialog_box_manager.Info(DialogBoxId::Magic).m_view = 4; break;
-			case KeyCode::Num6: m_dialog_box_manager.enable_dialog_box(DialogBoxId::Magic, 0, 0, 0); m_dialog_box_manager.Info(DialogBoxId::Magic).m_view = 5; break;
-			case KeyCode::Num7: m_dialog_box_manager.enable_dialog_box(DialogBoxId::Magic, 0, 0, 0); m_dialog_box_manager.Info(DialogBoxId::Magic).m_view = 6; break;
-			case KeyCode::Num8: m_dialog_box_manager.enable_dialog_box(DialogBoxId::Magic, 0, 0, 0); m_dialog_box_manager.Info(DialogBoxId::Magic).m_view = 7; break;
-			case KeyCode::Num9: m_dialog_box_manager.enable_dialog_box(DialogBoxId::Magic, 0, 0, 0); m_dialog_box_manager.Info(DialogBoxId::Magic).m_view = 8; break;
-			default: break;
-			}
-		}
-		// Only Enter key activates chat input - not every key press
-		else if (_key == KeyCode::Enter && (text_input_manager::get().is_active() == false) && (!hb::shared::input::is_alt_down()))
-		{
-			text_input_manager::get().start_input(CHAT_INPUT_X(), CHAT_INPUT_Y(), ChatMsgMaxLen, m_chat_msg);
-			text_input_manager::get().clear_input();
-		}
-	}
+	// Route to active screen
+	auto* screen = GameModeManager::get().get_active_screen();
+	if (screen) screen->on_key_down(_key);
 }
 
 void CGame::reserve_fightzone_response_handler(char* data)
@@ -4828,28 +3436,28 @@ void CGame::reserve_fightzone_response_handler(char* data)
 	switch (pkt->header.msg_type) {
 	case MsgType::Confirm:
 		add_event_list(RESERVE_FIGHTZONE_RESPONSE_HANDLER1, 10);
-		m_dialog_box_manager.Info(DialogBoxId::GuildMenu).m_mode = 14;
-		m_fightzone_number = m_fightzone_number_temp;
+		get_dialog_box_manager().get_dialog_as<DialogBox_GuildMenu>(DialogBoxId::GuildMenu)->m_mode = DialogBox_GuildMenu::mode::fightzone_reserved;
+		on_game()->m_fightzone_number = on_game()->m_fightzone_number_temp;
 		break;
 
 	case MsgType::Reject:
 		add_event_list(RESERVE_FIGHTZONE_RESPONSE_HANDLER2, 10);
-		m_fightzone_number_temp = 0;
+		on_game()->m_fightzone_number_temp = 0;
 
 		if (pkt->result == 0) {
-			m_dialog_box_manager.Info(DialogBoxId::GuildMenu).m_mode = 15;
+			get_dialog_box_manager().get_dialog_as<DialogBox_GuildMenu>(DialogBoxId::GuildMenu)->m_mode = DialogBox_GuildMenu::mode::fightzone_won;
 		}
 		else if (pkt->result == -1) {
-			m_dialog_box_manager.Info(DialogBoxId::GuildMenu).m_mode = 16;
+			get_dialog_box_manager().get_dialog_as<DialogBox_GuildMenu>(DialogBoxId::GuildMenu)->m_mode = DialogBox_GuildMenu::mode::fightzone_lost;
 		}
 		else if (pkt->result == -2) {
-			m_dialog_box_manager.Info(DialogBoxId::GuildMenu).m_mode = 17;
+			get_dialog_box_manager().get_dialog_as<DialogBox_GuildMenu>(DialogBoxId::GuildMenu)->m_mode = DialogBox_GuildMenu::mode::fightzone_draw;
 		}
 		else if (pkt->result == -3) {
-			m_dialog_box_manager.Info(DialogBoxId::GuildMenu).m_mode = 21;
+			get_dialog_box_manager().get_dialog_as<DialogBox_GuildMenu>(DialogBoxId::GuildMenu)->m_mode = DialogBox_GuildMenu::mode::fightzone_denied;
 		}
 		else if (pkt->result == -4) {
-			m_dialog_box_manager.Info(DialogBoxId::GuildMenu).m_mode = 22;
+			get_dialog_box_manager().get_dialog_as<DialogBox_GuildMenu>(DialogBoxId::GuildMenu)->m_mode = DialogBox_GuildMenu::mode::fightzone_canceled;
 		}
 		break;
 	}
@@ -4875,41 +3483,49 @@ void CGame::retrieve_item_handler(char* data)
 		bank_item_index = static_cast<char>(pkt->bank_index);
 		item_index = static_cast<char>(pkt->item_index);
 
-		if (m_bank_list[bank_item_index] != 0) {
+		if (m_player->m_bank_list[bank_item_index] != 0) {
 			// v1.42
-			auto itemInfo = item_name_formatter::get().format(m_bank_list[bank_item_index].get());
+			auto itemInfo = item_name_formatter::get().format(m_player->m_bank_list[bank_item_index].get());
 
 			txt = std::format(RETIEVE_ITEM_HANDLER4, itemInfo.name.c_str());//""You took out %s."
 			add_event_list(txt.c_str(), 10);
 
-			CItem* cfg_bank = get_item_config(m_bank_list[bank_item_index]->m_id_num);
+			CItem* cfg_bank = get_item_config(m_player->m_bank_list[bank_item_index]->m_id_num);
 			bool stackable = cfg_bank && ((cfg_bank->get_item_type() == ItemType::Consume) ||
 				(cfg_bank->get_item_type() == ItemType::Arrow));
 
-			if (stackable && m_item_list[item_index] != 0)
+			if (stackable && m_player->m_item_list[item_index] != 0)
 			{
 				// Stackable item with occupied inventory slot: just remove from bank
-				m_bank_list[bank_item_index].reset();
+				m_player->m_bank_list[bank_item_index].reset();
 			}
 			else
 			{
 				// Non-stackable or empty inventory slot: place item into inventory
-				if (m_item_list[item_index] != 0) return;
+				if (m_player->m_item_list[item_index] != 0) return;
 				short nX = 40;
 				short nY = 30;
 				for (j = 0; j < hb::shared::limits::MaxItems; j++)
 				{
-					if ((m_item_list[j] != 0) && (m_item_list[j]->m_id_num == m_bank_list[bank_item_index]->m_id_num))
+					if ((m_player->m_item_list[j] != 0) && (m_player->m_item_list[j]->m_id_num == m_player->m_bank_list[bank_item_index]->m_id_num))
 					{
-						nX = m_item_list[j]->m_x + 1;
-						nY = m_item_list[j]->m_y + 1;
+						nX = m_player->m_item_list[j]->m_x + 1;
+						nY = m_player->m_item_list[j]->m_y + 1;
 						break;
 					}
 				}
-				m_item_list[item_index] = std::move(m_bank_list[bank_item_index]);
-				m_item_list[item_index]->m_x = nX;
-				m_item_list[item_index]->m_y = nY;
-				send_command(MsgId::RequestSetItemPos, 0, item_index, nX, nY, 0, 0);
+				m_player->m_item_list[item_index] = std::move(m_player->m_bank_list[bank_item_index]);
+				m_player->m_item_list[item_index]->m_x = nX;
+				m_player->m_item_list[item_index]->m_y = nY;
+				{
+			hb::net::PacketRequestSetItemPos req{};
+			req.header.msg_id = MsgId::RequestSetItemPos;
+			req.header.msg_type = 0;
+			req.dir = static_cast<uint8_t>(item_index);
+			req.x = static_cast<int16_t>(nX);
+			req.y = static_cast<int16_t>(nY);
+			send_game_packet(req, false);
+		}
 
 				for (j = 0; j < hb::shared::limits::MaxItems; j++)
 					if (m_item_order[j] == -1)
@@ -4918,309 +3534,45 @@ void CGame::retrieve_item_handler(char* data)
 						break;
 					}
 				m_is_item_equipped[item_index] = false;
-				m_is_item_disabled[item_index] = false;
+				inventory_manager::get().unlock_item(item_index);
 			}
 			// Compact bank list
 			for (j = 0; j <= hb::shared::limits::MaxBankItems - 2; j++)
 			{
-				if ((m_bank_list[j + 1] != 0) && (m_bank_list[j] == 0))
+				if ((m_player->m_bank_list[j + 1] != 0) && (m_player->m_bank_list[j] == 0))
 				{
-					m_bank_list[j] = std::move(m_bank_list[j + 1]);
+					m_player->m_bank_list[j] = std::move(m_player->m_bank_list[j + 1]);
 				}
 			}
 		}
 	}
-	m_dialog_box_manager.Info(DialogBoxId::Bank).m_mode = 0;
+	get_dialog_box_manager().get_dialog_as<DialogBox_Bank>(DialogBoxId::Bank)->m_mode = DialogBox_Bank::mode::list;
 }
 
-void CGame::draw_npc_name(short screen_x, short screen_y, short owner_type, const hb::shared::entity::PlayerStatus& status, short npc_config_id)
-{
-	std::string text, text2;
-
-	// Name lookup: prefer config_id (direct), fall back to type-based lookup
-	auto npcName = [&]() -> const char* {
-		if (npc_config_id >= 0) return get_npc_config_name_by_id(npc_config_id);
-		return get_npc_config_name(owner_type);
-	};
-
-	// Crop subtypes override the base "Crop" name from config
-	if (owner_type == hb::shared::owner::Crops) {
-		static const char* cropNames[] = {
-			"Crop", "WaterMelon", "Pumpkin", "Garlic", "Barley", "Carrot",
-			"Radish", "Corn", "Chinese Bell Flower", "Melone", "Tomato",
-			"Grapes", "Blue Grape", "Mushroom", "Ginseng"
-		};
-		int sub = m_entity_state.m_appearance.sub_type;
-		if (sub >= 1 && sub <= 14)
-			text = cropNames[sub];
-		else
-			text = npcName();
-	}
-	// Crusade structure kit suffix
-	else if ((owner_type == hb::shared::owner::ArrowGuardTower || owner_type == hb::shared::owner::CannonGuardTower ||
-			  owner_type == hb::shared::owner::ManaCollector || owner_type == hb::shared::owner::Detector) &&
-			 m_entity_state.m_appearance.HasNpcSpecialState()) {
-		text = std::format("{} Kit", npcName());
-	}
-	else {
-		text = npcName();
-	}
-	if (status.berserk) text += DRAW_OBJECT_NAME50;//" Berserk"
-	if (status.frozen) text += DRAW_OBJECT_NAME51;//" Frozen"
-	hb::shared::text::draw_text(GameFont::Default, screen_x, screen_y, text.c_str(), hb::shared::text::TextStyle::with_shadow(GameColors::UIWhite));
-	if (m_is_observer_mode == true) hb::shared::text::draw_text(GameFont::Default, screen_x, screen_y + 14, text.c_str(), hb::shared::text::TextStyle::with_shadow(GameColors::NeutralNamePlate));
-	else if (m_player->m_is_confusion || (m_ilusion_owner_h != 0))
-	{
-		text = DRAW_OBJECT_NAME87;//"(Unknown)"
-		hb::shared::text::draw_text(GameFont::Default, screen_x, screen_y + 14, text.c_str(), hb::shared::text::TextStyle::with_shadow(GameColors::UIDisabled)); // v2.171
-	}
-	else
-	{
-		if (IsHostile(status.relationship))
-			hb::shared::text::draw_text(GameFont::Default, screen_x, screen_y + 14, DRAW_OBJECT_NAME90, hb::shared::text::TextStyle::with_shadow(GameColors::UIRed)); // "(Enemy)"
-		else if (IsFriendly(status.relationship))
-			hb::shared::text::draw_text(GameFont::Default, screen_x, screen_y + 14, DRAW_OBJECT_NAME89, hb::shared::text::TextStyle::with_shadow(GameColors::FriendlyNamePlate)); // "(Friendly)"
-		else
-			hb::shared::text::draw_text(GameFont::Default, screen_x, screen_y + 14, DRAW_OBJECT_NAME88, hb::shared::text::TextStyle::with_shadow(GameColors::NeutralNamePlate)); // "(Neutral)"
-	}
-	switch (status.angel_percent) {
-	case 0: break;
-	case 1: text2 = DRAW_OBJECT_NAME52; break;//"Clairvoyant"
-	case 2: text2 = DRAW_OBJECT_NAME53; break;//"Destruction of Magic Protection"
-	case 3: text2 = DRAW_OBJECT_NAME54; break;//"Anti-Physical Damage"
-	case 4: text2 = DRAW_OBJECT_NAME55; break;//"Anti-Magic Damage"
-	case 5: text2 = DRAW_OBJECT_NAME56; break;//"Poisonous"
-	case 6: text2 = DRAW_OBJECT_NAME57; break;//"Critical Poisonous"
-	case 7: text2 = DRAW_OBJECT_NAME58; break;//"Explosive"
-	case 8: text2 = DRAW_OBJECT_NAME59; break;//"Critical Explosive"
-	}
-	hb::shared::text::draw_text(GameFont::Default, screen_x, screen_y + 28, text2.c_str(), hb::shared::text::TextStyle::with_shadow(GameColors::MonsterStatusEffect));
-
-	// centu: no muestra la barra de hp de algunos npc
-	switch (owner_type) {
-	case hb::shared::owner::ShopKeeper:
-	case hb::shared::owner::Gandalf:
-	case hb::shared::owner::Howard:
-	case hb::shared::owner::Tom:
-	case hb::shared::owner::William:
-	case hb::shared::owner::Kennedy:
-	case hb::shared::owner::ManaStone:
-	case hb::shared::owner::Bunny:
-	case hb::shared::owner::Cat:
-	case hb::shared::owner::McGaffin:
-	case hb::shared::owner::Perry:
-	case hb::shared::owner::Devlin:
-	case hb::shared::owner::Crops:
-	{
-		switch (m_entity_state.m_appearance.sub_type) {
-		case 1:
-		case 2:
-		case 3:
-		case 4:
-		case 5:
-		case 6:
-		case 7:
-		case 8:
-		case 9:
-		case hb::shared::owner::Slime:
-		case hb::shared::owner::Skeleton:
-		case hb::shared::owner::StoneGolem:
-		case hb::shared::owner::Cyclops:
-		case hb::shared::owner::OrcMage:
-		default:
-			break;
-		}
-	}
-	case hb::shared::owner::Gail:
-		break;
-	default:
-		break;
-	}
-}
-
-void CGame::draw_object_name(short screen_x, short screen_y, const char* name, const hb::shared::entity::PlayerStatus& status, uint16_t object_id)
-{
-	std::string guild_text;
-	std::string text, text2;
-	uint8_t red = 0, green = 0, blue = 0;
-	int guild_index = 0, y_offset = 0;
-	bool is_pk = false, is_citizen = false, is_aresden = false, is_hunter = false;
-	auto relationship = status.relationship;
-	if (IsHostile(relationship))
-	{
-		red = 255; green = 0; blue = 0;
-	}
-	else if (IsFriendly(relationship))
-	{
-		red = 30; green = 200; blue = 30;
-	}
-	else
-	{
-		red = 50; green = 50; blue = 255;
-	}
-
-	if (m_ilusion_owner_h == 0)
-	{
-		if (m_is_crusade_mode == false) text = name;
-		else
-		{
-			if (!hb::shared::object_id::is_player_id(m_entity_state.m_object_id)) text = get_npc_config_name(hb::shared::owner::Barbarian);
-			else
-			{
-				if (relationship == EntityRelationship::Enemy) text = std::format("{}", m_entity_state.m_object_id);
-				else text = name;
-			}
-		}
-		if (m_party_status != 0)
-		{
-			for (int i = 0; i < hb::shared::limits::MaxPartyMembers; i++)
-			{
-				if (m_party_member_name_list[i].name == name)
-				{
-					text += BGET_NPC_NAME23; // ", Party Member"
-					break;
-				}
-			}
-		}
-	}
-	else text = "?????";
-
-	if (status.berserk) text += DRAW_OBJECT_NAME50;//" Berserk"
-	if (status.frozen) text += DRAW_OBJECT_NAME51;//" Frozen"
-
-	hb::shared::text::draw_text(GameFont::Default, screen_x, screen_y, text.c_str(), hb::shared::text::TextStyle::with_shadow(GameColors::UIWhite));
-
-	if (object_id == m_player->m_player_object_id)
-	{
-		if (m_player->m_guild_rank == 0)
-		{
-			guild_text = std::format(DEF_MSG_GUILDMASTER, m_player->m_guild_name);//" Guildmaster)"
-			hb::shared::text::draw_text(GameFont::Default, screen_x, screen_y + 14, guild_text.c_str(), hb::shared::text::TextStyle::with_shadow(GameColors::InfoGrayLight));
-			y_offset = 14;
-		}
-		if (m_player->m_guild_rank > 0)
-		{
-			guild_text = std::format(DEF_MSG_GUILDSMAN, m_player->m_guild_name);//" Guildsman)"
-			hb::shared::text::draw_text(GameFont::Default, screen_x, screen_y + 14, guild_text.c_str(), hb::shared::text::TextStyle::with_shadow(GameColors::InfoGrayLight));
-			y_offset = 14;
-		}
-		if (m_player->m_pk_count != 0)
-		{
-			is_pk = true;
-			red = 255; green = 0; blue = 0;
-		}
-		else
-		{
-			is_pk = false;
-			red = 30; green = 200; blue = 30;
-		}
-		is_citizen = m_player->m_citizen;
-		is_aresden = m_player->m_aresden;
-		is_hunter = m_player->m_hunter;
-	}
-	else
-	{	// CLEROTH - CRASH BUG ( STATUS )
-		is_pk = status.pk;
-		is_citizen = status.citizen;
-		is_aresden = status.aresden;
-		is_hunter = status.hunter;
-		if (m_is_crusade_mode == false || !IsHostile(relationship))
-		{
-			if (find_guild_name(name, &guild_index) == true)
-			{
-				if (!m_guild_name_cache[guild_index].guild_name.empty())
-				{
-					if (m_guild_name_cache[guild_index].guild_name != "NONE")
-					{
-						if (m_guild_name_cache[guild_index].guild_rank == 0)
-						{
-							guild_text = std::format(DEF_MSG_GUILDMASTER, m_guild_name_cache[guild_index].guild_name);//
-							hb::shared::text::draw_text(GameFont::Default, screen_x, screen_y + 14, guild_text.c_str(), hb::shared::text::TextStyle::with_shadow(GameColors::InfoGrayLight));
-							m_guild_name_cache[guild_index].ref_time = m_cur_time;
-							y_offset = 14;
-						}
-						else if (m_guild_name_cache[guild_index].guild_rank > 0)
-						{
-							guild_text = std::format(DEF_MSG_GUILDSMAN, m_guild_name_cache[guild_index].guild_name);//"
-							hb::shared::text::draw_text(GameFont::Default, screen_x, screen_y + 14, guild_text.c_str(), hb::shared::text::TextStyle::with_shadow(GameColors::InfoGrayLight));
-							m_guild_name_cache[guild_index].ref_time = m_cur_time;
-							y_offset = 14;
-						}
-					}
-					else
-					{
-						m_guild_name_cache[guild_index].ref_time = 0;
-					}
-				}
-			}
-			else send_command(MsgId::CommandCommon, CommonType::ReqGuildName, 0, m_entity_state.m_object_id, guild_index, 0, 0);
-		}
-	}
-
-	if (is_citizen == false)	text = DRAW_OBJECT_NAME60;// "Traveller"
-	else
-	{
-		if (is_aresden)
-		{
-			if (is_hunter == true) text = DEF_MSG_ARECIVIL; // "Aresden Civilian"
-			else text = DEF_MSG_ARESOLDIER; // "Aresden Combatant"
-		}
-		else
-		{
-			if (is_hunter == true) text = DEF_MSG_ELVCIVIL;// "Elvine Civilian"
-			else text = DEF_MSG_ELVSOLDIER;	// "Elvine Combatant"
-		}
-	}
-	if (is_pk == true)
-	{
-		if (is_citizen == false) text = DEF_MSG_PK;	//"Criminal"
-		else
-		{
-			if (is_aresden) text = DEF_MSG_AREPK;// "Aresden Criminal"
-			else text = DEF_MSG_ELVPK;  // "Elvine Criminal"
-		}
-	}
-	hb::shared::text::draw_text(GameFont::Default, screen_x, screen_y + 14 + y_offset, text.c_str(), hb::shared::text::TextStyle::with_shadow(hb::shared::render::Color(red, green, blue)));
-}
-
-bool CGame::find_guild_name(const char* name, int* ipIndex)
-{
-	int i, ret = 0;
-	uint32_t tmp_time;
-	for (i = 0; i < game_limits::max_guild_names; i++)
-	{
-		if (memcmp(m_guild_name_cache[i].char_name.c_str(), name, 10) == 0)
-		{
-			m_guild_name_cache[i].ref_time = m_cur_time;
-			*ipIndex = i;
-			return true;
-		}
-	}
-	tmp_time = m_guild_name_cache[0].ref_time;
-	for (i = 0; i < game_limits::max_guild_names; i++)
-	{
-		if (m_guild_name_cache[i].ref_time < tmp_time)
-		{
-			ret = i;
-			tmp_time = m_guild_name_cache[i].ref_time;
-		}
-	}
-	m_guild_name_cache[ret].char_name.assign(name, strnlen(name, 10));
-	m_guild_name_cache[ret].ref_time = m_cur_time;
-	m_guild_name_cache[ret].guild_rank = -1;
-	*ipIndex = ret;
-	return false;
-}
+// draw_npc_name REMOVED — moved to Screen_OnGame
+// draw_object_name REMOVED — moved to Screen_OnGame
 
 void CGame::draw_version()
 {
 	std::string G_cTxt;
-	G_cTxt = std::format("Ver: {}", hb::version::get_display_string());
-	hb::shared::text::draw_text(GameFont::Default, 12 , (LOGICAL_HEIGHT() - 12 - 14) , G_cTxt.c_str(), hb::shared::text::TextStyle::with_shadow(GameColors::UIDisabled));
+	G_cTxt = std::format("Ver: {}", hb::version::client::full_version);
+	hb::shared::text::draw_text(GameFont::Default, 12, (LOGICAL_HEIGHT() - 12 - 14), G_cTxt.c_str(), hb::shared::text::TextStyle::with_shadow(GameColors::UIDisabled));
 }
 
 char CGame::get_official_map_name(const char* map_name, char* name)
 {	// MapIndex
+	// Run the hardcoded chain to get the map_index, then override name from cache if available.
+	char map_index = get_hardcoded_map_index(map_name, name);
+
+	auto it = m_map_display_names.find(map_name);
+	if (it != m_map_display_names.end() && !it->second.empty()) {
+		std::snprintf(name, 21, "%s", it->second.c_str());
+	}
+	return map_index;
+}
+
+char CGame::get_hardcoded_map_index(const char* map_name, char* name)
+{
 	if (strcmp(map_name, "middleland") == 0)
 	{
 		std::snprintf(name, 21, "%s", GET_OFFICIAL_MAP_NAME28);	// Middleland
@@ -5410,32 +3762,32 @@ char CGame::get_official_map_name(const char* map_name, char* name)
 		std::snprintf(name, 21, "%s", GET_OFFICIAL_MAP_NAME38);	// Elvine Guildhall
 		return -1;
 	}
-	else if (strcmp(map_name, "bsmith_1") == 0)
+	else if (strcmp(map_name, "bsmith_1") == 0 || strcmp(map_name, "bsmith_1f") == 0)
 	{
 		std::snprintf(name, 21, "%s", GET_OFFICIAL_MAP_NAME33);	// Aresden Blacksmith
 		return -1;
 	}
-	else if (strcmp(map_name, "bsmith_2") == 0)
+	else if (strcmp(map_name, "bsmith_2") == 0 || strcmp(map_name, "bsmith_2f") == 0)
 	{
 		std::snprintf(name, 21, "%s", GET_OFFICIAL_MAP_NAME34);	// Elvine Blacksmith
 		return -1;
 	}
-	else if (strcmp(map_name, "gshop_1") == 0)
+	else if (strcmp(map_name, "gshop_1") == 0 || strcmp(map_name, "gshop_1f") == 0)
 	{
 		std::snprintf(name, 21, "%s", GET_OFFICIAL_MAP_NAME39);	// Aresden Shop
 		return -1;
 	}
-	else if (strcmp(map_name, "gshop_2") == 0)
+	else if (strcmp(map_name, "gshop_2") == 0 || strcmp(map_name, "gshop_2f") == 0)
 	{
 		std::snprintf(name, 21, "%s", GET_OFFICIAL_MAP_NAME40);	// Elvine Shop
 		return -1;
 	}
-	else if (strcmp(map_name, "wrhus_1") == 0)
+	else if (strcmp(map_name, "wrhus_1") == 0 || strcmp(map_name, "wrhus_1f") == 0)
 	{
 		std::snprintf(name, 21, "%s", GET_OFFICIAL_MAP_NAME43);	// Aresden Warehouse
 		return -1;
 	}
-	else if (strcmp(map_name, "wrhus_2") == 0)
+	else if (strcmp(map_name, "wrhus_2") == 0 || strcmp(map_name, "wrhus_2f") == 0)
 	{
 		std::snprintf(name, 21, "%s", GET_OFFICIAL_MAP_NAME44);	// Elvine Warehouse
 		return -1;
@@ -5599,17 +3951,16 @@ bool CGame::check_local_chat_command(const char* pMsg)
 
 void CGame::clear_skill_using_status()
 {
-	if (m_skill_using_status == true)
+	if (on_game()->m_skill_using_status == true)
 	{
 		add_event_list(CLEAR_SKILL_USING_STATUS1, 10);//"
-		m_dialog_box_manager.disable_dialog_box(DialogBoxId::Fishing);
-		m_dialog_box_manager.disable_dialog_box(DialogBoxId::Manufacture);
+		get_dialog_box_manager().disable_crafting_dialogs();
 		if ((m_player->m_player_type >= 1) && (m_player->m_player_type <= 6)/* && (!m_player->m_playerAppearance.is_walking)*/) {
 			m_player->m_Controller.set_command(Type::stop);
 			m_player->m_Controller.set_destination(m_player->m_player_x, m_player->m_player_y);
 		}
 	}
-	m_skill_using_status = false;
+	on_game()->m_skill_using_status = false;
 }
 
 void CGame::npc_talk_handler(char* packet_data)
@@ -5628,7 +3979,7 @@ void CGame::npc_talk_handler(char* packet_data)
 	short response = pkt->response;
 	int amount = pkt->amount;
 	int contribution = pkt->contribution;
-	int target_type = pkt->target_type;
+	int target_type = pkt->target_config_id;
 	int target_count = pkt->target_count;
 	int target_x = pkt->x;
 	int target_y = pkt->y;
@@ -5640,109 +3991,109 @@ void CGame::npc_talk_handler(char* packet_data)
 	memcpy(reward_name, pkt->reward_name, hb::shared::limits::ItemNameLen - 1);
 	memcpy(target_name, pkt->target_name, 20);
 
-	m_dialog_box_manager.enable_dialog_box(DialogBoxId::NpcTalk, response, npc_type, 0);
+	get_dialog_box_manager().enable_dialog_box(DialogBoxId::NpcTalk, response, npc_type, 0);
 
 	if ((npc_type >= 1) && (npc_type <= 100))
 	{
-		index = m_dialog_box_manager.Info(DialogBoxId::NpcTalk).m_v1;
-		m_msg_text_list2[index] = std::make_unique<CMsg>(0, "  ", 0);
+		index = get_dialog_box_manager().get_dialog_as<DialogBox_NpcTalk>(DialogBoxId::NpcTalk)->m_text_line_count;
+		on_game()->m_msg_text_list2[index] = std::make_unique<CMsg>(0, "  ", 0);
 		index++;
 		question_type = 0;
 		switch (npc_type) {
 		case 1: //Monster Hunt
-			std::snprintf(temp, hb::shared::limits::NpcNameLen, "%s", get_npc_config_name(target_type));
+			std::snprintf(temp, hb::shared::limits::NpcNameLen, "%s", get_npc_config_name_by_id(target_type));
 			text = std::format(NPC_TALK_HANDLER16, target_count, temp);
-			m_msg_text_list2[index] = std::make_unique<CMsg>(0, text.c_str(), 0);
+			on_game()->m_msg_text_list2[index] = std::make_unique<CMsg>(0, text.c_str(), 0);
 			index++;
 
 			if (memcmp(target_name, "NONE", 4) == 0) {
 				text = NPC_TALK_HANDLER17;//"
-				m_msg_text_list2[index] = std::make_unique<CMsg>(0, text.c_str(), 0);
+				on_game()->m_msg_text_list2[index] = std::make_unique<CMsg>(0, text.c_str(), 0);
 				index++;
 			}
 			else {
 				std::memset(temp, 0, sizeof(temp));
 				get_official_map_name(target_name, temp);
 				text = std::format(NPC_TALK_HANDLER18, temp);//"Map : %s"
-				m_msg_text_list2[index] = std::make_unique<CMsg>(0, text.c_str(), 0);
+				on_game()->m_msg_text_list2[index] = std::make_unique<CMsg>(0, text.c_str(), 0);
 				index++;
 
 				if (target_x != 0) {
 					text = std::format(NPC_TALK_HANDLER19, target_x, target_y, target_range);//"Position: %d,%d within %d blocks"
-					m_msg_text_list2[index] = std::make_unique<CMsg>(0, text.c_str(), 0);
+					on_game()->m_msg_text_list2[index] = std::make_unique<CMsg>(0, text.c_str(), 0);
 					index++;
 				}
 
 				text = std::format(NPC_TALK_HANDLER20, contribution);//"
-				m_msg_text_list2[index] = std::make_unique<CMsg>(0, text.c_str(), 0);
+				on_game()->m_msg_text_list2[index] = std::make_unique<CMsg>(0, text.c_str(), 0);
 				index++;
 			}
 			question_type = 1;
 			break;
 
 		case 7: //
-			m_msg_text_list2[index] = std::make_unique<CMsg>(0, NPC_TALK_HANDLER21, 0);
+			on_game()->m_msg_text_list2[index] = std::make_unique<CMsg>(0, NPC_TALK_HANDLER21, 0);
 			index++;
 
 			if (memcmp(target_name, "NONE", 4) == 0) {
 				text = NPC_TALK_HANDLER22;
-				m_msg_text_list2[index] = std::make_unique<CMsg>(0, text.c_str(), 0);
+				on_game()->m_msg_text_list2[index] = std::make_unique<CMsg>(0, text.c_str(), 0);
 				index++;
 			}
 			else {
 				std::memset(temp, 0, sizeof(temp));
 				get_official_map_name(target_name, temp);
 				text = std::format(NPC_TALK_HANDLER23, temp);
-				m_msg_text_list2[index] = std::make_unique<CMsg>(0, text.c_str(), 0);
+				on_game()->m_msg_text_list2[index] = std::make_unique<CMsg>(0, text.c_str(), 0);
 				index++;
 
 				if (target_x != 0) {
 					text = std::format(NPC_TALK_HANDLER24, target_x, target_y, target_range);
-					m_msg_text_list2[index] = std::make_unique<CMsg>(0, text.c_str(), 0);
+					on_game()->m_msg_text_list2[index] = std::make_unique<CMsg>(0, text.c_str(), 0);
 					index++;
 				}
 
 				text = std::format(NPC_TALK_HANDLER25, contribution);
-				m_msg_text_list2[index] = std::make_unique<CMsg>(0, text.c_str(), 0);
+				on_game()->m_msg_text_list2[index] = std::make_unique<CMsg>(0, text.c_str(), 0);
 				index++;
 			}
 			question_type = 1;
 			break;
 
 		case hb::shared::owner::Slime: // Crusade
-			m_msg_text_list2[index] = std::make_unique<CMsg>(0, NPC_TALK_HANDLER26, 0);
+			on_game()->m_msg_text_list2[index] = std::make_unique<CMsg>(0, NPC_TALK_HANDLER26, 0);
 			index++;
 
 			text = NPC_TALK_HANDLER27;//"
-			m_msg_text_list2[index] = std::make_unique<CMsg>(0, text.c_str(), 0);
+			on_game()->m_msg_text_list2[index] = std::make_unique<CMsg>(0, text.c_str(), 0);
 			index++;
 
 			text = NPC_TALK_HANDLER28;//"
-			m_msg_text_list2[index] = std::make_unique<CMsg>(0, text.c_str(), 0);
+			on_game()->m_msg_text_list2[index] = std::make_unique<CMsg>(0, text.c_str(), 0);
 			index++;
 
 			text = NPC_TALK_HANDLER29;//"
-			m_msg_text_list2[index] = std::make_unique<CMsg>(0, text.c_str(), 0);
+			on_game()->m_msg_text_list2[index] = std::make_unique<CMsg>(0, text.c_str(), 0);
 			index++;
 
 			text = NPC_TALK_HANDLER30;//"
-			m_msg_text_list2[index] = std::make_unique<CMsg>(0, text.c_str(), 0);
+			on_game()->m_msg_text_list2[index] = std::make_unique<CMsg>(0, text.c_str(), 0);
 			index++;
 
 			text = " ";
-			m_msg_text_list2[index] = std::make_unique<CMsg>(0, text.c_str(), 0);
+			on_game()->m_msg_text_list2[index] = std::make_unique<CMsg>(0, text.c_str(), 0);
 			index++;
 
 			if (memcmp(target_name, "NONE", 4) == 0) {
 				text = NPC_TALK_HANDLER31;//"
-				m_msg_text_list2[index] = std::make_unique<CMsg>(0, text.c_str(), 0);
+				on_game()->m_msg_text_list2[index] = std::make_unique<CMsg>(0, text.c_str(), 0);
 				index++;
 			}
 			else {
 				std::memset(temp, 0, sizeof(temp));
 				get_official_map_name(target_name, temp);
 				text = std::format(NPC_TALK_HANDLER32, temp);//"
-				m_msg_text_list2[index] = std::make_unique<CMsg>(0, text.c_str(), 0);
+				on_game()->m_msg_text_list2[index] = std::make_unique<CMsg>(0, text.c_str(), 0);
 				index++;
 			}
 			question_type = 2;
@@ -5751,22 +4102,22 @@ void CGame::npc_talk_handler(char* packet_data)
 
 		switch (question_type) {
 		case 1:
-			m_msg_text_list2[index] = std::make_unique<CMsg>(0, "  ", 0);
+			on_game()->m_msg_text_list2[index] = std::make_unique<CMsg>(0, "  ", 0);
 			index++;
-			m_msg_text_list2[index] = std::make_unique<CMsg>(0, NPC_TALK_HANDLER33, 0);//"
+			on_game()->m_msg_text_list2[index] = std::make_unique<CMsg>(0, NPC_TALK_HANDLER33, 0);//"
 			index++;
-			m_msg_text_list2[index] = std::make_unique<CMsg>(0, NPC_TALK_HANDLER34, 0);//"
+			on_game()->m_msg_text_list2[index] = std::make_unique<CMsg>(0, NPC_TALK_HANDLER34, 0);//"
 			index++;
-			m_msg_text_list2[index] = std::make_unique<CMsg>(0, "  ", 0);
+			on_game()->m_msg_text_list2[index] = std::make_unique<CMsg>(0, "  ", 0);
 			index++;
 			break;
 
 		case 2:
-			m_msg_text_list2[index] = std::make_unique<CMsg>(0, "  ", 0);
+			on_game()->m_msg_text_list2[index] = std::make_unique<CMsg>(0, "  ", 0);
 			index++;
-			m_msg_text_list2[index] = std::make_unique<CMsg>(0, NPC_TALK_HANDLER35, 0);//"
+			on_game()->m_msg_text_list2[index] = std::make_unique<CMsg>(0, NPC_TALK_HANDLER35, 0);//"
 			index++;
-			m_msg_text_list2[index] = std::make_unique<CMsg>(0, "  ", 0);
+			on_game()->m_msg_text_list2[index] = std::make_unique<CMsg>(0, "  ", 0);
 			index++;
 			break;
 
@@ -5778,7 +4129,7 @@ void CGame::npc_talk_handler(char* packet_data)
 void CGame::point_command_handler(int indexX, int indexY, char item_id)
 {
 	char temp[31];
-	if ((m_point_command_type >= 100) && (m_point_command_type < 200))
+	if ((on_game()->m_point_command_type >= 100) && (on_game()->m_point_command_type < 200))
 	{
 		// get target object ID for auto-aim (lag compensation)
 		// If player clicked on an entity, send its ID so server can track its current position
@@ -5788,30 +4139,54 @@ void CGame::point_command_handler(int indexX, int indexY, char item_id)
 		{
 			targetObjectID = focused.m_object_id;
 		}
-		send_command(MsgId::CommandCommon, CommonType::Magic, 0, indexX, indexY, m_point_command_type, nullptr, targetObjectID);
+		{
+			hb::net::PacketCommandCommonWithTime req{};
+			req.base.header.msg_id = MsgId::CommandCommon;
+			req.base.header.msg_type = CommonType::Magic;
+			req.base.x = m_player->m_player_x;
+			req.base.y = m_player->m_player_y;
+			req.v1 = indexX;
+			req.v2 = indexY;
+			req.v3 = on_game()->m_point_command_type;
+			req.time_ms = static_cast<uint32_t>(targetObjectID);
+			send_game_packet(req, false);
+		}
 	}
-	else if ((m_point_command_type >= 0) && (m_point_command_type < 50))
+	else if ((on_game()->m_point_command_type >= 0) && (on_game()->m_point_command_type < 50))
 	{
-		send_command(MsgId::CommandCommon, CommonType::ReqUseItem, 0, m_point_command_type, indexX, indexY, temp, item_id); // v1.4
+		{
+			auto pkt = hb::net::make_common_command_str(CommonType::ReqUseItem, m_player->m_player_x, m_player->m_player_y);
+			pkt.v1 = on_game()->m_point_command_type;
+			pkt.v2 = indexX;
+			pkt.v3 = indexY;
+			std::snprintf(pkt.text, sizeof(pkt.text), "%s", temp);
+			pkt.v4 = item_id;
+			send_game_packet(pkt);
+		}
 
-		CItem* cfg_pt = get_item_config(m_item_list[m_point_command_type]->m_id_num);
+		CItem* cfg_pt = get_item_config(m_player->m_item_list[on_game()->m_point_command_type]->m_id_num);
 		if (cfg_pt && cfg_pt->get_item_type() == ItemType::UseSkill)
-			m_skill_using_status = true;
+			on_game()->m_skill_using_status = true;
 	}
-	else if (m_point_command_type == 200) // Normal Hand
+	else if (on_game()->m_point_command_type == 200) // Normal Hand
 	{
 		if ((m_mc_name.size() == 0) || (m_mc_name == m_player->m_player_name) || (m_mc_name[0] == '_'))
 		{
-			m_dialog_box_manager.Info(DialogBoxId::Party).m_mode = 0;
-			play_game_sound('E', 14, 5);
+			get_dialog_box_manager().get_dialog_as<DialogBox_Party>(DialogBoxId::Party)->m_mode = DialogBox_Party::mode::main_menu;
+			audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 			add_event_list(POINT_COMMAND_HANDLER1, 10);
 		}
 		else
 		{
-			m_dialog_box_manager.Info(DialogBoxId::Party).m_mode = 3;
-			play_game_sound('E', 14, 5);
-			std::snprintf(m_dialog_box_manager.Info(DialogBoxId::Party).m_str, sizeof(m_dialog_box_manager.Info(DialogBoxId::Party).m_str), "%s", m_mc_name.c_str());
-			send_command(MsgId::CommandCommon, CommonType::RequestJoinParty, 0, 1, 0, 0, m_mc_name.c_str());
+			get_dialog_box_manager().get_dialog_as<DialogBox_Party>(DialogBoxId::Party)->m_mode = DialogBox_Party::mode::join_requested;
+			audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
+			std::snprintf(get_dialog_box_manager().get_dialog_as<DialogBox_Party>(DialogBoxId::Party)->m_leader_name, sizeof(DialogBox_Party::m_leader_name), "%s", m_mc_name.c_str());
+			{
+				auto pkt = hb::net::make_common_command_str(CommonType::RequestJoinParty, m_player->m_player_x, m_player->m_player_y);
+				pkt.v1 = 1;
+				std::snprintf(pkt.text, sizeof(pkt.text), "%s", m_mc_name.c_str());
+				send_game_packet(pkt);
+			}
 			return;
 		}
 	}
@@ -5823,7 +4198,7 @@ void CGame::start_bgm()
 	// Determine track name based on current location
 	const char* trackName = "maintm";
 
-	if ((m_is_xmas == true) && (weather_manager::get().is_snowing()))
+	if ((on_game()->m_is_xmas == true) && (weather_manager::get().is_snowing()))
 	{
 		trackName = "carol";
 	}
@@ -5876,7 +4251,7 @@ void CGame::motion_response_handler(char* packet_data)
 {
 	uint16_t response = 0;
 	short map_x = 0, map_y = 0;
-	char direction = 0;
+	direction move_dir = direction{};
 	int previous_hp = 0;
 	//						          0 3        4 5						 6 7		8 9		   10	    11
 	// Confirm Code(4) | MsgSize(4) | MsgID(4) | Confirm::MoveConfirm(2) | Loc-X(2) | Loc-Y(2) | Dir(1) | MapData ...
@@ -5913,7 +4288,7 @@ void CGame::motion_response_handler(char* packet_data)
 			m_player->m_playerStatus, m_player->m_player_name,
 			Type::stop, 0, 0, 0);
 		m_player->m_Controller.reset_command_count();
-		m_is_get_pointing_mode = false;
+		on_game()->m_is_get_pointing_mode = false;
 		m_Camera.snap_to((m_player->m_player_x - VIEW_CENTER_TILE_X()) * 32 - 16, (m_player->m_player_y - VIEW_CENTER_TILE_Y()) * 32 - 16);
 		break;
 
@@ -5924,7 +4299,7 @@ void CGame::motion_response_handler(char* packet_data)
 		if (!pkt) return;
 		map_x = pkt->x;
 		map_y = pkt->y;
-		direction = static_cast<char>(pkt->dir);
+		move_dir = static_cast<direction>(pkt->dir);
 		m_player->m_sp = m_player->m_sp - pkt->stamina_cost;
 		if (m_player->m_sp < 0) m_player->m_sp = 0;
 		previous_hp = m_player->m_hp;
@@ -5938,9 +4313,9 @@ void CGame::motion_response_handler(char* packet_data)
 				G_cTxt = std::format(NOTIFYMSG_HP_DOWN, previous_hp - m_player->m_hp);
 				add_event_list(G_cTxt.c_str(), 10);
 				m_damaged_time = GameClock::get_time_ms();
-				if ((m_logout_count > 0) && (m_force_disconn == false))
+				if ((on_game()->m_logout_count > 0) && (m_force_disconn == false))
 				{
-					m_logout_count = -1;
+					on_game()->m_logout_count = -1;
 					add_event_list(MOTION_RESPONSE_HANDLER2, 10);
 				}
 			}
@@ -5950,7 +4325,7 @@ void CGame::motion_response_handler(char* packet_data)
 				add_event_list(G_cTxt.c_str(), 10);
 			}
 		}
-		m_map_data->shift_map_data(direction);
+		m_map_data->shift_map_data(move_dir);
 		const char* mapData = reinterpret_cast<const char*>(packet_data) + sizeof(hb::net::PacketResponseMotionMoveConfirm);
 		read_map_data(map_x, map_y, mapData);
 		m_player->m_Controller.decrement_command_count();
@@ -5967,7 +4342,7 @@ void CGame::motion_response_handler(char* packet_data)
 			m_player->m_player_x = pkt->x;
 			m_player->m_player_y = pkt->y;
 			m_player->m_player_type = pkt->type;
-			m_player->m_player_dir = static_cast<char>(pkt->dir);
+			m_player->m_player_dir = static_cast<direction>(pkt->dir);
 			m_player->m_playerAppearance = pkt->appearance;
 			m_player->m_playerStatus = pkt->status;
 			m_player->m_is_gm_mode = m_player->m_playerStatus.gm_mode;
@@ -5980,19 +4355,19 @@ void CGame::motion_response_handler(char* packet_data)
 			Type::stop, 0, 0, 0,
 			0, 7);
 		m_player->m_Controller.reset_command_count();
-		m_is_get_pointing_mode = false;
+		on_game()->m_is_get_pointing_mode = false;
 		m_Camera.snap_to((m_player->m_player_x - VIEW_CENTER_TILE_X()) * 32 - 16, (m_player->m_player_y - VIEW_CENTER_TILE_Y()) * 32 - 16);
 		m_player->m_Controller.set_prev_move_blocked(true);
 		switch (m_player->m_player_type) {
 		case 1:
 		case 2:
 		case 3:
-			play_game_sound('C', 12, 0);
+			audio_manager::get().play_game_sound(sound_type::character, 12, 0);
 			break;
 		case 4:
 		case 5:
 		case 6:
-			play_game_sound('C', 13, 0);
+			audio_manager::get().play_game_sound(sound_type::character, 13, 0);
 			break;
 		}
 		break;
@@ -6005,35 +4380,35 @@ void CGame::command_processor(short mouse_x, short mouse_y, short tile_x, short 
 	uint16_t action_type = 0;
 	int result = 0;
 	short dialog_x = 0, dialog_y = 0;
-	char direction = 0;
+	direction move_dir = direction{};
 
 	// Fixed by Snoopy
-	if ((m_is_observer_commanded == false) && (m_is_observer_mode == true))
+	if ((on_game()->m_is_observer_commanded == false) && (on_game()->m_is_observer_mode == true))
 	{
 		if ((mouse_x == 0) && (mouse_y == 0) && (m_Camera.get_destination_x() > 32 * VIEW_TILE_WIDTH()) && (m_Camera.get_destination_y() > 32 * VIEW_TILE_HEIGHT()))
-			send_command(MsgId::RequestPanning, 0, 8, 0, 0, 0, 0);
+			send_game_packet(hb::net::make_panning_request(8));
 		else if ((mouse_x == LOGICAL_MAX_X()) && (mouse_y == 0) && (m_Camera.get_destination_x() < 32 * m_map_data->m_map_size_x - 32 * VIEW_TILE_WIDTH()) && (m_Camera.get_destination_y() > 32 * VIEW_TILE_HEIGHT()))
-			send_command(MsgId::RequestPanning, 0, 2, 0, 0, 0, 0);
+			send_game_packet(hb::net::make_panning_request(2));
 		else if ((mouse_x == LOGICAL_MAX_X()) && (mouse_y == LOGICAL_MAX_Y()) && (m_Camera.get_destination_x() < 32 * m_map_data->m_map_size_x - 32 * VIEW_TILE_WIDTH()) && (m_Camera.get_destination_y() < 32 * m_map_data->m_map_size_y - 32 * VIEW_TILE_HEIGHT()))
-			send_command(MsgId::RequestPanning, 0, 4, 0, 0, 0, 0);
+			send_game_packet(hb::net::make_panning_request(4));
 		else if ((mouse_x == 0) && (mouse_y == LOGICAL_MAX_Y()))
-			send_command(MsgId::RequestPanning, 0, 6, 0, 0, 0, 0);
+			send_game_packet(hb::net::make_panning_request(6));
 		else if ((mouse_x == 0) && (m_Camera.get_destination_x() > 32 * VIEW_TILE_WIDTH()))
-			send_command(MsgId::RequestPanning, 0, 7, 0, 0, 0, 0);
+			send_game_packet(hb::net::make_panning_request(7));
 		else if ((mouse_x == LOGICAL_MAX_X()) && (m_Camera.get_destination_x() < 32 * m_map_data->m_map_size_x - 32 * VIEW_TILE_WIDTH()))
-			send_command(MsgId::RequestPanning, 0, 3, 0, 0, 0, 0);
+			send_game_packet(hb::net::make_panning_request(3));
 		else if ((mouse_y == 0) && (m_Camera.get_destination_y() > 32 * VIEW_TILE_HEIGHT()))
-			send_command(MsgId::RequestPanning, 0, 1, 0, 0, 0, 0);
+			send_game_packet(hb::net::make_panning_request(1));
 		else if ((mouse_y == LOGICAL_MAX_Y()) && (m_Camera.get_destination_y() < 32 * m_map_data->m_map_size_y - 32 * VIEW_TILE_HEIGHT()))
-			send_command(MsgId::RequestPanning, 0, 5, 0, 0, 0, 0);
+			send_game_packet(hb::net::make_panning_request(5));
 		else return;
 
-		m_is_observer_commanded = true;
+		on_game()->m_is_observer_commanded = true;
 		m_arrow_pressed = 0;
 		return;
 	}
 
-	if (m_is_observer_mode == true) return;
+	if (on_game()->m_is_observer_mode == true) return;
 
 	if (hb::shared::input::is_alt_down()) // [ALT]
 		m_player->m_super_attack_mode = true;
@@ -6043,41 +4418,11 @@ void CGame::command_processor(short mouse_x, short mouse_y, short tile_x, short 
 	case CursorStatus::Null:
 		if (left_button != 0)
 		{
-			result = m_dialog_box_manager.handle_mouse_down(mouse_x, mouse_y);
+			result = get_dialog_box_manager().handle_mouse_down();
 			if (result == 1)
 			{
 				CursorTarget::set_cursor_status(CursorStatus::Selected);
 				return;
-			}
-			else if (result == 0)
-			{
-				CursorTarget::set_cursor_status(CursorStatus::Pressed);
-				// Snoopy: Added Golden LevelUp
-				if ((mouse_x > LEVELUP_TEXT_X()) && (mouse_x < (LEVELUP_TEXT_X())+75) && (mouse_y > LEVELUP_TEXT_Y()) && (mouse_y < (LEVELUP_TEXT_Y())+21))
-				{
-					if (m_player->m_hp > 0)
-					{
-						if ((m_dialog_box_manager.is_enabled(DialogBoxId::LevelUpSetting) != true) && (m_player->m_lu_point > 0))
-						{
-							m_dialog_box_manager.enable_dialog_box(DialogBoxId::LevelUpSetting, 0, 0, 0);
-							play_game_sound('E', 14, 5);
-						}
-					}
-					else // Centuu : restart
-					{
-						if (m_restart_count == -1)
-						{
-							std::string G_cTxt;
-							m_restart_count = 5;
-							m_restart_count_time = GameClock::get_time_ms();
-							G_cTxt = std::format(DLGBOX_CLICK_SYSMENU1, m_restart_count); // "Restarting game....%d"
-							add_event_list(G_cTxt.c_str(), 10);
-							play_game_sound('E', 14, 5);
-
-						}
-					}
-					return;
-				}
 			}
 			else if (result == -1)
 			{
@@ -6085,10 +4430,14 @@ void CGame::command_processor(short mouse_x, short mouse_y, short tile_x, short 
 				CursorTarget::set_cursor_status(CursorStatus::Selected);
 				return;
 			}
+			else if (result == 0)
+			{
+				CursorTarget::set_cursor_status(CursorStatus::Pressed);
+			}
 		}
 		else if (right_button != 0)
 		{
-			if (m_dialog_box_manager.handle_right_click(mouse_x, mouse_y, current_time)) return;
+			if (get_dialog_box_manager().handle_right_click(current_time)) return;
 		}
 		break;
 	case CursorStatus::Pressed:
@@ -6097,37 +4446,40 @@ void CGame::command_processor(short mouse_x, short mouse_y, short tile_x, short 
 			CursorTarget::set_cursor_status(CursorStatus::Null);
 		}
 		break;
-		case CursorStatus::Selected:
+	case CursorStatus::Selected:
 		if (left_button == 0)
 		{
 			CursorTarget::set_cursor_status(CursorStatus::Null);
 			bool double_click_consumed = false;
 			//ZeroEoyPnk - Bye delay...
-			if (((m_dialog_box_manager.is_enabled(DialogBoxId::LevelUpSetting) != true) || (CursorTarget::get_selected_id() != 12))
-				&& ((m_dialog_box_manager.is_enabled(DialogBoxId::ChangeStatsMajestic) != true) || (CursorTarget::get_selected_id() != 42)))
+			if (((get_dialog_box_manager().is_enabled(DialogBoxId::LevelUpSetting) != true) || (CursorTarget::get_selected_id() != 12))
+				&& ((get_dialog_box_manager().is_enabled(DialogBoxId::ChangeStatsMajestic) != true) || (CursorTarget::get_selected_id() != 42)))
 			{
 				if (((current_time - CursorTarget::get_selection_click_time()) < input_config::double_click_time_ms) 	// Double Click
 					&& (abs(mouse_x - CursorTarget::get_selection_click_x()) <= input_config::double_click_tolerance)
 					&& (abs(mouse_y - CursorTarget::get_selection_click_y()) <= input_config::double_click_tolerance))
 				{
 					CursorTarget::reset_selection_click_time(); // reset to prevent triple-click
-					double_click_consumed = m_dialog_box_manager.handle_double_click(mouse_x, mouse_y);
+					double_click_consumed = get_dialog_box_manager().handle_double_click();
+					if (!double_click_consumed)
+						get_dialog_box_manager().handle_click();
 				}
 				else // Click
 				{
-					m_dialog_box_manager.handle_click(mouse_x, mouse_y);
+					get_dialog_box_manager().handle_click();
 				}
 			}
 			else
 			{
-				m_dialog_box_manager.handle_click(mouse_x, mouse_y);
+				get_dialog_box_manager().handle_click();
 			}
 			CursorTarget::record_selection_click(mouse_x, mouse_y, current_time);
 			if (!double_click_consumed && CursorTarget::GetSelectedType() == SelectedObjectType::Item)
 			{
-				if (!m_dialog_box_manager.handle_dragging_item_release(mouse_x, mouse_y))
+				if (!get_dialog_box_manager().handle_dragging_item_release())
 				{
-					item_drop_external_screen(static_cast<char>(CursorTarget::get_selected_id()), mouse_x, mouse_y);
+					if (auto* on_game = GameModeManager::get_active_screen_as<Screen_OnGame>())
+						on_game->item_drop_external_screen(static_cast<char>(CursorTarget::get_selected_id()), mouse_x, mouse_y);
 				}
 			}
 			// Always clear selection after click-release to prevent stale state
@@ -6138,7 +4490,8 @@ void CGame::command_processor(short mouse_x, short mouse_y, short tile_x, short 
 		{
 			if ((m_map_data->is_teleport_loc(m_player->m_player_x, m_player->m_player_y) == true) && (m_player->m_Controller.get_command_count() == 0)) break;
 
-			if ((CursorTarget::get_prev_x() != mouse_x) || (CursorTarget::get_prev_y() != mouse_y))
+			if ((abs(CursorTarget::get_prev_x() - mouse_x) > input_config::double_click_tolerance) ||
+				(abs(CursorTarget::get_prev_y() - mouse_y) > input_config::double_click_tolerance))
 			{
 				CursorTarget::set_cursor_status(CursorStatus::Dragging);
 				CursorTarget::set_prev_position(mouse_x, mouse_y);
@@ -6148,17 +4501,17 @@ void CGame::command_processor(short mouse_x, short mouse_y, short tile_x, short 
 				}
 
 				if ((CursorTarget::GetSelectedType() == SelectedObjectType::DialogBox) &&
-					(CursorTarget::get_selected_id() == 7) && (m_dialog_box_manager.Info(DialogBoxId::GuildMenu).m_mode == 1))
+					(CursorTarget::get_selected_id() == 7) && (get_dialog_box_manager().get_dialog_as<DialogBox_GuildMenu>(DialogBoxId::GuildMenu)->m_mode == DialogBox_GuildMenu::mode::create_guild))
 				{
 					text_input_manager::get().end_input();
-					m_dialog_box_manager.Info(DialogBoxId::GuildMenu).m_mode = 20;
+					get_dialog_box_manager().get_dialog_as<DialogBox_GuildMenu>(DialogBoxId::GuildMenu)->m_mode = DialogBox_GuildMenu::mode::confirm_cancel;
 				}
 				// Query Drop Item Amount
 				if ((CursorTarget::GetSelectedType() == SelectedObjectType::DialogBox) &&
-					(CursorTarget::get_selected_id() == 17) && (m_dialog_box_manager.Info(DialogBoxId::ItemDropExternal).m_mode == 1))
+					(CursorTarget::get_selected_id() == 17) && (get_dialog_box_manager().get_dialog_as<DialogBox_ItemDropAmount>(DialogBoxId::ItemDropExternal)->m_mode == DialogBox_ItemDropAmount::mode::input))
 				{
 					text_input_manager::get().end_input();
-					m_dialog_box_manager.Info(DialogBoxId::ItemDropExternal).m_mode = 20;
+					get_dialog_box_manager().get_dialog_as<DialogBox_ItemDropAmount>(DialogBoxId::ItemDropExternal)->m_mode = DialogBox_ItemDropAmount::mode::selected;
 				}
 				return;
 			}
@@ -6175,8 +4528,11 @@ void CGame::command_processor(short mouse_x, short mouse_y, short tile_x, short 
 				// HudPanel is fixed and cannot be moved
 				if (CursorTarget::get_selected_id() != DialogBoxId::HudPanel)
 				{
-					m_dialog_box_manager.Info(CursorTarget::get_selected_id()).m_x = mouse_x - CursorTarget::get_drag_dist_x();
-					m_dialog_box_manager.Info(CursorTarget::get_selected_id()).m_y = mouse_y - CursorTarget::get_drag_dist_y();
+					auto* drag_dlg = get_dialog_box_manager().get_dialog_box(CursorTarget::get_selected_id());
+					if (drag_dlg) {
+						drag_dlg->m_x = mouse_x - CursorTarget::get_drag_dist_x();
+						drag_dlg->m_y = mouse_y - CursorTarget::get_drag_dist_y();
+					}
 				}
 			}
 			CursorTarget::set_prev_position(mouse_x, mouse_y);
@@ -6189,42 +4545,42 @@ void CGame::command_processor(short mouse_x, short mouse_y, short tile_x, short 
 			switch (CursorTarget::GetSelectedType()) {
 			case SelectedObjectType::DialogBox:
 				if ((CursorTarget::GetSelectedType() == SelectedObjectType::DialogBox) &&
-					(CursorTarget::get_selected_id() == 7) && (m_dialog_box_manager.Info(DialogBoxId::GuildMenu).m_mode == 20))
+					(CursorTarget::get_selected_id() == 7) && (get_dialog_box_manager().get_dialog_as<DialogBox_GuildMenu>(DialogBoxId::GuildMenu)->m_mode == DialogBox_GuildMenu::mode::confirm_cancel))
 				{
-					dialog_x = m_dialog_box_manager.Info(DialogBoxId::GuildMenu).m_x;
-					dialog_y = m_dialog_box_manager.Info(DialogBoxId::GuildMenu).m_y;
+					dialog_x = get_dialog_box_manager().get_dialog_box(DialogBoxId::GuildMenu)->m_x;
+					dialog_y = get_dialog_box_manager().get_dialog_box(DialogBoxId::GuildMenu)->m_y;
 					text_input_manager::get().start_input(dialog_x + 75, dialog_y + 140, 21, m_player->m_guild_name);
-					m_dialog_box_manager.Info(DialogBoxId::GuildMenu).m_mode = 1;
+					get_dialog_box_manager().get_dialog_as<DialogBox_GuildMenu>(DialogBoxId::GuildMenu)->m_mode = DialogBox_GuildMenu::mode::create_guild;
 				}
 
 				if ((CursorTarget::GetSelectedType() == SelectedObjectType::DialogBox) &&
-					(CursorTarget::get_selected_id() == 17) && (m_dialog_box_manager.Info(DialogBoxId::ItemDropExternal).m_mode == 20))
+					(CursorTarget::get_selected_id() == 17) && (get_dialog_box_manager().get_dialog_as<DialogBox_ItemDropAmount>(DialogBoxId::ItemDropExternal)->m_mode == DialogBox_ItemDropAmount::mode::selected))
 				{	// Query Drop Item Amount
-					dialog_x = m_dialog_box_manager.Info(DialogBoxId::ItemDropExternal).m_x;
-					dialog_y = m_dialog_box_manager.Info(DialogBoxId::ItemDropExternal).m_y;
+					dialog_x = get_dialog_box_manager().get_dialog_box(DialogBoxId::ItemDropExternal)->m_x;
+					dialog_y = get_dialog_box_manager().get_dialog_box(DialogBoxId::ItemDropExternal)->m_y;
 					text_input_manager::get().start_input(dialog_x + 40, dialog_y + 57, AmountStringMaxLen, m_amount_string);
-					m_dialog_box_manager.Info(DialogBoxId::ItemDropExternal).m_mode = 1;
+					get_dialog_box_manager().get_dialog_as<DialogBox_ItemDropAmount>(DialogBoxId::ItemDropExternal)->m_mode = DialogBox_ItemDropAmount::mode::input;
 				}
 
 				if (CursorTarget::get_selected_id() == 9)
 				{
 					{
-						if (mouse_x < 400) //LifeX Fix Map
+						if (mouse_x < LOGICAL_WIDTH() / 2)
 						{
-							m_dialog_box_manager.Info(DialogBoxId::GuideMap).m_x = 0;
+							get_dialog_box_manager().get_dialog_box(DialogBoxId::GuideMap)->m_x = 0;
 						}
 						else
 						{
-							m_dialog_box_manager.Info(DialogBoxId::GuideMap).m_x = LOGICAL_MAX_X() - m_dialog_box_manager.Info(DialogBoxId::GuideMap).m_size_x;
+							get_dialog_box_manager().get_dialog_box(DialogBoxId::GuideMap)->m_x = LOGICAL_MAX_X() - get_dialog_box_manager().get_dialog_box(DialogBoxId::GuideMap)->m_size_x;
 						}
 
-						if (mouse_y < 273)
+						if (mouse_y < LOGICAL_HEIGHT() / 2)
 						{
-							m_dialog_box_manager.Info(DialogBoxId::GuideMap).m_y = 0;
+							get_dialog_box_manager().get_dialog_box(DialogBoxId::GuideMap)->m_y = 0;
 						}
 						else
 						{
-							m_dialog_box_manager.Info(DialogBoxId::GuideMap).m_y = 547 - m_dialog_box_manager.Info(DialogBoxId::GuideMap).m_size_y;
+							get_dialog_box_manager().get_dialog_box(DialogBoxId::GuideMap)->m_y = (LOGICAL_HEIGHT() - ICON_PANEL_HEIGHT()) - get_dialog_box_manager().get_dialog_box(DialogBoxId::GuideMap)->m_size_y;
 						}
 					}
 				}
@@ -6233,9 +4589,10 @@ void CGame::command_processor(short mouse_x, short mouse_y, short tile_x, short 
 				break;
 
 			case SelectedObjectType::Item:
-				if (!m_dialog_box_manager.handle_dragging_item_release(mouse_x, mouse_y))
+				if (!get_dialog_box_manager().handle_dragging_item_release())
 				{
-					item_drop_external_screen(static_cast<char>(CursorTarget::get_selected_id()), mouse_x, mouse_y);
+					if (auto* on_game = GameModeManager::get_active_screen_as<Screen_OnGame>())
+						on_game->item_drop_external_screen(static_cast<char>(CursorTarget::get_selected_id()), mouse_x, mouse_y);
 				}
 				CursorTarget::clear_selection();
 				break;
@@ -6285,11 +4642,11 @@ void CGame::command_processor(short mouse_x, short mouse_y, short tile_x, short 
 				// Right click while moving: stop after current step and face click direction
 				m_player->m_Controller.set_destination(m_player->m_player_x, m_player->m_player_y);
 				// save pending direction to apply when movement stops
-				char pendingDir = CMisc::get_next_move_dir(m_player->m_player_x, m_player->m_player_y, tile_x, tile_y);
-				if (pendingDir != 0) m_player->m_Controller.set_pending_stop_dir(pendingDir);
+				direction pending_dir = CMisc::get_next_move_dir(m_player->m_player_x, m_player->m_player_y, tile_x, tile_y);
+				if (pending_dir != 0) m_player->m_Controller.set_pending_stop_dir(pending_dir);
 			}
 		}
-		else if (config_manager::get().is_quick_actions_enabled() && right_button != 0 && cmd == Type::stop && !m_is_get_pointing_mode)
+		else if (config_manager::get().is_quick_actions_enabled() && right_button != 0 && cmd == Type::stop && !on_game()->m_is_get_pointing_mode)
 		{
 			// Right click while stopped (and not casting): process turn immediately
 			// But don't interrupt attack/magic animations — the controller command is STOP
@@ -6298,16 +4655,18 @@ void CGame::command_processor(short mouse_x, short mouse_y, short tile_x, short 
 			int yc = m_player->m_player_y - m_map_data->m_pivot_y;
 			if (xc >= 0 && xc < MapDataSizeX && yc >= 0 && yc < MapDataSizeY) {
 				int8_t animAction = m_map_data->m_data[xc][yc].m_animation.m_action;
-				if (animAction == Type::Attack || animAction == Type::AttackMove || animAction == Type::Magic)
+				if (animAction == Type::Attack || animAction == Type::AttackMove || animAction == Type::Magic
+					|| animAction == Type::GetItem || animAction == Type::Damage || animAction == Type::DamageMove)
 					return;
 			}
-			direction = CMisc::get_next_move_dir(m_player->m_player_x, m_player->m_player_y, tile_x, tile_y);
-			if (direction != 0 && m_player->m_player_dir != direction)
+			move_dir = CMisc::get_next_move_dir(m_player->m_player_x, m_player->m_player_y, tile_x, tile_y);
+			if (move_dir != 0 && m_player->m_player_dir != move_dir)
 			{
-				m_player->m_player_dir = direction;
-				send_command(MsgId::CommandMotion, Type::stop, direction, 0, 0, 0, 0);
+				m_player->m_player_dir = move_dir;
+				send_game_packet(hb::net::make_motion(Type::stop, m_player->m_player_x, m_player->m_player_y, move_dir));
+				m_player->m_Controller.increment_command_count();
 				m_map_data->set_owner(m_player->m_player_object_id, m_player->m_player_x, m_player->m_player_y,
-					m_player->m_player_type, direction, m_player->m_playerAppearance,
+					m_player->m_player_type, move_dir, m_player->m_playerAppearance,
 					m_player->m_playerStatus, m_player->m_player_name, Type::stop, 0, 0, 0, 0, 10);
 				m_player->m_Controller.set_command_time(current_time);
 			}
@@ -6317,8 +4676,8 @@ void CGame::command_processor(short mouse_x, short mouse_y, short tile_x, short 
 	if ((current_time - m_player->m_Controller.get_command_time()) < 300)
 	{
 		m_g_sock.reset();
-		play_game_sound('E', 14, 5);
-		audio_manager::get().stop_sound(sound_type::Effect, 38);
+		audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
+		audio_manager::get().stop_sound(sound_type::effect, 38);
 		audio_manager::get().stop_music();
 		change_game_mode(GameMode::MainMenu);
 		return;
@@ -6331,7 +4690,8 @@ void CGame::command_processor(short mouse_x, short mouse_y, short tile_x, short 
 		process_motion_commands(action_type); return;
 	}
 
-	if ((m_map_data->is_teleport_loc(m_player->m_player_x, m_player->m_player_y) == true) && (m_player->m_Controller.get_command_count() == 0))
+	if ((m_map_data->is_teleport_loc(m_player->m_player_x, m_player->m_player_y) == true) && (m_player->m_Controller.get_command_count() == 0)
+		&& !teleport_manager::get().is_rejected_tile(m_player->m_player_x, m_player->m_player_y))
 		request_teleport_and_wait_data();
 
 	// indexX, indexY
@@ -6355,68 +4715,127 @@ bool CGame::process_left_click(short mouse_x, short mouse_y, short tile_x, short
 	hb::shared::entity::PlayerStatus object_status;
 	char abs_x = 0, abs_y = 0;
 
-		if (m_is_get_pointing_mode == true)
-		{
-			if ((m_mcx != 0) || (m_mcy != 0))
-				point_command_handler(m_mcx, m_mcy);
-			else point_command_handler(tile_x, tile_y);
+	if (on_game()->m_is_get_pointing_mode == true)
+	{
+		if ((m_mcx != 0) || (m_mcy != 0))
+			point_command_handler(m_mcx, m_mcy);
+		else point_command_handler(tile_x, tile_y);
 
-			m_player->m_Controller.set_command_available(false);
-			m_player->m_Controller.set_command_time(GameClock::get_time_ms());
-			m_is_get_pointing_mode = false;
-			m_magic_cast_time = current_time;  // Track when magic was cast
-			return true;
+		m_player->m_Controller.set_command_available(false);
+		m_player->m_Controller.set_command_time(GameClock::get_time_ms());
+		on_game()->m_is_get_pointing_mode = false;
+		on_game()->m_magic_cast_time = current_time;  // Track when magic was cast
+		return true;
+	}
+
+	// Delay after magic cast before allowing held-click actions
+	if (on_game()->m_magic_cast_time > 0 && (current_time - on_game()->m_magic_cast_time) < 750) return true;
+
+	m_map_data->get_owner(m_mcx, m_mcy - 1, name, &object_type, &object_status, &m_comm_object_id); // v1.4
+	if (m_mc_name == m_player->m_player_name && (object_type <= 6 || (m_map_data->m_data[m_player->m_player_x - m_map_data->m_pivot_x][m_player->m_player_y - m_map_data->m_pivot_y].m_item_id != 0 && m_item_config_list[m_map_data->m_data[m_player->m_player_x - m_map_data->m_pivot_x][m_player->m_player_y - m_map_data->m_pivot_y].m_item_id] != nullptr)))
+	{
+		if ((m_player->m_player_type >= 1) && (m_player->m_player_type <= 6)/* && (!m_player->m_playerAppearance.is_walking)*/)
+		{
+			m_player->m_Controller.set_command(Type::GetItem);
+			m_player->m_Controller.set_destination(m_player->m_player_x, m_player->m_player_y);
 		}
-
-		// Delay after magic cast before allowing held-click actions
-		if (m_magic_cast_time > 0 && (current_time - m_magic_cast_time) < 750) return true;
-
-		m_map_data->get_owner(m_mcx, m_mcy - 1, name, &object_type, &object_status, &m_comm_object_id); // v1.4
-		if (m_mc_name == m_player->m_player_name && (object_type <= 6 || (m_map_data->m_data[m_player->m_player_x - m_map_data->m_pivot_x][m_player->m_player_y - m_map_data->m_pivot_y].m_item_id != 0 && m_item_config_list[m_map_data->m_data[m_player->m_player_x - m_map_data->m_pivot_x][m_player->m_player_y - m_map_data->m_pivot_y].m_item_id]->m_sprite != 0)))
+	}
+	else
+	{
+		if (m_mc_name == m_player->m_player_name) m_mcy -= 1;
+		if ((m_mcx != 0) && (m_mcy != 0)) // m_mcx, m_mcy
 		{
-			if ((m_player->m_player_type >= 1) && (m_player->m_player_type <= 6)/* && (!m_player->m_playerAppearance.is_walking)*/)
+			if (hb::shared::input::is_ctrl_down() == true)
 			{
-				m_player->m_Controller.set_command(Type::GetItem);
-				m_player->m_Controller.set_destination(m_player->m_player_x, m_player->m_player_y);
-			}
-		}
-		else
-		{
-			if (m_mc_name == m_player->m_player_name) m_mcy -= 1;
-			if ((m_mcx != 0) && (m_mcy != 0)) // m_mcx, m_mcy
-			{
-				if (hb::shared::input::is_ctrl_down() == true)
+				m_map_data->get_owner(m_mcx, m_mcy, name, &object_type, &object_status, &m_comm_object_id);
+				if (object_status.invisibility) return true;
+				if ((object_type == 15) || (object_type == 20) || (object_type == 24)) return true;
+				abs_x = abs(m_player->m_player_x - m_mcx);
+				abs_y = abs(m_player->m_player_y - m_mcy);
+				if ((abs_x <= 1) && (abs_y <= 1))
 				{
-					m_map_data->get_owner(m_mcx, m_mcy, name, &object_type, &object_status, &m_comm_object_id);
-					if (object_status.invisibility) return true;
-					if ((object_type == 15) || (object_type == 20) || (object_type == 24)) return true;
-					abs_x = abs(m_player->m_player_x - m_mcx);
-					abs_y = abs(m_player->m_player_y - m_mcy);
-					if ((abs_x <= 1) && (abs_y <= 1))
-					{
-						action_type = combat_system::get().get_attack_type();
+					action_type = combat_system::get().get_attack_type();
+					m_player->m_Controller.set_command(Type::Attack);
+					m_player->m_Controller.set_destination(m_mcx, m_mcy);
+				}
+				else if ((abs_x <= 2) && (abs_y <= 2) // strike on Big mobs & gate from a range
+					&& ((object_type == 66) || (object_type == 73) || (object_type == 81) || (object_type == 91)))
+				{
+					action_type = combat_system::get().get_attack_type();
+					m_player->m_Controller.set_command(Type::Attack);
+					m_player->m_Controller.set_destination(m_mcx, m_mcy);
+				}
+				else // Pas au corp � corp
+				{
+					switch (combat_system::get().get_weapon_skill_type()) {
+					case 6: // Bow
 						m_player->m_Controller.set_command(Type::Attack);
 						m_player->m_Controller.set_destination(m_mcx, m_mcy);
-					}
-					else if ((abs_x <= 2) && (abs_y <= 2) // strike on Big mobs & gate from a range
-						&& ((object_type == 66) || (object_type == 73) || (object_type == 81) || (object_type == 91)))
-					{
 						action_type = combat_system::get().get_attack_type();
-						m_player->m_Controller.set_command(Type::Attack);
-						m_player->m_Controller.set_destination(m_mcx, m_mcy);
-					}
-					else // Pas au corp � corp
-					{
-						switch (combat_system::get().get_weapon_skill_type()) {
-						case 6: // Bow
+						break;
+
+					case 5: // OpenHand
+					case 7: // SS
+						if (((abs_x == 2) && (abs_y == 2)) || ((abs_x == 0) && (abs_y == 2)) || ((abs_x == 2) && (abs_y == 0)))
+						{
+							if ((hb::shared::input::is_shift_down() || config_manager::get().is_running_mode_enabled()) && (m_player->m_sp > 0))
+							{
+								if (m_player->m_skill_mastery[combat_system::get().get_weapon_skill_type()] == 100)
+								{
+									m_player->m_Controller.set_command(Type::AttackMove);
+									action_type = combat_system::get().get_attack_type();
+								}
+								else
+								{
+									m_player->m_Controller.set_command(Type::Run);
+									m_player->m_Controller.calculate_player_turn(m_player->m_player_x, m_player->m_player_y, m_map_data.get());
+								}
+								m_player->m_Controller.set_destination(m_mcx, m_mcy);
+							}
+							else
+							{
+								m_player->m_Controller.set_command(Type::Move);
+								m_player->m_Controller.set_destination(m_mcx, m_mcy);
+								m_player->m_Controller.calculate_player_turn(m_player->m_player_x, m_player->m_player_y, m_map_data.get());
+							}
+						}
+						else
+						{
+							if ((hb::shared::input::is_shift_down() || config_manager::get().is_running_mode_enabled()) && (m_player->m_sp > 0)
+								&& (m_player->m_player_type >= 1) && (m_player->m_player_type <= 6))
+								m_player->m_Controller.set_command(Type::Run);	// Staminar
+							else m_player->m_Controller.set_command(Type::Move);
+							m_player->m_Controller.set_destination(m_mcx, m_mcy);
+							m_player->m_Controller.calculate_player_turn(m_player->m_player_x, m_player->m_player_y, m_map_data.get());
+						}
+						break;
+
+					case 8: // LS
+						if ((abs_x <= 3) && (abs_y <= 3) && combat_system::get().can_super_attack()
+							&& (combat_system::get().get_attack_type() != 30)) // Crit without StormBlade
+						{
+							action_type = combat_system::get().get_attack_type();
 							m_player->m_Controller.set_command(Type::Attack);
 							m_player->m_Controller.set_destination(m_mcx, m_mcy);
+						}
+						else if ((abs_x <= 5) && (abs_y <= 5) && combat_system::get().can_super_attack()
+							&& (combat_system::get().get_attack_type() == 30))  // Crit with StormBlade (by Snoopy)
+						{
 							action_type = combat_system::get().get_attack_type();
-							break;
-
-						case 5: // OpenHand
-						case 7: // SS
-							if (((abs_x == 2) && (abs_y == 2)) || ((abs_x == 0) && (abs_y == 2)) || ((abs_x == 2) && (abs_y == 0)))
+							m_player->m_Controller.set_command(Type::Attack);
+							m_player->m_Controller.set_destination(m_mcx, m_mcy);
+						}
+						else if ((abs_x <= 3) && (abs_y <= 3)
+							&& (combat_system::get().get_attack_type() == 5))  // Normal hit with StormBlade (by Snoopy)
+						{
+							action_type = combat_system::get().get_attack_type();
+							m_player->m_Controller.set_command(Type::Attack);
+							m_player->m_Controller.set_destination(m_mcx, m_mcy);
+						}
+						else // Swing
+						{
+							if (((abs_x == 2) && (abs_y == 2)) || ((abs_x == 0) && (abs_y == 2)) || ((abs_x == 2) && (abs_y == 0))
+								&& (combat_system::get().get_attack_type() != 5)) // no Dash possible with StormBlade
 							{
 								if ((hb::shared::input::is_shift_down() || config_manager::get().is_running_mode_enabled()) && (m_player->m_sp > 0))
 								{
@@ -6443,141 +4862,391 @@ bool CGame::process_left_click(short mouse_x, short mouse_y, short tile_x, short
 							{
 								if ((hb::shared::input::is_shift_down() || config_manager::get().is_running_mode_enabled()) && (m_player->m_sp > 0)
 									&& (m_player->m_player_type >= 1) && (m_player->m_player_type <= 6))
-									m_player->m_Controller.set_command(Type::Run);	// Staminar
+									m_player->m_Controller.set_command(Type::Run);
 								else m_player->m_Controller.set_command(Type::Move);
 								m_player->m_Controller.set_destination(m_mcx, m_mcy);
 								m_player->m_Controller.calculate_player_turn(m_player->m_player_x, m_player->m_player_y, m_map_data.get());
 							}
-							break;
+						}
+						break;
 
-						case 8: // LS
-							if ((abs_x <= 3) && (abs_y <= 3) && combat_system::get().can_super_attack()
-								&& (combat_system::get().get_attack_type() != 30)) // Crit without StormBlade
-							{
-								action_type = combat_system::get().get_attack_type();
-								m_player->m_Controller.set_command(Type::Attack);
-								m_player->m_Controller.set_destination(m_mcx, m_mcy);
+					case 9: // Fencing
+						if ((abs_x <= 4) && (abs_y <= 4) && combat_system::get().can_super_attack())
+						{
+							m_player->m_Controller.set_command(Type::Attack);
+							m_player->m_Controller.set_destination(m_mcx, m_mcy);
+							action_type = combat_system::get().get_attack_type();
+						}
+						else {
+							if (((abs_x == 2) && (abs_y == 2)) || ((abs_x == 0) && (abs_y == 2)) || ((abs_x == 2) && (abs_y == 0))) {
+								if ((hb::shared::input::is_shift_down() || config_manager::get().is_running_mode_enabled()) && (m_player->m_sp > 0)) {
+									if (m_player->m_skill_mastery[combat_system::get().get_weapon_skill_type()] == 100) {
+										m_player->m_Controller.set_command(Type::AttackMove);
+										action_type = combat_system::get().get_attack_type();
+									}
+									else {
+										m_player->m_Controller.set_command(Type::Run);
+										m_player->m_Controller.calculate_player_turn(m_player->m_player_x, m_player->m_player_y, m_map_data.get());
+									}
+									m_player->m_Controller.set_destination(m_mcx, m_mcy);
+								}
+								else {
+									m_player->m_Controller.set_command(Type::Move);
+									m_player->m_Controller.set_destination(m_mcx, m_mcy);
+									m_player->m_Controller.calculate_player_turn(m_player->m_player_x, m_player->m_player_y, m_map_data.get());
+								}
 							}
-							else if ((abs_x <= 5) && (abs_y <= 5) && combat_system::get().can_super_attack()
-								&& (combat_system::get().get_attack_type() == 30))  // Crit with StormBlade (by Snoopy)
-							{
-								action_type = combat_system::get().get_attack_type();
-								m_player->m_Controller.set_command(Type::Attack);
+							else {
+								if ((hb::shared::input::is_shift_down() || config_manager::get().is_running_mode_enabled()) && (m_player->m_sp > 0) &&
+									(m_player->m_player_type >= 1) && (m_player->m_player_type <= 6))
+									m_player->m_Controller.set_command(Type::Run);
+								else m_player->m_Controller.set_command(Type::Move);
 								m_player->m_Controller.set_destination(m_mcx, m_mcy);
+								m_player->m_Controller.calculate_player_turn(m_player->m_player_x, m_player->m_player_y, m_map_data.get());
 							}
-							else if ((abs_x <= 3) && (abs_y <= 3)
-								&& (combat_system::get().get_attack_type() == 5))  // Normal hit with StormBlade (by Snoopy)
+						}
+						break;
+
+					case hb::shared::owner::Slime: // Axe
+						if ((abs_x <= 2) && (abs_y <= 2) && combat_system::get().can_super_attack())
+						{
+							m_player->m_Controller.set_command(Type::Attack);
+							m_player->m_Controller.set_destination(m_mcx, m_mcy);
+							action_type = combat_system::get().get_attack_type();
+						}
+						else
+						{
+							if (((abs_x == 2) && (abs_y == 2)) || ((abs_x == 0) && (abs_y == 2)) || ((abs_x == 2) && (abs_y == 0)))
 							{
-								action_type = combat_system::get().get_attack_type();
-								m_player->m_Controller.set_command(Type::Attack);
-								m_player->m_Controller.set_destination(m_mcx, m_mcy);
-							}
-							else // Swing
-							{
-								if (((abs_x == 2) && (abs_y == 2)) || ((abs_x == 0) && (abs_y == 2)) || ((abs_x == 2) && (abs_y == 0))
-									&& (combat_system::get().get_attack_type() != 5)) // no Dash possible with StormBlade
+								if ((hb::shared::input::is_shift_down() || config_manager::get().is_running_mode_enabled()) && (m_player->m_sp > 0))
 								{
-									if ((hb::shared::input::is_shift_down() || config_manager::get().is_running_mode_enabled()) && (m_player->m_sp > 0))
+									if (m_player->m_skill_mastery[combat_system::get().get_weapon_skill_type()] == 100)
 									{
-										if (m_player->m_skill_mastery[combat_system::get().get_weapon_skill_type()] == 100)
-										{
-											m_player->m_Controller.set_command(Type::AttackMove);
-											action_type = combat_system::get().get_attack_type();
-										}
-										else
-										{
-											m_player->m_Controller.set_command(Type::Run);
-											m_player->m_Controller.calculate_player_turn(m_player->m_player_x, m_player->m_player_y, m_map_data.get());
-										}
-										m_player->m_Controller.set_destination(m_mcx, m_mcy);
+										m_player->m_Controller.set_command(Type::AttackMove);
+										action_type = combat_system::get().get_attack_type();
 									}
 									else
 									{
-										m_player->m_Controller.set_command(Type::Move);
-										m_player->m_Controller.set_destination(m_mcx, m_mcy);
+										m_player->m_Controller.set_command(Type::Run);
 										m_player->m_Controller.calculate_player_turn(m_player->m_player_x, m_player->m_player_y, m_map_data.get());
 									}
+									m_player->m_Controller.set_destination(m_mcx, m_mcy);
 								}
 								else
 								{
-									if ((hb::shared::input::is_shift_down() || config_manager::get().is_running_mode_enabled()) && (m_player->m_sp > 0)
-										&& (m_player->m_player_type >= 1) && (m_player->m_player_type <= 6))
-										m_player->m_Controller.set_command(Type::Run);
-									else m_player->m_Controller.set_command(Type::Move);
+									m_player->m_Controller.set_command(Type::Move);
 									m_player->m_Controller.set_destination(m_mcx, m_mcy);
 									m_player->m_Controller.calculate_player_turn(m_player->m_player_x, m_player->m_player_y, m_map_data.get());
 								}
-							}
-							break;
-
-						case 9: // Fencing
-							if ((abs_x <= 4) && (abs_y <= 4) && combat_system::get().can_super_attack())
-							{
-								m_player->m_Controller.set_command(Type::Attack);
-								m_player->m_Controller.set_destination(m_mcx, m_mcy);
-								action_type = combat_system::get().get_attack_type();
-							}
-							else {
-								if (((abs_x == 2) && (abs_y == 2)) || ((abs_x == 0) && (abs_y == 2)) || ((abs_x == 2) && (abs_y == 0))) {
-									if ((hb::shared::input::is_shift_down() || config_manager::get().is_running_mode_enabled()) && (m_player->m_sp > 0)) {
-										if (m_player->m_skill_mastery[combat_system::get().get_weapon_skill_type()] == 100) {
-											m_player->m_Controller.set_command(Type::AttackMove);
-											action_type = combat_system::get().get_attack_type();
-										}
-										else {
-											m_player->m_Controller.set_command(Type::Run);
-											m_player->m_Controller.calculate_player_turn(m_player->m_player_x, m_player->m_player_y, m_map_data.get());
-										}
-										m_player->m_Controller.set_destination(m_mcx, m_mcy);
-									}
-									else {
-										m_player->m_Controller.set_command(Type::Move);
-										m_player->m_Controller.set_destination(m_mcx, m_mcy);
-										m_player->m_Controller.calculate_player_turn(m_player->m_player_x, m_player->m_player_y, m_map_data.get());
-									}
-								}
-								else {
-									if ((hb::shared::input::is_shift_down() || config_manager::get().is_running_mode_enabled()) && (m_player->m_sp > 0) &&
-										(m_player->m_player_type >= 1) && (m_player->m_player_type <= 6))
-										m_player->m_Controller.set_command(Type::Run);
-									else m_player->m_Controller.set_command(Type::Move);
-									m_player->m_Controller.set_destination(m_mcx, m_mcy);
-									m_player->m_Controller.calculate_player_turn(m_player->m_player_x, m_player->m_player_y, m_map_data.get());
-								}
-							}
-							break;
-
-						case hb::shared::owner::Slime: // Axe
-							if ((abs_x <= 2) && (abs_y <= 2) && combat_system::get().can_super_attack())
-							{
-								m_player->m_Controller.set_command(Type::Attack);
-								m_player->m_Controller.set_destination(m_mcx, m_mcy);
-								action_type = combat_system::get().get_attack_type();
 							}
 							else
 							{
-								if (((abs_x == 2) && (abs_y == 2)) || ((abs_x == 0) && (abs_y == 2)) || ((abs_x == 2) && (abs_y == 0)))
-								{
-									if ((hb::shared::input::is_shift_down() || config_manager::get().is_running_mode_enabled()) && (m_player->m_sp > 0))
-									{
-										if (m_player->m_skill_mastery[combat_system::get().get_weapon_skill_type()] == 100)
-										{
-											m_player->m_Controller.set_command(Type::AttackMove);
-											action_type = combat_system::get().get_attack_type();
-										}
-										else
-										{
-											m_player->m_Controller.set_command(Type::Run);
-											m_player->m_Controller.calculate_player_turn(m_player->m_player_x, m_player->m_player_y, m_map_data.get());
-										}
-										m_player->m_Controller.set_destination(m_mcx, m_mcy);
+								if ((hb::shared::input::is_shift_down() || config_manager::get().is_running_mode_enabled()) && (m_player->m_sp > 0) &&
+									(m_player->m_player_type >= 1) && (m_player->m_player_type <= 6))
+									m_player->m_Controller.set_command(Type::Run);
+								else m_player->m_Controller.set_command(Type::Move);
+								m_player->m_Controller.set_destination(m_mcx, m_mcy);
+								m_player->m_Controller.calculate_player_turn(m_player->m_player_x, m_player->m_player_y, m_map_data.get());
+							}
+						}
+						break;
+					case hb::shared::owner::OrcMage: // Hammer
+						if ((abs_x <= 2) && (abs_y <= 2) && combat_system::get().can_super_attack()) {
+							m_player->m_Controller.set_command(Type::Attack);
+							m_player->m_Controller.set_destination(m_mcx, m_mcy);
+							action_type = combat_system::get().get_attack_type();
+						}
+						else {
+							if (((abs_x == 2) && (abs_y == 2)) || ((abs_x == 0) && (abs_y == 2)) || ((abs_x == 2) && (abs_y == 0))) {
+								if ((hb::shared::input::is_shift_down() || config_manager::get().is_running_mode_enabled()) && (m_player->m_sp > 0)) {
+									if (m_player->m_skill_mastery[combat_system::get().get_weapon_skill_type()] == 100) {
+										m_player->m_Controller.set_command(Type::AttackMove);
+										action_type = combat_system::get().get_attack_type();
 									}
-									else
-									{
-										m_player->m_Controller.set_command(Type::Move);
-										m_player->m_Controller.set_destination(m_mcx, m_mcy);
+									else {
+										m_player->m_Controller.set_command(Type::Run);
 										m_player->m_Controller.calculate_player_turn(m_player->m_player_x, m_player->m_player_y, m_map_data.get());
 									}
+									m_player->m_Controller.set_destination(m_mcx, m_mcy);
+								}
+								else {
+									m_player->m_Controller.set_command(Type::Move);
+									m_player->m_Controller.set_destination(m_mcx, m_mcy);
+									m_player->m_Controller.calculate_player_turn(m_player->m_player_x, m_player->m_player_y, m_map_data.get());
+								}
+							}
+							else {
+								if ((hb::shared::input::is_shift_down() || config_manager::get().is_running_mode_enabled()) && (m_player->m_sp > 0) &&
+									(m_player->m_player_type >= 1) && (m_player->m_player_type <= 6))
+									m_player->m_Controller.set_command(Type::Run);
+								else m_player->m_Controller.set_command(Type::Move);
+								m_player->m_Controller.set_destination(m_mcx, m_mcy);
+								m_player->m_Controller.calculate_player_turn(m_player->m_player_x, m_player->m_player_y, m_map_data.get());
+							}
+						}
+						break;
+					case hb::shared::owner::Guard: // Wand
+						if ((abs_x <= 2) && (abs_y <= 2) && combat_system::get().can_super_attack()) {
+							m_player->m_Controller.set_command(Type::Attack);
+							m_player->m_Controller.set_destination(m_mcx, m_mcy);
+							action_type = combat_system::get().get_attack_type();
+						}
+						else {
+							if (((abs_x == 2) && (abs_y == 2)) || ((abs_x == 0) && (abs_y == 2)) || ((abs_x == 2) && (abs_y == 0))) {
+								if ((hb::shared::input::is_shift_down() || config_manager::get().is_running_mode_enabled()) && (m_player->m_sp > 0)) {
+									if (m_player->m_skill_mastery[combat_system::get().get_weapon_skill_type()] == 100) {
+										m_player->m_Controller.set_command(Type::AttackMove);
+										action_type = combat_system::get().get_attack_type();
+									}
+									else {
+										m_player->m_Controller.set_command(Type::Run);
+										m_player->m_Controller.calculate_player_turn(m_player->m_player_x, m_player->m_player_y, m_map_data.get());
+									}
+									m_player->m_Controller.set_destination(m_mcx, m_mcy);
+								}
+								else {
+									m_player->m_Controller.set_command(Type::Move);
+									m_player->m_Controller.set_destination(m_mcx, m_mcy);
+									m_player->m_Controller.calculate_player_turn(m_player->m_player_x, m_player->m_player_y, m_map_data.get());
+								}
+							}
+							else {
+								if ((hb::shared::input::is_shift_down() || config_manager::get().is_running_mode_enabled()) && (m_player->m_sp > 0) &&
+									(m_player->m_player_type >= 1) && (m_player->m_player_type <= 6))
+									m_player->m_Controller.set_command(Type::Run);
+								else m_player->m_Controller.set_command(Type::Move);
+								m_player->m_Controller.set_destination(m_mcx, m_mcy);
+								m_player->m_Controller.calculate_player_turn(m_player->m_player_x, m_player->m_player_y, m_map_data.get());
+							}
+						}
+						break;
+					}
+				}
+			}
+			else // CTRL not pressed
+			{
+				short npc_config_id = -1;
+				m_map_data->get_owner(m_mcx, m_mcy, name, &object_type, &object_status, &m_comm_object_id, &npc_config_id);
+				if (object_type >= 10 || ((object_type >= 1) && (object_type <= 6)))
+				{
+					switch (object_type) { 	// CLEROTH - NPC TALK
+					case hb::shared::owner::ShopKeeper: // ShopKeeper-W�
+					{
+						auto* npcDlg = get_dialog_box_manager().get_dialog_as<DialogBox_NpcActionQuery>(DialogBoxId::NpcActionQuery);
+						npcDlg->enable_with_target(5, 11, npc_config_id, 15, 0, 0, 0, get_npc_config_name_by_id(npc_config_id));
+						dialog_x = mouse_x - 117;
+						dialog_y = mouse_y - 50;
+						if (dialog_x < 0) dialog_x = 0;
+						if ((dialog_x + 235) > LOGICAL_MAX_X()) dialog_x = LOGICAL_MAX_X() - 235;
+						if (dialog_y < 0) dialog_y = 0;
+						if ((dialog_y + 100) > LOGICAL_MAX_Y()) dialog_y = LOGICAL_MAX_Y() - 100;
+						npcDlg->m_x = dialog_x;
+						npcDlg->m_y = dialog_y;
+					}	break;
+
+					case hb::shared::owner::Gandalf: // Gandlf
+					{
+						auto* npcDlg = get_dialog_box_manager().get_dialog_as<DialogBox_NpcActionQuery>(DialogBoxId::NpcActionQuery);
+						npcDlg->enable_with_target(0, 16, 0, 19, 0, 0, 0, get_npc_config_name_by_id(npc_config_id));
+						dialog_x = mouse_x - 117;
+						dialog_y = mouse_y - 50;
+						if (dialog_x < 0) dialog_x = 0;
+						if ((dialog_x + 235) > LOGICAL_MAX_X()) dialog_x = LOGICAL_MAX_X() - 235;
+						if (dialog_y < 0) dialog_y = 0;
+						if ((dialog_y + 100) > LOGICAL_MAX_Y()) dialog_y = LOGICAL_MAX_Y() - 100;
+						npcDlg->m_x = dialog_x;
+						npcDlg->m_y = dialog_y;
+					}	break;
+
+					case hb::shared::owner::Howard: // Howard
+					{
+						auto* npcDlg = get_dialog_box_manager().get_dialog_as<DialogBox_NpcActionQuery>(DialogBoxId::NpcActionQuery);
+						npcDlg->enable_with_target(0, 14, 0, 20, 0, 0, 0, get_npc_config_name_by_id(npc_config_id));
+						dialog_x = mouse_x - 117;
+						dialog_y = mouse_y - 50;
+						if (dialog_x < 0) dialog_x = 0;
+						if ((dialog_x + 235) > LOGICAL_MAX_X()) dialog_x = LOGICAL_MAX_X() - 235;
+						if (dialog_y < 0) dialog_y = 0;
+						if ((dialog_y + 100) > LOGICAL_MAX_Y()) dialog_y = LOGICAL_MAX_Y() - 100;
+						npcDlg->m_x = dialog_x;
+						npcDlg->m_y = dialog_y;
+						get_dialog_box_manager().m_give_item.action_type = 20;
+						get_dialog_box_manager().m_give_item.object_id = m_comm_object_id;
+						get_dialog_box_manager().m_give_item.target_x = m_mcx;
+						get_dialog_box_manager().m_give_item.target_y = m_mcy;
+					}	break;
+
+					case hb::shared::owner::Tom: // Tom
+					{
+						auto* npcDlg = get_dialog_box_manager().get_dialog_as<DialogBox_NpcActionQuery>(DialogBoxId::NpcActionQuery);
+						npcDlg->enable_with_target(5, 11, npc_config_id, 24, 0, 0, 0, get_npc_config_name_by_id(npc_config_id));
+						dialog_x = mouse_x - 117;
+						dialog_y = mouse_y - 50;
+						if (dialog_x < 0) dialog_x = 0;
+						if ((dialog_x + 235) > LOGICAL_MAX_X()) dialog_x = LOGICAL_MAX_X() - 235;
+						if (dialog_y < 0) dialog_y = 0;
+						if ((dialog_y + 100) > LOGICAL_MAX_Y()) dialog_y = LOGICAL_MAX_Y() - 100;
+						npcDlg->m_x = dialog_x;
+						npcDlg->m_y = dialog_y;
+						get_dialog_box_manager().m_give_item.action_type = 24;
+						get_dialog_box_manager().m_give_item.object_id = m_comm_object_id;
+						get_dialog_box_manager().m_give_item.target_x = m_mcx;
+						get_dialog_box_manager().m_give_item.target_y = m_mcy;
+					}	break;
+
+					case hb::shared::owner::William: // William
+					{
+						auto* npcDlg = get_dialog_box_manager().get_dialog_as<DialogBox_NpcActionQuery>(DialogBoxId::NpcActionQuery);
+						npcDlg->enable_with_target(0, 13, 0, 25, 0, 0, 0, get_npc_config_name_by_id(npc_config_id));
+						dialog_x = mouse_x - 117;
+						dialog_y = mouse_y - 50;
+						if (dialog_x < 0) dialog_x = 0;
+						if ((dialog_x + 235) > LOGICAL_MAX_X()) dialog_x = LOGICAL_MAX_X() - 235;
+						if (dialog_y < 0) dialog_y = 0;
+						if ((dialog_y + 100) > LOGICAL_MAX_Y()) dialog_y = LOGICAL_MAX_Y() - 100;
+						npcDlg->m_x = dialog_x;
+						npcDlg->m_y = dialog_y;
+					}	break;
+
+					case hb::shared::owner::Kennedy: // Kennedy
+					{
+						auto* npcDlg = get_dialog_box_manager().get_dialog_as<DialogBox_NpcActionQuery>(DialogBoxId::NpcActionQuery);
+						npcDlg->enable_with_target(0, 7, 0, 26, 0, 0, 0, get_npc_config_name_by_id(npc_config_id));
+						dialog_x = mouse_x - 117;
+						dialog_y = mouse_y - 50;
+						if (dialog_x < 0) dialog_x = 0;
+						if ((dialog_x + 235) > LOGICAL_MAX_X()) dialog_x = LOGICAL_MAX_X() - 235;
+						if (dialog_y < 0) dialog_y = 0;
+						if ((dialog_y + 100) > LOGICAL_MAX_Y()) dialog_y = LOGICAL_MAX_Y() - 100;
+						npcDlg->m_x = dialog_x;
+						npcDlg->m_y = dialog_y;
+					}	break;
+
+					case hb::shared::owner::Guard: // Guard
+						if (!IsHostile(object_status.relationship) && (!m_player->m_is_combat_mode))
+						{
+							auto* npcDlg = get_dialog_box_manager().get_dialog_as<DialogBox_NpcActionQuery>(DialogBoxId::NpcActionQuery);
+							npcDlg->enable_with_target(4, 0, 0, 21, 0, 0, 0, get_npc_config_name_by_id(npc_config_id));
+							dialog_x = mouse_x - 117;
+							dialog_y = mouse_y - 50;
+							if (dialog_x < 0) dialog_x = 0;
+							if ((dialog_x + 235) > LOGICAL_MAX_X()) dialog_x = LOGICAL_MAX_X() - 235;
+							if (dialog_y < 0) dialog_y = 0;
+							if ((dialog_y + 100) > LOGICAL_MAX_Y()) dialog_y = LOGICAL_MAX_Y() - 100;
+							npcDlg->m_x = dialog_x;
+							npcDlg->m_y = dialog_y;
+						}
+						break;
+					case hb::shared::owner::McGaffin: // McGaffin
+					case hb::shared::owner::Perry: // Perry
+					case hb::shared::owner::Devlin: // Devlin
+						if (!m_player->m_is_combat_mode)
+						{
+							auto* npcDlg = get_dialog_box_manager().get_dialog_as<DialogBox_NpcActionQuery>(DialogBoxId::NpcActionQuery);
+							npcDlg->enable_with_target(4, 0, 0, object_type, 0, 0, 0, get_npc_config_name_by_id(npc_config_id));
+							dialog_x = mouse_x - 117;
+							dialog_y = mouse_y - 50;
+							if (dialog_x < 0) dialog_x = 0;
+							if ((dialog_x + 235) > LOGICAL_MAX_X()) dialog_x = LOGICAL_MAX_X() - 235;
+							if (dialog_y < 0) dialog_y = 0;
+							if ((dialog_y + 100) > LOGICAL_MAX_Y()) dialog_y = LOGICAL_MAX_Y() - 100;
+							npcDlg->m_x = dialog_x;
+							npcDlg->m_y = dialog_y;
+						}
+						break;
+
+					case hb::shared::owner::Unicorn: // Unicorn
+						if (!m_player->m_is_combat_mode)
+						{
+							auto* npcDlg = get_dialog_box_manager().get_dialog_as<DialogBox_NpcActionQuery>(DialogBoxId::NpcActionQuery);
+							npcDlg->enable_with_target(4, 0, 0, 32, 0, 0, 0, get_npc_config_name_by_id(npc_config_id));
+							dialog_x = mouse_x - 117;
+							dialog_y = mouse_y - 50;
+							if (dialog_x < 0) dialog_x = 0;
+							if ((dialog_x + 235) > LOGICAL_MAX_X()) dialog_x = LOGICAL_MAX_X() - 235;
+							if (dialog_y < 0) dialog_y = 0;
+							if ((dialog_y + 100) > LOGICAL_MAX_Y()) dialog_y = LOGICAL_MAX_Y() - 100;
+							npcDlg->m_x = dialog_x;
+							npcDlg->m_y = dialog_y;
+						}
+						break;
+
+					case hb::shared::owner::Gail: // Snoopy: Gail
+					{
+						auto* npcDlg = get_dialog_box_manager().get_dialog_as<DialogBox_NpcActionQuery>(DialogBoxId::NpcActionQuery);
+						npcDlg->enable_with_target(6, 0, 0, 90, 0, 0, 0, get_npc_config_name_by_id(npc_config_id));
+						dialog_x = mouse_x - 117;
+						dialog_y = mouse_y - 50;
+						if (dialog_x < 0) dialog_x = 0;
+						if ((dialog_x + 235) > LOGICAL_MAX_X()) dialog_x = LOGICAL_MAX_X() - 235;
+						if (dialog_y < 0) dialog_y = 0;
+						if ((dialog_y + 100) > LOGICAL_MAX_Y()) dialog_y = LOGICAL_MAX_Y() - 100;
+						npcDlg->m_x = dialog_x;
+						npcDlg->m_y = dialog_y;
+					}	break;
+
+					default: // Other mobs
+						if (!IsHostile(object_status.relationship)) break;
+						if ((object_type >= 1) && (object_type <= 6) && (m_player->m_force_attack == false)) break;
+						abs_x = abs(m_player->m_player_x - m_mcx);
+						abs_y = abs(m_player->m_player_y - m_mcy);
+						if ((abs_x <= 1) && (abs_y <= 1))
+						{
+							action_type = combat_system::get().get_attack_type();
+							m_player->m_Controller.set_command(Type::Attack);
+							m_player->m_Controller.set_destination(m_mcx, m_mcy);
+						}
+						else if ((abs_x <= 2) && (abs_y <= 2) // strike on Big mobs & gate from a range
+							&& ((object_type == 66) || (object_type == 73) || (object_type == 81) || (object_type == 91)))
+						{
+							action_type = combat_system::get().get_attack_type();
+							m_player->m_Controller.set_command(Type::Attack);
+							m_player->m_Controller.set_destination(m_mcx, m_mcy);
+						}
+						else // Normal hit from a range.
+						{
+							switch (combat_system::get().get_weapon_skill_type()) {
+							case 6: // Bow
+								m_player->m_Controller.set_command(Type::Attack);
+								m_player->m_Controller.set_destination(m_mcx, m_mcy);
+								action_type = combat_system::get().get_attack_type();
+								break;
+
+							case 5: // Boxe
+							case 7: // SS
+								if ((hb::shared::input::is_shift_down() || config_manager::get().is_running_mode_enabled()) && (m_player->m_sp > 0)
+									&& (m_player->m_player_type >= 1) && (m_player->m_player_type <= 6))
+									m_player->m_Controller.set_command(Type::Run);
+								else m_player->m_Controller.set_command(Type::Move);
+								m_player->m_Controller.set_destination(m_mcx, m_mcy);
+								m_player->m_Controller.calculate_player_turn(m_player->m_player_x, m_player->m_player_y, m_map_data.get());
+								break;
+
+							case 8: // LS
+								if ((abs_x <= 3) && (abs_y <= 3) && combat_system::get().can_super_attack()
+									&& (combat_system::get().get_attack_type() != 30)) // Crit without StormBlade by Snoopy
+								{
+									if ((abs_x <= 1) && (abs_y <= 1) && (hb::shared::input::is_shift_down() || config_manager::get().is_running_mode_enabled()) && (m_player->m_sp > 0))
+										m_player->m_Controller.set_command(Type::AttackMove);
+									else m_player->m_Controller.set_command(Type::Attack);
+									m_player->m_Controller.set_destination(m_mcx, m_mcy);
+									action_type = combat_system::get().get_attack_type();
+								}
+								else if ((abs_x <= 5) && (abs_y <= 5) && combat_system::get().can_super_attack()
+									&& (combat_system::get().get_attack_type() == 30)) // Crit with StormBlade by Snoopy
+								{
+									if ((abs_x <= 1) && (abs_y <= 1) && (hb::shared::input::is_shift_down() || config_manager::get().is_running_mode_enabled()) && (m_player->m_sp > 0))
+										m_player->m_Controller.set_command(Type::AttackMove);
+									else m_player->m_Controller.set_command(Type::Attack);
+									m_player->m_Controller.set_destination(m_mcx, m_mcy);
+									action_type = combat_system::get().get_attack_type();
+								}
+								else if ((abs_x <= 3) && (abs_y <= 3)
+									&& (combat_system::get().get_attack_type() == 5)) // Normal hit with StormBlade by Snoopy
+								{
+									m_player->m_Controller.set_command(Type::Attack);
+									m_player->m_Controller.set_destination(m_mcx, m_mcy);
+									action_type = combat_system::get().get_attack_type();
 								}
 								else
 								{
@@ -6588,405 +5257,104 @@ bool CGame::process_left_click(short mouse_x, short mouse_y, short tile_x, short
 									m_player->m_Controller.set_destination(m_mcx, m_mcy);
 									m_player->m_Controller.calculate_player_turn(m_player->m_player_x, m_player->m_player_y, m_map_data.get());
 								}
-							}
-							break;
-						case hb::shared::owner::OrcMage: // Hammer
-							if ((abs_x <= 2) && (abs_y <= 2) && combat_system::get().can_super_attack()) {
-								m_player->m_Controller.set_command(Type::Attack);
-								m_player->m_Controller.set_destination(m_mcx, m_mcy);
-								action_type = combat_system::get().get_attack_type();
-							}
-							else {
-								if (((abs_x == 2) && (abs_y == 2)) || ((abs_x == 0) && (abs_y == 2)) || ((abs_x == 2) && (abs_y == 0))) {
-									if ((hb::shared::input::is_shift_down() || config_manager::get().is_running_mode_enabled()) && (m_player->m_sp > 0)) {
-										if (m_player->m_skill_mastery[combat_system::get().get_weapon_skill_type()] == 100) {
-											m_player->m_Controller.set_command(Type::AttackMove);
-											action_type = combat_system::get().get_attack_type();
-										}
-										else {
-											m_player->m_Controller.set_command(Type::Run);
-											m_player->m_Controller.calculate_player_turn(m_player->m_player_x, m_player->m_player_y, m_map_data.get());
-										}
-										m_player->m_Controller.set_destination(m_mcx, m_mcy);
-									}
-									else {
-										m_player->m_Controller.set_command(Type::Move);
-										m_player->m_Controller.set_destination(m_mcx, m_mcy);
-										m_player->m_Controller.calculate_player_turn(m_player->m_player_x, m_player->m_player_y, m_map_data.get());
-									}
-								}
-								else {
-									if ((hb::shared::input::is_shift_down() || config_manager::get().is_running_mode_enabled()) && (m_player->m_sp > 0) &&
-										(m_player->m_player_type >= 1) && (m_player->m_player_type <= 6))
-										m_player->m_Controller.set_command(Type::Run);
-									else m_player->m_Controller.set_command(Type::Move);
-									m_player->m_Controller.set_destination(m_mcx, m_mcy);
-									m_player->m_Controller.calculate_player_turn(m_player->m_player_x, m_player->m_player_y, m_map_data.get());
-								}
-							}
-							break;
-						case hb::shared::owner::Guard: // Wand
-							if ((abs_x <= 2) && (abs_y <= 2) && combat_system::get().can_super_attack()) {
-								m_player->m_Controller.set_command(Type::Attack);
-								m_player->m_Controller.set_destination(m_mcx, m_mcy);
-								action_type = combat_system::get().get_attack_type();
-							}
-							else {
-								if (((abs_x == 2) && (abs_y == 2)) || ((abs_x == 0) && (abs_y == 2)) || ((abs_x == 2) && (abs_y == 0))) {
-									if ((hb::shared::input::is_shift_down() || config_manager::get().is_running_mode_enabled()) && (m_player->m_sp > 0)) {
-										if (m_player->m_skill_mastery[combat_system::get().get_weapon_skill_type()] == 100) {
-											m_player->m_Controller.set_command(Type::AttackMove);
-											action_type = combat_system::get().get_attack_type();
-										}
-										else {
-											m_player->m_Controller.set_command(Type::Run);
-											m_player->m_Controller.calculate_player_turn(m_player->m_player_x, m_player->m_player_y, m_map_data.get());
-										}
-										m_player->m_Controller.set_destination(m_mcx, m_mcy);
-									}
-									else {
-										m_player->m_Controller.set_command(Type::Move);
-										m_player->m_Controller.set_destination(m_mcx, m_mcy);
-										m_player->m_Controller.calculate_player_turn(m_player->m_player_x, m_player->m_player_y, m_map_data.get());
-									}
-								}
-								else {
-									if ((hb::shared::input::is_shift_down() || config_manager::get().is_running_mode_enabled()) && (m_player->m_sp > 0) &&
-										(m_player->m_player_type >= 1) && (m_player->m_player_type <= 6))
-										m_player->m_Controller.set_command(Type::Run);
-									else m_player->m_Controller.set_command(Type::Move);
-									m_player->m_Controller.set_destination(m_mcx, m_mcy);
-									m_player->m_Controller.calculate_player_turn(m_player->m_player_x, m_player->m_player_y, m_map_data.get());
-								}
-							}
-							break;
-						}
-					}
-				}
-				else // CTRL not pressed
-				{
-					m_map_data->get_owner(m_mcx, m_mcy, name, &object_type, &object_status, &m_comm_object_id);
-					if (object_type >= 10 || ((object_type >= 1) && (object_type <= 6)))
-					{
-						switch (object_type) { 	// CLEROTH - NPC TALK
-						case hb::shared::owner::ShopKeeper: // ShopKeeper-W�
-							m_dialog_box_manager.enable_dialog_box(DialogBoxId::NpcActionQuery, 5, 11, 1);
-							dialog_x = mouse_x - 117;
-							dialog_y = mouse_y - 50;
-							if (dialog_x < 0) dialog_x = 0;
-							if ((dialog_x + 235) > LOGICAL_MAX_X()) dialog_x = LOGICAL_MAX_X() - 235;
-							if (dialog_y < 0) dialog_y = 0;
-							if ((dialog_y + 100) > LOGICAL_MAX_Y()) dialog_y = LOGICAL_MAX_Y() - 100;
-							m_dialog_box_manager.Info(DialogBoxId::NpcActionQuery).m_x = dialog_x;
-							m_dialog_box_manager.Info(DialogBoxId::NpcActionQuery).m_y = dialog_y;
-							m_dialog_box_manager.Info(DialogBoxId::NpcActionQuery).m_v3 = 15;
-							break;
+								break;
 
-						case hb::shared::owner::Gandalf: // Gandlf
-							m_dialog_box_manager.enable_dialog_box(DialogBoxId::NpcActionQuery, 0, 16, 0);
-							dialog_x = mouse_x - 117;
-							dialog_y = mouse_y - 50;
-							if (dialog_x < 0) dialog_x = 0;
-							if ((dialog_x + 235) > LOGICAL_MAX_X()) dialog_x = LOGICAL_MAX_X() - 235;
-							if (dialog_y < 0) dialog_y = 0;
-							if ((dialog_y + 100) > LOGICAL_MAX_Y()) dialog_y = LOGICAL_MAX_Y() - 100;
-							m_dialog_box_manager.Info(DialogBoxId::NpcActionQuery).m_x = dialog_x;
-							m_dialog_box_manager.Info(DialogBoxId::NpcActionQuery).m_y = dialog_y;
-							m_dialog_box_manager.Info(DialogBoxId::NpcActionQuery).m_v3 = 19;
-							break;
-
-						case hb::shared::owner::Howard: // Howard
-							m_dialog_box_manager.enable_dialog_box(DialogBoxId::NpcActionQuery, 0, 14, 0);
-							dialog_x = mouse_x - 117;
-							dialog_y = mouse_y - 50;
-							if (dialog_x < 0) dialog_x = 0;
-							if ((dialog_x + 235) > LOGICAL_MAX_X()) dialog_x = LOGICAL_MAX_X() - 235;
-							if (dialog_y < 0) dialog_y = 0;
-							if ((dialog_y + 100) > LOGICAL_MAX_Y()) dialog_y = LOGICAL_MAX_Y() - 100;
-							m_dialog_box_manager.Info(DialogBoxId::NpcActionQuery).m_x = dialog_x;
-							m_dialog_box_manager.Info(DialogBoxId::NpcActionQuery).m_y = dialog_y;
-							m_dialog_box_manager.Info(DialogBoxId::NpcActionQuery).m_v3 = 20;
-							m_dialog_box_manager.Info(DialogBoxId::GiveItem).m_v3 = 20;
-							m_dialog_box_manager.Info(DialogBoxId::GiveItem).m_v4 = m_comm_object_id;
-							m_dialog_box_manager.Info(DialogBoxId::GiveItem).m_v5 = m_mcx;
-							m_dialog_box_manager.Info(DialogBoxId::GiveItem).m_v6 = m_mcy;
-							break;
-
-						case hb::shared::owner::Tom: // Tom
-							m_dialog_box_manager.enable_dialog_box(DialogBoxId::NpcActionQuery, 5, 11, 2);
-							dialog_x = mouse_x - 117;
-							dialog_y = mouse_y - 50;
-							if (dialog_x < 0) dialog_x = 0;
-							if ((dialog_x + 235) > LOGICAL_MAX_X()) dialog_x = LOGICAL_MAX_X() - 235;
-							if (dialog_y < 0) dialog_y = 0;
-							if ((dialog_y + 100) > LOGICAL_MAX_Y()) dialog_y = LOGICAL_MAX_Y() - 100;
-							m_dialog_box_manager.Info(DialogBoxId::NpcActionQuery).m_x = dialog_x;
-							m_dialog_box_manager.Info(DialogBoxId::NpcActionQuery).m_y = dialog_y;
-							m_dialog_box_manager.Info(DialogBoxId::NpcActionQuery).m_v3 = 24;
-							m_dialog_box_manager.Info(DialogBoxId::GiveItem).m_v3 = 24;
-							m_dialog_box_manager.Info(DialogBoxId::GiveItem).m_v4 = m_comm_object_id;
-							m_dialog_box_manager.Info(DialogBoxId::GiveItem).m_v5 = m_mcx;
-							m_dialog_box_manager.Info(DialogBoxId::GiveItem).m_v6 = m_mcy;
-							break;
-
-						case hb::shared::owner::William: // William
-							m_dialog_box_manager.enable_dialog_box(DialogBoxId::NpcActionQuery, 0, 13, 0);
-							dialog_x = mouse_x - 117;
-							dialog_y = mouse_y - 50;
-							if (dialog_x < 0) dialog_x = 0;
-							if ((dialog_x + 235) > LOGICAL_MAX_X()) dialog_x = LOGICAL_MAX_X() - 235;
-							if (dialog_y < 0) dialog_y = 0;
-							if ((dialog_y + 100) > LOGICAL_MAX_Y()) dialog_y = LOGICAL_MAX_Y() - 100;
-							m_dialog_box_manager.Info(DialogBoxId::NpcActionQuery).m_x = dialog_x;
-							m_dialog_box_manager.Info(DialogBoxId::NpcActionQuery).m_y = dialog_y;
-							m_dialog_box_manager.Info(DialogBoxId::NpcActionQuery).m_v3 = 25;
-							break;
-
-						case hb::shared::owner::Kennedy: // Kennedy
-							m_dialog_box_manager.enable_dialog_box(DialogBoxId::NpcActionQuery, 0, 7, 0);
-							dialog_x = mouse_x - 117;
-							dialog_y = mouse_y - 50;
-							if (dialog_x < 0) dialog_x = 0;
-							if ((dialog_x + 235) > LOGICAL_MAX_X()) dialog_x = LOGICAL_MAX_X() - 235;
-							if (dialog_y < 0) dialog_y = 0;
-							if ((dialog_y + 100) > LOGICAL_MAX_Y()) dialog_y = LOGICAL_MAX_Y() - 100;
-							m_dialog_box_manager.Info(DialogBoxId::NpcActionQuery).m_x = dialog_x;
-							m_dialog_box_manager.Info(DialogBoxId::NpcActionQuery).m_y = dialog_y;
-							m_dialog_box_manager.Info(DialogBoxId::NpcActionQuery).m_v3 = 26;
-							break;
-
-						case hb::shared::owner::Guard: // Guard
-							if (!IsHostile(object_status.relationship) && (!m_player->m_is_combat_mode))
-							{
-								m_dialog_box_manager.enable_dialog_box(DialogBoxId::NpcActionQuery, 4, 0, 0);
-								dialog_x = mouse_x - 117;
-								dialog_y = mouse_y - 50;
-								if (dialog_x < 0) dialog_x = 0;
-								if ((dialog_x + 235) > LOGICAL_MAX_X()) dialog_x = LOGICAL_MAX_X() - 235;
-								if (dialog_y < 0) dialog_y = 0;
-								if ((dialog_y + 100) > LOGICAL_MAX_Y()) dialog_y = LOGICAL_MAX_Y() - 100;
-								m_dialog_box_manager.Info(DialogBoxId::NpcActionQuery).m_x = dialog_x;
-								m_dialog_box_manager.Info(DialogBoxId::NpcActionQuery).m_y = dialog_y;
-								m_dialog_box_manager.Info(DialogBoxId::NpcActionQuery).m_v3 = 21;
-							}
-							break;
-						case hb::shared::owner::McGaffin: // McGaffin
-						case hb::shared::owner::Perry: // Perry
-						case hb::shared::owner::Devlin: // Devlin
-							if (!m_player->m_is_combat_mode)
-							{
-								m_dialog_box_manager.enable_dialog_box(DialogBoxId::NpcActionQuery, 4, 0, 0);
-								dialog_x = mouse_x - 117;
-								dialog_y = mouse_y - 50;
-								if (dialog_x < 0) dialog_x = 0;
-								if ((dialog_x + 235) > LOGICAL_MAX_X()) dialog_x = LOGICAL_MAX_X() - 235;
-								if (dialog_y < 0) dialog_y = 0;
-								if ((dialog_y + 100) > LOGICAL_MAX_Y()) dialog_y = LOGICAL_MAX_Y() - 100;
-								m_dialog_box_manager.Info(DialogBoxId::NpcActionQuery).m_x = dialog_x;
-								m_dialog_box_manager.Info(DialogBoxId::NpcActionQuery).m_y = dialog_y;
-								m_dialog_box_manager.Info(DialogBoxId::NpcActionQuery).m_v3 = object_type;
-							}
-							break;
-
-						case hb::shared::owner::Unicorn: // Unicorn
-							if (!m_player->m_is_combat_mode)
-							{
-								m_dialog_box_manager.enable_dialog_box(DialogBoxId::NpcActionQuery, 4, 0, 0);
-								dialog_x = mouse_x - 117;
-								dialog_y = mouse_y - 50;
-								if (dialog_x < 0) dialog_x = 0;
-								if ((dialog_x + 235) > LOGICAL_MAX_X()) dialog_x = LOGICAL_MAX_X() - 235;
-								if (dialog_y < 0) dialog_y = 0;
-								if ((dialog_y + 100) > LOGICAL_MAX_Y()) dialog_y = LOGICAL_MAX_Y() - 100;
-								m_dialog_box_manager.Info(DialogBoxId::NpcActionQuery).m_x = dialog_x;
-								m_dialog_box_manager.Info(DialogBoxId::NpcActionQuery).m_y = dialog_y;
-								m_dialog_box_manager.Info(DialogBoxId::NpcActionQuery).m_v3 = 32;
-							}
-							break;
-
-						case hb::shared::owner::Gail: // Snoopy: Gail
-							m_dialog_box_manager.enable_dialog_box(DialogBoxId::NpcActionQuery, 6, 0, 0);
-							dialog_x = mouse_x - 117;
-							dialog_y = mouse_y - 50;
-							if (dialog_x < 0) dialog_x = 0;
-							if ((dialog_x + 235) > LOGICAL_MAX_X()) dialog_x = LOGICAL_MAX_X() - 235;
-							if (dialog_y < 0) dialog_y = 0;
-							if ((dialog_y + 100) > LOGICAL_MAX_Y()) dialog_y = LOGICAL_MAX_Y() - 100;
-							m_dialog_box_manager.Info(DialogBoxId::NpcActionQuery).m_x = dialog_x;
-							m_dialog_box_manager.Info(DialogBoxId::NpcActionQuery).m_y = dialog_y;
-							m_dialog_box_manager.Info(DialogBoxId::NpcActionQuery).m_v3 = 90;
-							break;
-
-						default: // Other mobs
-							if (!IsHostile(object_status.relationship)) break;
-							if ((object_type >= 1) && (object_type <= 6) && (m_player->m_force_attack == false)) break;
-							abs_x = abs(m_player->m_player_x - m_mcx);
-							abs_y = abs(m_player->m_player_y - m_mcy);
-							if ((abs_x <= 1) && (abs_y <= 1))
-							{
-								action_type = combat_system::get().get_attack_type();
-								m_player->m_Controller.set_command(Type::Attack);
-								m_player->m_Controller.set_destination(m_mcx, m_mcy);
-							}
-							else if ((abs_x <= 2) && (abs_y <= 2) // strike on Big mobs & gate from a range
-								&& ((object_type == 66) || (object_type == 73) || (object_type == 81) || (object_type == 91)))
-							{
-								action_type = combat_system::get().get_attack_type();
-								m_player->m_Controller.set_command(Type::Attack);
-								m_player->m_Controller.set_destination(m_mcx, m_mcy);
-							}
-							else // Normal hit from a range.
-							{
-								switch (combat_system::get().get_weapon_skill_type()) {
-								case 6: // Bow
-									m_player->m_Controller.set_command(Type::Attack);
+							case 9: // Fencing
+								if ((abs_x <= 4) && (abs_y <= 4) && combat_system::get().can_super_attack())
+								{
+									if ((abs_x <= 1) && (abs_y <= 1) && (hb::shared::input::is_shift_down() || config_manager::get().is_running_mode_enabled()) && (m_player->m_sp > 0))
+										m_player->m_Controller.set_command(Type::AttackMove);
+									else m_player->m_Controller.set_command(Type::Attack);
 									m_player->m_Controller.set_destination(m_mcx, m_mcy);
 									action_type = combat_system::get().get_attack_type();
-									break;
-
-								case 5: // Boxe
-								case 7: // SS
-									if ((hb::shared::input::is_shift_down() || config_manager::get().is_running_mode_enabled()) && (m_player->m_sp > 0)
-										&& (m_player->m_player_type >= 1) && (m_player->m_player_type <= 6))
+								}
+								else
+								{
+									if ((hb::shared::input::is_shift_down() || config_manager::get().is_running_mode_enabled()) && (m_player->m_sp > 0) &&
+										(m_player->m_player_type >= 1) && (m_player->m_player_type <= 6))
 										m_player->m_Controller.set_command(Type::Run);
 									else m_player->m_Controller.set_command(Type::Move);
 									m_player->m_Controller.set_destination(m_mcx, m_mcy);
 									m_player->m_Controller.calculate_player_turn(m_player->m_player_x, m_player->m_player_y, m_map_data.get());
-									break;
-
-								case 8: // LS
-									if ((abs_x <= 3) && (abs_y <= 3) && combat_system::get().can_super_attack()
-										&& (combat_system::get().get_attack_type() != 30)) // Crit without StormBlade by Snoopy
-									{
-										if ((abs_x <= 1) && (abs_y <= 1) && (hb::shared::input::is_shift_down() || config_manager::get().is_running_mode_enabled()) && (m_player->m_sp > 0))
-											m_player->m_Controller.set_command(Type::AttackMove);
-										else m_player->m_Controller.set_command(Type::Attack);
-										m_player->m_Controller.set_destination(m_mcx, m_mcy);
-										action_type = combat_system::get().get_attack_type();
-									}
-									else if ((abs_x <= 5) && (abs_y <= 5) && combat_system::get().can_super_attack()
-										&& (combat_system::get().get_attack_type() == 30)) // Crit with StormBlade by Snoopy
-									{
-										if ((abs_x <= 1) && (abs_y <= 1) && (hb::shared::input::is_shift_down() || config_manager::get().is_running_mode_enabled()) && (m_player->m_sp > 0))
-											m_player->m_Controller.set_command(Type::AttackMove);
-										else m_player->m_Controller.set_command(Type::Attack);
-										m_player->m_Controller.set_destination(m_mcx, m_mcy);
-										action_type = combat_system::get().get_attack_type();
-									}
-									else if ((abs_x <= 3) && (abs_y <= 3)
-										&& (combat_system::get().get_attack_type() == 5)) // Normal hit with StormBlade by Snoopy
-									{
-										m_player->m_Controller.set_command(Type::Attack);
-										m_player->m_Controller.set_destination(m_mcx, m_mcy);
-										action_type = combat_system::get().get_attack_type();
-									}
-									else
-									{
-										if ((hb::shared::input::is_shift_down() || config_manager::get().is_running_mode_enabled()) && (m_player->m_sp > 0) &&
-											(m_player->m_player_type >= 1) && (m_player->m_player_type <= 6))
-											m_player->m_Controller.set_command(Type::Run);
-										else m_player->m_Controller.set_command(Type::Move);
-										m_player->m_Controller.set_destination(m_mcx, m_mcy);
-										m_player->m_Controller.calculate_player_turn(m_player->m_player_x, m_player->m_player_y, m_map_data.get());
-									}
-									break;
-
-								case 9: // Fencing
-									if ((abs_x <= 4) && (abs_y <= 4) && combat_system::get().can_super_attack())
-									{
-										if ((abs_x <= 1) && (abs_y <= 1) && (hb::shared::input::is_shift_down() || config_manager::get().is_running_mode_enabled()) && (m_player->m_sp > 0))
-											m_player->m_Controller.set_command(Type::AttackMove);
-										else m_player->m_Controller.set_command(Type::Attack);
-										m_player->m_Controller.set_destination(m_mcx, m_mcy);
-										action_type = combat_system::get().get_attack_type();
-									}
-									else
-									{
-										if ((hb::shared::input::is_shift_down() || config_manager::get().is_running_mode_enabled()) && (m_player->m_sp > 0) &&
-											(m_player->m_player_type >= 1) && (m_player->m_player_type <= 6))
-											m_player->m_Controller.set_command(Type::Run);
-										else m_player->m_Controller.set_command(Type::Move);
-										m_player->m_Controller.set_destination(m_mcx, m_mcy);
-										m_player->m_Controller.calculate_player_turn(m_player->m_player_x, m_player->m_player_y, m_map_data.get());
-									}
-									break;
-
-								case hb::shared::owner::Slime: //
-									if ((abs_x <= 2) && (abs_y <= 2) && combat_system::get().can_super_attack()) {
-										if ((abs_x <= 1) && (abs_y <= 1) && (hb::shared::input::is_shift_down() || config_manager::get().is_running_mode_enabled()) && (m_player->m_sp > 0))
-											m_player->m_Controller.set_command(Type::AttackMove);
-										else m_player->m_Controller.set_command(Type::Attack);
-										m_player->m_Controller.set_destination(m_mcx, m_mcy);
-										action_type = combat_system::get().get_attack_type();
-									}
-									else {
-										if ((hb::shared::input::is_shift_down() || config_manager::get().is_running_mode_enabled()) && (m_player->m_sp > 0) &&
-											(m_player->m_player_type >= 1) && (m_player->m_player_type <= 6))
-											m_player->m_Controller.set_command(Type::Run);
-										else m_player->m_Controller.set_command(Type::Move);
-										m_player->m_Controller.set_destination(m_mcx, m_mcy);
-										m_player->m_Controller.calculate_player_turn(m_player->m_player_x, m_player->m_player_y, m_map_data.get());
-									}
-									break;
-								case hb::shared::owner::OrcMage: //
-									if ((abs_x <= 2) && (abs_y <= 2) && combat_system::get().can_super_attack()) {
-										if ((abs_x <= 1) && (abs_y <= 1) && (hb::shared::input::is_shift_down() || config_manager::get().is_running_mode_enabled()) && (m_player->m_sp > 0))
-											m_player->m_Controller.set_command(Type::AttackMove);
-										else m_player->m_Controller.set_command(Type::Attack);
-										m_player->m_Controller.set_destination(m_mcx, m_mcy);
-										action_type = combat_system::get().get_attack_type();
-									}
-									else {
-										if ((hb::shared::input::is_shift_down() || config_manager::get().is_running_mode_enabled()) && (m_player->m_sp > 0) &&
-											(m_player->m_player_type >= 1) && (m_player->m_player_type <= 6))
-											m_player->m_Controller.set_command(Type::Run);
-										else m_player->m_Controller.set_command(Type::Move);
-										m_player->m_Controller.set_destination(m_mcx, m_mcy);
-										m_player->m_Controller.calculate_player_turn(m_player->m_player_x, m_player->m_player_y, m_map_data.get());
-									}
-									break;
-								case hb::shared::owner::Guard: //
-									if ((abs_x <= 2) && (abs_y <= 2) && combat_system::get().can_super_attack()) {
-										if ((abs_x <= 1) && (abs_y <= 1) && (hb::shared::input::is_shift_down() || config_manager::get().is_running_mode_enabled()) && (m_player->m_sp > 0))
-											m_player->m_Controller.set_command(Type::AttackMove);
-										else m_player->m_Controller.set_command(Type::Attack);
-										m_player->m_Controller.set_destination(m_mcx, m_mcy);
-										action_type = combat_system::get().get_attack_type();
-									}
-									else {
-										if ((hb::shared::input::is_shift_down() || config_manager::get().is_running_mode_enabled()) && (m_player->m_sp > 0) &&
-											(m_player->m_player_type >= 1) && (m_player->m_player_type <= 6))
-											m_player->m_Controller.set_command(Type::Run);
-										else m_player->m_Controller.set_command(Type::Move);
-										m_player->m_Controller.set_destination(m_mcx, m_mcy);
-										m_player->m_Controller.calculate_player_turn(m_player->m_player_x, m_player->m_player_y, m_map_data.get());
-									}
-									break;
 								}
+								break;
+
+							case hb::shared::owner::Slime: //
+								if ((abs_x <= 2) && (abs_y <= 2) && combat_system::get().can_super_attack()) {
+									if ((abs_x <= 1) && (abs_y <= 1) && (hb::shared::input::is_shift_down() || config_manager::get().is_running_mode_enabled()) && (m_player->m_sp > 0))
+										m_player->m_Controller.set_command(Type::AttackMove);
+									else m_player->m_Controller.set_command(Type::Attack);
+									m_player->m_Controller.set_destination(m_mcx, m_mcy);
+									action_type = combat_system::get().get_attack_type();
+								}
+								else {
+									if ((hb::shared::input::is_shift_down() || config_manager::get().is_running_mode_enabled()) && (m_player->m_sp > 0) &&
+										(m_player->m_player_type >= 1) && (m_player->m_player_type <= 6))
+										m_player->m_Controller.set_command(Type::Run);
+									else m_player->m_Controller.set_command(Type::Move);
+									m_player->m_Controller.set_destination(m_mcx, m_mcy);
+									m_player->m_Controller.calculate_player_turn(m_player->m_player_x, m_player->m_player_y, m_map_data.get());
+								}
+								break;
+							case hb::shared::owner::OrcMage: //
+								if ((abs_x <= 2) && (abs_y <= 2) && combat_system::get().can_super_attack()) {
+									if ((abs_x <= 1) && (abs_y <= 1) && (hb::shared::input::is_shift_down() || config_manager::get().is_running_mode_enabled()) && (m_player->m_sp > 0))
+										m_player->m_Controller.set_command(Type::AttackMove);
+									else m_player->m_Controller.set_command(Type::Attack);
+									m_player->m_Controller.set_destination(m_mcx, m_mcy);
+									action_type = combat_system::get().get_attack_type();
+								}
+								else {
+									if ((hb::shared::input::is_shift_down() || config_manager::get().is_running_mode_enabled()) && (m_player->m_sp > 0) &&
+										(m_player->m_player_type >= 1) && (m_player->m_player_type <= 6))
+										m_player->m_Controller.set_command(Type::Run);
+									else m_player->m_Controller.set_command(Type::Move);
+									m_player->m_Controller.set_destination(m_mcx, m_mcy);
+									m_player->m_Controller.calculate_player_turn(m_player->m_player_x, m_player->m_player_y, m_map_data.get());
+								}
+								break;
+							case hb::shared::owner::Guard: //
+								if ((abs_x <= 2) && (abs_y <= 2) && combat_system::get().can_super_attack()) {
+									if ((abs_x <= 1) && (abs_y <= 1) && (hb::shared::input::is_shift_down() || config_manager::get().is_running_mode_enabled()) && (m_player->m_sp > 0))
+										m_player->m_Controller.set_command(Type::AttackMove);
+									else m_player->m_Controller.set_command(Type::Attack);
+									m_player->m_Controller.set_destination(m_mcx, m_mcy);
+									action_type = combat_system::get().get_attack_type();
+								}
+								else {
+									if ((hb::shared::input::is_shift_down() || config_manager::get().is_running_mode_enabled()) && (m_player->m_sp > 0) &&
+										(m_player->m_player_type >= 1) && (m_player->m_player_type <= 6))
+										m_player->m_Controller.set_command(Type::Run);
+									else m_player->m_Controller.set_command(Type::Move);
+									m_player->m_Controller.set_destination(m_mcx, m_mcy);
+									m_player->m_Controller.calculate_player_turn(m_player->m_player_x, m_player->m_player_y, m_map_data.get());
+								}
+								break;
 							}
-							break;
 						}
-					}
-					else {
-						if ((hb::shared::input::is_shift_down() || config_manager::get().is_running_mode_enabled()) && (m_player->m_sp > 0) &&
-							(m_player->m_player_type >= 1) && (m_player->m_player_type <= 6))
-							m_player->m_Controller.set_command(Type::Run);
-						else m_player->m_Controller.set_command(Type::Move);
-						m_player->m_Controller.set_destination(m_mcx, m_mcy);
-						m_player->m_Controller.calculate_player_turn(m_player->m_player_x, m_player->m_player_y, m_map_data.get());
+						break;
 					}
 				}
-			}
-			else
-			{
-				if ((hb::shared::input::is_shift_down() || config_manager::get().is_running_mode_enabled()) && (m_player->m_sp > 0) &&
-					(m_player->m_player_type >= 1) && (m_player->m_player_type <= 6))
-					m_player->m_Controller.set_command(Type::Run);
-				else m_player->m_Controller.set_command(Type::Move);
-				m_player->m_Controller.set_destination(tile_x, tile_y);
-				m_player->m_Controller.calculate_player_turn(m_player->m_player_x, m_player->m_player_y, m_map_data.get());
+				else {
+					if ((hb::shared::input::is_shift_down() || config_manager::get().is_running_mode_enabled()) && (m_player->m_sp > 0) &&
+						(m_player->m_player_type >= 1) && (m_player->m_player_type <= 6))
+						m_player->m_Controller.set_command(Type::Run);
+					else m_player->m_Controller.set_command(Type::Move);
+					m_player->m_Controller.set_destination(m_mcx, m_mcy);
+					m_player->m_Controller.calculate_player_turn(m_player->m_player_x, m_player->m_player_y, m_map_data.get());
+				}
 			}
 		}
+		else
+		{
+			if ((hb::shared::input::is_shift_down() || config_manager::get().is_running_mode_enabled()) && (m_player->m_sp > 0) &&
+				(m_player->m_player_type >= 1) && (m_player->m_player_type <= 6))
+				m_player->m_Controller.set_command(Type::Run);
+			else m_player->m_Controller.set_command(Type::Move);
+			m_player->m_Controller.set_destination(tile_x, tile_y);
+			m_player->m_Controller.calculate_player_turn(m_player->m_player_x, m_player->m_player_y, m_map_data.get());
+		}
+	}
 	return false;
 }
 
@@ -6995,34 +5363,35 @@ bool CGame::process_right_click(short mouse_x, short mouse_y, short tile_x, shor
 	std::string name;
 	short object_type = 0;
 	hb::shared::entity::PlayerStatus object_status;
-	char direction = 0, abs_x = 0, abs_y = 0;
+	direction move_dir = direction{};
+	char abs_x = 0, abs_y = 0;
 
-		// Right click on self = pickup (Quick Actions feature)
-		if (config_manager::get().is_quick_actions_enabled() &&
-			m_mc_name == m_player->m_player_name &&
-			(m_player->m_player_type >= 1) && (m_player->m_player_type <= 6))
+	// Right click on self = pickup (Quick Actions feature)
+	if (config_manager::get().is_quick_actions_enabled() &&
+		m_mc_name == m_player->m_player_name &&
+		(m_player->m_player_type >= 1) && (m_player->m_player_type <= 6))
+	{
+		m_player->m_Controller.set_command(Type::GetItem);
+		m_player->m_Controller.set_destination(m_player->m_player_x, m_player->m_player_y);
+		return false;
+	}
+	else
+	{
+		// Original right click behavior (stop, turn, attack, etc.)
+		m_player->m_Controller.set_command(Type::stop);
+		if (on_game()->m_is_get_pointing_mode == true)
 		{
-			m_player->m_Controller.set_command(Type::GetItem);
-			m_player->m_Controller.set_destination(m_player->m_player_x, m_player->m_player_y);
-			return false;
+			on_game()->m_is_get_pointing_mode = false;
+			add_event_list(COMMAND_PROCESSOR1, 10);
 		}
-		else
-		{
-			// Original right click behavior (stop, turn, attack, etc.)
-			m_player->m_Controller.set_command(Type::stop);
-			if (m_is_get_pointing_mode == true)
-			{
-				m_is_get_pointing_mode = false;
-				add_event_list(COMMAND_PROCESSOR1, 10);
-			}
-			if (m_player->m_Controller.is_command_available() == false) return true;
-			if (m_player->m_Controller.get_command_count() >= 6) return true;
+		if (m_player->m_Controller.is_command_available() == false) return true;
+		if (m_player->m_Controller.get_command_count() >= 6) return true;
 
-			if ((m_mcx != 0) && (m_mcy != 0))
-			{
-				abs_x = abs(m_player->m_player_x - m_mcx);
-				abs_y = abs(m_player->m_player_y - m_mcy);
-				if (abs_x == 0 && abs_y == 0) return true;
+		if ((m_mcx != 0) && (m_mcy != 0))
+		{
+			abs_x = abs(m_player->m_player_x - m_mcx);
+			abs_y = abs(m_player->m_player_y - m_mcy);
+			if (abs_x == 0 && abs_y == 0) return true;
 
 			if (hb::shared::input::is_ctrl_down() == true)
 			{
@@ -7219,13 +5588,14 @@ bool CGame::process_right_click(short mouse_x, short mouse_y, short tile_x, shor
 		}
 		else
 		{
-			direction = CMisc::get_next_move_dir(m_player->m_player_x, m_player->m_player_y, tile_x, tile_y);
+			move_dir = CMisc::get_next_move_dir(m_player->m_player_x, m_player->m_player_y, tile_x, tile_y);
 			if (m_player->m_hp <= 0) return true;
-			if (direction == 0) return true;
-			if (m_player->m_player_dir == direction) return true;
+			if (move_dir == 0) return true;
+			if (m_player->m_player_dir == move_dir) return true;
 			clear_skill_using_status();
-			m_player->m_player_dir = direction;
-			send_command(MsgId::CommandMotion, Type::stop, m_player->m_player_dir, 0, 0, 0, 0);
+			m_player->m_player_dir = move_dir;
+			send_game_packet(hb::net::make_motion(Type::stop, m_player->m_player_x, m_player->m_player_y, m_player->m_player_dir));
+			m_player->m_Controller.increment_command_count();
 
 			m_map_data->set_owner(m_player->m_player_object_id, m_player->m_player_x, m_player->m_player_y, m_player->m_player_type, m_player->m_player_dir,
 				m_player->m_playerAppearance,
@@ -7236,13 +5606,13 @@ bool CGame::process_right_click(short mouse_x, short mouse_y, short tile_x, shor
 			m_player->m_Controller.set_command_time(GameClock::get_time_ms());
 			return true;
 		}
-		} // close else block for "not clicking on self"
+	} // close else block for "not clicking on self"
 	return false;
 }
 
 void CGame::process_motion_commands(uint16_t action_type)
 {
-	char direction = 0;
+	direction move_dir = direction{};
 	std::string dest_name;
 	short dest_owner_type = 0;
 	hb::shared::entity::PlayerStatus dest_owner_status;
@@ -7304,8 +5674,8 @@ void CGame::process_motion_commands(uint16_t action_type)
 				}
 			}
 
-			m_floating_text.add_damage_from_value(m_player->m_damage_move_amount, false, m_cur_time,
-					m_player->m_player_object_id, m_map_data.get());
+			get_floating_text().add_damage_from_value(m_player->m_damage_move_amount, false, m_cur_time,
+				m_player->m_player_object_id, m_map_data.get());
 			m_player->m_damage_move = 0;
 			m_player->m_damage_move_amount = 0;
 		}
@@ -7322,13 +5692,14 @@ void CGame::process_motion_commands(uint16_t action_type)
 			{
 				m_player->m_Controller.set_command(Type::stop);
 				// Apply pending stop direction if set (from right-click while moving)
-				char pendingDir = m_player->m_Controller.get_pending_stop_dir();
-				if (pendingDir != 0)
+				direction pending_dir = m_player->m_Controller.get_pending_stop_dir();
+				if (pending_dir != 0)
 				{
-					m_player->m_player_dir = pendingDir;
-					send_command(MsgId::CommandMotion, Type::stop, pendingDir, 0, 0, 0, 0);
+					m_player->m_player_dir = pending_dir;
+					send_game_packet(hb::net::make_motion(Type::stop, m_player->m_player_x, m_player->m_player_y, pending_dir));
+					m_player->m_Controller.increment_command_count();
 					m_map_data->set_owner(m_player->m_player_object_id, m_player->m_player_x, m_player->m_player_y,
-						m_player->m_player_type, pendingDir, m_player->m_playerAppearance,
+						m_player->m_player_type, pending_dir, m_player->m_playerAppearance,
 						m_player->m_playerStatus, m_player->m_player_name, Type::stop, 0, 0, 0, 0, 10);
 					m_player->m_Controller.clear_pending_stop_dir();
 				}
@@ -7351,32 +5722,34 @@ void CGame::process_motion_commands(uint16_t action_type)
 					if (m_player->m_sp < 1) m_player->m_Controller.set_command(Type::Move);
 				}
 
-				direction = m_player->m_Controller.get_next_move_dir(m_player->m_player_x, m_player->m_player_y, m_player->m_Controller.get_destination_x(), m_player->m_Controller.get_destination_y(), m_map_data.get(), true);
+				move_dir = m_player->m_Controller.get_next_move_dir(m_player->m_player_x, m_player->m_player_y, m_player->m_Controller.get_destination_x(), m_player->m_Controller.get_destination_y(), m_map_data.get(), true);
 				// Snoopy: Illusion Movement
 				if ((m_illusion_mvt == true) && (m_player->m_Controller.get_command() != Type::DamageMove))
 				{
-					direction = m_player->m_Controller.get_next_move_dir(m_player->m_player_x, m_player->m_player_y, m_player->m_Controller.get_destination_x(), m_player->m_Controller.get_destination_y(), m_map_data.get(), true, true);
+					move_dir = m_player->m_Controller.get_next_move_dir(m_player->m_player_x, m_player->m_player_y, m_player->m_Controller.get_destination_x(), m_player->m_Controller.get_destination_y(), m_map_data.get(), true, true);
 				}
-				if (direction != 0)
+				if (move_dir != 0)
 				{
 					// Cancel logout countdown on movement
-					if ((m_logout_count > 0) && (m_force_disconn == false))
+					if ((on_game()->m_logout_count > 0) && (m_force_disconn == false))
 					{
-						m_logout_count = -1;
+						on_game()->m_logout_count = -1;
 						add_event_list(DLGBOX_CLICK_SYSMENU2, 10);
 					}
 
-					m_player->m_player_dir = direction;
-					send_command(MsgId::CommandMotion, m_player->m_Controller.get_command(), direction, 0, 0, 0, 0);
-					switch (direction) {
-					case 1:	m_player->m_player_y--; break;
-					case 2:	m_player->m_player_y--; m_player->m_player_x++;	break;
-					case 3:	m_player->m_player_x++; break;
-					case 4:	m_player->m_player_x++; m_player->m_player_y++;	break;
-					case 5:	m_player->m_player_y++; break;
-					case 6:	m_player->m_player_x--; m_player->m_player_y++;	break;
-					case 7:	m_player->m_player_x--; break;
-					case 8:	m_player->m_player_x--; m_player->m_player_y--;	break;
+					m_player->m_player_dir = move_dir;
+					send_game_packet(hb::net::make_motion(m_player->m_Controller.get_command(), m_player->m_player_x, m_player->m_player_y, move_dir));
+					m_player->m_Controller.increment_command_count();
+					switch (move_dir) {
+					case direction::north:	m_player->m_player_y--; break;
+					case direction::northeast:	m_player->m_player_y--; m_player->m_player_x++;	break;
+					case direction::east:	m_player->m_player_x++; break;
+					case direction::southeast:	m_player->m_player_x++; m_player->m_player_y++;	break;
+					case direction::south:	m_player->m_player_y++; break;
+					case direction::southwest:	m_player->m_player_x--; m_player->m_player_y++;	break;
+					case direction::west:	m_player->m_player_x--; break;
+					case direction::northwest:	m_player->m_player_x--; m_player->m_player_y--;	break;
+					default: break;
 					}
 					m_map_data->set_owner(m_player->m_player_object_id, m_player->m_player_x, m_player->m_player_y, m_player->m_player_type, m_player->m_player_dir,
 						m_player->m_playerAppearance, // v1.4
@@ -7390,27 +5763,27 @@ void CGame::process_motion_commands(uint16_t action_type)
 
 			if (m_player->m_Controller.get_command() == Type::DamageMove)
 			{
-				m_is_get_pointing_mode = false;
-				m_point_command_type = -1;
+				on_game()->m_is_get_pointing_mode = false;
+				on_game()->m_point_command_type = -1;
 				clear_skill_using_status();
 				m_player->m_Controller.set_command(Type::stop);
 			}
 			break;
 
 		case Type::Attack:
-			direction = CMisc::get_next_move_dir(m_player->m_player_x, m_player->m_player_y, m_player->m_Controller.get_destination_x(), m_player->m_Controller.get_destination_y());
+			move_dir = CMisc::get_next_move_dir(m_player->m_player_x, m_player->m_player_y, m_player->m_Controller.get_destination_x(), m_player->m_Controller.get_destination_y());
 			// Snoopy: Illusion movement
 			if (m_illusion_mvt == true)
 			{
-				direction += 4;
-				if (direction > 8) direction -= 8;
+				move_dir = static_cast<direction>(move_dir + 4);
+				if (move_dir > 8) move_dir = static_cast<direction>(move_dir - 8);
 			}
-			if (direction != 0)
+			if (move_dir != 0)
 			{
 				// Cancel logout countdown on attack
-				if ((m_logout_count > 0) && (m_force_disconn == false))
+				if ((on_game()->m_logout_count > 0) && (m_force_disconn == false))
 				{
-					m_logout_count = -1;
+					on_game()->m_logout_count = -1;
 					add_event_list(DLGBOX_CLICK_SYSMENU2, 10);
 				}
 
@@ -7419,9 +5792,10 @@ void CGame::process_motion_commands(uint16_t action_type)
 					if (check_item_by_type(ItemType::Arrow) == false)
 						action_type = 0;
 				}
-					m_player->m_player_dir = direction;
+				m_player->m_player_dir = move_dir;
 				m_last_attack_target_id = m_comm_object_id;
-				send_command(MsgId::CommandMotion, Type::Attack, direction, m_player->m_Controller.get_destination_x(), m_player->m_Controller.get_destination_y(), action_type, 0, m_comm_object_id);
+				send_game_packet(hb::net::make_motion_attack(Type::Attack, m_player->m_player_x, m_player->m_player_y, move_dir, static_cast<int16_t>(m_player->m_Controller.get_destination_x()), static_cast<int16_t>(m_player->m_Controller.get_destination_y()), static_cast<int16_t>(action_type), static_cast<uint16_t>(m_comm_object_id)));
+				m_player->m_Controller.increment_command_count();
 				m_map_data->set_owner(m_player->m_player_object_id, m_player->m_player_x, m_player->m_player_y, m_player->m_player_type, m_player->m_player_dir,
 					m_player->m_playerAppearance,
 					m_player->m_playerStatus, m_player->m_player_name,
@@ -7429,16 +5803,17 @@ void CGame::process_motion_commands(uint16_t action_type)
 					m_player->m_Controller.get_destination_x() - m_player->m_player_x, m_player->m_Controller.get_destination_y() - m_player->m_player_y, action_type);
 				m_player->m_Controller.set_command_available(false);
 				m_player->m_Controller.set_command_time(GameClock::get_time_ms());
-				// Compute expected swing duration (must match server's bCheckClientAttackFrequency formula)
+				// Compute expected swing duration (must match server's check_client_attack_frequency formula)
 				{
-					constexpr int ATTACK_FRAME_DURATIONS = 8;
-					int baseFrameTime = PlayerAnim::Attack.m_frame_time; // 78
-					int delay = m_player->m_playerStatus.attack_delay * 12;
-					if (m_player->m_playerStatus.frozen) delay += baseFrameTime >> 2;
-					if (m_player->m_playerStatus.haste)
-						delay -= static_cast<int>(PlayerAnim::Run.m_frame_time / 2.3);
-					int expectedSwingTime = ATTACK_FRAME_DURATIONS * (baseFrameTime + delay);
-					m_player->m_Controller.set_attack_end_time(GameClock::get_time_ms() + expectedSwingTime);
+					int base_swing = hb::shared::calc::swing_time(m_formula_engine,
+						hb::shared::calc::attack_delay_value{(double)m_player->m_playerStatus.attack_delay});
+					int frames = hb::shared::calc::swing_frames(m_formula_engine);
+					int bft = hb::shared::calc::base_frame_time(m_formula_engine);
+					int rft = hb::shared::calc::run_frame_time(m_formula_engine);
+					int effective_swing = base_swing;
+					if (m_player->m_playerStatus.frozen) effective_swing += frames * (bft >> 2);
+					if (m_player->m_playerStatus.haste)  effective_swing -= frames * static_cast<int>(rft / 2.3);
+					m_player->m_Controller.set_attack_end_time(GameClock::get_time_ms() + effective_swing);
 				}
 			}
 			m_player->m_Controller.set_command(Type::stop);
@@ -7454,33 +5829,35 @@ void CGame::process_motion_commands(uint16_t action_type)
 				m_player->m_Controller.set_command(Type::stop);
 			else
 			{
-				direction = m_player->m_Controller.get_next_move_dir(m_player->m_player_x, m_player->m_player_y, m_player->m_Controller.get_destination_x(), m_player->m_Controller.get_destination_y(), m_map_data.get(), true);
+				move_dir = m_player->m_Controller.get_next_move_dir(m_player->m_player_x, m_player->m_player_y, m_player->m_Controller.get_destination_x(), m_player->m_Controller.get_destination_y(), m_map_data.get(), true);
 				// Snoopy: Illusion mvt
 				if (m_illusion_mvt == true)
 				{
-					direction = m_player->m_Controller.get_next_move_dir(m_player->m_player_x, m_player->m_player_y, m_player->m_Controller.get_destination_x(), m_player->m_Controller.get_destination_y(), m_map_data.get(), true, true);
+					move_dir = m_player->m_Controller.get_next_move_dir(m_player->m_player_x, m_player->m_player_y, m_player->m_Controller.get_destination_x(), m_player->m_Controller.get_destination_y(), m_map_data.get(), true, true);
 				}
-				if (direction != 0)
+				if (move_dir != 0)
 				{
 					// Cancel logout countdown on attack-move
-					if ((m_logout_count > 0) && (m_force_disconn == false))
+					if ((on_game()->m_logout_count > 0) && (m_force_disconn == false))
 					{
-						m_logout_count = -1;
+						on_game()->m_logout_count = -1;
 						add_event_list(DLGBOX_CLICK_SYSMENU2, 10);
 					}
 
-					m_player->m_player_dir = direction;
+					m_player->m_player_dir = move_dir;
 					m_last_attack_target_id = m_comm_object_id;
-					send_command(MsgId::CommandMotion, Type::AttackMove, direction, m_player->m_Controller.get_destination_x(), m_player->m_Controller.get_destination_y(), action_type, 0, m_comm_object_id);
-					switch (direction) {
-					case 1:	m_player->m_player_y--; break;
-					case 2:	m_player->m_player_y--; m_player->m_player_x++;	break;
-					case 3:	m_player->m_player_x++; break;
-					case 4:	m_player->m_player_x++; m_player->m_player_y++;	break;
-					case 5:	m_player->m_player_y++; break;
-					case 6:	m_player->m_player_x--; m_player->m_player_y++;	break;
-					case 7:	m_player->m_player_x--; break;
-					case 8:	m_player->m_player_x--; m_player->m_player_y--;	break;
+					send_game_packet(hb::net::make_motion_attack(Type::AttackMove, m_player->m_player_x, m_player->m_player_y, move_dir, static_cast<int16_t>(m_player->m_Controller.get_destination_x()), static_cast<int16_t>(m_player->m_Controller.get_destination_y()), static_cast<int16_t>(action_type), static_cast<uint16_t>(m_comm_object_id)));
+					m_player->m_Controller.increment_command_count();
+					switch (move_dir) {
+					case direction::north:	m_player->m_player_y--; break;
+					case direction::northeast:	m_player->m_player_y--; m_player->m_player_x++;	break;
+					case direction::east:	m_player->m_player_x++; break;
+					case direction::southeast:	m_player->m_player_x++; m_player->m_player_y++;	break;
+					case direction::south:	m_player->m_player_y++; break;
+					case direction::southwest:	m_player->m_player_x--; m_player->m_player_y++;	break;
+					case direction::west:	m_player->m_player_x--; break;
+					case direction::northwest:	m_player->m_player_x--; m_player->m_player_y--;	break;
+					default: break;
 					}
 
 					m_map_data->set_owner(m_player->m_player_object_id, m_player->m_player_x, m_player->m_player_y, m_player->m_player_type, m_player->m_player_dir,
@@ -7489,16 +5866,17 @@ void CGame::process_motion_commands(uint16_t action_type)
 						m_player->m_Controller.get_command(), m_player->m_Controller.get_destination_x() - m_player->m_player_x, m_player->m_Controller.get_destination_y() - m_player->m_player_y, action_type);
 					m_player->m_Controller.set_command_available(false);
 					m_player->m_Controller.set_command_time(GameClock::get_time_ms());
-					// Compute expected swing duration (must match server's bCheckClientAttackFrequency formula)
+					// Compute expected swing duration (must match server's check_client_attack_frequency formula)
 					{
-						constexpr int ATTACK_FRAME_DURATIONS = 8;
-						int baseFrameTime = PlayerAnim::Attack.m_frame_time; // 78
-						int delay = m_player->m_playerStatus.attack_delay * 12;
-						if (m_player->m_playerStatus.frozen) delay += baseFrameTime >> 2;
-						if (m_player->m_playerStatus.haste)
-							delay -= static_cast<int>(PlayerAnim::Run.m_frame_time / 2.3);
-						int expectedSwingTime = ATTACK_FRAME_DURATIONS * (baseFrameTime + delay);
-						m_player->m_Controller.set_attack_end_time(GameClock::get_time_ms() + expectedSwingTime);
+						int base_swing = hb::shared::calc::swing_time(m_formula_engine,
+							hb::shared::calc::attack_delay_value{(double)m_player->m_playerStatus.attack_delay});
+						int frames = hb::shared::calc::swing_frames(m_formula_engine);
+						int bft = hb::shared::calc::base_frame_time(m_formula_engine);
+						int rft = hb::shared::calc::run_frame_time(m_formula_engine);
+						int effective_swing = base_swing;
+						if (m_player->m_playerStatus.frozen) effective_swing += frames * (bft >> 2);
+						if (m_player->m_playerStatus.haste)  effective_swing -= frames * static_cast<int>(rft / 2.3);
+						m_player->m_Controller.set_attack_end_time(GameClock::get_time_ms() + effective_swing);
 					}
 					m_player->m_Controller.set_prev_move(m_player->m_player_x, m_player->m_player_y);
 				}
@@ -7508,13 +5886,14 @@ void CGame::process_motion_commands(uint16_t action_type)
 
 		case Type::GetItem:
 			// Cancel logout countdown on get item
-			if ((m_logout_count > 0) && (m_force_disconn == false))
+			if ((on_game()->m_logout_count > 0) && (m_force_disconn == false))
 			{
-				m_logout_count = -1;
+				on_game()->m_logout_count = -1;
 				add_event_list(DLGBOX_CLICK_SYSMENU2, 10);
 			}
 
-			send_command(MsgId::CommandMotion, Type::GetItem, m_player->m_player_dir, 0, 0, 0, 0);
+			send_game_packet(hb::net::make_motion(Type::GetItem, m_player->m_player_x, m_player->m_player_y, m_player->m_player_dir));
+			m_player->m_Controller.increment_command_count();
 			m_map_data->set_owner(m_player->m_player_object_id, m_player->m_player_x, m_player->m_player_y, m_player->m_player_type, m_player->m_player_dir,
 				m_player->m_playerAppearance,
 				m_player->m_playerStatus, m_player->m_player_name,
@@ -7525,13 +5904,14 @@ void CGame::process_motion_commands(uint16_t action_type)
 
 		case Type::Magic:
 			// Cancel logout countdown on magic cast
-			if ((m_logout_count > 0) && (m_force_disconn == false))
+			if ((on_game()->m_logout_count > 0) && (m_force_disconn == false))
 			{
-				m_logout_count = -1;
+				on_game()->m_logout_count = -1;
 				add_event_list(DLGBOX_CLICK_SYSMENU2, 10);
 			}
 
-			send_command(MsgId::CommandMotion, Type::Magic, m_player->m_player_dir, m_casting_magic_type, 0, 0, 0);
+			send_game_packet(hb::net::make_motion(Type::Magic, m_player->m_player_x, m_player->m_player_y, m_player->m_player_dir, static_cast<int16_t>(m_casting_magic_type)));
+			m_player->m_Controller.increment_command_count();
 			m_map_data->set_owner(m_player->m_player_object_id, m_player->m_player_x, m_player->m_player_y, m_player->m_player_type, m_player->m_player_dir,
 				m_player->m_playerAppearance,
 				m_player->m_playerStatus, m_player->m_player_name,
@@ -7539,13 +5919,13 @@ void CGame::process_motion_commands(uint16_t action_type)
 			m_player->m_Controller.set_command_available(false);
 			m_player->m_Controller.set_command_time(GameClock::get_time_ms());
 			// Only enter targeting mode if the cast wasn't interrupted by damage
-			if (m_point_command_type >= 100 && m_point_command_type < 200)
-				m_is_get_pointing_mode = true;
+			if (on_game()->m_point_command_type >= 100 && on_game()->m_point_command_type < 200)
+				on_game()->m_is_get_pointing_mode = true;
 			m_player->m_Controller.set_command(Type::stop);
-			m_floating_text.remove_by_object_id(m_player->m_player_object_id);
+			get_floating_text().remove_by_object_id(m_player->m_player_object_id);
 			{
 				text = std::format("{}!", m_magic_cfg_list[m_casting_magic_type]->m_name);
-				m_floating_text.add_notify_text(notify_text_type::magic_cast_name, text, GameClock::get_time_ms(),
+				get_floating_text().add_notify_text(notify_text_type::magic_cast_name, text, GameClock::get_time_ms(),
 					m_player->m_player_object_id, m_map_data.get());
 			}
 			return;
@@ -7561,9 +5941,9 @@ void CGame::process_motion_commands(uint16_t action_type)
 void CGame::request_teleport_and_wait_data()
 {
 	if (teleport_manager::get().is_requested()) return;
+	if (teleport_manager::get().is_active()) return;
 
-	send_command(MsgId::RequestTeleport, 0, 0, 0, 0, 0, 0);
-	change_game_mode(GameMode::WaitingInitData);
+	teleport_manager::get().request_auth(m_player->m_player_x, m_player->m_player_y);
 }
 
 void CGame::init_data_response_handler(char* packet_data)
@@ -7581,32 +5961,19 @@ void CGame::init_data_response_handler(char* packet_data)
 	m_monster_id = 0;
 	m_monster_event_time = 0;
 
-	m_dialog_box_manager.disable_dialog_box(DialogBoxId::GuildMenu);
-	m_dialog_box_manager.disable_dialog_box(DialogBoxId::SaleMenu);
-	m_dialog_box_manager.disable_dialog_box(DialogBoxId::CityHallMenu);
-	m_dialog_box_manager.disable_dialog_box(DialogBoxId::Bank);
-	m_dialog_box_manager.disable_dialog_box(DialogBoxId::MagicShop);
-	m_dialog_box_manager.disable_dialog_box(DialogBoxId::Map);
-	m_dialog_box_manager.disable_dialog_box(DialogBoxId::NpcActionQuery);
-	m_dialog_box_manager.disable_dialog_box(DialogBoxId::NpcTalk);
-	m_dialog_box_manager.disable_dialog_box(DialogBoxId::SellOrRepair);
-	m_dialog_box_manager.disable_dialog_box(DialogBoxId::GuildHallMenu); // Gail's diag
-	m_dialog_box_manager.disable_dialog_box(DialogBoxId::ItemUpgrade);
-	m_dialog_box_manager.disable_dialog_box(DialogBoxId::Manufacture);
-	m_dialog_box_manager.disable_dialog_box(DialogBoxId::Exchange);
-	m_dialog_box_manager.disable_dialog_box(DialogBoxId::Slates);
+	get_dialog_box_manager().disable_npc_dialogs();
 
 	m_player->m_Controller.set_command(Type::stop);
 	m_player->m_Controller.reset_command_count();
-	m_is_get_pointing_mode = false;
-	m_point_command_type = -1;
-	m_ilusion_owner_h = 0;
-	m_ilusion_owner_type = 0;
+	on_game()->m_is_get_pointing_mode = false;
+	on_game()->m_point_command_type = -1;
+	on_game()->m_ilusion_owner_h = 0;
+	on_game()->m_ilusion_owner_type = 0;
 	teleport_manager::get().set_requested(false);
 	m_player->m_is_confusion = false;
-	m_skill_using_status = false;
+	on_game()->m_skill_using_status = false;
 
-	m_item_using_status = false;
+	on_game()->m_item_using_status = false;
 
 	m_restart_count = -1;
 	m_restart_count_time = 0;
@@ -7615,13 +5982,10 @@ void CGame::init_data_response_handler(char* packet_data)
 
 	weather_manager::get().reset_particles();
 
-	for (int i = 0; i < game_limits::max_guild_names; i++)
-	{
-		m_guild_name_cache[i].ref_time = 0;
-		m_guild_name_cache[i].guild_rank = -1;
-	}
+	if (auto* on_game = GameModeManager::get_active_screen_as<Screen_OnGame>())
+		on_game->get_guild_manager().clear_name_cache();
 
-	m_floating_text.clear_all();
+	get_floating_text().clear_all();
 
 	const auto* pkt = hb::net::PacketCast<hb::net::PacketResponseInitDataHeader>(
 		packet_data, sizeof(hb::net::PacketResponseInitDataHeader));
@@ -7651,13 +6015,13 @@ void CGame::init_data_response_handler(char* packet_data)
 	m_map_message = mapMsgBuf;
 	if (m_map_index < 0)
 	{
-		m_dialog_box_manager.Info(DialogBoxId::GuideMap).m_size_x = -1;
-		m_dialog_box_manager.Info(DialogBoxId::GuideMap).m_size_y = -1;
+		get_dialog_box_manager().get_dialog_box(DialogBoxId::GuideMap)->m_size_x = -1;
+		get_dialog_box_manager().get_dialog_box(DialogBoxId::GuideMap)->m_size_y = -1;
 	}
 	else
 	{
-		m_dialog_box_manager.Info(DialogBoxId::GuideMap).m_size_x = 128;
-		m_dialog_box_manager.Info(DialogBoxId::GuideMap).m_size_y = 128;
+		get_dialog_box_manager().get_dialog_box(DialogBoxId::GuideMap)->m_size_x = 128;
+		get_dialog_box_manager().get_dialog_box(DialogBoxId::GuideMap)->m_size_y = 128;
 	}
 
 	prev_location = m_cur_location;
@@ -7668,12 +6032,12 @@ void CGame::init_data_response_handler(char* packet_data)
 	weather_manager::get().set_weather_status(static_cast<char>(pkt->weather_status));
 	switch (weather_manager::get().get_ambient_light()) { // Xmas bulbs
 		// Will be sent by server if DayTime is 3 (and a snowy weather)
-	case 1:	m_is_xmas = false; break;
-	case 2: m_is_xmas = false; break;
+	case 1:	on_game()->m_is_xmas = false; break;
+	case 2: on_game()->m_is_xmas = false; break;
 	case 3: // Snoopy Special night with chrismas bulbs
-		if (weather_manager::get().get_weather_status() > 3) m_is_xmas = true;
-		else m_is_xmas = false;
-		weather_manager::get().set_xmas(m_is_xmas);
+		if (weather_manager::get().get_weather_status() > 3) on_game()->m_is_xmas = true;
+		else on_game()->m_is_xmas = false;
+		weather_manager::get().set_xmas(on_game()->m_is_xmas);
 		weather_manager::get().set_ambient_light(2);
 		break;
 	}
@@ -7721,7 +6085,7 @@ void CGame::init_data_response_handler(char* packet_data)
 	m_player->m_player_x = pivot_x + hb::shared::view::PlayerPivotOffsetX;
 	m_player->m_player_y = pivot_y + hb::shared::view::PlayerPivotOffsetY;
 
-	m_player->m_player_dir = 5;
+	m_player->m_player_dir = direction::south;
 
 	if (is_observer == false)
 	{
@@ -7737,21 +6101,24 @@ void CGame::init_data_response_handler(char* packet_data)
 	text = std::format(INITDATA_RESPONSE_HANDLER1, m_map_message);
 	add_event_list(text.c_str(), 10);
 
-	m_dialog_box_manager.Info(DialogBoxId::WarningBattleArea).m_x = 150;
-	m_dialog_box_manager.Info(DialogBoxId::WarningBattleArea).m_y = 130;
+	get_dialog_box_manager().get_dialog_box(DialogBoxId::WarningBattleArea)->m_x = 150;
+	get_dialog_box_manager().get_dialog_box(DialogBoxId::WarningBattleArea)->m_y = 130;
 
 	if ((m_cur_location.starts_with("middleland"))
 		|| (m_cur_location.starts_with("dglv2"))
 		|| (m_cur_location.starts_with("middled1n")))
-		m_dialog_box_manager.enable_dialog_box(DialogBoxId::WarningBattleArea, 0, 0, 0);
+		get_dialog_box_manager().enable_dialog_box(DialogBoxId::WarningBattleArea, 0, 0, 0);
 
 	m_is_server_changing = false;
 
-	// Wait for configs before entering the game world
+	// Notify TeleportManager that map data has loaded (screen is still black)
+	if (teleport_manager::get().get_state() == teleport_state::awaiting_data)
+		teleport_manager::get().on_map_loaded();
+
+	// Screen_OnGame is already active — clear the waiting overlay when all data is ready
 	m_init_data_ready = true;
 	if (m_configs_ready) {
-		GameModeManager::set_screen<Screen_OnGame>();
-		m_init_data_ready = false;
+		GameModeManager::clear_overlay();
 	}
 
 	//v1.41
@@ -7766,7 +6133,12 @@ void CGame::init_data_response_handler(char* packet_data)
 		std::error_code ec;
 		auto sz = std::filesystem::file_size("contents/contents1000.txt", ec);
 		file_size = ec ? 0 : static_cast<uint32_t>(sz);
-		send_command(MsgId::RequestNoticement, 0, 0, static_cast<int>(file_size), 0, 0, 0);
+		{
+			hb::net::PacketRequestNoticement pkt{};
+			pkt.header.msg_id = MsgId::RequestNoticement;
+			pkt.value = static_cast<int>(file_size);
+			send_game_packet(pkt);
+		}
 	}
 }
 
@@ -7776,7 +6148,7 @@ void CGame::motion_event_handler(char* packet_data)
 	short map_x = -1, map_y = -1, owner_type = 0, value1 = 0, value2 = 0, value3 = 0;
 	short npc_config_id = -1;
 	hb::shared::entity::PlayerStatus status;
-	char direction = 0;
+	direction move_dir = direction{};
 	std::string name;
 	int location = 0;
 	hb::shared::entity::PlayerAppearance appearance;
@@ -7804,7 +6176,7 @@ void CGame::motion_event_handler(char* packet_data)
 			map_x = pkt->x;
 			map_y = pkt->y;
 			owner_type = pkt->type;
-			direction = static_cast<char>(pkt->dir);
+			move_dir = static_cast<direction>(pkt->dir);
 			name.assign(pkt->name, strnlen(pkt->name, sizeof(pkt->name)));
 			appearance = pkt->appearance;
 			status = pkt->status;
@@ -7818,7 +6190,7 @@ void CGame::motion_event_handler(char* packet_data)
 			map_y = pkt->y;
 			npc_config_id = pkt->config_id;
 			owner_type = resolve_npc_type(npc_config_id);
-			direction = static_cast<char>(pkt->dir);
+			move_dir = static_cast<direction>(pkt->dir);
 			name.assign(pkt->name, strnlen(pkt->name, sizeof(pkt->name)));
 			appearance.SetFromNpcAppearance(pkt->appearance);
 			status.SetFromEntityStatus(pkt->status);
@@ -7833,7 +6205,7 @@ void CGame::motion_event_handler(char* packet_data)
 		{
 			const auto* pkt = hb::net::PacketCast<hb::net::PacketEventMotionDirOnly>(packet_data, sizeof(hb::net::PacketEventMotionDirOnly));
 			if (!pkt) return;
-			direction = static_cast<char>(pkt->dir);
+			move_dir = static_cast<direction>(pkt->dir);
 			map_x = -1;
 			map_y = -1;
 		}
@@ -7845,7 +6217,7 @@ void CGame::motion_event_handler(char* packet_data)
 		{
 			const auto* pkt = hb::net::PacketCast<hb::net::PacketEventMotionShort>(packet_data, sizeof(hb::net::PacketEventMotionShort));
 			if (!pkt) return;
-			direction = static_cast<char>(pkt->dir);
+			move_dir = static_cast<direction>(pkt->dir);
 			value1 = pkt->v1; // Damage or 0
 			value2 = pkt->v2;
 			map_x = -1;
@@ -7857,7 +6229,7 @@ void CGame::motion_event_handler(char* packet_data)
 		{
 			const auto* pkt = hb::net::PacketCast<hb::net::PacketEventMotionMove>(packet_data, sizeof(hb::net::PacketEventMotionMove));
 			if (!pkt) return;
-			direction = static_cast<char>(pkt->dir);
+			move_dir = static_cast<direction>(pkt->dir);
 			value1 = pkt->v1;
 			value2 = pkt->v2;
 			map_x = pkt->x;
@@ -7870,7 +6242,7 @@ void CGame::motion_event_handler(char* packet_data)
 		{
 			const auto* pkt = hb::net::PacketCast<hb::net::PacketEventMotionAttack>(packet_data, sizeof(hb::net::PacketEventMotionAttack));
 			if (!pkt) return;
-			direction = static_cast<char>(pkt->dir);
+			move_dir = static_cast<direction>(pkt->dir);
 			value1 = pkt->v1;
 			value2 = pkt->v2;
 			value3 = pkt->v3;
@@ -7881,7 +6253,7 @@ void CGame::motion_event_handler(char* packet_data)
 		{
 			const auto* pkt = hb::net::PacketCast<hb::net::PacketEventMotionDirOnly>(packet_data, sizeof(hb::net::PacketEventMotionDirOnly));
 			if (!pkt) return;
-			direction = static_cast<char>(pkt->dir);
+			move_dir = static_cast<direction>(pkt->dir);
 		}
 		break;
 		}
@@ -7910,23 +6282,23 @@ void CGame::motion_event_handler(char* packet_data)
 				m_player->m_is_combat_mode = false;
 			}
 		}
-		if (m_player->m_Controller.get_command() != Type::Run && m_player->m_Controller.get_command() != Type::Move) { m_map_data->set_owner(object_id, map_x, map_y, owner_type, direction, appearance, status, name, (char)event_type, value1, value2, value3, location, 0, npc_config_id); }
+		if (m_player->m_Controller.get_command() != Type::Run && m_player->m_Controller.get_command() != Type::Move) { m_map_data->set_owner(object_id, map_x, map_y, owner_type, move_dir, appearance, status, name, (char)event_type, value1, value2, value3, location, 0, npc_config_id); }
 	}
-	else { m_map_data->set_owner(object_id, map_x, map_y, owner_type, direction, appearance, status, name, (char)event_type, value1, value2, value3, location, 0, npc_config_id); }
+	else { m_map_data->set_owner(object_id, map_x, map_y, owner_type, move_dir, appearance, status, name, (char)event_type, value1, value2, value3, location, 0, npc_config_id); }
 
 	switch (event_type) {
 	case Type::Magic: // Casting
-		m_floating_text.remove_by_object_id(hb::shared::object_id::ToRealID(object_id));
+		get_floating_text().remove_by_object_id(hb::shared::object_id::ToRealID(object_id));
 		{
 			text = std::format("{}!", m_magic_cfg_list[value1]->m_name);
-			m_floating_text.add_notify_text(notify_text_type::magic_cast_name, text, m_cur_time,
+			get_floating_text().add_notify_text(notify_text_type::magic_cast_name, text, m_cur_time,
 				hb::shared::object_id::ToRealID(object_id), m_map_data.get());
 		}
 		break;
 
 	case Type::Dying:
-		m_floating_text.remove_by_object_id(hb::shared::object_id::ToRealID(object_id));
-		m_floating_text.add_damage_from_value(value1, true, m_cur_time,
+		get_floating_text().remove_by_object_id(hb::shared::object_id::ToRealID(object_id));
+		get_floating_text().add_damage_from_value(value1, true, m_cur_time,
 			hb::shared::object_id::ToRealID(object_id), m_map_data.get());
 		break;
 
@@ -7937,8 +6309,8 @@ void CGame::motion_event_handler(char* packet_data)
 			// Cancel spell casting if in the animation phase (Type::Magic)
 			if (m_player->m_Controller.get_command() == Type::Magic)
 				m_player->m_Controller.set_command(Type::stop);
-			m_is_get_pointing_mode = false;
-			m_point_command_type = -1;
+			on_game()->m_is_get_pointing_mode = false;
+			on_game()->m_point_command_type = -1;
 			clear_skill_using_status();
 			// Lock the controller until the damage animation finishes.
 			// Without this, quick actions allows immediate movement after being hit.
@@ -7946,8 +6318,8 @@ void CGame::motion_event_handler(char* packet_data)
 			m_player->m_Controller.set_command_available(false);
 			m_player->m_Controller.set_command_time(GameClock::get_time_ms());
 		}
-		m_floating_text.remove_by_object_id(hb::shared::object_id::ToRealID(object_id));
-		m_floating_text.add_damage_from_value(value1, false, m_cur_time,
+		get_floating_text().remove_by_object_id(hb::shared::object_id::ToRealID(object_id));
+		get_floating_text().add_damage_from_value(value1, false, m_cur_time,
 			hb::shared::object_id::ToRealID(object_id), m_map_data.get());
 		break;
 
@@ -7972,8 +6344,8 @@ void CGame::grand_magic_result(const char* map_name, int ares_crusade_points, in
 
 	for (int i = 0; i < game_limits::max_text_dlg_lines; i++)
 	{
-		if (m_msg_text_list[i] != 0)
-			m_msg_text_list[i].reset();
+		if (on_game()->m_msg_text_list[i] != 0)
+			on_game()->m_msg_text_list[i].reset();
 	}
 
 	for (int i = 0; i < 92; i++)
@@ -7981,49 +6353,49 @@ void CGame::grand_magic_result(const char* map_name, int ares_crusade_points, in
 
 	if (strcmp(map_name, "aresden") == 0)
 	{
-		m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[2]->m_pMsg, 0);
-		m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[3]->m_pMsg, 0);
-		m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, " ", 0);
+		on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[2]->m_pMsg, 0);
+		on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[3]->m_pMsg, 0);
+		on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, " ", 0);
 
 		std::snprintf(temp, sizeof(temp), "%s %d", m_game_msg_list[4]->m_pMsg, ares_crusade_points);
-		m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, temp, 0);
+		on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, temp, 0);
 
 		std::snprintf(temp, sizeof(temp), "%s %d", m_game_msg_list[5]->m_pMsg, elv_crusade_points);
-		m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, temp, 0);
+		on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, temp, 0);
 
 		std::snprintf(temp, sizeof(temp), "%s %d", m_game_msg_list[6]->m_pMsg, ares_industry_points);
-		m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, temp, 0);
+		on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, temp, 0);
 
 		std::snprintf(temp, sizeof(temp), "%s %d", m_game_msg_list[58]->m_pMsg, elv_industry_points);
-		m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, temp, 0);
-		m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, " ", 0);
+		on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, temp, 0);
+		on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, " ", 0);
 
 		std::snprintf(temp, sizeof(temp), "%s %d %d %d %d", NOTIFY_MSG_STRUCTURE_HP, ares_crusade_casualties, ares_industry_casualties, elv_crusade_casualties, elv_industry_casualties);
-		m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, temp, 0);
-		m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, " ", 0);
+		on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, temp, 0);
+		on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, " ", 0);
 
 		if (elv_crusade_points == 0) {
 			if ((m_player->m_citizen == true) && (m_player->m_aresden == false))
 			{
-				play_game_sound('E', 25, 0, 0);
-				m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[59]->m_pMsg, 0);
-				m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[60]->m_pMsg, 0);
-				m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[61]->m_pMsg, 0);
-				m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[62]->m_pMsg, 0);
-				for (int i = text_index; i < 18; i++) m_msg_text_list[i] = std::make_unique<CMsg>(0, " ", 0);
+				audio_manager::get().play_game_sound(sound_type::effect, 25, 0, 0);
+				on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[59]->m_pMsg, 0);
+				on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[60]->m_pMsg, 0);
+				on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[61]->m_pMsg, 0);
+				on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[62]->m_pMsg, 0);
+				for (int i = text_index; i < 18; i++) on_game()->m_msg_text_list[i] = std::make_unique<CMsg>(0, " ", 0);
 			}
 			else if ((m_player->m_citizen == true) && (m_player->m_aresden == true))
 			{
-				play_game_sound('E', 25, 0, 0);
-				m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[69]->m_pMsg, 0);
-				m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[70]->m_pMsg, 0);
-				m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[71]->m_pMsg, 0);
-				m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[72]->m_pMsg, 0);
-				m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[73]->m_pMsg, 0);
-				m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[74]->m_pMsg, 0);
-				for (int i = text_index; i < 18; i++) m_msg_text_list[i] = std::make_unique<CMsg>(0, " ", 0);
+				audio_manager::get().play_game_sound(sound_type::effect, 25, 0, 0);
+				on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[69]->m_pMsg, 0);
+				on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[70]->m_pMsg, 0);
+				on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[71]->m_pMsg, 0);
+				on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[72]->m_pMsg, 0);
+				on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[73]->m_pMsg, 0);
+				on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[74]->m_pMsg, 0);
+				for (int i = text_index; i < 18; i++) on_game()->m_msg_text_list[i] = std::make_unique<CMsg>(0, " ", 0);
 			}
-			else play_game_sound('E', 25, 0, 0);
+			else audio_manager::get().play_game_sound(sound_type::effect, 25, 0, 0);
 		}
 		else
 		{
@@ -8031,163 +6403,163 @@ void CGame::grand_magic_result(const char* map_name, int ares_crusade_points, in
 			{
 				if ((m_player->m_citizen == true) && (m_player->m_aresden == false))
 				{
-					play_game_sound('E', 23, 0, 0);
-					play_game_sound('C', 21, 0, 0);
-					play_game_sound('C', 22, 0, 0);
-					m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[63]->m_pMsg, 0);
-					m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[64]->m_pMsg, 0);
-					m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[65]->m_pMsg, 0);
-					for (int i = text_index; i < 18; i++) m_msg_text_list[i] = std::make_unique<CMsg>(0, " ", 0);
+					audio_manager::get().play_game_sound(sound_type::effect, 23, 0, 0);
+					audio_manager::get().play_game_sound(sound_type::character, 21, 0, 0);
+					audio_manager::get().play_game_sound(sound_type::character, 22, 0, 0);
+					on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[63]->m_pMsg, 0);
+					on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[64]->m_pMsg, 0);
+					on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[65]->m_pMsg, 0);
+					for (int i = text_index; i < 18; i++) on_game()->m_msg_text_list[i] = std::make_unique<CMsg>(0, " ", 0);
 				}
 				else if ((m_player->m_citizen == true) && (m_player->m_aresden == true))
 				{
-					play_game_sound('E', 24, 0, 0);
-					play_game_sound('C', 12, 0, 0);
-					play_game_sound('C', 13, 0, 0);
-					m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[75]->m_pMsg, 0);
-					m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[76]->m_pMsg, 0);
-					m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[77]->m_pMsg, 0);
-					m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[78]->m_pMsg, 0);
-					m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[79]->m_pMsg, 0);
-					m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[80]->m_pMsg, 0);
-					m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[81]->m_pMsg, 0);
-					m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[82]->m_pMsg, 0);
-					for (int i = text_index; i < 18; i++) m_msg_text_list[i] = std::make_unique<CMsg>(0, " ", 0);
+					audio_manager::get().play_game_sound(sound_type::effect, 24, 0, 0);
+					audio_manager::get().play_game_sound(sound_type::character, 12, 0, 0);
+					audio_manager::get().play_game_sound(sound_type::character, 13, 0, 0);
+					on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[75]->m_pMsg, 0);
+					on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[76]->m_pMsg, 0);
+					on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[77]->m_pMsg, 0);
+					on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[78]->m_pMsg, 0);
+					on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[79]->m_pMsg, 0);
+					on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[80]->m_pMsg, 0);
+					on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[81]->m_pMsg, 0);
+					on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[82]->m_pMsg, 0);
+					for (int i = text_index; i < 18; i++) on_game()->m_msg_text_list[i] = std::make_unique<CMsg>(0, " ", 0);
 				}
-				else play_game_sound('E', 25, 0, 0);
+				else audio_manager::get().play_game_sound(sound_type::effect, 25, 0, 0);
 			}
 			else
 			{
 				if ((m_player->m_citizen == true) && (m_player->m_aresden == false))
 				{
-					play_game_sound('E', 23, 0, 0);
-					m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[66]->m_pMsg, 0);
-					m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[67]->m_pMsg, 0);
-					m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[68]->m_pMsg, 0);
-					for (int i = text_index; i < 18; i++) m_msg_text_list[i] = std::make_unique<CMsg>(0, " ", 0);
+					audio_manager::get().play_game_sound(sound_type::effect, 23, 0, 0);
+					on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[66]->m_pMsg, 0);
+					on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[67]->m_pMsg, 0);
+					on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[68]->m_pMsg, 0);
+					for (int i = text_index; i < 18; i++) on_game()->m_msg_text_list[i] = std::make_unique<CMsg>(0, " ", 0);
 				}
 				else if ((m_player->m_citizen == true) && (m_player->m_aresden == true))
 				{
-					play_game_sound('E', 24, 0, 0);
-					m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[83]->m_pMsg, 0);
-					m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[84]->m_pMsg, 0);
-					m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[85]->m_pMsg, 0);
-					m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[86]->m_pMsg, 0);
-					m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[87]->m_pMsg, 0);
-					m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[88]->m_pMsg, 0);
-					m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[89]->m_pMsg, 0);
-					m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[90]->m_pMsg, 0);
-					for (int i = text_index; i < 18; i++) m_msg_text_list[i] = std::make_unique<CMsg>(0, " ", 0);
+					audio_manager::get().play_game_sound(sound_type::effect, 24, 0, 0);
+					on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[83]->m_pMsg, 0);
+					on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[84]->m_pMsg, 0);
+					on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[85]->m_pMsg, 0);
+					on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[86]->m_pMsg, 0);
+					on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[87]->m_pMsg, 0);
+					on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[88]->m_pMsg, 0);
+					on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[89]->m_pMsg, 0);
+					on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[90]->m_pMsg, 0);
+					for (int i = text_index; i < 18; i++) on_game()->m_msg_text_list[i] = std::make_unique<CMsg>(0, " ", 0);
 				}
-				else play_game_sound('E', 25, 0, 0);
+				else audio_manager::get().play_game_sound(sound_type::effect, 25, 0, 0);
 			}
 		}
 	}
 	else if (strcmp(map_name, "elvine") == 0)
 	{
-		m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[7]->m_pMsg, 0);
-		m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[8]->m_pMsg, 0);
-		m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, " ", 0);
+		on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[7]->m_pMsg, 0);
+		on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[8]->m_pMsg, 0);
+		on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, " ", 0);
 
 		std::snprintf(temp, sizeof(temp), "%s %d", m_game_msg_list[4]->m_pMsg, ares_crusade_points);
-		m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, temp, 0);
+		on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, temp, 0);
 
 		std::snprintf(temp, sizeof(temp), "%s %d", m_game_msg_list[5]->m_pMsg, elv_crusade_points);
-		m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, temp, 0);
+		on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, temp, 0);
 
 		std::snprintf(temp, sizeof(temp), "%s %d", m_game_msg_list[6]->m_pMsg, ares_industry_points);
-		m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, temp, 0);
+		on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, temp, 0);
 
 		std::snprintf(temp, sizeof(temp), "%s %d", m_game_msg_list[58]->m_pMsg, elv_industry_points);
-		m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, temp, 0);
-		m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, " ", 0);
+		on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, temp, 0);
+		on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, " ", 0);
 
 		std::snprintf(temp, sizeof(temp), "%s %d %d %d %d", NOTIFY_MSG_STRUCTURE_HP, ares_crusade_casualties, ares_industry_casualties, elv_crusade_casualties, elv_industry_casualties);
-		m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, temp, 0);
-		m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, " ", 0);
+		on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, temp, 0);
+		on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, " ", 0);
 
 		if (elv_crusade_points == 0) {
 			if ((m_player->m_citizen == true) && (m_player->m_aresden == true))
 			{
-				play_game_sound('E', 25, 0, 0);
-				m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[59]->m_pMsg, 0);
-				m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[60]->m_pMsg, 0);
-				m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[61]->m_pMsg, 0);
-				m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[62]->m_pMsg, 0);
-				for (int i = text_index; i < 18; i++) m_msg_text_list[i] = std::make_unique<CMsg>(0, " ", 0);
+				audio_manager::get().play_game_sound(sound_type::effect, 25, 0, 0);
+				on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[59]->m_pMsg, 0);
+				on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[60]->m_pMsg, 0);
+				on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[61]->m_pMsg, 0);
+				on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[62]->m_pMsg, 0);
+				for (int i = text_index; i < 18; i++) on_game()->m_msg_text_list[i] = std::make_unique<CMsg>(0, " ", 0);
 			}
 			else if ((m_player->m_citizen == true) && (m_player->m_aresden == false))
 			{
-				play_game_sound('E', 25, 0, 0);
-				m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[69]->m_pMsg, 0);
-				m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[70]->m_pMsg, 0);
-				m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[71]->m_pMsg, 0);
-				m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[72]->m_pMsg, 0);
-				m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[73]->m_pMsg, 0);
-				m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[74]->m_pMsg, 0);
-				for (int i = text_index; i < 18; i++) m_msg_text_list[i] = std::make_unique<CMsg>(0, " ", 0);
+				audio_manager::get().play_game_sound(sound_type::effect, 25, 0, 0);
+				on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[69]->m_pMsg, 0);
+				on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[70]->m_pMsg, 0);
+				on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[71]->m_pMsg, 0);
+				on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[72]->m_pMsg, 0);
+				on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[73]->m_pMsg, 0);
+				on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[74]->m_pMsg, 0);
+				for (int i = text_index; i < 18; i++) on_game()->m_msg_text_list[i] = std::make_unique<CMsg>(0, " ", 0);
 			}
-			else play_game_sound('E', 25, 0, 0);
+			else audio_manager::get().play_game_sound(sound_type::effect, 25, 0, 0);
 		}
 		else
 		{
 			if (ares_crusade_points != 0) {
 				if ((m_player->m_citizen == true) && (m_player->m_aresden == true))
 				{
-					play_game_sound('E', 23, 0, 0);
-					play_game_sound('C', 21, 0, 0);
-					play_game_sound('C', 22, 0, 0);
-					m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[63]->m_pMsg, 0);
-					m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[64]->m_pMsg, 0);
-					m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[65]->m_pMsg, 0);
-					for (int i = text_index; i < 18; i++) m_msg_text_list[i] = std::make_unique<CMsg>(0, " ", 0);
+					audio_manager::get().play_game_sound(sound_type::effect, 23, 0, 0);
+					audio_manager::get().play_game_sound(sound_type::character, 21, 0, 0);
+					audio_manager::get().play_game_sound(sound_type::character, 22, 0, 0);
+					on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[63]->m_pMsg, 0);
+					on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[64]->m_pMsg, 0);
+					on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[65]->m_pMsg, 0);
+					for (int i = text_index; i < 18; i++) on_game()->m_msg_text_list[i] = std::make_unique<CMsg>(0, " ", 0);
 				}
 				else if ((m_player->m_citizen == true) && (m_player->m_aresden == false))
 				{
-					play_game_sound('E', 24, 0, 0);
-					play_game_sound('C', 12, 0, 0);
-					play_game_sound('C', 13, 0, 0);
-					m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[75]->m_pMsg, 0);
-					m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[76]->m_pMsg, 0);
-					m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[77]->m_pMsg, 0);
-					m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[78]->m_pMsg, 0);
-					m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[79]->m_pMsg, 0);
-					m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[80]->m_pMsg, 0);
-					m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[81]->m_pMsg, 0);
-					m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[82]->m_pMsg, 0);
-					for (int i = text_index; i < 18; i++) m_msg_text_list[i] = std::make_unique<CMsg>(0, " ", 0);
+					audio_manager::get().play_game_sound(sound_type::effect, 24, 0, 0);
+					audio_manager::get().play_game_sound(sound_type::character, 12, 0, 0);
+					audio_manager::get().play_game_sound(sound_type::character, 13, 0, 0);
+					on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[75]->m_pMsg, 0);
+					on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[76]->m_pMsg, 0);
+					on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[77]->m_pMsg, 0);
+					on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[78]->m_pMsg, 0);
+					on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[79]->m_pMsg, 0);
+					on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[80]->m_pMsg, 0);
+					on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[81]->m_pMsg, 0);
+					on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[82]->m_pMsg, 0);
+					for (int i = text_index; i < 18; i++) on_game()->m_msg_text_list[i] = std::make_unique<CMsg>(0, " ", 0);
 				}
-				else play_game_sound('E', 25, 0, 0);
+				else audio_manager::get().play_game_sound(sound_type::effect, 25, 0, 0);
 			}
 			else
 			{
 				if ((m_player->m_citizen == true) && (m_player->m_aresden == true))
 				{
-					play_game_sound('E', 23, 0, 0);
-					m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[66]->m_pMsg, 0);
-					m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[67]->m_pMsg, 0);
-					m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[68]->m_pMsg, 0);
-					for (int i = text_index; i < 18; i++) m_msg_text_list[i] = std::make_unique<CMsg>(0, " ", 0);
+					audio_manager::get().play_game_sound(sound_type::effect, 23, 0, 0);
+					on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[66]->m_pMsg, 0);
+					on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[67]->m_pMsg, 0);
+					on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[68]->m_pMsg, 0);
+					for (int i = text_index; i < 18; i++) on_game()->m_msg_text_list[i] = std::make_unique<CMsg>(0, " ", 0);
 				}
 				else if ((m_player->m_citizen == true) && (m_player->m_aresden == false))
 				{
-					play_game_sound('E', 24, 0, 0);
-					m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[83]->m_pMsg, 0);
-					m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[84]->m_pMsg, 0);
-					m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[85]->m_pMsg, 0);
-					m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[86]->m_pMsg, 0);
-					m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[87]->m_pMsg, 0);
-					m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[88]->m_pMsg, 0);
-					m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[89]->m_pMsg, 0);
-					m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[90]->m_pMsg, 0);
-					for (int i = text_index; i < 18; i++) m_msg_text_list[i] = std::make_unique<CMsg>(0, " ", 0);
+					audio_manager::get().play_game_sound(sound_type::effect, 24, 0, 0);
+					on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[83]->m_pMsg, 0);
+					on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[84]->m_pMsg, 0);
+					on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[85]->m_pMsg, 0);
+					on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[86]->m_pMsg, 0);
+					on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[87]->m_pMsg, 0);
+					on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[88]->m_pMsg, 0);
+					on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[89]->m_pMsg, 0);
+					on_game()->m_msg_text_list[text_index++] = std::make_unique<CMsg>(0, m_game_msg_list[90]->m_pMsg, 0);
+					for (int i = text_index; i < 18; i++) on_game()->m_msg_text_list[i] = std::make_unique<CMsg>(0, " ", 0);
 				}
-				else play_game_sound('E', 25, 0, 0);
+				else audio_manager::get().play_game_sound(sound_type::effect, 25, 0, 0);
 			}
 		}
 	}
 
-	m_dialog_box_manager.enable_dialog_box(DialogBoxId::Text, 0, 0, 0);
+	get_dialog_box_manager().enable_dialog_box(DialogBoxId::Text, 0, 0, 0);
 }
 
 // num : 1 - F2, 2 - F3
@@ -8213,15 +6585,17 @@ void CGame::use_shortcut(int num)
 			m_short_cut[num] = m_recent_short_cut;
 			if (m_short_cut[num] < 100)
 			{
-				if (m_item_list[m_short_cut[num]] == 0)
+				if (m_player->m_item_list[m_short_cut[num]] == 0)
 				{
 					m_short_cut[num] = -1;
 					m_recent_short_cut = -1;
 					return;
 				}
 
-				auto itemInfo2 = item_name_formatter::get().format(m_item_list[m_short_cut[num]].get());
-				G_cTxt = std::format(MSG_SHORTCUT4, itemInfo2.name.c_str(), itemInfo2.effect.c_str(), itemInfo2.extra.c_str(), index);// (%s %s %s) [F%d]
+				auto itemInfo2 = item_name_formatter::get().format(m_player->m_item_list[m_short_cut[num]].get());
+				auto effect2 = itemInfo2.effect_text();
+				auto extra2 = itemInfo2.extra_text();
+				G_cTxt = std::format(MSG_SHORTCUT4, itemInfo2.name.c_str(), effect2.c_str(), extra2.c_str(), index);// (%s %s %s) [F%d]
 				add_event_list(G_cTxt.c_str(), 10);
 			}
 			else if (m_short_cut[num] >= 100)
@@ -8310,68 +6684,41 @@ void CGame::check_active_aura2(short sX, short sY, uint32_t time, short owner_ty
 		m_effect_sprites[81]->draw(sX + 115, sY + 120 - entity_visual::attacker_height[owner_type], m_entity_state.m_effect_frame % 21, hb::shared::sprite::DrawParams::alpha_blend(0.7f));
 }
 
-void CGame::draw_angel(int sprite, short sX, short sY, char frame, uint32_t time)
-{
-	switch (m_entity_state.m_dir)
-	{
-	case 1:
-	case 2:
-	case 7:
-	case 8:
-		sX -= 30;
-		break;
-	}
-	if (m_entity_state.m_status.invisibility)
-	{
-		if (m_entity_state.m_status.angel_str)
-			m_sprite[TutelaryAngelsPivotPoint + sprite]->draw(sX, sY, frame, hb::shared::sprite::DrawParams::alpha_blend(0.5f));  //AngelicPendant(STR)
-		else if (m_entity_state.m_status.angel_dex)
-			m_sprite[TutelaryAngelsPivotPoint + (50 * 1) + sprite]->draw(sX, sY, frame, hb::shared::sprite::DrawParams::alpha_blend(0.5f)); //AngelicPendant(DEX)
-		else if (m_entity_state.m_status.angel_int)
-			m_sprite[TutelaryAngelsPivotPoint + (50 * 2) + sprite]->draw(sX, sY - 15, frame, hb::shared::sprite::DrawParams::alpha_blend(0.5f));//AngelicPendant(INT)
-		else if (m_entity_state.m_status.angel_mag)
-			m_sprite[TutelaryAngelsPivotPoint + (50 * 3) + sprite]->draw(sX, sY - 15, frame, hb::shared::sprite::DrawParams::alpha_blend(0.5f));//AngelicPendant(MAG)
-	}
-	else
-	{
-		if (m_entity_state.m_status.angel_str)
-			m_sprite[TutelaryAngelsPivotPoint + sprite]->draw(sX, sY, frame);  //AngelicPendant(STR)
-		else if (m_entity_state.m_status.angel_dex)
-			m_sprite[TutelaryAngelsPivotPoint + (50 * 1) + sprite]->draw(sX, sY, frame); //AngelicPendant(DEX)
-		else if (m_entity_state.m_status.angel_int)
-			m_sprite[TutelaryAngelsPivotPoint + (50 * 2) + sprite]->draw(sX, sY - 15, frame);//AngelicPendant(INT)
-		else if (m_entity_state.m_status.angel_mag)
-			m_sprite[TutelaryAngelsPivotPoint + (50 * 3) + sprite]->draw(sX, sY - 15, frame);//AngelicPendant(MAG)
-	}
-
-}
+// draw_angel REMOVED — moved to Screen_OnGame
 /*********************************************************************************************************************
 **  int CGame::has_hero_set( short m_sAppr3, short m_sAppr3, char OwnerType)		( Snoopy )							**
 **  description			:: check weather the object (is character) is using a hero set (1:war, 2:mage)				**
 **********************************************************************************************************************/
 int CGame::has_hero_set(const hb::shared::entity::PlayerAppearance& appr, short OwnerType)
 {
-	char armor, leg, berk, hat;
-	armor = appr.armor_type;
-	leg = appr.pants_type;
-	hat = appr.helm_type;
-	berk = appr.arm_armor_type;
+	// Look up appearance_value for each armor slot via item config
+	auto get_appr = [this](int16_t item_id) -> int {
+		if (item_id <= 0) return 0;
+		CItem* cfg = get_item_config(item_id);
+		return cfg ? cfg->m_appearance_value : 0;
+		};
+
+	int armor = get_appr(appr.armor_item_id);
+	int leg = get_appr(appr.pants_item_id);
+	int hat = get_appr(appr.helm_item_id);
+	int berk = get_appr(appr.arm_item_id);
+
 	switch (OwnerType) {
 	case 1:
 	case 2:
 	case 3:
-		if ((armor == 8) && (leg == 5) && (hat == 9) && (berk == 3)) return (1); // Warr elv M
-		if ((armor == 9) && (leg == 6) && (hat == 10) && (berk == 4)) return (1); // Warr ares M
-		if ((armor == 10) && (leg == 5) && (hat == 11) && (berk == 3)) return (2); // Mage elv M
-		if ((armor == 11) && (leg == 6) && (hat == 12) && (berk == 4)) return (2); // Mage ares M
+		if (armor == 8 && leg == 5 && hat == 9 && berk == 3) return 1; // Warr elv M
+		if (armor == 9 && leg == 6 && hat == 10 && berk == 4) return 1; // Warr ares M
+		if (armor == 10 && leg == 5 && hat == 11 && berk == 3) return 2; // Mage elv M
+		if (armor == 11 && leg == 6 && hat == 12 && berk == 4) return 2; // Mage ares M
 		break;
 	case 4:
 	case 5:
-	case 6: // fixed
-		if ((armor == 9) && (leg == 6) && (hat == 9) && (berk == 4)) return (1); //warr elv W
-		if ((armor == 10) && (leg == 7) && (hat == 10) && (berk == 5)) return (1); //warr ares W
-		if ((armor == 11) && (leg == 6) && (hat == 11) && (berk == 4)) return (2); //mage elv W
-		if ((armor == 12) && (leg == 7) && (hat == 12) && (berk == 5)) return (2); //mage ares W
+	case 6:
+		if (armor == 9 && leg == 6 && hat == 9 && berk == 4) return 1; // Warr elv W
+		if (armor == 10 && leg == 7 && hat == 10 && berk == 5) return 1; // Warr ares W
+		if (armor == 11 && leg == 6 && hat == 11 && berk == 4) return 2; // Mage elv W
+		if (armor == 12 && leg == 7 && hat == 12 && berk == 5) return 2; // Mage ares W
 		break;
 	}
 	return 0;
@@ -8383,139 +6730,81 @@ int CGame::has_hero_set(const hb::shared::entity::PlayerAppearance& appr, short 
 void CGame::show_heldenian_victory(short side)
 {
 	int player_side = 0;
-	m_dialog_box_manager.disable_dialog_box(DialogBoxId::Text);
+	get_dialog_box_manager().disable_dialog_box(DialogBoxId::Text);
 	for (int i = 0; i < game_limits::max_text_dlg_lines; i++)
 	{
-		if (m_msg_text_list[i] != 0)
-			m_msg_text_list[i].reset();
+		if (on_game()->m_msg_text_list[i] != 0)
+			on_game()->m_msg_text_list[i].reset();
 	}
 	if (m_player->m_citizen == false) player_side = 0;
 	else if (m_player->m_aresden == true) player_side = 1;
 	else if (m_player->m_aresden == false) player_side = 2;
 	switch (side) {
 	case 0:
-		play_game_sound('E', 25, 0, 0);
-		m_msg_text_list[0] = std::make_unique<CMsg>(0, "Heldenian holy war has been closed!", 0);
-		m_msg_text_list[1] = std::make_unique<CMsg>(0, " ", 0);
-		m_msg_text_list[2] = std::make_unique<CMsg>(0, "Heldenian Holy war ended", 0);
-		m_msg_text_list[3] = std::make_unique<CMsg>(0, "in a tie.", 0);
+		audio_manager::get().play_game_sound(sound_type::effect, 25, 0, 0);
+		on_game()->m_msg_text_list[0] = std::make_unique<CMsg>(0, "Heldenian holy war has been closed!", 0);
+		on_game()->m_msg_text_list[1] = std::make_unique<CMsg>(0, " ", 0);
+		on_game()->m_msg_text_list[2] = std::make_unique<CMsg>(0, "Heldenian Holy war ended", 0);
+		on_game()->m_msg_text_list[3] = std::make_unique<CMsg>(0, "in a tie.", 0);
 		break;
 	case 1:
-		play_game_sound('E', 25, 0, 0);
-		m_msg_text_list[0] = std::make_unique<CMsg>(0, "Heldenian holy war has been closed!", 0);
-		m_msg_text_list[1] = std::make_unique<CMsg>(0, " ", 0);
-		m_msg_text_list[2] = std::make_unique<CMsg>(0, "Heldenian Holy war ended", 0);
-		m_msg_text_list[3] = std::make_unique<CMsg>(0, "in favor of Aresden.", 0);
+		audio_manager::get().play_game_sound(sound_type::effect, 25, 0, 0);
+		on_game()->m_msg_text_list[0] = std::make_unique<CMsg>(0, "Heldenian holy war has been closed!", 0);
+		on_game()->m_msg_text_list[1] = std::make_unique<CMsg>(0, " ", 0);
+		on_game()->m_msg_text_list[2] = std::make_unique<CMsg>(0, "Heldenian Holy war ended", 0);
+		on_game()->m_msg_text_list[3] = std::make_unique<CMsg>(0, "in favor of Aresden.", 0);
 		break;
 	case 2:
-		play_game_sound('E', 25, 0, 0);
-		m_msg_text_list[0] = std::make_unique<CMsg>(0, "Heldenian holy war has been closed!", 0);
-		m_msg_text_list[1] = std::make_unique<CMsg>(0, " ", 0);
-		m_msg_text_list[2] = std::make_unique<CMsg>(0, "Heldenian Holy war ended", 0);
-		m_msg_text_list[3] = std::make_unique<CMsg>(0, "in favor of Elvine.", 0);
+		audio_manager::get().play_game_sound(sound_type::effect, 25, 0, 0);
+		on_game()->m_msg_text_list[0] = std::make_unique<CMsg>(0, "Heldenian holy war has been closed!", 0);
+		on_game()->m_msg_text_list[1] = std::make_unique<CMsg>(0, " ", 0);
+		on_game()->m_msg_text_list[2] = std::make_unique<CMsg>(0, "Heldenian Holy war ended", 0);
+		on_game()->m_msg_text_list[3] = std::make_unique<CMsg>(0, "in favor of Elvine.", 0);
 		break;
 	}
-	m_msg_text_list[4] = std::make_unique<CMsg>(0, " ", 0);
+	on_game()->m_msg_text_list[4] = std::make_unique<CMsg>(0, " ", 0);
 
 	if (((player_side != 1) && (player_side != 2))   // Player not a normal citizen
 		|| (side == 0))								// or no winner
 	{
-		play_game_sound('E', 25, 0, 0);
-		m_msg_text_list[5] = std::make_unique<CMsg>(0, " ", 0);
-		m_msg_text_list[6] = std::make_unique<CMsg>(0, " ", 0);
-		m_msg_text_list[7] = std::make_unique<CMsg>(0, " ", 0);
-		m_msg_text_list[8] = std::make_unique<CMsg>(0, " ", 0);
+		audio_manager::get().play_game_sound(sound_type::effect, 25, 0, 0);
+		on_game()->m_msg_text_list[5] = std::make_unique<CMsg>(0, " ", 0);
+		on_game()->m_msg_text_list[6] = std::make_unique<CMsg>(0, " ", 0);
+		on_game()->m_msg_text_list[7] = std::make_unique<CMsg>(0, " ", 0);
+		on_game()->m_msg_text_list[8] = std::make_unique<CMsg>(0, " ", 0);
 	}
 	else
 	{
 		if (side == player_side)
 		{
-			play_game_sound('E', 23, 0, 0);
-			play_game_sound('C', 21, 0, 0);
-			play_game_sound('C', 22, 0, 0);
-			m_msg_text_list[5] = std::make_unique<CMsg>(0, "Congratulation.", 0);
-			m_msg_text_list[6] = std::make_unique<CMsg>(0, "As cityzen of victory,", 0);
-			m_msg_text_list[7] = std::make_unique<CMsg>(0, "You will recieve a reward.", 0);
-			m_msg_text_list[8] = std::make_unique<CMsg>(0, "      ", 0);
+			audio_manager::get().play_game_sound(sound_type::effect, 23, 0, 0);
+			audio_manager::get().play_game_sound(sound_type::character, 21, 0, 0);
+			audio_manager::get().play_game_sound(sound_type::character, 22, 0, 0);
+			on_game()->m_msg_text_list[5] = std::make_unique<CMsg>(0, "Congratulation.", 0);
+			on_game()->m_msg_text_list[6] = std::make_unique<CMsg>(0, "As cityzen of victory,", 0);
+			on_game()->m_msg_text_list[7] = std::make_unique<CMsg>(0, "You will recieve a reward.", 0);
+			on_game()->m_msg_text_list[8] = std::make_unique<CMsg>(0, "      ", 0);
 		}
 		else
 		{
-			play_game_sound('E', 24, 0, 0);
-			play_game_sound('C', 12, 0, 0);
-			play_game_sound('C', 13, 0, 0);
-			m_msg_text_list[5] = std::make_unique<CMsg>(0, "To our regret", 0);
-			m_msg_text_list[6] = std::make_unique<CMsg>(0, "As cityzen of defeat,", 0);
-			m_msg_text_list[7] = std::make_unique<CMsg>(0, "You cannot recieve any reward.", 0);
-			m_msg_text_list[8] = std::make_unique<CMsg>(0, "     ", 0);
+			audio_manager::get().play_game_sound(sound_type::effect, 24, 0, 0);
+			audio_manager::get().play_game_sound(sound_type::character, 12, 0, 0);
+			audio_manager::get().play_game_sound(sound_type::character, 13, 0, 0);
+			on_game()->m_msg_text_list[5] = std::make_unique<CMsg>(0, "To our regret", 0);
+			on_game()->m_msg_text_list[6] = std::make_unique<CMsg>(0, "As cityzen of defeat,", 0);
+			on_game()->m_msg_text_list[7] = std::make_unique<CMsg>(0, "You cannot recieve any reward.", 0);
+			on_game()->m_msg_text_list[8] = std::make_unique<CMsg>(0, "     ", 0);
 		}
 	}
 	for (int i = 9; i < 18; i++)
-		m_msg_text_list[i] = std::make_unique<CMsg>(0, " ", 0);
-	m_dialog_box_manager.enable_dialog_box(DialogBoxId::Text, 0, 0, 0);
-	m_dialog_box_manager.disable_dialog_box(DialogBoxId::CrusadeCommander);
-	m_dialog_box_manager.disable_dialog_box(DialogBoxId::CrusadeConstructor);
-	m_dialog_box_manager.disable_dialog_box(DialogBoxId::CrusadeSoldier);
+		on_game()->m_msg_text_list[i] = std::make_unique<CMsg>(0, " ", 0);
+	get_dialog_box_manager().enable_dialog_box(DialogBoxId::Text, 0, 0, 0);
+	get_dialog_box_manager().disable_crusade_dialogs();
 }
 
 /*********************************************************************************************************************
 **  void 	ResponseHeldenianTeleportList(char *data)									(  Snoopy )					**
 **  description			: Gail's TP																					**
 **********************************************************************************************************************/
-/*********************************************************************************************************************
-**  bool dk_glare(int weapon_index, int weapon_index, int *weapon_glare)	( Snoopy )									**
-**  description			: test glowing condition for DK set															**
-**********************************************************************************************************************/
-void CGame::dk_glare(int weapon_color, int weapon_index, int* weapon_glare)
-{
-	if (weapon_color != 9) return;
-	if (((weapon_index >= WeaponM + 64 * 14) && (weapon_index < WeaponM + 64 * 14 + 56)) //msw3
-		|| ((weapon_index >= WeaponW + 64 * 14) && (weapon_index < WeaponW + 64 * 14 + 56))) //wsw3
-	{
-		*weapon_glare = 3;
-	}
-	else if (((weapon_index >= WeaponM + 64 * 37) && (weapon_index < WeaponM + 64 * 37 + 56)) //MStaff3
-		|| ((weapon_index >= WeaponW + 64 * 37) && (weapon_index < WeaponW + 64 * 37 + 56)))//WStaff3
-	{
-		*weapon_glare = 2;
-	}
-}
-/*********************************************************************************************************************
-**  void CGame::abaddon_corpse(int sX, int sY);		( Snoopy )														**
-**  description			: Placeholder for abaddon's death lightnings												**
-**********************************************************************************************************************/
-void CGame::abaddon_corpse(int sX, int sY)
-{
-	int ir = (rand() % 20) - 10;
-	weather_manager::get().draw_thunder_effect(sX + 30, 0, sX + 30, sY - 10, ir, ir, 1);
-	weather_manager::get().draw_thunder_effect(sX + 30, 0, sX + 30, sY - 10, ir + 2, ir, 2);
-	weather_manager::get().draw_thunder_effect(sX + 30, 0, sX + 30, sY - 10, ir - 2, ir, 2);
-	ir = (rand() % 20) - 10;
-	weather_manager::get().draw_thunder_effect(sX - 20, 0, sX - 20, sY - 35, ir, ir, 1);
-	weather_manager::get().draw_thunder_effect(sX - 20, 0, sX - 20, sY - 35, ir + 2, ir, 2);
-	weather_manager::get().draw_thunder_effect(sX - 20, 0, sX - 20, sY - 35, ir - 2, ir, 2);
-	ir = (rand() % 20) - 10;
-	weather_manager::get().draw_thunder_effect(sX - 10, 0, sX - 10, sY + 30, ir, ir, 1);
-	weather_manager::get().draw_thunder_effect(sX - 10, 0, sX - 10, sY + 30, ir + 2, ir + 2, 2);
-	weather_manager::get().draw_thunder_effect(sX - 10, 0, sX - 10, sY + 30, ir - 2, ir + 2, 2);
-	ir = (rand() % 20) - 10;
-	weather_manager::get().draw_thunder_effect(sX + 50, 0, sX + 50, sY + 35, ir, ir, 1);
-	weather_manager::get().draw_thunder_effect(sX + 50, 0, sX + 50, sY + 35, ir + 2, ir + 2, 2);
-	weather_manager::get().draw_thunder_effect(sX + 50, 0, sX + 50, sY + 35, ir - 2, ir + 2, 2);
-	ir = (rand() % 20) - 10;
-	weather_manager::get().draw_thunder_effect(sX + 65, 0, sX + 65, sY - 5, ir, ir, 1);
-	weather_manager::get().draw_thunder_effect(sX + 65, 0, sX + 65, sY - 5, ir + 2, ir + 2, 2);
-	weather_manager::get().draw_thunder_effect(sX + 65, 0, sX + 65, sY - 5, ir - 2, ir + 2, 2);
-	ir = (rand() % 20) - 10;
-	weather_manager::get().draw_thunder_effect(sX + 45, 0, sX + 45, sY - 50, ir, ir, 1);
-	weather_manager::get().draw_thunder_effect(sX + 45, 0, sX + 45, sY - 50, ir + 2, ir + 2, 2);
-	weather_manager::get().draw_thunder_effect(sX + 45, 0, sX + 45, sY - 50, ir - 2, ir + 2, 2);
-
-	for (int x = sX - 50; x <= sX + 100; x += rand() % 35)
-	{
-		for (int y = sY - 30; y <= sY + 50; y += rand() % 45)
-		{
-			ir = (rand() % 20) - 10;
-			weather_manager::get().draw_thunder_effect(x, 0, x, y, ir, ir, 2);
-		}
-	}
-}
+// dk_glare REMOVED — moved to Screen_OnGame
+// abaddon_corpse REMOVED — moved to Screen_OnGame

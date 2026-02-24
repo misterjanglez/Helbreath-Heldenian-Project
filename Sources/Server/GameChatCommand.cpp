@@ -10,6 +10,7 @@
 #include "GameCmdGoto.h"
 #include "GameCmdCome.h"
 #include "GameCmdInvis.h"
+#include "GameCmdSaveAll.h"
 #include "Game.h"
 #include "Client.h"
 #include "AdminLevel.h"
@@ -127,6 +128,7 @@ void GameChatCommandManager::register_built_in_commands()
 	register_command(std::make_unique<GameCmdGoto>());
 	register_command(std::make_unique<GameCmdCome>());
 	register_command(std::make_unique<GameCmdInvis>());
+	register_command(std::make_unique<GameCmdSaveAll>());
 }
 
 void GameChatCommandManager::seed_command_permissions()

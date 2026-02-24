@@ -5,6 +5,8 @@
 #pragma once
 
 #include "CommonTypes.h"
+#include "DirectionHelpers.h"
+using hb::shared::direction::direction;
 
 class CTeleportLoc  
 {
@@ -35,7 +37,8 @@ public:
 												  
 	short m_src_x, m_src_y;
 
-	char  m_dest_map_name[11],  m_dir;
+	char  m_dest_map_name[11];
+	direction m_dir;
 	char  m_dest_map_name2[11];
 	short m_dest_x,  m_dest_y;
 	short m_dest_x2, m_dest_y2;

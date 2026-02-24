@@ -11,6 +11,7 @@
 
 using namespace hb::shared::net;
 using namespace hb::shared::action;
+using namespace hb::shared::direction;
 using namespace hb::server::config;
 namespace sdelay = hb::server::delay_event;
 namespace dynamic_object = hb::shared::dynamic_object;
@@ -188,7 +189,7 @@ void DynamicObjectManager::dynamic_object_effect_processor()
 										}
 									}
 
-									if ((m_game->m_combat_manager->check_resisting_magic_success(1, owner_h, hb::shared::owner_class::Player, 100) == false) &&
+									if ((m_game->m_combat_manager->check_resisting_magic_success(direction::north, owner_h, hb::shared::owner_class::Player, 100) == false) &&
 										(m_game->m_client_list[owner_h]->m_is_poisoned == false)) {
 
 										m_game->m_client_list[owner_h]->m_is_poisoned = true;
@@ -283,7 +284,7 @@ void DynamicObjectManager::dynamic_object_effect_processor()
 										}
 									}
 
-									if ((m_game->m_combat_manager->check_resisting_ice_success(1, owner_h, hb::shared::owner_class::Player, m_dynamic_object_list[i]->m_v1) == false) &&
+									if ((m_game->m_combat_manager->check_resisting_ice_success(direction::north, owner_h, hb::shared::owner_class::Player, m_dynamic_object_list[i]->m_v1) == false) &&
 										(m_game->m_client_list[owner_h]->m_magic_effect_status[hb::shared::magic::Ice] == 0)) {
 
 										m_game->m_client_list[owner_h]->m_magic_effect_status[hb::shared::magic::Ice] = 1;
@@ -336,7 +337,7 @@ void DynamicObjectManager::dynamic_object_effect_processor()
 									// NPC   .
 									m_game->send_event_to_near_client_type_a(owner_h, hb::shared::owner_class::Npc, MsgId::EventMotion, Type::Damage, damage, 0, 0);
 
-									if ((m_game->m_combat_manager->check_resisting_ice_success(1, owner_h, hb::shared::owner_class::Npc, m_dynamic_object_list[i]->m_v1) == false) &&
+									if ((m_game->m_combat_manager->check_resisting_ice_success(direction::north, owner_h, hb::shared::owner_class::Npc, m_dynamic_object_list[i]->m_v1) == false) &&
 										(m_game->m_npc_list[owner_h]->m_magic_effect_status[hb::shared::magic::Ice] == 0)) {
 
 										m_game->m_npc_list[owner_h]->m_magic_effect_status[hb::shared::magic::Ice] = 1;

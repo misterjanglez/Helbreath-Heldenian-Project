@@ -4,6 +4,8 @@
 #include "Misc.h"
 #include "DirectionHelpers.h"
 
+using namespace hb::shared::direction;
+
 CPlayerController::CPlayerController()
 {
 	reset();
@@ -17,22 +19,22 @@ void CPlayerController::reset()
 	m_command_available = true;
 	m_command_time = 0;
 	m_command_count = 0;
-	m_prev_move_x = 0;
-	m_prev_move_y = 0;
+	m_prev_move_x = -1;
+	m_prev_move_y = -1;
 	m_is_prev_move_blocked = false;
 	m_player_turn = 0;
-	m_pending_stop_dir = 0;
+	m_pending_stop_dir = direction{};
 	m_attack_end_time = 0;
 }
 
-char CPlayerController::get_next_move_dir(short sX, short sY, short dstX, short dstY,
+direction CPlayerController::get_next_move_dir(short sX, short sY, short dstX, short dstY,
                                         CMapData* map_data, bool move_check, bool mim)
 {
-	char dir, tmp_dir;
+	direction dir, tmp_dir;
 	int aX, aY, dX, dY;
 	int i;
 
-	if ((sX == dstX) && (sY == dstY)) return 0;
+	if ((sX == dstX) && (sY == dstY)) return direction{};
 
 	dX = sX;
 	dY = sY;
@@ -42,14 +44,14 @@ char CPlayerController::get_next_move_dir(short sX, short sY, short dstX, short 
 	else
 		dir = CMisc::get_next_move_dir(dstX, dstY, dX, dY);
 
-	if (dir < 1 || dir > 8) return 0;
+	if (dir < 1 || dir > 8) return direction{};
 
 	if (m_player_turn == 0)
 	{
 		for (i = dir; i <= dir + 2; i++)
 		{
-			tmp_dir = i;
-			if (tmp_dir > 8) tmp_dir -= 8;
+			tmp_dir = static_cast<direction>(i);
+			if (tmp_dir > 8) tmp_dir = static_cast<direction>(tmp_dir - 8);
 			aX = hb::shared::direction::OffsetX[tmp_dir];
 			aY = hb::shared::direction::OffsetY[tmp_dir];
 			if (((dX + aX) == m_prev_move_x) && ((dY + aY) == m_prev_move_y) && (m_is_prev_move_blocked == true) && (move_check == true))
@@ -71,8 +73,8 @@ char CPlayerController::get_next_move_dir(short sX, short sY, short dstX, short 
 	{
 		for (i = dir; i >= dir - 2; i--)
 		{
-			tmp_dir = i;
-			if (tmp_dir < 1) tmp_dir += 8;
+			tmp_dir = static_cast<direction>(i);
+			if (tmp_dir < 1) tmp_dir = static_cast<direction>(tmp_dir + 8);
 			aX = hb::shared::direction::OffsetX[tmp_dir];
 			aY = hb::shared::direction::OffsetY[tmp_dir];
 			if (((dX + aX) == m_prev_move_x) && ((dY + aY) == m_prev_move_y) && (m_is_prev_move_blocked == true) && (move_check == true))
@@ -90,14 +92,14 @@ char CPlayerController::get_next_move_dir(short sX, short sY, short dstX, short 
 		}
 	}
 
-	return 0;
+	return direction{};
 }
 
 // Determines optimal turn direction (left/right bias) for pathfinding.
 // Tries both directions with a 30-step cap to prevent infinite loops on unreachable targets.
 void CPlayerController::calculate_player_turn(short playerX, short playerY, CMapData* map_data)
 {
-	char dir;
+	direction dir;
 	short sX, sY, cnt1, cnt2;
 
 	sX = playerX;

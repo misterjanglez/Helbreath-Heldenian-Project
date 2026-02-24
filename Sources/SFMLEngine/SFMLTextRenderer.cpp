@@ -130,19 +130,30 @@ void SFMLTextRenderer::SetFontSize(int size)
     m_font_size = static_cast<unsigned int>(adjustedSize);
 }
 
+unsigned int SFMLTextRenderer::resolve_font_size(int fontSize) const
+{
+    if (fontSize <= 0)
+        return m_font_size;  // Use default
+
+    // Apply GDI-2 adjustment for the requested size.
+    // sf::Font lazily caches glyph pages per character size internally,
+    // so requesting different sizes has no reload cost.
+    return static_cast<unsigned int>((fontSize > 2) ? (fontSize - 2) : fontSize);
+}
+
 bool SFMLTextRenderer::IsFontLoaded() const
 {
     return m_fontLoaded;
 }
 
-TextMetrics SFMLTextRenderer::measure_text(const char* text) const
+TextMetrics SFMLTextRenderer::measure_text(const char* text, int fontSize) const
 {
     TextMetrics metrics = {0, 0};
 
     if (!text || !m_fontLoaded)
         return metrics;
 
-    sf::Text sfText(m_font, text, m_font_size);
+    sf::Text sfText(m_font, text, resolve_font_size(fontSize));
     sf::FloatRect bounds = sfText.getLocalBounds();
 
     metrics.width = static_cast<int>(bounds.size.x);
@@ -151,13 +162,14 @@ TextMetrics SFMLTextRenderer::measure_text(const char* text) const
     return metrics;
 }
 
-int SFMLTextRenderer::get_fitting_char_count(const char* text, int maxWidth) const
+int SFMLTextRenderer::get_fitting_char_count(const char* text, int maxWidth, int fontSize) const
 {
     if (!text || !m_fontLoaded)
         return 0;
 
+    unsigned int resolvedSize = resolve_font_size(fontSize);
     int len = static_cast<int>(strlen(text));
-    sf::Text sfText(m_font, "", m_font_size);
+    sf::Text sfText(m_font, "", resolvedSize);
 
     for (int i = len; i > 0; i--)
     {
@@ -172,33 +184,38 @@ int SFMLTextRenderer::get_fitting_char_count(const char* text, int maxWidth) con
     return 0;
 }
 
-int SFMLTextRenderer::get_line_height() const
+int SFMLTextRenderer::get_line_height(int fontSize) const
 {
     if (!m_fontLoaded)
         return 0;
 
-    return static_cast<int>(m_font.getLineSpacing(m_font_size));
+    return static_cast<int>(m_font.getLineSpacing(resolve_font_size(fontSize)));
 }
 
-void SFMLTextRenderer::draw_text(int x, int y, const char* text, const hb::shared::render::Color& color)
+void SFMLTextRenderer::draw_text(int x, int y, const char* text, const hb::shared::render::Color& color,
+                                int fontSize, bool bold)
 {
     if (!text || !m_fontLoaded || !m_back_buffer)
         return;
 
-    sf::Text sfText(m_font, text, m_font_size);
+    sf::Text sfText(m_font, text, resolve_font_size(fontSize));
     sfText.setPosition({static_cast<float>(x), static_cast<float>(y)});
     sfText.setFillColor(sf::Color(color.r, color.g, color.b));
+    if (bold)
+        sfText.setStyle(sf::Text::Bold);
 
     m_back_buffer->draw(sfText);
 }
 
 void SFMLTextRenderer::draw_text_aligned(int x, int y, int width, int height, const char* text, const hb::shared::render::Color& color,
-                                        Align alignment)
+                                        Align alignment, int fontSize, bool bold)
 {
     if (!text || !m_fontLoaded || !m_back_buffer)
         return;
 
-    sf::Text sfText(m_font, text, m_font_size);
+    sf::Text sfText(m_font, text, resolve_font_size(fontSize));
+    if (bold)
+        sfText.setStyle(sf::Text::Bold);
     sf::FloatRect bounds = sfText.getLocalBounds();
 
     // Extract alignment components

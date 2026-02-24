@@ -19,6 +19,8 @@
 #include "ObjectIDRange.h"
 #include <string>
 
+using hb::shared::direction::direction;
+
 namespace hb::client::config
 {
 constexpr int MapDataSizeX = 60;
@@ -32,15 +34,15 @@ public:
 	virtual ~CMapData();
 	void init();
 	void open_map_data_file(char * fn);
-	void get_owner_status_by_object_id(uint16_t object_id, char * owner_type, char * dir, hb::shared::entity::PlayerAppearance * appearance, hb::shared::entity::PlayerStatus * status, std::string& name);
+	void get_owner_status_by_object_id(uint16_t object_id, char * owner_type, direction * dir, hb::shared::entity::PlayerAppearance * appearance, hb::shared::entity::PlayerStatus * status, std::string& name);
 	void clear_dead_chat_msg(short sX, short sY);
 	void clear_chat_msg(short sX, short sY);
-	void shift_map_data(char dir);
+	void shift_map_data(direction dir);
 	void decode_map_info(char * header);
 	bool set_chat_msg_owner(uint16_t object_id, short sX, short sY, int index);
-	bool set_dead_owner(uint16_t object_id, short sX, short sY, short type, char dir, const hb::shared::entity::PlayerAppearance& appearance, const hb::shared::entity::PlayerStatus& status, std::string& name, short npcConfigId = -1);
-	bool set_owner(uint16_t object_id, int sX, int sY, int type, int dir, const hb::shared::entity::PlayerAppearance& appearance, const hb::shared::entity::PlayerStatus& status, std::string& name, short action, short v1, short v2, short v3, int pre_loc = 0, int frame = 0, short npcConfigId = -1);
-	bool get_owner(short sX, short sY, std::string& name, short * owner_type, hb::shared::entity::PlayerStatus * owner_status, uint16_t * object_id);
+	bool set_dead_owner(uint16_t object_id, short sX, short sY, short type, direction dir, const hb::shared::entity::PlayerAppearance& appearance, const hb::shared::entity::PlayerStatus& status, std::string& name, short npcConfigId = -1);
+	bool set_owner(uint16_t object_id, int sX, int sY, int type, direction dir, const hb::shared::entity::PlayerAppearance& appearance, const hb::shared::entity::PlayerStatus& status, std::string& name, short action, short v1, short v2, short v3, int pre_loc = 0, int frame = 0, short npcConfigId = -1);
+	bool get_owner(short sX, short sY, std::string& name, short * owner_type, hb::shared::entity::PlayerStatus * owner_status, uint16_t * object_id, short* npc_config_id = nullptr);
 	bool set_dynamic_object(short sX, short sY, uint16_t id, short type, bool is_event);
 	bool is_teleport_loc(short sX, short sY);
 	bool get_is_locatable(short sX, short sY);

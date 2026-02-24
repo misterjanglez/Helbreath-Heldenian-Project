@@ -9,9 +9,13 @@ public:
 	DialogBox_HudPanel(CGame* game);
 	~DialogBox_HudPanel() override = default;
 
-	void on_draw(short mouse_x, short mouse_y, short z, char lb) override;
-	bool on_click(short mouse_x, short mouse_y) override;
-	bool on_item_drop(short mouse_x, short mouse_y) override;
+	void on_draw() override;
+	bool on_click() override;
+	bool on_item_drop() override;
+
+	// HudPanel is not draggable and doesn't cancel text input
+	bool is_draggable() const override { return false; }
+	bool cancels_text_input_on_enable() const override { return false; }
 
 private:
 	// Y offset for resolution - shifts all Y positions when running at higher resolutions
@@ -98,10 +102,14 @@ private:
 	static constexpr int LOCAL_LEVELUP_TEXT_X = 32;
 	static constexpr int LOCAL_LEVELUP_TEXT_Y = 448;
 
+	// Tester menu text position (above Level Up text)
+	static constexpr int BASE_TESTER_TEXT_Y = 433;
+
 	// Helper methods
 	void draw_gauge_bars();
-	void draw_icon_buttons(short mouse_x, short mouse_y);
-	void draw_status_icons(short mouse_x, short mouse_y);
-	bool is_in_button(short mouse_x, short mouse_y, int x1, int x2) const;
+	void draw_icon_buttons();
+	void draw_status_icons();
+	void draw_super_attack_overlay();
+	bool is_in_button(int x1, int x2) const;
 	void toggle_dialog_with_sound(DialogBoxId::Type dialogId);
 };

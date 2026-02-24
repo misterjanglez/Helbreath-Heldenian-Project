@@ -1,8 +1,10 @@
 #include "DialogBox_WarningMsg.h"
 #include "Game.h"
+#include "InventoryManager.h"
 #include "lan_eng.h"
 #include "GameFonts.h"
 #include "TextLibExt.h"
+#include "IInput.h"
 using namespace hb::client::sprite_id;
 
 DialogBox_WarningMsg::DialogBox_WarningMsg(CGame* game)
@@ -11,10 +13,10 @@ DialogBox_WarningMsg::DialogBox_WarningMsg(CGame* game)
 	set_default_rect(0 , 0 , 310, 170);
 }
 
-void DialogBox_WarningMsg::on_draw(short mouse_x, short mouse_y, short z, char lb)
+void DialogBox_WarningMsg::on_draw()
 {
-	short sX = Info().m_x;
-	short sY = Info().m_y;
+	short sX = m_x;
+	short sY = m_y;
 
 	draw_new_dialog_box(InterfaceNdGame4, sX, sY, 2);
 
@@ -25,23 +27,34 @@ void DialogBox_WarningMsg::on_draw(short mouse_x, short mouse_y, short z, char l
 	put_string(sX + 30, sY + 110, DEF_MSG_WARNING5, GameColors::UIOrange);
 
 	// OK button
-	if ((mouse_x >= sX + 122) && (mouse_x <= sX + 125 + ui_layout::btn_size_x) && (mouse_y >= sY + 127) && (mouse_y <= sY + 127 + ui_layout::btn_size_y))
+	if (mouse_in(btn_ok))
 		draw_new_dialog_box(InterfaceNdButton, sX + 122, sY + 127, 1);
 	else
 		draw_new_dialog_box(InterfaceNdButton, sX + 122, sY + 127, 0);
 }
 
-bool DialogBox_WarningMsg::on_click(short mouse_x, short mouse_y)
+bool DialogBox_WarningMsg::on_click()
 {
-	short sX = Info().m_x;
-	short sY = Info().m_y;
-
 	// OK button click
-	if ((mouse_x >= sX + 122) && (mouse_x <= sX + 125 + ui_layout::btn_size_x) && (mouse_y >= sY + 127) && (mouse_y <= sY + 127 + ui_layout::btn_size_y))
+	if (mouse_in(btn_ok))
 	{
 		disable_this_dialog();
 		return true;
 	}
 
 	return false;
+}
+
+bool DialogBox_WarningMsg::on_enable(int type, int64_t v1, int v2, const char* string)
+{
+	if (is_enabled()) return true;
+	m_item_index = type;
+	return true;
+}
+
+bool DialogBox_WarningMsg::on_disable()
+{
+	{ int idx = m_item_index;
+	inventory_manager::get().unlock_item(idx); }
+	return true;
 }

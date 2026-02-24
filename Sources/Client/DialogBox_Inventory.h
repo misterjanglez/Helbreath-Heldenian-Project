@@ -9,12 +9,13 @@ public:
 	DialogBox_Inventory(CGame* game);
 	~DialogBox_Inventory() override = default;
 
-	void on_draw(short mouse_x, short mouse_y, short z, char lb) override;
-	bool on_click(short mouse_x, short mouse_y) override;
-	bool on_double_click(short mouse_x, short mouse_y) override;
-	PressResult on_press(short mouse_x, short mouse_y) override;
-	bool on_item_drop(short mouse_x, short mouse_y) override;
+	void on_draw() override;
+	bool on_click() override;
+	bool on_double_click() override;
+	PressResult on_press() override;
+	bool on_item_drop() override;
 
+	bool cancels_text_input_on_enable() const override { return false; }
 private:
 	// Layout constants
 	static constexpr int ITEM_OFFSET_X = 32;

@@ -12,131 +12,168 @@
 #include "Misc.h"
 #include "GameFonts.h"
 #include "TextLibExt.h"
+#include "TextFieldRenderer.h"
+#include "InputStateHelper.h"
 #include "Packet/SharedPackets.h"
+#include "AudioManager.h"
 #include <string>
-
 
 using namespace hb::shared::net;
 using namespace hb::client::sprite_id;
-namespace MouseButton = hb::shared::input::MouseButton;
 
 Overlay_ChangePassword::Overlay_ChangePassword(CGame* game)
     : IGameScreen(game)
-    , m_iCurFocus(2)
-    , m_iPrevFocus(2)
-    , m_iMaxFocus(6)
 {
 }
 
 void Overlay_ChangePassword::on_initialize()
 {
-    m_dwStartTime = GameClock::get_time_ms();
-    m_dwAnimTime = m_dwStartTime;
-
-    // End any existing input string
-    end_input_string();
-
-    // initialize focus
-    m_iPrevFocus = 2;
-    m_iCurFocus = 2;
-    m_iMaxFocus = 6;
+    m_error_msg.clear();
     m_game->m_arrow_pressed = 0;
 
-    // clear input buffers
-    m_account_name.clear();
-    m_cOldPassword.clear();
-    m_cNewPassword.clear();
-    m_cConfirmPassword.clear();
-
-    // Copy account name from player
-    m_account_name = m_game->m_player->m_account_name;
-
-    // start input on old password field
     int dlgX, dlgY;
     get_centered_dialog_pos(InterfaceNdGame4, 0, dlgX, dlgY);
-    start_input_string(dlgX + 161, dlgY + 67, 11, m_cOldPassword, true);
-    clear_input_string();
+
+    m_controls.set_screen_size(LOGICAL_WIDTH(), LOGICAL_HEIGHT());
+    m_controls.set_hover_focus(false);
+    m_controls.set_enter_advances_focus(true);
+    m_controls.set_default_button(BTN_OK);
+
+    m_controls.set_clipboard_provider(
+        [] { return hb::shared::input::get_clipboard_text(); },
+        [](const std::string& s) { hb::shared::input::set_clipboard_text(s); }
+    );
+
+    // Textbox render helper
+    auto textbox_renderer = [](const cc::control& c) {
+        auto& field = static_cast<const cc::text_input&>(c);
+        hb::client::draw_text_field(field, GameClock::get_time_ms(),
+            hb::shared::text::TextStyle::with_shadow(GameColors::InputValid),
+            hb::shared::text::TextStyle::with_shadow(GameColors::InputInvalid));
+    };
+
+    // === Textboxes ===
+    // Account name is displayed as static text in on_render() — not editable.
+    // handle_submit() reads directly from m_game->m_account_name.
+
+    auto* tb_old_pw = m_controls.add<cc::textbox>(TXT_OLD_PW, cc::rect{dlgX + 161, dlgY + 67, 125, 17}, 11);
+    tb_old_pw->set_hidden(true);
+    tb_old_pw->set_character_filter(hb::client::password_allowed_chars);
+    tb_old_pw->set_validator([](const std::string& s) {
+        return !s.empty() && CMisc::check_valid_string(s.c_str());
+    });
+    tb_old_pw->set_render_handler(textbox_renderer);
+
+    auto* tb_new_pw = m_controls.add<cc::textbox>(TXT_NEW_PW, cc::rect{dlgX + 161, dlgY + 91, 125, 17}, 11);
+    tb_new_pw->set_hidden(true);
+    tb_new_pw->set_character_filter(hb::client::password_allowed_chars);
+    tb_new_pw->set_validator([](const std::string& s) {
+        return s.size() >= 8 && CMisc::check_valid_string(s.c_str());
+    });
+    tb_new_pw->set_render_handler(textbox_renderer);
+
+    auto* tb_confirm = m_controls.add<cc::textbox>(TXT_CONFIRM_PW, cc::rect{dlgX + 161, dlgY + 115, 125, 17}, 11);
+    tb_confirm->set_hidden(true);
+    tb_confirm->set_character_filter(hb::client::password_allowed_chars);
+    tb_confirm->set_validator([this](const std::string& s) {
+        auto* pw = m_controls.find_as<cc::textbox>(TXT_NEW_PW);
+        return !s.empty() && pw && s == pw->text();
+    });
+    tb_confirm->set_render_handler(textbox_renderer);
+
+    // === Buttons ===
+    auto* btn_ok = m_controls.add<cc::button>(BTN_OK, cc::rect{dlgX + 44, dlgY + 208, ui_layout::btn_size_x, ui_layout::btn_size_y});
+    btn_ok->set_click_sound([this] { audio_manager::get().play_game_sound(sound_type::effect, 14, 5); });
+    btn_ok->set_on_click([this](int) {
+        handle_submit();
+    });
+    btn_ok->set_render_handler([this](const cc::control& c) {
+        auto sb = c.screen_bounds();
+        // Only highlight when all fields are valid and passwords match
+        auto* tb_old = m_controls.find_as<cc::textbox>(TXT_OLD_PW);
+        auto* tb_new = m_controls.find_as<cc::textbox>(TXT_NEW_PW);
+        auto* tb_conf = m_controls.find_as<cc::textbox>(TXT_CONFIRM_PW);
+        bool all_valid = tb_old && tb_old->is_valid()
+                      && tb_new && tb_new->is_valid()
+                      && tb_conf && tb_conf->is_valid()
+                      && tb_old->text() != tb_new->text();
+        int frame = (all_valid && c.is_highlighted()) ? 21 : 20;
+        m_game->m_sprite[InterfaceNdButton]->draw(sb.x, sb.y, frame);
+    });
+
+    auto* btn_cancel = m_controls.add<cc::button>(BTN_CANCEL, cc::rect{dlgX + 217, dlgY + 208, ui_layout::btn_size_x, ui_layout::btn_size_y});
+    btn_cancel->set_click_sound([this] { audio_manager::get().play_game_sound(sound_type::effect, 14, 5); });
+    btn_cancel->set_on_click([this](int) {
+        clear_overlay();
+    });
+    btn_cancel->set_render_handler([this](const cc::control& c) {
+        auto sb = c.screen_bounds();
+        int frame = c.is_highlighted() ? 17 : 16;
+        m_game->m_sprite[InterfaceNdButton]->draw(sb.x, sb.y, frame);
+    });
+
+    m_controls.set_focus_order({TXT_OLD_PW, TXT_NEW_PW, TXT_CONFIRM_PW, BTN_OK, BTN_CANCEL});
+    m_controls.set_focus(TXT_OLD_PW);
+
+    cc::input_state init_input;
+    hb::client::fill_input_state(init_input);
+    m_controls.discard_pending_input(init_input);
 }
 
 void Overlay_ChangePassword::on_uninitialize()
 {
-    end_input_string();
-}
-
-void Overlay_ChangePassword::update_focused_input()
-{
-    if (m_iPrevFocus != m_iCurFocus)
-    {
-        int dlgX, dlgY;
-        get_centered_dialog_pos(InterfaceNdGame4, 0, dlgX, dlgY);
-
-        end_input_string();
-        switch (m_iCurFocus)
-        {
-        case 1:
-            start_input_string(dlgX + 161, dlgY + 43, 11, m_account_name);
-            break;
-        case 2:
-            start_input_string(dlgX + 161, dlgY + 67, 11, m_cOldPassword, true);
-            break;
-        case 3:
-            start_input_string(dlgX + 161, dlgY + 91, 11, m_cNewPassword, true);
-            break;
-        case 4:
-            start_input_string(dlgX + 161, dlgY + 115, 11, m_cConfirmPassword, true);
-            break;
-        }
-        m_iPrevFocus = m_iCurFocus;
-    }
-}
-
-bool Overlay_ChangePassword::validate_inputs()
-{
-    // Check account name
-    if (!CMisc::check_valid_string(m_account_name.data()) || m_account_name.empty())
-        return false;
-
-    // Check old password
-    if (!CMisc::check_valid_string(m_cOldPassword.data()) || m_cOldPassword.empty())
-        return false;
-
-    // Check new password
-    if (!CMisc::check_valid_string(m_cNewPassword.data()) || m_cNewPassword.size() < 8)
-        return false;
-
-    // Check confirm password matches
-    if (!CMisc::check_valid_string(m_cConfirmPassword.data()))
-        return false;
-
-    if (m_cNewPassword != m_cConfirmPassword)
-        return false;
-
-    // New password must be different from old
-    if (m_cOldPassword == m_cNewPassword)
-        return false;
-
-    return true;
 }
 
 void Overlay_ChangePassword::handle_submit()
 {
-    if (!validate_inputs())
+    auto* tb_old = m_controls.find_as<cc::textbox>(TXT_OLD_PW);
+    auto* tb_new = m_controls.find_as<cc::textbox>(TXT_NEW_PW);
+    auto* tb_conf = m_controls.find_as<cc::textbox>(TXT_CONFIRM_PW);
+
+    const auto& account_name = m_game->m_account_name;
+    if (account_name.empty())
+    {
+        m_error_msg = "No account loaded.";
         return;
+    }
+    if (tb_old->text().empty() || !CMisc::check_valid_string(tb_old->text().c_str()))
+    {
+        m_error_msg = "Please enter your current password.";
+        return;
+    }
+    if (tb_new->text().size() < 8)
+    {
+        m_error_msg = "New password must be at least 8 characters.";
+        return;
+    }
+    if (!CMisc::check_valid_string(tb_new->text().c_str()))
+    {
+        m_error_msg = "New password contains invalid characters.";
+        return;
+    }
+    if (tb_new->text() != tb_conf->text())
+    {
+        m_error_msg = "Password confirmation does not match.";
+        return;
+    }
+    if (tb_old->text() == tb_new->text())
+    {
+        m_error_msg = "New password must be different from current.";
+        return;
+    }
+    m_error_msg.clear();
 
-    end_input_string();
-
-    // Copy account name/password to player session
-    m_game->m_player->m_account_name = m_account_name;
-    m_game->m_player->m_account_password = m_cOldPassword;
+    // Store current password for verification
+    m_game->m_account_password = tb_old->text();
 
     // Build ChangePasswordRequest packet
     hb::net::ChangePasswordRequest req{};
     req.header.msg_id = MsgId::RequestChangePassword;
     req.header.msg_type = 0;
-    std::snprintf(req.account_name, sizeof(req.account_name), "%s", m_account_name.c_str());
-    std::snprintf(req.password, sizeof(req.password), "%s", m_cOldPassword.c_str());
-    std::snprintf(req.new_password, sizeof(req.new_password), "%s", m_cNewPassword.c_str());
-    std::snprintf(req.new_password_confirm, sizeof(req.new_password_confirm), "%s", m_cConfirmPassword.c_str());
+    std::snprintf(req.account_name, sizeof(req.account_name), "%s", account_name.c_str());
+    std::snprintf(req.password, sizeof(req.password), "%s", tb_old->text().c_str());
+    std::snprintf(req.new_password, sizeof(req.new_password), "%s", tb_new->text().c_str());
+    std::snprintf(req.new_password_confirm, sizeof(req.new_password_confirm), "%s", tb_conf->text().c_str());
 
     // Store packet for sending after connection completes
     auto* p = reinterpret_cast<char*>(&req);
@@ -147,153 +184,35 @@ void Overlay_ChangePassword::handle_submit()
     m_game->m_l_sock->connect(m_game->m_log_server_addr.c_str(), m_game->m_log_server_port);
     m_game->m_l_sock->init_buffer_size(hb::shared::limits::MsgBufferSize);
 
-    m_game->m_connect_mode = MsgId::RequestChangePassword;
     std::snprintf(m_game->m_msg, sizeof(m_game->m_msg), "%s", "41");
 
-    // set_overlay will clear this overlay automatically
     m_game->change_game_mode(GameMode::Connecting);
 }
 
 void Overlay_ChangePassword::on_update()
 {
-    uint32_t time = GameClock::get_time_ms();
+    cc::input_state input;
+    hb::client::fill_input_state(input);
+    m_controls.update(input, GameClock::get_time_ms());
 
-    // Animation frame updates
-    if ((time - m_dwAnimTime) > 100)
+    // Clear error when focus changes to a text field
+    int focused = m_controls.focused_id();
+    if (focused != m_prev_focused)
     {
-        m_game->m_menu_frame++;
-        m_dwAnimTime = time;
-    }
-    if (m_game->m_menu_frame >= 8)
-    {
-        m_game->m_menu_dir_cnt++;
-        if (m_game->m_menu_dir_cnt > 8)
-        {
-            m_game->m_menu_dir++;
-            m_game->m_menu_dir_cnt = 1;
-        }
-        if (m_game->m_menu_dir > 8) m_game->m_menu_dir = 1;
-        m_game->m_menu_frame = 0;
+        if (focused >= TXT_OLD_PW && focused <= TXT_CONFIRM_PW)
+            m_error_msg.clear();
+        m_prev_focused = focused;
     }
 
-    // Tab key navigation (consistent with Login and CreateAccount screens)
-    if (hb::shared::input::is_key_pressed(KeyCode::Tab))
-    {
-        play_game_sound('E', 14, 5);
-        if (hb::shared::input::is_shift_down())
-        {
-            m_iCurFocus--;
-            if (m_iCurFocus <= 0) m_iCurFocus = m_iMaxFocus;
-        }
-        else
-        {
-            m_iCurFocus++;
-            if (m_iCurFocus > m_iMaxFocus) m_iCurFocus = 1;
-        }
-    }
-
-    // Arrow key navigation
-    if (m_game->m_arrow_pressed != 0)
-    {
-        switch (m_game->m_arrow_pressed)
-        {
-        case 1: // Up
-            m_iCurFocus--;
-            if (m_iCurFocus <= 0) m_iCurFocus = m_iMaxFocus;
-            break;
-        case 2: // Left
-            if (m_iCurFocus == 5) m_iCurFocus = 6;
-            else if (m_iCurFocus == 6) m_iCurFocus = 5;
-            break;
-        case 3: // Down
-            m_iCurFocus++;
-            if (m_iCurFocus > m_iMaxFocus) m_iCurFocus = 1;
-            break;
-        case 4: // Right
-            if (m_iCurFocus == 5) m_iCurFocus = 6;
-            else if (m_iCurFocus == 6) m_iCurFocus = 5;
-            break;
-        }
-        m_game->m_arrow_pressed = 0;
-    }
-
-    // Enter key
-    if (hb::shared::input::is_key_pressed(KeyCode::Enter))
-    {
-        play_game_sound('E', 14, 5);
-        switch (m_iCurFocus)
-        {
-        case 1:
-        case 2:
-        case 3:
-        case 4:
-            // Move to next field
-            m_iCurFocus++;
-            if (m_iCurFocus > m_iMaxFocus) m_iCurFocus = 1;
-            break;
-        case 5: // OK button
-            handle_submit();
-            return;
-        case 6: // Cancel button - return to base screen
-            clear_overlay();
-            return;
-        }
-    }
-
-    // ESC key - return to main menu (set_screen will clear overlay automatically)
-    if (hb::shared::input::is_key_pressed(KeyCode::Escape))
+    if (m_controls.escape_pressed())
     {
         m_game->change_game_mode(GameMode::MainMenu);
         return;
     }
-
-    // Mouse click detection
-    int dlgX, dlgY;
-    get_centered_dialog_pos(InterfaceNdGame4, 0, dlgX, dlgY);
-
-    if (hb::shared::input::is_mouse_button_pressed(MouseButton::Left))
-    {
-        play_game_sound('E', 14, 5);
-
-        int clicked_field = 0;
-        if (hb::shared::input::is_mouse_in_rect(dlgX + 147, dlgY + 36, 125, 22)) clicked_field = 1;
-        else if (hb::shared::input::is_mouse_in_rect(dlgX + 147, dlgY + 60, 125, 22)) clicked_field = 2;
-        else if (hb::shared::input::is_mouse_in_rect(dlgX + 147, dlgY + 84, 125, 22)) clicked_field = 3;
-        else if (hb::shared::input::is_mouse_in_rect(dlgX + 147, dlgY + 108, 125, 22)) clicked_field = 4;
-        else if (hb::shared::input::is_mouse_in_rect(dlgX + 44, dlgY + 208, ui_layout::btn_size_x, ui_layout::btn_size_y)) clicked_field = 5;
-        else if (hb::shared::input::is_mouse_in_rect(dlgX + 217, dlgY + 208, ui_layout::btn_size_x, ui_layout::btn_size_y)) clicked_field = 6;
-
-        switch (clicked_field)
-        {
-        case 1:
-        case 2:
-        case 3:
-        case 4:
-            m_iCurFocus = clicked_field;
-            break;
-        case 5: // OK
-            handle_submit();
-            return;
-        case 6: // Cancel - return to base screen
-            clear_overlay();
-            return;
-        }
-    }
-
-    // Mouse hover for buttons
-    if (hb::shared::input::is_mouse_in_rect(dlgX + 44, dlgY + 208, ui_layout::btn_size_x, ui_layout::btn_size_y))
-        m_iCurFocus = 5;
-    if (hb::shared::input::is_mouse_in_rect(dlgX + 217, dlgY + 208, ui_layout::btn_size_x, ui_layout::btn_size_y))
-        m_iCurFocus = 6;
-
-    // update input field focus
-    update_focused_input();
 }
 
 void Overlay_ChangePassword::on_render()
 {
-    bool valid_inputs = validate_inputs();
-
     int dlgX, dlgY;
     get_centered_dialog_pos(InterfaceNdGame4, 0, dlgX, dlgY);
 
@@ -304,58 +223,26 @@ void Overlay_ChangePassword::on_render()
 
     // draw labels
     put_string(dlgX + 53, dlgY + 43, UPDATE_SCREEN_ON_CHANGE_PASSWORD1, GameColors::UILabel);
+    put_string(dlgX + 161, dlgY + 43, m_game->m_account_name.c_str(), GameColors::InputValid);
     put_string(dlgX + 53, dlgY + 67, UPDATE_SCREEN_ON_CHANGE_PASSWORD2, GameColors::UILabel);
     put_string(dlgX + 53, dlgY + 91, UPDATE_SCREEN_ON_CHANGE_PASSWORD3, GameColors::UILabel);
     put_string(dlgX + 53, dlgY + 115, UPDATE_SCREEN_ON_CHANGE_PASSWORD4, GameColors::UILabel);
 
-    // draw input field values (when not focused)
-    static constexpr hb::shared::render::Color kInvalidInput{55, 18, 13};
+    // Controls (textboxes + buttons)
+    m_controls.render();
 
-    if (m_iCurFocus != 1)
+    // Help text or error message
+    if (!m_error_msg.empty())
     {
-        const hb::shared::render::Color& color = CMisc::check_valid_string(m_account_name.data()) ? GameColors::UILabel : kInvalidInput;
-        put_string(dlgX + 161, dlgY + 43, m_account_name.c_str(), color);
+        hb::shared::text::draw_text_aligned(GameFont::Default, dlgX, dlgY + 146, 334, 15, m_error_msg.c_str(),
+            hb::shared::text::TextStyle::from_color({195, 25, 25}), hb::shared::text::Align::TopCenter);
     }
-
-    if (m_iCurFocus != 2)
+    else
     {
-        const hb::shared::render::Color& color = CMisc::check_valid_string(m_cOldPassword.data()) ? GameColors::UILabel : kInvalidInput;
-        std::string maskedOld(m_cOldPassword.size(), '*');
-        hb::shared::text::draw_text(GameFont::Default, dlgX + 161, dlgY + 67, maskedOld.c_str(), hb::shared::text::TextStyle::from_color(color));
+        put_aligned_string(dlgX, dlgX + 334, dlgY + 146, UPDATE_SCREEN_ON_CHANGE_PASSWORD5);
+        put_aligned_string(dlgX, dlgX + 334, dlgY + 161, UPDATE_SCREEN_ON_CHANGE_PASSWORD6);
+        put_aligned_string(dlgX, dlgX + 334, dlgY + 176, UPDATE_SCREEN_ON_CHANGE_PASSWORD7);
     }
-
-    if (m_iCurFocus != 3)
-    {
-        const hb::shared::render::Color& color = CMisc::check_valid_name(m_cNewPassword.data()) ? GameColors::UILabel : kInvalidInput;
-        std::string maskedNew(m_cNewPassword.size(), '*');
-        hb::shared::text::draw_text(GameFont::Default, dlgX + 161, dlgY + 91, maskedNew.c_str(), hb::shared::text::TextStyle::from_color(color));
-    }
-
-    if (m_iCurFocus != 4)
-    {
-        const hb::shared::render::Color& color = CMisc::check_valid_name(m_cConfirmPassword.data()) ? GameColors::UILabel : kInvalidInput;
-        std::string maskedConfirm(m_cConfirmPassword.size(), '*');
-        hb::shared::text::draw_text(GameFont::Default, dlgX + 161, dlgY + 115, maskedConfirm.c_str(), hb::shared::text::TextStyle::from_color(color));
-    }
-
-    // Show active input string (with masking for password fields)
-    if (m_iCurFocus == 1)
-        show_received_string();
-    else if (m_iCurFocus >= 2 && m_iCurFocus <= 4)
-        show_received_string();  // Hide (mask) password
-
-    // Help text
-    put_aligned_string(dlgX, dlgX + 334, dlgY + 146, UPDATE_SCREEN_ON_CHANGE_PASSWORD5);
-    put_aligned_string(dlgX, dlgX + 334, dlgY + 161, UPDATE_SCREEN_ON_CHANGE_PASSWORD6);
-    put_aligned_string(dlgX, dlgX + 334, dlgY + 176, UPDATE_SCREEN_ON_CHANGE_PASSWORD7);
-
-    // OK button (enabled only when inputs are valid)
-    int okFrame = (valid_inputs && m_iCurFocus == 5) ? 21 : 20;
-    m_game->m_sprite[InterfaceNdButton]->draw(dlgX + 44, dlgY + 208, okFrame);
-
-    // Cancel button
-    int cancelFrame = (m_iCurFocus == 6) ? 17 : 16;
-    m_game->m_sprite[InterfaceNdButton]->draw(dlgX + 217, dlgY + 208, cancelFrame);
 
     draw_version();
 }

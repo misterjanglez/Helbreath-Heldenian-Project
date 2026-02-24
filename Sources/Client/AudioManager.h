@@ -18,9 +18,9 @@ static const int AUDIO_MAX_ACTIVE_SOUNDS = 32;
 // Sound types matching existing categories
 enum class sound_type
 {
-	Character,  // Combat sounds (C1-C24)
-	Monster,    // Magic/Monster sounds (M1-M156)
-	Effect      // Environmental/Effect sounds (E1-E53)
+	character,  // Combat sounds (C1-C24)
+	monster,    // Magic/Monster sounds (M1-M156)
+	effect      // Environmental/effect sounds (E1-E53)
 };
 
 // Decoded sound data stored in our own memory (bypasses miniaudio resource manager)
@@ -143,7 +143,7 @@ private:
 	struct active_sound {
 		ma_audio_buffer_ref bufferRef;
 		ma_sound sound;
-		sound_type type = sound_type::Character;
+		sound_type type = sound_type::character;
 		int index = 0;
 		uint32_t startOrder = 0;
 		bool inUse = false;

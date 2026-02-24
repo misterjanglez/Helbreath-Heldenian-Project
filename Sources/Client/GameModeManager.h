@@ -244,6 +244,10 @@ private:
     // When active, base screen still updates but doesn't receive input
     std::unique_ptr<IGameScreen> m_pActiveOverlay;
 
+    // Holds overlay being destroyed — defers destruction until update_screens_impl() finishes,
+    // preventing use-after-free when clear_overlay() is called from within m_controls.update().
+    std::unique_ptr<IGameScreen> m_dying_overlay;
+
     // Factory to create the next screen (set by set_screen<T>)
     std::function<std::unique_ptr<IGameScreen>()> m_pendingScreenFactory;
 

@@ -7,8 +7,12 @@ public:
 	DialogBox_LevelUpSetting(CGame* game);
 	~DialogBox_LevelUpSetting() override = default;
 
-	void on_draw(short mouse_x, short mouse_y, short z, char lb) override;
-	bool on_click(short mouse_x, short mouse_y) override;
+	void on_draw() override;
+	bool on_click() override;
+
+	bool on_enable(int type, int64_t v1, int v2, const char* string) override;
+
+	int m_initial_lu_points{};
 
 private:
 	void draw_stat_row(short sX, short sY, int y_offset, const char* label,

@@ -93,9 +93,8 @@ void CraftingManager::req_create_portion_handler(int client_h, char* data)
 					if (item_index[j] == -1) {
 						item_index[j] = cI[i];
 						item_number[j]++;
-						goto RCPH_LOOPBREAK;
+						break;
 					}
-			RCPH_LOOPBREAK:;
 			}
 		}
 
@@ -104,7 +103,7 @@ void CraftingManager::req_create_portion_handler(int client_h, char* data)
 			if (item_index[i] < 0) return;
 			if ((item_index[i] >= 0) && (item_index[i] >= hb::shared::limits::MaxItems)) return;
 			if (m_game->m_client_list[client_h]->m_item_list[item_index[i]] == 0) return;
-			if (m_game->m_client_list[client_h]->m_item_list[item_index[i]]->m_count < static_cast<uint32_t>(item_number[i])) return;
+			if (m_game->m_client_list[client_h]->m_item_list[item_index[i]]->m_count < static_cast<uint64_t>(item_number[i])) return;
 		}
 
 	// . Bubble Sort
@@ -282,9 +281,8 @@ void CraftingManager::req_create_crafting_handler(int client_h, char* data)
 					{
 						item_index[j] = cI[i];
 						item_number[j]++;
-						goto RCPH_LOOPBREAK;
+						break;
 					}
-			RCPH_LOOPBREAK:;
 			}
 		}
 
@@ -294,11 +292,9 @@ void CraftingManager::req_create_crafting_handler(int client_h, char* data)
 			if (item_index[i] < 0) return;
 			if ((item_index[i] >= 0) && (item_index[i] >= hb::shared::limits::MaxItems)) return;
 			if (m_game->m_client_list[client_h]->m_item_list[item_index[i]] == 0) return;
-			if (m_game->m_client_list[client_h]->m_item_list[item_index[i]]->m_count < static_cast<uint32_t>(item_number[i])) return;
+			if (m_game->m_client_list[client_h]->m_item_list[item_index[i]]->m_count < static_cast<uint64_t>(item_number[i])) return;
 			item_purity[i] = m_game->m_client_list[client_h]->m_item_list[item_index[i]]->m_item_special_effect_value2;
-			if ((m_game->m_client_list[client_h]->m_item_list[item_index[i]]->get_item_type() == ItemType::None)
-				&& (m_game->m_client_list[client_h]->m_item_list[item_index[i]]->m_sprite == 6)
-				&& (m_game->m_client_list[client_h]->m_item_list[item_index[i]]->m_sprite_frame == 129))
+			if (m_game->m_client_list[client_h]->m_item_list[item_index[i]]->m_id_num == 657) // Stone of Merien
 			{
 				item_purity[i] = 100; // Merien stones considered 100% purity.
 			}
@@ -398,9 +394,7 @@ void CraftingManager::req_create_crafting_handler(int client_h, char* data)
 		for(int i = 0; i < 6; i++)
 			if (item_index[i] != -1)
 			{	// Deplete any Merien Stone
-				if ((m_game->m_client_list[client_h]->m_item_list[item_index[i]]->get_item_type() == ItemType::None)
-					&& (m_game->m_client_list[client_h]->m_item_list[item_index[i]]->m_sprite == 6)
-					&& (m_game->m_client_list[client_h]->m_item_list[item_index[i]]->m_sprite_frame == 129))
+				if (m_game->m_client_list[client_h]->m_item_list[item_index[i]]->m_id_num == 657) // Stone of Merien
 				{
 					m_game->m_item_manager->item_deplete_handler(client_h, item_index[i], false);
 				}

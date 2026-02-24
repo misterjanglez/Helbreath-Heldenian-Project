@@ -21,6 +21,8 @@
 #include "Appearance.h"
 #include "PlayerStatusData.h"
 #include "StringCompat.h"
+#include "DirectionHelpers.h"
+using hb::shared::direction::direction;
 using namespace std;
 
 namespace hb::server::config { constexpr int ClientSocketBlockLimit = 2000; } // Queue size per client
@@ -79,11 +81,23 @@ public:
 	int   m_guild_rank;
 	int   m_guild_guid;
 	
-	char  m_dir;
+	direction m_dir;
 	short m_type;
 	short m_original_type;
 	hb::shared::entity::PlayerAppearance m_appearance;
 	hb::shared::entity::PlayerStatus m_status;
+
+	// Get the appearance_value (weapon sub-type) of the currently equipped weapon.
+	// Returns 0 if unarmed. Reads directly from equipped item, not cached appearance.
+	uint8_t get_equipped_weapon_type() const
+	{
+		using hb::shared::item::EquipPos;
+		using hb::shared::item::to_int;
+		int slot = m_item_equipment_status[to_int(EquipPos::RightHand)];
+		if (slot == -1) slot = m_item_equipment_status[to_int(EquipPos::TwoHand)];
+		if (slot == -1 || !m_item_list[slot]) return 0;
+		return static_cast<uint8_t>(m_item_list[slot]->m_appearance_value);
+	}
 
 	uint32_t m_time, m_hp_time, m_mp_time, m_sp_time, m_auto_save_time, m_hunger_time, m_warm_effect_time;
 	uint32_t m_afk_activity_time;
@@ -133,7 +147,7 @@ public:
 	struct
 	{
 		char index;
-		short price;
+		int32_t price;
 	} m_repair_all[hb::shared::limits::MaxItems];
 
 	char m_attack_dice_throw_sm;
@@ -377,6 +391,7 @@ public:
 	uint32_t m_fightzone_dead_time;
 	char m_save_count;
 
+	uint32_t m_last_version_warning_time = 0;
 	uint32_t m_last_config_request_time = 0;
 	uint32_t m_last_damage_taken_time = 0;
 

@@ -13,6 +13,7 @@
 #include <cstdint>
 #include <string>
 
+enum class KeyCode : int;
 class CGame;
 class GameModeManager;
 
@@ -58,10 +59,25 @@ public:
     // Override to false for overlays that draw their own background (e.g. DevConsole).
     virtual bool wants_background_dim() const { return true; }
 
+    // Called when a text character is entered (WM_CHAR / SFML TextEntered).
+    // Return true if handled (e.g. auto-activated chat input).
+    // The universal on_text_char forwarding happens regardless of return value.
+    virtual bool on_text_input(uint32_t codepoint) { return false; }
+
+    // Called on key press/release events routed from CGame::on_key_event.
+    // Return true if handled, false to fall through.
+    virtual bool on_key_down(KeyCode key) { return false; }
+    virtual bool on_key_up(KeyCode key) { return false; }
+
     // Called when a server response arrives in log_response_handler.
     // Return true if this screen handled the response (stops further processing),
     // false to fall through to default handling. Optional — not all screens need this.
     virtual bool on_net_response(uint16_t response_type, char* data) { return false; }
+
+    // Called when a game server message arrives in game_recv_msg_handler.
+    // Return true if this screen handled the message (stops further processing),
+    // false to fall through to default handling. Optional — not all screens need this.
+    virtual bool on_game_msg(uint32_t msg_id, uint16_t msg_type, char* data, uint32_t msg_size) { return false; }
 
 protected:
     // ============== Helper Methods (delegate to CGame) ==============
@@ -78,17 +94,8 @@ protected:
     void put_string_spr_font(int iX, int iY, const char* str, uint8_t r, uint8_t g, uint8_t b);
     void draw_version();
 
-    // Audio helpers
-    void play_game_sound(char type, int num, int dist, long lPan = 0);
-
     // Event/message helpers
     void add_event_list(const char* txt, char color = 0, bool dup_allow = true);
-
-    // Input string helpers (for text entry screens)
-    void start_input_string(int sX, int sY, unsigned char len, std::string& buffer, bool is_hide = false);
-    void end_input_string();
-    void clear_input_string();
-    void show_received_string();
 
     // Screen transition helper - request transition to a new screen
     // This delegates to GameModeManager::set_screen<T>()

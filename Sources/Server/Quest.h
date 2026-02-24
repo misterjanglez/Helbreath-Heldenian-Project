@@ -38,7 +38,7 @@ public:
 	char m_side;
 	
 	int m_type;				// Quest
-	int m_target_type;			// Quest  .  Type    .
+	int m_target_config_id;			// Quest target NPC config ID
 	int m_max_count;
 
 	int m_from;				// Quest  NPC

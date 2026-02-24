@@ -1,7 +1,7 @@
 #include "CmdShowChat.h"
+#include "ServerConsole.h"
 #include <cstdio>
 #include <filesystem>
-#include "Log.h"
 
 #ifdef _WIN32
 
@@ -12,7 +12,7 @@ void CmdShowChat::execute(CGame* game, const char* args)
 		DWORD exit_code = 0;
 		if (GetExitCodeProcess(m_hProcess, &exit_code) && exit_code == STILL_ACTIVE)
 		{
-			hb::logger::log("Chat viewer is already open.");
+			hb::console::warn("Chat viewer is already open.");
 			return;
 		}
 		CloseHandle(m_hProcess);
@@ -49,11 +49,11 @@ void CmdShowChat::execute(CGame* game, const char* args)
 	{
 		CloseHandle(pi.hThread);
 		m_hProcess = pi.hProcess;
-		hb::logger::log("Chat viewer opened in new terminal.");
+		hb::console::success("Chat viewer opened in new terminal.");
 	}
 	else
 	{
-		hb::logger::log("Failed to open chat viewer (error {}).", GetLastError());
+		hb::console::error("Failed to open chat viewer (error {}).", GetLastError());
 	}
 }
 
@@ -65,9 +65,9 @@ void CmdShowChat::execute(CGame* game, const char* args)
 	std::string cmd = "tail -f \"" + logPath + "\" | grep -v '\\[DEBUG\\]' &";
 	int ret = std::system(cmd.c_str());
 	if (ret == 0)
-		hb::logger::log("Chat viewer started (tail -f).");
+		hb::console::success("Chat viewer started (tail -f).");
 	else
-		hb::logger::log("Failed to open chat viewer (exit code {}).", ret);
+		hb::console::error("Failed to open chat viewer (exit code {}).", ret);
 }
 
 #endif

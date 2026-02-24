@@ -2,18 +2,49 @@
 #include "ConfigManager.h"
 #include "CursorTarget.h"
 #include "Game.h"
+#include "PacketSendHelpers.h"
+
 #include "InventoryManager.h"
 #include "ItemNameFormatter.h"
+#include "ItemSpriteMetadata.h"
 #include "lan_eng.h"
 #include "SharedCalculations.h"
 #include <format>
 #include <string>
+#include "IInput.h"
+#include "AudioManager.h"
 
 using namespace hb::shared::net;
 using namespace hb::shared::item;
 
 using hb::shared::item::EquipPos;
 using namespace hb::client::sprite_id;
+
+// Margin (in pixels) added around item sprites to make small items easier to click.
+// Checks if any opaque pixel exists within this distance of the cursor.
+constexpr int item_hit_margin = 8;
+
+static bool check_item_collision(auto&& sprite, int sprite_x, int sprite_y,
+	int frame, int point_x, int point_y, int margin)
+{
+	if (sprite->CheckCollision(sprite_x, sprite_y, frame, point_x, point_y))
+		return true;
+
+	if (margin <= 0)
+		return false;
+
+	for (int dy = -margin; dy <= margin; dy++)
+	{
+		for (int dx = -margin; dx <= margin; dx++)
+		{
+			if (dx == 0 && dy == 0) continue;
+			if (dx * dx + dy * dy > margin * margin) continue;
+			if (sprite->CheckCollision(sprite_x, sprite_y, frame, point_x + dx, point_y + dy))
+				return true;
+		}
+	}
+	return false;
+}
 
 // draw order: first entry drawn first (bottom layer), last entry drawn last (top layer).
 // Collision checks iterate in reverse so topmost-drawn item has highest click priority.
@@ -75,17 +106,19 @@ void DialogBox_Character::draw_stat(int x1, int x2, int y, int baseStat, int ang
 static EquipPos FindHoverSlot(CGame* game, const EquipSlotLayout* slots, int slotCount,
 	short sX, short sY, short mouse_x, short mouse_y, const char* equip_poi_status, int spriteOffset)
 {
+	bool is_female = (spriteOffset == 40);
 	for (int i = slotCount - 1; i >= 0; i--)
 	{
 		int ep = static_cast<int>(slots[i].equipPos);
 		int itemIdx = equip_poi_status[ep];
 		if (itemIdx == -1) continue;
 
-		CItem* cfg = game->get_item_config(game->m_item_list[itemIdx]->m_id_num);
+		CItem* cfg = game->get_item_config(game->m_player->m_item_list[itemIdx]->m_id_num);
 		if (cfg == nullptr) continue;
 
-		if (game->m_sprite[ItemEquipPivotPoint + cfg->m_sprite + spriteOffset]->CheckCollision(
-			sX + slots[i].offsetX, sY + slots[i].offsetY, cfg->m_sprite_frame, mouse_x, mouse_y))
+		auto draw = game->get_item_draw(cfg->m_display_id, item_atlas::equip, is_female);
+		if (check_item_collision(draw.sprite,
+			sX + slots[i].offsetX, sY + slots[i].offsetY, draw.frame, mouse_x, mouse_y, item_hit_margin))
 		{
 			return slots[i].equipPos;
 		}
@@ -100,19 +133,20 @@ void DialogBox_Character::draw_equipped_item(hb::shared::item::EquipPos equipPos
 	int itemIdx = equip_poi_status[static_cast<int>(equipPos)];
 	if (itemIdx == -1) return;
 
-	CItem* item = m_game->m_item_list[itemIdx].get();
+	CItem* item = player().m_item_list[itemIdx].get();
 	CItem* cfg = m_game->get_item_config(item->m_id_num);
 	if (cfg == nullptr) return;
 
-	short spr_h = cfg->m_sprite;
-	short frame = cfg->m_sprite_frame;
 	char item_color = item->m_item_color;
-	bool disabled = m_game->m_is_item_disabled[itemIdx];
+	bool disabled = inventory_manager::get().is_locked(itemIdx);
 
 	// Select color array based on item type (weapons use different colors)
 	const hb::shared::render::Color* colors = useWeaponColors ? GameColors::Weapons : GameColors::Items;
 
-	auto sprite = m_game->m_sprite[ItemEquipPivotPoint + spr_h + spriteOffset];
+	bool is_female = (spriteOffset == 40);
+	auto equip_draw = m_game->get_item_draw(cfg->m_display_id, item_atlas::equip, is_female);
+	auto sprite = equip_draw.sprite;
+	int16_t frame = equip_draw.frame;
 
 	if (!disabled)
 	{
@@ -149,9 +183,9 @@ void DialogBox_Character::build_equip_status_array(char (&equip_poi_status)[DEF_
 	std::memset(equip_poi_status, -1, sizeof(equip_poi_status));
 	for (int i = 0; i < hb::shared::limits::MaxItems; i++)
 	{
-		if (m_game->m_item_list[i] != nullptr && m_game->m_is_item_equipped[i])
+		if (player().m_item_list[i] != nullptr && m_game->m_is_item_equipped[i])
 		{
-			CItem* cfg = m_game->get_item_config(m_game->m_item_list[i]->m_id_num);
+			CItem* cfg = m_game->get_item_config(player().m_item_list[i]->m_id_num);
 			if (cfg != nullptr)
 				equip_poi_status[cfg->m_equip_pos] = i;
 		}
@@ -165,12 +199,12 @@ char DialogBox_Character::find_equip_item_at_point(short mouse_x, short mouse_y,
 	int slotCount = 0;
 	int spriteOffset = 0;
 
-	if (m_game->m_player->m_player_type >= 1 && m_game->m_player->m_player_type <= 3)
+	if (player().m_player_type >= 1 && player().m_player_type <= 3)
 	{
 		slots = MaleEquipSlots;
 		slotCount = static_cast<int>(std::size(MaleEquipSlots));
 	}
-	else if (m_game->m_player->m_player_type >= 4 && m_game->m_player->m_player_type <= 6)
+	else if (player().m_player_type >= 4 && player().m_player_type <= 6)
 	{
 		slots = FemaleEquipSlots;
 		slotCount = static_cast<int>(std::size(FemaleEquipSlots));
@@ -184,14 +218,13 @@ char DialogBox_Character::find_equip_item_at_point(short mouse_x, short mouse_y,
 		int itemIdx = equip_poi_status[ep];
 		if (itemIdx == -1) continue;
 
-		CItem* cfg = m_game->get_item_config(m_game->m_item_list[itemIdx]->m_id_num);
+		CItem* cfg = m_game->get_item_config(player().m_item_list[itemIdx]->m_id_num);
 		if (cfg == nullptr) continue;
 
-		short spr_h = cfg->m_sprite;
-		short frame = cfg->m_sprite_frame;
-
-		if (m_game->m_sprite[ItemEquipPivotPoint + spr_h + spriteOffset]->CheckCollision(
-			sX + slots[i].offsetX, sY + slots[i].offsetY, frame, mouse_x, mouse_y))
+		bool is_female = (spriteOffset == 40);
+		auto draw = m_game->get_item_draw(cfg->m_display_id, item_atlas::equip, is_female);
+		if (check_item_collision(draw.sprite,
+			sX + slots[i].offsetX, sY + slots[i].offsetY, draw.frame, mouse_x, mouse_y, item_hit_margin))
 		{
 			return static_cast<char>(itemIdx);
 		}
@@ -200,11 +233,13 @@ char DialogBox_Character::find_equip_item_at_point(short mouse_x, short mouse_y,
 	return -1;
 }
 
-void DialogBox_Character::on_draw(short mouse_x, short mouse_y, short z, char lb)
+void DialogBox_Character::on_draw()
 {
+	short mouse_x = static_cast<short>(hb::shared::input::get_mouse_x());
+	short mouse_y = static_cast<short>(hb::shared::input::get_mouse_y());
 	if (!m_game->ensure_item_configs_loaded()) return;
-	short sX = Info().m_x;
-	short sY = Info().m_y;
+	short sX = m_x;
+	short sY = m_y;
 	char collison = -1;
 	const bool dialogTrans = config_manager::get().is_dialog_transparency_enabled();
 
@@ -212,63 +247,72 @@ void DialogBox_Character::on_draw(short mouse_x, short mouse_y, short z, char lb
 
 	// Player name and PK/contribution
 	std::string txt2;
-	std::string infoBuf = m_game->m_player->m_player_name + " : ";
+	std::string infoBuf = player().m_player_name + " : ";
 
-	if (m_game->m_player->m_pk_count > 0) {
-		txt2 = std::format(DRAW_DIALOGBOX_CHARACTER1, m_game->m_player->m_pk_count);
+	if (player().m_pk_count > 0) {
+		txt2 = std::format(DRAW_DIALOGBOX_CHARACTER1, player().m_pk_count);
 		infoBuf += txt2;
 	}
-	txt2 = std::format(DRAW_DIALOGBOX_CHARACTER2, m_game->m_player->m_contribution);
+	txt2 = std::format(DRAW_DIALOGBOX_CHARACTER2, player().m_contribution);
 	infoBuf += txt2;
 	put_aligned_string(sX + 24, sX + 252, sY + 52, infoBuf.c_str(), GameColors::UIDarkRed);
 
 	// Citizenship / Guild status
 	std::string statusBuf;
-	if (!m_game->m_player->m_citizen)
+	if (!player().m_citizen)
 	{
 		statusBuf = DRAW_DIALOGBOX_CHARACTER7;
 	}
 	else
 	{
-		statusBuf = m_game->m_player->m_hunter
-			? (m_game->m_player->m_aresden ? DEF_MSG_ARECIVIL : DEF_MSG_ELVCIVIL)
-			: (m_game->m_player->m_aresden ? DEF_MSG_ARESOLDIER : DEF_MSG_ELVSOLDIER);
+		statusBuf = player().m_hunter
+			? (player().m_aresden ? DEF_MSG_ARECIVIL : DEF_MSG_ELVCIVIL)
+			: (player().m_aresden ? DEF_MSG_ARESOLDIER : DEF_MSG_ELVSOLDIER);
 
-		if (m_game->m_player->m_guild_rank >= 0)
+		if (player().m_guild_rank >= 0)
 		{
 			statusBuf += "(";
-			statusBuf += m_game->m_player->m_guild_name;
-			statusBuf += m_game->m_player->m_guild_rank == 0 ? DEF_MSG_GUILDMASTER1 : DEF_MSG_GUILDSMAN1;
+			statusBuf += player().m_guild_name;
+			statusBuf += player().m_guild_rank == 0 ? DEF_MSG_GUILDMASTER1 : DEF_MSG_GUILDSMAN1;
 		}
 	}
 	put_aligned_string(sX, sX + 275, sY + 69, statusBuf.c_str(), GameColors::UILabel);
 
 	// Level, Exp, Next Exp
 	std::string statBuf;
-	statBuf = std::format("{}", m_game->m_player->m_level);
+	statBuf = std::format("{}", player().m_level);
 	put_aligned_string(sX + 180, sX + 250, sY + 106, statBuf.c_str(), GameColors::UILabel);
 
-	statBuf = m_game->format_comma_number(m_game->m_player->m_exp);
+	statBuf = m_game->format_comma_number(player().m_exp);
 	put_aligned_string(sX + 180, sX + 250, sY + 125, statBuf.c_str(), GameColors::UILabel);
 
-	statBuf = m_game->format_comma_number(m_game->get_level_exp(m_game->m_player->m_level + 1));
+	statBuf = m_game->format_comma_number(m_game->get_level_exp(player().m_level + 1));
 	put_aligned_string(sX + 180, sX + 250, sY + 142, statBuf.c_str(), GameColors::UILabel);
 
 	// Calculate max stats
-	int max_hp = hb::shared::calc::CalculateMaxHP(m_game->m_player->m_vit, m_game->m_player->m_level, m_game->m_player->m_str, m_game->m_player->m_angelic_str);
-	int max_mp = hb::shared::calc::CalculateMaxMP(m_game->m_player->m_mag, m_game->m_player->m_angelic_mag, m_game->m_player->m_level, m_game->m_player->m_int, m_game->m_player->m_angelic_int);
-	int max_sp = hb::shared::calc::CalculateMaxSP(m_game->m_player->m_str, m_game->m_player->m_angelic_str, m_game->m_player->m_level);
-	int max_load = hb::shared::calc::CalculateMaxLoad(m_game->m_player->m_str, m_game->m_player->m_angelic_str, m_game->m_player->m_level);
+	int max_hp = hb::shared::calc::max_hp(m_game->m_formula_engine,
+		hb::shared::calc::vit{(double)player().m_vit}, hb::shared::calc::level{(double)player().m_level},
+		hb::shared::calc::str{(double)player().m_str}, hb::shared::calc::angelic_str{(double)player().m_angelic_str});
+	int max_mp = hb::shared::calc::max_mp(m_game->m_formula_engine,
+		hb::shared::calc::mag{(double)player().m_mag}, hb::shared::calc::angelic_mag{(double)player().m_angelic_mag},
+		hb::shared::calc::level{(double)player().m_level}, hb::shared::calc::intel{(double)player().m_int},
+		hb::shared::calc::angelic_int{(double)player().m_angelic_int});
+	int max_sp = hb::shared::calc::max_sp(m_game->m_formula_engine,
+		hb::shared::calc::str{(double)player().m_str}, hb::shared::calc::angelic_str{(double)player().m_angelic_str},
+		hb::shared::calc::level{(double)player().m_level});
+	int max_load = hb::shared::calc::max_load(m_game->m_formula_engine,
+		hb::shared::calc::str{(double)player().m_str}, hb::shared::calc::angelic_str{(double)player().m_angelic_str},
+		hb::shared::calc::level{(double)player().m_level});
 
 	// HP, MP, SP
 	std::string valueBuf;
-	valueBuf = std::format("{}/{}", m_game->m_player->m_hp, max_hp);
+	valueBuf = std::format("{}/{}", player().m_hp, max_hp);
 	put_aligned_string(sX + 180, sX + 250, sY + 173, valueBuf.c_str(), GameColors::UILabel);
 
-	valueBuf = std::format("{}/{}", m_game->m_player->m_mp, max_mp);
+	valueBuf = std::format("{}/{}", player().m_mp, max_mp);
 	put_aligned_string(sX + 180, sX + 250, sY + 191, valueBuf.c_str(), GameColors::UILabel);
 
-	valueBuf = std::format("{}/{}", m_game->m_player->m_sp, max_sp);
+	valueBuf = std::format("{}/{}", player().m_sp, max_sp);
 	put_aligned_string(sX + 180, sX + 250, sY + 208, valueBuf.c_str(), GameColors::UILabel);
 
 	// Max load
@@ -277,32 +321,32 @@ void DialogBox_Character::on_draw(short mouse_x, short mouse_y, short z, char lb
 	put_aligned_string(sX + 180, sX + 250, sY + 240, valueBuf.c_str(), GameColors::UILabel);
 
 	// Enemy Kills
-	valueBuf = std::format("{}", m_game->m_player->m_enemy_kill_count);
+	valueBuf = std::format("{}", player().m_enemy_kill_count);
 	put_aligned_string(sX + 180, sX + 250, sY + 257, valueBuf.c_str(), GameColors::UILabel);
 
 	// Stats with angelic bonuses
-	draw_stat(sX + 48, sX + 82, sY + 285, m_game->m_player->m_str, m_game->m_player->m_angelic_str);   // Str
-	draw_stat(sX + 48, sX + 82, sY + 302, m_game->m_player->m_dex, m_game->m_player->m_angelic_dex);   // Dex
-	draw_stat(sX + 135, sX + 167, sY + 285, m_game->m_player->m_int, m_game->m_player->m_angelic_int); // Int
-	draw_stat(sX + 135, sX + 167, sY + 302, m_game->m_player->m_mag, m_game->m_player->m_angelic_mag); // Mag
+	draw_stat(sX + 44, sX + 86, sY + 285, player().m_str, player().m_angelic_str);   // Str
+	draw_stat(sX + 48, sX + 86, sY + 304, player().m_dex, player().m_angelic_dex);   // Dex
+	draw_stat(sX + 131, sX + 171, sY + 285, player().m_int, player().m_angelic_int); // Int
+	draw_stat(sX + 131, sX + 171, sY + 304, player().m_mag, player().m_angelic_mag); // Mag
 
 	// Vit and Chr (no angelic bonus)
 	std::string vitChrBuf;
-	vitChrBuf = std::format("{}", m_game->m_player->m_vit);
-	put_aligned_string(sX + 218, sX + 251, sY + 285, vitChrBuf.c_str(), GameColors::UILabel);
-	vitChrBuf = std::format("{}", m_game->m_player->m_charisma);
-	put_aligned_string(sX + 218, sX + 251, sY + 302, vitChrBuf.c_str(), GameColors::UILabel);
+	vitChrBuf = std::format("{}", player().m_vit);
+	put_aligned_string(sX + 214, sX + 255, sY + 285, vitChrBuf.c_str(), GameColors::UILabel);
+	vitChrBuf = std::format("{}", player().m_charisma);
+	put_aligned_string(sX + 214, sX + 255, sY + 304, vitChrBuf.c_str(), GameColors::UILabel);
 
 	// Build equipment status array
 	char equip_poi_status[DEF_MAXITEMEQUIPPOS];
 	build_equip_status_array(equip_poi_status);
 
 	// draw character model based on gender
-	if (m_game->m_player->m_player_type >= 1 && m_game->m_player->m_player_type <= 3)
+	if (player().m_player_type >= 1 && player().m_player_type <= 3)
 	{
 		draw_male_character(sX, sY, mouse_x, mouse_y, equip_poi_status, collison);
 	}
-	else if (m_game->m_player->m_player_type >= 4 && m_game->m_player->m_player_type <= 6)
+	else if (player().m_player_type >= 4 && player().m_player_type <= 6)
 	{
 		draw_female_character(sX, sY, mouse_x, mouse_y, equip_poi_status, collison);
 	}
@@ -317,17 +361,17 @@ void DialogBox_Character::draw_male_character(short sX, short sY, short mouse_x,
 	const char* equip_poi_status, char& collison)
 {
 	// Base body
-	m_game->m_sprite[ItemEquipPivotPoint + 0]->draw(sX + 171, sY + 290, m_game->m_player->m_player_type - 1);
+	m_game->m_sprite[ItemEquipPivotPoint + 0]->draw(sX + 171, sY + 290, player().m_player_type - 1);
 
 	// Hair (if no helmet)
 	if (equip_poi_status[to_int(EquipPos::Head)] == -1)
 	{
-		const auto& hc = GameColors::Hair[m_game->m_player->m_playerAppearance.hair_color];
-		m_game->m_sprite[ItemEquipPivotPoint + 18]->draw(sX + 171, sY + 290, m_game->m_player->m_playerAppearance.hair_style, hb::shared::sprite::DrawParams::tint(hc.r, hc.g, hc.b));
+		const auto& hc = GameColors::Hair[player().m_playerAppearance.hair_color];
+		m_game->m_sprite[ItemEquipPivotPoint + 18]->draw(sX + 171, sY + 290, player().m_playerAppearance.hair_style, hb::shared::sprite::DrawParams::tint(hc.r, hc.g, hc.b));
 	}
 
 	// Underwear
-	m_game->m_sprite[ItemEquipPivotPoint + 19]->draw(sX + 171, sY + 290, m_game->m_player->m_playerAppearance.underwear_type);
+	m_game->m_sprite[ItemEquipPivotPoint + 19]->draw(sX + 171, sY + 290, player().m_playerAppearance.underwear_type);
 
 	// Find topmost hovered slot (reverse scan) before drawing
 	EquipPos hoverSlot = FindHoverSlot(m_game, MaleEquipSlots, static_cast<int>(std::size(MaleEquipSlots)),
@@ -342,48 +386,30 @@ void DialogBox_Character::draw_male_character(short sX, short sY, short mouse_x,
 			equip_poi_status, slot.useWeaponColors, slot.equipPos == hoverSlot);
 	}
 
-	// Angel staff special case
-	if (equip_poi_status[to_int(EquipPos::TwoHand)] != -1)
-	{
-		int itemIdx = equip_poi_status[to_int(EquipPos::TwoHand)];
-		CItem* cfg = m_game->get_item_config(m_game->m_item_list[itemIdx]->m_id_num);
-		if (cfg != nullptr)
-		{
-			short spr_h = cfg->m_sprite;
-			short frame = cfg->m_sprite_frame;
-			if (spr_h == 8) // Angel staff
-			{
-				if (!m_game->m_is_item_disabled[itemIdx])
-					m_game->m_sprite[ItemEquipPivotPoint + spr_h + 40]->draw(sX + 45, sY + 143, frame);
-				else
-					m_game->m_sprite[ItemEquipPivotPoint + spr_h + 40]->draw(sX + 45, sY + 143, frame, hb::shared::sprite::DrawParams::alpha_blend(0.5f));
-			}
-		}
-	}
 }
 
 void DialogBox_Character::draw_female_character(short sX, short sY, short mouse_x, short mouse_y,
 	const char* equip_poi_status, char& collison)
 {
 	// Base body (female uses +40 offset from male sprites)
-	m_game->m_sprite[ItemEquipPivotPoint + 40]->draw(sX + 171, sY + 290, m_game->m_player->m_player_type - 4);
+	m_game->m_sprite[ItemEquipPivotPoint + 40]->draw(sX + 171, sY + 290, player().m_player_type - 4);
 
 	// Hair (if no helmet) - female hair is at +18+40 = +58
 	if (equip_poi_status[to_int(EquipPos::Head)] == -1)
 	{
-		const auto& hc = GameColors::Hair[m_game->m_player->m_playerAppearance.hair_color];
-		m_game->m_sprite[ItemEquipPivotPoint + 18 + 40]->draw(sX + 171, sY + 290, m_game->m_player->m_playerAppearance.hair_style, hb::shared::sprite::DrawParams::tint(hc.r, hc.g, hc.b));
+		const auto& hc = GameColors::Hair[player().m_playerAppearance.hair_color];
+		m_game->m_sprite[ItemEquipPivotPoint + 18 + 40]->draw(sX + 171, sY + 290, player().m_playerAppearance.hair_style, hb::shared::sprite::DrawParams::tint(hc.r, hc.g, hc.b));
 	}
 
 	// Underwear - female underwear is at +19+40 = +59
-	m_game->m_sprite[ItemEquipPivotPoint + 19 + 40]->draw(sX + 171, sY + 290, m_game->m_player->m_playerAppearance.underwear_type);
+	m_game->m_sprite[ItemEquipPivotPoint + 19 + 40]->draw(sX + 171, sY + 290, player().m_playerAppearance.underwear_type);
 
 	// Check for skirt in pants slot (sprite 12, frame 0 = skirt)
 	bool skirt = false;
 	if (equip_poi_status[to_int(EquipPos::Pants)] != -1)
 	{
-		CItem* cfg = m_game->get_item_config(m_game->m_item_list[equip_poi_status[to_int(EquipPos::Pants)]]->m_id_num);
-		if (cfg != nullptr && cfg->m_sprite == 12 && cfg->m_sprite_frame == 0)
+		CItem* cfg = m_game->get_item_config(player().m_item_list[equip_poi_status[to_int(EquipPos::Pants)]]->m_id_num);
+		if (cfg != nullptr && player().m_item_list[equip_poi_status[to_int(EquipPos::Pants)]]->m_id_num == 479) // Skirt (W)
 			skirt = true;
 	}
 
@@ -405,63 +431,44 @@ void DialogBox_Character::draw_female_character(short sX, short sY, short mouse_
 			equip_poi_status, slot.useWeaponColors, slot.equipPos == hoverSlot, 40);
 	}
 
-	// Angel staff special case
-	if (equip_poi_status[to_int(EquipPos::TwoHand)] != -1)
-	{
-		int itemIdx = equip_poi_status[to_int(EquipPos::TwoHand)];
-		CItem* cfg = m_game->get_item_config(m_game->m_item_list[itemIdx]->m_id_num);
-		if (cfg != nullptr)
-		{
-			short spr_h = cfg->m_sprite;
-			short frame = cfg->m_sprite_frame;
-			if (spr_h == 8) // Angel staff
-			{
-				if (!m_game->m_is_item_disabled[itemIdx])
-					m_game->m_sprite[ItemEquipPivotPoint + spr_h + 40]->draw(sX + 45, sY + 143, frame);
-				else
-					m_game->m_sprite[ItemEquipPivotPoint + spr_h + 40]->draw(sX + 45, sY + 143, frame, hb::shared::sprite::DrawParams::alpha_blend(0.5f));
-			}
-		}
-	}
 }
 
-bool DialogBox_Character::on_click(short mouse_x, short mouse_y)
+bool DialogBox_Character::on_click()
 {
-	short sX = Info().m_x;
-	short sY = Info().m_y;
-
 	// Quest button
-	if ((mouse_x >= sX + 15) && (mouse_x <= sX + 15 + ui_layout::btn_size_x) && (mouse_y >= sY + 340) && (mouse_y <= sY + 340 + ui_layout::btn_size_y)) {
+	if (mouse_in(btn_quest)) {
 		enable_dialog_box(DialogBoxId::Quest, 1, 0, 0);
 		disable_this_dialog();
-		play_sound_effect('E', 14, 5);
+		audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 		return true;
 	}
 	// Party button
-	if ((mouse_x >= sX + 98) && (mouse_x <= sX + 98 + ui_layout::btn_size_x) && (mouse_y >= sY + 340) && (mouse_y <= sY + 340 + ui_layout::btn_size_y)) {
+	if (mouse_in(btn_party)) {
 		enable_dialog_box(DialogBoxId::Party, 0, 0, 0);
 		disable_this_dialog();
-		play_sound_effect('E', 14, 5);
+		audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 		return true;
 	}
 	// LevelUp button
-	if ((mouse_x >= sX + 180) && (mouse_x <= sX + 180 + ui_layout::btn_size_x) && (mouse_y >= sY + 340) && (mouse_y <= sY + 340 + ui_layout::btn_size_y)) {
+	if (mouse_in(btn_levelup)) {
 		enable_dialog_box(DialogBoxId::LevelUpSetting, 0, 0, 0);
 		disable_this_dialog();
-		play_sound_effect('E', 14, 5);
+		audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 		return true;
 	}
 
 	return false;
 }
 
-bool DialogBox_Character::on_double_click(short mouse_x, short mouse_y)
+bool DialogBox_Character::on_double_click()
 {
-	if (m_game->m_dialog_box_manager.is_enabled(DialogBoxId::ItemDropExternal))
+	short mouse_x = static_cast<short>(hb::shared::input::get_mouse_x());
+	short mouse_y = static_cast<short>(hb::shared::input::get_mouse_y());
+	if (m_game->get_dialog_box_manager().is_enabled(DialogBoxId::ItemDropExternal))
 		return false;
 
-	short sX = Info().m_x;
-	short sY = Info().m_y;
+	short sX = m_x;
+	short sY = m_y;
 
 	// Build equipment position status array
 	char equip_poi_status[DEF_MAXITEMEQUIPPOS];
@@ -469,10 +476,10 @@ bool DialogBox_Character::on_double_click(short mouse_x, short mouse_y)
 
 	// Find clicked item
 	char item_id = find_equip_item_at_point(mouse_x, mouse_y, sX, sY, equip_poi_status);
-	if (item_id == -1 || m_game->m_item_list[item_id] == nullptr)
+	if (item_id == -1 || player().m_item_list[item_id] == nullptr)
 		return false;
 
-	CItem* item = m_game->m_item_list[item_id].get();
+	CItem* item = player().m_item_list[item_id].get();
 	CItem* cfg = m_game->get_item_config(item->m_id_num);
 	if (cfg == nullptr)
 		return false;
@@ -485,14 +492,18 @@ bool DialogBox_Character::on_double_click(short mouse_x, short mouse_y)
 		return false;
 
 	// Check if at repair shop
-	if (m_game->m_dialog_box_manager.is_enabled(DialogBoxId::SaleMenu) &&
-		!m_game->m_dialog_box_manager.is_enabled(DialogBoxId::SellOrRepair) &&
-		m_game->m_dialog_box_manager.Info(DialogBoxId::GiveItem).m_v3 == 24)
+	if (m_game->get_dialog_box_manager().is_enabled(DialogBoxId::SaleMenu) &&
+		!m_game->get_dialog_box_manager().is_enabled(DialogBoxId::SellOrRepair) &&
+		m_game->get_dialog_box_manager().m_give_item.action_type == 24)
 	{
-		send_command(MsgId::CommandCommon, CommonType::ReqRepairItem, 0, item_id,
-			m_game->m_dialog_box_manager.Info(DialogBoxId::GiveItem).m_v3, 0,
-			cfg->m_name,
-			m_game->m_dialog_box_manager.Info(DialogBoxId::GiveItem).m_v4);
+		{
+			auto pkt = hb::net::make_common_command_str(CommonType::ReqRepairItem, player().m_player_x, player().m_player_y);
+			pkt.v1 = item_id;
+			pkt.v2 = m_game->get_dialog_box_manager().m_give_item.action_type;
+			std::snprintf(pkt.text, sizeof(pkt.text), "%s", cfg->m_name);
+			pkt.v4 = m_game->get_dialog_box_manager().m_give_item.object_id;
+			send_game_packet(pkt);
+		}
 	}
 	else
 	{
@@ -508,9 +519,9 @@ bool DialogBox_Character::on_double_click(short mouse_x, short mouse_y)
 				short id = item->m_id_num;
 				if (id == hb::shared::item::ItemId::AngelicPandentSTR || id == hb::shared::item::ItemId::AngelicPandentDEX ||
 					id == hb::shared::item::ItemId::AngelicPandentINT || id == hb::shared::item::ItemId::AngelicPandentMAG)
-					m_game->play_game_sound('E', 53, 0);
+					audio_manager::get().play_game_sound(sound_type::effect, 53, 0);
 				else
-					m_game->play_game_sound('E', 29, 0);
+					audio_manager::get().play_game_sound(sound_type::effect, 29, 0);
 			}
 
 			// Remove Angelic Stats
@@ -518,16 +529,20 @@ bool DialogBox_Character::on_double_click(short mouse_x, short mouse_y)
 				cfg->get_item_type() == ItemType::Equip)
 			{
 				if (item->m_id_num == hb::shared::item::ItemId::AngelicPandentSTR)
-					m_game->m_player->m_angelic_str = 0;
+					player().m_angelic_str = 0;
 				else if (item->m_id_num == hb::shared::item::ItemId::AngelicPandentDEX)
-					m_game->m_player->m_angelic_dex = 0;
+					player().m_angelic_dex = 0;
 				else if (item->m_id_num == hb::shared::item::ItemId::AngelicPandentINT)
-					m_game->m_player->m_angelic_int = 0;
+					player().m_angelic_int = 0;
 				else if (item->m_id_num == hb::shared::item::ItemId::AngelicPandentMAG)
-					m_game->m_player->m_angelic_mag = 0;
+					player().m_angelic_mag = 0;
 			}
 
-			send_command(MsgId::CommandCommon, CommonType::ReleaseItem, 0, item_id, 0, 0, 0);
+			{
+				auto pkt = hb::net::make_common_command(CommonType::ReleaseItem, player().m_player_x, player().m_player_y);
+				pkt.v1 = item_id;
+				send_game_packet(pkt);
+			}
 			m_game->m_is_item_equipped[item_id] = false;
 			m_game->m_item_equipment_status[cfg->m_equip_pos] = -1;
 			CursorTarget::clear_selection();
@@ -537,13 +552,15 @@ bool DialogBox_Character::on_double_click(short mouse_x, short mouse_y)
 	return true;
 }
 
-PressResult DialogBox_Character::on_press(short mouse_x, short mouse_y)
+PressResult DialogBox_Character::on_press()
 {
-	if (m_game->m_dialog_box_manager.is_enabled(DialogBoxId::ItemDropExternal))
+	short mouse_x = static_cast<short>(hb::shared::input::get_mouse_x());
+	short mouse_y = static_cast<short>(hb::shared::input::get_mouse_y());
+	if (m_game->get_dialog_box_manager().is_enabled(DialogBoxId::ItemDropExternal))
 		return PressResult::Normal;
 
-	short sX = Info().m_x;
-	short sY = Info().m_y;
+	short sX = m_x;
+	short sY = m_y;
 
 	char equip_poi_status[DEF_MAXITEMEQUIPPOS];
 	build_equip_status_array(equip_poi_status);
@@ -558,7 +575,7 @@ PressResult DialogBox_Character::on_press(short mouse_x, short mouse_y)
 	return PressResult::Normal;
 }
 
-bool DialogBox_Character::on_item_drop(short mouse_x, short mouse_y)
+bool DialogBox_Character::on_item_drop()
 {
 	inventory_manager::get().equip_item(static_cast<char>(CursorTarget::get_selected_id()));
 	return true;

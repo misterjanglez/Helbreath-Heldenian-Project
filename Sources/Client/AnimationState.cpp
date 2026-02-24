@@ -4,13 +4,15 @@
 
 #include "AnimationState.h"
 
+using namespace hb::shared::direction;
+
 //=============================================================================
 // reset - clear all state back to defaults
 //=============================================================================
 void animation_state::reset()
 {
 	m_action        = 0;
-	m_dir           = 0;
+	m_dir           = direction{};
 	m_max_frame      = 0;
 	m_frame_time     = 0;
 	m_loop          = true;
@@ -23,7 +25,7 @@ void animation_state::reset()
 //=============================================================================
 // set_action - Configure for a new action (resets playback)
 //=============================================================================
-void animation_state::set_action(int8_t action, int8_t dir,
+void animation_state::set_action(int8_t action, direction dir,
                                int16_t maxFrame, int16_t frameTime, bool loop,
                                int8_t startFrame)
 {
@@ -41,7 +43,7 @@ void animation_state::set_action(int8_t action, int8_t dir,
 //=============================================================================
 // set_direction - Change facing without resetting animation
 //=============================================================================
-void animation_state::set_direction(int8_t dir)
+void animation_state::set_direction(direction dir)
 {
 	m_dir = dir;
 }

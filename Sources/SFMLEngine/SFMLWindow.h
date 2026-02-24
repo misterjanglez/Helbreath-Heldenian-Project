@@ -51,6 +51,8 @@ public:
     int get_framerate_limit() const override;
     void set_vsync_enabled(bool enabled) override;
     bool is_vsync_enabled() const override;
+    void set_background_fps_limit(int limit) override;
+    int get_background_fps_limit() const override;
 
     // Scaling
     void set_fullscreen_stretch(bool stretch) override;
@@ -59,6 +61,9 @@ public:
     // Platform (stageable)
     void set_native_instance(hb::shared::types::NativeInstance instance) override;
     void set_icon_resource_id(int id) override;
+
+    // Icon (cross-platform)
+    void set_icon(unsigned int width, unsigned int height, const unsigned char* rgba_pixels) override;
 
     // Cursor
     void set_mouse_cursor_visible(bool visible) override;
@@ -116,6 +121,7 @@ private:
     bool m_mouse_capture_enabled;
     bool m_vsync;
     int m_fps_limit;
+    int m_background_fps_limit;  // 0 = disabled, >0 = throttle to this FPS on focus loss
     int m_windowed_width;
     int m_windowed_height;
     hb::shared::types::NativeInstance m_nativeInstance;

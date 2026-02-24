@@ -64,14 +64,18 @@ public:
     virtual bool IsFontLoaded() const = 0;
 
     // Text measurement
-    virtual TextMetrics measure_text(const char* text) const = 0;
-    virtual int get_fitting_char_count(const char* text, int maxWidth) const = 0;
-    virtual int get_line_height() const = 0;
+    // fontSize: 0 = use default, nonzero = override for this call only
+    virtual TextMetrics measure_text(const char* text, int fontSize = 0) const = 0;
+    virtual int get_fitting_char_count(const char* text, int maxWidth, int fontSize = 0) const = 0;
+    virtual int get_line_height(int fontSize = 0) const = 0;
 
     // Drawing
-    virtual void draw_text(int x, int y, const char* text, const hb::shared::render::Color& color) = 0;
+    // fontSize: 0 = use default, nonzero = override for this call only.
+    // sf::Font lazily caches glyph pages per character size, so per-call size is free.
+    virtual void draw_text(int x, int y, const char* text, const hb::shared::render::Color& color,
+                          int fontSize = 0, bool bold = false) = 0;
     virtual void draw_text_aligned(int x, int y, int width, int height, const char* text, const hb::shared::render::Color& color,
-                                 Align alignment = Align::TopLeft) = 0;
+                                 Align alignment = Align::TopLeft, int fontSize = 0, bool bold = false) = 0;
 
     // Batching for performance (DDraw needs DC acquisition)
     virtual void begin_batch() = 0;

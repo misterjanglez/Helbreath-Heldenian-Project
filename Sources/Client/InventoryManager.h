@@ -21,6 +21,12 @@ public:
 	void erase_item(int item_id);
 	bool check_item_operation_enabled(int item_id);
 
+	// Item lock (wraps m_is_item_disabled)
+	void lock_item(int slot);
+	void unlock_item(int slot);
+	bool is_locked(int slot) const;
+	void unlock_all();
+
 	// Equipment
 	void unequip_slot(int equip_pos);
 	void equip_item(int item_id);

@@ -13,23 +13,23 @@ public:
 	static shop_manager& get();
 	void set_game(CGame* game);
 
-	void request_shop_menu(char type);
+	void request_shop_menu(int16_t npc_config_id);
 	void handle_response(char* data);
 
 	void clear_items();
 	bool has_items() const;
 
 	auto& get_item_list() { return m_item_list; }
-	int16_t get_pending_shop_type() const { return m_pending_shop_type; }
-	void set_pending_shop_type(int16_t type) { m_pending_shop_type = type; }
+	int16_t get_pending_npc_config_id() const { return m_pending_npc_config_id; }
+	void set_pending_npc_config_id(int16_t npc_config_id) { m_pending_npc_config_id = npc_config_id; }
 
 private:
 	shop_manager();
 	~shop_manager();
 
-	void send_request(int16_t npcType);
+	void send_request(int16_t npc_config_id);
 
 	CGame* m_game = nullptr;
 	std::array<std::unique_ptr<CItem>, game_limits::max_menu_items> m_item_list;
-	int16_t m_pending_shop_type = 0;
+	int16_t m_pending_npc_config_id = 0;
 };

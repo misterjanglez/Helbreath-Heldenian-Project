@@ -1,12 +1,13 @@
 #include "CmdGiveItem.h"
+#include "ServerConsole.h"
 #include "Game.h"
 #include "ItemManager.h"
 #include "Item.h"
 #include "Item/ItemEnums.h"
-#include <cstdio>
 #include <cstring>
 #include <cstdlib>
 #include "Log.h"
+#include "ServerLogChannels.h"
 #include "StringCompat.h"
 using namespace hb::server::config;
 
@@ -14,7 +15,7 @@ void CmdGiveItem::execute(CGame* game, const char* args)
 {
 	if (args == nullptr || args[0] == '\0')
 	{
-		hb::logger::log("Usage: giveitem <playername> <item_id> <amount>");
+		hb::console::error("Usage: giveitem <playername> <item_id> <amount>");
 		return;
 	}
 
@@ -35,7 +36,7 @@ void CmdGiveItem::execute(CGame* game, const char* args)
 
 	if (*p == '\0')
 	{
-		hb::logger::log("Usage: giveitem <playername> <item_id> <amount>");
+		hb::console::error("Usage: giveitem <playername> <item_id> <amount>");
 		return;
 	}
 
@@ -50,7 +51,7 @@ void CmdGiveItem::execute(CGame* game, const char* args)
 
 	if (*p == '\0')
 	{
-		hb::logger::log("Usage: giveitem <playername> <item_id> <amount>");
+		hb::console::error("Usage: giveitem <playername> <item_id> <amount>");
 		return;
 	}
 
@@ -71,23 +72,24 @@ void CmdGiveItem::execute(CGame* game, const char* args)
 
 	if (client_h == 0)
 	{
-		hb::logger::log("Player '{}' not found.", player_name);
+		hb::console::error("Player '{}' not found.", player_name);
 		return;
 	}
 
 	// Validate item ID
 	if (item_id < 0 || item_id >= MaxItemTypes || game->m_item_config_list[item_id] == nullptr)
 	{
-		hb::logger::log("Invalid item ID: {}.", item_id);
+		hb::console::error("Invalid item ID: {}.", item_id);
 		return;
 	}
 
 	if (amount < 1) amount = 1;
-	if (amount > 1000) amount = 1000;
+	bool is_gold = (item_id == hb::shared::item::ItemId::Gold);
+	if (!is_gold && amount > 1000) amount = 1000;
 
 	const char* item_name = game->m_item_config_list[item_id]->m_name;
 	auto itemType = game->m_item_config_list[item_id]->get_item_type();
-	bool true_stack = hb::shared::item::is_true_stack_type(itemType) || (item_id == hb::shared::item::ItemId::Gold);
+	bool true_stack = hb::shared::item::is_true_stack_type(itemType) || is_gold;
 
 	int created = 0;
 
@@ -98,14 +100,14 @@ void CmdGiveItem::execute(CGame* game, const char* args)
 		if (game->m_item_manager->init_item_attr(item, item_id) == false)
 		{
 			delete item;
-			hb::logger::log("Failed to initialize item ID: {}.", item_id);
+			hb::console::error("Failed to initialize item ID: {}.", item_id);
 			return;
 		}
 		item->m_count = amount;
 
 		if (game->m_item_manager->add_item(client_h, item, 0) == false)
 		{
-			hb::logger::log("Failed to give item: player inventory full.");
+			hb::console::error("Failed to give item: player inventory full.");
 			return;
 		}
 		created = amount;
@@ -117,5 +119,6 @@ void CmdGiveItem::execute(CGame* game, const char* args)
 	}
 
 	// Success
-	hb::logger::log("Gave {}x {} (ID: {}) to {}.", created, item_name, item_id, player_name);
+	hb::console::success("Gave {}x {} (ID: {}) to {}.", created, item_name, item_id, player_name);
+	hb::logger::log<hb::log_channel::commands>("giveitem: {}x {} (ID: {}) to {}", created, item_name, item_id, player_name);
 }

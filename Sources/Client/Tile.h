@@ -114,7 +114,7 @@ public:
 	uint32_t m_item_attr;
 
 	char  m_dead_owner_frame;
-	char  m_dead_dir;
+	direction m_dead_dir;
 
 	char  m_dynamic_object_frame;
 	char  m_dynamic_object_data_1, m_dynamic_object_data_2, m_dynamic_object_data_3, m_dynamic_object_data_4;

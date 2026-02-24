@@ -47,4 +47,17 @@ public:
 	uint32_t m_element_count[7];
 	bool  m_element_flag[7];
 
+	const std::string& get_element_name(int index) const
+	{
+		switch (index)
+		{
+		case 1: return m_element_name_1;
+		case 2: return m_element_name_2;
+		case 3: return m_element_name_3;
+		case 4: return m_element_name_4;
+		case 5: return m_element_name_5;
+		default: return m_element_name_6;
+		}
+	}
+
 };

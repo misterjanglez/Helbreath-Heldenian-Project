@@ -30,8 +30,6 @@ struct HB_PACKED PacketItemConfigEntry
 	int16_t  effectValue6;          // Effect value 6
 	uint16_t maxLifeSpan;           // Maximum durability
 	int16_t  specialEffect;         // Special effect type
-	int16_t  sprite;                // Sprite sheet index
-	int16_t  spriteFrame;           // Frame within sprite sheet
 	int32_t  price;                 // Price (negative if not for sale)
 	uint16_t weight;                // Item weight
 	int8_t   apprValue;             // Appearance value
@@ -43,6 +41,7 @@ struct HB_PACKED PacketItemConfigEntry
 	int16_t  relatedSkill;          // Related skill ID
 	int8_t   category;              // Item category
 	int8_t   itemColor;             // Item color variant
+	int16_t  displayId;             // Atlas display ID (maps to ItemSpriteMetadata)
 };
 HB_PACK_END
 

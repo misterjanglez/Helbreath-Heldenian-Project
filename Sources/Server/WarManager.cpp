@@ -30,6 +30,7 @@ using namespace hb::shared::action;
 using namespace hb::server::net;
 using namespace hb::server::config;
 using namespace hb::shared::item;
+using namespace hb::shared::direction;
 namespace sock = hb::shared::net::socket;
 namespace dynamic_object = hb::shared::dynamic_object;
 namespace smap = hb::server::map;
@@ -391,7 +392,8 @@ bool WarManager::read_crusade_guid_file(const char* fn)
 	else {
 		cp = new char[file_size + 2];
 		std::memset(cp, 0, file_size + 2);
-		fread(cp, file_size, 1, file);
+		if (fread(cp, file_size, 1, file) != 1)
+			hb::logger::warn("Short read on guid file");
 
 		token = strtok(cp, seps);
 
@@ -628,7 +630,7 @@ void WarManager::meteor_strike_handler(int map_index)
 
 			if (target_index == -1) {
 				hb::logger::error("Strike point error: map index is -1");
-				goto MSH_SKIP_STRIKE;
+				continue;
 			}
 
 			dX = m_game->m_map_list[map_index]->m_strike_point[target_index].x;
@@ -665,7 +667,6 @@ void WarManager::meteor_strike_handler(int map_index)
 						60 * 1000 * 50);
 				}
 			}
-		MSH_SKIP_STRIKE:;
 		}
 
 		m_game->m_delay_event_manager->register_delay_event(sdelay::Type::DoMeteorStrikeDamage, 0, time + 1000, 0, 0, map_index, 0, 0, 0, 0, 0);
@@ -842,9 +843,8 @@ void WarManager::link_strike_point_map_index()
 							//testcode
 							hb::logger::log("{}", G_cTxt);
 
-							goto LSPMI_LOOPBREAK;
+							break;
 						}
-				LSPMI_LOOPBREAK:;
 				}
 		}
 }
@@ -911,9 +911,10 @@ void WarManager::send_map_status(int client_h)
 	auto* entries = reinterpret_cast<hb::net::CrusadeStructureEntry*>(data + sizeof(hb::net::CrusadeMapStatusHeader));
 	int entryCount = 0;
 
+	bool end_of_data = false;
 	for (int i = 0; i < 100; i++) {
-		if (m_game->m_client_list[client_h]->m_crusade_info_send_point >= hb::shared::limits::MaxCrusadeStructures) goto SMS_ENDOFDATA;
-		if (m_game->m_client_list[client_h]->m_crusade_structure_info[m_game->m_client_list[client_h]->m_crusade_info_send_point].type == 0) goto SMS_ENDOFDATA;
+		if (m_game->m_client_list[client_h]->m_crusade_info_send_point >= hb::shared::limits::MaxCrusadeStructures) { end_of_data = true; break; }
+		if (m_game->m_client_list[client_h]->m_crusade_structure_info[m_game->m_client_list[client_h]->m_crusade_info_send_point].type == 0) { end_of_data = true; break; }
 
 		entries[entryCount].type = m_game->m_client_list[client_h]->m_crusade_structure_info[m_game->m_client_list[client_h]->m_crusade_info_send_point].type;
 		entries[entryCount].x = m_game->m_client_list[client_h]->m_crusade_structure_info[m_game->m_client_list[client_h]->m_crusade_info_send_point].x;
@@ -925,16 +926,14 @@ void WarManager::send_map_status(int client_h)
 	}
 
 	hdr.count = static_cast<uint8_t>(entryCount);
-	m_game->send_notify_msg(0, client_h, Notify::MapStatusNext, static_cast<int>(sizeof(hb::net::CrusadeMapStatusHeader) + entryCount * sizeof(hb::net::CrusadeStructureEntry)), 0, 0, data);
-	return;
 
-SMS_ENDOFDATA:
-
-	hdr.count = static_cast<uint8_t>(entryCount);
-	m_game->send_notify_msg(0, client_h, Notify::MapStatusLast, static_cast<int>(sizeof(hb::net::CrusadeMapStatusHeader) + entryCount * sizeof(hb::net::CrusadeStructureEntry)), 0, 0, data);
-	m_game->m_client_list[client_h]->m_is_sending_map_status = false;
-
-	return;
+	if (end_of_data) {
+		m_game->send_notify_msg(0, client_h, Notify::MapStatusLast, static_cast<int>(sizeof(hb::net::CrusadeMapStatusHeader) + entryCount * sizeof(hb::net::CrusadeStructureEntry)), 0, 0, data);
+		m_game->m_client_list[client_h]->m_is_sending_map_status = false;
+	}
+	else {
+		m_game->send_notify_msg(0, client_h, Notify::MapStatusNext, static_cast<int>(sizeof(hb::net::CrusadeMapStatusHeader) + entryCount * sizeof(hb::net::CrusadeStructureEntry)), 0, 0, data);
+	}
 }
 
 void WarManager::map_status_handler(int client_h, int mode, const char* map_name)
@@ -1200,23 +1199,29 @@ void WarManager::request_summon_war_unit_handler(int client_h, int dX, int dY, c
 					return;
 				}
 
-				for(int i = 0; i < MaxGuilds; i++)
-					if (m_game->m_guild_teleport_loc[i].m_v1 == m_game->m_client_list[client_h]->m_guild_guid) {
-						m_game->m_guild_teleport_loc[i].m_time = time;
-						if (m_game->m_guild_teleport_loc[i].m_v2 >= MaxConstructNum) {
-							m_game->m_map_list[m_game->m_client_list[client_h]->m_map_index]->set_naming_value_empty(naming_value);
-							m_game->send_notify_msg(0, client_h, Notify::cannot_construct, 3, 0, 0, 0);
-							return;
+				{
+					bool found = false;
+					for(int i = 0; i < MaxGuilds; i++)
+						if (m_game->m_guild_teleport_loc[i].m_v1 == m_game->m_client_list[client_h]->m_guild_guid) {
+							m_game->m_guild_teleport_loc[i].m_time = time;
+							if (m_game->m_guild_teleport_loc[i].m_v2 >= MaxConstructNum) {
+								m_game->m_map_list[m_game->m_client_list[client_h]->m_map_index]->set_naming_value_empty(naming_value);
+								m_game->send_notify_msg(0, client_h, Notify::cannot_construct, 3, 0, 0, 0);
+								return;
+							}
+							else {
+								m_game->m_guild_teleport_loc[i].m_v2++;
+								found = true;
+								break;
+							}
 						}
-						else {
-							m_game->m_guild_teleport_loc[i].m_v2++;
-							goto RSWU_LOOPBREAK;
-						}
-					}
 
-				m_game->m_map_list[m_game->m_client_list[client_h]->m_map_index]->set_naming_value_empty(naming_value);
-				m_game->send_notify_msg(0, client_h, Notify::cannot_construct, 3, 0, 0, 0);
-				return;
+					if (!found) {
+						m_game->m_map_list[m_game->m_client_list[client_h]->m_map_index]->set_naming_value_empty(naming_value);
+						m_game->send_notify_msg(0, client_h, Notify::cannot_construct, 3, 0, 0, 0);
+						return;
+					}
+				}
 				break;
 			case 43:
 			case 44:
@@ -1234,8 +1239,6 @@ void WarManager::request_summon_war_unit_handler(int client_h, int dX, int dY, c
 			case 50:
 				break;
 			}
-
-		RSWU_LOOPBREAK:
 
 			ret = false;
 			switch (type) {
@@ -2154,7 +2157,8 @@ bool WarManager::read_apocalypse_guid_file(const char* fn)
 	else {
 		cp = new char[file_size + 2];
 		std::memset(cp, 0, file_size + 2);
-		fread(cp, file_size, 1, file);
+		if (fread(cp, file_size, 1, file) != 1)
+			hb::logger::warn("Short read on guid file");
 
 		token = strtok(cp, seps);
 
@@ -2203,7 +2207,8 @@ bool WarManager::read_heldenian_guid_file(const char* fn)
 	else {
 		cp = new char[file_size + 2];
 		std::memset(cp, 0, file_size + 2);
-		fread(cp, file_size, 1, file);
+		if (fread(cp, file_size, 1, file) != 1)
+			hb::logger::warn("Short read on guid file");
 
 		token = strtok(cp, seps);
 
@@ -2592,12 +2597,10 @@ void WarManager::set_summon_mob_action(int client_h, int mode, size_t msg_size, 
 					(strcmp(m_game->m_client_list[client_h]->m_map_name, m_game->m_client_list[i]->m_map_name) == 0)) // adamas(map  .)
 				{
 					target_index = i;
-					goto SSMA_SKIPSEARCH;
+					break;
 				}
 			}
 		}
-
-	SSMA_SKIPSEARCH:
 
 		if ((target_index != 0) && (m_game->m_client_list[target_index]->m_side != 0) &&
 			(m_game->m_client_list[target_index]->m_side != m_game->m_client_list[client_h]->m_side)) {
@@ -2717,7 +2720,7 @@ bool WarManager::set_occupy_flag(char map_index, int dX, int dY, int side, int e
 void WarManager::fightzone_reserve_handler(int client_h, char* data, size_t msg_size)
 {
 	int fightzone_num, enable_reserve_time;
-	uint32_t gold_count;
+	uint64_t gold_count;
 	uint16_t msg_result;
 	int     ret, result = 1, cannot_reserve_day;
 	hb::time::local_time SysTime{};

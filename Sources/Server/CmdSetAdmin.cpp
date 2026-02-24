@@ -1,12 +1,13 @@
 #include "CmdSetAdmin.h"
+#include "ServerConsole.h"
 #include "Game.h"
 #include "GameConfigSqliteStore.h"
 #include "AccountSqliteStore.h"
 #include "AdminLevel.h"
 #include <cstring>
-#include <cstdio>
 #include <cstdlib>
 #include "Log.h"
+#include "ServerLogChannels.h"
 #include "StringCompat.h"
 using namespace hb::server::config;
 
@@ -14,7 +15,7 @@ void CmdSetAdmin::execute(CGame* game, const char* args)
 {
 	if (args == nullptr || args[0] == '\0')
 	{
-		hb::logger::log("Usage: setadmin <charname> [resetip]");
+		hb::console::error("Usage: setadmin <charname> [resetip]");
 		return;
 	}
 
@@ -37,7 +38,7 @@ void CmdSetAdmin::execute(CGame* game, const char* args)
 		int idx = game->find_admin_by_char_name(char_name);
 		if (idx == -1)
 		{
-			hb::logger::log("Admin entry not found for character: {}", char_name);
+			hb::console::error("Admin entry not found for character: {}", char_name);
 			return;
 		}
 
@@ -51,7 +52,8 @@ void CmdSetAdmin::execute(CGame* game, const char* args)
 			CloseGameConfigDatabase(configDb);
 		}
 
-		hb::logger::log("Admin IP reset for character: {}", char_name);
+		hb::console::success("Admin IP reset for character: {}", char_name);
+		hb::logger::log<hb::log_channel::commands>("setadmin: IP reset for {}", char_name);
 		return;
 	}
 
@@ -62,7 +64,7 @@ void CmdSetAdmin::execute(CGame* game, const char* args)
 		admin_level = std::atoi(p);
 		if (admin_level < 1)
 		{
-			hb::logger::log("Admin level must be >= 1. Use level 0 is Player (non-admin).");
+			hb::console::error("Admin level must be >= 1. Level 0 is Player (non-admin).");
 			return;
 		}
 	}
@@ -95,7 +97,7 @@ void CmdSetAdmin::execute(CGame* game, const char* args)
 
 	if (!found)
 	{
-		hb::logger::log("Player not found: {}", char_name);
+		hb::console::error("Player not found: {}", char_name);
 		return;
 	}
 
@@ -124,14 +126,15 @@ void CmdSetAdmin::execute(CGame* game, const char* args)
 			CloseGameConfigDatabase(configDb);
 		}
 
-		hb::logger::log("Admin level updated: {} (account: {}) -> level {}", char_name, account_name, admin_level);
+		hb::console::success("Admin level updated: {} (account: {}) -> level {}", char_name, account_name, admin_level);
+		hb::logger::log<hb::log_channel::commands>("setadmin: {} (account: {}) updated to level {}", char_name, account_name, admin_level);
 		return;
 	}
 
 	// Check capacity
 	if (game->m_admin_count >= MaxAdmins)
 	{
-		hb::logger::log("Admin list is full");
+		hb::console::error("Admin list is full.");
 		return;
 	}
 
@@ -166,5 +169,6 @@ void CmdSetAdmin::execute(CGame* game, const char* args)
 		CloseGameConfigDatabase(configDb);
 	}
 
-	hb::logger::log("Admin added: {} (account: {}, level: {})", char_name, account_name, admin_level);
+	hb::console::success("Admin added: {} (account: {}, level: {})", char_name, account_name, admin_level);
+	hb::logger::log<hb::log_channel::commands>("setadmin: added {} (account: {}, level: {})", char_name, account_name, admin_level);
 }

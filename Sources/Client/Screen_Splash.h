@@ -8,6 +8,7 @@
 #pragma once
 
 #include "IGameScreen.h"
+#include "CControls.h"
 #include <cstdint>
 #include <string>
 #include <array>
@@ -37,6 +38,13 @@ private:
         std::string url;
     };
 
+    enum control_id
+    {
+        LBL_CREDIT_NAME_0 = 1,  // through LBL_CREDIT_NAME_0 + NUM_CONTRIBUTORS - 1
+        LBL_CREDIT_URL_0 = 10,  // through LBL_CREDIT_URL_0 + NUM_CONTRIBUTORS - 1
+    };
+
+    cc::control_collection m_controls;
     std::array<Credit, NUM_CONTRIBUTORS> m_credits;
 
     float get_contributor_alpha(uint32_t elapsedMs, int contributorIndex) const;

@@ -130,7 +130,7 @@ struct AccountDbItemRow
 {
     int slot;
     int item_id;
-    int count;
+    int64_t count;
     int touch_effect_type;
     int touch_effect_value1;
     int touch_effect_value2;
@@ -150,7 +150,7 @@ struct AccountDbBankItemRow
 {
     int slot;
     int item_id;
-    int count;
+    int64_t count;
     int touch_effect_type;
     int touch_effect_value1;
     int touch_effect_value2;
@@ -212,3 +212,12 @@ bool ResolveCharacterToAccount(const char* character_name, char* outAccountName,
 // Global name checks - scan all account databases
 bool CharacterNameExistsGlobally(const char* character_name);
 bool AccountNameExists(const char* account_name);
+
+// Global counts - scan all account databases
+struct account_stats
+{
+    int accounts;
+    int characters;
+    std::vector<std::pair<std::string, int>> over_limit; // accounts with >4 characters
+};
+account_stats CountAccountStats();

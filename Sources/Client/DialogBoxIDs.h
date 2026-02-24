@@ -47,8 +47,14 @@ namespace DialogBoxId
 		Slates = 40,
 		ConfirmExchange = 41,
 		ChangeStatsMajestic = 42,
+		StatusOverlay = 49,
 		Resurrect = 50,
 		GuildHallMenu = 51,
-		RepairAll = 52
+		RepairAll = 52,
+#ifdef TESTER_ONLY
+		// TESTER MENU — dialog IDs (tester builds only)
+		TesterMenu = 53,
+		ItemCreator = 54
+#endif // TESTER_ONLY
 	};
 }

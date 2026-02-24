@@ -75,7 +75,7 @@ namespace net {
 
 	struct HB_PACKED PacketResponseItemListEntry {
 		char name[hb::shared::limits::ItemNameLen];
-		uint32_t count;
+		uint64_t count;
 		uint8_t item_type;
 		uint8_t equip_pos;
 		uint8_t is_equipped;
@@ -83,8 +83,6 @@ namespace net {
 		uint8_t gender_limit;
 		uint16_t cur_lifespan;
 		uint16_t weight;
-		int16_t sprite;
-		int16_t sprite_frame;
 		uint8_t item_color;
 		uint8_t spec_value2;
 		uint32_t attribute;
@@ -98,15 +96,13 @@ namespace net {
 
 	struct HB_PACKED PacketResponseBankItemEntry {
 		char name[hb::shared::limits::ItemNameLen];
-		uint32_t count;
+		uint64_t count;
 		uint8_t item_type;
 		uint8_t equip_pos;
 		int16_t level_limit;
 		uint8_t gender_limit;
 		uint16_t cur_lifespan;
 		uint16_t weight;
-		int16_t sprite;
-		int16_t sprite_frame;
 		uint8_t item_color;
 		uint8_t spec_value2;
 		uint32_t attribute;

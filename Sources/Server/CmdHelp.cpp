@@ -1,7 +1,7 @@
 #include "CmdHelp.h"
-#include <cstdio>
+#include "ServerConsole.h"
 #include <cstring>
-#include "Log.h"
+#include <format>
 #include "StringCompat.h"
 
 void CmdHelp::execute(CGame* game, const char* args)
@@ -13,7 +13,7 @@ void CmdHelp::execute(CGame* game, const char* args)
 		{
 			if (hb_stricmp(args, cmd->get_name()) == 0)
 			{
-				hb::logger::log("{} - {}", cmd->get_name(), cmd->GetDescription());
+				hb::console::info("{} - {}", cmd->get_name(), cmd->GetDescription());
 
 				// Print help text line by line (split on \n)
 				const char* help = cmd->GetHelp();
@@ -24,12 +24,8 @@ void CmdHelp::execute(CGame* game, const char* args)
 					while (*lineEnd != '\0' && *lineEnd != '\n')
 						lineEnd++;
 
-					char line[256];
-					size_t len = lineEnd - p;
-					if (len >= sizeof(line)) len = sizeof(line) - 1;
-					std::memcpy(line, p, len);
-					line[len] = '\0';
-					hb::logger::log("{}", line);
+					std::string line(p, lineEnd - p);
+					hb::console::write("  {}", line);
 
 					p = (*lineEnd == '\n') ? lineEnd + 1 : lineEnd;
 				}
@@ -37,15 +33,27 @@ void CmdHelp::execute(CGame* game, const char* args)
 			}
 		}
 
-		hb::logger::log("Unknown command: '{}'. Type 'help' for a list.", args);
+		hb::console::error("Unknown command: '{}'. Type 'help' for a list.", args);
 		return;
 	}
 
 	// help — list all commands
-	hb::logger::log("Available commands:");
+	hb::console::info("Available commands:");
+
+	// Find the longest command name for alignment
+	size_t max_name_len = 0;
 	for (const auto& cmd : m_commands)
 	{
-		hb::logger::log("{} {}", cmd->get_name(), cmd->GetDescription());
+		size_t len = std::strlen(cmd->get_name());
+		if (len > max_name_len)
+			max_name_len = len;
 	}
-	hb::logger::log("Type 'help <command>' for detailed usage.");
+
+	for (const auto& cmd : m_commands)
+	{
+		hb::console::write("  {:<{}}  {}", cmd->get_name(), max_name_len, cmd->GetDescription());
+	}
+
+	hb::console::write("");
+	hb::console::write("Type 'help <command>' for detailed usage.", console_color::muted);
 }

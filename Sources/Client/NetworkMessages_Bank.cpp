@@ -1,8 +1,9 @@
-﻿#include "Game.h"
+#include "Game.h"
 #include "NetworkMessageManager.h"
 #include "Packet/SharedPackets.h"
 #include "lan_eng.h"
 #include "DialogBoxIDs.h"
+#include "DialogBox_Bank.h"
 #include <cstring>
 #include <cstdio>
 #include <format>
@@ -13,10 +14,11 @@ namespace NetworkMessageHandlers {
 	void HandleItemToBank(CGame* game, char* data)
 	{
 		int index;
-		uint32_t count, attribute;
+		uint64_t count;
+		uint32_t attribute;
 		char  name[hb::shared::limits::ItemNameLen]{}, item_type, equip_pos, gender_limit, item_color;
 		bool  is_equipped;
-		short sprite, sprite_frame, level_limit, item_effect_value2, item_spec_effect_value2;
+		short level_limit, item_effect_value2, item_spec_effect_value2;
 		uint16_t weight, cur_life_span;
 		std::string txt;
 		const auto* pkt = hb::net::PacketCast<hb::net::PacketNotifyItemToBank>(
@@ -34,8 +36,6 @@ namespace NetworkMessageHandlers {
 		gender_limit = static_cast<char>(pkt->gender_limit);
 		cur_life_span = pkt->cur_lifespan;
 		weight = pkt->weight;
-		sprite = static_cast<short>(pkt->sprite);
-		sprite_frame = static_cast<short>(pkt->sprite_frame);
 		item_color = static_cast<char>(pkt->item_color);
 		item_effect_value2 = static_cast<short>(pkt->item_effect_value2);
 		attribute = pkt->attribute;
@@ -49,21 +49,35 @@ namespace NetworkMessageHandlers {
 		str2[0] = 0;
 		str3[0] = 0;
 
-		if (game->m_bank_list[index] == 0) {
-			game->m_bank_list[index] = std::make_unique<CItem>();
-			game->m_bank_list[index]->m_id_num = static_cast<short>(pkt->item_id);
-			game->m_bank_list[index]->m_count = count;
-			game->m_bank_list[index]->m_cur_life_span = cur_life_span;
-			game->m_bank_list[index]->m_item_color = item_color;
-			game->m_bank_list[index]->m_attribute = attribute;
-			game->m_bank_list[index]->m_item_special_effect_value2 = item_spec_effect_value2;
+		if (game->m_player->m_bank_list[index] == 0)
+		{
+			game->m_player->m_bank_list[index] = std::make_unique<CItem>();
+			game->m_player->m_bank_list[index]->m_id_num = static_cast<short>(pkt->item_id);
+			game->m_player->m_bank_list[index]->m_count = count;
+			game->m_player->m_bank_list[index]->m_cur_life_span = cur_life_span;
+			game->m_player->m_bank_list[index]->m_item_color = item_color;
+			game->m_player->m_bank_list[index]->m_attribute = attribute;
+			game->m_player->m_bank_list[index]->m_item_special_effect_value2 = item_spec_effect_value2;
 
 			if (count == 1) txt = std::format(NOTIFYMSG_ITEMTOBANK3, str1.c_str());
 			else txt = std::format(NOTIFYMSG_ITEMTOBANK2, count, str1.c_str());
 
-			if (game->m_dialog_box_manager.is_enabled(DialogBoxId::Bank) == true)
-				game->m_dialog_box_manager.Info(DialogBoxId::Bank).m_view = hb::shared::limits::MaxBankItems - 12;
+			if (game->get_dialog_box_manager().is_enabled(DialogBoxId::Bank) == true)
+				{
+				auto* bank_dlg = game->get_dialog_box_manager().get_dialog_as<DialogBox_Bank>(DialogBoxId::Bank);
+				if (bank_dlg) bank_dlg->m_scroll_offset = hb::shared::limits::MaxBankItems - 12;
+			}
 			game->add_event_list(txt.c_str(), 10);
+		}
+		else if (pkt->is_new == 0)
+		{
+			// Update existing bank item in-place (e.g., hero item sex swap)
+			game->m_player->m_bank_list[index]->m_id_num = static_cast<short>(pkt->item_id);
+			game->m_player->m_bank_list[index]->m_count = count;
+			game->m_player->m_bank_list[index]->m_cur_life_span = cur_life_span;
+			game->m_player->m_bank_list[index]->m_item_color = item_color;
+			game->m_player->m_bank_list[index]->m_attribute = attribute;
+			game->m_player->m_bank_list[index]->m_item_special_effect_value2 = item_spec_effect_value2;
 		}
 	}
 
@@ -72,4 +86,3 @@ namespace NetworkMessageHandlers {
 		game->add_event_list(NOTIFY_MSG_HANDLER63, 10);
 	}
 } // namespace NetworkMessageHandlers
-

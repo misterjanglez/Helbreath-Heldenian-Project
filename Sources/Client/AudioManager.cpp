@@ -121,21 +121,21 @@ void audio_manager::load_sounds()
 	// load Character sounds (C1-C24)
 	for (int i = 1; i < AUDIO_MAX_CHARACTER_SOUNDS; i++)
 	{
-		auto filename = std::format("sounds/c{}.wav", i);
+		auto filename = std::format("sounds/character/c{}.wav", i);
 		decode_file(filename.c_str(), m_character_sounds[i]);
 	}
 
 	// load Monster/Magic sounds (M1-M156)
 	for (int i = 1; i < AUDIO_MAX_MONSTER_SOUNDS; i++)
 	{
-		auto filename = std::format("sounds/m{}.wav", i);
+		auto filename = std::format("sounds/monster/m{}.wav", i);
 		decode_file(filename.c_str(), m_monster_sounds[i]);
 	}
 
 	// load Effect sounds (E1-E53)
 	for (int i = 1; i < AUDIO_MAX_EFFECT_SOUNDS; i++)
 	{
-		auto filename = std::format("sounds/e{}.wav", i);
+		auto filename = std::format("sounds/effects/e{}.wav", i);
 		decode_file(filename.c_str(), m_effect_sounds[i]);
 	}
 }
@@ -236,15 +236,15 @@ decoded_sound* audio_manager::get_decoded_sound(sound_type type, int index)
 {
 	switch (type)
 	{
-	case sound_type::Character:
+	case sound_type::character:
 		if (index >= 0 && index < AUDIO_MAX_CHARACTER_SOUNDS && m_character_sounds[index].loaded)
 			return &m_character_sounds[index];
 		break;
-	case sound_type::Monster:
+	case sound_type::monster:
 		if (index >= 0 && index < AUDIO_MAX_MONSTER_SOUNDS && m_monster_sounds[index].loaded)
 			return &m_monster_sounds[index];
 		break;
-	case sound_type::Effect:
+	case sound_type::effect:
 		if (index >= 0 && index < AUDIO_MAX_EFFECT_SOUNDS && m_effect_sounds[index].loaded)
 			return &m_effect_sounds[index];
 		break;
@@ -254,7 +254,7 @@ decoded_sound* audio_manager::get_decoded_sound(sound_type type, int index)
 
 ma_sound_group* audio_manager::get_group_for_sound(sound_type type, int index)
 {
-	if (type == sound_type::Effect)
+	if (type == sound_type::effect)
 	{
 		// Ambient: E38 (rain loop)
 		if (index == 38)
@@ -271,7 +271,7 @@ ma_sound_group* audio_manager::get_group_for_sound(sound_type type, int index)
 
 bool audio_manager::is_category_enabled(sound_type type, int index) const
 {
-	if (type == sound_type::Effect)
+	if (type == sound_type::effect)
 	{
 		if (index == 38)
 			return m_ambient_enabled;

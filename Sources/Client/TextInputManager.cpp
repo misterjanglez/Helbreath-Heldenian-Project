@@ -1,7 +1,14 @@
-﻿#include "TextInputManager.h"
+#include "TextInputManager.h"
+#include "textbox.h"
+#include "InputStateHelper.h"
+#include "TextFieldRenderer.h"
 #include "GameFonts.h"
 #include "TextLibExt.h"
-#include "GameTimer.h"
+#include "CommonTypes.h"
+#include "IInput.h"
+
+static constexpr int TEXTBOX_ID = 1;
+static constexpr int TEXTBOX_WIDTH = 800;
 
 text_input_manager& text_input_manager::get()
 {
@@ -9,96 +16,100 @@ text_input_manager& text_input_manager::get()
 	return instance;
 }
 
-void text_input_manager::start_input(int x, int y, unsigned char maxLen, std::string& buffer, bool hidden)
+text_input_manager::text_input_manager()
 {
-	m_is_active = true;
-	m_input_x = x;
-	m_input_y = y;
+	m_controls.set_clipboard_provider(
+		[] { return hb::shared::input::get_clipboard_text(); },
+		[](const std::string& s) { hb::shared::input::set_clipboard_text(s); }
+	);
+}
+
+void text_input_manager::start_input(int x, int y, unsigned char max_len, std::string& buffer,
+                                     bool hidden, std::string_view char_filter)
+{
+	m_controls.clear();
+
+	int line_height = hb::shared::text::get_line_height(GameFont::Default);
+	auto* tb = m_controls.add<cc::textbox>(TEXTBOX_ID, cc::rect{x, y, TEXTBOX_WIDTH, line_height}, max_len);
+
+	if (hidden)
+		tb->set_hidden(true);
+	if (!char_filter.empty())
+		tb->set_character_filter(char_filter);
+
+	tb->set_render_handler([](const cc::control&) {
+		// Rendering handled in render() via draw_text_field
+	});
+
+	// Copy caller's buffer into textbox
+	tb->text() = buffer;
+
+	// Set focus and rebuild focus order
+	m_controls.set_focus_order({TEXTBOX_ID});
+	m_controls.set_focus(TEXTBOX_ID);
+
+	m_active_textbox = tb;
 	m_buffer = &buffer;
-	m_max_len = maxLen;
-	m_is_hidden = hidden;
+	m_is_active = true;
+	m_show_chat_bg = false;
 }
 
 void text_input_manager::end_input()
 {
-	m_is_active = false;
+	if (m_is_active && m_active_textbox && m_buffer)
+		*m_buffer = m_active_textbox->text();
+
+	m_controls.clear();
+	m_active_textbox = nullptr;
 	m_buffer = nullptr;
+	m_is_active = false;
 }
 
 void text_input_manager::clear_input()
 {
-	if (m_buffer) m_buffer->clear();
+	if (m_active_textbox)
+	{
+		m_active_textbox->text().clear();
+		m_active_textbox->move_to_start(false);
+	}
+	if (m_buffer)
+		m_buffer->clear();
+}
+
+void text_input_manager::update(uint32_t time_ms)
+{
+	if (!m_is_active)
+		return;
+
+	cc::input_state input{};
+	hb::client::fill_input_state(input);
+	m_controls.update(input, time_ms);
+
+	// Sync textbox text back to caller's buffer each frame
+	if (m_active_textbox && m_buffer)
+		*m_buffer = m_active_textbox->text();
+}
+
+void text_input_manager::render()
+{
+	if (!m_is_active || !m_active_textbox)
+		return;
+
+	hb::client::draw_text_field(*m_active_textbox, 0,
+		hb::shared::text::TextStyle::with_shadow(GameColors::InputNormal),
+		hb::shared::text::TextStyle::with_shadow(GameColors::InputNormal));
 }
 
 void text_input_manager::show_input()
 {
-	if (m_buffer == nullptr) return;
-
-	std::string display = *m_buffer;
-
-	if (m_is_hidden)
-	{
-		for (auto& ch : display)
-			if (ch != 0) ch = '*';
-	}
-
-	if ((GameClock::get_time_ms() % 400) < 210) display += '_';
-
-	hb::shared::text::draw_text(GameFont::Default, m_input_x, m_input_y, display.c_str(), hb::shared::text::TextStyle::with_shadow(GameColors::InputNormal));
+	render();
 }
 
-bool text_input_manager::handle_char(hb::shared::types::NativeWindowHandle hWnd, uint32_t msg, uintptr_t wparam, intptr_t lparam)
+std::string text_input_manager::get_input_string() const
 {
-	if (m_buffer == nullptr) return false;
-
-#ifndef WM_CHAR
-#define WM_CHAR 0x0102
-#endif
-
-	switch (msg) {
-	case WM_CHAR:
-		if (wparam == 8)
-		{
-			if (!m_buffer->empty())
-			{
-				int len = static_cast<int>(m_buffer->size());
-				switch (get_char_kind(*m_buffer, len - 1)) {
-				case 1:
-					m_buffer->pop_back();
-					break;
-				case 2:
-				case 3:
-					if (m_buffer->size() >= 2)
-					{
-						m_buffer->pop_back();
-						m_buffer->pop_back();
-					}
-					break;
-				}
-			}
-		}
-		else if ((wparam != 9) && (wparam != 13) && (wparam != 27))
-		{
-			if (m_max_len == 0 || m_buffer->size() + 1 >= m_max_len) return false;
-			*m_buffer += static_cast<char>(wparam & 0xff);
-		}
-		return true;
-	}
-	return false;
-}
-
-int text_input_manager::get_char_kind(const std::string& str, int index)
-{
-	int kind = 1;
-	int i = 0;
-	for (int pos = 0; pos <= index && pos < static_cast<int>(str.size()); pos++)
-	{
-		if (kind == 2) kind = 3;
-		else
-		{
-			if (static_cast<unsigned char>(str[pos]) < 128) kind = 1;
-			else kind = 2;
-		}
-	}
-	return kind;
+	if (m_active_textbox)
+		return m_active_textbox->text();
+	if (m_buffer)
+		return *m_buffer;
+	return {};
 }

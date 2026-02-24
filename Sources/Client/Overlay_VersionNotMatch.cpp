@@ -8,10 +8,9 @@
 #include "RendererFactory.h"
 #include "lan_eng.h"
 #include "IInput.h"
+#include "InputStateHelper.h"
+#include "AudioManager.h"
 using namespace hb::client::sprite_id;
-
-
-namespace MouseButton = hb::shared::input::MouseButton;
 
 Overlay_VersionNotMatch::Overlay_VersionNotMatch(CGame* game)
     : IGameScreen(game)
@@ -20,38 +19,58 @@ Overlay_VersionNotMatch::Overlay_VersionNotMatch(CGame* game)
 
 void Overlay_VersionNotMatch::on_initialize()
 {
-    m_iFrameCount = 0;
-
     // Close game socket
     if (m_game->m_g_sock != nullptr)
     {
         m_game->m_g_sock.reset();
     }
+
+    int dlgX, dlgY;
+    get_centered_dialog_pos(InterfaceNdGame4, 2, dlgX, dlgY);
+
+    m_controls.set_screen_size(LOGICAL_WIDTH(), LOGICAL_HEIGHT());
+    m_controls.set_hover_focus(false);
+    m_controls.set_default_button(BTN_OK);
+
+    auto* btn_ok = m_controls.add<cc::button>(BTN_OK, cc::rect{dlgX + 208, dlgY + 119, ui_layout::btn_size_x, ui_layout::btn_size_y});
+    btn_ok->set_click_sound([this] { audio_manager::get().play_game_sound(sound_type::effect, 14, 5); });
+    btn_ok->set_on_click([this](int) {
+        close_app();
+    });
+    btn_ok->set_render_handler([this](const cc::control& c) {
+        auto sb = c.screen_bounds();
+        int frame = c.is_highlighted() ? 1 : 0;
+        m_game->m_sprite[InterfaceNdButton]->draw(sb.x, sb.y, frame);
+    });
+
+    m_controls.set_focus_order({BTN_OK});
+    m_controls.set_focus(BTN_OK);
+
+    cc::input_state init_input;
+    hb::client::fill_input_state(init_input);
+    m_controls.discard_pending_input(init_input);
 }
 
 void Overlay_VersionNotMatch::on_uninitialize()
 {
-    // Nothing to clean up
+}
+
+void Overlay_VersionNotMatch::close_app()
+{
+    m_game->change_game_mode(GameMode::Null);
+    hb::shared::render::Window::close();
 }
 
 void Overlay_VersionNotMatch::on_update()
 {
-    m_iFrameCount++;
-    if (m_iFrameCount > 120) m_iFrameCount = 120;
+    cc::input_state input;
+    hb::client::fill_input_state(input);
+    m_controls.update(input, GameClock::get_time_ms());
 
-    // Any key press closes the application
-    if (hb::shared::input::is_key_pressed(KeyCode::Escape) || hb::shared::input::is_key_pressed(KeyCode::Enter))
+    // ESC also closes app
+    if (m_controls.escape_pressed())
     {
-        m_game->change_game_mode(GameMode::Null);
-        hb::shared::render::Window::close();
-        return;
-    }
-
-    // Mouse click also closes
-    if (hb::shared::input::is_mouse_button_pressed(MouseButton::Left))
-    {
-        m_game->change_game_mode(GameMode::Null);
-        hb::shared::render::Window::close();
+        close_app();
         return;
     }
 }
@@ -65,5 +84,9 @@ void Overlay_VersionNotMatch::on_render()
     draw_new_dialog_box(InterfaceNdGame4, dlgX, dlgY, 2);
     put_aligned_string(dlgX + 6, dlgX + 312, dlgY + 35, UPDATE_SCREEN_ON_VERSION_NO_MATCH1);
     put_aligned_string(dlgX + 6, dlgX + 312, dlgY + 55, UPDATE_SCREEN_ON_VERSION_NO_MATCH2);
+
+    // OK button
+    m_controls.render();
+
     draw_version();
 }

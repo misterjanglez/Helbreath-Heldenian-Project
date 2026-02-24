@@ -9,17 +9,20 @@
 namespace hb {
 namespace net {
 	HB_PACK_BEGIN
-	struct HB_PACKED LoginRequest
+	struct HB_PACKED LoginRequest : packet_base
 	{
 		PacketHeader header;
 		char account_name[hb::shared::limits::AccountNameLen];
 		char password[hb::shared::limits::AccountPassLen];
 		char world_name[30];
+		uint16_t version_major;
+		uint16_t version_minor;
+		uint16_t version_patch;
 	};
 	HB_PACK_END
 
 	HB_PACK_BEGIN
-	struct HB_PACKED CreateCharacterRequest
+	struct HB_PACKED CreateCharacterRequest : packet_base
 	{
 		PacketHeader header;
 		char character_name[hb::shared::limits::CharNameLen];
@@ -41,7 +44,7 @@ namespace net {
 	HB_PACK_END
 
 	HB_PACK_BEGIN
-	struct HB_PACKED DeleteCharacterRequest
+	struct HB_PACKED DeleteCharacterRequest : packet_base
 	{
 		PacketHeader header;
 		char character_name[hb::shared::limits::CharNameLen];
@@ -52,7 +55,7 @@ namespace net {
 	HB_PACK_END
 
 	HB_PACK_BEGIN
-	struct HB_PACKED ChangePasswordRequest
+	struct HB_PACKED ChangePasswordRequest : packet_base
 	{
 		PacketHeader header;
 		char account_name[hb::shared::limits::AccountNameLen];
@@ -63,7 +66,7 @@ namespace net {
 	HB_PACK_END
 
 	HB_PACK_BEGIN
-	struct HB_PACKED CreateAccountRequest
+	struct HB_PACKED CreateAccountRequest : packet_base
 	{
 		PacketHeader header;
 		char account_name[hb::shared::limits::AccountNameLen];
@@ -73,7 +76,7 @@ namespace net {
 	HB_PACK_END
 
 	HB_PACK_BEGIN
-	struct HB_PACKED EnterGameRequest
+	struct HB_PACKED EnterGameRequest : packet_base
 	{
 		PacketHeader header;
 		char character_name[hb::shared::limits::CharNameLen];
@@ -82,11 +85,14 @@ namespace net {
 		char password[hb::shared::limits::AccountPassLen];
 		std::int32_t level;
 		char world_name[30];
+		uint16_t version_major;
+		uint16_t version_minor;
+		uint16_t version_patch;
 	};
 	HB_PACK_END
 
 	HB_PACK_BEGIN
-	struct HB_PACKED EnterGameRequestFull
+	struct HB_PACKED EnterGameRequestFull : packet_base
 	{
 		PacketHeader header;
 		char character_name[hb::shared::limits::CharNameLen];
@@ -95,6 +101,9 @@ namespace net {
 		char password[hb::shared::limits::AccountPassLen];
 		std::int32_t level;
 		char world_name[30];
+		uint16_t version_major;
+		uint16_t version_minor;
+		uint16_t version_patch;
 	};
 	HB_PACK_END
 

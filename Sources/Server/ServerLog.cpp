@@ -28,19 +28,10 @@ static_assert(std::size(channel_filenames) == static_cast<size_t>(hb::log_channe
 class server_log_backend : public hb::logger::log_backend
 {
 protected:
-	void write_console(int channel, int level, std::string_view formatted_line) override
+	void write_console(int channel, std::string_view colored_line) override
 	{
-		if (channel != (int)hb::log_channel::main) return; // only main channel shows on server console
-
-		int color;
-		switch (level)
-		{
-		case hb::logger::level::error: color = console_color::error;   break;
-		case hb::logger::level::warn:  color = console_color::warning; break;
-		default:                       color = console_color::normal;  break;
-		}
-		std::string line(formatted_line);
-		GetServerConsole().write_line(line.c_str(), color);
+		if (channel != (int)hb::log_channel::main) return;
+		GetServerConsole().write_line_raw(colored_line);
 	}
 };
 

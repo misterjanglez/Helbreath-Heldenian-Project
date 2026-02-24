@@ -1,17 +1,19 @@
 #include "CmdBroadcast.h"
+#include "ServerConsole.h"
 #include "Game.h"
-#include <cstdio>
 #include "Log.h"
+#include "ServerLogChannels.h"
 
 void CmdBroadcast::execute(CGame* game, const char* args)
 {
 	if (args == nullptr || args[0] == '\0')
 	{
-		hb::logger::log("Usage: broadcast <message>");
+		hb::console::error("Usage: broadcast <message>");
 		return;
 	}
 
 	game->broadcast_server_message(args);
 
-	hb::logger::log("Broadcast sent: {}", args);
+	hb::console::success("Broadcast sent: {}", args);
+	hb::logger::log<hb::log_channel::commands>("broadcast: {}", args);
 }

@@ -154,21 +154,31 @@ inline void add_minimize_button(handle hwnd)
 #endif
 }
 
-inline void position_window(handle hwnd, int x, int y, int width, int height)
+inline void position_window(handle hwnd, int x, int y, int client_w, int client_h)
 {
 #ifdef _WIN32
-	SetWindowPos(hwnd, HWND_TOP, x, y, width, height, SWP_SHOWWINDOW);
+	RECT rect = { 0, 0, client_w, client_h };
+	DWORD style = static_cast<DWORD>(GetWindowLong(hwnd, GWL_STYLE));
+	DWORD ex_style = static_cast<DWORD>(GetWindowLong(hwnd, GWL_EXSTYLE));
+	AdjustWindowRectEx(&rect, style, FALSE, ex_style);
+	SetWindowPos(hwnd, HWND_TOP, x, y,
+		rect.right - rect.left, rect.bottom - rect.top, SWP_SHOWWINDOW);
 #else
-	(void)hwnd; (void)x; (void)y; (void)width; (void)height;
+	(void)hwnd; (void)x; (void)y; (void)client_w; (void)client_h;
 #endif
 }
 
-inline void resize_window(handle hwnd, int width, int height)
+inline void resize_window(handle hwnd, int client_w, int client_h)
 {
 #ifdef _WIN32
-	SetWindowPos(hwnd, HWND_TOP, 0, 0, width, height, SWP_NOMOVE | SWP_SHOWWINDOW);
+	RECT rect = { 0, 0, client_w, client_h };
+	DWORD style = static_cast<DWORD>(GetWindowLong(hwnd, GWL_STYLE));
+	DWORD ex_style = static_cast<DWORD>(GetWindowLong(hwnd, GWL_EXSTYLE));
+	AdjustWindowRectEx(&rect, style, FALSE, ex_style);
+	SetWindowPos(hwnd, HWND_TOP, 0, 0,
+		rect.right - rect.left, rect.bottom - rect.top, SWP_NOMOVE | SWP_SHOWWINDOW);
 #else
-	(void)hwnd; (void)width; (void)height;
+	(void)hwnd; (void)client_w; (void)client_h;
 #endif
 }
 

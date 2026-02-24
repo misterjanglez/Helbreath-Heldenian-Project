@@ -7,6 +7,9 @@
 #pragma once
 
 #include <cstdint>
+#include "DirectionHelpers.h"
+
+using hb::shared::direction::direction;
 
 //=============================================================================
 // Movement Timing Constants
@@ -32,7 +35,7 @@ struct EntityMotion {
     // State
     //-------------------------------------------------------------------------
     bool m_is_moving = false;
-    int8_t m_direction = 0;          // 1-8 cardinal/ordinal directions
+    direction m_direction = direction{};  // 1-8 cardinal/ordinal directions
 
     //-------------------------------------------------------------------------
     // Interpolation
@@ -64,7 +67,7 @@ struct EntityMotion {
     // Pending next movement (2-slot queue for seamless chaining)
     //-------------------------------------------------------------------------
     bool m_has_pending = false;
-    int8_t m_pending_direction = 0;
+    direction m_pending_direction = direction{};
     uint32_t m_pending_duration = 0;
 
     //-------------------------------------------------------------------------
@@ -75,15 +78,15 @@ struct EntityMotion {
     // direction: 1=N, 2=NE, 3=E, 4=SE, 5=S, 6=SW, 7=W, 8=NW
     // currentTime: current game time in milliseconds
     // duration: time to complete movement in milliseconds
-    void start_move(int8_t direction, uint32_t currentTime, uint32_t duration);
+    void start_move(direction dir, uint32_t currentTime, uint32_t duration);
 
     // start movement with a custom initial offset (for seamless tile transitions)
     // This allows continuing from where a previous motion left off
     // offsetX, offsetY: The starting offset (can be outside normal [-32, 0] range for seamless transitions)
-    void start_move_with_offset(int8_t direction, uint32_t currentTime, uint32_t duration, float offsetX, float offsetY);
+    void start_move_with_offset(direction dir, uint32_t currentTime, uint32_t duration, float offsetX, float offsetY);
 
     // Queue a follow-up move (called when move arrives while still interpolating)
-    void queue_move(int8_t direction, uint32_t duration);
+    void queue_move(direction dir, uint32_t duration);
 
     // update interpolation - call every frame
     // currentTime: current game time in milliseconds
@@ -113,7 +116,7 @@ struct EntityMotion {
     // get starting pixel offset for a movement direction
     // Entity moving in direction D came FROM the opposite direction
     // Returns the pixel offset from tile center where movement starts
-    static void get_direction_start_offset(int8_t direction, int16_t& outX, int16_t& outY);
+    static void get_direction_start_offset(direction dir, int16_t& outX, int16_t& outY);
 
     // get movement duration for an action type
     static uint32_t get_duration_for_action(int action, bool hasHaste = false, bool frozen = false);

@@ -4,6 +4,8 @@
 #include "IInput.h"
 #include "GameFonts.h"
 #include "TextLibExt.h"
+#include "Screen_OnGame.h"
+#include "AudioManager.h"
 using namespace hb::client::sprite_id;
 // game_limits::max_text_dlg_lines is in GameConstants.h (via Game.h)
 
@@ -18,16 +20,20 @@ int DialogBox_Text::get_total_lines() const
 	int total_lines = 0;
 	for (int i = 0; i < game_limits::max_text_dlg_lines; i++)
 	{
-		if (m_game->m_msg_text_list[i] != nullptr)
+		if (m_game->on_game()->m_msg_text_list[i] != nullptr)
 			total_lines++;
 	}
 	return total_lines;
 }
 
-void DialogBox_Text::on_draw(short mouse_x, short mouse_y, short z, char lb)
+void DialogBox_Text::on_draw()
 {
-	short sX = m_game->m_dialog_box_manager.Info(DialogBoxId::Text).m_x;
-	short sY = m_game->m_dialog_box_manager.Info(DialogBoxId::Text).m_y;
+	short mouse_x = static_cast<short>(hb::shared::input::get_mouse_x());
+	short mouse_y = static_cast<short>(hb::shared::input::get_mouse_y());
+	short z = static_cast<short>(hb::shared::input::get_mouse_wheel_delta());
+	char lb = hb::shared::input::is_mouse_button_down(hb::shared::input::MouseButton::Left) ? 1 : 0;
+	short sX = m_x;
+	short sY = m_y;
 
 	m_game->draw_new_dialog_box(InterfaceNdGame2, sX, sY, 0);
 
@@ -37,23 +43,23 @@ void DialogBox_Text::on_draw(short mouse_x, short mouse_y, short z, char lb)
 		m_game->draw_new_dialog_box(InterfaceNdGame2, sX, sY, 1);
 
 	// Mouse wheel scrolling
-	if (m_game->m_dialog_box_manager.get_top_dialog_box_index() == DialogBoxId::Text && z != 0)
+	if (m_game->get_dialog_box_manager().get_top_id() == DialogBoxId::Text && z != 0)
 	{
-		m_game->m_dialog_box_manager.Info(DialogBoxId::Text).m_view -= z / 60;
+		m_scroll_view -= z / 60;
 
 	}
 
 	// clamp scroll view
-	if (m_game->m_dialog_box_manager.Info(DialogBoxId::Text).m_view < 0)
-		m_game->m_dialog_box_manager.Info(DialogBoxId::Text).m_view = 0;
-	if (total_lines > 17 && m_game->m_dialog_box_manager.Info(DialogBoxId::Text).m_view > total_lines - 17)
-		m_game->m_dialog_box_manager.Info(DialogBoxId::Text).m_view = total_lines - 17;
+	if (m_scroll_view < 0)
+		m_scroll_view = 0;
+	if (total_lines > 17 && m_scroll_view > total_lines - 17)
+		m_scroll_view = total_lines - 17;
 
 	// draw scroll bar
 	int pointer_loc = 0;
 	if (total_lines > 17)
 	{
-		double d1 = static_cast<double>(m_game->m_dialog_box_manager.Info(DialogBoxId::Text).m_view);
+		double d1 = static_cast<double>(m_scroll_view);
 		double d2 = static_cast<double>(total_lines - 17);
 		double d3 = (274.0 * d1) / d2;
 		pointer_loc = static_cast<int>(d3 + 0.5);
@@ -62,12 +68,12 @@ void DialogBox_Text::on_draw(short mouse_x, short mouse_y, short z, char lb)
 	}
 
 	// draw text lines
-	short view = m_game->m_dialog_box_manager.Info(DialogBoxId::Text).m_view;
+	short view = m_scroll_view;
 	for (int i = 0; i < 17; i++)
 	{
-		if ((i + view) < game_limits::max_text_dlg_lines && m_game->m_msg_text_list[i + view] != nullptr)
+		if ((i + view) < game_limits::max_text_dlg_lines && m_game->on_game()->m_msg_text_list[i + view] != nullptr)
 		{
-			char* pMsg = m_game->m_msg_text_list[i + view]->m_pMsg;
+			char* pMsg = m_game->on_game()->m_msg_text_list[i + view]->m_pMsg;
 			if (config_manager::get().is_dialog_transparency_enabled() == false)
 			{
 				switch (pMsg[0])
@@ -93,9 +99,9 @@ void DialogBox_Text::on_draw(short mouse_x, short mouse_y, short z, char lb)
 	// Handle scroll bar dragging
 	if (lb != 0 && total_lines > 17)
 	{
-		if (m_game->m_dialog_box_manager.get_top_dialog_box_index() == DialogBoxId::Text)
+		if (m_game->get_dialog_box_manager().get_top_id() == DialogBoxId::Text)
 		{
-			if ((mouse_x >= sX + 240) && (mouse_x <= sX + 260) && (mouse_y >= sY + 40) && (mouse_y <= sY + 320))
+			if (mouse_in(area_scroll))
 			{
 				double d1 = static_cast<double>(mouse_y - (sY + 35));
 				double d2 = static_cast<double>(total_lines - 17);
@@ -103,55 +109,57 @@ void DialogBox_Text::on_draw(short mouse_x, short mouse_y, short z, char lb)
 				pointer_loc = static_cast<int>(d3);
 				if (pointer_loc > total_lines - 17)
 					pointer_loc = total_lines - 17;
-				m_game->m_dialog_box_manager.Info(DialogBoxId::Text).m_view = pointer_loc;
+				m_scroll_view = pointer_loc;
 			}
 		}
 	}
 	else
 	{
-		m_game->m_dialog_box_manager.Info(DialogBoxId::Text).m_is_scroll_selected = false;
+		m_is_scroll_selected = false;
 	}
 
 	// Close button hover highlight
-	if ((mouse_x > sX + ui_layout::right_btn_x) && (mouse_x < sX + ui_layout::right_btn_x + ui_layout::btn_size_x) &&
-		(mouse_y > sY + ui_layout::btn_y) && (mouse_y < sY + ui_layout::btn_y + ui_layout::btn_size_y))
-	{
+	if (mouse_in(btn_close))
 		m_game->draw_new_dialog_box(InterfaceNdButton, sX + ui_layout::right_btn_x, sY + ui_layout::btn_y, 1);
-	}
 	else
-	{
 		m_game->draw_new_dialog_box(InterfaceNdButton, sX + ui_layout::right_btn_x, sY + ui_layout::btn_y, 0);
-	}
 }
 
-bool DialogBox_Text::on_click(short mouse_x, short mouse_y)
+bool DialogBox_Text::on_click()
 {
-	short sX = m_game->m_dialog_box_manager.Info(DialogBoxId::Text).m_x;
-	short sY = m_game->m_dialog_box_manager.Info(DialogBoxId::Text).m_y;
-
 	// Close button
-	if ((mouse_x >= sX + ui_layout::right_btn_x) && (mouse_x <= sX + ui_layout::right_btn_x + ui_layout::btn_size_x) &&
-		(mouse_y > sY + ui_layout::btn_y) && (mouse_y < sY + ui_layout::btn_y + ui_layout::btn_size_y))
+	if (mouse_in(btn_close))
 	{
-		m_game->m_dialog_box_manager.disable_dialog_box(DialogBoxId::Text);
-		m_game->play_game_sound('E', 14, 5);
+		m_game->get_dialog_box_manager().disable_dialog_box(DialogBoxId::Text);
+		audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 		return true;
 	}
 
 	return false;
 }
 
-PressResult DialogBox_Text::on_press(short mouse_x, short mouse_y)
+PressResult DialogBox_Text::on_press()
 {
-	short sX = Info().m_x;
-	short sY = Info().m_y;
-
 	// Scroll bar region
-	if ((mouse_x >= sX + 240) && (mouse_x <= sX + 260) && (mouse_y >= sY + 40) && (mouse_y <= sY + 320))
-	{
+	if (mouse_in(area_scroll))
 		return PressResult::ScrollClaimed;
-	}
 
 	return PressResult::Normal;
 }
 
+bool DialogBox_Text::on_enable(int type, int64_t v1, int v2, const char* string)
+{
+	if (is_enabled()) return true;
+	switch (type) {
+	case 0:
+		m_mode = 0;
+		m_scroll_view = 0;
+		break;
+	default:
+		m_game->load_text_dlg_contents(type);
+		m_mode = 0;
+		m_scroll_view = 0;
+		break;
+	}
+	return true;
+}

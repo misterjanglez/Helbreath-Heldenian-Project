@@ -4,57 +4,54 @@
 #include "ConfigManager.h"
 using namespace hb::client::sprite_id;
 
-EquipmentIndices EquipmentIndices::CalcPlayer(const CEntityRenderState& state, int bodyPose, int weaponPose, int shieldPose)
+EquipmentIndices EquipmentIndices::CalcPlayer(const CEntityRenderState& state, int bodyPose, bool drawWeapon, bool drawShield)
 {
 	EquipmentIndices eq = {};
 	const auto& appr = state.m_appearance;
 	bool female = state.is_female();
 
-	// Gender-specific sprite base IDs
-	int UNDIES  = female ? UndiesW    : UndiesM;
-	int HAIR    = female ? HairW      : HairM;
-	int ARMOR   = female ? BodyArmorW : BodyArmorM;
-	int BERK    = female ? BerkW      : BerkM;
-	int LEGG    = female ? LeggW      : LeggM;
-	int BOOT    = female ? BootW      : BootM;
-	int WEAPON  = female ? WeaponW    : WeaponM;
-	int SHIELD  = female ? ShieldW    : ShieldM;
-	int MANTLE  = female ? MantleW    : MantleM;
-	int HEAD    = female ? HeadW      : HeadM;
-
-	// Body index
+	// Body index (still from m_sprite — not per-item)
 	eq.m_body_index = 500 + (state.m_owner_type - 1) * 8 * 15 + (bodyPose * 8);
 
-	// Equipment indices — each uses bodyPose as the pose offset
+	// Cosmetics — still from m_sprite with old base IDs
+	int UNDIES = female ? UndiesW : UndiesM;
+	int HAIR   = female ? HairW  : HairM;
 	eq.m_undies_index = UNDIES + appr.underwear_type * 15 + bodyPose;
 	eq.m_hair_index   = HAIR + appr.hair_style * 15 + bodyPose;
 
-	// Body armor (hidden armor = no armor drawn)
-	if (!appr.hide_armor && appr.armor_type != 0)
-		eq.m_body_armor_index = ARMOR + appr.armor_type * 15 + bodyPose;
+	// Equipment — from m_equip_sprites via equip_sprite::index()
+	// Check item_id > 0 for "is equipped" (display_id=0 is valid after memset)
+	if (!appr.hide_armor && appr.armor_item_id > 0)
+		eq.m_body_armor_index = equip_sprite::index(female, appr.armor_display_id, bodyPose);
 	else
 		eq.m_body_armor_index = -1;
 
-	eq.m_arm_armor_index = (appr.arm_armor_type != 0) ? BERK + appr.arm_armor_type * 15 + bodyPose : -1;
-	eq.m_pants_index    = (appr.pants_type != 0)     ? LEGG + appr.pants_type * 15 + bodyPose    : -1;
-	eq.m_boots_index    = (appr.boots_type != 0)     ? BOOT + appr.boots_type * 15 + bodyPose    : -1;
-	eq.m_mantle_index   = (appr.mantle_type != 0)    ? MANTLE + appr.mantle_type * 15 + bodyPose : -1;
-	eq.m_helm_index     = (appr.helm_type != 0)      ? HEAD + appr.helm_type * 15 + bodyPose     : -1;
+	eq.m_arm_armor_index = (appr.arm_item_id > 0)    ? equip_sprite::index(female, appr.arm_display_id, bodyPose)    : -1;
+	eq.m_pants_index     = (appr.pants_item_id > 0)   ? equip_sprite::index(female, appr.pants_display_id, bodyPose)  : -1;
+	eq.m_boots_index     = (appr.boots_item_id > 0)   ? equip_sprite::index(female, appr.boots_display_id, bodyPose)  : -1;
+	eq.m_mantle_index    = (appr.mantle_item_id > 0)  ? equip_sprite::index(female, appr.mantle_display_id, bodyPose) : -1;
+	eq.m_helm_index      = (appr.helm_item_id > 0)    ? equip_sprite::index(female, appr.helm_display_id, bodyPose)   : -1;
 
-	// Weapon — uses separate weaponPose; -1 means no weapon drawn
-	if (weaponPose >= 0 && appr.weapon_type != 0)
-		eq.m_weapon_index = WEAPON + appr.weapon_type * 64 + 8 * weaponPose + (state.m_dir - 1);
+	// Weapon — same unified formula, direction now in frame (not index)
+	if (drawWeapon && appr.weapon_item_id > 0)
+	{
+		eq.m_weapon_index = equip_sprite::index(female, appr.weapon_display_id, bodyPose);
+		eq.m_weapon_item_id = appr.weapon_item_id;
+	}
 	else
+	{
 		eq.m_weapon_index = -1;
+		eq.m_weapon_item_id = 0;
+	}
 
-	// Shield — uses separate shieldPose; -1 means no shield drawn
-	if (shieldPose >= 0 && appr.shield_type != 0)
-		eq.m_shield_index = SHIELD + appr.shield_type * 8 + shieldPose;
+	// Shield — same unified formula
+	if (drawShield && appr.shield_item_id > 0)
+		eq.m_shield_index = equip_sprite::index(female, appr.shield_display_id, bodyPose);
 	else
 		eq.m_shield_index = -1;
 
-	// Female skirt check (pants type 1)
-	eq.m_skirt_draw = (female && appr.pants_type == 1) ? 1 : 0;
+	// Female skirt check — from is_skirt flag computed at broadcast time
+	eq.m_skirt_draw = (female && appr.is_skirt) ? 1 : 0;
 
 	// Colors and glare initialized to 0 by = {} above
 	return eq;

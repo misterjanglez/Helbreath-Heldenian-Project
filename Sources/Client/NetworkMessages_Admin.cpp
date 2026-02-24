@@ -2,6 +2,8 @@
 #include "NetworkMessageManager.h"
 #include "Packet/SharedPackets.h"
 #include "DialogBoxIDs.h"
+#include "DialogBox_Noticement.h"
+#include "AudioManager.h"
 #include <cstdio>
 #include <cstring>
 #include <string>
@@ -38,10 +40,21 @@ void HandleServerShutdown(CGame* game, char* data)
 	const auto* pkt = hb::net::PacketCast<hb::net::PacketNotifyServerShutdown>(
 		data, sizeof(hb::net::PacketNotifyServerShutdown));
 	if (!pkt) return;
-	if (game->m_dialog_box_manager.is_enabled(DialogBoxId::Noticement) == false)
-		game->m_dialog_box_manager.enable_dialog_box(DialogBoxId::Noticement, pkt->mode, 0, 0);
-	else game->m_dialog_box_manager.Info(DialogBoxId::Noticement).m_mode = pkt->mode;
-	game->play_game_sound('E', 27, 0);
+
+	// Enable or update the noticement dialog
+	if (!game->get_dialog_box_manager().is_enabled(DialogBoxId::Noticement))
+		game->get_dialog_box_manager().enable_dialog_box(DialogBoxId::Noticement, pkt->mode, pkt->seconds, 0);
+
+	// Pass shutdown info to the dialog (seconds + custom message)
+	auto* dlg = game->get_dialog_box_manager().get_dialog_as<DialogBox_Noticement>(DialogBoxId::Noticement);
+	if (dlg != nullptr)
+	{
+		dlg->m_mode = pkt->mode;
+		dlg->m_countdown_seconds = pkt->seconds;
+		dlg->set_shutdown_info(pkt->seconds, pkt->message);
+	}
+
+	audio_manager::get().play_game_sound(sound_type::effect, 27, 0);
 }
 
 } // namespace NetworkMessageHandlers

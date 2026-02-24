@@ -1,5 +1,6 @@
 #include "Game.h"
 #include "NetworkMessageManager.h"
+#include "TeleportManager.h"
 #include "Packet/SharedPackets.h"
 #include "lan_eng.h"
 #include <cstdio>
@@ -159,6 +160,12 @@ namespace NetworkMessageHandlers {
 	void HandlePKcaptured(CGame* game, char* data);
 	void HandlePKpenalty(CGame* game, char* data);
 	void HandleEnemyKills(CGame* game, char* data);
+	void HandleContribution(CGame* game, char* data);
+#ifdef TESTER_ONLY
+	// TESTER MENU — notification handlers (tester builds only)
+	void HandleTesterItemSearchResult(CGame* game, char* data);
+	void HandleTesterMapListResult(CGame* game, char* data);
+#endif // TESTER_ONLY
 	void HandleEnemyKillReward(CGame* game, char* data);
 	void HandleGlobalAttackMode(CGame* game, char* data);
 	void HandleDamageMove(CGame* game, char* data);
@@ -324,6 +331,7 @@ bool NetworkMessageManager::process_message(uint32_t msg_id, char* data, uint32_
 		case Notify::PkCaptured: NetworkMessageHandlers::HandlePKcaptured(m_game, data); return true;
 		case Notify::PkPenalty: NetworkMessageHandlers::HandlePKpenalty(m_game, data); return true;
 		case Notify::EnemyKills: NetworkMessageHandlers::HandleEnemyKills(m_game, data); return true;
+		case Notify::Contribution: NetworkMessageHandlers::HandleContribution(m_game, data); return true;
 		case Notify::EnemyKillReward: NetworkMessageHandlers::HandleEnemyKillReward(m_game, data); return true;
 		case Notify::GlobalAttackMode: NetworkMessageHandlers::HandleGlobalAttackMode(m_game, data); return true;
 		case Notify::DamageMove: NetworkMessageHandlers::HandleDamageMove(m_game, data); return true;
@@ -464,6 +472,7 @@ bool NetworkMessageManager::process_message(uint32_t msg_id, char* data, uint32_
 		case Notify::TotalUsers: NetworkMessageHandlers::HandleTotalUsers(m_game, data); return true;
 		case Notify::ForceRecallTime: NetworkMessageHandlers::HandleForceRecallTime(m_game, data); return true;
 		case Notify::NoRecall: NetworkMessageHandlers::HandleNoRecall(m_game, data); return true;
+		case Notify::TeleportApproved: teleport_manager::get().on_auth_approved(); return true;
 		case Notify::FightZoneReserve: NetworkMessageHandlers::HandleFightZoneReserve(m_game, data); return true;
 		case Notify::LoteryLost: NetworkMessageHandlers::HandleLoteryLost(m_game, data); return true;
 		case Notify::NotFlagSpot: NetworkMessageHandlers::HandleNotFlagSpot(m_game, data); return true;
@@ -472,22 +481,14 @@ bool NetworkMessageManager::process_message(uint32_t msg_id, char* data, uint32_
 		case Notify::LimitedLevel: NetworkMessageHandlers::HandleLimitedLevel(m_game, data); return true;
 		case Notify::ToBeRecalled: NetworkMessageHandlers::HandleToBeRecalled(m_game, data); return true;
 
+#ifdef TESTER_ONLY
+		// TESTER MENU — notification handlers (tester builds only)
+		case Notify::TesterItemSearchResult: NetworkMessageHandlers::HandleTesterItemSearchResult(m_game, data); return true;
+		case Notify::TesterMapListResult: NetworkMessageHandlers::HandleTesterMapListResult(m_game, data); return true;
+#endif // TESTER_ONLY
+
 		}
 		return false;
-	}
-
-	switch (msg_id)
-	{
-	case MsgId::ResponseCreateNewGuild:
-		NetworkMessageHandlers::handle_create_new_guild_response(m_game, data);
-		return true;
-
-	case MsgId::ResponseDisbandGuild:
-		NetworkMessageHandlers::handle_disband_guild_response(m_game, data);
-		return true;
-
-	default:
-		break;
 	}
 
 	return false;

@@ -281,7 +281,7 @@ int QuestManager::search_for_quest(int client_h, int who, int* quest_type, int* 
 	*pY = m_quest_config_list[quest_index]->m_y;
 	*range = m_quest_config_list[quest_index]->m_range;
 
-	*target_type = m_quest_config_list[quest_index]->m_target_type;
+	*target_type = m_quest_config_list[quest_index]->m_target_config_id;
 	*target_count = m_quest_config_list[quest_index]->m_max_count;
 	*quest_type = m_quest_config_list[quest_index]->m_type;
 
@@ -337,7 +337,7 @@ void QuestManager::send_quest_contents(int client_h)
 		who = m_quest_config_list[index]->m_from;
 		quest_type = m_quest_config_list[index]->m_type;
 		contribution = m_quest_config_list[index]->m_contribution;
-		target_type = m_quest_config_list[index]->m_target_type;
+		target_type = m_quest_config_list[index]->m_target_config_id;
 		target_count = m_quest_config_list[index]->m_max_count;
 		iX = m_quest_config_list[index]->m_x;
 		iY = m_quest_config_list[index]->m_y;

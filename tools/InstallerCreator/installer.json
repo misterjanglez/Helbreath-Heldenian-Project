@@ -1,0 +1,7 @@
+{
+    "source_dir": "Helbreath",
+    "game_title": "Helbreath",
+    "output_dir": ".",
+    "platforms": "1",
+    "exe_name": "Game_x64_win.exe"
+}

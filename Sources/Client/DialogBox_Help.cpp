@@ -1,12 +1,15 @@
 #include "DialogBox_Help.h"
 #include "Game.h"
 #include "lan_eng.h"
+#include "IInput.h"
+#include "Screen_OnGame.h"
+#include "AudioManager.h"
 using namespace hb::client::sprite_id;
 
 DialogBox_Help::DialogBox_Help(CGame* game)
 	: IDialogBox(DialogBoxId::Help, game)
 {
-	set_default_rect(358 , 65 , 258, 339);
+	set_default_rect(518 , 65 , 258, 339);
 }
 
 bool DialogBox_Help::is_mouse_over_item(short mouse_x, short mouse_y, short sX, short sY, int item)
@@ -23,11 +26,13 @@ void DialogBox_Help::draw_help_item(short sX, short size_x, short sY, int item, 
 		put_aligned_string(sX, sX + size_x, sY + 50 + 15 * item, (char*)text, GameColors::UIMagicBlue);
 }
 
-void DialogBox_Help::on_draw(short mouse_x, short mouse_y, short z, char lb)
+void DialogBox_Help::on_draw()
 {
-	short sX = Info().m_x;
-	short sY = Info().m_y;
-	short size_x = Info().m_size_x;
+	short mouse_x = static_cast<short>(hb::shared::input::get_mouse_x());
+	short mouse_y = static_cast<short>(hb::shared::input::get_mouse_y());
+	short sX = m_x;
+	short sY = m_y;
+	short size_x = m_size_x;
 
 	draw_new_dialog_box(InterfaceNdGame2, sX, sY, 2);
 
@@ -55,10 +60,12 @@ void DialogBox_Help::on_draw(short mouse_x, short mouse_y, short z, char lb)
 		draw_new_dialog_box(InterfaceNdButton, sX + ui_layout::right_btn_x, sY + ui_layout::btn_y, 0);
 }
 
-bool DialogBox_Help::on_click(short mouse_x, short mouse_y)
+bool DialogBox_Help::on_click()
 {
-	short sX = Info().m_x;
-	short sY = Info().m_y;
+	short mouse_x = static_cast<short>(hb::shared::input::get_mouse_x());
+	short mouse_y = static_cast<short>(hb::shared::input::get_mouse_y());
+	short sX = m_x;
+	short sY = m_y;
 
 	// Help topic clicks - each opens a different Text dialog
 	if (is_mouse_over_item(mouse_x, mouse_y, sX, sY, 0)) {
@@ -88,7 +95,7 @@ bool DialogBox_Help::on_click(short mouse_x, short mouse_y)
 	if (is_mouse_over_item(mouse_x, mouse_y, sX, sY, 4)) {
 		disable_dialog_box(DialogBoxId::Text);
 		enable_dialog_box(DialogBoxId::Text, 903, 0, 0);
-		m_game->m_is_f1_help_window_enabled = true;
+		m_game->on_game()->m_is_f1_help_window_enabled = true;
 		return true;
 	}
 
@@ -149,7 +156,7 @@ bool DialogBox_Help::on_click(short mouse_x, short mouse_y)
 	// Close button
 	if ((mouse_x >= sX + ui_layout::right_btn_x) && (mouse_x <= sX + ui_layout::right_btn_x + ui_layout::btn_size_x) &&
 	    (mouse_y > sY + ui_layout::btn_y) && (mouse_y < sY + ui_layout::btn_y + ui_layout::btn_size_y)) {
-		play_sound_effect('E', 14, 5);
+		audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 		disable_this_dialog();
 		return true;
 	}

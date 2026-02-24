@@ -1,37 +1,35 @@
-﻿#pragma once
+#pragma once
 
 #include "IGameScreen.h"
-#include "NetConstants.h"
-#include <string>
-
+#include "CControls.h"
+#include <cstdint>
 
 class Screen_CreateAccount : public IGameScreen {
 public:
     SCREEN_TYPE(Screen_CreateAccount)
 
-    Screen_CreateAccount(class CGame* game);
-    virtual ~Screen_CreateAccount();
+    explicit Screen_CreateAccount(CGame* game);
+    ~Screen_CreateAccount() override = default;
 
-    virtual void on_initialize() override;
-    virtual void on_uninitialize() override;
-    virtual void on_update() override;
-    virtual void on_render() override;
-    virtual bool on_net_response(uint16_t response_type, char* data) override;
+    void on_initialize() override;
+    void on_uninitialize() override;
+    void on_update() override;
+    void on_render() override;
+    bool on_net_response(uint16_t response_type, char* data) override;
 
 private:
-    void _submit_create_account();
-    void _clear_fields();
+    void submit_create_account();
 
-    std::string m_cNewAcctName;
-    std::string m_cNewAcctPassword;
-    std::string m_cNewAcctConfirm;
-    std::string m_cEmail;
+    enum control_id
+    {
+        TXT_ACCOUNT = 1,
+        TXT_PASSWORD = 2,
+        TXT_CONFIRM = 3,
+        TXT_EMAIL = 4,
+        BTN_CREATE = 5,
+        BTN_CLEAR = 6,
+        BTN_CANCEL = 7,
+    };
 
-    char m_cNewAcctPrevFocus;
-    short m_sNewAcctMsX;
-    short m_sNewAcctMsY;
-    char m_cNewAcctPrevLB;
-
-    int m_cur_focus;
-    int m_max_focus;
+    cc::control_collection m_controls;
 };

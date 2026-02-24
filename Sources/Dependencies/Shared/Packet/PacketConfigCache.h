@@ -11,7 +11,7 @@
 namespace hb {
 namespace net {
 	HB_PACK_BEGIN
-	struct HB_PACKED PacketRequestInitDataEx {
+	struct HB_PACKED PacketRequestInitDataEx : packet_base {
 		PacketHeader header;
 		char player[hb::shared::limits::CharNameLen];
 		char account[hb::shared::limits::AccountNameLen];
@@ -20,10 +20,12 @@ namespace net {
 		char server[20];
 		uint8_t padding;
 		// --- Cache extension ---
-		uint32_t itemConfigHash;
-		uint32_t magicConfigHash;
-		uint32_t skillConfigHash;
-		uint32_t npcConfigHash;
+		char itemConfigHash[65];
+		char magicConfigHash[65];
+		char skillConfigHash[65];
+		char npcConfigHash[65];
+		char mapConfigHash[65];
+		char balanceConfigHash[65];
 	};
 
 	struct HB_PACKED PacketResponseConfigCacheStatus {
@@ -32,6 +34,8 @@ namespace net {
 		uint8_t magicCacheValid;
 		uint8_t skillCacheValid;
 		uint8_t npcCacheValid;
+		uint8_t mapCacheValid;
+		uint8_t balanceCacheValid;
 	};
 
 	struct HB_PACKED PacketNotifyConfigReload {
@@ -40,6 +44,8 @@ namespace net {
 		uint8_t reloadMagic;
 		uint8_t reloadSkills;
 		uint8_t reloadNpcs;
+		uint8_t reloadMaps;
+		uint8_t reloadBalance;
 	};
 
 	struct HB_PACKED PacketRequestConfigData {
@@ -48,6 +54,20 @@ namespace net {
 		uint8_t requestMagic;
 		uint8_t requestSkills;
 		uint8_t requestNpcs;
+		uint8_t requestMaps;
+		uint8_t requestBalance;
+	};
+
+	struct HB_PACKED PacketMapConfigHeader {
+		PacketHeader header;
+		uint16_t mapCount;
+		uint16_t totalMaps;
+		uint16_t packetIndex;
+	};
+
+	struct HB_PACKED PacketMapConfigEntry {
+		char map_name[hb::shared::limits::MapNameLen];
+		char display_name[hb::shared::limits::MapDisplayNameLen];
 	};
 	HB_PACK_END
 }

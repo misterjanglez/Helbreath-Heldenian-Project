@@ -11,21 +11,22 @@ using namespace hb::client::sprite_id;
 DialogBox_Map::DialogBox_Map(CGame* game)
 	: IDialogBox(DialogBoxId::Map, game)
 {
-	set_default_rect(336 , 88 , 270, 346);
+	set_default_rect(496 , 88 , 270, 346);
 }
 
-void DialogBox_Map::on_enable(int type, int v1, int v2, char* string)
+bool DialogBox_Map::on_enable(int type, int64_t v1, int v2, const char* string)
 {
-	Info().m_v1 = v1;
-	Info().m_v2 = v2;
-	Info().m_size_x = 290;
-	Info().m_size_y = 290;
+	m_map_zone = static_cast<int>(v1);
+	m_map_id = v2;
+	m_size_x = 290;
+	m_size_y = 290;
+	return true;
 }
 
-void DialogBox_Map::on_draw(short mouse_x, short mouse_y, short z, char lb)
+void DialogBox_Map::on_draw()
 {
-	short sX = Info().m_x;
-	short sY = Info().m_y;
+	short sX = m_x;
+	short sY = m_y;
 	const bool dialogTrans = config_manager::get().is_dialog_transparency_enabled();
 	uint32_t time = m_game->m_cur_time;
 	double v1, v2, v3;
@@ -34,9 +35,9 @@ void DialogBox_Map::on_draw(short mouse_x, short mouse_y, short z, char lb)
 	size_x = 0;
 	size_y = 0;
 
-	switch (Info().m_v1) {
+	switch (m_map_zone) {
 	case 1:
-		switch (Info().m_v2) {
+		switch (m_map_id) {
 		case 0: // aresden
 			if (dialogTrans)
 				m_game->m_sprite[InterfaceNewMaps1]->draw(sX, sY, 0, hb::shared::sprite::DrawParams::alpha_blend(0.25f));
@@ -139,25 +140,25 @@ void DialogBox_Map::on_draw(short mouse_x, short mouse_y, short z, char lb)
 		}
 
 		v1 = static_cast<double>(m_game->m_map_data->m_map_size_x);
-		v2 = static_cast<double>(m_game->m_player->m_player_x);
+		v2 = static_cast<double>(player().m_player_x);
 		v3 = (v2 * static_cast<double>(size_x)) / v1;
 		tX = static_cast<int>(v3) + dX;
 
 		v1 = static_cast<double>(m_game->m_map_data->m_map_size_y);
 		if (v1 == 752) v1 = 680;
-		v2 = static_cast<double>(m_game->m_player->m_player_y);
+		v2 = static_cast<double>(player().m_player_y);
 		v3 = (v2 * static_cast<double>(size_y)) / v1;
 		tY = static_cast<int>(v3) + dY;
 
 		draw_new_dialog_box(InterfaceNdGame4, sX + tX, sY + tY, 43);
 		std::string coordBuf;
-		coordBuf = std::format("{},{}", m_game->m_player->m_player_x, m_game->m_player->m_player_y);
+		coordBuf = std::format("{},{}", player().m_player_x, player().m_player_y);
 		hb::shared::text::draw_text(GameFont::SprFont3_2, sX + 10 + tX - 5, sY + 10 + tY - 6, coordBuf.c_str(), hb::shared::text::TextStyle::with_two_point_shadow(GameColors::Yellow4x));
 		break;
 	}
 }
 
-bool DialogBox_Map::on_click(short mouse_x, short mouse_y)
+bool DialogBox_Map::on_click()
 {
 	// Map dialog has no click handling - it just displays
 	return false;

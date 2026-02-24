@@ -20,6 +20,9 @@ ISpriteFactory* Sprites::get_factory() {
 
 ISprite* Sprites::create(const std::string& pakName, int spriteIndex, bool alphaEffect) {
     if (s_factory) {
+        // Build full path and soft-lock the PAK file
+        std::string pakPath = s_factory->get_sprite_path() + "/" + pakName + ".pak";
+        PAKLib::pak_lock_manager::lock(pakPath);
         return s_factory->create_sprite(pakName, spriteIndex, alphaEffect);
     }
     printf("[Sprites::create] ERROR: No factory set! Cannot create sprite %s[%d]\n", pakName.c_str(), spriteIndex);

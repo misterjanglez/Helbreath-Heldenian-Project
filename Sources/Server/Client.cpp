@@ -7,6 +7,7 @@
 
 using namespace hb::shared::item;
 using namespace hb::server::config;
+using namespace hb::shared::direction;
 
 extern char G_cTxt[512];
 
@@ -103,7 +104,7 @@ CClient::CClient(asio::io_context& ctx)
 	m_map_index = -1;
 	m_x = -1;
 	m_y = -1;
-	m_dir = 5; 
+	m_dir = direction::south;
 	m_type   = 0;
 	m_original_type = 0;
 	m_appearance.clear();

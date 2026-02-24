@@ -5,6 +5,7 @@
 #include "GlobalDef.h"
 #include "lan_eng.h"
 #include <format>
+#include "IInput.h"
 
 
 using namespace hb::shared::action;
@@ -40,8 +41,8 @@ void DialogBox_GuideMap::draw_zoomed_map(short sX, short sY)
 	if (m_game->m_map_index >= 35)
 		m_iMaxMapIndex = InterfaceGuideMap + m_game->m_map_index + 1;
 
-	short shX = m_game->m_player->m_player_x - 64;
-	short shY = m_game->m_player->m_player_y - 64;
+	short shX = player().m_player_x - 64;
+	short shY = player().m_player_y - 64;
 	if (shX < 0) shX = 0;
 	if (shY < 0) shY = 0;
 	if (shX > m_game->m_map_data->m_map_size_x - 128) shX = m_game->m_map_data->m_map_size_x - 128;
@@ -52,7 +53,7 @@ void DialogBox_GuideMap::draw_zoomed_map(short sX, short sY)
 	else
 		m_game->m_sprite[m_iMaxMapIndex]->DrawShifted(sX, sY, shX, shY, 0);
 
-	m_game->m_sprite[InterfaceNdCrusade]->draw(sX - shX + m_game->m_player->m_player_x, sY - shY + m_game->m_player->m_player_y, 37);
+	m_game->m_sprite[InterfaceNdCrusade]->draw(sX - shX + player().m_player_x, sY - shY + player().m_player_y, 37);
 
 	if ((m_game->m_cur_time - m_game->m_monster_event_time) < 30000)
 	{
@@ -84,8 +85,8 @@ void DialogBox_GuideMap::draw_full_map(short sX, short sY)
 	else
 		m_game->m_sprite[m_iMinMapIndex]->draw(sX, sY, m_iMinMapSquare, hb::shared::sprite::DrawParams::no_color_key());
 
-	short shX = (m_game->m_player->m_player_x * 128) / (m_game->m_map_data->m_map_size_x);
-	short shY = (m_game->m_player->m_player_y * 128) / (m_game->m_map_data->m_map_size_y);
+	short shX = (player().m_player_x * 128) / (m_game->m_map_data->m_map_size_x);
+	short shY = (player().m_player_y * 128) / (m_game->m_map_data->m_map_size_y);
 	m_game->m_sprite[InterfaceNdCrusade]->draw(sX + shX, sY + shY, 37);
 
 	if ((m_game->m_cur_time - m_game->m_monster_event_time) < 30000)
@@ -103,12 +104,12 @@ void DialogBox_GuideMap::draw_location_tooltip(short mouse_x, short mouse_y, sho
 {
 	std::string G_cTxt;
 	short shX, shY;
-	short size_y = Info().m_size_y;
+	short size_y = m_size_y;
 
 	if (config_manager::get().is_zoom_map_enabled())
 	{
-		shX = m_game->m_player->m_player_x - 64;
-		shY = m_game->m_player->m_player_y - 64;
+		shX = player().m_player_x - 64;
+		shY = player().m_player_y - 64;
 		if (shX < 0) shX = 0;
 		if (shY < 0) shY = 0;
 		if (shX > m_game->m_map_data->m_map_size_x - 128) shX = m_game->m_map_data->m_map_size_x - 128;
@@ -182,14 +183,17 @@ void DialogBox_GuideMap::draw_location_tooltip(short mouse_x, short mouse_y, sho
 	put_string(mouse_x - 10, mouse_y - 13, G_cTxt.c_str(), GameColors::UIPaleYellow);
 }
 
-void DialogBox_GuideMap::on_draw(short mouse_x, short mouse_y, short z, char lb)
+void DialogBox_GuideMap::on_draw()
 {
+	short mouse_x = static_cast<short>(hb::shared::input::get_mouse_x());
+	short mouse_y = static_cast<short>(hb::shared::input::get_mouse_y());
+	char lb = hb::shared::input::is_mouse_button_down(hb::shared::input::MouseButton::Left) ? 1 : 0;
 	if (m_game->m_map_index < 0) return;
 
-	short sX = Info().m_x;
-	short sY = Info().m_y;
-	short size_x = Info().m_size_x;
-	short size_y = Info().m_size_y;
+	short sX = m_x;
+	short sY = m_y;
+	short size_x = m_size_x;
+	short size_y = m_size_y;
 
 	// clamp position
 	if (sX < 20) sX = 0;
@@ -222,20 +226,22 @@ void DialogBox_GuideMap::on_draw(short mouse_x, short mouse_y, short z, char lb)
 	}
 }
 
-bool DialogBox_GuideMap::on_click(short mouse_x, short mouse_y)
+bool DialogBox_GuideMap::on_click()
 {
 	return false;
 }
 
-bool DialogBox_GuideMap::on_double_click(short mouse_x, short mouse_y)
+bool DialogBox_GuideMap::on_double_click()
 {
-	if (CursorTarget::get_cursor_frame() != 0) return false;
+	short mouse_x = static_cast<short>(hb::shared::input::get_mouse_x());
+	short mouse_y = static_cast<short>(hb::shared::input::get_mouse_y());
+	if (CursorTarget::get_cursor_type() != cursor_type::arrow) return false;
 	if (m_game->m_map_index < 0) return false;
 
-	short sX = Info().m_x;
-	short sY = Info().m_y;
-	short size_x = Info().m_size_x;
-	short size_y = Info().m_size_y;
+	short sX = m_x;
+	short sY = m_y;
+	short size_x = m_size_x;
+	short size_y = m_size_y;
 
 	// clamp position (same as on_draw)
 	if (sX < 20) sX = 0;
@@ -246,8 +252,8 @@ bool DialogBox_GuideMap::on_double_click(short mouse_x, short mouse_y)
 	short shX, shY;
 	if (config_manager::get().is_zoom_map_enabled())
 	{
-		shX = m_game->m_player->m_player_x - 64;
-		shY = m_game->m_player->m_player_y - 64;
+		shX = player().m_player_x - 64;
+		shY = player().m_player_y - 64;
 		if (shX < 0) shX = 0;
 		if (shY < 0) shY = 0;
 		if (shX > m_game->m_map_data->m_map_size_x - 128) shX = m_game->m_map_data->m_map_size_x - 128;
@@ -264,13 +270,13 @@ bool DialogBox_GuideMap::on_double_click(short mouse_x, short mouse_y)
 	if (shX < 30 || shY < 30) return false;
 	if (shX > m_game->m_map_data->m_map_size_x - 30 || shY > m_game->m_map_data->m_map_size_y - 30) return false;
 
-	if (config_manager::get().is_running_mode_enabled() && m_game->m_player->m_sp > 0)
-		m_game->m_player->m_Controller.set_command(Type::Run);
+	if (config_manager::get().is_running_mode_enabled() && player().m_sp > 0)
+		player().m_Controller.set_command(Type::Run);
 	else
-		m_game->m_player->m_Controller.set_command(Type::Move);
+		player().m_Controller.set_command(Type::Move);
 
-	m_game->m_player->m_Controller.set_destination(shX, shY);
-	m_game->m_player->m_Controller.calculate_player_turn(m_game->m_player->m_player_x, m_game->m_player->m_player_y, m_game->m_map_data.get());
+	player().m_Controller.set_destination(shX, shY);
+	player().m_Controller.calculate_player_turn(player().m_player_x, player().m_player_y, m_game->m_map_data.get());
 
 	return true;
 }

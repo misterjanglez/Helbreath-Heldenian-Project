@@ -10,14 +10,19 @@
 #include "TimeUtils.h"
 using namespace std;
 
+#include "SharedCalculations.h"
 #include "AccountSqliteStore.h"
 #include "sqlite3.h"
 #include "PasswordHash.h"
 #include "../../Dependencies/Shared/Packet/SharedPackets.h"
 #include "Log.h"
+#include "Item/ItemEnums.h"
+#include "version_info.h"
+#include "Game.h"
 #include <filesystem>
 
 using namespace hb::shared::net;
+using namespace hb::shared::item;
 using namespace hb::server::config;
 namespace sock = hb::shared::net::socket;
 extern char	G_cData50000[50000];
@@ -101,6 +106,17 @@ void LoginServer::request_login(int h, char* data)
 	std::memcpy(password, req->password, sizeof(req->password));
 	std::memcpy(world_name, req->world_name, 30);
 
+	if (req->version_major != hb::version::compatibility::major ||
+		req->version_minor != hb::version::compatibility::minor ||
+		req->version_patch != hb::version::compatibility::patch)
+	{
+		hb::logger::warn("Version mismatch on login from {}: client={}.{}.{} server={}.{}.{}",
+			G_pGame->_lclients[h]->ip, req->version_major, req->version_minor, req->version_patch,
+			hb::version::compatibility::major, hb::version::compatibility::minor, hb::version::compatibility::patch);
+		send_login_msg(LogResMsg::VersionMismatch, LogResMsg::VersionMismatch, 0, 0, h);
+		return;
+	}
+
 	if (string(world_name) != WORLDNAMELS)
 		return;
 
@@ -115,12 +131,14 @@ void LoginServer::request_login(int h, char* data)
 	{
 	case LogIn::Ok:
 	{
+		// Send balance config BEFORE login response — login response closes the socket
+		send_balance_config(h);
+
 		char data[512] = {};
 		char* cp2 = data;
 		push(cp2, (int)chars.size());
 		get_char_list(name, cp2, chars);
 		send_login_msg(LogResMsg::Confirm, LogResMsg::Confirm, data, cp2 - data, h);
-		//PutLogList("Ok");
 		break;
 	}
 
@@ -190,7 +208,60 @@ LogIn LoginServer::AccountLogIn(string acc, string pass, std::vector<AccountDbCh
 			for (const auto& item : equippedItems) {
 				if (item.item_id > 0 && item.item_id < MaxItemTypes && G_pGame->m_item_config_list[item.item_id] != nullptr) {
 					auto* config = G_pGame->m_item_config_list[item.item_id];
-					hb::shared::entity::ApplyEquipAppearance(entry.appearance, config->get_equip_pos(), config->m_appearance_value, item.item_color);
+					// Populate item_id + display_id + color/flags for each equipment slot
+					uint8_t color = static_cast<uint8_t>(item.item_color);
+					switch (config->get_equip_pos()) {
+					case EquipPos::Head:
+						entry.appearance.helm_item_id = static_cast<int16_t>(item.item_id);
+						entry.appearance.helm_display_id = config->m_display_id;
+						entry.appearance.helm_color = color;
+						break;
+					case EquipPos::Body:
+						entry.appearance.armor_item_id = static_cast<int16_t>(item.item_id);
+						entry.appearance.armor_display_id = config->m_display_id;
+						entry.appearance.armor_color = color;
+						entry.appearance.hide_armor = (config->m_appearance_value >= 100);
+						break;
+					case EquipPos::FullBody:
+						entry.appearance.armor_item_id = static_cast<int16_t>(item.item_id);
+						entry.appearance.armor_display_id = config->m_display_id;
+						entry.appearance.mantle_color = 0;
+						break;
+					case EquipPos::Arms:
+						entry.appearance.arm_item_id = static_cast<int16_t>(item.item_id);
+						entry.appearance.arm_display_id = config->m_display_id;
+						entry.appearance.arm_color = color;
+						break;
+					case EquipPos::Pants:
+						entry.appearance.pants_item_id = static_cast<int16_t>(item.item_id);
+						entry.appearance.pants_display_id = config->m_display_id;
+						entry.appearance.pants_color = color;
+						entry.appearance.is_skirt = (config->m_appearance_value == 1);
+						break;
+					case EquipPos::Leggings:
+						entry.appearance.boots_item_id = static_cast<int16_t>(item.item_id);
+						entry.appearance.boots_display_id = config->m_display_id;
+						entry.appearance.boots_color = color;
+						break;
+					case EquipPos::RightHand:
+					case EquipPos::TwoHand:
+						entry.appearance.weapon_item_id = static_cast<int16_t>(item.item_id);
+						entry.appearance.weapon_display_id = config->m_display_id;
+						entry.appearance.weapon_color = color;
+						break;
+					case EquipPos::LeftHand:
+						entry.appearance.shield_item_id = static_cast<int16_t>(item.item_id);
+						entry.appearance.shield_display_id = config->m_display_id;
+						entry.appearance.shield_color = color;
+						break;
+					case EquipPos::Back:
+						entry.appearance.mantle_item_id = static_cast<int16_t>(item.item_id);
+						entry.appearance.mantle_display_id = config->m_display_id;
+						entry.appearance.mantle_color = color;
+						break;
+					default:
+						break;
+					}
 				}
 			}
 		}
@@ -240,7 +311,7 @@ void LoginServer::response_character(int h, char* data)
 	if (status != LogIn::Ok)
 		return;
 
-	if (chars.size() >= 4)
+	if (chars.size() >= hb::shared::limits::MaxCharactersPerAccount)
 		return;
 
 	if (!IsValidName(acc) || !IsValidName(password) || !IsValidName(name))
@@ -249,13 +320,6 @@ void LoginServer::response_character(int h, char* data)
 	// Check if character name already exists globally (across all accounts)
 	if (CharacterNameExistsGlobally(name)) {
 		hb::logger::log("Character name '{}' already exists globally", name);
-		send_login_msg(LogResMsg::NewCharacterFailed, LogResMsg::NewCharacterFailed, 0, 0, h);
-		return;
-	}
-
-	// Check if character name conflicts with an existing account name
-	if (AccountNameExists(name)) {
-		hb::logger::log("Character name '{}' conflicts with existing account name", name);
 		send_login_msg(LogResMsg::NewCharacterFailed, LogResMsg::NewCharacterFailed, 0, 0, h);
 		return;
 	}
@@ -295,9 +359,16 @@ void LoginServer::response_character(int h, char* data)
 	std::snprintf(state.map_name, sizeof(state.map_name), "default");
 	state.map_x = -1;
 	state.map_y = -1;
-	state.hp = vit * 3 + 1 * 2 + str / 2;
-	state.mp = (mag) * 2 + 1 * 2 + (intl) / 2;
-	state.sp = 1 * 2 + str * 2;
+	state.hp = hb::shared::calc::max_hp(G_pGame->m_formula_engine,
+		hb::shared::calc::vit{(double)vit}, hb::shared::calc::level{1.0},
+		hb::shared::calc::str{(double)str}, hb::shared::calc::angelic_str{0.0});
+	state.mp = hb::shared::calc::max_mp(G_pGame->m_formula_engine,
+		hb::shared::calc::mag{(double)mag}, hb::shared::calc::angelic_mag{0.0},
+		hb::shared::calc::level{1.0}, hb::shared::calc::intel{(double)intl},
+		hb::shared::calc::angelic_int{0.0});
+	state.sp = hb::shared::calc::max_sp(G_pGame->m_formula_engine,
+		hb::shared::calc::str{(double)str}, hb::shared::calc::angelic_str{0.0},
+		hb::shared::calc::level{1.0});
 	state.level = 1;
 	state.rating = 0;
 	state.str = str;
@@ -358,7 +429,7 @@ void LoginServer::response_character(int h, char* data)
 
 	bool ok = InsertCharacterState(db, state);
 
-	// Starter item IDs from gameconfigs.db
+	// Starter item IDs from gamedata.db
 	constexpr int ITEM_DAGGER = 1;
 	constexpr int ITEM_BIG_RED_POTION = 92;    // Health potion
 	constexpr int ITEM_BIG_BLUE_POTION = 94;   // Mana potion
@@ -715,6 +786,23 @@ void LoginServer::send_login_msg(uint32_t msg_id, uint16_t msg_type, char* data,
 	}
 }
 
+void LoginServer::send_balance_config(int h)
+{
+	if (!G_pGame->_lclients[h]) return;
+
+	auto serialized = G_pGame->m_formula_engine.serialize();
+	if (serialized.empty()) return;
+
+	// Build packet: header + serialized formula data
+	std::vector<char> buf(sizeof(hb::net::PacketHeader) + serialized.size(), 0);
+	auto* header = reinterpret_cast<hb::net::PacketHeader*>(buf.data());
+	header->msg_id = MsgId::BalanceConfigContents;
+	header->msg_type = MsgType::Confirm;
+	std::memcpy(buf.data() + sizeof(hb::net::PacketHeader), serialized.data(), serialized.size());
+
+	G_pGame->_lclients[h]->sock->send_msg(buf.data(), static_cast<int>(buf.size()));
+}
+
 void LoginServer::request_enter_game(int h, char* data)
 {
 	//	PutLogList("request_enter_game()");
@@ -728,6 +816,17 @@ void LoginServer::request_enter_game(int h, char* data)
 
 	const auto* req = hb::net::PacketCast<hb::net::EnterGameRequest>(data, sizeof(hb::net::EnterGameRequest));
 	if (!req) return;
+
+	if (req->version_major != hb::version::compatibility::major ||
+		req->version_minor != hb::version::compatibility::minor ||
+		req->version_patch != hb::version::compatibility::patch)
+	{
+		hb::logger::warn("Version mismatch on enter-game from {}: client={}.{}.{} server={}.{}.{}",
+			G_pGame->_lclients[h]->ip, req->version_major, req->version_minor, req->version_patch,
+			hb::version::compatibility::major, hb::version::compatibility::minor, hb::version::compatibility::patch);
+		send_login_msg(LogResMsg::VersionMismatch, LogResMsg::VersionMismatch, 0, 0, h);
+		return;
+	}
 
 	std::memcpy(name, req->character_name, sizeof(req->character_name));
 	std::memcpy(map_name, req->map_name, sizeof(req->map_name));

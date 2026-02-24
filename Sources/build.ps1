@@ -37,6 +37,9 @@ Write-Host "============================================"
 Write-Host "Building: $Target | Config: $configString | Platform: $Platform"
 Write-Host "============================================"
 
+# Generate version header
+& "C:\Python314\python" "$scriptDir\version_gen.py"
+
 # Determine MSBuild target
 $msbuildTarget = if ($Target -eq "All") { "" } else { "/t:$Target" }
 
@@ -45,6 +48,7 @@ $msbuildArgs = @(
     $solutionPath
     "/p:Configuration=$configString"
     "/p:Platform=$Platform"
+    "/p:SkipVersionIncrement=true"
     "/nologo"
     "/v:minimal"
     "/consoleloggerparameters:Summary;ErrorsOnly;WarningsOnly"

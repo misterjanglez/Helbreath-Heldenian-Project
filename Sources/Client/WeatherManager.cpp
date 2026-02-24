@@ -91,13 +91,13 @@ void weather_manager::draw()
 				dX = m_particles[i].x - m_camera->get_x();
 				dY = m_particles[i].y - m_camera->get_y();
 				temp_frame = 16 + (m_particles[i].step / 6);
-				(*m_effect_sprites)[11]->draw(dX, dY, temp_frame, hb::shared::sprite::DrawParams::alpha_blend(0.5f));
+				(*m_effect_sprites)[11]->draw(dX, dY, temp_frame, hb::shared::sprite::DrawParams::additive_no_color_key());
 			}
 			else if ((m_particles[i].step >= 20) && (m_particles[i].step < 25) && (m_particles[i].x != 0))
 			{
 				dX = m_particles[i].x - m_camera->get_x();
 				dY = m_particles[i].y - m_camera->get_y();
-				(*m_effect_sprites)[11]->draw(dX, dY, m_particles[i].step, hb::shared::sprite::DrawParams::alpha_blend(0.5f));
+				(*m_effect_sprites)[11]->draw(dX, dY, m_particles[i].step, hb::shared::sprite::DrawParams::additive_no_color_key());
 			}
 		}
 		break;
@@ -126,7 +126,7 @@ void weather_manager::draw()
 				}
 				else temp_frame = 39 + (m_particles[i].step / 20) * 3 + (rand() % 3);
 
-				(*m_effect_sprites)[11]->draw(dX, dY, temp_frame, hb::shared::sprite::DrawParams::alpha_blend(0.5f));
+				(*m_effect_sprites)[11]->draw(dX, dY, temp_frame, hb::shared::sprite::DrawParams::additive_no_color_key());
 
 				if (m_is_xmas == true)
 				{
@@ -145,7 +145,7 @@ void weather_manager::draw()
 		{
 			for (i = 0; i < MaxSnowAccum; i++)
 			{
-				if (iy2[i] > 10) (*m_effect_sprites)[11]->draw(ix1[i], iy2[i], frame[i], hb::shared::sprite::DrawParams::alpha_blend(0.5f));
+				if (iy2[i] > 10) (*m_effect_sprites)[11]->draw(ix1[i], iy2[i], frame[i], hb::shared::sprite::DrawParams::additive_no_color_key());
 			}
 		}
 		break;
@@ -260,7 +260,7 @@ void weather_manager::set_ambient_light(char level)
 void weather_manager::set_weather(bool start, char effect_type)
 {
 	// Always stop weather sounds first when changing weather
-	audio_manager::get().stop_sound(sound_type::Effect, 38);
+	audio_manager::get().stop_sound(sound_type::effect, 38);
 
 	if (start == true)
 	{
@@ -269,7 +269,7 @@ void weather_manager::set_weather(bool start, char effect_type)
 
 		// Rain sound (types 1-3)
 		if (audio_manager::get().is_sound_enabled() && (effect_type >= 1) && (effect_type <= 3))
-			audio_manager::get().play_sound_loop(sound_type::Effect, 38);
+			audio_manager::get().play_sound_loop(sound_type::effect, 38);
 
 		for (auto& p : m_particles)
 		{
@@ -294,7 +294,7 @@ void weather_manager::draw_thunder_effect(int sX, int sY, int dX, int dY, int rX
 	if (!m_renderer || !m_effect_sprites) return;
 
 	int j, err, prev_x1, prev_y1, x1, y1, tX, tY;
-	char dir;
+	direction dir;
 	prev_x1 = x1 = tX = sX;
 	prev_y1 = y1 = tY = sY;
 

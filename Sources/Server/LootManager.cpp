@@ -347,6 +347,7 @@ void LootManager::penalty_item_drop(int client_h, int total, bool is_s_aattacked
 			m_game->m_item_manager->drop_item_handler(client_h, m_game->m_client_list[client_h]->m_alter_item_drop_index, -1, m_game->m_client_list[client_h]->m_item_list[m_game->m_client_list[client_h]->m_alter_item_drop_index]->m_name);
 
 			m_game->m_client_list[client_h]->m_alter_item_drop_index = -1;
+			return;
 		}
 		else {
 			// v2.04 testcode
@@ -362,13 +363,8 @@ void LootManager::penalty_item_drop(int client_h, int total, bool is_s_aattacked
 					m_game->m_client_list[client_h]->m_alter_item_drop_index = -1;
 					return;
 				}
-
-			goto PID_DROP;
 		}
-		return;
 	}
-
-PID_DROP:
 
 	for(int i = 1; i <= total; i++) {
 		remain_item = 0;

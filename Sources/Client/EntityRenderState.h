@@ -14,6 +14,9 @@
 #include "Appearance.h"
 #include "PlayerStatusData.h"
 #include "OwnerType.h"
+#include "DirectionHelpers.h"
+
+using hb::shared::direction::direction;
 
 // Maximum length for entity names
 constexpr int ENTITY_NAME_LENGTH = 12;
@@ -31,7 +34,7 @@ public:
         m_appearance.clear();
         m_status.clear();
         m_action = 0;
-        m_dir = 0;
+        m_dir = direction{};
         m_frame = 0;
         m_name.fill('\0');
         m_chat_index = 0;
@@ -70,7 +73,7 @@ public:
     // State
     hb::shared::entity::PlayerStatus m_status;
     int8_t m_action;           // Current action (idle, walk, attack, etc.)
-    int8_t m_dir;              // Facing direction (1-8)
+    direction m_dir;           // Facing direction (1-8)
     int8_t m_frame;            // Current animation frame
 
     // Display

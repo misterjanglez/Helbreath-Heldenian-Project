@@ -60,7 +60,7 @@ class CMap
 {
 public:
 	
-	bool check_fly_space_available(short sX, char sY, char dir, short owner);
+	bool check_fly_space_available(short sX, char sY, direction dir, short owner);
 	bool get_is_farm(short tX, short tY);
 	void restore_strike_points();
 	bool remove_crusade_structure_info(short sX, short sY);
@@ -81,7 +81,7 @@ public:
 	bool get_dynamic_object(short sX, short sY, short * type, uint32_t * register_time, int * index = 0);
 	void set_dynamic_object(uint16_t id, short type, short sX, short sY, uint32_t register_time);
 	bool get_is_teleport(short dX, short dY);
-	bool search_teleport_dest(int sX, int sY, char * map_name, int * dx, int * dy, char * dir);
+	bool search_teleport_dest(int sX, int sY, char * map_name, int * dx, int * dy, direction * dir);
 	bool init(char * name);
 	bool is_valid_loc(short sX, short sY);
 	CItem * get_item(short sX, short sY, short* remain_item_id, char* remain_item_color, uint32_t* remain_item_attr);
@@ -103,6 +103,7 @@ public:
 	class CGame * m_game;
 	char  m_name[11];
 	char  m_location_name[11];
+	char  m_display_name[31];
 	short m_size_x, m_size_y, m_tile_data_size;
 	class CTeleportLoc * m_teleport_loc[hb::server::map::MaxTeleportLoc];
 	
@@ -218,7 +219,7 @@ public:
 	} m_item_event_list[hb::server::map::MaxItemEvents]{};
 
 	struct {
-		char  dir;
+		direction dir;
 		short x;
 		short y;
 	} m_heldenian_gate_door[hb::server::map::MaxHeldenianDoor];

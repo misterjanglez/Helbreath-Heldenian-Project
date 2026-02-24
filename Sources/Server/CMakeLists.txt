@@ -1,5 +1,12 @@
 cmake_minimum_required(VERSION 3.16)
-project(HelbreathServer LANGUAGES C CXX)
+
+# Include generated version info (provides HB_SERVER_VERSION etc.)
+include(${CMAKE_CURRENT_SOURCE_DIR}/../version.cmake OPTIONAL)
+
+project(HelbreathServer
+    VERSION ${HB_SERVER_VERSION}
+    LANGUAGES C CXX
+)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -19,7 +26,9 @@ set(SERVER_SOURCES
     CmdHelp.cpp
     CmdReload.cpp
     CmdSetAdmin.cpp
+    CmdSaveAll.cpp
     CmdSetCmdLevel.cpp
+    CmdShutdown.cpp
     CmdShowChat.cpp
     CombatManager.cpp
     CommonTypes.cpp
@@ -38,10 +47,12 @@ set(SERVER_SOURCES
     GameCmdGoto.cpp
     GameCmdInvis.cpp
     GameCmdRegen.cpp
+    GameCmdSaveAll.cpp
     GameCmdSpawn.cpp
     GameCmdUnblock.cpp
     GameCmdWhisper.cpp
     GameConfigSqliteStore.cpp
+    ServerConfig.cpp
     GuildManager.cpp
     ItemManager.cpp
     LoginServer.cpp
@@ -72,6 +83,8 @@ set(SHARED_SOURCES
     ../Dependencies/Shared/Net/ASIOSocket.cpp
     ../Dependencies/Shared/Net/IOServicePool.cpp
     ../Dependencies/Shared/Log/LogBackend.cpp
+    ../Dependencies/Shared/Util/SHA256.cpp
+    ../Dependencies/Shared/Game/FormulaEngine.cpp
 )
 
 # ---------------------------------------------------------------------------
@@ -107,6 +120,11 @@ target_include_directories(HelbreathServer PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/../Dependencies/Shared/Log
     ${CMAKE_CURRENT_SOURCE_DIR}/../Dependencies/Server/Includes
 )
+
+# ---------------------------------------------------------------------------
+# Preprocessor definitions
+# ---------------------------------------------------------------------------
+target_compile_definitions(HelbreathServer PRIVATE TESTER_ONLY)
 
 # ---------------------------------------------------------------------------
 # Linux link libraries

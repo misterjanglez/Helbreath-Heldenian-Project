@@ -1,7 +1,10 @@
 #include "IDialogBox.h"
+#include "DialogBoxManager.h"
+#include "Player.h"
 #include "Game.h"
 #include "GameFonts.h"
 #include "TextLibExt.h"
+#include "IInput.h"
 
 IDialogBox::IDialogBox(DialogBoxId::Type id, CGame* game)
 	: m_game(game)
@@ -9,19 +12,12 @@ IDialogBox::IDialogBox(DialogBoxId::Type id, CGame* game)
 {
 }
 
-DialogBoxInfo& IDialogBox::Info()
+bool IDialogBox::mouse_in(const ui_rect& r) const
 {
-	return m_game->m_dialog_box_manager.Info(m_id);
-}
-
-const DialogBoxInfo& IDialogBox::Info() const
-{
-	return m_game->m_dialog_box_manager.Info(m_id);
-}
-
-bool IDialogBox::is_enabled() const
-{
-	return m_game->m_dialog_box_manager.is_enabled(m_id);
+	int mx = hb::shared::input::get_mouse_x();
+	int my = hb::shared::input::get_mouse_y();
+	return mx >= m_x + r.x && mx < m_x + r.x + r.w
+		&& my >= m_y + r.y && my < m_y + r.y + r.h;
 }
 
 void IDialogBox::draw_new_dialog_box(char type, int sX, int sY, int frame, bool is_no_color_key, bool is_trans)
@@ -40,56 +36,45 @@ void IDialogBox::put_aligned_string(int x1, int x2, int iY, const char* string, 
 	                         hb::shared::text::TextStyle::from_color(color), hb::shared::text::Align::TopCenter);
 }
 
-void IDialogBox::play_sound_effect(char type, int num, int dist, long lPan)
-{
-	m_game->play_game_sound(type, num, dist, lPan);
-}
-
 void IDialogBox::add_event_list(const char* txt, char color, bool dup_allow)
 {
 	m_game->add_event_list(txt, color, dup_allow);
 }
 
-bool IDialogBox::send_command(uint32_t msg_id, uint16_t command, char dir, int v1, int v2, int v3, const char* string, int v4)
+bool IDialogBox::send_game_packet_impl(const hb::net::packet_base& pkt, size_t size, bool encrypt)
 {
-	return m_game->send_command(msg_id, command, dir, v1, v2, v3, string, v4);
+	return m_game->send_game_packet_impl(pkt, size, encrypt);
 }
 
 void IDialogBox::set_default_rect(short sX, short sY, short size_x, short size_y)
 {
-	auto& info = Info();
-	info.m_x = sX;
-	info.m_y = sY;
-	info.m_size_x = size_x;
-	info.m_size_y = size_y;
+	m_x = sX;
+	m_y = sY;
+	m_size_x = size_x;
+	m_size_y = size_y;
 }
 
-void IDialogBox::enable_dialog_box(DialogBoxId::Type id, int type, int v1, int v2, char* string)
+void IDialogBox::enable_dialog_box(DialogBoxId::Type id, int type, int64_t v1, int v2, const char* string)
 {
-	m_game->m_dialog_box_manager.enable_dialog_box(id, type, v1, v2, string);
+	m_manager->enable_dialog_box(id, type, v1, v2, string);
 }
 
 void IDialogBox::disable_dialog_box(DialogBoxId::Type id)
 {
-	m_game->m_dialog_box_manager.disable_dialog_box(id);
+	m_manager->disable_dialog_box(id);
 }
 
 void IDialogBox::disable_this_dialog()
 {
-	m_game->m_dialog_box_manager.disable_dialog_box(m_id);
-}
-
-void IDialogBox::set_can_close_on_right_click(bool can_close)
-{
-	Info().m_can_close_on_right_click = can_close;
+	m_manager->disable_dialog_box(m_id);
 }
 
 IDialogBox* IDialogBox::get_dialog_box(DialogBoxId::Type id)
 {
-	return m_game->m_dialog_box_manager.get_dialog_box(id);
+	return m_manager->get_dialog_box(id);
 }
 
-DialogBoxInfo& IDialogBox::info_of(DialogBoxId::Type id)
+CPlayer& IDialogBox::player() const
 {
-	return m_game->m_dialog_box_manager.Info(id);
+	return m_manager->get_player();
 }

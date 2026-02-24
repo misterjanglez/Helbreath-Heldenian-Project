@@ -43,7 +43,8 @@ enum class BlendMode {
     Alpha,          // Standard alpha blending: result = src * alpha + dst * (1-alpha)
     Additive,       // Additive blending: result = src + dst (for light effects)
     AdditiveOffset, // Additive blend with per-pixel color offset (DDraw PutTransSpriteRGB)
-    Average         // 50/50 averaging: result = (src + dst) / 2 (original PutTransSprite2)
+    Average,        // 50/50 averaging: result = (src + dst) / 2 (original PutTransSprite2)
+    Multiply        // Multiply blending: result = src * dst (DDraw PutDarkSprite, for dark fog/shadow)
 };
 
 // Drawing parameters for sprite rendering
@@ -64,6 +65,7 @@ struct DrawParams {
     bool m_fade = false;        // Fade effect
     bool m_additive = false;    // Deprecated: use blendMode instead
     bool m_nearest_filter = false; // Force nearest-neighbor filtering (no bilinear smoothing)
+    bool m_ignore_pivot = false;   // Draw at exact position, ignoring the sprite's baked-in pivot offset
     BlendMode m_blend_mode = BlendMode::Alpha;  // Blend mode for rendering
 
     // Static factory methods for common configurations
@@ -167,6 +169,16 @@ struct DrawParams {
     static DrawParams average() {
         DrawParams p;
         p.m_blend_mode = BlendMode::Average;
+        return p;
+    }
+
+    // Multiply blend: result = src * dst (darkening effect)
+    // Dark sprite pixels darken the background, white pixels preserve it
+    // Used for dark fog, shadows, and ground darkening effects (DDraw PutDarkSprite)
+    static DrawParams multiply(float a = 1.0f) {
+        DrawParams p;
+        p.m_alpha = a;
+        p.m_blend_mode = BlendMode::Multiply;
         return p;
     }
 };

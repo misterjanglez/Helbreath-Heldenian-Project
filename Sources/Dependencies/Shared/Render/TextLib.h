@@ -42,6 +42,7 @@ struct TextStyle
 	float alpha = 1.0f;
 	ShadowStyle shadow = ShadowStyle::None;
 	int fontSize = 0;  // 0 = use default size, ignored for bitmap fonts
+	bool bold = false;  // Bold style (TTF only, ignored for bitmap fonts)
 	bool useAdditive = false;  // Use additive blending for bright text on dark sprites
 
 	// Default constructor
@@ -68,8 +69,8 @@ struct TextStyle
 		: color(c), alpha(a), shadow(s), fontSize(size) {}
 
 	// Full constructor with additive
-	constexpr TextStyle(const hb::shared::render::Color& c, float a, ShadowStyle s, int size, bool additive)
-		: color(c), alpha(a), shadow(s), fontSize(size), useAdditive(additive) {}
+	constexpr TextStyle(const hb::shared::render::Color& c, float a, ShadowStyle s, int size, bool additive, bool b = false)
+		: color(c), alpha(a), shadow(s), fontSize(size), bold(b), useAdditive(additive) {}
 
 	// ============== Factory Methods ==============
 
@@ -112,23 +113,28 @@ struct TextStyle
 
 	// Create a copy with different shadow style
 	constexpr TextStyle with_shadow_style(ShadowStyle s) const {
-		return TextStyle(color, alpha, s, fontSize, useAdditive);
+		return TextStyle(color, alpha, s, fontSize, useAdditive, bold);
 	}
 
 	// Create a copy with different alpha
 	constexpr TextStyle with_alpha(float a) const {
-		return TextStyle(color, a, shadow, fontSize, useAdditive);
+		return TextStyle(color, a, shadow, fontSize, useAdditive, bold);
 	}
 
 	// Create a copy with different font size (ignored for bitmap fonts)
 	constexpr TextStyle with_font_size(int size) const {
-		return TextStyle(color, alpha, shadow, size, useAdditive);
+		return TextStyle(color, alpha, shadow, size, useAdditive, bold);
 	}
 
 	// Create a copy with additive blending enabled
 	// Use this for bright text (damage numbers) that needs DDraw-like brightness
 	constexpr TextStyle with_additive() const {
-		return TextStyle(color, alpha, shadow, fontSize, true);
+		return TextStyle(color, alpha, shadow, fontSize, true, bold);
+	}
+
+	// Create a copy with bold enabled (TTF only)
+	constexpr TextStyle with_bold() const {
+		return TextStyle(color, alpha, shadow, fontSize, useAdditive, true);
 	}
 };
 

@@ -7,7 +7,7 @@
 #include "GameModeManager.h"
 #include "IGameScreen.h"
 #include "CommonTypes.h"  // For GameClock
-#include "FrameTiming.h"  // For FrameTiming::GetDeltaTime()
+#include "performance_monitor.h"  // For FrameTiming::GetDeltaTime()
 #include "IInput.h"       // For hb::shared::input::SetSuppressed
 #include "ConfigManager.h"
 #include "RendererFactory.h"
@@ -45,6 +45,7 @@ void GameModeManager::shutdown_impl()
 {
     // clear overlay first
     clear_overlay_impl();
+    m_dying_overlay.reset();
 
     // Ensure screen is properly uninitialized before destruction
     if (m_pCurrentScreen)
@@ -63,7 +64,10 @@ void GameModeManager::clear_overlay_impl()
     if (m_pActiveOverlay)
     {
         m_pActiveOverlay->on_uninitialize();
-        m_pActiveOverlay.reset();
+        // Defer destruction — the overlay may still be on the call stack
+        // (e.g., clear_overlay() called from a button handler inside m_controls.update()).
+        // Moving to m_dying_overlay keeps it alive until update_screens_impl() finishes.
+        m_dying_overlay = std::move(m_pActiveOverlay);
     }
 }
 
@@ -143,6 +147,10 @@ void GameModeManager::update_screens_impl()
     {
         m_pActiveOverlay->on_update();
     }
+
+    // Destroy overlay that was cleared during this frame's update.
+    // Safe now — we're no longer inside the overlay's call stack.
+    m_dying_overlay.reset();
 }
 
 void GameModeManager::render_impl()
@@ -212,6 +220,7 @@ void GameModeManager::apply_screen_change()
         m_previousScreenType = m_pCurrentScreen->get_type_id();
         m_pCurrentScreen->on_uninitialize();
         m_pCurrentScreen.reset();
+        m_game->m_active_screen = nullptr;
     }
 
     // Create and initialize new screen from factory
@@ -222,22 +231,15 @@ void GameModeManager::apply_screen_change()
 
         if (m_pCurrentScreen)
         {
+            m_game->m_active_screen = m_pCurrentScreen.get();
             m_pCurrentScreen->on_initialize();
 
-            // Game screen uses user's configured FPS limit;
-            // all other screens cap at 60 FPS (no reason to render menus faster)
+            // Apply user's configured display settings on every screen transition
             hb::shared::render::IWindow* window = hb::shared::render::Window::get();
             if (window)
             {
-                if (m_currentMode == GameMode::MainGame)
-                {
-                    window->set_vsync_enabled(config_manager::get().is_vsync_enabled());
-                    window->set_framerate_limit(config_manager::get().get_fps_limit());
-                }
-                else
-                {
-                    window->set_framerate_limit(60);
-                }
+                window->set_vsync_enabled(config_manager::get().is_vsync_enabled());
+                window->set_framerate_limit(config_manager::get().get_fps_limit());
             }
         }
     }

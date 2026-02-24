@@ -591,7 +591,7 @@ int ASIOSocket::send_msg(char* data, size_t size, char key)
 
 int ASIOSocket::send_msg_async(char* data, size_t size, char key)
 {
-	if (size > m_buffer_size) return sock::Event::MsgSizeTooLarge;
+	if (size > m_buffer_size || size > UINT16_MAX - 3) return sock::Event::MsgSizeTooLarge;
 	if (m_type != sock::Type::Normal) return sock::Event::SocketMismatch;
 
 	// Build frame into a per-message vector

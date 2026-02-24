@@ -4,6 +4,10 @@
 #include <thread>
 #include <chrono>
 #include <ctime>
+#include <csignal>
+#ifdef _WIN32
+#include <windows.h>
+#endif
 
 #include "Game.h"
 #include "LoginServer.h"
@@ -36,6 +40,25 @@ hb::shared::net::ConcurrentQueue<asio::ip::tcp::socket> G_loginAcceptQueue;
 hb::shared::net::ConcurrentQueue<hb::shared::net::SocketErrorEvent> G_errorQueue;
 
 bool G_bRunning = true;
+
+// --- Signal handlers for graceful shutdown ---
+
+static void signal_handler(int sig)
+{
+	G_bRunning = false;
+}
+
+#ifdef _WIN32
+static BOOL WINAPI console_ctrl_handler(DWORD ctrl_type)
+{
+	if (ctrl_type == CTRL_C_EVENT || ctrl_type == CTRL_CLOSE_EVENT || ctrl_type == CTRL_BREAK_EVENT)
+	{
+		G_bRunning = false;
+		return TRUE;
+	}
+	return FALSE;
+}
+#endif
 
 // --- Async I/O helpers (called from main loop) ---
 
@@ -98,6 +121,13 @@ void PollAllSockets()
 
 int main()
 {
+	// Register signal handlers for graceful shutdown
+	std::signal(SIGINT, signal_handler);
+	std::signal(SIGTERM, signal_handler);
+#ifdef _WIN32
+	SetConsoleCtrlHandler(console_ctrl_handler, TRUE);
+#endif
+
 	// Portable startup timestamp
 	auto now = std::chrono::system_clock::now();
 	std::time_t t = std::chrono::system_clock::to_time_t(now);
@@ -108,17 +138,43 @@ int main()
 	localtime_r(&t, &tm_buf);
 #endif
 
-	printf("\n");
-	printf("=======================================================================\n");
-	printf("         HELBREATH GAME SERVER                                         \n");
-	printf("=======================================================================\n");
-	printf("Version: %s.%s\n", hb::server::version::Upper, hb::server::version::Lower);
-	printf("Build: %d\n", hb::server::version::BuildDate);
-	printf("Started: %d/%d/%d %02d:%02d\n",
-		tm_buf.tm_mon + 1, tm_buf.tm_mday, tm_buf.tm_year + 1900,
-		tm_buf.tm_hour, tm_buf.tm_min);
-	printf("=======================================================================\n\n");
-	printf("Initializing server...\n\n");
+	{
+		const char* banner[] = {
+			"  _  _ ___ _    ___ ___ ___   _ _____ _  _",
+			" | || | __| |  | _ ) _ \\ __| /_\\_   _| || |",
+			" | __ | _|| |__| _ \\   / _| / _ \\| | | __ |",
+			" |_||_|___|____|___/_|_\\___/_/ \\_\\_| |_||_|",
+		};
+		const char* subtitle = "The Heldenian Project";
+		constexpr int console_width = 80;
+
+		int max_width = 0;
+		for (const auto& line : banner)
+		{
+			int len = static_cast<int>(strlen(line));
+			if (len > max_width) max_width = len;
+		}
+
+		int left_pad = (console_width - max_width) / 2;
+		if (left_pad < 0) left_pad = 0;
+
+		printf("\n\033[1;36m");
+		for (const auto& line : banner)
+			printf("%*s%s\n", left_pad, "", line);
+
+		int subtitle_len = static_cast<int>(strlen(subtitle));
+		int subtitle_pad = left_pad + max_width - subtitle_len;
+		printf("\033[1;37m%*s%s\033[0m\n", subtitle_pad, "", subtitle);
+
+		printf("\033[0;90m  Version: %s\n", hb::version::server::display_version);
+		printf("  Build:   %s\n", hb::version::server::full_version);
+		printf("  Started: %d/%d/%d %02d:%02d\033[0m\n\n",
+			tm_buf.tm_mon + 1, tm_buf.tm_mday, tm_buf.tm_year + 1900,
+			tm_buf.tm_hour, tm_buf.tm_min);
+	}
+
+	// initialize console first so log messages get ANSI color
+	GetServerConsole().init();
 
 	// initialize logger
 	hb::logger::initialize("gamelogs/");
@@ -138,8 +194,6 @@ int main()
 
 	ServerCommandManager::get().initialize(G_pGame);
 	GameChatCommandManager::get().initialize(G_pGame);
-
-	GetServerConsole().init();
 
 	// start listen sockets
 	G_pListenSock = new hb::shared::net::ASIOSocket(G_pIOPool->get_context(), ServerSocketBlockLimit);
@@ -185,6 +239,10 @@ int main()
 	}
 
 	// --- shutdown ---
+	hb::logger::log("Saving all player data before shutdown...");
+	int saved = G_pGame->save_all_players();
+	hb::logger::log("Saved {} player(s)", saved);
+
 	G_pIOPool->stop();
 
 	delete G_pListenSock;

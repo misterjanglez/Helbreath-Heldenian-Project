@@ -1,17 +1,18 @@
 {
     "audio": {
         "ambientEnabled": true,
-        "ambientVolume": 15,
+        "ambientVolume": 20,
         "masterEnabled": true,
-        "masterVolume": 42,
+        "masterVolume": 50,
         "musicEnabled": false,
-        "musicVolume": 16,
+        "musicVolume": 15,
         "soundEnabled": true,
-        "soundVolume": 20,
+        "soundVolume": 22,
         "uiEnabled": true,
         "uiVolume": 14
     },
     "display": {
+        "backgroundFpsThrottle": true,
         "borderless": false,
         "captureMouse": false,
         "detailLevel": 2,
@@ -20,25 +21,22 @@
         "fullscreen": false,
         "fullscreenStretch": false,
         "patchingGrid": false,
+        "reducedMotion": false,
         "runningMode": true,
         "showFps": true,
         "showLatency": true,
         "tileGrid": false,
+        "toggleToChat": true,
         "vsync": false,
         "zoomMap": true
     },
-    "server": {
-        "address": "199.187.160.239",
-        "gamePort": 9907,
-        "port": 2500
-    },
     "shortcuts": {
-        "magic": 31,
+        "magic": 0,
         "slots": [
             -1,
             -1,
-            191,
-            196,
+            -1,
+            -1,
             -1
         ]
     },

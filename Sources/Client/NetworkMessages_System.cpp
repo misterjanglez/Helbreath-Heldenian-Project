@@ -1,8 +1,10 @@
 ﻿#include "Game.h"
+#include "SharedCalculations.h"
+#include "FloatingTextManager.h"
 #include "GameModeManager.h"
 #include "AudioManager.h"
 #include "WeatherManager.h"
-
+#include "TeleportManager.h"
 
 #include "NetworkMessageManager.h"
 #include "Packet/SharedPackets.h"
@@ -12,6 +14,7 @@
 #include <cmath>
 #include <format>
 #include <string>
+#include "Screen_OnGame.h"
 
 using namespace hb::shared::net;
 namespace NetworkMessageHandlers {
@@ -40,19 +43,21 @@ void HandleTimeChange(CGame* game, char* data)
 	if (!pkt) return;
 	weather_manager::get().set_ambient_light(static_cast<char>(pkt->sprite_alpha));
 	switch (weather_manager::get().get_ambient_light()) {
-	case 1:	game->m_is_xmas = false; game->play_game_sound('E', 32, 0); break;
-	case 2: game->m_is_xmas = false; game->play_game_sound('E', 31, 0); break;
+	case 1:	game->on_game()->m_is_xmas = false; audio_manager::get().play_game_sound(sound_type::effect, 32, 0); break;
+	case 2: game->on_game()->m_is_xmas = false; audio_manager::get().play_game_sound(sound_type::effect, 31, 0); break;
 	case 3: // Snoopy Special night with chrismas bulbs
-		if (weather_manager::get().is_snowing()) game->m_is_xmas = true;
-		else game->m_is_xmas = false;
-		weather_manager::get().set_xmas(game->m_is_xmas);
-		game->play_game_sound('E', 31, 0);
+		if (weather_manager::get().is_snowing()) game->on_game()->m_is_xmas = true;
+		else game->on_game()->m_is_xmas = false;
+		weather_manager::get().set_xmas(game->on_game()->m_is_xmas);
+		audio_manager::get().play_game_sound(sound_type::effect, 31, 0);
 		weather_manager::get().set_ambient_light(2); break;
 	}
 }
 
 void HandleNoticeMsg(CGame* game, char* data)
 {
+	if (teleport_manager::get().get_state() == teleport_state::awaiting_auth)
+		teleport_manager::get().on_auth_rejected();
 	const auto* pkt = hb::net::PacketCast<hb::net::PacketNotifyNoticeMsg>(
 		data, sizeof(hb::net::PacketNotifyNoticeMsg));
 	if (!pkt) return;
@@ -66,7 +71,7 @@ void HandleStatusText(CGame* game, char* data)
 	if (!pkt) return;
 
 	// Display floating text above the local player's head (like "* Failed! *")
-	game->m_floating_text.add_damage_text(damage_text_type::Medium, pkt->text, game->m_cur_time,
+	game->get_floating_text().add_damage_text(damage_text_type::Medium, pkt->text, game->m_cur_time,
 		game->m_player->m_player_object_id, game->m_map_data.get());
 }
 
@@ -77,7 +82,11 @@ void HandleForceDisconn(CGame* game, char* data)
 	if (!pkt) return;
 	const auto wpCount = pkt->seconds;
 	game->m_force_disconn = true;
-	if (game->m_logout_count < 0 || game->m_logout_count > 5) game->m_logout_count = 5;
+	if (game->on_game()->m_logout_count < 0 || game->on_game()->m_logout_count > 5)
+	{
+		game->on_game()->m_logout_count = 5;
+		game->on_game()->m_logout_count_time = GameClock::get_time_ms();
+	}
 	game->add_event_list(NOTIFYMSG_FORCE_DISCONN1, 10);
 }
 
@@ -100,7 +109,7 @@ void HandleSettingSuccess(CGame* game, char* data)
 	txt = "Your stat has been changed.";
 	game->add_event_list(txt.c_str(), 10);
 	// CLEROTH - LU
-	game->m_player->m_lu_point = (game->m_player->m_level - 1) * 3 - ((game->m_player->m_str + game->m_player->m_vit + game->m_player->m_dex + game->m_player->m_int + game->m_player->m_mag + game->m_player->m_charisma) - 70);
+	game->m_player->m_lu_point = hb::shared::calc::level_up_points(game->m_formula_engine, hb::shared::calc::level{(double)game->m_player->m_level}, hb::shared::calc::total_stats{(double)(game->m_player->m_str + game->m_player->m_vit + game->m_player->m_dex + game->m_player->m_int + game->m_player->m_mag + game->m_player->m_charisma)});
 	game->m_player->m_lu_str = game->m_player->m_lu_vit = game->m_player->m_lu_dex = game->m_player->m_lu_int = game->m_player->m_lu_mag = game->m_player->m_lu_char = 0;
 }
 
@@ -135,10 +144,24 @@ void HandleServerChange(CGame* game, char* data)
 
 	game->m_player->m_is_poisoned = false;
 
-	game->change_game_mode(GameMode::Connecting);
-	game->m_connect_mode = MsgId::request_enter_game;
-	//m_enter_game_type = EnterGameMsg::New; //Gateway
 	game->m_enter_game_type = EnterGameMsg::NewToWlsButMls;
+
+	// Build enter game packet for deferred send after connection establishes
+	hb::net::EnterGameRequestFull req{};
+	req.header.msg_id = MsgId::request_enter_game;
+	req.header.msg_type = static_cast<uint16_t>(game->m_enter_game_type);
+	std::snprintf(req.character_name, sizeof(req.character_name), "%s", game->m_selected_char_name.c_str());
+	std::snprintf(req.map_name, sizeof(req.map_name), "%s", game->m_map_name.c_str());
+	std::snprintf(req.account_name, sizeof(req.account_name), "%s", game->m_account_name.c_str());
+	std::snprintf(req.password, sizeof(req.password), "%s", game->m_account_password.c_str());
+	req.level = game->m_selected_char_level;
+	std::snprintf(req.world_name, sizeof(req.world_name), "%s", game->m_world_server_name.c_str());
+	req.version_major = hb::version::compatibility::major;
+	req.version_minor = hb::version::compatibility::minor;
+	req.version_patch = hb::version::compatibility::patch;
+	game->set_pending_login_packet(req);
+
+	game->change_game_mode(GameMode::Connecting);
 	std::snprintf(game->m_msg, sizeof(game->m_msg), "%s", "55");
 }
 
@@ -211,6 +234,8 @@ void HandleForceRecallTime(CGame* game, char* data)
 
 void HandleNoRecall(CGame* game, char* data)
 {
+	if (teleport_manager::get().get_state() == teleport_state::awaiting_auth)
+		teleport_manager::get().on_auth_rejected();
 	game->add_event_list("You can not recall in this map.", 10);
 }
 
@@ -231,11 +256,11 @@ void HandleFightZoneReserve(CGame* game, char* data)
 		game->add_event_list(NOTIFY_MSG_HANDLER70, 10);
 		break;
 	case -2:
-		game->m_fightzone_number = 0;
+		game->on_game()->m_fightzone_number = 0;
 		game->add_event_list(NOTIFY_MSG_HANDLER71, 10);
 		break;
 	case -1:
-		game->m_fightzone_number = game->m_fightzone_number * -1;
+		game->on_game()->m_fightzone_number = game->on_game()->m_fightzone_number * -1;
 		game->add_event_list(NOTIFY_MSG_HANDLER72, 10);
 		break;
 	case 1:
@@ -270,11 +295,15 @@ void HandleNpcTalk(CGame* game, char* data)
 
 void HandleTravelerLimitedLevel(CGame* game, char* data)
 {
+	if (teleport_manager::get().get_state() == teleport_state::awaiting_auth)
+		teleport_manager::get().on_auth_rejected();
 	game->add_event_list(NOTIFY_MSG_HANDLER64, 10);
 }
 
 void HandleLimitedLevel(CGame* game, char* data)
 {
+	if (teleport_manager::get().get_state() == teleport_state::awaiting_auth)
+		teleport_manager::get().on_auth_rejected();
 	game->add_event_list(NOTIFYMSG_LIMITED_LEVEL1, 10);
 }
 

@@ -1,4 +1,4 @@
-﻿// Screen_Login.h: Login Screen Class
+// Screen_Login.h: Login Screen Class
 //
 // Handles user login interaction, credential entry, and server connection request.
 //
@@ -7,8 +7,7 @@
 #pragma once
 
 #include "IGameScreen.h"
-#include <cstdint>
-#include <string>
+#include "CControls.h"
 
 class Screen_Login : public IGameScreen
 {
@@ -22,20 +21,18 @@ public:
     void on_uninitialize() override;
     void on_update() override;
     void on_render() override;
-
-    bool attempt_login();
-
-private:
-    // Helper method for rendering (migrated from CGame::_Draw_OnLogin)
-    void draw_login_window(int mouse_x, int mouse_y);
+    bool on_net_response(uint16_t response_type, char* data) override;
 
 private:
-    // Screen-specific input buffers (migrated from file-scope statics)
-    std::string m_cLoginName;
-    std::string m_cLoginPassword;
-    
-    // Logic state
-    char m_cPrevFocus;
-    char m_cur_focus;
-    char m_max_focus;
+    void submit_login();
+
+    enum control_id
+    {
+        TXT_NAME = 1,
+        TXT_PASSWORD = 2,
+        BTN_LOGIN = 3,
+        BTN_CANCEL = 4,
+    };
+
+    cc::control_collection m_controls;
 };

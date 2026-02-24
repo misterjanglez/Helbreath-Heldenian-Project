@@ -1,5 +1,12 @@
 cmake_minimum_required(VERSION 3.16)
-project(HelbreathClient LANGUAGES CXX)
+
+# Include generated version info (provides HB_CLIENT_VERSION etc.)
+include(${CMAKE_CURRENT_SOURCE_DIR}/../version.cmake OPTIONAL)
+
+project(HelbreathClient
+    VERSION ${HB_CLIENT_VERSION}
+    LANGUAGES CXX
+)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -23,7 +30,35 @@ set(SFMLENGINE_SOURCES
     ../SFMLEngine/SFMLWindow.cpp
 )
 
+# ---------------------------------------------------------------------------
+# CControls static library (UI controls — no game/engine dependencies)
+# ---------------------------------------------------------------------------
+add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../CControls ${CMAKE_CURRENT_BINARY_DIR}/CControls_build)
+
 add_library(SFMLEngine STATIC ${SFMLENGINE_SOURCES})
+
+# ---------------------------------------------------------------------------
+# AutoUpdater static library
+# ---------------------------------------------------------------------------
+set(AUTOUPDATER_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../AutoUpdater)
+set(AUTOUPDATER_SOURCES
+    ${AUTOUPDATER_DIR}/auto_updater.cpp
+    ${AUTOUPDATER_DIR}/updater_manifest.cpp
+    ${AUTOUPDATER_DIR}/updater_http.cpp
+    ${AUTOUPDATER_DIR}/updater_sha256.cpp
+    ${AUTOUPDATER_DIR}/updater_file_ops.cpp
+    ${AUTOUPDATER_DIR}/updater_gui_x11.cpp
+)
+
+add_library(AutoUpdater STATIC ${AUTOUPDATER_SOURCES})
+
+target_include_directories(AutoUpdater PRIVATE
+    ${AUTOUPDATER_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/../Dependencies/Shared
+)
+
+find_package(X11 REQUIRED)
+target_link_libraries(AutoUpdater PRIVATE X11::X11)
 
 # ---------------------------------------------------------------------------
 # Shared sources (8 .cpp files)
@@ -37,6 +72,8 @@ set(SHARED_SOURCES
     ../Dependencies/Shared/Render/ISpriteFactory.cpp
     ../Dependencies/Shared/Render/ResolutionConfig.cpp
     ../Dependencies/Shared/Render/TextLib.cpp
+    ../Dependencies/Shared/Util/SHA256.cpp
+    ../Dependencies/Shared/Game/FormulaEngine.cpp
 )
 
 # ---------------------------------------------------------------------------
@@ -52,6 +89,14 @@ add_executable(HelbreathClient
     ${SHARED_SOURCES}
 )
 
+# Output name: Game_x64_linux / Game_x86_linux
+if(CMAKE_SIZEOF_VOID_P EQUAL 8)
+    set(_arch "x64")
+else()
+    set(_arch "x86")
+endif()
+set_target_properties(HelbreathClient PROPERTIES OUTPUT_NAME "Game_${_arch}_linux")
+
 # ---------------------------------------------------------------------------
 # Include directories (mirrors vcxproj IncludePath)
 # ---------------------------------------------------------------------------
@@ -59,7 +104,9 @@ set(SHARED_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../Dependencies/Shared)
 
 set(COMMON_INCLUDE_DIRS
     ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/../CControls
     ${CMAKE_CURRENT_SOURCE_DIR}/../SFMLEngine
+    ${CMAKE_CURRENT_SOURCE_DIR}/../AutoUpdater
     ${SHARED_DIR}
     ${SHARED_DIR}/Entity
     ${SHARED_DIR}/Game
@@ -79,6 +126,7 @@ target_include_directories(HelbreathClient PRIVATE ${COMMON_INCLUDE_DIRS})
 # ---------------------------------------------------------------------------
 target_compile_definitions(SFMLEngine PRIVATE SFML_STATIC SFML_ENGINE)
 target_compile_definitions(HelbreathClient PRIVATE SFML_STATIC SFML_ENGINE)
+target_compile_definitions(HelbreathClient PRIVATE TESTER_ONLY)
 
 # ---------------------------------------------------------------------------
 # Find SFML 3 — try system install first, fall back to FetchContent
@@ -109,10 +157,13 @@ target_link_libraries(SFMLEngine PRIVATE SFML::Graphics SFML::Window SFML::Syste
 find_package(Threads REQUIRED)
 
 target_link_libraries(HelbreathClient PRIVATE
+    CControls
+    AutoUpdater
     SFMLEngine
     SFML::Graphics
     SFML::Window
     SFML::System
     Threads::Threads
+    X11::X11
     ${CMAKE_DL_LIBS}
 )

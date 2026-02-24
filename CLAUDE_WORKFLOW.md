@@ -6,13 +6,13 @@ Use only for large-scale mechanical transforms (e.g., "replace X with Y in every
 
 Must explicitly justify: "This touches N files with pattern X, a script is appropriate because Y."
 
-1. Write a script in `Scripts/` that calls `bak.py guard` internally.
+1. Write a script in `Scripts/` that calls `bak.py guard` internally (bak.py is at repo root).
 2. Run `--dry-run` — preview changes, full log to `Scripts/output/<script_name>_dry_run.log`.
 3. Run `--verify` — scan for collisions (Shared enums, SFMLEngine interfaces, C++ keywords, duplicate targets). Log to `Scripts/output/<script_name>_verify.log`.
 4. Review both logs. Fix any flagged collisions.
 5. Run without flags to apply.
 6. If errors: fix the script itself, re-run. **Never write a second "fix" script.**
-7. Once 0 errors: `python Scripts/bak.py commit` to accept.
+7. Once 0 errors: `python bak.py commit` to accept.
 
 ## Bulk Script Verification Standards
 

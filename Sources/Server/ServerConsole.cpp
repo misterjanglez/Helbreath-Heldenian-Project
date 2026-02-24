@@ -24,6 +24,8 @@ static const char* GetAnsiColor(int color)
 	case console_color::warning: return "\033[1;33m";
 	case console_color::success: return "\033[1;32m";
 	case console_color::bright:  return "\033[1;37m";
+	case console_color::info:    return "\033[1;36m";
+	case console_color::muted:   return "\033[0;90m";
 	default:                     return "";
 	}
 }
@@ -133,10 +135,104 @@ void ServerConsole::write_line(const char* text, int color)
 	draw_input_line();
 }
 
+void ServerConsole::write_line_raw(std::string_view text)
+{
+	if (!m_init) {
+		std::fwrite(text.data(), 1, text.size(), stdout);
+		std::fputc('\n', stdout);
+		return;
+	}
+
+	clear_input_line();
+	std::fwrite(text.data(), 1, text.size(), stdout);
+	std::fputs("\033[0m", stdout);
+	std::fputc('\n', stdout);
+	draw_input_line();
+}
+
 void ServerConsole::redraw_prompt()
 {
 	if (!m_init) return;
 	draw_input_line();
+}
+
+// --- Command history ---
+
+void ServerConsole::history_push(const char* cmd, int len)
+{
+	std::string entry(cmd, len);
+
+	// Don't push duplicates of the most recent entry
+	if (m_history_count > 0)
+	{
+		int last = (m_history_write - 1 + max_history) % max_history;
+		if (m_history[last] == entry)
+		{
+			m_history_browse = m_history_count;
+			m_browsing_history = false;
+			return;
+		}
+	}
+
+	m_history[m_history_write] = std::move(entry);
+	m_history_write = (m_history_write + 1) % max_history;
+	if (m_history_count < max_history)
+		m_history_count++;
+	m_history_browse = m_history_count;
+	m_browsing_history = false;
+}
+
+void ServerConsole::set_input(const std::string& text)
+{
+	int len = static_cast<int>(text.size());
+	if (len >= (int)sizeof(m_input))
+		len = (int)sizeof(m_input) - 1;
+	std::memcpy(m_input, text.c_str(), len);
+	m_input[len] = '\0';
+	m_input_len = len;
+	m_cursor_pos = len;
+	draw_input_line();
+}
+
+void ServerConsole::history_up()
+{
+	if (m_history_count == 0) return;
+
+	if (!m_browsing_history)
+	{
+		// Save current input before starting to browse
+		m_saved_input.assign(m_input, m_input_len);
+		m_browsing_history = true;
+	}
+
+	if (m_history_browse > 0)
+	{
+		m_history_browse--;
+		// Convert browse index to ring buffer index
+		int ring_start = (m_history_count < max_history) ? 0 : m_history_write;
+		int idx = (ring_start + m_history_browse) % max_history;
+		set_input(m_history[idx]);
+	}
+}
+
+void ServerConsole::history_down()
+{
+	if (!m_browsing_history) return;
+
+	m_history_browse++;
+	if (m_history_browse >= m_history_count)
+	{
+		// Back to current input
+		m_history_browse = m_history_count;
+		m_browsing_history = false;
+		set_input(m_saved_input);
+	}
+	else
+	{
+		int ring_start = (m_history_count < max_history) ? 0 : m_history_write;
+		int idx = (ring_start + m_history_browse) % max_history;
+		set_input(m_history[idx]);
+	}
 }
 
 // =========================================================================
@@ -175,6 +271,7 @@ bool ServerConsole::poll_input(char* out_cmd, int maxLen)
 					int copyLen = (m_input_len < maxLen - 1) ? m_input_len : (maxLen - 1);
 					std::memcpy(out_cmd, m_input, copyLen);
 					out_cmd[copyLen] = '\0';
+					history_push(m_input, m_input_len);
 					std::memset(m_input, 0, sizeof(m_input));
 					m_input_len = 0;
 					m_cursor_pos = 0;
@@ -213,6 +310,8 @@ bool ServerConsole::poll_input(char* out_cmd, int maxLen)
 			if (vk == VK_RIGHT) { if (m_cursor_pos < m_input_len) { m_cursor_pos++; draw_input_line(); } continue; }
 			if (vk == VK_HOME)  { m_cursor_pos = 0; draw_input_line(); continue; }
 			if (vk == VK_END)   { m_cursor_pos = m_input_len; draw_input_line(); continue; }
+			if (vk == VK_UP)    { history_up(); continue; }
+			if (vk == VK_DOWN)  { history_down(); continue; }
 
 			if (ch >= 32 && ch < 127 && m_input_len < (int)(sizeof(m_input) - 1)) {
 				std::memmove(&m_input[m_cursor_pos + 1], &m_input[m_cursor_pos], m_input_len - m_cursor_pos);
@@ -260,6 +359,8 @@ bool ServerConsole::poll_input(char* out_cmd, int maxLen)
 					char seq2 = 0;
 					if (read(STDIN_FILENO, &seq2, 1) == 1) {
 						switch (seq2) {
+						case 'A': history_up(); break;
+						case 'B': history_down(); break;
 						case 'D': if (m_cursor_pos > 0) { m_cursor_pos--; draw_input_line(); } break;
 						case 'C': if (m_cursor_pos < m_input_len) { m_cursor_pos++; draw_input_line(); } break;
 						case 'H': m_cursor_pos = 0; draw_input_line(); break;
@@ -267,7 +368,7 @@ bool ServerConsole::poll_input(char* out_cmd, int maxLen)
 						case '3': // Delete key: ESC[3~
 						{
 							char tilde = 0;
-							read(STDIN_FILENO, &tilde, 1);
+							[[maybe_unused]] auto n = read(STDIN_FILENO, &tilde, 1);
 							if (m_cursor_pos < m_input_len) {
 								std::memmove(&m_input[m_cursor_pos], &m_input[m_cursor_pos + 1], m_input_len - m_cursor_pos - 1);
 								m_input_len--;
@@ -289,6 +390,7 @@ bool ServerConsole::poll_input(char* out_cmd, int maxLen)
 				int copyLen = (m_input_len < maxLen - 1) ? m_input_len : (maxLen - 1);
 				std::memcpy(out_cmd, m_input, copyLen);
 				out_cmd[copyLen] = '\0';
+				history_push(m_input, m_input_len);
 				std::memset(m_input, 0, sizeof(m_input));
 				m_input_len = 0;
 				m_cursor_pos = 0;

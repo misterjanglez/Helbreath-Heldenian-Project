@@ -3,7 +3,9 @@
 #include "EquipmentIndices.h"
 
 class CGame;
+class Screen_OnGame;
 class CEntityRenderState;
+namespace hb::shared::sprite { class SpriteCollection; }
 
 // Drawing order arrays — indexed by direction (1-8), element [0] unused.
 // weapon_draw_order: 1 = draw weapon BEFORE body, 0 = draw weapon AFTER body
@@ -17,18 +19,23 @@ namespace RenderHelpers
 {
 	// draw a single equipment layer (undies, armor, pants, boots, arm, helm, mantle)
 	// with optional color tint. Does nothing if spriteIndex == -1.
-	// frame: usually (dir-1)*8 + animFrame for equipment layers
-	void draw_equip_layer(CGame& game, int spriteIndex, int sX, int sY, int frame,
+	// sprites: the SpriteCollection to draw from (m_sprite for cosmetics, m_equip_sprites for equipment)
+	// frame: usually (dir-1)*equipFrameMul + animFrame
+	void draw_equip_layer(hb::shared::sprite::SpriteCollection& sprites, int spriteIndex, int sX, int sY, int frame,
 	                    bool inv, int colorIndex);
 
 	// draw weapon sprite with color tint + dk_glare overlay.
-	// weaponFrame: usually just animFrame (direction is baked into weapon index).
-	void draw_weapon(CGame& game, const EquipmentIndices& eq, int sX, int sY,
+	// sprites: the SpriteCollection containing the weapon sprite (m_equip_sprites)
+	// weaponFrame: (dir-1)*equipFrameMul + animFrame (direction now in frame, not index)
+	void draw_weapon(CGame& game, hb::shared::sprite::SpriteCollection& sprites,
+	                const EquipmentIndices& eq, int sX, int sY,
 	                int weaponFrame, bool inv);
 
 	// draw shield sprite with color tint + glare overlay.
-	// frame: usually (dir-1)*8 + animFrame
-	void draw_shield(CGame& game, const EquipmentIndices& eq, int sX, int sY,
+	// sprites: the SpriteCollection containing the shield sprite (m_equip_sprites)
+	// frame: (dir-1)*equipFrameMul + animFrame
+	void draw_shield(CGame& game, hb::shared::sprite::SpriteCollection& sprites,
+	                const EquipmentIndices& eq, int sX, int sY,
 	                int frame, bool inv);
 
 	// draw body shadow. Checks mob type skip list and detail level.
@@ -67,7 +74,7 @@ namespace RenderHelpers
 	void apply_direction_override(CEntityRenderState& state);
 
 	// draw entity name (player or NPC).
-	void draw_name(CGame& game, const CEntityRenderState& state, int sX, int sY);
+	void draw_name(Screen_OnGame& screen, const CEntityRenderState& state, int sX, int sY);
 
 	// update chat message position or clear expired chat.
 	// indexX/indexY needed for chat message clearing when message expires.

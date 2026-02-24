@@ -7,6 +7,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include "GlobalDef.h"
+#include "DirectionHelpers.h"
+
+using hb::shared::direction::direction;
 
 enum {CODE_ENG,CODE_HAN1,CODE_HAN2};
 
@@ -14,36 +17,36 @@ namespace CMisc
 {
 	// Movement direction calculation using asymmetric zones (N/S 3:1, E/W 4:1 ratio)
 	// Returns direction 1-8 (N, NE, E, SE, S, SW, W, NW) or 0 if same position
-	static inline char get_next_move_dir(short sX, short sY, short dX, short dY)
+	static inline direction get_next_move_dir(short sX, short sY, short dX, short dY)
 	{
 		short diffX = dX - sX;
 		short diffY = dY - sY;
 
-		if (diffX == 0 && diffY == 0) return 0;
+		if (diffX == 0 && diffY == 0) return direction{};
 
 		short absX = (diffX < 0) ? -diffX : diffX;
 		short absY = (diffY < 0) ? -diffY : diffY;
 
 		if (absY == 0) {
-			return (diffX > 0) ? 3 : 7;  // East or West
+			return (diffX > 0) ? direction::east : direction::west;
 		}
 		if (absX == 0) {
-			return (diffY < 0) ? 1 : 5;  // North or South
+			return (diffY < 0) ? direction::north : direction::south;
 		}
 
 		// Asymmetric ratios: N/S uses 3:1, E/W uses 4:1
 		if (absY >= absX * 3) {
-			return (diffY < 0) ? 1 : 5;  // North or South
+			return (diffY < 0) ? direction::north : direction::south;
 		}
 		if (absX >= absY * 4) {
-			return (diffX > 0) ? 3 : 7;  // East or West
+			return (diffX > 0) ? direction::east : direction::west;
 		}
 
 		// Diagonal
-		if (diffX > 0 && diffY < 0) return 2;  // NE
-		if (diffX > 0 && diffY > 0) return 4;  // SE
-		if (diffX < 0 && diffY > 0) return 6;  // SW
-		return 8;  // NW
+		if (diffX > 0 && diffY < 0) return direction::northeast;
+		if (diffX > 0 && diffY > 0) return direction::southeast;
+		if (diffX < 0 && diffY > 0) return direction::southwest;
+		return direction::northwest;
 	}
 
 	static inline void get_point(int x0, int y0, int x1, int y1, int * pX, int * pY, int * error_acc, int count)
@@ -115,46 +118,46 @@ namespace CMisc
 		}
 	}
 
-	static inline char calc_direction(short sX, short sY, short dX, short dY)
+	static inline direction calc_direction(short sX, short sY, short dX, short dY)
 	{
 		double tmp1, tmp2, tmp3;
-		if ((sX == dX) && (sY == dY)) return 1;
+		if ((sX == dX) && (sY == dY)) return direction::north;
 		if ((sX == dX) && (sY != dY))
-		{	if (sY > dY) return 1;
-			else return 5;
+		{	if (sY > dY) return direction::north;
+			else return direction::south;
 		}
 		if ((sX != dX) && (sY == dY))
-		{	if (sX > dX) return 7;
-			else return 3;
+		{	if (sX > dX) return direction::west;
+			else return direction::east;
 		}
 		tmp1 = static_cast<double>(dX - sX);
 		tmp2 = static_cast<double>(dY - sY);
 		tmp3 = tmp1 / tmp2;
 		if (tmp3 < -3)
-		{	if (sX > dX) return 7;
-			else return 3;
+		{	if (sX > dX) return direction::west;
+			else return direction::east;
 		}
 		if (tmp3 > 3)
-		{	if (sX > dX) return 7;
-			else return 3;
+		{	if (sX > dX) return direction::west;
+			else return direction::east;
 		}
 		if ((tmp3 > -0.3333f) && (tmp3 <= 0.3333f))
-		{	if (sY > dY) return 1;
-			else return 5;
+		{	if (sY > dY) return direction::north;
+			else return direction::south;
 		}
 		if ((tmp3 > 0.3333f) && (tmp3 <= 3.0f))
-		{	if (sX > dX) return 8;
-			else return 4;
+		{	if (sX > dX) return direction::northwest;
+			else return direction::southeast;
 		}
 		if ((tmp3 >= -0.3333f) && (tmp3 < 3.0f))
-		{	if (sX > dX) return 7;
-			else return 3;
+		{	if (sX > dX) return direction::west;
+			else return direction::east;
 		}
 		if ((tmp3 >= -3.0f) && (tmp3 < -0.3333f))
-		{	if (sX > dX) return 6;
-			else return 2;
+		{	if (sX > dX) return direction::southwest;
+			else return direction::northeast;
 		}
-		return 1;
+		return direction::north;
 	}
 
 	static inline bool check_valid_name(const char *str)

@@ -11,20 +11,27 @@
 #include "SpriteTypes.h"
 #include "Appearance.h"
 #include "PlayerStatusData.h"
+#include "DirectionHelpers.h"
+
+using hb::shared::direction::direction;
 
 //=============================================================================
-// Cursor Types (replacing magic frame numbers)
+// Cursor Types — maps 1:1 to sprite frames in MouseCursor sprite sheet
 //=============================================================================
-enum class CursorType {
-    Arrow = 0,           // Default cursor
-    ItemGround1 = 1,     // Item on ground (animated frame 1)
-    ItemGround2 = 2,     // Item on ground (animated frame 2)
-    TargetHostile = 3,   // Red - hostile/dead body
-    SpellFriendly = 4,   // Blue - spell on friendly
-    SpellHostile = 5,    // Red - spell on hostile
-    TargetNeutral = 6,   // Blue - neutral/friendly
-    Unavailable = 8,     // Can't perform action
-    ItemUse = 10         // Hand cursor for item use
+enum class cursor_type : int
+{
+    arrow           = 0,   // Standard arrow cursor
+    grab_open       = 1,   // Open hand — item pickup (animation frame 1)
+    grab_closed     = 2,   // Closed hand — item pickup (animation frame 2)
+    attack          = 3,   // Sword — target is attackable / friendly attack toggled
+    spell_friendly  = 4,   // Magic cast on friendly target
+    spell_hostile   = 5,   // Magic cast on enemy target
+    arrow_blue      = 6,   // Arrow with blue outline — friendly/neutral hover
+    arrow_red       = 7,   // Arrow with red outline — unused, reserved
+    hourglass       = 8,   // Waiting / loading
+    item_target     = 9,   // Item-on-item targeting (animation frame 1 of 3)
+    item_target_2   = 10,  // Item-on-item targeting (animation frame 2 of 3)
+    item_target_3   = 11,  // Item-on-item targeting (animation frame 3 of 3)
 };
 
 //=============================================================================
@@ -54,8 +61,9 @@ struct FocusedObject {
     // Type info
     FocusedObjectType m_type = FocusedObjectType::None;
     short m_owner_type = 0;
+    short m_npc_config_id = -1;
     char m_action = 0;
-    char m_direction = 0;
+    direction m_direction = direction{};
     char m_frame = 0;
 
     // Display info
@@ -78,7 +86,9 @@ struct TargetObjectInfo {
     short m_screen_x, m_screen_y;
     short m_data_x, m_data_y;  // Map data array indices
     short m_owner_type;
-    char m_action, m_direction, m_frame;
+    short m_npc_config_id;
+    char m_action, m_frame;
+    direction m_direction;
     const char* m_name;  // Points to existing string, no copy
     hb::shared::entity::PlayerAppearance m_appearance;
     hb::shared::entity::PlayerStatus m_status;
@@ -142,8 +152,7 @@ namespace CursorTarget {
     const FocusedObject& GetFocusedObject();
     bool has_focused_object();
 
-    CursorType GetCursorType();
-    int get_cursor_frame();  // Returns (int)CursorType for compatibility
+    cursor_type get_cursor_type();
 
     // Map coordinates (for m_mcx/m_mcy compatibility)
     short get_focused_map_x();
@@ -161,7 +170,8 @@ namespace CursorTarget {
     bool get_focus_highlight_data(
         short& outScreenX, short& outScreenY,
         uint16_t& outObjectID,
-        short& outOwnerType, char& outAction, char& outDir, char& outFrame,
+        short& outOwnerType, short& outNpcConfigId,
+        char& outAction, direction& outDir, char& outFrame,
         hb::shared::entity::PlayerAppearance& outAppearance, hb::shared::entity::PlayerStatus& outStatus,
         short& outDataX, short& outDataY
     );

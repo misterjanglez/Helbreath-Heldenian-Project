@@ -52,11 +52,12 @@ bool GameCmdGiveItem::execute(CGame* game, int client_h, const char* args)
 	}
 
 	if (amount < 1) amount = 1;
-	if (amount > 1000) amount = 1000;
+	bool is_gold = (item_id == hb::shared::item::ItemId::Gold);
+	if (!is_gold && amount > 1000) amount = 1000;
 
 	const char* item_name = game->m_item_config_list[item_id]->m_name;
 	auto itemType = game->m_item_config_list[item_id]->get_item_type();
-	bool true_stack = hb::shared::item::is_true_stack_type(itemType) || (item_id == hb::shared::item::ItemId::Gold);
+	bool true_stack = hb::shared::item::is_true_stack_type(itemType) || is_gold;
 
 	int created = 0;
 

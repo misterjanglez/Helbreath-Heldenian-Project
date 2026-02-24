@@ -17,6 +17,7 @@ using namespace hb::shared::action;
 using namespace hb::server::net;
 using namespace hb::server::config;
 using namespace hb::shared::item;
+using namespace hb::shared::direction;
 namespace sock = hb::shared::net::socket;
 using namespace hb::server::skill;
 
@@ -376,7 +377,7 @@ void SkillManager::clear_skill_using_status(int client_h)
 			fX = m_game->m_client_list[client_h]->m_x + _tmp_cCorpseX[m_game->m_client_list[client_h]->m_dir];
 			fY = m_game->m_client_list[client_h]->m_y + _tmp_cCorpseY[m_game->m_client_list[client_h]->m_dir];
 			if (m_game->m_map_list[m_game->m_client_list[client_h]->m_map_index]->get_moveable(fX, fY, 0) == false) {
-				m_game->m_client_list[client_h]->m_dir = static_cast<char>(m_game->dice(1, 8));
+				m_game->m_client_list[client_h]->m_dir = static_cast<direction>(m_game->dice(1, 8));
 				fX = m_game->m_client_list[client_h]->m_x + _tmp_cCorpseX[m_game->m_client_list[client_h]->m_dir];
 				fY = m_game->m_client_list[client_h]->m_y + _tmp_cCorpseY[m_game->m_client_list[client_h]->m_dir];
 				if (m_game->m_map_list[m_game->m_client_list[client_h]->m_map_index]->get_moveable(fX, fY, 0) == false) {
@@ -627,7 +628,7 @@ void SkillManager::reload_skill_configs()
 	bool configDbCreated = false;
 	if (!EnsureGameConfigDatabase(&configDb, configDbPath, &configDbCreated) || configDbCreated)
 	{
-		hb::logger::log("Skill config reload failed: gameconfigs.db unavailable");
+		hb::logger::log("Skill config reload failed: gamedata.db unavailable");
 		return;
 	}
 

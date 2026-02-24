@@ -6,6 +6,7 @@
 #include "StringCompat.h"
 #include "TimeUtils.h"
 #include <filesystem>
+#include <iostream>
 #include "LoginServer.h"
 #include "EntityManager.h"
 #include "FishingManager.h"
@@ -15,7 +16,7 @@
 #include "MapInfoSqliteStore.h"
 #include "sqlite3.h"
 #include "Packet/SharedPackets.h"
-#include "CRC32.h"
+#include "SHA256.h"
 #include "SharedCalculations.h"
 #include "Item/ItemAttributes.h"
 #include "ObjectIDRange.h"
@@ -51,6 +52,7 @@ namespace sock = hb::shared::net::socket;
 namespace dynamic_object = hb::shared::dynamic_object;
 
 using namespace hb::shared::action;
+using namespace hb::shared::direction;
 
 using namespace hb::shared::item;
 
@@ -61,6 +63,49 @@ extern char	G_cData50000[50000];
 
 // extern void PutDebugMsg(char * str);	// 2002-09-09 #2
 
+
+// Build a snapshot of a player's appearance with equipment item_id/display_id
+// populated from their currently equipped items. Called at each broadcast point
+// rather than stored, so it's always in sync with actual inventory.
+hb::shared::entity::PlayerAppearance CGame::build_broadcast_appearance(int client_h)
+{
+	auto* client = m_client_list[client_h];
+	auto appr = client->m_appearance;  // copy cosmetic + old type fields
+
+	// Helper: populate item_id + display_id for one equip slot.
+	// display_id comes from the item CONFIG template (m_item_config_list),
+	// not the player's inventory item instance (which has default -1).
+	auto fill_slot = [&](EquipPos pos, int16_t& out_item_id, int16_t& out_display_id) {
+		short slot_index = client->m_item_equipment_status[to_int(pos)];
+		if (slot_index >= 0 && client->m_item_list[slot_index] != nullptr) {
+			auto* item = client->m_item_list[slot_index];
+			out_item_id = item->m_id_num;
+			if (item->m_id_num > 0 && item->m_id_num < hb::server::config::MaxItemTypes
+				&& m_item_config_list[item->m_id_num] != nullptr)
+			{
+				out_display_id = m_item_config_list[item->m_id_num]->m_display_id;
+			}
+		}
+	};
+
+	fill_slot(EquipPos::Head,      appr.helm_item_id,   appr.helm_display_id);
+	fill_slot(EquipPos::Body,      appr.armor_item_id,  appr.armor_display_id);
+	fill_slot(EquipPos::FullBody,  appr.armor_item_id,  appr.armor_display_id);
+	fill_slot(EquipPos::Arms,      appr.arm_item_id,    appr.arm_display_id);
+	fill_slot(EquipPos::Pants,     appr.pants_item_id,  appr.pants_display_id);
+	fill_slot(EquipPos::Leggings,  appr.boots_item_id,  appr.boots_display_id);
+	fill_slot(EquipPos::RightHand, appr.weapon_item_id, appr.weapon_display_id);
+	fill_slot(EquipPos::TwoHand,   appr.weapon_item_id, appr.weapon_display_id);
+	fill_slot(EquipPos::LeftHand,  appr.shield_item_id, appr.shield_display_id);
+	fill_slot(EquipPos::Back,      appr.mantle_item_id, appr.mantle_display_id);
+
+	// Compute is_skirt from equipped pants
+	short pants_slot = client->m_item_equipment_status[to_int(EquipPos::Pants)];
+	if (pants_slot >= 0 && client->m_item_list[pants_slot] != nullptr)
+		appr.is_skirt = (client->m_item_list[pants_slot]->m_appearance_value == 1);
+
+	return appr;
+}
 
 // Move location tables  auto-calculated from hb::shared::view::InitDataTilesX/Y.
 // Each direction lists the (X,Y) tile offsets revealed when the player
@@ -395,23 +440,22 @@ bool CGame::accept_login(hb::shared::net::ASIOSocket* sock)
 	if (m_is_game_started == false)
 	{
 		hb::logger::log("Connection closed (not initialized)");
-		goto CLOSE_ANYWAY;
 	}
-
-	for(int i = 0; i < MaxClientLoginSock; i++)
+	else
 	{
-		auto& p = _lclients[i];
-		if (!p)
+		for(int i = 0; i < MaxClientLoginSock; i++)
 		{
-			p = new LoginClient(G_pIOPool->get_context());
-			sock->accept(p->sock);  // MODERNIZED: Removed WM_USER_BOT_ACCEPT message ID
-			std::memset(p->ip, 0, sizeof(p->ip));
-			p->sock->get_peer_address(p->ip);
-			return true;
+			auto& p = _lclients[i];
+			if (!p)
+			{
+				p = new LoginClient(G_pIOPool->get_context());
+				sock->accept(p->sock);  // MODERNIZED: Removed WM_USER_BOT_ACCEPT message ID
+				std::memset(p->ip, 0, sizeof(p->ip));
+				p->sock->get_peer_address(p->ip);
+				return true;
+			}
 		}
 	}
-
-CLOSE_ANYWAY:
 
 	// MODERNIZED: Removed m_hWnd parameter
 	auto tmp_sock = new hb::shared::net::ASIOSocket(G_pIOPool->get_context(), ServerSocketBlockLimit);
@@ -427,88 +471,95 @@ bool CGame::accept(class hb::shared::net::ASIOSocket* x_sock)
 	class hb::shared::net::ASIOSocket* tmp_sock;
 	char i_pto_ban[21];
 	FILE* file;
+	bool close_conn = false;
 
 	if (m_is_game_started == false)
-		goto CLOSE_ANYWAY;
+	{
+		// Fall through to CLOSE_ANYWAY
+	}
+	else
+	{
+		for(int i = 1; i < MaxClients; i++)
+			if (m_client_list[i] == 0) {
 
-	for(int i = 1; i < MaxClients; i++)
-		if (m_client_list[i] == 0) {
+				m_client_list[i] = new class CClient(G_pIOPool->get_context());
+				add_client_short_cut(i);
+				m_client_list[i]->m_sp_time = m_client_list[i]->m_mp_time =
+					m_client_list[i]->m_hp_time = m_client_list[i]->m_auto_save_time =
+					m_client_list[i]->m_time = m_client_list[i]->m_hunger_time = m_client_list[i]->m_exp_stock_time =
+					m_client_list[i]->m_recent_attack_time = m_client_list[i]->m_auto_exp_time = m_client_list[i]->m_speed_hack_check_time =
+					m_client_list[i]->m_afk_activity_time = GameClock::GetTimeMS();
 
-			m_client_list[i] = new class CClient(G_pIOPool->get_context());
-			add_client_short_cut(i);
-			m_client_list[i]->m_sp_time = m_client_list[i]->m_mp_time =
-				m_client_list[i]->m_hp_time = m_client_list[i]->m_auto_save_time =
-				m_client_list[i]->m_time = m_client_list[i]->m_hunger_time = m_client_list[i]->m_exp_stock_time =
-				m_client_list[i]->m_recent_attack_time = m_client_list[i]->m_auto_exp_time = m_client_list[i]->m_speed_hack_check_time =
-				m_client_list[i]->m_afk_activity_time = GameClock::GetTimeMS();
+				x_sock->accept(m_client_list[i]->m_socket);
 
-			x_sock->accept(m_client_list[i]->m_socket);
+				std::memset(m_client_list[i]->m_ip_address, 0, sizeof(m_client_list[i]->m_ip_address));
+				m_client_list[i]->m_socket->get_peer_address(m_client_list[i]->m_ip_address);
 
-			std::memset(m_client_list[i]->m_ip_address, 0, sizeof(m_client_list[i]->m_ip_address));
-			m_client_list[i]->m_socket->get_peer_address(m_client_list[i]->m_ip_address);
+				a = i;
 
-			a = i;
-
-			for(int v = 0; v < MaxBanned; v++)
-			{
-				if (strcmp(m_banned_list[v].banned_ip_address, m_client_list[i]->m_ip_address) == 0)
+				for(int v = 0; v < MaxBanned; v++)
 				{
-					goto CLOSE_CONN;
+					if (strcmp(m_banned_list[v].banned_ip_address, m_client_list[i]->m_ip_address) == 0)
+					{
+						close_conn = true;
+						break;
+					}
 				}
-			}
-			//centu: Anti-Downer
-			for(int j = 0; j < MaxClients; j++) {
-				if (m_client_list[j] != 0) {
-					if (strcmp(m_client_list[j]->m_ip_address, m_client_list[i]->m_ip_address) == 0) totalip++;
+				if (!close_conn) {
+					//centu: Anti-Downer
+					for(int j = 0; j < MaxClients; j++) {
+						if (m_client_list[j] != 0) {
+							if (strcmp(m_client_list[j]->m_ip_address, m_client_list[i]->m_ip_address) == 0) totalip++;
+						}
+					}
+					if (totalip > 9) {
+						std::memset(i_pto_ban, 0, sizeof(i_pto_ban));
+						strcpy(i_pto_ban, m_client_list[i]->m_ip_address);
+						//opens cfg file
+						file = fopen("gameconfigs/bannedlist.cfg", "a");
+						//shows log
+						hb::logger::log("Client {}: IP banned ({})", i, i_pto_ban);
+						//modifys cfg file
+						fprintf(file, "banned-ip = %s", i_pto_ban);
+						fprintf(file, "\n");
+						fclose(file);
+
+						//updates bannedlist.cfg on the server
+						for(int x = 0; x < MaxBanned; x++)
+							if (strlen(m_banned_list[x].banned_ip_address) == 0)
+								strcpy(m_banned_list[x].banned_ip_address, i_pto_ban);
+
+						close_conn = true;
+					}
 				}
+
+				if (close_conn) {
+					delete m_client_list[a];
+					m_client_list[a] = 0;
+					remove_client_short_cut(a);
+					return false;
+				}
+
+				hb::logger::log("Client {}: connected from {}", i, m_client_list[i]->m_ip_address);
+
+				m_total_clients++;
+
+				if (m_total_clients > m_max_clients) {
+					m_max_clients = m_total_clients;
+					//m_max_user_sys_time = hb::time::local_time::now();
+					//std::snprintf(txt, sizeof(txt), "Maximum Players: %d", m_max_clients);
+					//PutLogFileList(txt);
+				}
+
+				// m_client_list[client_h]->m_is_init_complete   .
+				return true;
 			}
-			if (totalip > 9) {
-				std::memset(i_pto_ban, 0, sizeof(i_pto_ban));
-				strcpy(i_pto_ban, m_client_list[i]->m_ip_address);
-				//opens cfg file
-				file = fopen("gameconfigs/bannedlist.cfg", "a");
-				//shows log
-				hb::logger::log("Client {}: IP banned ({})", i, i_pto_ban);
-				//modifys cfg file
-				fprintf(file, "banned-ip = %s", i_pto_ban);
-				fprintf(file, "\n");
-				fclose(file);
-
-				//updates bannedlist.cfg on the server
-				for(int x = 0; x < MaxBanned; x++)
-					if (strlen(m_banned_list[x].banned_ip_address) == 0)
-						strcpy(m_banned_list[x].banned_ip_address, i_pto_ban);
-
-				goto CLOSE_CONN;
-			}
-
-			hb::logger::log("Client {}: connected from {}", i, m_client_list[i]->m_ip_address);
-
-			m_total_clients++;
-
-			if (m_total_clients > m_max_clients) {
-				m_max_clients = m_total_clients;
-				//m_max_user_sys_time = hb::time::local_time::now();
-				//std::snprintf(txt, sizeof(txt), "Maximum Players: %d", m_max_clients);
-				//PutLogFileList(txt);
-			}
-
-			// m_client_list[client_h]->m_is_init_complete   .
-			return true;
-		}
-
-CLOSE_ANYWAY:
+	}
 
 	tmp_sock = new class hb::shared::net::ASIOSocket(G_pIOPool->get_context(), ServerSocketBlockLimit);
 	x_sock->accept(tmp_sock);
 	delete tmp_sock;
 
-	return false;
-
-CLOSE_CONN:
-	delete m_client_list[a];
-	m_client_list[a] = 0;
-	remove_client_short_cut(a);
 	return false;
 }
 
@@ -537,6 +588,7 @@ bool CGame::accept_from_async(asio::ip::tcp::socket&& peer)
 	int totalip = 0, a;
 	char i_pto_ban[21];
 	FILE* file;
+	bool close_conn = false;
 
 	if (m_is_game_started == false) return false;
 
@@ -562,29 +614,39 @@ bool CGame::accept_from_async(asio::ip::tcp::socket&& peer)
 			{
 				if (strcmp(m_banned_list[v].banned_ip_address, m_client_list[i]->m_ip_address) == 0)
 				{
-					goto CLOSE_CONN_ASYNC;
+					close_conn = true;
+					break;
 				}
 			}
 
-			for(int j = 0; j < MaxClients; j++) {
-				if (m_client_list[j] != 0) {
-					if (strcmp(m_client_list[j]->m_ip_address, m_client_list[i]->m_ip_address) == 0) totalip++;
+			if (!close_conn) {
+				for(int j = 0; j < MaxClients; j++) {
+					if (m_client_list[j] != 0) {
+						if (strcmp(m_client_list[j]->m_ip_address, m_client_list[i]->m_ip_address) == 0) totalip++;
+					}
+				}
+				if (totalip > 9) {
+					std::memset(i_pto_ban, 0, sizeof(i_pto_ban));
+					strcpy(i_pto_ban, m_client_list[i]->m_ip_address);
+					file = fopen("gameconfigs/bannedlist.cfg", "a");
+					hb::logger::log("Client {}: IP banned ({})", i, i_pto_ban);
+					fprintf(file, "banned-ip = %s", i_pto_ban);
+					fprintf(file, "\n");
+					fclose(file);
+
+					for(int x = 0; x < MaxBanned; x++)
+						if (strlen(m_banned_list[x].banned_ip_address) == 0)
+							strcpy(m_banned_list[x].banned_ip_address, i_pto_ban);
+
+					close_conn = true;
 				}
 			}
-			if (totalip > 9) {
-				std::memset(i_pto_ban, 0, sizeof(i_pto_ban));
-				strcpy(i_pto_ban, m_client_list[i]->m_ip_address);
-				file = fopen("gameconfigs/bannedlist.cfg", "a");
-				hb::logger::log("Client {}: IP banned ({})", i, i_pto_ban);
-				fprintf(file, "banned-ip = %s", i_pto_ban);
-				fprintf(file, "\n");
-				fclose(file);
 
-				for(int x = 0; x < MaxBanned; x++)
-					if (strlen(m_banned_list[x].banned_ip_address) == 0)
-						strcpy(m_banned_list[x].banned_ip_address, i_pto_ban);
-
-				goto CLOSE_CONN_ASYNC;
+			if (close_conn) {
+				delete m_client_list[a];
+				m_client_list[a] = 0;
+				remove_client_short_cut(a);
+				return false;
 			}
 
 			hb::logger::log("Client {}: connected from {}", i, m_client_list[i]->m_ip_address);
@@ -627,12 +689,6 @@ bool CGame::accept_from_async(asio::ip::tcp::socket&& peer)
 			return true;
 		}
 
-	return false;
-
-CLOSE_CONN_ASYNC:
-	delete m_client_list[a];
-	m_client_list[a] = 0;
-	remove_client_short_cut(a);
 	return false;
 }
 
@@ -897,67 +953,59 @@ bool CGame::init()
 
 	m_fightzone_no_force_recall = 0;
 
-	for(int i = 1; i < 1000; i++) {
-		m_level_exp_table[i] = get_level_exp(i);
-		//testcode
-		//std::snprintf(G_cTxt, sizeof(G_cTxt), "Level:%d --- Exp:%d", i, m_level_exp_table[i]);
-		//PutLogFileList(G_cTxt);
+	// Load server_config.json (balance settings, timing, combat, etc.)
+	server_config cfg;
+	if (!load_server_config("server_config.json", cfg))
+	{
+		hb::logger::error("Cannot start server: server_config.json unavailable or invalid");
+		return false;
 	}
-
-	m_level_exp_20 = m_level_exp_table[20];
+	apply_server_config(cfg);
 
 	sqlite3* configDb = nullptr;
 	std::string configDbPath;
 	bool configDbCreated = false;
-	hb::logger::log("Validating gameconfigs.db");
+	hb::logger::log("Loading game data from gamedata.db");
 	bool configDbReady = EnsureGameConfigDatabase(&configDb, configDbPath, &configDbCreated);
 	if (!configDbReady) {
-		hb::logger::error("Cannot start server: gameconfigs.db unavailable");
+		hb::logger::error("Cannot start server: gamedata.db unavailable");
 		return false;
 	}
 	if (configDbCreated) {
-		hb::logger::error("Cannot start server: gameconfigs.db missing configuration data");
+		hb::logger::error("Cannot start server: gamedata.db missing configuration data");
 		CloseGameConfigDatabase(configDb);
 		return false;
 	}
 
-	if (!HasGameConfigRows(configDb, "realmlist") || !HasGameConfigRows(configDb, "active_maps") ||
-		!LoadRealmConfig(configDb, this)) {
-		hb::logger::error("Cannot start server: program configs missing in gameconfigs.db");
+	if (!LoadFormulas(configDb, m_formula_engine))
+	{
+		hb::logger::error("Cannot start server: formula data missing in gamedata.db");
 		CloseGameConfigDatabase(configDb);
 		return false;
 	}
 
-	if (!HasGameConfigRows(configDb, "settings") || !LoadSettingsConfig(configDb, this)) {
-		hb::logger::error("Cannot start server: settings configs missing in gameconfigs.db");
+	auto vr = m_formula_engine.validate();
+	if (!vr.success)
+	{
+		hb::logger::error("Formula validation failed. Press Enter to exit...");
+		std::string dummy;
+		std::getline(std::cin, dummy);
 		CloseGameConfigDatabase(configDb);
 		return false;
 	}
 
-	// Calculate m_max_stat_value after settings are loaded
-	// Formula: base + creation + (levelup * max_level) + angelic_max(16)
-	m_max_stat_value = m_base_stat_value + m_creation_stat_bonus + (m_levelup_stat_gain * m_max_level) + 16;
-	hb::logger::log("Max stat value calculated: {}", m_max_stat_value);
+	for (int i = 1; i < 1000; i++)
+		m_level_exp_table[i] = get_level_exp(i);
+	m_level_exp_20 = m_level_exp_table[20];
 
 	if (!LoadBannedListConfig(configDb, this)) {
-		hb::logger::error("Cannot start server: banned list unavailable in gameconfigs.db");
+		hb::logger::error("Cannot start server: banned list unavailable in gamedata.db");
 		CloseGameConfigDatabase(configDb);
 		return false;
 	}
 
-	if (!LoadAdminConfig(configDb, this)) {
-		hb::logger::log("Could not load admin config from gameconfigs.db, admin list empty");
-	}
-	else {
-		hb::logger::log("Loaded {} admin(s) from gameconfigs.db.", m_admin_count);
-	}
-
-	if (!LoadCommandPermissions(configDb, this)) {
-		hb::logger::log("Could not load command permissions from gameconfigs.db");
-	}
-	else if (!m_command_permissions.empty()) {
-		hb::logger::log("Loaded {} command permission override(s) from gameconfigs.db.", (int)m_command_permissions.size());
-	}
+	LoadAdminConfig(configDb, this);
+	LoadCommandPermissions(configDb, this);
 
 	srand((unsigned)std::time(0));
 
@@ -966,6 +1014,10 @@ bool CGame::init()
 	_lsock->init_buffer_size(hb::shared::limits::MsgBufferSize);
 
 	m_on_exit_process = false;
+	m_shutdown_start_time = 0;
+	m_shutdown_delay_ms = 0;
+	m_shutdown_next_milestone = 0;
+	m_shutdown_message[0] = '\0';
 
 	for(int i = 0; i <= 100; i++) {
 		m_skill_progress_threshold[i] = m_skill_manager->calc_skill_ssn_point(i);
@@ -975,9 +1027,6 @@ bool CGame::init()
 	if (SysTime.minute >= m_nighttime_duration)
 		m_day_or_night = 2;
 	else m_day_or_night = 1;
-
-	read_notify_msg_list_file("gameconfigs/notice.txt");
-	m_notice_time = time;
 
 	m_notice_data = 0;
 	m_notice_data_size = 0;
@@ -1016,7 +1065,7 @@ bool CGame::init()
 		m_is_item_available = LoadItemConfigs(configDb, m_item_config_list, MaxItemTypes);
 	}
 	if (!m_is_item_available) {
-		hb::logger::error("Cannot start server: item configs missing in gameconfigs.db");
+		hb::logger::error("Cannot start server: item configs missing in gamedata.db");
 		CloseGameConfigDatabase(configDb);
 		return false;
 	}
@@ -1026,7 +1075,7 @@ bool CGame::init()
 		m_is_build_item_available = LoadBuildItemConfigs(configDb, this);
 	}
 	if (!m_is_build_item_available) {
-		hb::logger::error("Cannot start server: build item configs missing in gameconfigs.db");
+		hb::logger::error("Cannot start server: build item configs missing in gamedata.db");
 		CloseGameConfigDatabase(configDb);
 		return false;
 	}
@@ -1036,7 +1085,7 @@ bool CGame::init()
 		m_is_npc_available = LoadNpcConfigs(configDb, this);
 	}
 	if (!m_is_npc_available) {
-		hb::logger::error("Cannot start server: NPC configs missing in gameconfigs.db");
+		hb::logger::error("Cannot start server: NPC configs missing in gamedata.db");
 		CloseGameConfigDatabase(configDb);
 		return false;
 	}
@@ -1046,7 +1095,7 @@ bool CGame::init()
 		m_is_drop_table_available = LoadDropTables(configDb, this);
 	}
 	if (!m_is_drop_table_available) {
-		hb::logger::error("Cannot start server: drop tables missing in gameconfigs.db");
+		hb::logger::error("Cannot start server: drop tables missing in gamedata.db");
 		CloseGameConfigDatabase(configDb);
 		return false;
 	}
@@ -1069,21 +1118,12 @@ bool CGame::init()
 		}
 	}
 
-	// Load shop configurations (optional - server works without shops)
-	m_is_shop_data_available = false;
-	if (HasGameConfigRows(configDb, "npc_shop_mapping") || HasGameConfigRows(configDb, "shop_items")) {
-		LoadShopConfigs(configDb, this);
-	}
-	if (!m_is_shop_data_available) {
-		hb::logger::log("Shop data not configured, NPCs will not have shop inventories");
-	}
-
 	m_is_magic_available = false;
 	if (HasGameConfigRows(configDb, "magic_configs")) {
 		m_is_magic_available = LoadMagicConfigs(configDb, this);
 	}
 	if (!m_is_magic_available) {
-		hb::logger::error("Cannot start server: magic configs missing in gameconfigs.db");
+		hb::logger::error("Cannot start server: magic configs missing in gamedata.db");
 		CloseGameConfigDatabase(configDb);
 		return false;
 	}
@@ -1093,19 +1133,17 @@ bool CGame::init()
 		m_is_skill_available = LoadSkillConfigs(configDb, this);
 	}
 	if (!m_is_skill_available) {
-		hb::logger::error("Cannot start server: skill configs missing in gameconfigs.db");
+		hb::logger::error("Cannot start server: skill configs missing in gamedata.db");
 		CloseGameConfigDatabase(configDb);
 		return false;
 	}
-
-	compute_config_hashes();
 
 	m_is_quest_available = false;
 	if (HasGameConfigRows(configDb, "quest_configs")) {
 		m_is_quest_available = LoadQuestConfigs(configDb, this);
 	}
 	if (!m_is_quest_available) {
-		hb::logger::error("Cannot start server: quest configs missing in gameconfigs.db");
+		hb::logger::error("Cannot start server: quest configs missing in gamedata.db");
 		CloseGameConfigDatabase(configDb);
 		return false;
 	}
@@ -1115,12 +1153,98 @@ bool CGame::init()
 		m_is_portion_available = LoadPortionConfigs(configDb, this);
 	}
 	if (!m_is_portion_available) {
-		hb::logger::error("Cannot start server: potion/crafting configs missing in gameconfigs.db");
+		hb::logger::error("Cannot start server: potion/crafting configs missing in gamedata.db");
+		CloseGameConfigDatabase(configDb);
+		return false;
+	}
+
+	// Log consolidated game data counts
+	{
+		int item_count = 0;
+		for (int i = 0; i < MaxItemTypes; i++)
+			if (m_item_config_list[i] != nullptr) item_count++;
+		int build_item_count = 0;
+		for (int i = 0; i < hb::shared::limits::MaxBuildItems; i++)
+			if (m_build_item_list[i] != nullptr) build_item_count++;
+		int npc_count = 0;
+		for (int i = 0; i < MaxNpcTypes; i++)
+			if (m_npc_config_list[i] != nullptr) npc_count++;
+		int magic_count = 0;
+		for (int i = 0; i < hb::shared::limits::MaxMagicType; i++)
+			if (m_magic_config_list[i] != nullptr) magic_count++;
+		int skill_count = 0;
+		for (int i = 0; i < hb::shared::limits::MaxSkillType; i++)
+			if (m_skill_config_list[i] != nullptr) skill_count++;
+		int quest_count = 0;
+		for (int i = 0; i < MaxQuestType; i++)
+			if (m_quest_manager->m_quest_config_list[i] != nullptr) quest_count++;
+		int potion_count = 0;
+		for (int i = 0; i < MaxPortionTypes; i++)
+			if (m_crafting_manager->m_portion_config_list[i] != nullptr) potion_count++;
+
+		hb::logger::log("- {} items, {} build items", item_count, build_item_count);
+		hb::logger::log("- {} NPCs, {} drop tables", npc_count, (int)m_drop_tables.size());
+		hb::logger::log("- {} magic, {} skills", magic_count, skill_count);
+		hb::logger::log("- {} quests, {} potions", quest_count, potion_count);
+		hb::logger::log("- {} admins, {} command permission overrides", m_admin_count, (int)m_command_permissions.size());
+	}
+
+	// Load shop configurations (optional - server works without shops)
+	m_is_shop_data_available = false;
+	if (HasGameConfigRows(configDb, "npc_shop_mapping") || HasGameConfigRows(configDb, "shop_items")) {
+		LoadShopConfigs(configDb, this);
+	}
+	if (!m_is_shop_data_available) {
+		hb::logger::warn("Shop data not configured, NPCs will not have shop inventories");
+	}
+
+	read_notify_msg_list_file("gameconfigs/notice.txt");
+	m_notice_time = time;
+
+	// Load active maps from gamedata.db (must be before map config loading below)
+	hb::logger::log("Loading active maps from gamedata.db");
+	if (!HasGameConfigRows(configDb, "active_maps") || !LoadActiveMaps(configDb, this)) {
+		hb::logger::error("Cannot start server: active_maps missing in gamedata.db");
 		CloseGameConfigDatabase(configDb);
 		return false;
 	}
 
 	CloseGameConfigDatabase(configDb);
+
+	// Load map configurations (display names, no-attack areas, static NPCs) from mapinfo.db
+	// Must be after NPC configs are loaded from gamedata.db (spawn_map_npcs needs m_npc_config_list)
+	{
+		sqlite3* mapInfoDb = nullptr;
+		std::string mapInfoDbPath;
+		bool mapInfoDbCreated = false;
+
+		if (!EnsureMapInfoDatabase(&mapInfoDb, mapInfoDbPath, &mapInfoDbCreated)) {
+			hb::logger::error("Cannot start server: mapinfo.db not available");
+			return false;
+		}
+
+		for (int i = 0; i < MaxMaps; i++)
+		{
+			if (m_map_list[i] != 0)
+			{
+				if (memcmp(m_map_list[i]->m_name, "fightzone", 9) == 0)
+					m_map_list[i]->m_is_fight_zone = true;
+				if (memcmp(m_map_list[i]->m_name, "icebound", 8) == 0)
+					m_map_list[i]->m_is_snow_enabled = true;
+
+				if (LoadMapConfig(mapInfoDb, m_map_list[i]->m_name, m_map_list[i])) {
+					m_map_list[i]->setup_no_attack_area();
+					spawn_map_npcs_from_database(mapInfoDb, i);
+				}
+				else {
+					hb::logger::warn("- Failed to load map config for: {}", m_map_list[i]->m_name);
+				}
+			}
+		}
+		CloseMapInfoDatabase(mapInfoDb);
+	}
+
+	compute_config_hashes();
 
 	return true;
 }
@@ -1159,7 +1283,7 @@ void CGame::client_motion_handler(int client_h, char* data)
 	uint32_t client_time;
 	uint16_t command, target_object_id = 0;
 	short sX, sY, dX, dY, type;
-	char dir;
+	direction dir;
 	int   ret, temp;
 
 	if (m_client_list[client_h] == 0) return;
@@ -1172,7 +1296,7 @@ void CGame::client_motion_handler(int client_h, char* data)
 	command = base->header.msg_type;
 	sX = base->x;
 	sY = base->y;
-	dir = static_cast<char>(base->dir);
+	dir = static_cast<direction>(base->dir);
 	dX = base->dx;
 	dY = base->dy;
 	type = base->type;
@@ -1285,7 +1409,7 @@ void CGame::client_motion_handler(int client_h, char* data)
 	}
 }
 
-int CGame::client_motion_move_handler(int client_h, short sX, short sY, char dir, char move_type)
+int CGame::client_motion_move_handler(int client_h, short sX, short sY, direction dir, char move_type)
 {
 	char moveMapData[3000];
 	class CTile* tile;
@@ -1425,6 +1549,7 @@ int CGame::client_motion_move_handler(int client_h, short sX, short sY, char dir
 				if (m_client_list[client_h]->m_time_left_firm_stamina == 0) {
 					m_client_list[client_h]->m_sp--;
 					pkt->stamina_cost = 1;
+					send_notify_msg(0, client_h, Notify::Sp, 0, 0, 0, 0);
 				}
 			}
 		}
@@ -1462,7 +1587,7 @@ int CGame::client_motion_move_handler(int client_h, short sX, short sY, char dir
 		pkt->type = m_client_list[object_id]->m_type;
 		pkt->dir = static_cast<std::uint8_t>(m_client_list[object_id]->m_dir);
 		std::memcpy(pkt->name, m_client_list[object_id]->m_char_name, sizeof(pkt->name));
-		pkt->appearance = m_client_list[object_id]->m_appearance;
+		pkt->appearance = build_broadcast_appearance(object_id);
 		{
 			auto pktStatus = m_client_list[object_id]->m_status;
 			pktStatus.pk = (m_client_list[object_id]->m_player_kill_count != 0) ? 1 : 0;
@@ -1658,19 +1783,23 @@ void CGame::request_init_data_handler(int client_h, char* data, char key, size_t
 
 	// Send configs FIRST so the client has item/magic/skill definitions
 	// before receiving player data that references them.
-	uint32_t clientItemHash = 0, clientMagicHash = 0, clientSkillHash = 0, clientNpcHash = 0;
+	std::string clientItemHash, clientMagicHash, clientSkillHash, clientNpcHash, clientMapHash, clientBalanceHash;
 	if (msg_size >= sizeof(hb::net::PacketRequestInitDataEx)) {
 		const auto* exReq = reinterpret_cast<const hb::net::PacketRequestInitDataEx*>(data);
 		clientItemHash = exReq->itemConfigHash;
 		clientMagicHash = exReq->magicConfigHash;
 		clientSkillHash = exReq->skillConfigHash;
 		clientNpcHash = exReq->npcConfigHash;
+		clientMapHash = exReq->mapConfigHash;
+		clientBalanceHash = exReq->balanceConfigHash;
 	}
 
-	bool item_cache_valid  = (clientItemHash != 0 && clientItemHash == m_config_hash[0]);
-	bool magic_cache_valid = (clientMagicHash != 0 && clientMagicHash == m_config_hash[1]);
-	bool skill_cache_valid = (clientSkillHash != 0 && clientSkillHash == m_config_hash[2]);
-	bool npc_cache_valid   = (clientNpcHash != 0 && clientNpcHash == m_config_hash[3]);
+	bool item_cache_valid    = (!clientItemHash.empty() && clientItemHash == m_config_hash[0]);
+	bool magic_cache_valid   = (!clientMagicHash.empty() && clientMagicHash == m_config_hash[1]);
+	bool skill_cache_valid   = (!clientSkillHash.empty() && clientSkillHash == m_config_hash[2]);
+	bool npc_cache_valid     = (!clientNpcHash.empty() && clientNpcHash == m_config_hash[3]);
+	bool map_cache_valid     = (!clientMapHash.empty() && clientMapHash == m_config_hash[4]);
+	bool balance_cache_valid = (!clientBalanceHash.empty() && clientBalanceHash == m_config_hash[5]);
 
 	{
 		hb::net::PacketResponseConfigCacheStatus cacheStatus{};
@@ -1680,14 +1809,18 @@ void CGame::request_init_data_handler(int client_h, char* data, char key, size_t
 		cacheStatus.magicCacheValid = magic_cache_valid ? 1 : 0;
 		cacheStatus.skillCacheValid = skill_cache_valid ? 1 : 0;
 		cacheStatus.npcCacheValid = npc_cache_valid ? 1 : 0;
+		cacheStatus.mapCacheValid = map_cache_valid ? 1 : 0;
+		cacheStatus.balanceCacheValid = balance_cache_valid ? 1 : 0;
 		m_client_list[client_h]->m_socket->send_msg(
 			reinterpret_cast<char*>(&cacheStatus), sizeof(cacheStatus));
 	}
 
-	if (!item_cache_valid)  m_item_manager->send_client_item_configs(client_h);
-	if (!magic_cache_valid) m_magic_manager->send_client_magic_configs(client_h);
-	if (!skill_cache_valid) m_skill_manager->send_client_skill_configs(client_h);
-	if (!npc_cache_valid)   send_client_npc_configs(client_h);
+	if (!item_cache_valid)    m_item_manager->send_client_item_configs(client_h);
+	if (!magic_cache_valid)   m_magic_manager->send_client_magic_configs(client_h);
+	if (!skill_cache_valid)   m_skill_manager->send_client_skill_configs(client_h);
+	if (!npc_cache_valid)     send_client_npc_configs(client_h);
+	if (!map_cache_valid)     send_client_map_configs(client_h);
+	if (!balance_cache_valid) send_client_balance_config(client_h);
 
 	// Now send player data (configs are guaranteed loaded on client)
 	writer.Reset();
@@ -1777,8 +1910,6 @@ void CGame::request_init_data_handler(int client_h, char* data, char key, size_t
 		entry->gender_limit = m_client_list[client_h]->m_item_list[i]->m_gender_limit;
 		entry->cur_lifespan = m_client_list[client_h]->m_item_list[i]->m_cur_life_span;
 		entry->weight = m_client_list[client_h]->m_item_list[i]->m_weight;
-		entry->sprite = m_client_list[client_h]->m_item_list[i]->m_sprite;
-		entry->sprite_frame = m_client_list[client_h]->m_item_list[i]->m_sprite_frame;
 		entry->item_color = m_client_list[client_h]->m_item_list[i]->m_item_color;
 		entry->spec_value2 = static_cast<std::uint8_t>(m_client_list[client_h]->m_item_list[i]->m_item_special_effect_value2);
 		entry->attribute = m_client_list[client_h]->m_item_list[i]->m_attribute;
@@ -1811,8 +1942,6 @@ void CGame::request_init_data_handler(int client_h, char* data, char key, size_t
 		entry->gender_limit = m_client_list[client_h]->m_item_in_bank_list[i]->m_gender_limit;
 		entry->cur_lifespan = m_client_list[client_h]->m_item_in_bank_list[i]->m_cur_life_span;
 		entry->weight = m_client_list[client_h]->m_item_in_bank_list[i]->m_weight;
-		entry->sprite = m_client_list[client_h]->m_item_in_bank_list[i]->m_sprite;
-		entry->sprite_frame = m_client_list[client_h]->m_item_in_bank_list[i]->m_sprite_frame;
 		entry->item_color = m_client_list[client_h]->m_item_in_bank_list[i]->m_item_color;
 		entry->spec_value2 = static_cast<std::uint8_t>(m_client_list[client_h]->m_item_in_bank_list[i]->m_item_special_effect_value2);
 		entry->attribute = m_client_list[client_h]->m_item_in_bank_list[i]->m_attribute;
@@ -1844,14 +1973,26 @@ void CGame::request_init_data_handler(int client_h, char* data, char key, size_t
 	init_header->header.msg_type = MsgType::Confirm;
 
 	if (m_client_list[client_h]->m_is_observer_mode == false)
+	{
+		// When dest is -1,-1 (teleport to initial points), resolve to a random spawn first
+		// so get_empty_position searches near a valid point instead of (-1,-1).
+		// Use the destination map's location_name (not player's m_location) to ensure
+		// randomization even for players with location "NONE".
+		if (m_client_list[client_h]->m_x == -1 && m_client_list[client_h]->m_y == -1)
+		{
+			get_map_initial_point(m_client_list[client_h]->m_map_index,
+				&m_client_list[client_h]->m_x, &m_client_list[client_h]->m_y,
+				m_map_list[m_client_list[client_h]->m_map_index]->m_location_name);
+		}
 		get_empty_position(&m_client_list[client_h]->m_x, &m_client_list[client_h]->m_y, m_client_list[client_h]->m_map_index);
+	}
 	else get_map_initial_point(m_client_list[client_h]->m_map_index, &m_client_list[client_h]->m_x, &m_client_list[client_h]->m_y);
 
 	init_header->player_object_id = static_cast<std::int16_t>(client_h);
 	init_header->pivot_x = static_cast<std::int16_t>(m_client_list[client_h]->m_x - hb::shared::view::PlayerPivotOffsetX);
 	init_header->pivot_y = static_cast<std::int16_t>(m_client_list[client_h]->m_y - hb::shared::view::PlayerPivotOffsetY);
 	init_header->player_type = m_client_list[client_h]->m_type;
-	init_header->appearance = m_client_list[client_h]->m_appearance;
+	init_header->appearance = build_broadcast_appearance(client_h);
 	init_header->status = m_client_list[client_h]->m_status;
 	std::memcpy(init_header->map_name, m_client_list[client_h]->m_map_name, sizeof(init_header->map_name));
 	std::memcpy(init_header->cur_location, m_map_list[m_client_list[client_h]->m_map_index]->m_location_name, sizeof(init_header->cur_location));
@@ -2181,9 +2322,76 @@ bool CGame::send_client_npc_configs(int client_h)
 	return true;
 }
 
+bool CGame::send_client_map_configs(int client_h)
+{
+	if (m_client_list[client_h] == 0) {
+		return false;
+	}
+
+	constexpr size_t maxPacketSize = 7000;
+	constexpr size_t headerSize = sizeof(hb::net::PacketMapConfigHeader);
+	constexpr size_t entrySize = sizeof(hb::net::PacketMapConfigEntry);
+	constexpr size_t maxEntriesPerPacket = (maxPacketSize - headerSize) / entrySize;
+
+	int totalMaps = 0;
+	for (int i = 0; i < MaxMaps; i++) {
+		if (m_map_list[i] != 0 && m_map_list[i]->m_display_name[0] != '\0') totalMaps++;
+	}
+
+	int mapsSent = 0;
+	int packetIndex = 0;
+
+	while (mapsSent < totalMaps) {
+		std::memset(G_cData50000, 0, sizeof(G_cData50000));
+
+		auto* pktHeader = reinterpret_cast<hb::net::PacketMapConfigHeader*>(G_cData50000);
+		pktHeader->header.msg_id = MsgId::MapConfigContents;
+		pktHeader->header.msg_type = MsgType::Confirm;
+		pktHeader->totalMaps = static_cast<uint16_t>(totalMaps);
+		pktHeader->packetIndex = static_cast<uint16_t>(packetIndex);
+
+		auto* entries = reinterpret_cast<hb::net::PacketMapConfigEntry*>(G_cData50000 + headerSize);
+
+		uint16_t entriesInPacket = 0;
+		int skipped = 0;
+
+		for (int i = 0; i < MaxMaps && entriesInPacket < maxEntriesPerPacket; i++) {
+			if (m_map_list[i] == 0 || m_map_list[i]->m_display_name[0] == '\0') continue;
+			if (skipped < mapsSent) { skipped++; continue; }
+
+			auto& entry = entries[entriesInPacket];
+			std::memset(&entry, 0, sizeof(entry));
+			std::snprintf(entry.map_name, sizeof(entry.map_name), "%s", m_map_list[i]->m_name);
+			std::snprintf(entry.display_name, sizeof(entry.display_name), "%s", m_map_list[i]->m_display_name);
+			entriesInPacket++;
+		}
+
+		pktHeader->mapCount = entriesInPacket;
+		size_t packetSize = headerSize + (entriesInPacket * entrySize);
+
+		int ret = m_client_list[client_h]->m_socket->send_msg(G_cData50000, static_cast<int>(packetSize));
+		switch (ret) {
+		case sock::Event::QueueFull:
+		case sock::Event::SocketError:
+		case sock::Event::CriticalError:
+		case sock::Event::SocketClosed:
+			hb::logger::log("Failed to send map configs: Client({}) Packet({})", client_h, packetIndex);
+			delete_client(client_h, true, true);
+			delete m_client_list[client_h];
+			m_client_list[client_h] = 0;
+			return false;
+		}
+
+		mapsSent += entriesInPacket;
+		packetIndex++;
+	}
+
+	return true;
+}
+
 void CGame::compute_config_hashes()
 {
-	// Compute CRC32 for item configs
+	// Compute SHA256 for item configs
 	{
 		constexpr size_t headerSize = sizeof(hb::net::PacketItemConfigHeader);
 		constexpr size_t entrySize = sizeof(hb::net::PacketItemConfigEntry);
@@ -2229,8 +2437,6 @@ void CGame::compute_config_hashes()
 				entry.effectValue6 = item->m_item_effect_value6;
 				entry.maxLifeSpan = item->m_max_life_span;
 				entry.specialEffect = item->m_special_effect;
-				entry.sprite = item->m_sprite;
-				entry.spriteFrame = item->m_sprite_frame;
 				entry.price = item->m_is_for_sale ? static_cast<int32_t>(item->m_price) : -static_cast<int32_t>(item->m_price);
 				entry.weight = item->m_weight;
 				entry.apprValue = item->m_appearance_value;
@@ -2257,10 +2463,10 @@ void CGame::compute_config_hashes()
 			itemsSent += entriesInPacket;
 			packetIndex++;
 		}
-		m_config_hash[0] = allData.empty() ? 0 : hb::shared::util::hb_crc32(allData.data(), allData.size());
+		m_config_hash[0] = allData.empty() ? std::string{} : hb::shared::util::sha256(allData.data(), allData.size());
 	}
 
-	// Compute CRC32 for magic configs
+	// Compute SHA256 for magic configs
 	{
 		constexpr size_t headerSize = sizeof(hb::net::PacketMagicConfigHeader);
 		constexpr size_t entrySize = sizeof(hb::net::PacketMagicConfigEntry);
@@ -2319,10 +2525,10 @@ void CGame::compute_config_hashes()
 			magicsSent += entriesInPacket;
 			packetIndex++;
 		}
-		m_config_hash[1] = allData.empty() ? 0 : hb::shared::util::hb_crc32(allData.data(), allData.size());
+		m_config_hash[1] = allData.empty() ? std::string{} : hb::shared::util::sha256(allData.data(), allData.size());
 	}
 
-	// Compute CRC32 for skill configs
+	// Compute SHA256 for skill configs
 	{
 		constexpr size_t headerSize = sizeof(hb::net::PacketSkillConfigHeader);
 		constexpr size_t entrySize = sizeof(hb::net::PacketSkillConfigEntry);
@@ -2374,10 +2580,10 @@ void CGame::compute_config_hashes()
 			skillsSent += entriesInPacket;
 			packetIndex++;
 		}
-		m_config_hash[2] = allData.empty() ? 0 : hb::shared::util::hb_crc32(allData.data(), allData.size());
+		m_config_hash[2] = allData.empty() ? std::string{} : hb::shared::util::sha256(allData.data(), allData.size());
 	}
 
-	// Compute CRC32 for NPC configs
+	// Compute SHA256 for NPC configs
 	{
 		constexpr size_t headerSize = sizeof(hb::net::PacketNpcConfigHeader);
 		constexpr size_t entrySize = sizeof(hb::net::PacketNpcConfigEntry);
@@ -2428,10 +2634,101 @@ void CGame::compute_config_hashes()
 			npcsSent += entriesInPacket;
 			packetIndex++;
 		}
-		m_config_hash[3] = allData.empty() ? 0 : hb::shared::util::hb_crc32(allData.data(), allData.size());
+		m_config_hash[3] = allData.empty() ? std::string{} : hb::shared::util::sha256(allData.data(), allData.size());
 	}
 
-	hb::logger::log("Config hashes computed - Items: 0x{:08X}, Magic: 0x{:08X}, Skills: 0x{:08X}, Npcs: 0x{:08X}", m_config_hash[0], m_config_hash[1], m_config_hash[2], m_config_hash[3]);
+	// Compute SHA256 for map display name configs
+	{
+		constexpr size_t headerSize = sizeof(hb::net::PacketMapConfigHeader);
+		constexpr size_t entrySize = sizeof(hb::net::PacketMapConfigEntry);
+		constexpr size_t maxEntriesPerPacket = (7000 - headerSize) / entrySize;
+
+		std::vector<uint8_t> allData;
+		int totalMaps = 0;
+		for (int i = 0; i < MaxMaps; i++) {
+			if (m_map_list[i] != 0 && m_map_list[i]->m_display_name[0] != '\0') totalMaps++;
+		}
+
+		int mapsSent = 0;
+		int packetIndex = 0;
+		while (mapsSent < totalMaps) {
+			char buf[7000]{};
+			auto* pktHeader = reinterpret_cast<hb::net::PacketMapConfigHeader*>(buf);
+			pktHeader->header.msg_id = MsgId::MapConfigContents;
+			pktHeader->header.msg_type = MsgType::Confirm;
+			pktHeader->totalMaps = static_cast<uint16_t>(totalMaps);
+			pktHeader->packetIndex = static_cast<uint16_t>(packetIndex);
+
+			auto* entries = reinterpret_cast<hb::net::PacketMapConfigEntry*>(buf + headerSize);
+			uint16_t entriesInPacket = 0;
+			int skipped = 0;
+
+			for (int i = 0; i < MaxMaps && entriesInPacket < maxEntriesPerPacket; i++) {
+				if (m_map_list[i] == 0 || m_map_list[i]->m_display_name[0] == '\0') continue;
+				if (skipped < mapsSent) { skipped++; continue; }
+
+				auto& entry = entries[entriesInPacket];
+				std::memset(&entry, 0, sizeof(entry));
+				std::snprintf(entry.map_name, sizeof(entry.map_name), "%s", m_map_list[i]->m_name);
+				std::snprintf(entry.display_name, sizeof(entry.display_name), "%s", m_map_list[i]->m_display_name);
+				entriesInPacket++;
+			}
+
+			pktHeader->mapCount = entriesInPacket;
+			size_t packetSize = headerSize + (entriesInPacket * entrySize);
+
+			uint16_t len = static_cast<uint16_t>(packetSize);
+			const uint8_t* lenBytes = reinterpret_cast<const uint8_t*>(&len);
+			allData.push_back(lenBytes[0]);
+			allData.push_back(lenBytes[1]);
+			allData.insert(allData.end(), reinterpret_cast<uint8_t*>(buf), reinterpret_cast<uint8_t*>(buf) + packetSize);
+
+			mapsSent += entriesInPacket;
+			packetIndex++;
+		}
+		m_config_hash[4] = allData.empty() ? std::string{} : hb::shared::util::sha256(allData.data(), allData.size());
+	}
+
+	compute_balance_hash();
+
+	hb::logger::log("Config hashes computed:");
+	hb::logger::log("- Items: {}", m_config_hash[0]);
+	hb::logger::log("- Magic: {}", m_config_hash[1]);
+	hb::logger::log("- Skills: {}", m_config_hash[2]);
+	hb::logger::log("- Npcs: {}", m_config_hash[3]);
+	hb::logger::log("- Maps: {}", m_config_hash[4]);
+	hb::logger::log("- Balance: {}", m_config_hash[5]);
+}
+
+void CGame::compute_balance_hash()
+{
+	auto serialized = m_formula_engine.serialize();
+	if (serialized.empty())
+	{
+		m_config_hash[5].clear();
+	}
+	else
+	{
+		m_config_hash[5] = hb::shared::util::sha256(serialized.data(), serialized.size());
+	}
+}
+
+bool CGame::send_client_balance_config(int client_h)
+{
+	if (m_client_list[client_h] == nullptr) return false;
+
+	auto serialized = m_formula_engine.serialize();
+	if (serialized.empty()) return false;
+
+	// Send as a single packet: header + serialized data
+	std::vector<char> buf(sizeof(hb::net::PacketHeader) + serialized.size(), 0);
+	auto* header = reinterpret_cast<hb::net::PacketHeader*>(buf.data());
+	header->msg_id = MsgId::BalanceConfigContents;
+	header->msg_type = MsgType::Confirm;
+	std::memcpy(buf.data() + sizeof(hb::net::PacketHeader), serialized.data(), serialized.size());
+
+	m_client_list[client_h]->m_socket->send_msg(buf.data(), static_cast<int>(buf.size()));
+	return true;
 }
 
 void CGame::fill_player_map_object(hb::net::PacketMapDataObjectPlayer& obj, short owner_h, int viewer_h)
@@ -2439,8 +2736,8 @@ void CGame::fill_player_map_object(hb::net::PacketMapDataObjectPlayer& obj, shor
 	auto* client = m_client_list[owner_h];
 	obj.base.object_id = static_cast<uint16_t>(owner_h);
 	obj.type = client->m_type;
-	obj.dir = client->m_dir;
-	obj.appearance = client->m_appearance;
+	obj.dir = static_cast<uint8_t>(client->m_dir);
+	obj.appearance = build_broadcast_appearance(owner_h);
 	obj.status = client->m_status;
 	obj.status.pk = (client->m_player_kill_count != 0) ? 1 : 0;
 	obj.status.citizen = (client->m_side != 0) ? 1 : 0;
@@ -2455,7 +2752,7 @@ void CGame::fill_npc_map_object(hb::net::PacketMapDataObjectNpc& obj, short owne
 	auto* npc = m_npc_list[owner_h];
 	obj.base.object_id = static_cast<uint16_t>(owner_h + hb::shared::object_id::NpcMin);
 	obj.config_id = npc->m_npc_config_id;
-	obj.dir = npc->m_dir;
+	obj.dir = static_cast<uint8_t>(npc->m_dir);
 	obj.appearance = npc->m_appearance;
 	obj.status = npc->m_status;
 	obj.status.relationship = m_entity_manager->get_npc_relationship(owner_h, viewer_h);
@@ -2818,9 +3115,9 @@ void CGame::delete_client(int client_h, bool save, bool notify, bool count_logou
 				m_client_list[client_h]->m_party_status = PartyStatus::Null;
 				m_client_list[client_h]->m_req_join_party_client_h = 0;
 				hb::logger::log("Party {}: member {} removed (deleted), total={}", m_client_list[client_h]->m_party_id, client_h, m_party_info[m_client_list[client_h]->m_party_id].total_members);
-				goto DC_LOOPBREAK1;
+				break;
 			}
-	DC_LOOPBREAK1:
+
 		for(int i = 0; i < hb::shared::limits::MaxPartyMembers - 1; i++)
 			if ((m_party_info[m_client_list[client_h]->m_party_id].index[i] == 0) && (m_party_info[m_client_list[client_h]->m_party_id].index[i + 1] != 0)) {
 				m_party_info[m_client_list[client_h]->m_party_id].index[i] = m_party_info[m_client_list[client_h]->m_party_id].index[i + 1];
@@ -2880,7 +3177,7 @@ void CGame::send_event_to_near_client_type_a(short owner_h, char owner_type, uin
 		base_all.type = m_client_list[owner_h]->m_type;
 		base_all.dir = static_cast<std::uint8_t>(m_client_list[owner_h]->m_dir);
 		std::memcpy(base_all.name, m_client_list[owner_h]->m_char_name, sizeof(base_all.name));
-		base_all.appearance = m_client_list[owner_h]->m_appearance;
+		base_all.appearance = build_broadcast_appearance(owner_h);
 		base_all.status = m_client_list[owner_h]->m_status;
 		base_all.loc = 0;
 		if (msg_type == Type::NullAction) {
@@ -3253,7 +3550,7 @@ void CGame::send_event_to_near_client_type_a(short owner_h, char owner_type, uin
 	} // else - NPC
 }
 
-int CGame::compose_move_map_data(short sX, short sY, int client_h, char dir, char* data)
+int CGame::compose_move_map_data(short sX, short sY, int client_h, direction dir, char* data)
 {
 	int ix, iy, size, tile_exists, index;
 	class CTile* tile;
@@ -4215,6 +4512,8 @@ void CGame::init_player_data(int client_h, char* data, uint32_t size)
 	total_points = 0;
 	for(int i = 0; i < hb::shared::limits::MaxSkillType; i++)
 		total_points += m_client_list[client_h]->m_skill_mastery[i];
+#ifndef TESTER_ONLY
+	// Skill point validation — disabled in tester builds for tester menu "Max all skills"
 	if ((total_points - 21 > MaxSkillPoints) ) {
 		try
 		{
@@ -4226,6 +4525,7 @@ void CGame::init_player_data(int client_h, char* data, uint32_t size)
 		}
 		return;
 	}
+#endif
 
 	check_special_event(client_h);
 	m_magic_manager->check_magic_int(client_h);
@@ -4401,6 +4701,7 @@ int CGame::spawn_map_npcs_from_database(sqlite3* db, int map_index)
 		// Spawn the NPC
 		if (create_new_npc(npc_config_id, name, m_map_list[map_index]->m_name, 0, 0, npc_move_type, 0, 0, npc_waypoint_index, 0, 0, -1, false) == false) {
 			m_map_list[map_index]->set_naming_value_empty(naming_value);
+			hb::logger::warn("- Failed to spawn static NPC (config_id={}) for map: {}", npc_config_id, m_map_list[map_index]->m_name);
 		}
 		else {
 			npcCount++;
@@ -4408,10 +4709,6 @@ int CGame::spawn_map_npcs_from_database(sqlite3* db, int map_index)
 	}
 
 	sqlite3_finalize(stmt);
-
-	if (npcCount > 0) {
-		hb::logger::log("- Spawned {} static NPCs for map: {}", npcCount, m_map_list[map_index]->m_name);
-	}
 
 	return npcCount;
 }
@@ -4811,7 +5108,7 @@ void CGame::chat_msg_handler_gsm(int msg_type, int v1, char* name, char* data, s
 //						   - fixed attack unmoving object
 // Incomplete: 
 //			- Direction Bow damage disabled
-int CGame::client_motion_attack_handler(int client_h, short sX, short sY, short dX, short dY, short type, char dir, uint16_t target_object_id, uint32_t client_time, bool response, bool is_dash)
+int CGame::client_motion_attack_handler(int client_h, short sX, short sY, short dX, short dY, short type, direction dir, uint16_t target_object_id, uint32_t client_time, bool response, bool is_dash)
 {
 	uint32_t time, exp;
 	int     ret, tdX = 0, tdY = 0;
@@ -4833,22 +5130,19 @@ int CGame::client_motion_attack_handler(int client_h, short sX, short sY, short 
 		if (m_client_list[client_h]->m_attack_last_action_time != 0) {
 			// Compute expected time for 7 consecutive attacks from weapon speed and status.
 			// Uses client time to avoid false positives from TCP buffering/network jitter.
-			// Must match client-side animation timing (PlayerAnim::Attack: max_frame=7, frames 0-7 = 8 durations @ 78ms base).
-			constexpr int ATTACK_FRAME_DURATIONS = 8;
-			constexpr int BASE_FRAME_TIME = 78;
-			constexpr int RUN_FRAME_TIME = 39;
 			constexpr int BATCH_TOLERANCE_MS = 100;
 
 			const auto& status = m_client_list[client_h]->m_status;
-			int attack_delay = status.attack_delay;
-			bool haste = status.haste;
-			bool frozen = status.frozen;
+			int base_swing = hb::shared::calc::swing_time(m_formula_engine,
+				hb::shared::calc::attack_delay_value{(double)status.attack_delay});
+			int frames = hb::shared::calc::swing_frames(m_formula_engine);
+			int bft = hb::shared::calc::base_frame_time(m_formula_engine);
+			int rft = hb::shared::calc::run_frame_time(m_formula_engine);
+			int effective_swing = base_swing;
+			if (status.frozen) effective_swing += frames * (bft >> 2);
+			if (status.haste)  effective_swing -= frames * static_cast<int>(rft / 2.3);
 
-			int effectiveFrameTime = BASE_FRAME_TIME + (attack_delay * 12);
-			if (frozen) effectiveFrameTime += BASE_FRAME_TIME >> 2;
-			if (haste)  effectiveFrameTime -= static_cast<int>(RUN_FRAME_TIME / 2.3);
-
-			int singleSwingTime = ATTACK_FRAME_DURATIONS * effectiveFrameTime;
+			int singleSwingTime = effective_swing;
 			int batchThreshold = 7 * singleSwingTime - BATCH_TOLERANCE_MS;
 			if (batchThreshold < 2800) batchThreshold = 2800;
 
@@ -5066,13 +5360,13 @@ int CGame::client_motion_attack_handler(int client_h, short sX, short sY, short 
 	return 1;
 }
 
-char CGame::get_next_move_dir(short sX, short sY, short dstX, short dstY, char map_index, char turn, int* error_acc)
+direction CGame::get_next_move_dir(short sX, short sY, short dstX, short dstY, char map_index, char turn, int* error_acc)
 {
-	char  dir, tmp_dir;
+	direction dir, tmp_dir;
 	int   aX, aY, dX, dY;
 	int   res_x, res_y;
 
-	if ((sX == dstX) && (sY == dstY)) return 0;
+	if ((sX == dstX) && (sY == dstY)) return direction{};
 
 	dX = sX;
 	dY = sY;
@@ -5087,8 +5381,8 @@ char CGame::get_next_move_dir(short sX, short sY, short dstX, short dstY, char m
 
 	if (turn == 0)
 		for(int i = dir; i <= dir + 7; i++) {
-			tmp_dir = i;
-			if (tmp_dir > 8) tmp_dir -= 8;
+			tmp_dir = static_cast<direction>(i);
+			if (tmp_dir > 8) tmp_dir = static_cast<direction>(tmp_dir - 8);
 			aX = _tmp_cTmpDirX[tmp_dir];
 			aY = _tmp_cTmpDirY[tmp_dir];
 			if (m_map_list[map_index]->get_moveable(dX + aX, dY + aY)) return tmp_dir;
@@ -5096,14 +5390,14 @@ char CGame::get_next_move_dir(short sX, short sY, short dstX, short dstY, char m
 
 	if (turn == 1)
 		for(int i = dir; i >= dir - 7; i--) {
-			tmp_dir = i;
-			if (tmp_dir < 1) tmp_dir += 8;
+			tmp_dir = static_cast<direction>(i);
+			if (tmp_dir < 1) tmp_dir = static_cast<direction>(tmp_dir + 8);
 			aX = _tmp_cTmpDirX[tmp_dir];
 			aY = _tmp_cTmpDirY[tmp_dir];
 			if (m_map_list[map_index]->get_moveable(dX + aX, dY + aY)) return tmp_dir;
 		}
 
-	return 0;
+	return direction{};
 }
 
 char _tmp_cEmptyPosX[] = { 0, 1, 1, 0, -1, -1, -1, 0 ,1, 2, 2, 2, 2, 1, 0, -1, -2, -2, -2, -2, -2, -1, 0, 1, 2 };
@@ -5219,6 +5513,10 @@ void CGame::msg_process()
 				request_teleport_handler(client_h, data);
 				break;
 
+			case MsgId::RequestTeleportAuth:
+				request_teleport_auth_handler(client_h, data);
+				break;
+
 			case MsgId::RequestInitPlayer:
 				request_init_player_handler(client_h, data, key);
 				break;
@@ -5303,10 +5601,12 @@ void CGame::msg_process()
 				if (!reqPkt) break;
 				if (time - m_client_list[client_h]->m_last_config_request_time < 30000) break;
 				m_client_list[client_h]->m_last_config_request_time = time;
-				if (reqPkt->requestItems)  m_item_manager->send_client_item_configs(client_h);
-				if (reqPkt->requestMagic)  m_magic_manager->send_client_magic_configs(client_h);
-				if (reqPkt->requestSkills) m_skill_manager->send_client_skill_configs(client_h);
-				if (reqPkt->requestNpcs)   send_client_npc_configs(client_h);
+				if (reqPkt->requestItems)   m_item_manager->send_client_item_configs(client_h);
+				if (reqPkt->requestMagic)   m_magic_manager->send_client_magic_configs(client_h);
+				if (reqPkt->requestSkills)  m_skill_manager->send_client_skill_configs(client_h);
+				if (reqPkt->requestNpcs)    send_client_npc_configs(client_h);
+				if (reqPkt->requestMaps)    send_client_map_configs(client_h);
+				if (reqPkt->requestBalance) send_client_balance_config(client_h);
 			}
 			break;
 
@@ -5380,7 +5680,7 @@ void CGame::client_common_handler(int client_h, char* data)
 	uint16_t command;
 	short sX, sY;
 	int v1, v2, v3, v4;
-	char dir;
+	direction dir;
 	const char* string;
 
 	if (m_client_list[client_h] == 0) return;
@@ -5393,7 +5693,7 @@ void CGame::client_common_handler(int client_h, char* data)
 	command = req->base.header.msg_type;
 	sX = req->base.x;
 	sY = req->base.y;
-	dir = static_cast<char>(req->base.dir);
+	dir = static_cast<direction>(req->base.dir);
 	v1 = req->v1;
 	v2 = req->v2;
 	v3 = req->v3;
@@ -5677,6 +5977,333 @@ void CGame::client_common_handler(int client_h, char* data)
 		request_accept_join_party_handler(client_h, v1);
 		break;
 
+#ifdef TESTER_ONLY
+	// TESTER MENU — all tester handlers
+	case CommonType::TesterAction:
+	{
+		// No permission check — tester menu is available to all players
+
+		int action_id = v1;
+		switch (action_id)
+		{
+		case 0: // Reset stats
+		{
+			m_client_list[client_h]->m_str = 10;
+			m_client_list[client_h]->m_int = 10;
+			m_client_list[client_h]->m_vit = 10;
+			m_client_list[client_h]->m_dex = 10;
+			m_client_list[client_h]->m_mag = 10;
+			m_client_list[client_h]->m_charisma = 10;
+			// Recalculate levelup pool: total available = (level-1)*3, base stats = 70, now 60
+			m_client_list[client_h]->m_levelup_pool = (m_client_list[client_h]->m_level - 1) * 3 + 10;
+			// Clamp HP/MP/SP to new maximums — check_character_data() kicks if HP > max
+			m_client_list[client_h]->m_hp = get_max_hp(client_h);
+			m_client_list[client_h]->m_mp = get_max_mp(client_h);
+			m_client_list[client_h]->m_sp = get_max_sp(client_h);
+			// LevelUp refreshes all stats on client, Exp refreshes XP bar
+			send_notify_msg(0, client_h, Notify::LevelUp, 0, 0, 0, 0);
+			send_notify_msg(0, client_h, Notify::Exp, 0, 0, 0, 0);
+			hb::logger::log<log_channel::commands>("[TesterMenu] '{}' reset stats (lu_pool={})",
+				m_client_list[client_h]->m_char_name, m_client_list[client_h]->m_levelup_pool);
+			break;
+		}
+		case 1: // Add 100 contribution
+		{
+			m_client_list[client_h]->m_contribution += 100;
+			send_notify_msg(0, client_h, Notify::Contribution,
+				m_client_list[client_h]->m_contribution, 0, 0, 0);
+			hb::logger::log<log_channel::commands>("[TesterMenu] '{}' added 100 contribution (now {})",
+				m_client_list[client_h]->m_char_name, m_client_list[client_h]->m_contribution);
+			break;
+		}
+		case 2: // Add 100 majestics
+		{
+			m_client_list[client_h]->m_gizon_item_upgrade_left += 100;
+			send_notify_msg(0, client_h, Notify::GizonItemUpgradeLeft,
+				m_client_list[client_h]->m_gizon_item_upgrade_left, 0, 0, 0);
+			hb::logger::log<log_channel::commands>("[TesterMenu] '{}' added 100 majestics (now {})",
+				m_client_list[client_h]->m_char_name, m_client_list[client_h]->m_gizon_item_upgrade_left);
+			break;
+		}
+		case 3: // Add 100 eks
+		{
+			m_client_list[client_h]->m_enemy_kill_count += 100;
+			send_notify_msg(0, client_h, Notify::EnemyKills,
+				m_client_list[client_h]->m_enemy_kill_count, 0, 0, 0);
+			hb::logger::log<log_channel::commands>("[TesterMenu] '{}' added 100 eks (now {})",
+				m_client_list[client_h]->m_char_name, m_client_list[client_h]->m_enemy_kill_count);
+			break;
+		}
+		case 4: // Add 1m gold
+		{
+			CItem* gold_item = new CItem();
+			if (m_item_manager->init_item_attr(gold_item, hb::shared::item::ItemId::Gold))
+			{
+				gold_item->m_count = 1000000;
+				int erase_req = 0;
+				if (m_item_manager->add_client_item_list(client_h, gold_item, &erase_req))
+				{
+					m_item_manager->send_item_notify_msg(client_h, Notify::ItemObtained, gold_item, 0);
+				}
+				else
+				{
+					delete gold_item;
+					send_notify_msg(0, client_h, Notify::CannotCarryMoreItem, 0, 0, 0, 0);
+				}
+			}
+			else
+			{
+				delete gold_item;
+			}
+			hb::logger::log<log_channel::commands>("[TesterMenu] '{}' added 1m gold",
+				m_client_list[client_h]->m_char_name);
+			break;
+		}
+		case 5: // Add 100 crits
+		{
+			m_client_list[client_h]->m_super_attack_left += 100;
+			send_notify_msg(0, client_h, Notify::SuperAttackLeft, 0, 0, 0, 0);
+			hb::logger::log<log_channel::commands>("[TesterMenu] '{}' added 100 crits (now {})",
+				m_client_list[client_h]->m_char_name, m_client_list[client_h]->m_super_attack_left);
+			break;
+		}
+		case 6: // Max all skills (only valid skill slots)
+		{
+			for (int i = 0; i < hb::shared::limits::MaxSkillType; i++)
+			{
+				if (m_skill_config_list[i] != 0)
+					m_client_list[client_h]->m_skill_mastery[i] = 100;
+				else
+					m_client_list[client_h]->m_skill_mastery[i] = 0;
+				send_notify_msg(0, client_h, Notify::Skill, i, m_client_list[client_h]->m_skill_mastery[i], 0, 0);
+			}
+			hb::logger::log<log_channel::commands>("[TesterMenu] '{}' maxed all skills",
+				m_client_list[client_h]->m_char_name);
+			break;
+		}
+		case 7: // Set level
+		{
+			int target_level = std::clamp(static_cast<int>(v2), 1, hb::shared::limits::PlayerMaxLevel);
+
+			// Traveller anti-hack kicks players at level >= 20 if not in a faction city.
+			// Teleport them to their faction city first, or clamp if no faction.
+			if (target_level >= 20)
+			{
+				bool is_traveller =
+					(strcmp(m_client_list[client_h]->m_location, "elvine") != 0) &&
+					(strcmp(m_client_list[client_h]->m_location, "elvhunter") != 0) &&
+					(strcmp(m_client_list[client_h]->m_location, "arehunter") != 0) &&
+					(strcmp(m_client_list[client_h]->m_location, "aresden") != 0);
+
+				if (is_traveller)
+				{
+					if (m_client_list[client_h]->m_side == 1)
+						gm_teleport_to(client_h, "aresden", -1, -1);
+					else if (m_client_list[client_h]->m_side == 2)
+						gm_teleport_to(client_h, "elvine", -1, -1);
+					else
+						target_level = 19;
+					if (m_client_list[client_h] == nullptr) break;
+				}
+			}
+
+			m_client_list[client_h]->m_level = target_level;
+			m_client_list[client_h]->m_exp = m_level_exp_table[target_level];
+			m_client_list[client_h]->m_next_level_exp = m_level_exp_table[target_level + 1];
+
+			// Recalculate levelup pool: (level-1)*3 total points, minus points already spent
+			int total_stats = m_client_list[client_h]->m_str + m_client_list[client_h]->m_int
+				+ m_client_list[client_h]->m_vit + m_client_list[client_h]->m_dex
+				+ m_client_list[client_h]->m_mag + m_client_list[client_h]->m_charisma;
+			m_client_list[client_h]->m_levelup_pool = (target_level - 1) * 3 - (total_stats - 70);
+			if (m_client_list[client_h]->m_levelup_pool < 0)
+				m_client_list[client_h]->m_levelup_pool = 0;
+
+			// Clamp HP/MP/SP — check_character_data() kicks if HP > max
+			m_client_list[client_h]->m_hp = std::min(m_client_list[client_h]->m_hp, get_max_hp(client_h));
+			m_client_list[client_h]->m_mp = std::min(m_client_list[client_h]->m_mp, get_max_mp(client_h));
+			m_client_list[client_h]->m_sp = std::min(m_client_list[client_h]->m_sp, get_max_sp(client_h));
+
+			// Match natural level-up notification order (check_level_up)
+			send_notify_msg(0, client_h, Notify::SuperAttackLeft, 0, 0, 0, 0);
+			send_notify_msg(0, client_h, Notify::LevelUp, 0, 0, 0, 0);
+			send_notify_msg(0, client_h, Notify::Exp, 0, 0, 0, 0);
+			hb::logger::log<log_channel::commands>("[TesterMenu] '{}' set level to {} (lu_pool={})",
+				m_client_list[client_h]->m_char_name, target_level, m_client_list[client_h]->m_levelup_pool);
+			break;
+		}
+		case 9: // Teleport to map
+		{
+			if (string == nullptr || string[0] == '\0') break;
+
+			if (!gm_teleport_to(client_h, string, -1, -1))
+			{
+				send_notify_msg(0, client_h, Notify::NoticeMsg, 0, 0, 0, "Teleport failed — map not found.");
+			}
+			else
+			{
+				hb::logger::log<log_channel::commands>("[TesterMenu] '{}' teleported to '{}'",
+					m_client_list[client_h]->m_char_name, string);
+			}
+			break;
+		}
+		default:
+			break;
+		}
+		break;
+	}
+
+	case CommonType::TesterMapList:
+	{
+		if (m_client_list[client_h] == nullptr) break;
+
+		hb::net::PacketNotifyTesterMapListResult result{};
+		result.header.msg_id = MsgId::Notify;
+		result.header.msg_type = Notify::TesterMapListResult;
+		result.count = 0;
+
+		for (int i = 0; i < hb::server::config::MaxMaps && result.count < 100; i++)
+		{
+			if (m_map_list[i] == nullptr) continue;
+			auto& entry = result.entries[result.count];
+			std::memset(entry.name, 0, sizeof(entry.name));
+			std::memcpy(entry.name, m_map_list[i]->m_name, 10);
+			result.count++;
+		}
+
+		m_client_list[client_h]->m_socket->send_msg(
+			reinterpret_cast<char*>(&result), sizeof(result));
+		hb::logger::log<log_channel::commands>("[TesterMenu] '{}' requested map list ({} maps)",
+			m_client_list[client_h]->m_char_name, result.count);
+		break;
+	}
+
+	case CommonType::TesterItemSearch:
+	{
+		if (m_client_list[client_h] == nullptr) break;
+
+		// Empty search = return first 50 items; otherwise filter by substring
+		bool has_filter = (string != nullptr && string[0] != '\0');
+		char search_lower[64]{};
+		if (has_filter)
+		{
+			std::snprintf(search_lower, sizeof(search_lower), "%s", string);
+			for (int i = 0; search_lower[i]; i++)
+				search_lower[i] = static_cast<char>(std::tolower(static_cast<unsigned char>(search_lower[i])));
+		}
+
+		hb::net::PacketNotifyTesterItemSearchResult result{};
+		result.header.msg_id = MsgId::Notify;
+		result.header.msg_type = Notify::TesterItemSearchResult;
+		result.count = 0;
+
+		for (int i = 0; i < hb::server::config::MaxItemTypes && result.count < 50; i++)
+		{
+			if (m_item_config_list[i] == nullptr) continue;
+
+			if (has_filter)
+			{
+				char name_lower[64]{};
+				std::snprintf(name_lower, sizeof(name_lower), "%s", m_item_config_list[i]->m_name);
+				for (int j = 0; name_lower[j]; j++)
+					name_lower[j] = static_cast<char>(std::tolower(static_cast<unsigned char>(name_lower[j])));
+
+				if (std::strstr(name_lower, search_lower) == nullptr)
+					continue;
+			}
+
+			auto& entry = result.entries[result.count];
+			entry.item_id = static_cast<int16_t>(i);
+			entry.effect_type = m_item_config_list[i]->m_item_effect_type;
+			std::memset(entry.name, 0, sizeof(entry.name));
+			std::snprintf(entry.name, sizeof(entry.name), "%s", m_item_config_list[i]->m_name);
+			result.count++;
+		}
+
+		m_client_list[client_h]->m_socket->send_msg(
+			reinterpret_cast<char*>(&result), sizeof(result));
+		hb::logger::log<log_channel::commands>("[TesterMenu] '{}' searched items '{}' ({} results)",
+			m_client_list[client_h]->m_char_name, has_filter ? string : "(all)", result.count);
+		break;
+	}
+
+	case CommonType::TesterCreateItem:
+	{
+		if (m_client_list[client_h] == nullptr) break;
+
+		int item_id = static_cast<int>(v1);
+		uint32_t attribute = static_cast<uint32_t>(v2);
+		int count = std::clamp(static_cast<int>(v3), 1, 10);
+
+		if (item_id < 0 || item_id >= hb::server::config::MaxItemTypes
+			|| m_item_config_list[item_id] == nullptr)
+		{
+			send_notify_msg(0, client_h, Notify::NoticeMsg, 0, 0, 0, "Invalid item ID.");
+			break;
+		}
+
+		// Parse attribute once for color lookup
+		auto parsed = hb::shared::item::parse_attribute(attribute);
+
+		int created = 0;
+		for (int i = 0; i < count; i++)
+		{
+			CItem* item = new CItem();
+			if (!m_item_manager->init_item_attr(item, item_id))
+			{
+				delete item;
+				continue;
+			}
+
+			item->m_attribute = attribute;
+			m_item_manager->adjust_rare_item_value(item);
+
+			// Set item color based on prefix type — matches generate_item_attributes() color table
+			switch (parsed.prefixType)
+			{
+			case hb::shared::item::AttributePrefixType::Agile:      item->m_item_color = 1; break;
+			case hb::shared::item::AttributePrefixType::Light:       item->m_item_color = 2; break;
+			case hb::shared::item::AttributePrefixType::Strong:      item->m_item_color = 3; break;
+			case hb::shared::item::AttributePrefixType::Poisoning:   item->m_item_color = 4; break;
+			case hb::shared::item::AttributePrefixType::Critical:    item->m_item_color = 5; break;
+			case hb::shared::item::AttributePrefixType::Special:     item->m_item_color = 5; break;
+			case hb::shared::item::AttributePrefixType::Sharp:       item->m_item_color = 6; break;
+			case hb::shared::item::AttributePrefixType::Righteous:   item->m_item_color = 7; break;
+			case hb::shared::item::AttributePrefixType::Ancient:     item->m_item_color = 8; break;
+			default: break;
+			}
+
+			int erase_req = 0;
+			if (m_item_manager->add_client_item_list(client_h, item, &erase_req))
+			{
+				m_item_manager->send_item_notify_msg(client_h, Notify::ItemObtained, item, 0);
+				created++;
+			}
+			else
+			{
+				delete item;
+				send_notify_msg(0, client_h, Notify::CannotCarryMoreItem, 0, 0, 0, 0);
+				break;
+			}
+		}
+
+		if (created > 0)
+		{
+			char buf[128];
+			std::snprintf(buf, sizeof(buf), "Created %dx %s (ID: %d)", created, m_item_config_list[item_id]->m_name, item_id);
+			send_notify_msg(0, client_h, Notify::NoticeMsg, 0, 0, 0, buf);
+		}
+		else
+		{
+			send_notify_msg(0, client_h, Notify::NoticeMsg, 0, 0, 0, "Failed to create item.");
+		}
+
+		hb::logger::log<log_channel::commands>("[TesterMenu] '{}' created {}x item ID {} attr=0x{:08X}",
+			m_client_list[client_h]->m_char_name, created, item_id, attribute);
+		break;
+	}
+#endif // TESTER_ONLY
+
 	default:
 		hb::logger::log("Unknown message: 0x{:X}", command);
 		break;
@@ -5791,7 +6418,7 @@ void CGame::send_event_to_near_client_type_b(uint32_t msg_id, uint16_t msg_type,
 //  description			:: checks if player is stopped
 //  last updated		:: October 29, 2004; 6:46 PM; Hypnotoad
 //	return value		:: int
-int CGame::client_motion_stop_handler(int client_h, short sX, short sY, char dir)
+int CGame::client_motion_stop_handler(int client_h, short sX, short sY, direction dir)
 {
 	int     ret;
 	short   owner_h;
@@ -5852,7 +6479,7 @@ int CGame::client_motion_stop_handler(int client_h, short sX, short sY, char dir
 
 // 05/29/2004 - Hypnotoad - Purchase Dicount updated to take charisma into consideration
 
-void CGame::send_notify_msg(int from_h, int to_h, uint16_t msg_type, uint32_t v1, uint32_t v2, uint32_t v3, const char* string, uint32_t v4, uint32_t v5, uint32_t v6, uint32_t v7, uint32_t v8, uint32_t v9, const char* string2)
+void CGame::send_notify_msg(int from_h, int to_h, uint16_t msg_type, uint32_t v1, uint64_t v2, uint32_t v3, const char* string, uint32_t v4, uint32_t v5, uint32_t v6, uint32_t v7, uint32_t v8, uint32_t v9, const char* string2)
 {
 	int ret = 0;
 
@@ -5946,6 +6573,7 @@ void CGame::send_notify_msg(int from_h, int to_h, uint16_t msg_type, uint32_t v1
 	case Notify::ApocGateStartMsg:
 	case Notify::ApocGateEndMsg:
 	case Notify::NoRecall:
+	case Notify::TeleportApproved:
 	{
 		hb::net::PacketNotifyEmpty pkt{};
 		pkt.header.msg_id = MsgId::Notify;
@@ -6105,7 +6733,7 @@ void CGame::send_notify_msg(int from_h, int to_h, uint16_t msg_type, uint32_t v1
 		pkt.header.msg_id = MsgId::Notify;
 		pkt.header.msg_type = msg_type;
 		pkt.item_index = static_cast<int16_t>(v1);
-		pkt.attribute = v2;
+		pkt.attribute = static_cast<uint32_t>(v2);
 		pkt.spec_value1 = v3;
 		pkt.spec_value2 = v4;
 		ret = m_client_list[to_h]->m_socket->send_msg(reinterpret_cast<char*>(&pkt), sizeof(pkt));
@@ -6120,8 +6748,6 @@ void CGame::send_notify_msg(int from_h, int to_h, uint16_t msg_type, uint32_t v1
 		pkt.item_index = static_cast<int16_t>(v1);
 		pkt.item_type = static_cast<uint8_t>(v2);
 		pkt.cur_lifespan = static_cast<int16_t>(v3);
-		pkt.sprite = static_cast<int16_t>(v4);
-		pkt.sprite_frame = static_cast<int16_t>(v5);
 		pkt.item_color = static_cast<uint8_t>(v6);
 		pkt.spec_value2 = static_cast<uint8_t>(v7);
 		pkt.attribute = v8;
@@ -6337,7 +6963,7 @@ void CGame::send_notify_msg(int from_h, int to_h, uint16_t msg_type, uint32_t v1
 		pkt.who = static_cast<int16_t>(v1);
 		pkt.quest_type = static_cast<int16_t>(v2);
 		pkt.contribution = static_cast<int16_t>(v3);
-		pkt.target_type = static_cast<int16_t>(v4);
+		pkt.target_config_id = static_cast<int16_t>(v4);
 		pkt.target_count = static_cast<int16_t>(v5);
 		pkt.x = static_cast<int16_t>(v6);
 		pkt.y = static_cast<int16_t>(v7);
@@ -6388,8 +7014,6 @@ void CGame::send_notify_msg(int from_h, int to_h, uint16_t msg_type, uint32_t v1
 		pkt.header.msg_id = MsgId::Notify;
 		pkt.header.msg_type = msg_type;
 		pkt.dir = static_cast<int16_t>(v1);
-		pkt.sprite = static_cast<int16_t>(v2);
-		pkt.sprite_frame = static_cast<int16_t>(v3);
 		pkt.amount = static_cast<int32_t>(v4);
 		pkt.color = static_cast<uint8_t>(v5);
 		pkt.cur_life = static_cast<int16_t>(v6);
@@ -6411,8 +7035,6 @@ void CGame::send_notify_msg(int from_h, int to_h, uint16_t msg_type, uint32_t v1
 		pkt.header.msg_id = MsgId::Notify;
 		pkt.header.msg_type = msg_type;
 		pkt.dir = static_cast<int16_t>(v1);
-		pkt.sprite = static_cast<int16_t>(v2);
-		pkt.sprite_frame = static_cast<int16_t>(v3);
 		pkt.amount = static_cast<int32_t>(v4);
 		pkt.color = static_cast<uint8_t>(v5);
 		pkt.cur_life = static_cast<int16_t>(v6);
@@ -6459,6 +7081,18 @@ void CGame::send_notify_msg(int from_h, int to_h, uint16_t msg_type, uint32_t v1
 		ret = m_client_list[to_h]->m_socket->send_msg(reinterpret_cast<char*>(&pkt), sizeof(pkt));
 	}
 	break;
+
+#ifdef TESTER_ONLY
+	case Notify::Contribution:
+	{
+		hb::net::PacketNotifySimpleInt pkt{};
+		pkt.header.msg_id = MsgId::Notify;
+		pkt.header.msg_type = msg_type;
+		pkt.value = static_cast<int32_t>(v1);
+		ret = m_client_list[to_h]->m_socket->send_msg(reinterpret_cast<char*>(&pkt), sizeof(pkt));
+	}
+	break;
+#endif // TESTER_ONLY
 
 	case Notify::Crusade:
 	{
@@ -6537,7 +7171,7 @@ void CGame::send_notify_msg(int from_h, int to_h, uint16_t msg_type, uint32_t v1
 		pkt.response = static_cast<int16_t>(v2);
 		pkt.amount = static_cast<int16_t>(v3);
 		pkt.contribution = static_cast<int16_t>(v4);
-		pkt.target_type = static_cast<int16_t>(v5);
+		pkt.target_config_id = static_cast<int16_t>(v5);
 		pkt.target_count = static_cast<int16_t>(v6);
 		pkt.x = static_cast<int16_t>(v7);
 		pkt.y = static_cast<int16_t>(v8);
@@ -6654,6 +7288,12 @@ void CGame::send_notify_msg(int from_h, int to_h, uint16_t msg_type, uint32_t v1
 		pkt.header.msg_id = MsgId::Notify;
 		pkt.header.msg_type = msg_type;
 		pkt.mode = static_cast<uint8_t>(v1);
+		pkt.seconds = static_cast<uint16_t>(v2);
+		if (string != nullptr)
+		{
+			std::strncpy(pkt.message, string, sizeof(pkt.message) - 1);
+			pkt.message[sizeof(pkt.message) - 1] = '\0';
+		}
 		ret = m_client_list[to_h]->m_socket->send_msg(reinterpret_cast<char*>(&pkt), sizeof(pkt));
 	}
 	break;
@@ -6734,8 +7374,6 @@ void CGame::send_notify_msg(int from_h, int to_h, uint16_t msg_type, uint32_t v1
 			pkt.header.msg_id = MsgId::Notify;
 			pkt.header.msg_type = msg_type;
 			pkt.price = static_cast<uint16_t>(v1);
-			pkt.sprite = static_cast<uint16_t>(v2);
-			pkt.sprite_frame = static_cast<uint16_t>(v3);
 			if (string != 0) {
 				memcpy(pkt.name, string, sizeof(pkt.name));
 			}
@@ -7036,7 +7674,7 @@ void CGame::send_notify_msg(int from_h, int to_h, uint16_t msg_type, uint32_t v1
 		pkt.header.msg_id = MsgId::Notify;
 		pkt.header.msg_type = msg_type;
 		pkt.item_index = static_cast<uint16_t>(v1);
-		pkt.count = static_cast<uint32_t>(v2);
+		pkt.count = v2;
 		pkt.notify = static_cast<uint8_t>(v3);
 		ret = m_client_list[to_h]->m_socket->send_msg(reinterpret_cast<char*>(&pkt), sizeof(pkt));
 	}
@@ -7774,7 +8412,8 @@ void CGame::toggle_combat_mode_handler(int client_h)
 void CGame::request_teleport_handler(int client_h, const char* data, const char* map_name, int dX, int dY)
 {
 	char temp_map_name[21];
-	char dest_map_name[11], dir, map_index, quest_remain;
+	char dest_map_name[11], map_index, quest_remain;
+	direction dir;
 	short sX, sY, summon_points;
 	int ret, size, dest_x, dest_y, ex_h, map_side;
 	bool    ret_ok, is_locked_map_notify;
@@ -7852,6 +8491,7 @@ void CGame::request_teleport_handler(int client_h, const char* data, const char*
 	}
 
 	if ((ret_ok) && (map_name == 0)) {
+		bool map_found = false;
 		for(int i = 0; i < MaxMaps; i++)
 			if (m_map_list[i] != 0) {
 				if (memcmp(m_map_list[i]->m_name, dest_map_name, 10) == 0) {
@@ -7861,30 +8501,34 @@ void CGame::request_teleport_handler(int client_h, const char* data, const char*
 					m_client_list[client_h]->m_map_index = i;
 					std::memset(m_client_list[client_h]->m_map_name, 0, sizeof(m_client_list[client_h]->m_map_name));
 					memcpy(m_client_list[client_h]->m_map_name, m_map_list[i]->m_name, 10);
-					goto RTH_NEXTSTEP;
+					map_found = true;
+					break;
 				}
 			}
 
-		m_client_list[client_h]->m_x = dest_x;
-		m_client_list[client_h]->m_y = dest_y;
-		m_client_list[client_h]->m_dir = dir;
-		std::memset(m_client_list[client_h]->m_map_name, 0, sizeof(m_client_list[client_h]->m_map_name));
-		memcpy(m_client_list[client_h]->m_map_name, dest_map_name, 10);
+		if (!map_found) {
+			m_client_list[client_h]->m_x = dest_x;
+			m_client_list[client_h]->m_y = dest_y;
+			m_client_list[client_h]->m_dir = dir;
+			std::memset(m_client_list[client_h]->m_map_name, 0, sizeof(m_client_list[client_h]->m_map_name));
+			memcpy(m_client_list[client_h]->m_map_name, dest_map_name, 10);
 
-		// New 18/05/2004
-		send_notify_msg(0, client_h, Notify::MagicEffectOff, hb::shared::magic::Confuse,
-			m_client_list[client_h]->m_magic_effect_status[hb::shared::magic::Confuse], 0, 0);
-		m_item_manager->set_slate_flag(client_h, SlateClearNotify, false);
+			// New 18/05/2004
+			send_notify_msg(0, client_h, Notify::MagicEffectOff, hb::shared::magic::Confuse,
+				m_client_list[client_h]->m_magic_effect_status[hb::shared::magic::Confuse], 0, 0);
+			m_item_manager->set_slate_flag(client_h, SlateClearNotify, false);
 
-		// send_msg_to_ls(ServerMsgId::RequestSavePlayerDataReply, client_h, false);  // !   .
-		m_client_list[client_h]->m_is_on_server_change = true;
-		m_client_list[client_h]->m_is_on_waiting_process = true;
-		return;
+			// send_msg_to_ls(ServerMsgId::RequestSavePlayerDataReply, client_h, false);  // !   .
+			m_client_list[client_h]->m_is_on_server_change = true;
+			m_client_list[client_h]->m_is_on_waiting_process = true;
+			return;
+		}
 	}
 	else {
 		switch (data[0]) {
 		case '0':
-			// Forced Recall. 
+		{
+			// Forced Recall.
 			std::memset(temp_map_name, 0, sizeof(temp_map_name));
 			if (memcmp(m_client_list[client_h]->m_location, "NONE", 4) == 0) {
 				strcpy(temp_map_name, "default");
@@ -7904,6 +8548,7 @@ void CGame::request_teleport_handler(int client_h, const char* data, const char*
 				strcpy(temp_map_name, m_client_list[client_h]->m_locked_map_name);
 			}
 
+			bool map_found = false;
 			for(int i = 0; i < MaxMaps; i++)
 				if (m_map_list[i] != 0) {
 					if (memcmp(m_map_list[i]->m_name, temp_map_name, 10) == 0) {
@@ -7912,28 +8557,34 @@ void CGame::request_teleport_handler(int client_h, const char* data, const char*
 						m_client_list[client_h]->m_map_index = i;
 						std::memset(m_client_list[client_h]->m_map_name, 0, sizeof(m_client_list[client_h]->m_map_name));
 						memcpy(m_client_list[client_h]->m_map_name, temp_map_name, 10);
-						goto RTH_NEXTSTEP;
+						map_found = true;
+						break;
 					}
 				}
 
-			m_client_list[client_h]->m_x = -1;
-			m_client_list[client_h]->m_y = -1;	  // -1 InitialPoint .
+			if (!map_found) {
+				m_client_list[client_h]->m_x = -1;
+				m_client_list[client_h]->m_y = -1;	  // -1 InitialPoint .
 
-			std::memset(m_client_list[client_h]->m_map_name, 0, sizeof(m_client_list[client_h]->m_map_name));
-			memcpy(m_client_list[client_h]->m_map_name, temp_map_name, 10);
+				std::memset(m_client_list[client_h]->m_map_name, 0, sizeof(m_client_list[client_h]->m_map_name));
+				memcpy(m_client_list[client_h]->m_map_name, temp_map_name, 10);
 
-			// New 18/05/2004
-			send_notify_msg(0, client_h, Notify::MagicEffectOff, hb::shared::magic::Confuse,
-				m_client_list[client_h]->m_magic_effect_status[hb::shared::magic::Confuse], 0, 0);
-			m_item_manager->set_slate_flag(client_h, SlateClearNotify, false);
+				// New 18/05/2004
+				send_notify_msg(0, client_h, Notify::MagicEffectOff, hb::shared::magic::Confuse,
+					m_client_list[client_h]->m_magic_effect_status[hb::shared::magic::Confuse], 0, 0);
+				m_item_manager->set_slate_flag(client_h, SlateClearNotify, false);
 
-			// send_msg_to_ls(ServerMsgId::RequestSavePlayerDataReply, client_h, false); // !   .
+				// send_msg_to_ls(ServerMsgId::RequestSavePlayerDataReply, client_h, false); // !   .
 
-			m_client_list[client_h]->m_is_on_server_change = true;
-			m_client_list[client_h]->m_is_on_waiting_process = true;
-			return;
+				m_client_list[client_h]->m_is_on_server_change = true;
+				m_client_list[client_h]->m_is_on_waiting_process = true;
+				return;
+			}
+			break;
+		}
 
 		case '1':
+		{
 			// Recall.     .
 			// if (memcmp(m_map_list[ m_client_list[client_h]->m_map_index ]->m_name, "resurr", 6) == 0) return;
 
@@ -7959,6 +8610,7 @@ void CGame::request_teleport_handler(int client_h, const char* data, const char*
 				strcpy(temp_map_name, m_client_list[client_h]->m_locked_map_name);
 			}
 
+			bool map_found = false;
 			for(int i = 0; i < MaxMaps; i++)
 				if (m_map_list[i] != 0) {
 					if (memcmp(m_map_list[i]->m_name, temp_map_name, 10) == 0) {
@@ -7968,25 +8620,30 @@ void CGame::request_teleport_handler(int client_h, const char* data, const char*
 						m_client_list[client_h]->m_map_index = i;
 						std::memset(m_client_list[client_h]->m_map_name, 0, sizeof(m_client_list[client_h]->m_map_name));
 						memcpy(m_client_list[client_h]->m_map_name, m_map_list[i]->m_name, 10);
-						goto RTH_NEXTSTEP;
+						map_found = true;
+						break;
 					}
 				}
 
-			m_client_list[client_h]->m_x = -1;
-			m_client_list[client_h]->m_y = -1;	  // -1 InitialPoint .
+			if (!map_found) {
+				m_client_list[client_h]->m_x = -1;
+				m_client_list[client_h]->m_y = -1;	  // -1 InitialPoint .
 
-			std::memset(m_client_list[client_h]->m_map_name, 0, sizeof(m_client_list[client_h]->m_map_name));
-			memcpy(m_client_list[client_h]->m_map_name, temp_map_name, 10);
+				std::memset(m_client_list[client_h]->m_map_name, 0, sizeof(m_client_list[client_h]->m_map_name));
+				memcpy(m_client_list[client_h]->m_map_name, temp_map_name, 10);
 
-			// New 18/05/2004
-			send_notify_msg(0, client_h, Notify::MagicEffectOff, hb::shared::magic::Confuse,
-				m_client_list[client_h]->m_magic_effect_status[hb::shared::magic::Confuse], 0, 0);
-			m_item_manager->set_slate_flag(client_h, SlateClearNotify, false);
+				// New 18/05/2004
+				send_notify_msg(0, client_h, Notify::MagicEffectOff, hb::shared::magic::Confuse,
+					m_client_list[client_h]->m_magic_effect_status[hb::shared::magic::Confuse], 0, 0);
+				m_item_manager->set_slate_flag(client_h, SlateClearNotify, false);
 
-			// send_msg_to_ls(ServerMsgId::RequestSavePlayerDataReply, client_h, false); // !   .
-			m_client_list[client_h]->m_is_on_server_change = true;
-			m_client_list[client_h]->m_is_on_waiting_process = true;
-			return;
+				// send_msg_to_ls(ServerMsgId::RequestSavePlayerDataReply, client_h, false); // !   .
+				m_client_list[client_h]->m_is_on_server_change = true;
+				m_client_list[client_h]->m_is_on_waiting_process = true;
+				return;
+			}
+			break;
+		}
 
 		case '2':
 
@@ -8032,8 +8689,6 @@ void CGame::request_teleport_handler(int client_h, const char* data, const char*
 		}
 	}
 
-RTH_NEXTSTEP:
-
 	// New 17/05/2004
 	set_playing_status(client_h);
 	// Set faction/identity status fields from player data
@@ -8054,14 +8709,26 @@ RTH_NEXTSTEP:
 	init_header->header.msg_type = MsgType::Confirm;
 
 	if (m_client_list[client_h]->m_is_observer_mode == false)
+	{
+		// When dest is -1,-1 (teleport to initial points), resolve to a random spawn first
+		// so get_empty_position searches near a valid point instead of (-1,-1).
+		// Use the destination map's location_name (not player's m_location) to ensure
+		// randomization even for players with location "NONE".
+		if (m_client_list[client_h]->m_x == -1 && m_client_list[client_h]->m_y == -1)
+		{
+			get_map_initial_point(m_client_list[client_h]->m_map_index,
+				&m_client_list[client_h]->m_x, &m_client_list[client_h]->m_y,
+				m_map_list[m_client_list[client_h]->m_map_index]->m_location_name);
+		}
 		get_empty_position(&m_client_list[client_h]->m_x, &m_client_list[client_h]->m_y, m_client_list[client_h]->m_map_index);
+	}
 	else get_map_initial_point(m_client_list[client_h]->m_map_index, &m_client_list[client_h]->m_x, &m_client_list[client_h]->m_y);
 
 	init_header->player_object_id = static_cast<std::int16_t>(client_h);
 	init_header->pivot_x = static_cast<std::int16_t>(m_client_list[client_h]->m_x - hb::shared::view::PlayerPivotOffsetX);
 	init_header->pivot_y = static_cast<std::int16_t>(m_client_list[client_h]->m_y - hb::shared::view::PlayerPivotOffsetY);
 	init_header->player_type = m_client_list[client_h]->m_type;
-	init_header->appearance = m_client_list[client_h]->m_appearance;
+	init_header->appearance = build_broadcast_appearance(client_h);
 	init_header->status = m_client_list[client_h]->m_status;
 	std::memcpy(init_header->map_name, m_client_list[client_h]->m_map_name, sizeof(init_header->map_name));
 	std::memcpy(init_header->cur_location, m_map_list[m_client_list[client_h]->m_map_index]->m_location_name, sizeof(init_header->cur_location));
@@ -8334,7 +9001,7 @@ void CGame::quit()
 
 uint32_t CGame::get_level_exp(int level)
 {
-	return hb::shared::calc::CalculateLevelExp(level);
+	return hb::shared::calc::level_exp(m_formula_engine, hb::shared::calc::level{(double)level});
 }
 
 /*****************************************************************
@@ -8363,7 +9030,7 @@ bool CGame::check_level_up(int client_h)
 		if (m_client_list[client_h]->m_level < m_max_level)
 		{
 			m_client_list[client_h]->m_level++;
-			m_client_list[client_h]->m_levelup_pool += 3;
+			m_client_list[client_h]->m_levelup_pool += hb::shared::calc::levelup_stat_gain(m_formula_engine);
 //			if ( (m_client_list[client_h]->m_cLU_Str + m_client_list[client_h]->m_cLU_Vit + m_client_list[client_h]->m_cLU_Dex + 
 //	  		      m_client_list[client_h]->m_cLU_Int + m_client_list[client_h]->m_cLU_Mag + m_client_list[client_h]->m_cLU_Char) <= TotalLevelUpPoint) {
 
@@ -8436,7 +9103,7 @@ void CGame::state_change_handler(int client_h, char* data, size_t msg_size)
 		return;
 	}
 
-	int majestic_cost = total_reduction / TotalLevelUpPoint;
+	int majestic_cost = total_reduction / hb::shared::calc::levelup_stat_gain(m_formula_engine);
 	if (majestic_cost > m_client_list[client_h]->m_gizon_item_upgrade_left)
 	{
 		send_notify_msg(0, client_h, Notify::StateChangeFailed, 0, 0, 0, 0);
@@ -8451,7 +9118,9 @@ void CGame::state_change_handler(int client_h, char* data, size_t msg_size)
 	int old_mag = m_client_list[client_h]->m_mag;
 	int old_char = m_client_list[client_h]->m_charisma;
 
-	if (old_str + old_vit + old_dex + old_int + old_mag + old_char != ((m_max_level - 1) * 3 + 70))
+	int expected_stats = (m_max_level - 1) * hb::shared::calc::levelup_stat_gain(m_formula_engine)
+		+ hb::shared::calc::base_stat_total(m_formula_engine);
+	if (old_str + old_vit + old_dex + old_int + old_mag + old_char != expected_stats)
 		return;
 
 	// Each stat must stay >= 10 and <= CharPointLimit after reduction
@@ -8492,6 +9161,98 @@ void CGame::state_change_handler(int client_h, char* data, size_t msg_size)
 	m_client_list[client_h]->m_sp = get_max_sp(client_h);
 
 	send_notify_msg(0, client_h, Notify::StateChangeSuccess, 0, 0, 0, 0);
+}
+
+void CGame::request_teleport_auth_handler(int client_h, const char* data)
+{
+	using namespace hb::shared::net;
+	using namespace hb::server::config;
+
+	// Basic player state validation (same checks as request_teleport_handler)
+	if (m_client_list[client_h] == 0) return;
+	if (m_client_list[client_h]->m_is_init_complete == false) {
+		send_notify_msg(0, client_h, Notify::NoticeMsg, 0, 0, 0, "Teleport not available");
+		return;
+	}
+	if (m_client_list[client_h]->m_is_killed) {
+		send_notify_msg(0, client_h, Notify::NoticeMsg, 0, 0, 0, "Teleport not available");
+		return;
+	}
+	if (m_client_list[client_h]->m_is_on_waiting_process) {
+		send_notify_msg(0, client_h, Notify::NoticeMsg, 0, 0, 0, "Teleport not available");
+		return;
+	}
+
+	// Apocalypse recall-impossible map check
+	if ((m_map_list[m_client_list[client_h]->m_map_index]->m_is_recall_impossible) &&
+		(m_client_list[client_h]->m_is_killed == false) && (m_is_apocalypse_mode) && (m_client_list[client_h]->m_hp > 0)) {
+		send_notify_msg(0, client_h, Notify::NoRecall, 0, 0, 0, 0);
+		return;
+	}
+
+	// Crusade force-recall restrictions (enemy city)
+	if ((memcmp(m_client_list[client_h]->m_location, "elvine", 6) == 0)
+		&& (m_client_list[client_h]->m_time_left_force_recall > 0)
+		&& (memcmp(m_map_list[m_client_list[client_h]->m_map_index]->m_location_name, "aresden", 7) == 0)
+		&& (m_is_crusade_mode == false)) {
+		send_notify_msg(0, client_h, Notify::NoticeMsg, 0, 0, 0, "Teleport not available");
+		return;
+	}
+	if ((memcmp(m_client_list[client_h]->m_location, "aresden", 7) == 0)
+		&& (m_client_list[client_h]->m_time_left_force_recall > 0)
+		&& (memcmp(m_map_list[m_client_list[client_h]->m_map_index]->m_location_name, "elvine", 6) == 0)
+		&& (m_is_crusade_mode == false)) {
+		send_notify_msg(0, client_h, Notify::NoticeMsg, 0, 0, 0, "Teleport not available");
+		return;
+	}
+
+	// Check teleport tile exists at current position
+	short sX = m_client_list[client_h]->m_x;
+	short sY = m_client_list[client_h]->m_y;
+	char dest_map_name[11]{};
+	int dest_x, dest_y;
+	direction dir;
+	bool ret_ok = m_map_list[m_client_list[client_h]->m_map_index]->search_teleport_dest(sX, sY, dest_map_name, &dest_x, &dest_y, &dir);
+	if (!ret_ok) {
+		send_notify_msg(0, client_h, Notify::NoticeMsg, 0, 0, 0, "No teleport at this location");
+		return;
+	}
+
+	// Crusade locked-map override — redirect destination
+	if ((strcmp(m_client_list[client_h]->m_locked_map_name, "NONE") != 0) && (m_client_list[client_h]->m_locked_map_time > 0)) {
+		int map_side = get_map_location_side(dest_map_name);
+		if (map_side > 3) map_side -= 2;
+		if (!((map_side != 0) && (m_client_list[client_h]->m_side == map_side))) {
+			std::memset(dest_map_name, 0, sizeof(dest_map_name));
+			strcpy(dest_map_name, m_client_list[client_h]->m_locked_map_name);
+		}
+	}
+
+	// Look up destination map on this server
+	int dest_map_index = -1;
+	for (int i = 0; i < MaxMaps; i++) {
+		if (m_map_list[i] != 0 && memcmp(m_map_list[i]->m_name, dest_map_name, 10) == 0) {
+			dest_map_index = i;
+			break;
+		}
+	}
+
+	// Destination map not on this server — still valid (server change), approve
+	if (dest_map_index >= 0) {
+		// Check level limits on destination map
+		if (m_client_list[client_h]->m_level < m_map_list[dest_map_index]->m_level_limit) {
+			send_notify_msg(0, client_h, Notify::LimitedLevel, 0, 0, 0, 0);
+			return;
+		}
+		if ((m_map_list[dest_map_index]->m_upper_level_limit != 0) &&
+			(m_client_list[client_h]->m_level > m_map_list[dest_map_index]->m_upper_level_limit)) {
+			send_notify_msg(0, client_h, Notify::TravelerLimitedLevel, 0, 0, 0, 0);
+			return;
+		}
+	}
+
+	// All checks pass — approve teleport
+	send_notify_msg(0, client_h, Notify::TeleportApproved, 0, 0, 0, 0);
 }
 
 // 2003-04-21     ...
@@ -8588,10 +9349,11 @@ void CGame::level_up_settings_handler(int client_h, char* data, size_t msg_size)
 		weapon_index = m_client_list[client_h]->m_item_equipment_status[to_int(EquipPos::TwoHand)];
 	if (weapon_index != -1 && m_client_list[client_h]->m_item_list[weapon_index] != nullptr)
 	{
-		short speed = m_client_list[client_h]->m_item_list[weapon_index]->m_speed;
-		speed -= ((m_client_list[client_h]->m_str + m_client_list[client_h]->m_angelic_str) / 13);
-		if (speed < 0) speed = 0;
-		m_client_list[client_h]->m_status.attack_delay = static_cast<uint8_t>(speed);
+		m_client_list[client_h]->m_status.attack_delay = static_cast<uint8_t>(hb::shared::calc::attack_delay(
+			m_formula_engine,
+			hb::shared::calc::weapon_speed{(double)m_client_list[client_h]->m_item_list[weapon_index]->m_speed},
+			hb::shared::calc::str{(double)m_client_list[client_h]->m_str},
+			hb::shared::calc::angelic_str{(double)m_client_list[client_h]->m_angelic_str}));
 	}
 
 	send_notify_msg(0, client_h, Notify::SettingSuccess, 0, 0, 0, 0);
@@ -8667,7 +9429,10 @@ int CGame::calc_max_load(int client_h)
 {
 	if (m_client_list[client_h] == 0) return 0;
 
-	return ((m_client_list[client_h]->m_str + m_client_list[client_h]->m_angelic_str) * 500 + m_client_list[client_h]->m_level * 500);
+	return hb::shared::calc::max_load(m_formula_engine,
+		hb::shared::calc::str{(double)m_client_list[client_h]->m_str},
+		hb::shared::calc::angelic_str{(double)m_client_list[client_h]->m_angelic_str},
+		hb::shared::calc::level{(double)m_client_list[client_h]->m_level});
 }
 
 void CGame::request_full_object_data(int client_h, char* data)
@@ -8703,7 +9468,7 @@ void CGame::request_full_object_data(int client_h, char* data)
 		pkt.type = m_client_list[object_id]->m_type;
 		pkt.dir = static_cast<uint8_t>(m_client_list[object_id]->m_dir);
 		memcpy(pkt.name, m_client_list[object_id]->m_char_name, sizeof(pkt.name));
-		pkt.appearance = m_client_list[object_id]->m_appearance;
+		pkt.appearance = build_broadcast_appearance(object_id);
 
 		{
 			auto pktStatus = m_client_list[object_id]->m_status;
@@ -8817,7 +9582,7 @@ int CGame::calc_total_weight(int client_h)
 	for(int i = 0; i < hb::shared::limits::MaxItems; i++)
 		if (m_client_list[client_h]->m_item_list[i] != 0) {
 
-			weight += m_item_manager->get_item_weight(m_client_list[client_h]->m_item_list[i], m_client_list[client_h]->m_item_list[i]->m_count);
+			weight += m_item_manager->get_item_weight(m_client_list[client_h]->m_item_list[i], static_cast<int>(m_client_list[client_h]->m_item_list[i]->m_count));
 		}
 
 	m_client_list[client_h]->m_cur_weight_load = weight;
@@ -9378,14 +10143,15 @@ bool CGame::read_notify_msg_list_file(const char* fn)
 
 	file = fopen(fn, "rt");
 	if (file == 0) {
-		hb::logger::log("Notify message list file not found");
+		hb::logger::warn("Notify message list file not found");
 		return false;
 	}
 	else {
 		hb::logger::log("Reading notify message list file");
 		cp = new char[file_size + 2];
 		std::memset(cp, 0, file_size + 2);
-		fread(cp, file_size, 1, file);
+		if (fread(cp, file_size, 1, file) != 1)
+			hb::logger::warn("Short read on notify message list file");
 
 		token = strtok(cp, seps);
 		while (token != 0) {
@@ -9398,9 +10164,9 @@ bool CGame::read_notify_msg_list_file(const char* fn)
 							m_notice_msg_list[i] = new class CMsg;
 							m_notice_msg_list[i]->put(0, token, strlen(token), 0, 0);
 							m_total_notice_msg++;
-							goto LNML_NEXTSTEP1;
+							break;
 						}
-				LNML_NEXTSTEP1:
+
 					read_mode = 0;
 					break;
 				}
@@ -9636,6 +10402,20 @@ int CGame::force_player_disconnect(int num)
 	return cnt;
 }
 
+int CGame::save_all_players()
+{
+	int count = 0;
+	for (int i = 1; i < MaxClients; i++)
+	{
+		if (m_client_list[i] != nullptr && m_client_list[i]->m_is_init_complete)
+		{
+			g_login->local_save_player_data(i);
+			count++;
+		}
+	}
+	return count;
+}
+
 void CGame::special_event_handler()
 {
 	uint32_t time;
@@ -9706,11 +10486,11 @@ int CGame::get_max_hp(int client_h)
 {
 	if (m_client_list[client_h] == 0) return 0;
 
-	int ret = hb::shared::calc::CalculateMaxHP(
-		m_client_list[client_h]->m_vit,
-		m_client_list[client_h]->m_level,
-		m_client_list[client_h]->m_str,
-		m_client_list[client_h]->m_angelic_str);
+	int ret = hb::shared::calc::max_hp(m_formula_engine,
+		hb::shared::calc::vit{(double)m_client_list[client_h]->m_vit},
+		hb::shared::calc::level{(double)m_client_list[client_h]->m_level},
+		hb::shared::calc::str{(double)m_client_list[client_h]->m_str},
+		hb::shared::calc::angelic_str{(double)m_client_list[client_h]->m_angelic_str});
 
 	// Apply side effect reduction if active
 	if (m_client_list[client_h]->m_side_effect_max_hp_down != 0)
@@ -9723,22 +10503,22 @@ int CGame::get_max_mp(int client_h)
 {
 	if (m_client_list[client_h] == 0) return 0;
 
-	return hb::shared::calc::CalculateMaxMP(
-		m_client_list[client_h]->m_mag,
-		m_client_list[client_h]->m_angelic_mag,
-		m_client_list[client_h]->m_level,
-		m_client_list[client_h]->m_int,
-		m_client_list[client_h]->m_angelic_int);
+	return hb::shared::calc::max_mp(m_formula_engine,
+		hb::shared::calc::mag{(double)m_client_list[client_h]->m_mag},
+		hb::shared::calc::angelic_mag{(double)m_client_list[client_h]->m_angelic_mag},
+		hb::shared::calc::level{(double)m_client_list[client_h]->m_level},
+		hb::shared::calc::intel{(double)m_client_list[client_h]->m_int},
+		hb::shared::calc::angelic_int{(double)m_client_list[client_h]->m_angelic_int});
 }
 
 int CGame::get_max_sp(int client_h)
 {
 	if (m_client_list[client_h] == 0) return 0;
 
-	return hb::shared::calc::CalculateMaxSP(
-		m_client_list[client_h]->m_str,
-		m_client_list[client_h]->m_angelic_str,
-		m_client_list[client_h]->m_level);
+	return hb::shared::calc::max_sp(m_formula_engine,
+		hb::shared::calc::str{(double)m_client_list[client_h]->m_str},
+		hb::shared::calc::angelic_str{(double)m_client_list[client_h]->m_angelic_str},
+		hb::shared::calc::level{(double)m_client_list[client_h]->m_level});
 }
 
 void CGame::get_map_initial_point(int map_index, short* pX, short* pY, char* player_location)
@@ -10016,7 +10796,8 @@ void CGame::request_noticement_handler(int client_h)
 
 	std::memset(G_cData50000, 0, sizeof(G_cData50000));
 
-	fread(G_cData50000 + sizeof(hb::net::PacketHeader), 1, file_size, noti_file);
+	if (fread(G_cData50000 + sizeof(hb::net::PacketHeader), 1, file_size, noti_file) != file_size)
+		hb::logger::warn("Short read on noticement file");
 	fclose(noti_file);
 
 	{
@@ -10065,7 +10846,8 @@ void CGame::request_check_account_password_handler(char* data, size_t msg_size)
 
 int CGame::request_panning_map_data_request(int client_h, char* data)
 {
-	char dir, mapData[3000];
+	direction dir;
+	char mapData[3000];
 	short dX, dY;
 	int   ret, size;
 
@@ -10079,7 +10861,7 @@ int CGame::request_panning_map_data_request(int client_h, char* data)
 
 	const auto* req = hb::net::PacketCast<hb::net::PacketRequestPanning>(data, sizeof(hb::net::PacketRequestPanning));
 	if (!req) return 0;
-	dir = static_cast<char>(req->dir);
+	dir = static_cast<direction>(req->dir);
 	if ((dir <= 0) || (dir > 8)) return 0;
 
 	hb::shared::direction::ApplyOffset(dir, dX, dY);
@@ -10201,13 +10983,13 @@ void CGame::request_shop_contents_handler(int client_h, char* data)
 	const auto* req = hb::net::PacketCast<hb::net::PacketShopRequest>(data, sizeof(hb::net::PacketShopRequest));
 	if (!req) return;
 
-	int16_t npc_type = req->npcType;
+	int16_t npc_config_id = req->npcConfigId;
 
-	// Look up shop ID for this NPC type
-	auto mappingIt = m_npc_shop_mappings.find(static_cast<int>(npc_type));
+	// Look up shop ID for this NPC config ID
+	auto mappingIt = m_npc_shop_mappings.find(static_cast<int>(npc_config_id));
 	if (mappingIt == m_npc_shop_mappings.end()) {
-		// No shop configured for this NPC type
-		hb::logger::log("Shop request for NPC type {} - no shop mapping found", npc_type);
+		// No shop configured for this NPC config ID
+		hb::logger::log("Shop request for NPC config {} - no shop mapping found", npc_config_id);
 		return;
 	}
 
@@ -10217,7 +10999,7 @@ void CGame::request_shop_contents_handler(int client_h, char* data)
 	auto shopIt = m_shop_data.find(shop_id);
 	if (shopIt == m_shop_data.end() || shopIt->second.item_ids.empty()) {
 		// Shop exists in mapping but has no items
-		hb::logger::log("Shop request for NPC type {}, shop {} - no items found", npc_type, shop_id);
+		hb::logger::log("Shop request for NPC config {}, shop {} - no items found", npc_config_id, shop_id);
 		return;
 	}
 
@@ -10236,7 +11018,7 @@ void CGame::request_shop_contents_handler(int client_h, char* data)
 	auto* resp = reinterpret_cast<hb::net::PacketShopResponseHeader*>(resp_data);
 	resp->header.msg_id = MSGID_RESPONSE_SHOP_CONTENTS;
 	resp->header.msg_type = MsgType::Confirm;
-	resp->npcType = npc_type;
+	resp->npcConfigId = npc_config_id;
 	resp->shopId = static_cast<int16_t>(shop_id);
 	resp->itemCount = itemCount;
 
@@ -10249,7 +11031,7 @@ void CGame::request_shop_contents_handler(int client_h, char* data)
 	// Send to client
 	m_client_list[client_h]->m_socket->send_msg(resp_data, static_cast<uint32_t>(packetSize));
 
-	hb::logger::log("Sent shop contents: NPC type {}, shop {}, {} items", npc_type, shop_id, itemCount);
+	hb::logger::log("Sent shop contents: NPC config {}, shop {}, {} items", npc_config_id, shop_id, itemCount);
 
 	delete[] resp_data;
 }
@@ -10482,6 +11264,30 @@ void CGame::check_connection_handler(int client_h, char* data, bool already_resp
 		resp.time_ms = time_rcv;
 		m_client_list[client_h]->m_socket->send_msg(reinterpret_cast<char*>(&resp), sizeof(resp));
 	}
+
+	// Client version check — warn outdated clients every 5 minutes
+	if (req->client_major != 0 || req->client_minor != 0 || req->client_patch != 0 || req->client_build != 0) {
+		uint64_t client_ver = static_cast<uint64_t>(req->client_major) * 10000000
+			+ static_cast<uint64_t>(req->client_minor) * 100000
+			+ static_cast<uint64_t>(req->client_patch) * 1000
+			+ req->client_build;
+		uint64_t expected_ver = static_cast<uint64_t>(hb::version::client::major) * 10000000
+			+ static_cast<uint64_t>(hb::version::client::minor) * 100000
+			+ static_cast<uint64_t>(hb::version::client::patch) * 1000
+			+ hb::version::client::build_number;
+		if (client_ver < expected_ver) {
+			if (time - m_client_list[client_h]->m_last_version_warning_time >= 300000) {
+				m_client_list[client_h]->m_last_version_warning_time = time;
+				char msg[128];
+				std::snprintf(msg, sizeof(msg),
+					"Your client (%d.%d.%d.%d) is outdated. Expected: %d.%d.%d.%d. Please relaunch to update.",
+					req->client_major, req->client_minor, req->client_patch, req->client_build,
+					hb::version::client::major, hb::version::client::minor,
+					hb::version::client::patch, hb::version::client::build_number);
+				send_notify_msg(0, client_h, Notify::NoticeMsg, 0, 0, 0, msg);
+			}
+		}
+	}
 }
 
 void CGame::request_help_handler(int client_h)
@@ -10525,10 +11331,8 @@ void CGame::remove_client_short_cut(int client_h)
 	for(int i = 0; i < MaxClients + 1; i++)
 		if (m_client_shortcut[i] == client_h) {
 			m_client_shortcut[i] = 0;
-			goto RCSC_LOOPBREAK;
+			break;
 		}
-
-RCSC_LOOPBREAK:
 
 	//m_client_shortcut[i] = m_client_shortcut[m_total_clients+1];
 	//m_client_shortcut[m_total_clients+1] = 0;
@@ -10751,7 +11555,7 @@ bool CGame::gm_teleport_to(int client_h, const char* dest_map, short dest_x, sho
 	init_header->pivot_x = static_cast<std::int16_t>(m_client_list[client_h]->m_x - hb::shared::view::PlayerPivotOffsetX);
 	init_header->pivot_y = static_cast<std::int16_t>(m_client_list[client_h]->m_y - hb::shared::view::PlayerPivotOffsetY);
 	init_header->player_type = m_client_list[client_h]->m_type;
-	init_header->appearance = m_client_list[client_h]->m_appearance;
+	init_header->appearance = build_broadcast_appearance(client_h);
 	init_header->status = m_client_list[client_h]->m_status;
 	std::memcpy(init_header->map_name, m_client_list[client_h]->m_map_name, sizeof(init_header->map_name));
 	std::memcpy(init_header->cur_location, m_map_list[m_client_list[client_h]->m_map_index]->m_location_name, sizeof(init_header->cur_location));
@@ -10992,7 +11796,7 @@ void CGame::show_version(int client_h)
 	char ver_message[256];
 
 	std::memset(ver_message, 0, sizeof(ver_message));
-	std::snprintf(ver_message, sizeof(ver_message), "Helbreath Sources %s.%s - www.xtremehb.com", hb::server::version::Upper, hb::server::version::Lower);
+	std::snprintf(ver_message, sizeof(ver_message), "Helbreath %s", hb::version::server::display_version);
 	show_client_msg(client_h, ver_message);
 
 }
@@ -11106,7 +11910,6 @@ void CGame::on_timer(char type)
 
 		// v1.41
 		if (m_is_game_started == false) {
-			hb::logger::log("Sending start message");
 			on_start_game_signal();
 			m_is_game_started = true;
 
@@ -11147,7 +11950,6 @@ void CGame::on_timer(char type)
 	m_skill_manager->set_game(this);
 	m_war_manager->set_game(this);
 	m_status_effect_manager->set_game(this);
-				hb::logger::log("EntityManager initialized");
 			}
 
 			// initialize Gathering Managers
@@ -11253,6 +12055,44 @@ void CGame::on_timer(char type)
 		m_can_fightzone_reserve_time = time;
 	}
 
+	// Scheduled shutdown: send milestone notifications, then begin disconnect
+	if (m_shutdown_start_time != 0 && !m_on_exit_process)
+	{
+		uint32_t elapsed_ms = time - m_shutdown_start_time;
+
+		if (elapsed_ms >= m_shutdown_delay_ms)
+		{
+			// Delay elapsed — save and begin disconnect sequence
+			hb::logger::log("Scheduled shutdown delay elapsed, beginning disconnect sequence...");
+			save_all_players();
+			m_on_exit_process = true;
+			m_exit_process_time = time;
+			m_shutdown_start_time = 0;
+		}
+		else
+		{
+			// Check if we've crossed a milestone
+			uint32_t remaining_ms = m_shutdown_delay_ms - elapsed_ms;
+			int remaining_sec = static_cast<int>(remaining_ms / 1000);
+
+			if (m_shutdown_next_milestone < static_cast<int>(m_shutdown_milestones.size()))
+			{
+				int milestone = m_shutdown_milestones[m_shutdown_next_milestone];
+				if (remaining_sec <= milestone)
+				{
+					hb::logger::log("Shutdown countdown: {} seconds remaining", milestone);
+					for (int i = 1; i < MaxClients; i++)
+					{
+						if (m_client_list[i] != nullptr && m_client_list[i]->m_is_init_complete)
+							send_notify_msg(0, i, Notify::ServerShutdown, 1, milestone, 0,
+								m_shutdown_message[0] != '\0' ? m_shutdown_message : nullptr);
+					}
+					m_shutdown_next_milestone++;
+				}
+			}
+		}
+	}
+
 	if ((m_is_server_shutdown == false) && (m_on_exit_process) && ((time - m_exit_process_time) > 1000 * 2)) {
 		if (force_player_disconnect(15) == 0) {
 			hb::logger::log("Server shutdown complete, all players disconnected");
@@ -11286,39 +12126,6 @@ void CGame::on_timer(char type)
 
 void CGame::on_start_game_signal()
 {
-	// Load map configurations from mapinfo.db
-	sqlite3* mapInfoDb = nullptr;
-	std::string mapInfoDbPath;
-	bool mapInfoDbCreated = false;
-
-	if (!EnsureMapInfoDatabase(&mapInfoDb, mapInfoDbPath, &mapInfoDbCreated)) {
-		hb::logger::error("mapinfo.db not available");
-	}
-	else {
-		hb::logger::log("Loading map configurations from mapinfo.db");
-		int mapsLoaded = 0;
-		for(int i = 0; i < MaxMaps; i++)
-		{
-			if (m_map_list[i] != 0)
-			{
-				if (memcmp(m_map_list[i]->m_name, "fightzone", 9) == 0)
-					m_map_list[i]->m_is_fight_zone = true;
-				if (memcmp(m_map_list[i]->m_name, "icebound", 8) == 0)
-					m_map_list[i]->m_is_snow_enabled = true;
-
-				if (LoadMapConfig(mapInfoDb, m_map_list[i]->m_name, m_map_list[i])) {
-					mapsLoaded++;
-					spawn_map_npcs_from_database(mapInfoDb, i);
-				}
-				else {
-					hb::logger::log("WARNING: Failed to load map config for: {}", m_map_list[i]->m_name);
-				}
-			}
-		}
-		hb::logger::log("Loaded {} map configurations from database.", mapsLoaded);
-		CloseMapInfoDatabase(mapInfoDb);
-	}
-
 	bool loadedSchedules = false;
 	sqlite3* configDb = nullptr;
 	std::string configDbPath;
@@ -11335,7 +12142,7 @@ void CGame::on_start_game_signal()
 	}
 
 	if (!loadedSchedules) {
-		hb::logger::error("Crusade/schedule configs missing in gameconfigs.db");
+		hb::logger::error("Crusade/schedule configs missing in gamedata.db");
 	}
 
 	m_war_manager->link_strike_point_map_index();
@@ -11349,6 +12156,12 @@ void CGame::on_start_game_signal()
 	m_war_manager->read_heldenian_guid_file("GameData/HeldenianGUID.txt");
 
 	hb::logger::log("Game server activated");
+
+	auto stats = CountAccountStats();
+	hb::logger::log("- Max level: {}, Max stat: {}, Stat/level: {}", m_max_level, m_max_stat_value, m_levelup_stat_gain);
+	hb::logger::log("- Accounts: {}, Characters: {}", stats.accounts, stats.characters);
+	for (const auto& [name, count] : stats.over_limit)
+		hb::logger::warn("- Account '{}' has {} characters (limit: {})", name, count, hb::shared::limits::MaxCharactersPerAccount);
 
 }
 
@@ -11830,16 +12643,11 @@ void CGame::local_update_configs(char config_type)
 	std::string configDbPath;
 	bool configDbCreated = false;
 	if (!EnsureGameConfigDatabase(&configDb, configDbPath, &configDbCreated) || configDbCreated) {
-		hb::logger::error("gameconfigs.db unavailable, cannot reload configs");
+		hb::logger::error("gamedata.db unavailable, cannot reload configs");
 		return;
 	}
 
 	bool ok = false;
-	if (config_type == 1) {
-		ok = HasGameConfigRows(configDb, "settings") && LoadSettingsConfig(configDb, this);
-		if (ok) hb::logger::log("Settings updated successfully!");
-		else hb::logger::error("Settings reload failed!");
-	}
 	if (config_type == 3) {
 		ok = LoadBannedListConfig(configDb, this);
 		if (ok) hb::logger::log("BannedList updated successfully!");
@@ -11855,7 +12663,7 @@ void CGame::reload_npc_configs()
 	bool configDbCreated = false;
 	if (!EnsureGameConfigDatabase(&configDb, configDbPath, &configDbCreated) || configDbCreated)
 	{
-		hb::logger::log("NPC config reload failed: gameconfigs.db unavailable");
+		hb::logger::log("NPC config reload failed: gamedata.db unavailable");
 		return;
 	}
 
@@ -11880,7 +12688,36 @@ void CGame::reload_npc_configs()
 	hb::logger::log("NPC configs reloaded successfully");
 }
 
-void CGame::send_config_reload_notification(bool items, bool magic, bool skills, bool npcs)
+void CGame::reload_shop_configs()
+{
+	sqlite3* configDb = nullptr;
+	std::string configDbPath;
+	bool configDbCreated = false;
+	if (!EnsureGameConfigDatabase(&configDb, configDbPath, &configDbCreated) || configDbCreated)
+	{
+		hb::logger::log("Shop config reload failed: gamedata.db unavailable");
+		return;
+	}
+
+	m_npc_shop_mappings.clear();
+	m_shop_data.clear();
+	m_is_shop_data_available = false;
+
+	if (HasGameConfigRows(configDb, "npc_shop_mapping") || HasGameConfigRows(configDb, "shop_items"))
+	{
+		LoadShopConfigs(configDb, this);
+	}
+
+	CloseGameConfigDatabase(configDb);
+
+	if (m_is_shop_data_available)
+		hb::logger::log("Shop configs reloaded successfully ({} shops, {} NPC config mappings)",
+			m_shop_data.size(), m_npc_shop_mappings.size());
+	else
+		hb::logger::log("Shop configs reloaded (no shop data found)");
+}
+
+void CGame::send_config_reload_notification(bool items, bool magic, bool skills, bool npcs, bool balance)
 {
 	hb::net::PacketNotifyConfigReload pkt{};
 	pkt.header.msg_id = MsgId::NotifyConfigReload;
@@ -11889,6 +12726,7 @@ void CGame::send_config_reload_notification(bool items, bool magic, bool skills,
 	pkt.reloadMagic = magic ? 1 : 0;
 	pkt.reloadSkills = skills ? 1 : 0;
 	pkt.reloadNpcs = npcs ? 1 : 0;
+	pkt.reloadBalance = balance ? 1 : 0;
 
 	for(int i = 1; i < MaxClients; i++)
 	{
@@ -11897,17 +12735,18 @@ void CGame::send_config_reload_notification(bool items, bool magic, bool skills,
 	}
 }
 
-void CGame::push_config_reload_to_clients(bool items, bool magic, bool skills, bool npcs)
+void CGame::push_config_reload_to_clients(bool items, bool magic, bool skills, bool npcs, bool balance)
 {
 	int count = 0;
 	for(int i = 1; i < MaxClients; i++)
 	{
 		if (m_client_list[i] != 0 && m_client_list[i]->m_is_init_complete)
 		{
-			if (items)  m_item_manager->send_client_item_configs(i);
-			if (magic)  m_magic_manager->send_client_magic_configs(i);
-			if (skills) m_skill_manager->send_client_skill_configs(i);
-			if (npcs)   send_client_npc_configs(i);
+			if (items)   m_item_manager->send_client_item_configs(i);
+			if (magic)   m_magic_manager->send_client_magic_configs(i);
+			if (skills)  m_skill_manager->send_client_skill_configs(i);
+			if (npcs)    send_client_npc_configs(i);
+			if (balance) send_client_balance_config(i);
 			count++;
 		}
 	}
@@ -12009,9 +12848,8 @@ void CGame::party_operation_result_handler(char* data)
 				m_party_info[m_client_list[client_h]->m_party_id].total_members--;
 
 				hb::logger::log("Party {}: member {} left, total={}", m_client_list[client_h]->m_party_id, client_h, m_party_info[m_client_list[client_h]->m_party_id].total_members);
-				goto PORH_LOOPBREAK1;
+				break;
 			}
-	PORH_LOOPBREAK1:
 
 		for (int i = 0; i < hb::shared::limits::MaxPartyMembers - 1; i++)
 			if ((m_party_info[m_client_list[client_h]->m_party_id].index[i] == 0) && (m_party_info[m_client_list[client_h]->m_party_id].index[i + 1] != 0)) {
@@ -12103,9 +12941,8 @@ void CGame::party_operation_result_create(int client_h, char* name, int result, 
 				m_party_info[m_client_list[client_h]->m_party_id].total_members++;
 				//testcode
 				hb::logger::log("Party {}: member {} added, total={}", m_client_list[client_h]->m_party_id, client_h, m_party_info[m_client_list[client_h]->m_party_id].total_members);
-				goto PORC_LOOPBREAK1;
+				break;
 			}
-	PORC_LOOPBREAK1:
 
 		if ((m_client_list[client_h]->m_req_join_party_client_h != 0) && (strlen(m_client_list[client_h]->m_req_join_party_name) != 0)) {
 			std::memset(data, 0, sizeof(data));
@@ -12160,9 +12997,8 @@ void CGame::party_operation_result_join(int client_h, char* name, int result, in
 				m_party_info[m_client_list[client_h]->m_party_id].total_members++;
 
 				hb::logger::log("PartyID:{} member:{} In(Join) Total:{}", m_client_list[client_h]->m_party_id, client_h, m_party_info[m_client_list[client_h]->m_party_id].total_members);
-				goto PORC_LOOPBREAK1;
+				break;
 			}
-	PORC_LOOPBREAK1:
 
 		for(int i = 1; i < MaxClients; i++)
 			if ((i != client_h) && (m_client_list[i] != 0) && (m_client_list[i]->m_party_id != 0) && (m_client_list[i]->m_party_id == party_id)) {
@@ -12187,9 +13023,8 @@ void CGame::party_operation_result_dismiss(int client_h, char* name, int result,
 			for(int i = 1; i < MaxClients; i++)
 				if ((m_client_list[i] != 0) && (hb_stricmp(m_client_list[i]->m_char_name, name) == 0)) {
 					client_h = i;
-					goto PORD_LOOPBREAK;
+					break;
 				}
-		PORD_LOOPBREAK:
 
 			for(int i = 0; i < hb::shared::limits::MaxPartyMembers; i++)
 				if (m_party_info[party_id].index[i] == client_h) {
@@ -12197,9 +13032,9 @@ void CGame::party_operation_result_dismiss(int client_h, char* name, int result,
 					m_party_info[party_id].total_members--;
 					//testcode
 					hb::logger::log("PartyID:{} member:{} Out Total:{}", party_id, client_h, m_party_info[party_id].total_members);
-					goto PORC_LOOPBREAK1;
+					break;
 				}
-		PORC_LOOPBREAK1:
+
 			for(int i = 0; i < hb::shared::limits::MaxPartyMembers - 1; i++)
 				if ((m_party_info[party_id].index[i] == 0) && (m_party_info[party_id].index[i + 1] != 0)) {
 					m_party_info[party_id].index[i] = m_party_info[party_id].index[i + 1];
@@ -12233,9 +13068,9 @@ void CGame::party_operation_result_dismiss(int client_h, char* name, int result,
 				m_party_info[party_id].total_members--;
 				//testcode
 				hb::logger::log("PartyID:{} member:{} Out Total:{}", party_id, client_h, m_party_info[party_id].total_members);
-				goto PORC_LOOPBREAK2;
+				break;
 			}
-	PORC_LOOPBREAK2:
+
 		for(int i = 0; i < hb::shared::limits::MaxPartyMembers - 1; i++)
 			if ((m_party_info[party_id].index[i] == 0) && (m_party_info[party_id].index[i + 1] != 0)) {
 				m_party_info[party_id].index[i] = m_party_info[party_id].index[i + 1];
@@ -12614,7 +13449,7 @@ void CGame::time_hit_points_up(int client_h)
 		if ((target_type == hb::shared::owner_class::Player) && (m_client_list[target_h]->m_side != m_client_list[attacker_h]->m_side)) {
 			switch (m_client_list[attacker_h]->m_using_weapon_skill) {
 				case 14:
-					if ((31 == m_client_list[attacker_h]->m_appearance.weapon_type) || (32 == m_client_list[attacker_h]->m_appearance.weapon_type)) {
+					if ((31 == m_client_list[attacker_h]->get_equipped_weapon_type()) || (32 == m_client_list[attacker_h]->get_equipped_weapon_type())) {
 						item_index = m_client_list[attacker_h]->m_item_equipment_status[to_int(EquipPos::TwoHand)];
 						if ((item_index != -1) && (m_client_list[attacker_h]->m_item_list[item_index] != 0)) {
 							if (m_client_list[attacker_h]->m_item_list[item_index]->m_id_num == 761) { // BattleHammer
@@ -12684,7 +13519,7 @@ void CGame::time_hit_points_up(int client_h)
 				hammer_chance = dice(4, (m_client_list[target_h]->m_item_list[armor_type]->m_max_life_span - m_client_list[target_h]->m_item_list[armor_type]->m_cur_life_span));
 			}
 
-			if ((31 == m_client_list[attacker_h]->m_appearance.weapon_type) || (32 == m_client_list[attacker_h]->m_appearance.weapon_type)) {
+			if ((31 == m_client_list[attacker_h]->get_equipped_weapon_type()) || (32 == m_client_list[attacker_h]->get_equipped_weapon_type())) {
 				item_index = m_client_list[attacker_h]->m_item_equipment_status[to_int(EquipPos::TwoHand)];
 				if ((item_index != -1) && (m_client_list[attacker_h]->m_item_list[item_index] != 0)) {
 					if (m_client_list[attacker_h]->m_item_list[item_index]->m_id_num == 761) { // BattleHammer
@@ -13287,3 +14122,121 @@ void CGame::get_angel_handler(int client_h, char* data, size_t msg_size)
 
 //50Cent - Repair All
 
+void CGame::apply_server_config(const server_config& cfg)
+{
+	m_server_config = cfg;
+
+	// Drop rates
+	m_primary_drop_rate = cfg.drop_rates.primary;
+	m_gold_drop_rate = cfg.drop_rates.gold;
+	m_secondary_drop_rate = cfg.drop_rates.secondary;
+	m_rep_drop_modifier = static_cast<char>(cfg.drop_rates.rep_modifier);
+
+	// Timing
+	m_client_timeout = cfg.timing.client_timeout_ms;
+	m_stamina_regen_interval = cfg.timing.stamina_regen_ms;
+	m_poison_damage_interval = cfg.timing.poison_damage_ms;
+	m_health_regen_interval = cfg.timing.health_regen_ms;
+	m_mana_regen_interval = cfg.timing.mana_regen_ms;
+	m_hunger_consume_interval = cfg.timing.hunger_consume_ms;
+	m_summon_creature_duration = cfg.timing.summon_duration_ms;
+	m_autosave_interval = cfg.timing.autosave_ms;
+	m_lag_protection_interval = cfg.timing.lag_protection_ms;
+
+	// Combat
+	m_enemy_kill_mode = (cfg.combat.enemy_kill_mode == "deathmatch");
+	m_enemy_kill_adjust = cfg.combat.enemy_kill_adjust;
+	m_slate_success_rate = static_cast<short>(cfg.combat.slate_success_rate);
+	m_minimum_hit_ratio = cfg.combat.min_hit_ratio;
+	m_maximum_hit_ratio = cfg.combat.max_hit_ratio;
+
+	// Character
+	m_base_stat_value = cfg.character.base_stat_value;
+	m_creation_stat_bonus = cfg.character.creation_stat_bonus;
+	m_levelup_stat_gain = cfg.character.levelup_stat_gain;
+	m_max_level = cfg.character.max_level;
+	m_max_stat_value = m_base_stat_value + m_creation_stat_bonus + (m_levelup_stat_gain * m_max_level) + 16;
+
+	// Gameplay
+	m_nighttime_duration = cfg.gameplay.nighttime_duration;
+	m_starting_guild_rank = cfg.gameplay.starting_guild_rank;
+	m_grand_magic_mana_consumption = cfg.gameplay.grand_magic_mana_cost;
+	m_max_construction_points = cfg.gameplay.max_construction_points;
+	m_max_summon_points = cfg.gameplay.max_summon_points;
+	m_max_war_contribution = cfg.gameplay.max_war_contribution;
+	m_max_bank_items = cfg.gameplay.max_bank_items;
+
+	// Raid schedule
+	m_raid_time_monday = cfg.raid_schedule.monday;
+	m_raid_time_tuesday = cfg.raid_schedule.tuesday;
+	m_raid_time_wednesday = cfg.raid_schedule.wednesday;
+	m_raid_time_thursday = cfg.raid_schedule.thursday;
+	m_raid_time_friday = cfg.raid_schedule.friday;
+	m_raid_time_saturday = cfg.raid_schedule.saturday;
+	m_raid_time_sunday = cfg.raid_schedule.sunday;
+
+	// Realm
+	std::snprintf(m_realm_name, sizeof(m_realm_name), "%s", cfg.realm.name.c_str());
+	std::snprintf(m_login_listen_ip, sizeof(m_login_listen_ip), "%s", cfg.realm.login_listen_ip.c_str());
+	m_login_listen_port = cfg.realm.login_listen_port;
+	std::snprintf(m_game_listen_ip, sizeof(m_game_listen_ip), "%s", cfg.realm.game_listen_ip.c_str());
+	m_game_listen_port = cfg.realm.game_listen_port;
+	if (!cfg.realm.game_connection_ip.empty())
+	{
+		std::snprintf(m_game_connection_ip, sizeof(m_game_connection_ip), "%s", cfg.realm.game_connection_ip.c_str());
+		m_game_connection_port = cfg.realm.game_connection_port;
+	}
+	else
+	{
+		m_game_connection_ip[0] = '\0';
+		m_game_connection_port = 0;
+	}
+}
+
+bool CGame::reload_server_config()
+{
+	server_config cfg;
+	if (!load_server_config("server_config.json", cfg))
+	{
+		hb::logger::error("Failed to reload server_config.json");
+		return false;
+	}
+	apply_server_config(cfg);
+	hb::logger::log("server_config.json reloaded successfully");
+	return true;
+}
+
+bool CGame::reload_formulas()
+{
+	sqlite3* db = nullptr;
+	std::string dbPath;
+	bool created = false;
+	if (!EnsureGameConfigDatabase(&db, dbPath, &created))
+	{
+		hb::logger::error("Failed to open gamedata.db for formula reload");
+		return false;
+	}
+
+	// Load into temporary engine, validate before swapping
+	hb::shared::formula_engine temp_engine;
+	bool ok = LoadFormulas(db, temp_engine);
+	CloseGameConfigDatabase(db);
+
+	if (!ok)
+	{
+		hb::logger::error("Formula reload failed (load error)");
+		return false;
+	}
+
+	auto vr = temp_engine.validate();
+	if (!vr.success)
+	{
+		hb::logger::error("Formula reload failed (validation error) — keeping current formulas");
+		return false;
+	}
+
+	m_formula_engine = std::move(temp_engine);
+	compute_balance_hash();
+	hb::logger::log("Formulas reloaded from gamedata.db (balance hash updated)");
+	return true;
+}

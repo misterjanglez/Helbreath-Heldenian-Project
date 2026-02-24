@@ -64,23 +64,26 @@ void Overlay_WaitInitData::on_render()
     uint32_t time = GameClock::get_time_ms();
     uint32_t elapsed = time - m_dwStartTime;
 
-    int dlgX, dlgY;
-    get_centered_dialog_pos(InterfaceNdGame4, 2, dlgX, dlgY);
-
-    draw_new_dialog_box(InterfaceNdGame4, dlgX, dlgY, 2);
-
-    G_cTxt = std::format("Waiting for response... {}sec", elapsed / 1000);
-    hb::shared::text::draw_text(GameFont::Bitmap1, dlgX + 54, dlgY + 65, G_cTxt.c_str(), hb::shared::text::TextStyle::with_highlight(GameColors::UIDarkRed));
-
-    if (elapsed > 7000)
+    if (elapsed >= 3000)
     {
-        put_aligned_string(dlgX + 12, dlgX + 305, dlgY + 95, UPDATE_SCREEN_ON_WAIT_INIT_DATA1);
-        put_aligned_string(dlgX + 12, dlgX + 305, dlgY + 110, UPDATE_SCREEN_ON_WAIT_INIT_DATA2);
-    }
-    else
-    {
-        put_aligned_string(dlgX + 12, dlgX + 305, dlgY + 100, UPDATE_SCREEN_ON_WAIT_INIT_DATA3);
-    }
+        int dlgX, dlgY;
+        get_centered_dialog_pos(InterfaceNdGame4, 2, dlgX, dlgY);
 
-    draw_version();
+        draw_new_dialog_box(InterfaceNdGame4, dlgX, dlgY, 2);
+
+        G_cTxt = std::format("Waiting for response... {}sec", elapsed / 1000);
+        hb::shared::text::draw_text(GameFont::Bitmap1, dlgX + 54, dlgY + 65, G_cTxt.c_str(), hb::shared::text::TextStyle::with_highlight(GameColors::UIDarkRed));
+
+        if (elapsed > 7000)
+        {
+            put_aligned_string(dlgX + 12, dlgX + 305, dlgY + 95, UPDATE_SCREEN_ON_WAIT_INIT_DATA1);
+            put_aligned_string(dlgX + 12, dlgX + 305, dlgY + 110, UPDATE_SCREEN_ON_WAIT_INIT_DATA2);
+        }
+        else
+        {
+            put_aligned_string(dlgX + 12, dlgX + 305, dlgY + 100, UPDATE_SCREEN_ON_WAIT_INIT_DATA3);
+        }
+
+        draw_version();
+    }
 }

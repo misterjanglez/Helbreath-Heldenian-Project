@@ -27,7 +27,8 @@ struct local_time
 inline void format_timestamp(const local_time& lt, char* buf, size_t size)
 {
 	std::snprintf(buf, size, "%04d-%02d-%02d %02d:%02d:%02d",
-		lt.year, lt.month, lt.day, lt.hour, lt.minute, lt.second);
+		lt.year % 10000, lt.month % 100, lt.day % 100,
+		lt.hour % 100, lt.minute % 100, lt.second % 100);
 }
 
 } // namespace hb::time

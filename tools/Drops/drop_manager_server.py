@@ -17,7 +17,7 @@ from urllib.parse import urlparse, parse_qs
 import os
 
 PORT = 8888
-DB_PATH = Path(__file__).parent / '../../Binaries/Server/GameConfigs.db'
+DB_PATH = Path(__file__).parent / '../../Binaries/Server/gameconfigs.db'
 CHANGELOG_PATH = Path(__file__).parent / 'changelog.txt'
 
 
@@ -33,7 +33,7 @@ class DropManagerHandler(http.server.SimpleHTTPRequestHandler):
     
     def do_GET(self):
         parsed = urlparse(self.path)
-        
+
         if parsed.path == '/api/items':
             self.send_json(self.get_items())
         elif parsed.path == '/api/npcs':
@@ -45,8 +45,7 @@ class DropManagerHandler(http.server.SimpleHTTPRequestHandler):
         elif parsed.path == '/api/changelog':
             self.send_json(self.get_changelog())
         elif parsed.path == '/':
-            self.path = '/drop_manager.html'
-            super().do_GET()
+            self.send_html()
         else:
             super().do_GET()
     
@@ -74,6 +73,16 @@ class DropManagerHandler(http.server.SimpleHTTPRequestHandler):
         else:
             self.send_error(404)
     
+    def send_html(self):
+        html_path = Path(__file__).parent / 'drop_manager.html'
+        with open(html_path, 'r', encoding='utf-8') as f:
+            content = f.read()
+        self.send_response(200)
+        self.send_header('Content-Type', 'text/html; charset=utf-8')
+        self.send_header('Cache-Control', 'no-cache, no-store, must-revalidate')
+        self.end_headers()
+        self.wfile.write(content.encode('utf-8'))
+
     def send_json(self, data):
         self.send_response(200)
         self.send_header('Content-Type', 'application/json')
@@ -302,12 +311,12 @@ def main():
     os.chdir(Path(__file__).parent)
     
     with ReuseAddrTCPServer(("", PORT), DropManagerHandler) as httpd:
-        print(f"🎮 Drop Manager running at http://localhost:{PORT}")
+        print(f"Drop Manager running at http://localhost:{PORT}")
         print("Press Ctrl+C to stop")
         try:
             httpd.serve_forever()
         except KeyboardInterrupt:
-            print("\n👋 Server stopped")
+            print("\nServer stopped")
 
 
 if __name__ == "__main__":

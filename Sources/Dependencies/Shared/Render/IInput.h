@@ -7,6 +7,8 @@
 #pragma once
 
 #include <cstdint>
+#include <string>
+#include <vector>
 
 namespace hb::shared::input
 {
@@ -143,6 +145,16 @@ public:
     virtual void set_suppressed(bool suppressed) = 0;
     virtual bool is_suppressed() const = 0;
 
+    // ============== Clipboard ==============
+    virtual std::string get_clipboard_text() const = 0;
+    virtual void set_clipboard_text(const std::string& text) = 0;
+
+    // ============== Typed Character Buffer ==============
+    // Buffered Unicode codepoints from text input events this frame.
+    // Filled by on_text_char(), consumed by take_typed_chars().
+    virtual void on_text_char(uint32_t codepoint) = 0;
+    virtual std::vector<uint32_t> take_typed_chars() = 0;
+
     // ============== Input Events ==============
     // Called by window/event handler to feed input
     virtual void on_key_down(KeyCode key) = 0;
@@ -194,6 +206,14 @@ namespace hb::shared::input {
     // Input suppression (used internally by overlay system)
     inline void set_suppressed(bool suppressed) { get()->set_suppressed(suppressed); }
     inline bool is_suppressed() { return get()->is_suppressed(); }
+
+    // Clipboard
+    inline std::string get_clipboard_text() { return get()->get_clipboard_text(); }
+    inline void set_clipboard_text(const std::string& text) { get()->set_clipboard_text(text); }
+
+    // Typed character buffer
+    inline void on_text_char(uint32_t codepoint) { get()->on_text_char(codepoint); }
+    inline std::vector<uint32_t> take_typed_chars() { return get()->take_typed_chars(); }
 
     // ============== Hit-Testing Helpers (replaces CMouseInterface) ==============
 

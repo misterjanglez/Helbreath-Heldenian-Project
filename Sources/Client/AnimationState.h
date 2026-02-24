@@ -7,12 +7,15 @@
 #pragma once
 
 #include <cstdint>
+#include "DirectionHelpers.h"
+
+using hb::shared::direction::direction;
 
 struct animation_state
 {
 	// --- Config (set when action changes) ---
 	int8_t  m_action        = 0;    // hb::shared::action::Type::stop, MOVE, RUN, ATTACK, etc.
-	int8_t  m_dir           = 0;    // Facing direction (1-8)
+	direction m_dir         = direction{};  // Facing direction (1-8)
 	int16_t m_max_frame      = 0;    // Total frame count
 	int16_t m_frame_time     = 0;    // Milliseconds per frame (final, after modifiers)
 	bool    m_loop          = true; // STOP/MOVE/RUN loop; others play once
@@ -25,10 +28,10 @@ struct animation_state
 
 	// --- Lifecycle ---
 	void reset();
-	void set_action(int8_t action, int8_t dir,
+	void set_action(int8_t action, direction dir,
 	               int16_t maxFrame, int16_t frameTime, bool loop,
 	               int8_t startFrame = 0);
-	void set_direction(int8_t dir);
+	void set_direction(direction dir);
 
 	// --- Per-frame update. Returns true if frame changed ---
 	bool update(uint32_t current_time);

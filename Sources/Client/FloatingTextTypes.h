@@ -46,8 +46,8 @@ struct AnimParams {
 namespace FloatingTextParams {
 
 inline constexpr AnimParams Chat[] = {
-	// player_chat: white renderer text, 4s, slow rise
-	{ 4000, 0, 55, 1, 200, 0, GameColors::UIWhite, false },
+	// player_chat: white renderer text, 4s, fast rise
+	{ 4000, 0, 55, 10, 200, 0, GameColors::UIWhite, false },
 };
 
 inline constexpr AnimParams Damage[] = {

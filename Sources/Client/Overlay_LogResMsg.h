@@ -8,6 +8,7 @@
 #pragma once
 
 #include "IGameScreen.h"
+#include "CControls.h"
 
 class Overlay_LogResMsg : public IGameScreen
 {
@@ -32,8 +33,10 @@ private:
     void handle_dismiss();
     void render_message(int dlgX, int dlgY);
 
+    static constexpr int BTN_OK = 1;
+
+    cc::control_collection m_controls;
+
     char m_cReturnDest;
     char m_cMsgCode;
-    uint32_t m_dwStartTime = 0;
-    uint32_t m_dwAnimTime = 0;
 };

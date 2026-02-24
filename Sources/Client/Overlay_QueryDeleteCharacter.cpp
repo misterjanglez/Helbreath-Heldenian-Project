@@ -11,11 +11,12 @@
 #include "ASIOSocket.h"
 #include "TextLibExt.h"
 #include "GameFonts.h"
-
+#include "InputStateHelper.h"
+#include "Packet/SharedPackets.h"
+#include "AudioManager.h"
 
 using namespace hb::shared::net;
 using namespace hb::client::sprite_id;
-namespace MouseButton = hb::shared::input::MouseButton;
 
 Overlay_QueryDeleteCharacter::Overlay_QueryDeleteCharacter(CGame* game)
     : IGameScreen(game)
@@ -25,83 +26,78 @@ Overlay_QueryDeleteCharacter::Overlay_QueryDeleteCharacter(CGame* game)
 void Overlay_QueryDeleteCharacter::on_initialize()
 {
     m_dwStartTime = GameClock::get_time_ms();
-    m_dwAnimTime = m_dwStartTime;
 
     // Play warning sound
-    play_game_sound('E', 25, 0);
-}
-
-void Overlay_QueryDeleteCharacter::on_uninitialize()
-{
-    // Nothing to clean up
-}
-
-void Overlay_QueryDeleteCharacter::on_update()
-{
-    uint32_t time = GameClock::get_time_ms();
+    audio_manager::get().play_game_sound(sound_type::effect, 25, 0);
 
     int dlgX, dlgY;
     get_centered_dialog_pos(InterfaceNdGame4, 2, dlgX, dlgY);
 
-    // ESC cancels - base screen (SelectCharacter) will be revealed
-    if (hb::shared::input::is_key_pressed(KeyCode::Escape))
+    m_controls.set_screen_size(LOGICAL_WIDTH(), LOGICAL_HEIGHT());
+    m_controls.set_hover_focus(false);
+
+    // Yes button — confirm deletion
+    auto* btn_yes = m_controls.add<cc::button>(BTN_YES, cc::rect{dlgX + 38, dlgY + 119, ui_layout::btn_size_x, ui_layout::btn_size_y});
+    btn_yes->set_click_sound([this] { audio_manager::get().play_game_sound(sound_type::effect, 14, 5); });
+    btn_yes->set_on_click([this](int) {
+        // Build delete character packet for deferred send after connection establishes
+        hb::net::DeleteCharacterRequest req{};
+        req.header.msg_id = MsgId::RequestDeleteCharacter;
+        req.header.msg_type = static_cast<uint16_t>(m_game->m_enter_game_type);
+        std::snprintf(req.character_name, sizeof(req.character_name), "%s", m_game->m_char_list[m_game->m_enter_game_type - 1]->m_name.c_str());
+        std::snprintf(req.account_name, sizeof(req.account_name), "%s", m_game->m_account_name.c_str());
+        std::snprintf(req.password, sizeof(req.password), "%s", m_game->m_account_password.c_str());
+        std::snprintf(req.world_name, sizeof(req.world_name), "%s", m_game->m_world_server_name.c_str());
+        m_game->set_pending_login_packet(req);
+
+        m_game->m_l_sock = std::make_unique<hb::shared::net::ASIOSocket>(m_game->m_io_pool->get_context(), game_limits::socket_block_limit);
+        m_game->m_l_sock->connect(m_game->m_log_server_addr.c_str(), m_game->m_log_server_port);
+        m_game->m_l_sock->init_buffer_size(hb::shared::limits::MsgBufferSize);
+
+        std::snprintf(m_game->m_msg, sizeof(m_game->m_msg), "%s", "33");
+        m_game->change_game_mode(GameMode::Connecting);
+    });
+    btn_yes->set_render_handler([this](const cc::control& c) {
+        auto sb = c.screen_bounds();
+        int frame = c.is_highlighted() ? 19 : 18;
+        m_game->m_sprite[InterfaceNdButton]->draw(sb.x, sb.y, frame);
+    });
+
+    // No button — cancel
+    auto* btn_no = m_controls.add<cc::button>(BTN_NO, cc::rect{dlgX + 208, dlgY + 119, ui_layout::btn_size_x, ui_layout::btn_size_y});
+    btn_no->set_click_sound([this] { audio_manager::get().play_game_sound(sound_type::effect, 14, 5); });
+    btn_no->set_on_click([this](int) {
+        clear_overlay();
+    });
+    btn_no->set_render_handler([this](const cc::control& c) {
+        auto sb = c.screen_bounds();
+        int frame = c.is_highlighted() ? 3 : 2;
+        m_game->m_sprite[InterfaceNdButton]->draw(sb.x, sb.y, frame);
+    });
+
+    m_controls.set_focus_order({BTN_YES, BTN_NO});
+    m_controls.set_focus(BTN_NO);  // Safe default — don't accidentally delete
+}
+
+void Overlay_QueryDeleteCharacter::on_uninitialize()
+{
+}
+
+void Overlay_QueryDeleteCharacter::on_update()
+{
+    cc::input_state input;
+    hb::client::fill_input_state(input);
+    m_controls.update(input, GameClock::get_time_ms());
+
+    if (m_controls.escape_pressed())
     {
         clear_overlay();
         return;
-    }
-
-    // Mouse click detection
-    if (hb::shared::input::is_mouse_button_pressed(MouseButton::Left))
-    {
-        play_game_sound('E', 14, 5);
-
-        // Yes button - confirm deletion
-        if (hb::shared::input::is_mouse_in_rect(dlgX + 38, dlgY + 119, ui_layout::btn_size_x, ui_layout::btn_size_y))
-        {
-            // Create login socket and initiate delete request
-            m_game->m_l_sock = std::make_unique<hb::shared::net::ASIOSocket>(m_game->m_io_pool->get_context(), game_limits::socket_block_limit);
-            m_game->m_l_sock->connect(m_game->m_log_server_addr.c_str(), m_game->m_log_server_port);
-            m_game->m_l_sock->init_buffer_size(hb::shared::limits::MsgBufferSize);
-
-            m_game->m_connect_mode = MsgId::RequestDeleteCharacter;
-            std::snprintf(m_game->m_msg, sizeof(m_game->m_msg), "%s", "33");
-
-            // set_overlay will clear this overlay automatically
-            m_game->change_game_mode(GameMode::Connecting);
-            return;
-        }
-
-        // No button - cancel, base screen (SelectCharacter) will be revealed
-        if (hb::shared::input::is_mouse_in_rect(dlgX + 208, dlgY + 119, ui_layout::btn_size_x, ui_layout::btn_size_y))
-        {
-            clear_overlay();
-            return;
-        }
-    }
-
-    // Animation frame updates
-    if ((time - m_dwAnimTime) > 100)
-    {
-        m_game->m_menu_frame++;
-        m_dwAnimTime = time;
-    }
-    if (m_game->m_menu_frame >= 8)
-    {
-        m_game->m_menu_dir_cnt++;
-        if (m_game->m_menu_dir_cnt > 8)
-        {
-            m_game->m_menu_dir++;
-            m_game->m_menu_dir_cnt = 1;
-        }
-        if (m_game->m_menu_dir > 8) m_game->m_menu_dir = 1;
-        m_game->m_menu_frame = 0;
     }
 }
 
 void Overlay_QueryDeleteCharacter::on_render()
 {
-    int mouse_x = hb::shared::input::get_mouse_x();
-    int mouse_y = hb::shared::input::get_mouse_y();
     uint32_t elapsed = GameClock::get_time_ms() - m_dwStartTime;
 
     int dlgX, dlgY;
@@ -132,15 +128,8 @@ void Overlay_QueryDeleteCharacter::on_render()
     // Confirmation text
     put_aligned_string(dlgX + 16, dlgX + 291, dlgY + 95, UPDATE_SCREEN_ON_QUERY_DELETE_CHARACTER2);
 
-    // Yes button with hover effect
-    bool yes_hover = (mouse_x >= dlgX + 38) && (mouse_x <= dlgX + 38 + ui_layout::btn_size_x) &&
-                     (mouse_y >= dlgY + 119) && (mouse_y <= dlgY + 119 + ui_layout::btn_size_y);
-    draw_new_dialog_box(InterfaceNdButton, dlgX + 38, dlgY + 119, yes_hover ? 19 : 18);
-
-    // No button with hover effect
-    bool no_hover = (mouse_x >= dlgX + 208) && (mouse_x <= dlgX + 208 + ui_layout::btn_size_x) &&
-                    (mouse_y >= dlgY + 119) && (mouse_y <= dlgY + 119 + ui_layout::btn_size_y);
-    draw_new_dialog_box(InterfaceNdButton, dlgX + 208, dlgY + 119, no_hover ? 3 : 2);
+    // Buttons
+    m_controls.render();
 
     draw_version();
 }

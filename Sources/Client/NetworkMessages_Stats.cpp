@@ -1,4 +1,6 @@
 #include "Game.h"
+#include "SharedCalculations.h"
+#include "FloatingTextManager.h"
 #include "NetworkMessageManager.h"
 #include "Packet/SharedPackets.h"
 #include "lan_eng.h"
@@ -7,6 +9,8 @@
 #include <cmath>
 #include <format>
 #include <string>
+#include "Screen_OnGame.h"
+#include "AudioManager.h"
 
 
 namespace NetworkMessageHandlers {
@@ -27,13 +31,13 @@ namespace NetworkMessageHandlers {
 		if ((game->m_player->m_hp - prev_hp) < 10) return;
 		txt = std::format(NOTIFYMSG_HP_UP, game->m_player->m_hp - prev_hp);
 		game->add_event_list(txt.c_str(), 10);
-		game->play_game_sound('E', 21, 0);
+		audio_manager::get().play_game_sound(sound_type::effect, 21, 0);
 	}
 	else
 	{
-		if ((game->m_logout_count > 0) && (game->m_force_disconn == false))
+		if ((game->on_game()->m_logout_count > 0) && (game->m_force_disconn == false))
 		{
-			game->m_logout_count = -1;
+			game->on_game()->m_logout_count = -1;
 			game->add_event_list(NOTIFYMSG_HP2, 10);
 		}
 		game->m_damaged_time = GameClock::get_time_ms();
@@ -58,7 +62,7 @@ namespace NetworkMessageHandlers {
 		{
 			txt = std::format(NOTIFYMSG_MP_UP, game->m_player->m_mp - prev_mp);
 			game->add_event_list(txt.c_str(), 10);
-			game->play_game_sound('E', 21, 0);
+			audio_manager::get().play_game_sound(sound_type::effect, 21, 0);
 		}
 		else
 		{
@@ -81,7 +85,7 @@ namespace NetworkMessageHandlers {
 		{
 			txt = std::format(NOTIFYMSG_SP_UP, game->m_player->m_sp - prev_sp);
 			game->add_event_list(txt.c_str(), 10);
-			game->play_game_sound('E', 21, 0);
+			audio_manager::get().play_game_sound(sound_type::effect, 21, 0);
 		}
 		else
 		{
@@ -131,7 +135,7 @@ namespace NetworkMessageHandlers {
 		game->m_player->m_mag = pkt->mag;
 		game->m_player->m_charisma = pkt->chr;
 
-		game->m_player->m_lu_point = (game->m_player->m_level - 1) * 3 - ((game->m_player->m_str + game->m_player->m_vit + game->m_player->m_dex + game->m_player->m_int + game->m_player->m_mag + game->m_player->m_charisma) - 70);
+		game->m_player->m_lu_point = hb::shared::calc::level_up_points(game->m_formula_engine, hb::shared::calc::level{(double)game->m_player->m_level}, hb::shared::calc::total_stats{(double)(game->m_player->m_str + game->m_player->m_vit + game->m_player->m_dex + game->m_player->m_int + game->m_player->m_mag + game->m_player->m_charisma)});
 		game->m_player->m_lu_str = game->m_player->m_lu_vit = game->m_player->m_lu_dex = game->m_player->m_lu_int = game->m_player->m_lu_mag = game->m_player->m_lu_char = 0;
 
 		txt = std::format(NOTIFYMSG_LEVELUP1, game->m_player->m_level);
@@ -141,17 +145,17 @@ namespace NetworkMessageHandlers {
 		case 1:
 		case 2:
 		case 3:
-			game->play_game_sound('C', 21, 0);
+			audio_manager::get().play_game_sound(sound_type::character, 21, 0);
 			break;
 		case 4:
 		case 5:
 		case 6:
-			game->play_game_sound('C', 22, 0);
+			audio_manager::get().play_game_sound(sound_type::character, 22, 0);
 			break;
 		}
 
-		game->m_floating_text.remove_by_object_id(game->m_player->m_player_object_id);
-		game->m_floating_text.add_notify_text(notify_text_type::LevelUp, "Level up!", game->m_cur_time,
+		game->get_floating_text().remove_by_object_id(game->m_player->m_player_object_id);
+		game->get_floating_text().add_notify_text(notify_text_type::LevelUp, "Level up!", game->m_cur_time,
 			game->m_player->m_player_object_id, game->m_map_data.get());
 		return;
 	}

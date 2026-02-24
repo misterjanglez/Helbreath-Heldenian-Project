@@ -1,15 +1,24 @@
 ﻿#include "Game.h"
+#include "FloatingTextManager.h"
 #include "NetworkMessageManager.h"
 #include "Packet/SharedPackets.h"
+#ifdef TESTER_ONLY
+// TESTER MENU — includes (tester builds only)
+#include "DialogBox_ItemCreator.h"
+#include "DialogBox_TesterMenu.h"
+#endif // TESTER_ONLY
 #include "lan_eng.h"
 #include <cstdio>
 #include <cstring>
 #include <cmath>
 #include <format>
 #include <string>
+#include "Screen_OnGame.h"
+#include "AudioManager.h"
 
 
 using namespace hb::shared::action;
+using namespace hb::shared::direction;
 
 namespace NetworkMessageHandlers {
 	void HandleKilled(CGame* game, char* data)
@@ -20,7 +29,7 @@ namespace NetworkMessageHandlers {
 		game->m_player->m_hp = 0;
 		game->m_player->m_Controller.set_command(-1);
 		// Restart
-		game->m_item_using_status = false;
+		game->on_game()->m_item_using_status = false;
 		game->clear_skill_using_status();
 		const auto* pkt = hb::net::PacketCast<hb::net::PacketNotifyKilled>(
 			data, sizeof(hb::net::PacketNotifyKilled));
@@ -96,6 +105,39 @@ namespace NetworkMessageHandlers {
 		game->m_player->m_enemy_kill_count = pkt->count;
 	}
 
+	void HandleContribution(CGame* game, char* data)
+	{
+		const auto* pkt = hb::net::PacketCast<hb::net::PacketNotifySimpleInt>(
+			data, sizeof(hb::net::PacketNotifySimpleInt));
+		if (!pkt) return;
+		game->m_player->m_contribution = pkt->value;
+	}
+
+#ifdef TESTER_ONLY
+	// TESTER MENU — notification handlers (tester builds only)
+	void HandleTesterItemSearchResult(CGame* game, char* data)
+	{
+		const auto* pkt = hb::net::PacketCast<hb::net::PacketNotifyTesterItemSearchResult>(
+			data, sizeof(hb::net::PacketNotifyTesterItemSearchResult));
+		if (!pkt) return;
+
+		auto* dlg = dynamic_cast<DialogBox_ItemCreator*>(
+			game->get_dialog_box_manager().get_dialog_box(DialogBoxId::ItemCreator));
+		if (dlg) dlg->receive_search_results(pkt);
+	}
+
+	void HandleTesterMapListResult(CGame* game, char* data)
+	{
+		const auto* pkt = hb::net::PacketCast<hb::net::PacketNotifyTesterMapListResult>(
+			data, sizeof(hb::net::PacketNotifyTesterMapListResult));
+		if (!pkt) return;
+
+		auto* dlg = dynamic_cast<DialogBox_TesterMenu*>(
+			game->get_dialog_box_manager().get_dialog_box(DialogBoxId::TesterMenu));
+		if (dlg) dlg->receive_map_list(pkt);
+	}
+#endif // TESTER_ONLY
+
 	void HandleEnemyKillReward(CGame* game, char* data)
 	{
 		uint32_t exp;
@@ -153,10 +195,10 @@ namespace NetworkMessageHandlers {
 
 		game->m_player->m_exp = exp;
 		game->m_player->m_enemy_kill_count = enemy_kill_count;
-		game->play_game_sound('E', 23, 0);
+		audio_manager::get().play_game_sound(sound_type::effect, 23, 0);
 
-		game->m_floating_text.remove_by_object_id(game->m_player->m_player_object_id);
-		game->m_floating_text.add_notify_text(notify_text_type::enemy_kill, "Enemy Kill!", game->m_cur_time,
+		game->get_floating_text().remove_by_object_id(game->m_player->m_player_object_id);
+		game->get_floating_text().add_notify_text(notify_text_type::enemy_kill, "Enemy Kill!", game->m_cur_time,
 			game->m_player->m_player_object_id, game->m_map_data.get());
 		game->create_screen_shot();
 	}
@@ -195,15 +237,15 @@ namespace NetworkMessageHandlers {
 		if (pkt->enabled == 1)
 		{
 			game->add_event_list(NOTIFY_MSG_HANDLER40); // "Observer Mode On. Press 'SHIFT + ESC' to Log Out..."
-			game->m_is_observer_mode = true;
+			game->on_game()->m_is_observer_mode = true;
 			game->m_observer_cam_time = GameClock::get_time_ms();
 			std::string name = game->m_player->m_player_name;
-			game->m_map_data->set_owner(game->m_player->m_player_object_id, -1, -1, 0, 0, hb::shared::entity::PlayerAppearance{}, hb::shared::entity::PlayerStatus{}, name, 0, 0, 0, 0);
+			game->m_map_data->set_owner(game->m_player->m_player_object_id, -1, -1, 0, direction{}, hb::shared::entity::PlayerAppearance{}, hb::shared::entity::PlayerStatus{}, name, 0, 0, 0, 0);
 		}
 		else
 		{
 			game->add_event_list(NOTIFY_MSG_HANDLER41); // "Observer Mode Off"
-			game->m_is_observer_mode = false;
+			game->on_game()->m_is_observer_mode = false;
 			game->m_map_data->set_owner(game->m_player->m_player_object_id, game->m_player->m_player_x, game->m_player->m_player_y, game->m_player->m_player_type, game->m_player->m_player_dir, game->m_player->m_playerAppearance, game->m_player->m_playerStatus, game->m_player->m_player_name, Type::stop, 0, 0, 0);
 		}
 	}
@@ -237,8 +279,8 @@ namespace NetworkMessageHandlers {
 	{
 		if (game->m_player->m_Controller.get_command() == Type::Magic)
 			game->m_player->m_Controller.set_command(Type::stop);
-		game->m_is_get_pointing_mode = false;
-		game->m_point_command_type = -1;
+		game->on_game()->m_is_get_pointing_mode = false;
+		game->on_game()->m_point_command_type = -1;
 	}
 }
 

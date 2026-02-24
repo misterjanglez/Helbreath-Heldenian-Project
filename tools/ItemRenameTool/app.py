@@ -7,9 +7,9 @@ import sqlite3
 import os
 import json
 from http.server import HTTPServer, BaseHTTPRequestHandler
-from urllib.parse import parse_qs
+from urllib.parse import parse_qs, urlparse
 
-DB_PATH = os.path.join(os.path.dirname(__file__), "..", "..", "Binaries", "Server", "GameConfigs.db")
+DB_PATH = os.path.join(os.path.dirname(__file__), "..", "..", "Binaries", "Server", "gameconfigs.db")
 BACKUP_FILE = os.path.join(os.path.dirname(__file__), "original_names.json")
 
 def get_db():
@@ -44,40 +44,48 @@ HTML_PAGE = """<!DOCTYPE html>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
         font-family: 'Segoe UI', Tahoma, sans-serif;
-        background: #1a1a2e;
-        color: #e0e0e0;
+        background: #181620;
+        color: #ddd8d0;
         min-height: 100vh;
     }
-    .header {
-        background: #16213e;
-        padding: 16px 24px;
-        border-bottom: 2px solid #0f3460;
+    .navbar {
+        background: linear-gradient(to right, #7a5c34, #3a3248);
+        padding: 12px 24px;
+        border-bottom: 2px solid #3a3248;
         display: flex;
-        justify-content: space-between;
         align-items: center;
+        gap: 16px;
         position: sticky;
         top: 0;
         z-index: 100;
+        flex-shrink: 0;
     }
-    .header h1 {
+    .navbar h1 {
         font-size: 20px;
-        color: #e94560;
+        color: #fff;
+        white-space: nowrap;
     }
-    .header-actions {
+    .navbar-search {
+        flex: 1;
+        max-width: 400px;
+        position: relative;
+    }
+    .navbar-search input {
+        width: 100%;
+        padding: 8px 12px;
+        border: 1px solid #3a3248;
+        border-radius: 4px;
+        background: #181620;
+        color: #ddd8d0;
+        font-size: 14px;
+    }
+    .navbar-search input:focus { outline: none; border-color: #c8a850; }
+    .navbar-search input::placeholder { color: #686058; }
+    .navbar-actions {
         display: flex;
         gap: 8px;
         align-items: center;
     }
-    .search-box {
-        padding: 8px 12px;
-        background: #1a1a2e;
-        border: 1px solid #0f3460;
-        color: #e0e0e0;
-        border-radius: 4px;
-        font-size: 14px;
-        width: 250px;
-    }
-    .search-box:focus { outline: none; border-color: #e94560; }
     .btn {
         padding: 8px 16px;
         border: none;
@@ -87,14 +95,14 @@ HTML_PAGE = """<!DOCTYPE html>
         font-weight: 600;
         transition: background 0.2s;
     }
-    .btn-save { background: #28a745; color: #fff; }
-    .btn-save:hover { background: #218838; }
-    .btn-revert { background: #dc3545; color: #fff; }
-    .btn-revert:hover { background: #c82333; }
-    .btn-revert-one { background: #6c757d; color: #fff; font-size: 11px; padding: 4px 8px; }
-    .btn-revert-one:hover { background: #5a6268; }
-    .btn-snapshot { background: #17a2b8; color: #fff; }
-    .btn-snapshot:hover { background: #138496; }
+    .btn-save { background: #6e5530; color: #fff; }
+    .btn-save:hover { background: #7e6538; }
+    .btn-revert { background: #8b2828; color: #fff; }
+    .btn-revert:hover { background: #a03030; }
+    .btn-revert-one { background: #5a5248; color: #fff; font-size: 11px; padding: 4px 8px; }
+    .btn-revert-one:hover { background: #6a6258; }
+    .btn-snapshot { background: #3a3468; color: #fff; }
+    .btn-snapshot:hover { background: #2e2a56; }
     .status {
         padding: 8px 16px;
         margin: 0;
@@ -102,8 +110,8 @@ HTML_PAGE = """<!DOCTYPE html>
         text-align: center;
         display: none;
     }
-    .status.success { display: block; background: #155724; color: #d4edda; }
-    .status.error { display: block; background: #721c24; color: #f8d7da; }
+    .status.success { display: block; background: #2e2818; color: #d8ccb0; }
+    .status.error { display: block; background: #3a1818; color: #e0c0c0; }
     .container { max-width: 900px; margin: 0 auto; padding: 16px; }
     .gender-badge {
         display: inline-block;
@@ -114,7 +122,7 @@ HTML_PAGE = """<!DOCTYPE html>
         text-align: center;
         min-width: 50px;
     }
-    .gender-any { background: #333; color: #888; }
+    .gender-any { background: #332e3a; color: #887868; }
     .gender-male { background: #1a3a5c; color: #5b9bd5; }
     .gender-female { background: #5c1a3a; color: #d55b9b; }
     .item-table {
@@ -122,47 +130,47 @@ HTML_PAGE = """<!DOCTYPE html>
         border-collapse: collapse;
     }
     .item-table thead th {
-        background: #16213e;
+        background: #22202c;
         padding: 10px 12px;
         text-align: left;
         font-size: 12px;
         text-transform: uppercase;
-        color: #888;
-        border-bottom: 2px solid #0f3460;
+        color: #887868;
+        border-bottom: 2px solid #3a3248;
         position: sticky;
         top: 57px;
         z-index: 50;
     }
     .item-table tbody tr {
-        border-bottom: 1px solid #222244;
+        border-bottom: 1px solid #2e2838;
     }
-    .item-table tbody tr:hover { background: #1e1e3a; }
-    .item-table tbody tr.modified { background: #2a2a1a; }
+    .item-table tbody tr:hover { background: #282434; }
+    .item-table tbody tr.modified { background: #2c2820; }
     .item-table td { padding: 6px 12px; }
     .item-table td:first-child {
         width: 60px;
-        color: #888;
+        color: #887868;
         font-size: 13px;
     }
     .item-table td:nth-child(2) {
         width: 200px;
-        color: #666;
+        color: #686058;
         font-size: 12px;
     }
     .name-input {
         width: 100%;
         padding: 6px 8px;
-        background: #12122a;
-        border: 1px solid #333;
-        color: #e0e0e0;
+        background: #14121c;
+        border: 1px solid #332e3a;
+        color: #ddd8d0;
         border-radius: 3px;
         font-size: 14px;
     }
-    .name-input:focus { outline: none; border-color: #e94560; }
-    .name-input.changed { border-color: #ffc107; }
+    .name-input:focus { outline: none; border-color: #c8a850; }
+    .name-input.changed { border-color: #c8a850; }
     .changes-count {
-        background: #e94560;
-        color: #fff;
+        background: #c8a850;
+        color: #181620;
         border-radius: 12px;
         padding: 2px 8px;
         font-size: 12px;
@@ -172,16 +180,18 @@ HTML_PAGE = """<!DOCTYPE html>
 </style>
 </head>
 <body>
-<div class="header">
+<nav class="navbar">
     <h1>Item Rename Tool</h1>
-    <div class="header-actions">
+    <div class="navbar-search">
+        <input type="text" id="searchBox" placeholder="Search items...">
+    </div>
+    <div class="navbar-actions">
         <span class="changes-count" id="changesCount">0 changes</span>
-        <input type="text" class="search-box" id="searchBox" placeholder="Search items...">
         <button class="btn btn-snapshot" onclick="takeSnapshot()">New Snapshot</button>
         <button class="btn btn-revert" onclick="revertAll()">Revert All</button>
         <button class="btn btn-save" onclick="saveAll()">Save Changes</button>
     </div>
-</div>
+</nav>
 <div class="status" id="statusBar"></div>
 <div class="container">
     <table class="item-table">
@@ -363,19 +373,21 @@ class RequestHandler(BaseHTTPRequestHandler):
         print(f"[{self.log_date_time_string()}] {format % args}")
 
     def do_GET(self):
-        if self.path == "/":
+        path = urlparse(self.path).path
+        if path == "/":
             self._send_html(HTML_PAGE)
-        elif self.path == "/api/items":
+        elif path == "/api/items":
             self._send_items()
         else:
             self._send_error(404, "Not found")
 
     def do_POST(self):
-        if self.path == "/api/update":
+        path = urlparse(self.path).path
+        if path == "/api/update":
             self._handle_update()
-        elif self.path == "/api/revert":
+        elif path == "/api/revert":
             self._handle_revert()
-        elif self.path == "/api/snapshot":
+        elif path == "/api/snapshot":
             self._handle_snapshot()
         else:
             self._send_error(404, "Not found")

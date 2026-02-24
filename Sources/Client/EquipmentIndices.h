@@ -33,6 +33,9 @@ struct EquipmentIndices
 	int m_boots_color;
 	int m_helm_color;
 
+	// Weapon item ID (for item config lookups — dk_glare, two-hand detection, etc.)
+	int16_t m_weapon_item_id;
+
 	// Glare effects
 	int m_weapon_glare;
 	int m_shield_glare;
@@ -41,14 +44,12 @@ struct EquipmentIndices
 	int m_skirt_draw;
 
 	// Calculate all equipment indices for a player character.
-	// bodyPose: pose for body sprite and equipment layers (0-14 range)
-	//   Body: 500 + (ownerType-1)*8*15 + (bodyPose*8)
-	//   Equipment: base + type*15 + bodyPose
-	// weaponPose: pose for weapon sprite (-1 = don't draw weapon)
-	//   Weapon: base + type*64 + 8*weaponPose + (dir-1)
-	// shieldPose: pose for shield sprite (-1 = don't draw shield)
-	//   Shield: base + type*8 + shieldPose
-	static EquipmentIndices CalcPlayer(const CEntityRenderState& state, int bodyPose, int weaponPose, int shieldPose);
+	// bodyPose: animation pose (0-11) for body, cosmetics, and equipment layers.
+	//   Body: 500 + (ownerType-1)*8*15 + (bodyPose*8) — from m_sprite
+	//   Cosmetics (undies/hair): old base + type*15 + bodyPose — from m_sprite
+	//   Equipment: equip_sprite::index(female, display_id, bodyPose) — from m_equip_sprites
+	// drawWeapon/drawShield: false = set index to -1 (e.g. magic casting)
+	static EquipmentIndices CalcPlayer(const CEntityRenderState& state, int bodyPose, bool drawWeapon = true, bool drawShield = true);
 
 	// Calculate body index for NPC/mob. All equipment indices set to -1.
 	// npcPose: animation pose for the mob sprite

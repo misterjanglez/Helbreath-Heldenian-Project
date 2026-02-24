@@ -4,7 +4,6 @@
 
 #include "IGameScreen.h"
 #include "EventListManager.h"
-#include "TextInputManager.h"
 #include "Game.h"
 #include "GameModeManager.h"
 #include "GameFonts.h"
@@ -54,40 +53,12 @@ void IGameScreen::draw_version()
     m_game->draw_version();
 }
 
-// ============== Audio Helpers ==============
-
-void IGameScreen::play_game_sound(char type, int num, int dist, long lPan)
-{
-    m_game->play_game_sound(type, num, dist, lPan);
-}
 
 // ============== Event/Message Helpers ==============
 
 void IGameScreen::add_event_list(const char* txt, char color, bool dup_allow)
 {
     event_list_manager::get().add_event(txt, color, dup_allow);
-}
-
-// ============== Input String Helpers ==============
-
-void IGameScreen::start_input_string(int sX, int sY, unsigned char len, std::string& buffer, bool is_hide)
-{
-    text_input_manager::get().start_input(sX, sY, len, buffer, is_hide);
-}
-
-void IGameScreen::end_input_string()
-{
-    text_input_manager::get().end_input();
-}
-
-void IGameScreen::clear_input_string()
-{
-    text_input_manager::get().clear_input();
-}
-
-void IGameScreen::show_received_string()
-{
-    text_input_manager::get().show_input();
 }
 
 // ============== Timing Helper ==============

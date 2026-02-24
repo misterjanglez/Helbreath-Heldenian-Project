@@ -1,5 +1,6 @@
-﻿#include "CombatSystem.h"
+#include "CombatSystem.h"
 #include "Player.h"
+#include "Game.h"
 
 combat_system& combat_system::get()
 {
@@ -12,12 +13,28 @@ void combat_system::set_player(CPlayer& player)
 	m_player = &player;
 }
 
+void combat_system::set_game(CGame& game)
+{
+	m_game = &game;
+}
+
+// Read weapon sub-type from item config via weapon_item_id in appearance.
+// Returns 0 (unarmed) if no weapon equipped or config unavailable.
+uint8_t combat_system::get_weapon_appr_value() const
+{
+	if (!m_player || !m_game) return 0;
+	int16_t weapon_id = m_player->m_playerAppearance.weapon_item_id;
+	if (weapon_id <= 0) return 0;
+	CItem* cfg = m_game->get_item_config(weapon_id);
+	if (!cfg) return 0;
+	return static_cast<uint8_t>(cfg->m_appearance_value);
+}
+
 // Snoopy: added StormBlade
 int combat_system::get_attack_type() const
 {
 	if (!m_player) return 0;
-	uint16_t weapon_type;
-	weapon_type = m_player->m_playerAppearance.weapon_type;
+	uint16_t weapon_type = get_weapon_appr_value();
 	if (weapon_type == 0)
 	{
 		if ((m_player->m_super_attack_left > 0) && (m_player->m_super_attack_mode == true) && (m_player->m_skill_mastery[5] >= 100)) return 20;
@@ -82,8 +99,7 @@ int combat_system::get_attack_type() const
 int combat_system::get_weapon_skill_type() const
 {
 	if (!m_player) return 1;
-	uint16_t weapon_type;
-	weapon_type = m_player->m_playerAppearance.weapon_type;
+	uint16_t weapon_type = get_weapon_appr_value();
 	if (weapon_type == 0)
 	{
 		return 5; // Openhand

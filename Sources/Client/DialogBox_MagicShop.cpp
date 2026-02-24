@@ -1,10 +1,13 @@
 #include "DialogBox_MagicShop.h"
 #include "Game.h"
+#include "PacketSendHelpers.h"
+
 #include "IInput.h"
 #include "Misc.h"
 #include "lan_eng.h"
 #include "GameFonts.h"
 #include "TextLibExt.h"
+#include "AudioManager.h"
 #include <format>
 #include <string>
 
@@ -16,48 +19,52 @@ DialogBox_MagicShop::DialogBox_MagicShop(CGame* game)
 	set_default_rect(30 , 30 , 304, 328);
 }
 
-void DialogBox_MagicShop::on_draw(short mouse_x, short mouse_y, short z, char lb)
+void DialogBox_MagicShop::on_draw()
 {
-	short sX = m_game->m_dialog_box_manager.Info(DialogBoxId::MagicShop).m_x;
-	short sY = m_game->m_dialog_box_manager.Info(DialogBoxId::MagicShop).m_y;
+	short mouse_x = static_cast<short>(hb::shared::input::get_mouse_x());
+	short mouse_y = static_cast<short>(hb::shared::input::get_mouse_y());
+	short sX = m_x;
+	short sY = m_y;
 
 	m_game->draw_new_dialog_box(InterfaceNdGame4, sX, sY, 1);
 	m_game->draw_new_dialog_box(InterfaceNdText, sX, sY, 14);
 
 	// Mouse wheel scrolling - read and consume input directly
-	if (m_game->m_dialog_box_manager.get_top_dialog_box_index() == DialogBoxId::MagicShop)
+	if (m_game->get_dialog_box_manager().get_top_id() == DialogBoxId::MagicShop)
 	{
 		short wheel_delta = hb::shared::input::get_mouse_wheel_delta();
 		if (wheel_delta != 0)
 		{
 			if (wheel_delta > 0)
-				m_game->m_dialog_box_manager.Info(DialogBoxId::MagicShop).m_view--;
+				m_page--;
 			if (wheel_delta < 0)
-				m_game->m_dialog_box_manager.Info(DialogBoxId::MagicShop).m_view++;
+				m_page++;
 			// Consume the input
 		}
 	}
 
 	// clamp view (pages 0-9)
-	if (m_game->m_dialog_box_manager.Info(DialogBoxId::MagicShop).m_view < 0)
-		m_game->m_dialog_box_manager.Info(DialogBoxId::MagicShop).m_view = 9;
-	if (m_game->m_dialog_box_manager.Info(DialogBoxId::MagicShop).m_view > 9)
-		m_game->m_dialog_box_manager.Info(DialogBoxId::MagicShop).m_view = 0;
+	if (m_page < 0)
+		m_page = 9;
+	if (m_page > 9)
+		m_page = 0;
 
 	// Column headers
 	hb::shared::text::draw_text(GameFont::Default, sX - 20 + 60 - 17, sY - 35 + 90, DRAW_DIALOGBOX_MAGICSHOP11, hb::shared::text::TextStyle::from_color(GameColors::UILabel)); // "Spell Name"
 	hb::shared::text::draw_text(GameFont::Default, sX - 20 + 232 - 20, sY - 35 + 90, DRAW_DIALOGBOX_MAGICSHOP12, hb::shared::text::TextStyle::from_color(GameColors::UILabel)); // "Req.Int"
 	hb::shared::text::draw_text(GameFont::Default, sX - 20 + 270, sY - 35 + 90, DRAW_DIALOGBOX_MAGICSHOP13, hb::shared::text::TextStyle::from_color(GameColors::UILabel)); // "Cost"
 
-	draw_spell_list(sX, sY, mouse_x, mouse_y);
+	draw_spell_list(sX, sY);
 	draw_page_indicator(sX, sY);
 
-	hb::shared::text::draw_text_aligned(GameFont::Default, sX, sY + 275, sX + m_game->m_dialog_box_manager.Info(DialogBoxId::MagicShop).m_size_x - sX, 15, DRAW_DIALOGBOX_MAGICSHOP14, hb::shared::text::TextStyle::from_color(GameColors::UILabel), hb::shared::text::Align::TopCenter);
+	hb::shared::text::draw_text_aligned(GameFont::Default, sX, sY + 275, sX + m_size_x - sX, 15, DRAW_DIALOGBOX_MAGICSHOP14, hb::shared::text::TextStyle::from_color(GameColors::UILabel), hb::shared::text::Align::TopCenter);
 }
 
-void DialogBox_MagicShop::draw_spell_list(short sX, short sY, short mouse_x, short mouse_y)
+void DialogBox_MagicShop::draw_spell_list(short sX, short sY)
 {
-	int c_pivot = m_game->m_dialog_box_manager.Info(DialogBoxId::MagicShop).m_view * 10;
+	short mouse_x = static_cast<short>(hb::shared::input::get_mouse_x());
+	short mouse_y = static_cast<short>(hb::shared::input::get_mouse_y());
+	int c_pivot = m_page * 10;
 	int yloc = 0;
 	std::string mana;
 
@@ -71,7 +78,7 @@ void DialogBox_MagicShop::draw_spell_list(short sX, short sY, short mouse_x, sho
 			std::snprintf(txt, sizeof(txt), "%s", m_game->m_magic_cfg_list[c_pivot + i]->m_name.c_str());
 			CMisc::replace_string(txt, '-', ' ');
 
-			if (m_game->m_player->m_magic_mastery[c_pivot + i] != 0)
+			if (player().m_magic_mastery[c_pivot + i] != 0)
 			{
 				// Already mastered - purple color
 				hb::shared::text::draw_text(GameFont::Bitmap1, sX + 24, sY + 70 + yloc, txt, hb::shared::text::TextStyle::with_highlight(GameColors::UIMagicPurple));
@@ -111,7 +118,7 @@ void DialogBox_MagicShop::draw_page_indicator(short sX, short sY)
 	m_game->m_sprite[InterfaceSprFonts]->draw(sX + 55, sY + 250, 19);
 
 	// Highlight current page
-	short view = m_game->m_dialog_box_manager.Info(DialogBoxId::MagicShop).m_view;
+	short view = m_page;
 	switch (view)
 	{
 	case 0: m_game->m_sprite[InterfaceSprFonts]->draw(sX - 20 + 44 + 31, sY + 250, 20); break;
@@ -127,23 +134,27 @@ void DialogBox_MagicShop::draw_page_indicator(short sX, short sY)
 	}
 }
 
-bool DialogBox_MagicShop::on_click(short mouse_x, short mouse_y)
+bool DialogBox_MagicShop::on_click()
 {
-	short sX = m_game->m_dialog_box_manager.Info(DialogBoxId::MagicShop).m_x;
-	short sY = m_game->m_dialog_box_manager.Info(DialogBoxId::MagicShop).m_y;
+	short mouse_x = static_cast<short>(hb::shared::input::get_mouse_x());
+	short mouse_y = static_cast<short>(hb::shared::input::get_mouse_y());
+	short sX = m_x;
+	short sY = m_y;
 
-	if (handle_spell_click(sX, sY, mouse_x, mouse_y))
+	if (handle_spell_click(sX, sY))
 		return true;
 
-	handle_page_click(sX, sY, mouse_x, mouse_y);
+	handle_page_click(sX, sY);
 	return false;
 }
 
-bool DialogBox_MagicShop::handle_spell_click(short sX, short sY, short mouse_x, short mouse_y)
+bool DialogBox_MagicShop::handle_spell_click(short sX, short sY)
 {
+	short mouse_x = static_cast<short>(hb::shared::input::get_mouse_x());
+	short mouse_y = static_cast<short>(hb::shared::input::get_mouse_y());
 	int adj_x = -20;
 	int adj_y = -35;
-	int c_pivot = m_game->m_dialog_box_manager.Info(DialogBoxId::MagicShop).m_view * 10;
+	int c_pivot = m_page * 10;
 	int yloc = 0;
 
 	for (int i = 0; i < 9; i++)
@@ -154,11 +165,14 @@ bool DialogBox_MagicShop::handle_spell_click(short sX, short sY, short mouse_x, 
 			if ((mouse_x >= sX + adj_x + 44) && (mouse_x <= sX + adj_x + 135 + 44) &&
 				(mouse_y >= sY + adj_y + 70 + yloc + 35) && (mouse_y <= sY + adj_y + 70 + 14 + yloc + 35))
 			{
-				if (m_game->m_player->m_magic_mastery[c_pivot + i] == 0)
+				if (player().m_magic_mastery[c_pivot + i] == 0)
 				{
-					m_game->send_command(MsgId::CommandCommon, CommonType::ReqStudyMagic, 0, 0, 0, 0,
-						m_game->m_magic_cfg_list[c_pivot + i]->m_name.c_str());
-					m_game->play_game_sound('E', 14, 5);
+					{
+						auto pkt = hb::net::make_common_command_str(CommonType::ReqStudyMagic, m_game->m_player->m_player_x, m_game->m_player->m_player_y);
+						std::snprintf(pkt.text, sizeof(pkt.text), "%s", m_game->m_magic_cfg_list[c_pivot + i]->m_name.c_str());
+						m_game->send_game_packet(pkt);
+					}
+					audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 				}
 				return true;
 			}
@@ -168,49 +182,62 @@ bool DialogBox_MagicShop::handle_spell_click(short sX, short sY, short mouse_x, 
 	return false;
 }
 
-void DialogBox_MagicShop::handle_page_click(short sX, short sY, short mouse_x, short mouse_y)
+void DialogBox_MagicShop::handle_page_click(short sX, short sY)
 {
+	short mouse_x = static_cast<short>(hb::shared::input::get_mouse_x());
+	short mouse_y = static_cast<short>(hb::shared::input::get_mouse_y());
 	int adj_x = -20;
 	int adj_y = -35;
 
 	if ((mouse_x >= sX + adj_x + 42 + 31) && (mouse_x <= sX + adj_x + 50 + 31) &&
 		(mouse_y >= sY + adj_y + 248 + 35) && (mouse_y <= sY + adj_y + 260 + 35))
-		m_game->m_dialog_box_manager.Info(DialogBoxId::MagicShop).m_view = 0;
+		m_page = 0;
 
 	if ((mouse_x >= sX + adj_x + 55 + 31) && (mouse_x <= sX + adj_x + 68 + 31) &&
 		(mouse_y >= sY + adj_y + 248 + 35) && (mouse_y <= sY + adj_y + 260 + 35))
-		m_game->m_dialog_box_manager.Info(DialogBoxId::MagicShop).m_view = 1;
+		m_page = 1;
 
 	if ((mouse_x >= sX + adj_x + 73 + 31) && (mouse_x <= sX + adj_x + 93 + 31) &&
 		(mouse_y >= sY + adj_y + 248 + 35) && (mouse_y <= sY + adj_y + 260 + 35))
-		m_game->m_dialog_box_manager.Info(DialogBoxId::MagicShop).m_view = 2;
+		m_page = 2;
 
 	if ((mouse_x >= sX + adj_x + 98 + 31) && (mouse_x <= sX + adj_x + 113 + 31) &&
 		(mouse_y >= sY + adj_y + 248 + 35) && (mouse_y <= sY + adj_y + 260 + 35))
-		m_game->m_dialog_box_manager.Info(DialogBoxId::MagicShop).m_view = 3;
+		m_page = 3;
 
 	if ((mouse_x >= sX + adj_x + 118 + 31) && (mouse_x <= sX + adj_x + 129 + 31) &&
 		(mouse_y >= sY + adj_y + 248 + 35) && (mouse_y <= sY + adj_y + 260 + 35))
-		m_game->m_dialog_box_manager.Info(DialogBoxId::MagicShop).m_view = 4;
+		m_page = 4;
 
 	if ((mouse_x >= sX + adj_x + 133 + 31) && (mouse_x <= sX + adj_x + 150 + 31) &&
 		(mouse_y >= sY + adj_y + 248 + 35) && (mouse_y <= sY + adj_y + 260 + 35))
-		m_game->m_dialog_box_manager.Info(DialogBoxId::MagicShop).m_view = 5;
+		m_page = 5;
 
 	if ((mouse_x >= sX + adj_x + 154 + 31) && (mouse_x <= sX + adj_x + 177 + 31) &&
 		(mouse_y >= sY + adj_y + 248 + 35) && (mouse_y <= sY + adj_y + 260 + 35))
-		m_game->m_dialog_box_manager.Info(DialogBoxId::MagicShop).m_view = 6;
+		m_page = 6;
 
 	if ((mouse_x >= sX + adj_x + 181 + 31) && (mouse_x <= sX + adj_x + 210 + 31) &&
 		(mouse_y >= sY + adj_y + 248 + 35) && (mouse_y <= sY + adj_y + 260 + 35))
-		m_game->m_dialog_box_manager.Info(DialogBoxId::MagicShop).m_view = 7;
+		m_page = 7;
 
 	if ((mouse_x >= sX + adj_x + 214 + 31) && (mouse_x <= sX + adj_x + 230 + 31) &&
 		(mouse_y >= sY + adj_y + 248 + 35) && (mouse_y <= sY + adj_y + 260 + 35))
-		m_game->m_dialog_box_manager.Info(DialogBoxId::MagicShop).m_view = 8;
+		m_page = 8;
 
 	if ((mouse_x >= sX + adj_x + 234 + 31) && (mouse_x <= sX + adj_x + 245 + 31) &&
 		(mouse_y >= sY + adj_y + 248 + 35) && (mouse_y <= sY + adj_y + 260 + 35))
-		m_game->m_dialog_box_manager.Info(DialogBoxId::MagicShop).m_view = 9;
+		m_page = 9;
 }
 
+bool DialogBox_MagicShop::on_enable(int type, int64_t v1, int v2, const char* string)
+{
+	if (is_enabled()) return true;
+	if (player().m_skill_mastery[4] == 0) {
+		enable_dialog_box(DialogBoxId::NpcTalk, 0, 480, 0);
+		return false;
+	}
+	m_mode = 0;
+	m_page = 0;
+	return true;
+}

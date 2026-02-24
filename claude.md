@@ -44,7 +44,7 @@ powershell -ExecutionPolicy Bypass -File Sources\build.ps1 -Target Server -Confi
 
 ## Workflow
 
-**Never use git commands. The user handles all git operations. Backups use `.bak_<guid>` files via `Scripts/bak.py`.**
+**Never use git commands. The user handles all git operations. Backups use `.bak_<guid>` files via `bak.py`.**
 
 Two modes. **Default to Mode 1.** Use Mode 2 only when justified.
 
@@ -54,10 +54,10 @@ Two modes. **Default to Mode 1.** Use Mode 2 only when justified.
 bak.py guard <files>  →  Read/Edit tools  →  Build  →  bak.py commit (or revert)
 ```
 
-1. **Guard** — `python Scripts/bak.py guard <file1> [file2 ...]` — creates versioned checkpoint (.bak_<guid>).
+1. **Guard** — `python bak.py guard <file1> [file2 ...]` — creates versioned checkpoint (.bak_<guid>).
 2. **Edit** — Read and Edit tools.
 3. **Build** — `powershell -ExecutionPolicy Bypass -File Sources/build.ps1 -Target All -Config Debug`
-4. **If build succeeds** — `python Scripts/bak.py commit` — deletes all .bak files, accepts changes.
+4. **If build succeeds** — `python bak.py commit` — deletes all .bak files, accepts changes.
 5. **If build fails** — choose:
    - `guard` again to checkpoint, then fix and rebuild (layer the fix).
    - `revert <id>` to undo a specific checkpoint, retry from previous.
@@ -96,20 +96,21 @@ Safety rules:
 
 ## Code Search
 
-`Scripts/grep.py` — two modes: brief (`-b`) for quick stdout, detailed for full-context log file.
+`grep.py` — two modes: brief (`-b`) for quick stdout, detailed for full-context log file.
 
 ```
-python Scripts/grep.py "pattern" -b                       # brief: one line per match to stdout
-python Scripts/grep.py "pattern"                          # detailed: context blocks to log file
-python Scripts/grep.py "pattern" -F --path Sources/Client # fixed string, scoped to directory
-python Scripts/grep.py "pattern" -C 8 -i -o results.log  # 8 context lines, case-insensitive
+python grep.py "pattern" -b                       # brief: one line per match to stdout
+python grep.py "pattern"                          # detailed: context blocks to log file
+python grep.py "pattern" -F --path Sources/Client # fixed string, scoped to directory
+python grep.py "pattern" -C 8 -i -o results.log  # 8 context lines, case-insensitive
 ```
 
 Brief (`-b`): prints `file:line | match` to stdout. Detailed (default): writes to `Scripts/output/grep_results.log` with context, enclosing scope, `>>>` markers. Output dir auto-clears at 10MB.
 
 ## Project Structure
 
-- **Client** (`Sources/Client/`) — Game client, C++20. Cross-platform (Windows + Linux). Depends on SFMLEngine.
+- **Client** (`Sources/Client/`) — Game client, C++20. Cross-platform (Windows + Linux). Depends on SFMLEngine and CControls.
+- **CControls** (`Sources/CControls/`) — UI control library, C++20. Pure logic, no game/engine dependencies. Static library (`cc::` namespace). See `PLANS/CControls_Library_Plan.md` for full design.
 - **SFMLEngine** (`Sources/SFMLEngine/`) — Rendering abstraction over SFML. Cross-platform (Windows + Linux).
 - **Server** (`Sources/Server/`) — Game server, C++20. Cross-platform (Windows + Linux). Standalone.
 - **Shared** (`Sources/Dependencies/Shared/`) — Protocol, enums, items, packets, networking.
@@ -130,6 +131,31 @@ Both the client and server build and run on Windows and Linux. **All new code (c
 - **Linux filesystem is case-sensitive** — `Binaries/Server/mapdata/` must be lowercase.
 - **Prefer `std::string`/`std::string_view`** over raw `char*`/`char[]` — avoids buffer overruns that silently work on MSVC but fail on GCC.
 
+## Versioning
+
+Three-track system managed from `Sources/version.cfg`. See `VERSION_STANDARDS.md` for full reference (version format, bump rules, generated files, platform details).
+
+- **Compatibility** — Protocol version. Must match between client and server (major.minor.patch). Key test: **does the client need a code change to handle this?** If yes, bump. If the server is just sending an existing message more/less frequently, that's server-only — no compatibility bump.
+- **Client** — Client identity. Displayed in window title and in-game overlay. Bump for client-only changes.
+- **Server** — Server identity. Displayed in console banner and logs. Bump for server-only changes.
+- Pre-build script `Sources/version_gen.py` generates `version_info.h`, `version_rc.h`, and `version.cmake` automatically.
+- Edit `Sources/version.cfg` to change versions. Never edit generated files.
+- **Build counters** (`build_counter_client.txt`, `build_counter_server.txt`) are per-project and incremented automatically by the build system. **Never pass `--increment-version` manually** — your builds are for compile verification only.
+
+## UI Controls (CControls Library)
+
+**All menu screen UI (buttons, textboxes, focus, tooltips) must use CControls** (`#include "CControls.h"`, namespace `cc::`). Do NOT write manual `is_mouse_in_rect()` hit-testing, manual `m_cur_focus` tracking, or manual per-control rendering loops.
+
+Pattern for each screen:
+- `cc::control_collection m_controls;` member in the screen class
+- `on_initialize()`: create controls via `m_controls.add<cc::button>(...)`, set render handlers, callbacks, focus order, click sound
+- `on_update()`: fill `cc::input_state` from engine input, call `m_controls.update(input, time_ms)`
+- `on_render()`: draw background, call `m_controls.render()`, draw overlays
+
+Key types: `cc::button`, `cc::textbox`, `cc::label`, `cc::toggle_button`, `cc::panel` (grouping), `cc::control_collection` (screen-level owner).
+
+See `CCONTROLS_REFERENCE.md` for full API reference, render handler patterns, and usage examples.
+
 ## Modernization Direction
 
 - Legacy C-style → C++20 while preserving game logic.
@@ -138,7 +164,7 @@ Both the client and server build and run on Windows and Linux. **All new code (c
 
 ## Coding Standards
 
-**Convention: `snake_case` throughout.** Full reference: `PLANS/CODING_STANDARDS.md`.
+**Convention: `snake_case` throughout.** See `CODING_STANDARDS.md` for full reference (naming, formatting, ownership, error handling, enum patterns).
 
 Key rules:
 - **Tabs** for indentation, **Allman** braces.

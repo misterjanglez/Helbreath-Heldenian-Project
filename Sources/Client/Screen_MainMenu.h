@@ -7,6 +7,7 @@
 #pragma once
 
 #include "IGameScreen.h"
+#include "CControls.h"
 
 class Screen_MainMenu : public IGameScreen
 {
@@ -22,6 +23,7 @@ public:
     void on_render() override;
 
 private:
-    char m_cur_focus;
-    char m_max_focus;
+    enum control_id { BTN_LOGIN = 1, BTN_NEW_ACCOUNT = 2, BTN_QUIT = 3 };
+
+    cc::control_collection m_controls;
 };

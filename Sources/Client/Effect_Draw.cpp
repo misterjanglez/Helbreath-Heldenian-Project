@@ -35,13 +35,10 @@ void effect_manager::draw_effects_impl()
 				break;
 
 			case EffectType::GOLD_DROP: // gold
-				/// 1.5
-				if (m_effect_list[i]->m_frame < 9) break;
-				temp_frame = m_effect_list[i]->m_frame - 9;
+				temp_frame = m_effect_list[i]->m_frame;
 				dX = (m_effect_list[i]->m_move_x) - m_game->m_Camera.get_x();
 				dY = (m_effect_list[i]->m_move_y) - m_game->m_Camera.get_y();
 				(*m_effect_sprites)[1]->draw(dX, dY - 40, temp_frame);
-
 				break;
 
 			case EffectType::FIREBALL_EXPLOSION: // FireBall Fire Explosion
@@ -698,7 +695,7 @@ void effect_manager::draw_effects_impl()
 				if (temp_frame < 0) break;
 				dX = (m_effect_list[i]->m_dest_x * 32) - m_game->m_Camera.get_x();
 				dY = (m_effect_list[i]->m_dest_y * 32) - m_game->m_Camera.get_y();
-				(*m_effect_sprites)[55]->draw(dX, dY + 35, m_effect_list[i]->m_frame, hb::shared::sprite::DrawParams::alpha_blend(0.7f));
+				(*m_effect_sprites)[55]->draw(dX, dY + 35, m_effect_list[i]->m_frame, hb::shared::sprite::DrawParams::tinted_alpha(0, 0, 0, 0.7f));
 				(*m_effect_sprites)[54]->draw(dX, dY, m_effect_list[i]->m_frame, hb::shared::sprite::DrawParams::additive(0.5f));
 				break;
 

@@ -3,6 +3,9 @@
 #include <cstdint>
 #include <map>
 
+#include "DirectionHelpers.h"
+using hb::shared::direction::direction;
+
 struct DropTable;
 class CGame;
 class CItem;
@@ -34,9 +37,9 @@ public:
 	bool add_client_item_list(int client_h, CItem* item, int* del_req);
 	int add_client_bulk_item_list(int client_h, const char* item_name, int amount);
 	void release_item_handler(int client_h, short item_index, bool notice);
-	int set_item_count(int client_h, int item_index, uint32_t count);
-	int set_item_count_by_id(int client_h, short item_id, uint32_t count);
-	uint32_t get_item_count_by_id(int client_h, short item_id);
+	int set_item_count(int client_h, int item_index, uint64_t count);
+	int set_item_count_by_id(int client_h, short item_id, uint64_t count);
+	uint64_t get_item_count_by_id(int client_h, short item_id);
 	int get_item_space_left(int client_h);
 	void set_item_pos(int client_h, char* data);
 	int get_item_weight(CItem* item, int count);
@@ -62,7 +65,7 @@ public:
 
 	// Drop / pickup
 	void drop_item_handler(int client_h, short item_index, int amount, const char* item_name, bool by_player = true);
-	int client_motion_get_item_handler(int client_h, short sX, short sY, char dir);
+	int client_motion_get_item_handler(int client_h, short sX, short sY, direction dir);
 
 	// Give / exchange
 	void give_item_handler(int client_h, short item_index, int amount, short dX, short dY, uint16_t object_id, const char* item_name);

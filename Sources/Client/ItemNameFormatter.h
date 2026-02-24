@@ -4,15 +4,38 @@
 #include <memory>
 #include <array>
 #include <string>
+#include <vector>
 
 class CItem;
+
+struct tooltip_effect
+{
+	std::string label;   // e.g., "Magic Casting Probability "
+	std::string value;   // e.g., "+9%"
+};
 
 struct ItemNameInfo
 {
 	std::string name;
-	std::string effect;
-	std::string extra;
+	std::vector<tooltip_effect> effects;
 	bool is_special = false;
+
+	// Backward compat: reconstruct combined effect/extra text for non-tooltip callers
+	std::string effect_text() const
+	{
+		if (effects.empty()) return "";
+		if (effects.size() == 1) return effects[0].label + effects[0].value;
+		std::string result;
+		for (size_t i = 0; i + 1 < effects.size(); ++i)
+			result += effects[i].label + effects[i].value;
+		return result;
+	}
+
+	std::string extra_text() const
+	{
+		if (effects.size() < 2) return "";
+		return effects.back().label + effects.back().value;
+	}
 };
 
 class item_name_formatter

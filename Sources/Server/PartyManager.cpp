@@ -49,12 +49,10 @@ int PartyManager::create_new_party_id(char* master_name)
 			// Party ID? i, ??? ??
 			party_id = i;
 			m_member_num_list[party_id]++;
-			goto CNP_BREAKLOOP;
+			break;
 		}
 
-	return 0;
-
-CNP_BREAKLOOP:;
+	if (party_id == 0) return 0;
 	// ?? ??? ????.
 	for(int i = 1; i < hb::server::party::MaxParty; i++)
 		if (m_member_name_list[i].m_party_id == 0) {

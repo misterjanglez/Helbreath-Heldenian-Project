@@ -20,11 +20,6 @@ public:
 	bool load(const char* filename = "settings.json");
 	bool save(const char* filename = "settings.json");
 
-	// Server address - uses DEF_SERVER_IP/PORT macros as defaults
-	//const char* GetServerAddress() const { return DEF_SERVER_IP; }
-	//int GetServerPort() const { return DEF_SERVER_PORT; }
-	//int GetGameServerPort() const { return DEF_GSERVER_PORT; }
-
 	// Shortcuts - replaces registry storage
 	// Magic shortcut: -1 = none, 0-99 = valid slot
 	short get_magic_shortcut() const { return m_magic_shortcut; }
@@ -107,9 +102,21 @@ public:
 	int get_fps_limit() const { return m_fps_limit; }
 	void set_fps_limit(int limit);
 
+	// Background FPS throttle: reduce rendering when window loses focus
+	bool is_background_fps_throttle_enabled() const { return m_background_fps_throttle; }
+	void set_background_fps_throttle_enabled(bool enabled);
+
 	// Fullscreen stretch (false = letterbox, true = stretch to fill)
 	bool is_fullscreen_stretch_enabled() const { return m_fullscreen_stretch; }
 	void set_fullscreen_stretch_enabled(bool enabled);
+
+	// Reduced motion - disables camera shake effects
+	bool is_reduced_motion_enabled() const { return m_reduced_motion; }
+	void set_reduced_motion_enabled(bool enabled);
+
+	// Toggle to Chat - when ON (default), Enter required to start chat; when OFF, any printable key activates chat
+	bool is_toggle_to_chat_enabled() const { return m_toggle_to_chat; }
+	void set_toggle_to_chat_enabled(bool enabled);
 
 	// Quick Actions - always enabled (pickup during movement, 95% unlock, responsive stops)
 	bool is_quick_actions_enabled() const { return true; }
@@ -160,9 +167,12 @@ private:
 	bool m_borderless;
 	bool m_vsync;
 	int m_fps_limit;
+	bool m_background_fps_throttle;
 	bool m_fullscreen_stretch;
 	bool m_tile_grid;
 	bool m_patching_grid;
+	bool m_reduced_motion;
+	bool m_toggle_to_chat;
 
 	// State
 	bool m_dirty;

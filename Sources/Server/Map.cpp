@@ -5,6 +5,7 @@
 #include "StringCompat.h"
 using namespace hb::server::map;
 using namespace hb::server::config;
+using namespace hb::shared::direction;
 
 // Construction/Destruction
 
@@ -124,7 +125,7 @@ CMap::CMap(class CGame* game)
 	m_top_neutral_sector_x = m_top_neutral_sector_y = m_top_aresden_sector_x = m_top_aresden_sector_y = m_top_elvine_sector_x = m_top_elvine_sector_y = m_top_monster_sector_x = m_top_monster_sector_y = m_top_player_sector_x = m_top_player_sector_y = 0;
 
 	for(int i = 0; i < MaxHeldenianDoor; i++) {
-		m_heldenian_gate_door[i].dir = 0;
+		m_heldenian_gate_door[i].dir = direction{};
 		m_heldenian_gate_door[i].x = 0;
 		m_heldenian_gate_door[i].y = 0;
 	}
@@ -201,7 +202,7 @@ void CMap::set_owner(short owner, char owner_class, short sX, short sY)
 
 char _tmp_cMoveDirX[9] = { 0,0,1,1,1,0,-1,-1,-1 };
 char _tmp_cMoveDirY[9] = { 0,-1,-1,0,1,1,1,0,-1 };
-bool CMap::check_fly_space_available(short sX, char sY, char dir, short owner)
+bool CMap::check_fly_space_available(short sX, char sY, direction dir, short owner)
 {
 	class CTile* tile;
 	short dX, dY;
@@ -444,6 +445,7 @@ bool CMap::init(char* name)
 	strcpy(m_name, name);
 
 	std::memset(m_location_name, 0, sizeof(m_location_name));
+	std::memset(m_display_name, 0, sizeof(m_display_name));
 
 	if (decode_map_data_file_contents() == false)
 		return false;
@@ -542,7 +544,7 @@ bool CMap::decode_map_data_file_contents()
 	return true;
 }
 
-bool CMap::search_teleport_dest(int sX, int sY, char* map_name, int* dx, int* dy, char* dir)
+bool CMap::search_teleport_dest(int sX, int sY, char* map_name, int* dx, int* dy, direction* dir)
 {
 	// Collect all matching teleport entries for this source tile
 	int matches[MaxTeleportLoc];
@@ -811,18 +813,18 @@ bool CMap::remove_crusade_structure_info(short sX, short sY)
 {
 	
 
+	bool found = false;
 	for(int i = 0; i < hb::shared::limits::MaxCrusadeStructures; i++)
 		if ((m_crusade_structure_info[i].x == sX) && (m_crusade_structure_info[i].y == sY)) {
 			m_crusade_structure_info[i].type = 0;
 			m_crusade_structure_info[i].side = 0;
 			m_crusade_structure_info[i].x = 0;
 			m_crusade_structure_info[i].y = 0;
-			goto RCSI_REARRANGE;
+			found = true;
+			break;
 		}
 
-	return false;
-
-RCSI_REARRANGE:;
+	if (!found) return false;
 
 	for(int i = 0; i < hb::shared::limits::MaxCrusadeStructures - 1; i++)
 		if ((m_crusade_structure_info[i].type == 0) && (m_crusade_structure_info[i + 1].type != 0)) {
