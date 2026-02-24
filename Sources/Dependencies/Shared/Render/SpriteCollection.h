@@ -126,6 +126,9 @@ public:
     // Check if collection is empty
     bool empty() const { return m_sprites.empty(); }
 
+    // Swap sprites at two indices within this collection
+    void swap_indices(size_t index_a, size_t index_b);
+
     //------------------------------------------------------------------
     // Iteration
     //------------------------------------------------------------------
@@ -318,6 +321,29 @@ inline void SpriteCollection::restoreAll()
         if (pair.second) {
             pair.second->Restore();
         }
+    }
+}
+
+inline void SpriteCollection::swap_indices(size_t index_a, size_t index_b)
+{
+    auto it_a = m_sprites.find(index_a);
+    auto it_b = m_sprites.find(index_b);
+    bool has_a = it_a != m_sprites.end();
+    bool has_b = it_b != m_sprites.end();
+
+    if (has_a && has_b)
+    {
+        std::swap(it_a->second, it_b->second);
+    }
+    else if (has_a)
+    {
+        m_sprites[index_b] = std::move(it_a->second);
+        m_sprites.erase(it_a);
+    }
+    else if (has_b)
+    {
+        m_sprites[index_a] = std::move(it_b->second);
+        m_sprites.erase(it_b);
     }
 }
 

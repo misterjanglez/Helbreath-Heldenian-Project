@@ -35,13 +35,10 @@ void effect_manager::draw_effects_impl()
 				break;
 
 			case EffectType::GOLD_DROP: // gold
-				/// 1.5
-				if (m_effect_list[i]->m_frame < 9) break;
-				temp_frame = m_effect_list[i]->m_frame - 9;
+				temp_frame = m_effect_list[i]->m_frame;
 				dX = (m_effect_list[i]->m_move_x) - m_game->m_Camera.get_x();
 				dY = (m_effect_list[i]->m_move_y) - m_game->m_Camera.get_y();
 				(*m_effect_sprites)[1]->draw(dX, dY - 40, temp_frame);
-
 				break;
 
 			case EffectType::FIREBALL_EXPLOSION: // FireBall Fire Explosion

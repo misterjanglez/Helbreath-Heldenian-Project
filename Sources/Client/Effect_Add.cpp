@@ -75,7 +75,7 @@ void effect_manager::add_effect_impl(EffectType type, int sX, int sY, int dX, in
 			case EffectType::GOLD_DROP: // Gold
 				m_effect_list[i]->m_move_x = sX * 32;
 				m_effect_list[i]->m_move_y = sY * 32;
-				m_effect_list[i]->m_max_frame = 12;
+				m_effect_list[i]->m_max_frame = 3;
 				m_effect_list[i]->m_frame_time = 100;
 				abs_x = abs(((m_game->m_Camera.get_x() / 32) + fixx) - sX);
 				abs_y = abs(((m_game->m_Camera.get_y() / 32) + fixy) - sY);

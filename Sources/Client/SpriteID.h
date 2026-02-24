@@ -59,6 +59,9 @@ constexpr int HairW                         = 11600;
 // Angels
 constexpr int TutelaryAngelsPivotPoint      = 10800;
 
+// Holiday tile variants (stored at offset from normal tile index)
+constexpr int HolidayTileOffset             = 10000;
+
 // Splash screen
 constexpr int SplashScreen                  = 18491;
 

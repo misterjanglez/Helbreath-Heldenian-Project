@@ -30,7 +30,9 @@ void Screen_Loading::on_initialize()
     m_iLoadingStage = 0;
 
     // Pre-load the loading screen sprite so it can render immediately
-    m_game->m_sprite[InterfaceNdLoading] = hb::shared::sprite::Sprites::create("new-dialog", 0, false);
+    hb::shared::sprite::SpriteLoader::open_pak("interface/new-dialog", [&](hb::shared::sprite::SpriteLoader& loader) {
+        m_game->m_sprite[InterfaceNdLoading] = loader.get_sprite(0, false);
+    });
 }
 
 void Screen_Loading::on_uninitialize()
@@ -82,12 +84,12 @@ void Screen_Loading::on_render()
 void Screen_Loading::LoadStage_Interface()
 {
     // load interface sprites
-    hb::shared::sprite::SpriteLoader::open_pak("interface", [&](hb::shared::sprite::SpriteLoader& loader) {
+    hb::shared::sprite::SpriteLoader::open_pak("interface/interface", [&](hb::shared::sprite::SpriteLoader& loader) {
         m_game->m_sprite[MouseCursor] = loader.get_sprite(0, false);
         m_game->m_sprite[InterfaceSprFonts] = loader.get_sprite(1, false);
     });
 
-    hb::shared::sprite::SpriteLoader::open_pak("newmaps", [&](hb::shared::sprite::SpriteLoader& loader) {
+    hb::shared::sprite::SpriteLoader::open_pak("interface/newmaps", [&](hb::shared::sprite::SpriteLoader& loader) {
         m_game->m_sprite[InterfaceNewMaps1] = loader.get_sprite(0, false);
         m_game->m_sprite[InterfaceNewMaps2] = loader.get_sprite(1, false);
         m_game->m_sprite[InterfaceNewMaps3] = loader.get_sprite(2, false);
@@ -95,15 +97,17 @@ void Screen_Loading::LoadStage_Interface()
         m_game->m_sprite[InterfaceNewMaps5] = loader.get_sprite(4, false);
     });
 
-    m_game->m_sprite[InterfaceNdLogin] = hb::shared::sprite::Sprites::create("logindialog", 0, false);
+    hb::shared::sprite::SpriteLoader::open_pak("interface/logindialog", [&](hb::shared::sprite::SpriteLoader& loader) {
+        m_game->m_sprite[InterfaceNdLogin] = loader.get_sprite(0, false);
+    });
 
-    hb::shared::sprite::SpriteLoader::open_pak("new-dialog", [&](hb::shared::sprite::SpriteLoader& loader) {
+    hb::shared::sprite::SpriteLoader::open_pak("interface/new-dialog", [&](hb::shared::sprite::SpriteLoader& loader) {
         m_game->m_sprite[InterfaceNdMainMenu] = loader.get_sprite(1, false);
         m_game->m_sprite[InterfaceNdQuit] = loader.get_sprite(2, false);
         m_game->m_sprite[InterfaceNdNewAccount] = loader.get_sprite(2, false);
     });
 
-    hb::shared::sprite::SpriteLoader::open_pak("gamedialog", [&](hb::shared::sprite::SpriteLoader& loader) {
+    hb::shared::sprite::SpriteLoader::open_pak("interface/gamedialog", [&](hb::shared::sprite::SpriteLoader& loader) {
         m_game->m_sprite[InterfaceNdGame1] = loader.get_sprite(0, false);
         m_game->m_sprite[InterfaceNdGame2] = loader.get_sprite(1, false);
         m_game->m_sprite[InterfaceNdGame3] = loader.get_sprite(2, false);
@@ -116,19 +120,21 @@ void Screen_Loading::LoadStage_Interface()
         m_game->m_sprite[InterfaceNdNewExchange] = loader.get_sprite(10, false);
     });
 
-    m_game->m_sprite[InterfaceNdPartyStatus] = hb::shared::sprite::Sprites::create("partysprite", 0, false);
+    hb::shared::sprite::SpriteLoader::open_pak("interface/partysprite", [&](hb::shared::sprite::SpriteLoader& loader) {
+        m_game->m_sprite[InterfaceNdPartyStatus] = loader.get_sprite(0, false);
+    });
 
-    hb::shared::sprite::SpriteLoader::open_pak("dialogtext", [&](hb::shared::sprite::SpriteLoader& loader) {
+    hb::shared::sprite::SpriteLoader::open_pak("interface/dialogtext", [&](hb::shared::sprite::SpriteLoader& loader) {
         m_game->m_sprite[InterfaceNdText] = loader.get_sprite(0, false);
         m_game->m_sprite[InterfaceNdButton] = loader.get_sprite(1, false);
     });
 
-    make_sprite("telescope", InterfaceGuideMap, 32, false);
-    make_sprite("telescope2", InterfaceGuideMap + 35, 4, false);
-    make_sprite("monster", InterfaceMonster, 1, false);
+    make_sprite("interface/telescope", InterfaceGuideMap, 32, false);
+    make_sprite("interface/telescope2", InterfaceGuideMap + 35, 4, false);
+    make_sprite("interface/monster", InterfaceMonster, 1, false);
 
     // load interface2 sprites in one batch
-    hb::shared::sprite::SpriteLoader::open_pak("interface2", [&](hb::shared::sprite::SpriteLoader& loader) {
+    hb::shared::sprite::SpriteLoader::open_pak("interface/interface2", [&](hb::shared::sprite::SpriteLoader& loader) {
         m_game->m_sprite[InterfaceAddInterface] = loader.get_sprite(0, false);
         m_game->m_sprite[InterfaceSprFonts2] = loader.get_sprite(1, false);
         m_game->m_sprite[InterfaceF1HelpWindows] = loader.get_sprite(2, false);
@@ -136,7 +142,7 @@ void Screen_Loading::LoadStage_Interface()
     });
 
     // load sprfonts sprites in one batch
-    hb::shared::sprite::SpriteLoader::open_pak("sprfonts", [&](hb::shared::sprite::SpriteLoader& loader) {
+    hb::shared::sprite::SpriteLoader::open_pak("interface/sprfonts", [&](hb::shared::sprite::SpriteLoader& loader) {
         m_game->m_sprite[InterfaceFont1] = loader.get_sprite(0, false);
         m_game->m_sprite[InterfaceFont2] = loader.get_sprite(1, false);
     });
@@ -179,16 +185,18 @@ void Screen_Loading::LoadStage_Interface()
 //=============================================================================
 void Screen_Loading::LoadStage_Tiles1()
 {
-    make_tile_spr("maptiles1", 0, 32, true);
-    m_game->m_tile_spr[1 + 50] = hb::shared::sprite::Sprites::create("structures1", 1, true);
-    m_game->m_tile_spr[5 + 50] = hb::shared::sprite::Sprites::create("structures1", 5, true);
-    make_tile_spr("sinside1", 70, 27, false);
-    make_tile_spr("trees1", 100, 46, true);
-    make_tile_spr("treeshadows", 150, 46, true);
-    make_tile_spr("objects1", 200, 10, true);
-    make_tile_spr("objects2", 211, 5, true);
-    make_tile_spr("objects3", 216, 4, true);
-    make_tile_spr("objects4", 220, 2, true);
+    make_tile_spr("tiles/maptiles1", 0, 32, true);
+    hb::shared::sprite::SpriteLoader::open_pak("objects/structures1", [&](hb::shared::sprite::SpriteLoader& loader) {
+        m_game->m_tile_spr[1 + 50] = loader.get_sprite(1, true);
+        m_game->m_tile_spr[5 + 50] = loader.get_sprite(5, true);
+    });
+    make_tile_spr("tiles/sinside1", 70, 27, false);
+    make_tile_spr("objects/trees1", 100, 46, true);
+    make_tile_spr("objects/treeshadows", 150, 46, true);
+    make_tile_spr("objects/objects1", 200, 10, true);
+    make_tile_spr("objects/objects2", 211, 5, true);
+    make_tile_spr("objects/objects3", 216, 4, true);
+    make_tile_spr("objects/objects4", 220, 2, true);
 
     m_iLoadingStage = 8;
 }
@@ -198,21 +206,21 @@ void Screen_Loading::LoadStage_Tiles1()
 //=============================================================================
 void Screen_Loading::LoadStage_Tiles2()
 {
-    make_tile_spr("tile223-225", 223, 3, true);
-    make_tile_spr("tile226-229", 226, 4, true);
-    make_tile_spr("objects5", 230, 9, true);
-    make_tile_spr("objects6", 238, 4, true);
-    make_tile_spr("objects7", 242, 7, true);
-    make_tile_spr("maptiles2", 300, 15, true);
-    make_tile_spr("maptiles4", 320, 10, true);
-    make_tile_spr("maptiles5", 330, 19, true);
-    make_tile_spr("maptiles6", 349, 4, true);
-    make_tile_spr("maptiles353-361", 353, 9, true);
-    make_tile_spr("tile363-366", 363, 4, true);
-    make_tile_spr("tile367-367", 367, 1, true);
-    make_tile_spr("tile370-381", 370, 12, true);
-    make_tile_spr("tile382-387", 382, 6, true);
-    make_tile_spr("tile388-402", 388, 15, true);
+    make_tile_spr("tiles/tile223-225", 223, 3, true);
+    make_tile_spr("tiles/tile226-229", 226, 4, true);
+    make_tile_spr("objects/objects5", 230, 9, true);
+    make_tile_spr("objects/objects6", 238, 4, true);
+    make_tile_spr("objects/objects7", 242, 7, true);
+    make_tile_spr("tiles/maptiles2", 300, 15, true);
+    make_tile_spr("tiles/maptiles4", 320, 10, true);
+    make_tile_spr("tiles/maptiles5", 330, 19, true);
+    make_tile_spr("tiles/maptiles6", 349, 4, true);
+    make_tile_spr("tiles/maptiles353-361", 353, 9, true);
+    make_tile_spr("tiles/tile363-366", 363, 4, true);
+    make_tile_spr("tiles/tile367-367", 367, 1, true);
+    make_tile_spr("tiles/tile370-381", 370, 12, true);
+    make_tile_spr("tiles/tile382-387", 382, 6, true);
+    make_tile_spr("tiles/tile388-402", 388, 15, true);
 
     m_iLoadingStage = 12;
 }
@@ -222,24 +230,25 @@ void Screen_Loading::LoadStage_Tiles2()
 //=============================================================================
 void Screen_Loading::LoadStage_Tiles3()
 {
-    make_tile_spr("tile403-405", 403, 3, true);
-    make_tile_spr("tile406-421", 406, 16, true);
-    make_tile_spr("tile422-429", 422, 8, true);
-    make_tile_spr("tile430-443", 430, 14, true);
-    make_tile_spr("tile444-444", 444, 1, true);
-    make_tile_spr("tile445-461", 445, 17, true);
-    make_tile_spr("tile462-473", 462, 12, true);
-    make_tile_spr("tile474-478", 474, 5, true);
-    make_tile_spr("tile479-488", 479, 10, true);
-    make_tile_spr("tile489-522", 489, 34, true);
-    make_tile_spr("tile523-530", 523, 8, true);
-    make_tile_spr("tile531-540", 531, 10, true);
-    make_tile_spr("tile541-545", 541, 5, true);
+    make_tile_spr("tiles/tile403-405", 403, 3, true);
+    make_tile_spr("tiles/tile406-421", 406, 16, true);
+    make_tile_spr("tiles/htile406-421", HolidayTileOffset + 406, 16, true);  // Christmas variant
+    make_tile_spr("tiles/tile422-429", 422, 8, true);
+    make_tile_spr("tiles/tile430-443", 430, 14, true);
+    make_tile_spr("tiles/tile444-444", 444, 1, true);
+    make_tile_spr("tiles/tile445-461", 445, 17, true);
+    make_tile_spr("tiles/tile462-473", 462, 12, true);
+    make_tile_spr("tiles/tile474-478", 474, 5, true);
+    make_tile_spr("tiles/tile479-488", 479, 10, true);
+    make_tile_spr("tiles/tile489-522", 489, 34, true);
+    make_tile_spr("tiles/tile523-530", 523, 8, true);
+    make_tile_spr("tiles/tile531-540", 531, 10, true);
+    make_tile_spr("tiles/tile541-545", 541, 5, true);
 
-    make_sprite("item-dynamic", ItemDynamicPivotPoint, 3, false);
+    make_sprite("objects/item-dynamic", ItemDynamicPivotPoint, 3, false);
 
     // Item atlas sprites (unified atlas for new display_id system)
-    hb::shared::sprite::SpriteLoader::open_pak("item_atlas", [&](hb::shared::sprite::SpriteLoader& loader) {
+    hb::shared::sprite::SpriteLoader::open_pak("items/item_atlas", [&](hb::shared::sprite::SpriteLoader& loader) {
         for (size_t i = 0; i < 3 && i < loader.get_sprite_count(); i++) {
             m_game->m_item_sprites[i] = loader.get_sprite(i, false);
         }
@@ -257,48 +266,24 @@ void Screen_Loading::LoadStage_Tiles3()
 //=============================================================================
 void Screen_Loading::LoadStage_Equipment1()
 {
-    // Male equipment
-    hb::shared::sprite::SpriteLoader::open_pak("item-equipm", [&](hb::shared::sprite::SpriteLoader& loader) {
+    // Male equipment (body, hair, underwear)
+    hb::shared::sprite::SpriteLoader::open_pak("interface/item-equipm", [&](hb::shared::sprite::SpriteLoader& loader) {
         m_game->m_sprite[ItemEquipPivotPoint + 0] = loader.get_sprite(0, false);
-        m_game->m_sprite[ItemEquipPivotPoint + 1] = loader.get_sprite(1, false);
-        m_game->m_sprite[ItemEquipPivotPoint + 2] = loader.get_sprite(2, false);
-        m_game->m_sprite[ItemEquipPivotPoint + 3] = loader.get_sprite(3, false);
-        m_game->m_sprite[ItemEquipPivotPoint + 4] = loader.get_sprite(4, false);
-        m_game->m_sprite[ItemEquipPivotPoint + 5] = loader.get_sprite(5, false);
-        m_game->m_sprite[ItemEquipPivotPoint + 7] = loader.get_sprite(6, false);
-        m_game->m_sprite[ItemEquipPivotPoint + 8] = loader.get_sprite(7, false);
-        m_game->m_sprite[ItemEquipPivotPoint + 9] = loader.get_sprite(8, false);
-        m_game->m_sprite[ItemEquipPivotPoint + 15] = loader.get_sprite(11, false);
-        m_game->m_sprite[ItemEquipPivotPoint + 17] = loader.get_sprite(12, false);
-        m_game->m_sprite[ItemEquipPivotPoint + 18] = loader.get_sprite(9, false);
-        m_game->m_sprite[ItemEquipPivotPoint + 19] = loader.get_sprite(10, false);
-        m_game->m_sprite[ItemEquipPivotPoint + 20] = loader.get_sprite(13, false);
-        m_game->m_sprite[ItemEquipPivotPoint + 21] = loader.get_sprite(14, false);
+        m_game->m_sprite[ItemEquipPivotPoint + 18] = loader.get_sprite(1, false);
+        m_game->m_sprite[ItemEquipPivotPoint + 19] = loader.get_sprite(2, false);
     });
 
-    // Female equipment
-    hb::shared::sprite::SpriteLoader::open_pak("item-equipw", [&](hb::shared::sprite::SpriteLoader& loader) {
+    // Female equipment (body, hair, underwear)
+    hb::shared::sprite::SpriteLoader::open_pak("interface/item-equipw", [&](hb::shared::sprite::SpriteLoader& loader) {
         m_game->m_sprite[ItemEquipPivotPoint + 40] = loader.get_sprite(0, false);
-        m_game->m_sprite[ItemEquipPivotPoint + 41] = loader.get_sprite(1, false);
-        m_game->m_sprite[ItemEquipPivotPoint + 42] = loader.get_sprite(2, false);
-        m_game->m_sprite[ItemEquipPivotPoint + 43] = loader.get_sprite(3, false);
-        m_game->m_sprite[ItemEquipPivotPoint + 45] = loader.get_sprite(4, false);
-        m_game->m_sprite[ItemEquipPivotPoint + 50] = loader.get_sprite(5, false);
-        m_game->m_sprite[ItemEquipPivotPoint + 51] = loader.get_sprite(6, false);
-        m_game->m_sprite[ItemEquipPivotPoint + 52] = loader.get_sprite(7, false);
-        m_game->m_sprite[ItemEquipPivotPoint + 53] = loader.get_sprite(8, false);
-        m_game->m_sprite[ItemEquipPivotPoint + 55] = loader.get_sprite(11, false);
-        m_game->m_sprite[ItemEquipPivotPoint + 57] = loader.get_sprite(12, false);
-        m_game->m_sprite[ItemEquipPivotPoint + 58] = loader.get_sprite(9, false);
-        m_game->m_sprite[ItemEquipPivotPoint + 59] = loader.get_sprite(10, false);
-        m_game->m_sprite[ItemEquipPivotPoint + 60] = loader.get_sprite(13, false);
-        m_game->m_sprite[ItemEquipPivotPoint + 61] = loader.get_sprite(14, false);
+        m_game->m_sprite[ItemEquipPivotPoint + 58] = loader.get_sprite(1, false);
+        m_game->m_sprite[ItemEquipPivotPoint + 59] = loader.get_sprite(2, false);
     });
 
     // Player body sprites
-    make_sprite("bm", 500 + 15 * 8 * 0, 96, true);  // Black Man
-    make_sprite("wm", 500 + 15 * 8 * 1, 96, true);  // White Man
-    make_sprite("ym", 500 + 15 * 8 * 2, 96, true);  // Yellow Man
+    make_sprite("players/black-man", 500 + 15 * 8 * 0, 96, true);
+    make_sprite("players/white-man", 500 + 15 * 8 * 1, 96, true);
+    make_sprite("players/yellow-man", 500 + 15 * 8 * 2, 96, true);
 
     m_iLoadingStage = 20;
 }
@@ -308,14 +293,14 @@ void Screen_Loading::LoadStage_Equipment1()
 //=============================================================================
 void Screen_Loading::LoadStage_Angels()
 {
-    make_sprite("tutelarangel1", TutelaryAngelsPivotPoint + 50 * 0, 48, false);
-    make_sprite("tutelarangel2", TutelaryAngelsPivotPoint + 50 * 1, 48, false);
-    make_sprite("tutelarangel3", TutelaryAngelsPivotPoint + 50 * 2, 48, false);
-    make_sprite("tutelarangel4", TutelaryAngelsPivotPoint + 50 * 3, 48, false);
+    make_sprite("pets/tutelary-angel1", TutelaryAngelsPivotPoint + 50 * 0, 48, false);
+    make_sprite("pets/tutelary-angel2", TutelaryAngelsPivotPoint + 50 * 1, 48, false);
+    make_sprite("pets/tutelary-angel3", TutelaryAngelsPivotPoint + 50 * 2, 48, false);
+    make_sprite("pets/tutelary-angel4", TutelaryAngelsPivotPoint + 50 * 3, 48, false);
 
-    make_sprite("bw", 500 + 15 * 8 * 3, 96, true);  // Black Woman
-    make_sprite("ww", 500 + 15 * 8 * 4, 96, true);  // White Woman
-    make_sprite("yw", 500 + 15 * 8 * 5, 96, true);  // Yellow Woman
+    make_sprite("players/black-woman", 500 + 15 * 8 * 3, 96, true);
+    make_sprite("players/white-woman", 500 + 15 * 8 * 4, 96, true);
+    make_sprite("players/yellow-woman", 500 + 15 * 8 * 5, 96, true);
 
     m_iLoadingStage = 24;
 }
@@ -325,22 +310,22 @@ void Screen_Loading::LoadStage_Angels()
 //=============================================================================
 void Screen_Loading::LoadStage_Monsters1()
 {
-    make_sprite("slm", Mob + 7 * 8 * 0, 40, true);
-    make_sprite("ske", Mob + 7 * 8 * 1, 40, true);
-    make_sprite("gol", Mob + 7 * 8 * 2, 40, true);
-    make_sprite("cyc", Mob + 7 * 8 * 3, 40, true);
-    make_sprite("orc", Mob + 7 * 8 * 4, 40, true);
-    make_sprite("shopkpr", Mob + 7 * 8 * 5, 8, true);
-    make_sprite("ant", Mob + 7 * 8 * 6, 40, true);
-    make_sprite("scp", Mob + 7 * 8 * 7, 40, true);
-    make_sprite("zom", Mob + 7 * 8 * 8, 40, true);
-    make_sprite("gandlf", Mob + 7 * 8 * 9, 8, true);
-    make_sprite("howard", Mob + 7 * 8 * 10, 8, true);
-    make_sprite("guard", Mob + 7 * 8 * 11, 40, true);
-    make_sprite("amp", Mob + 7 * 8 * 12, 40, true);
-    make_sprite("cla", Mob + 7 * 8 * 13, 40, true);
-    make_sprite("tom", Mob + 7 * 8 * 14, 8, true);
-    make_sprite("william", Mob + 7 * 8 * 15, 8, true);
+    make_sprite("npcs/slime", Mob + 7 * 8 * 0, 40, true);
+    make_sprite("npcs/skeleton", Mob + 7 * 8 * 1, 40, true);
+    make_sprite("npcs/stone-golem", Mob + 7 * 8 * 2, 40, true);
+    make_sprite("npcs/cyclops", Mob + 7 * 8 * 3, 40, true);
+    make_sprite("npcs/orc-mage", Mob + 7 * 8 * 4, 40, true);
+    make_sprite("npcs/shopkeeper", Mob + 7 * 8 * 5, 8, true);
+    make_sprite("npcs/giant-ant", Mob + 7 * 8 * 6, 40, true);
+    make_sprite("npcs/scorpion", Mob + 7 * 8 * 7, 40, true);
+    make_sprite("npcs/zombie", Mob + 7 * 8 * 8, 40, true);
+    make_sprite("npcs/gandalf", Mob + 7 * 8 * 9, 8, true);
+    make_sprite("npcs/howard", Mob + 7 * 8 * 10, 8, true);
+    make_sprite("npcs/guard", Mob + 7 * 8 * 11, 40, true);
+    make_sprite("npcs/amphis", Mob + 7 * 8 * 12, 40, true);
+    make_sprite("npcs/clay-golem", Mob + 7 * 8 * 13, 40, true);
+    make_sprite("npcs/tom", Mob + 7 * 8 * 14, 8, true);
+    make_sprite("npcs/william", Mob + 7 * 8 * 15, 8, true);
 
     m_iLoadingStage = 28;
 }
@@ -350,18 +335,18 @@ void Screen_Loading::LoadStage_Monsters1()
 //=============================================================================
 void Screen_Loading::LoadStage_Monsters2()
 {
-    make_sprite("kennedy", Mob + 7 * 8 * 16, 8, true);
-    make_sprite("helb", Mob + 7 * 8 * 17, 40, true);
-    make_sprite("troll", Mob + 7 * 8 * 18, 40, true);
-    make_sprite("orge", Mob + 7 * 8 * 19, 40, true);
-    make_sprite("liche", Mob + 7 * 8 * 20, 40, true);
-    make_sprite("demon", Mob + 7 * 8 * 21, 40, true);
-    make_sprite("unicorn", Mob + 7 * 8 * 22, 40, true);
-    make_sprite("werewolf", Mob + 7 * 8 * 23, 40, true);
-    make_sprite("dummy", Mob + 7 * 8 * 24, 40, true);
+    make_sprite("npcs/kennedy", Mob + 7 * 8 * 16, 8, true);
+    make_sprite("npcs/hellhound", Mob + 7 * 8 * 17, 40, true);
+    make_sprite("npcs/troll", Mob + 7 * 8 * 18, 40, true);
+    make_sprite("npcs/ogre", Mob + 7 * 8 * 19, 40, true);
+    make_sprite("npcs/liche", Mob + 7 * 8 * 20, 40, true);
+    make_sprite("npcs/demon", Mob + 7 * 8 * 21, 40, true);
+    make_sprite("npcs/unicorn", Mob + 7 * 8 * 22, 40, true);
+    make_sprite("npcs/werewolf", Mob + 7 * 8 * 23, 40, true);
+    make_sprite("npcs/dummy", Mob + 7 * 8 * 24, 40, true);
 
     // Energy Ball - all 40 slots use the same sprite
-    hb::shared::sprite::SpriteLoader::open_pak("effect5", [&](hb::shared::sprite::SpriteLoader& loader) {
+    hb::shared::sprite::SpriteLoader::open_pak("effects/effect5", [&](hb::shared::sprite::SpriteLoader& loader) {
         for (int i = 0; i < 40; i++)
             m_game->m_sprite[Mob + i + 7 * 8 * 25] = loader.get_sprite(0, true);
     });
@@ -374,18 +359,18 @@ void Screen_Loading::LoadStage_Monsters2()
 //=============================================================================
 void Screen_Loading::LoadStage_Monsters3()
 {
-    make_sprite("gt-arrow", Mob + 7 * 8 * 26, 40, true);
-    make_sprite("gt-cannon", Mob + 7 * 8 * 27, 40, true);
-    make_sprite("manacollector", Mob + 7 * 8 * 28, 40, true);
-    make_sprite("detector", Mob + 7 * 8 * 29, 40, true);
-    make_sprite("esg", Mob + 7 * 8 * 30, 40, true);
-    make_sprite("gmg", Mob + 7 * 8 * 31, 40, true);
-    make_sprite("manastone", Mob + 7 * 8 * 32, 40, true);
-    make_sprite("lwb", Mob + 7 * 8 * 33, 40, true);
-    make_sprite("ghk", Mob + 7 * 8 * 34, 40, true);
-    make_sprite("ghkabs", Mob + 7 * 8 * 35, 40, true);
-    make_sprite("tk", Mob + 7 * 8 * 36, 40, true);
-    make_sprite("bg", Mob + 7 * 8 * 37, 40, true);
+    make_sprite("npcs/arrow-guard-tower", Mob + 7 * 8 * 26, 40, true);
+    make_sprite("npcs/cannon-guard-tower", Mob + 7 * 8 * 27, 40, true);
+    make_sprite("npcs/mana-collector", Mob + 7 * 8 * 28, 40, true);
+    make_sprite("npcs/detector", Mob + 7 * 8 * 29, 40, true);
+    make_sprite("npcs/energy-shield", Mob + 7 * 8 * 30, 40, true);
+    make_sprite("npcs/grand-magic-generator", Mob + 7 * 8 * 31, 40, true);
+    make_sprite("npcs/mana-stone", Mob + 7 * 8 * 32, 40, true);
+    make_sprite("npcs/light-war-beetle", Mob + 7 * 8 * 33, 40, true);
+    make_sprite("npcs/gods-hand-knight", Mob + 7 * 8 * 34, 40, true);
+    make_sprite("npcs/gods-hand-knight-ck", Mob + 7 * 8 * 35, 40, true);
+    make_sprite("npcs/temple-knight", Mob + 7 * 8 * 36, 40, true);
+    make_sprite("npcs/battle-golem", Mob + 7 * 8 * 37, 40, true);
 
     m_iLoadingStage = 36;
 }
@@ -395,17 +380,17 @@ void Screen_Loading::LoadStage_Monsters3()
 //=============================================================================
 void Screen_Loading::LoadStage_Monsters4()
 {
-    make_sprite("stalker", Mob + 7 * 8 * 38, 40, true);
-    make_sprite("hellclaw", Mob + 7 * 8 * 39, 40, true);
-    make_sprite("tigerworm", Mob + 7 * 8 * 40, 40, true);
-    make_sprite("catapult", Mob + 7 * 8 * 41, 40, true);
-    make_sprite("gagoyle", Mob + 7 * 8 * 42, 40, true);
-    make_sprite("beholder", Mob + 7 * 8 * 43, 40, true);
-    make_sprite("darkelf", Mob + 7 * 8 * 44, 40, true);
-    make_sprite("bunny", Mob + 7 * 8 * 45, 40, true);
-    make_sprite("cat", Mob + 7 * 8 * 46, 40, true);
-    make_sprite("giantfrog", Mob + 7 * 8 * 47, 40, true);
-    make_sprite("mtgiant", Mob + 7 * 8 * 48, 40, true);
+    make_sprite("npcs/stalker", Mob + 7 * 8 * 38, 40, true);
+    make_sprite("npcs/hell-claw", Mob + 7 * 8 * 39, 40, true);
+    make_sprite("npcs/tiger-worm", Mob + 7 * 8 * 40, 40, true);
+    make_sprite("npcs/catapult", Mob + 7 * 8 * 41, 40, true);
+    make_sprite("npcs/gargoyle", Mob + 7 * 8 * 42, 40, true);
+    make_sprite("npcs/beholder", Mob + 7 * 8 * 43, 40, true);
+    make_sprite("npcs/dark-elf", Mob + 7 * 8 * 44, 40, true);
+    make_sprite("npcs/bunny", Mob + 7 * 8 * 45, 40, true);
+    make_sprite("npcs/cat", Mob + 7 * 8 * 46, 40, true);
+    make_sprite("npcs/giant-frog", Mob + 7 * 8 * 47, 40, true);
+    make_sprite("npcs/mountain-giant", Mob + 7 * 8 * 48, 40, true);
 
     m_iLoadingStage = 40;
 }
@@ -415,23 +400,23 @@ void Screen_Loading::LoadStage_Monsters4()
 //=============================================================================
 void Screen_Loading::LoadStage_Monsters5()
 {
-    make_sprite("ettin", Mob + 7 * 8 * 49, 40, true);
-    make_sprite("canplant", Mob + 7 * 8 * 50, 40, true);
-    make_sprite("rudolph", Mob + 7 * 8 * 51, 40, true);
-    make_sprite("direboar", Mob + 7 * 8 * 52, 40, true);
-    make_sprite("frost", Mob + 7 * 8 * 53, 40, true);
-    make_sprite("crop", Mob + 7 * 8 * 54, 40, true);
-    make_sprite("icegolem", Mob + 7 * 8 * 55, 40, true);
-    make_sprite("wyvern", Mob + 7 * 8 * 56, 24, true);
-    make_sprite("mcgaffin", Mob + 7 * 8 * 57, 16, true);
-    make_sprite("perry", Mob + 7 * 8 * 58, 16, true);
-    make_sprite("devlin", Mob + 7 * 8 * 59, 16, true);
-    make_sprite("barlog", Mob + 7 * 8 * 60, 40, true);
-    make_sprite("centaurus", Mob + 7 * 8 * 61, 40, true);
-    make_sprite("clawturtle", Mob + 7 * 8 * 62, 40, true);
-    make_sprite("firewyvern", Mob + 7 * 8 * 63, 24, true);
-    make_sprite("giantcrayfish", Mob + 7 * 8 * 64, 40, true);
-    make_sprite("giantlizard", Mob + 7 * 8 * 65, 40, true);
+    make_sprite("npcs/ettin", Mob + 7 * 8 * 49, 40, true);
+    make_sprite("npcs/cannibal-plant", Mob + 7 * 8 * 50, 40, true);
+    make_sprite("npcs/rudolph", Mob + 7 * 8 * 51, 40, true);
+    make_sprite("npcs/dire-boar", Mob + 7 * 8 * 52, 40, true);
+    make_sprite("npcs/frost", Mob + 7 * 8 * 53, 40, true);
+    make_sprite("npcs/crops", Mob + 7 * 8 * 54, 40, true);
+    make_sprite("npcs/ice-golem", Mob + 7 * 8 * 55, 40, true);
+    make_sprite("npcs/wyvern", Mob + 7 * 8 * 56, 24, true);
+    make_sprite("npcs/mcgaffin", Mob + 7 * 8 * 57, 16, true);
+    make_sprite("npcs/perry", Mob + 7 * 8 * 58, 16, true);
+    make_sprite("npcs/devlin", Mob + 7 * 8 * 59, 16, true);
+    make_sprite("npcs/barlog", Mob + 7 * 8 * 60, 40, true);
+    make_sprite("npcs/centaur", Mob + 7 * 8 * 61, 40, true);
+    make_sprite("npcs/claw-turtle", Mob + 7 * 8 * 62, 40, true);
+    make_sprite("npcs/fire-wyvern", Mob + 7 * 8 * 63, 24, true);
+    make_sprite("npcs/giant-crayfish", Mob + 7 * 8 * 64, 40, true);
+    make_sprite("npcs/giant-lizard", Mob + 7 * 8 * 65, 40, true);
 
     m_iLoadingStage = 44;
 }
@@ -441,20 +426,20 @@ void Screen_Loading::LoadStage_Monsters5()
 //=============================================================================
 void Screen_Loading::LoadStage_Monsters6()
 {
-    make_sprite("giantplant", Mob + 7 * 8 * 66, 40, true);
-    make_sprite("mastermageorc", Mob + 7 * 8 * 67, 40, true);
-    make_sprite("minotaurs", Mob + 7 * 8 * 68, 40, true);
-    make_sprite("nizie", Mob + 7 * 8 * 69, 40, true);
-    make_sprite("tentocle", Mob + 7 * 8 * 70, 40, true);
-    make_sprite("yspro", Mob + 7 * 8 * 71, 32, true);
-    make_sprite("sorceress", Mob + 7 * 8 * 72, 40, true);
-    make_sprite("tpknight", Mob + 7 * 8 * 73, 40, true);
-    make_sprite("elfmaster", Mob + 7 * 8 * 74, 40, true);
-    make_sprite("darkknight", Mob + 7 * 8 * 75, 40, true);
-    make_sprite("hbtank", Mob + 7 * 8 * 76, 32, true);
-    make_sprite("cbturret", Mob + 7 * 8 * 77, 32, true);
-    make_sprite("babarian", Mob + 7 * 8 * 78, 40, true);
-    make_sprite("acannon", Mob + 7 * 8 * 79, 32, true);
+    make_sprite("npcs/giant-plant", Mob + 7 * 8 * 66, 40, true);
+    make_sprite("npcs/master-mage-orc", Mob + 7 * 8 * 67, 40, true);
+    make_sprite("npcs/minotaur", Mob + 7 * 8 * 68, 40, true);
+    make_sprite("npcs/nizie", Mob + 7 * 8 * 69, 40, true);
+    make_sprite("npcs/tentacle", Mob + 7 * 8 * 70, 40, true);
+    make_sprite("npcs/abaddon", Mob + 7 * 8 * 71, 32, true);
+    make_sprite("npcs/sorceress", Mob + 7 * 8 * 72, 40, true);
+    make_sprite("npcs/temple-knight-atk", Mob + 7 * 8 * 73, 40, true);
+    make_sprite("npcs/master-elf", Mob + 7 * 8 * 74, 40, true);
+    make_sprite("npcs/dark-knight", Mob + 7 * 8 * 75, 40, true);
+    make_sprite("npcs/helbreath-tank", Mob + 7 * 8 * 76, 32, true);
+    make_sprite("npcs/crusade-barricade-turret", Mob + 7 * 8 * 77, 32, true);
+    make_sprite("npcs/barbarian", Mob + 7 * 8 * 78, 40, true);
+    make_sprite("npcs/apocalypse-cannon", Mob + 7 * 8 * 79, 32, true);
 
     m_iLoadingStage = 48;
 }
@@ -464,11 +449,11 @@ void Screen_Loading::LoadStage_Monsters6()
 //=============================================================================
 void Screen_Loading::LoadStage_CosmeticsMale()
 {
-    make_sprite("gail", Mob + 7 * 8 * 80, 8, true);
-    make_sprite("gate", Mob + 7 * 8 * 81, 24, true);
+    make_sprite("npcs/gail", Mob + 7 * 8 * 80, 8, true);
+    make_sprite("npcs/gate", Mob + 7 * 8 * 81, 24, true);
 
     // Male underwear
-    hb::shared::sprite::SpriteLoader::open_pak("mpt", [&](hb::shared::sprite::SpriteLoader& loader) {
+    hb::shared::sprite::SpriteLoader::open_pak("players/male-underwear", [&](hb::shared::sprite::SpriteLoader& loader) {
         for (int g = 0; g < 8; g++) {
             for (int i = 0; i < 12; i++) {
                 m_game->m_sprite[UndiesM + i + 15 * g] = loader.get_sprite(i + 12 * g, true);
@@ -477,7 +462,7 @@ void Screen_Loading::LoadStage_CosmeticsMale()
     });
 
     // Male hair
-    hb::shared::sprite::SpriteLoader::open_pak("mhr", [&](hb::shared::sprite::SpriteLoader& loader) {
+    hb::shared::sprite::SpriteLoader::open_pak("players/male-hair", [&](hb::shared::sprite::SpriteLoader& loader) {
         for (int g = 0; g < 8; g++) {
             for (int i = 0; i < 12; i++) {
                 m_game->m_sprite[HairM + i + 15 * g] = loader.get_sprite(i + 12 * g, true);
@@ -494,7 +479,7 @@ void Screen_Loading::LoadStage_CosmeticsMale()
 void Screen_Loading::LoadStage_CosmeticsFemale()
 {
     // Female underwear
-    hb::shared::sprite::SpriteLoader::open_pak("wpt", [&](hb::shared::sprite::SpriteLoader& loader) {
+    hb::shared::sprite::SpriteLoader::open_pak("players/female-underwear", [&](hb::shared::sprite::SpriteLoader& loader) {
         for (int g = 0; g < 8; g++) {
             for (int i = 0; i < 12; i++) {
                 m_game->m_sprite[UndiesW + i + 15 * g] = loader.get_sprite(i + 12 * g, true);
@@ -503,7 +488,7 @@ void Screen_Loading::LoadStage_CosmeticsFemale()
     });
 
     // Female hair
-    hb::shared::sprite::SpriteLoader::open_pak("whr", [&](hb::shared::sprite::SpriteLoader& loader) {
+    hb::shared::sprite::SpriteLoader::open_pak("players/female-hair", [&](hb::shared::sprite::SpriteLoader& loader) {
         for (int g = 0; g < 8; g++) {
             for (int i = 0; i < 12; i++) {
                 m_game->m_sprite[HairW + i + 15 * g] = loader.get_sprite(i + 12 * g, true);
@@ -579,30 +564,30 @@ void Screen_Loading::LoadStage_EquipmentBatch()
 //=============================================================================
 void Screen_Loading::LoadStage_Effects()
 {
-    make_effect_spr("effect", 0, 10, false);
-    make_effect_spr("effect2", 10, 3, false);
-    make_effect_spr("effect3", 13, 6, false);
-    make_effect_spr("effect4", 19, 5, false);
+    make_effect_spr("effects/effect", 0, 10, false);
+    make_effect_spr("effects/effect2", 10, 3, false);
+    make_effect_spr("effects/effect3", 13, 6, false);
+    make_effect_spr("effects/effect4", 19, 5, false);
 
     // Effect5 batch load
-    hb::shared::sprite::SpriteLoader::open_pak("effect5", [&](hb::shared::sprite::SpriteLoader& loader) {
+    hb::shared::sprite::SpriteLoader::open_pak("effects/effect5", [&](hb::shared::sprite::SpriteLoader& loader) {
         for (int i = 0; i <= 6; i++) {
             m_game->m_effect_sprites[i + 24] = loader.get_sprite(i + 1, false);
         }
     });
 
-    make_effect_spr("crueffect1", 31, 9, false);
-    make_effect_spr("effect6", 40, 5, false);
-    make_effect_spr("effect7", 45, 12, false);
-    make_effect_spr("effect8", 57, 9, false);
-    make_effect_spr("effect9", 66, 21, false);
-    make_effect_spr("effect10", 87, 2, false);
-    make_effect_spr("effect11", 89, 14, false);
-    make_effect_spr("effect11s", 104, 1, false);
-    make_effect_spr("yseffect2", 140, 8, false);
-    make_effect_spr("effect12", 148, 4, false);
-    make_effect_spr("yseffect3", 152, 16, false);
-    make_effect_spr("yseffect4", 133, 7, false);
+    make_effect_spr("effects/crusade-effect", 31, 9, false);
+    make_effect_spr("effects/effect6", 40, 5, false);
+    make_effect_spr("effects/effect7", 45, 12, false);
+    make_effect_spr("effects/effect8", 57, 9, false);
+    make_effect_spr("effects/effect9", 66, 21, false);
+    make_effect_spr("effects/effect10", 87, 2, false);
+    make_effect_spr("effects/effect11", 89, 14, false);
+    make_effect_spr("effects/effect11-shadow", 104, 1, false);
+    make_effect_spr("effects/abaddon-effect2", 140, 8, false);
+    make_effect_spr("effects/effect12", 148, 4, false);
+    make_effect_spr("effects/abaddon-effect3", 152, 16, false);
+    make_effect_spr("effects/abaddon-effect4", 133, 7, false);
 
     // initialize effect_manager with loaded sprites
     m_game->m_effect_manager->set_effect_sprites(m_game->m_effect_sprites);

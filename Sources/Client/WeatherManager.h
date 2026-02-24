@@ -40,6 +40,7 @@ public:
 	                     CCamera& camera);
 	void set_map_data(CMapData* map_data);
 	void set_xmas(bool is_xmas) { m_is_xmas = is_xmas; }
+	bool is_xmas() const { return m_is_xmas; }
 
 	// Accessors
 	char get_effect_type() const { return m_effect_type; }

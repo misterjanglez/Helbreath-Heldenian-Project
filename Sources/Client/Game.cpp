@@ -609,11 +609,28 @@ void CGame::on_update()
 	// update teleport pre-auth fade state machine
 	teleport_manager::get().update();
 
+	// Swap holiday tile variants if month changed
+	update_holiday_tiles();
+
 	// update game screens/overlays
 	FrameTiming::begin_profile(ProfileStage::update);
 	GameModeManager::update_screens();
 	FrameTiming::end_profile(ProfileStage::update);
 
+}
+
+void CGame::update_holiday_tiles()
+{
+	bool is_xmas = weather_manager::get().is_xmas();
+
+	if (is_xmas != m_holiday_tiles_active)
+	{
+		for (int i = 0; i < 16; i++)
+		{
+			m_tile_spr.swap_indices(406 + i, hb::client::sprite_id::HolidayTileOffset + 406 + i);
+		}
+		m_holiday_tiles_active = is_xmas;
+	}
 }
 
 // on_render: render only — gated by engine frame limiting

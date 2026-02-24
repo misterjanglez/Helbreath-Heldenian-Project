@@ -159,6 +159,7 @@ public:
 	void draw_cursor();
 	void on_update();   // Logic update: audio, timers, network, game state
 	void on_render();   // render only: clear backbuffer -> draw -> flip
+	void update_holiday_tiles();  // Swap holiday tile variants based on current month
 
 	void npc_talk_handler(char * packet_data);
 	void set_camera_shaking_effect(short dist, int mul = 0);
@@ -263,6 +264,7 @@ public:
 	std::unique_ptr<hb::shared::sprite::ISpriteFactory> m_sprite_factory;  // Sprite factory for creating sprites
 	hb::shared::sprite::SpriteCollection m_sprite;
 	hb::shared::sprite::SpriteCollection m_tile_spr;
+	bool m_holiday_tiles_active = false;
 	hb::shared::sprite::SpriteCollection m_effect_sprites;
 	hb::shared::sprite::SpriteCollection m_item_sprites;	// Atlas: [0]=equip, [1]=ground, [2]=pack
 	hb::shared::sprite::SpriteCollection m_equip_sprites;	// Per-item equipment sprites (indexed via equip_sprite::index)
