@@ -109,6 +109,7 @@ void guild_manager::handle_create_new_guild_response(char* data)
 		break;
 	case MsgType::Reject:
 		m_game->m_player->m_guild_rank = -1;
+		m_game->m_player->m_guild_name.clear();
 		m_game->get_dialog_box_manager().get_dialog_as<DialogBox_GuildMenu>(DialogBoxId::GuildMenu)->m_mode = DialogBox_GuildMenu::mode::create_failed;
 		break;
 	}

@@ -21,6 +21,12 @@ DialogBox_GuildMenu::DialogBox_GuildMenu(CGame* game)
 	m_can_close_on_right_click = true;
 }
 
+int DialogBox_GuildMenu::get_centered_input_x(int sX) const
+{
+	auto metrics = hb::shared::text::measure_text(GameFont::Default, "____________________");
+	return sX + (m_size_x - metrics.width) / 2;
+}
+
 void DialogBox_GuildMenu::on_draw()
 {
 	short mouse_x = static_cast<short>(hb::shared::input::get_mouse_x());
@@ -208,11 +214,12 @@ void DialogBox_GuildMenu::DrawMode1_CreateGuild(short sX, short sY, short size_x
 	short mouse_x = static_cast<short>(hb::shared::input::get_mouse_x());
 	short mouse_y = static_cast<short>(hb::shared::input::get_mouse_y());
 	put_aligned_string(sX, sX + size_x, sY + 125, DRAW_DIALOGBOX_GUILDMENU18, GameColors::UILabel);
-	put_string(sX + 75, sY + 150, "____________________", GameColors::UILabel);
+	put_aligned_string(sX, sX + size_x, sY + 155, "____________________", GameColors::UILabel);
 
 	if (m_game->get_dialog_box_manager().get_top_id() != DialogBoxId::GuildMenu) {
+		int input_x = get_centered_input_x(sX);
 		std::string masked(player().m_guild_name.size(), '*');
-		hb::shared::text::draw_text(GameFont::Default, sX + 75, sY + 140, masked.c_str(), hb::shared::text::TextStyle::from_color(GameColors::UIWhite));
+		hb::shared::text::draw_text(GameFont::Default, input_x, sY + 140, masked.c_str(), hb::shared::text::TextStyle::from_color(GameColors::UIWhite));
 	}
 
 	if ((mouse_x >= sX + ui_layout::left_btn_x) && (mouse_x <= sX + ui_layout::left_btn_x + ui_layout::btn_size_x) && (mouse_y >= sY + ui_layout::btn_y) && (mouse_y <= sY + ui_layout::btn_y + ui_layout::btn_size_y)) {
@@ -342,8 +349,9 @@ void DialogBox_GuildMenu::DrawMode20_ConfirmCancel(short sX, short sY, short siz
 	short mouse_x = static_cast<short>(hb::shared::input::get_mouse_x());
 	short mouse_y = static_cast<short>(hb::shared::input::get_mouse_y());
 	put_aligned_string(sX, sX + size_x, sY + 125, DRAW_DIALOGBOX_GUILDMENU75, GameColors::UILabel);
-	put_string(sX + 75, sY + 150, "____________________", GameColors::UILabel);
-	hb::shared::text::draw_text(GameFont::Default, sX + 75, sY + 140, player().m_guild_name.c_str(), hb::shared::text::TextStyle::from_color(GameColors::UIWhite));
+	put_aligned_string(sX, sX + size_x, sY + 155, "____________________", GameColors::UILabel);
+	int input_x = get_centered_input_x(sX);
+	hb::shared::text::draw_text(GameFont::Default, input_x, sY + 140, player().m_guild_name.c_str(), hb::shared::text::TextStyle::from_color(GameColors::UIWhite));
 	if ((mouse_x >= sX + ui_layout::left_btn_x) && (mouse_x <= sX + ui_layout::left_btn_x + ui_layout::btn_size_x) && (mouse_y >= sY + ui_layout::btn_y) && (mouse_y <= sY + ui_layout::btn_y + ui_layout::btn_size_y))
 		m_game->draw_new_dialog_box(InterfaceNdButton, sX + ui_layout::left_btn_x, sY + ui_layout::btn_y, 25);
 	else m_game->draw_new_dialog_box(InterfaceNdButton, sX + ui_layout::left_btn_x, sY + ui_layout::btn_y, 24);
@@ -401,7 +409,8 @@ bool DialogBox_GuildMenu::on_click_mode0(short sX, short sY)
 		if (player().m_level < 20) return false;
 		if (m_game->on_game()->m_is_crusade_mode) return false;
 		text_input_manager::get().end_input();
-		text_input_manager::get().start_input(sX + 75, sY + 140, 21, player().m_guild_name, false, hb::client::guild_name_allowed_chars);
+		player().m_guild_name.clear();
+		text_input_manager::get().start_input(get_centered_input_x(sX), sY + 140, 21, player().m_guild_name, false, hb::client::guild_name_allowed_chars);
 		m_mode = mode::create_guild;
 		play_sound_effect('E', 14, 5);
 		return true;
@@ -476,12 +485,15 @@ bool DialogBox_GuildMenu::on_click_mode1(short sX, short sY)
 	if ((mouse_x >= sX + 154) && (mouse_x <= sX + 154 + ui_layout::btn_size_x) && (mouse_y >= sY + ui_layout::btn_y) && (mouse_y <= sY + ui_layout::btn_y + ui_layout::btn_size_y)) {
 		m_mode = mode::main_menu;
 		text_input_manager::get().end_input();
+		player().m_guild_name.clear();
 		play_sound_effect('E', 14, 5);
 		return true;
 	}
 
 	return false;
 }
+
+
 
 bool DialogBox_GuildMenu::on_click_mode5(short sX, short sY)
 {
@@ -720,7 +732,7 @@ bool DialogBox_GuildMenu::on_enable(int type, int64_t v1, int v2, const char* st
 {
 	if (m_mode == mode::create_guild) {
 		text_input_manager::get().end_input();
-		text_input_manager::get().start_input(m_x + 75, m_y + 140, 21, player().m_guild_name, false, hb::client::guild_name_allowed_chars);
+		text_input_manager::get().start_input(get_centered_input_x(m_x), m_y + 140, 21, player().m_guild_name, false, hb::client::guild_name_allowed_chars);
 	}
 	return true;
 }
@@ -728,7 +740,10 @@ bool DialogBox_GuildMenu::on_enable(int type, int64_t v1, int v2, const char* st
 bool DialogBox_GuildMenu::on_disable()
 {
 	if (m_mode == mode::create_guild)
+	{
 		text_input_manager::get().end_input();
+		player().m_guild_name.clear();
+	}
 	m_mode = mode::main_menu;
 	return true;
 }

@@ -4,6 +4,7 @@
 #include "CommonTypes.h"
 #include "RenderHelpers.h"
 #include "GameFonts.h"
+#include "TextFieldRenderer.h"
 #include "TextLibExt.h"
 #include "Benchmark.h"
 #include "performance_monitor.h"
@@ -4507,10 +4508,14 @@ void CGame::command_processor(short mouse_x, short mouse_y, short tile_x, short 
 				if ((CursorTarget::GetSelectedType() == SelectedObjectType::DialogBox) &&
 					(CursorTarget::get_selected_id() == 7) && (get_dialog_box_manager().get_dialog_as<DialogBox_GuildMenu>(DialogBoxId::GuildMenu)->m_mode == DialogBox_GuildMenu::mode::confirm_cancel))
 				{
-					dialog_x = get_dialog_box_manager().get_dialog_box(DialogBoxId::GuildMenu)->m_x;
-					dialog_y = get_dialog_box_manager().get_dialog_box(DialogBoxId::GuildMenu)->m_y;
-					text_input_manager::get().start_input(dialog_x + 75, dialog_y + 140, 21, m_player->m_guild_name);
-					get_dialog_box_manager().get_dialog_as<DialogBox_GuildMenu>(DialogBoxId::GuildMenu)->m_mode = DialogBox_GuildMenu::mode::create_guild;
+					auto* guild_dlg = get_dialog_box_manager().get_dialog_as<DialogBox_GuildMenu>(DialogBoxId::GuildMenu);
+					dialog_x = guild_dlg->m_x;
+					dialog_y = guild_dlg->m_y;
+					auto underline_metrics = hb::shared::text::measure_text(GameFont::Default, "____________________");
+					int input_x = dialog_x + (guild_dlg->m_size_x - underline_metrics.width) / 2;
+					m_player->m_guild_name.clear();
+					text_input_manager::get().start_input(input_x, dialog_y + 140, 21, m_player->m_guild_name, false, hb::client::guild_name_allowed_chars);
+					guild_dlg->m_mode = DialogBox_GuildMenu::mode::create_guild;
 				}
 
 				if ((CursorTarget::GetSelectedType() == SelectedObjectType::DialogBox) &&

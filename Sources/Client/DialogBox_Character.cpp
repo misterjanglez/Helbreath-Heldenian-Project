@@ -2,7 +2,9 @@
 #include "ConfigManager.h"
 #include "CursorTarget.h"
 #include "Game.h"
+#include "GameFonts.h"
 #include "PacketSendHelpers.h"
+#include "TextLibExt.h"
 
 #include "InventoryManager.h"
 #include "ItemNameFormatter.h"
@@ -270,9 +272,33 @@ void DialogBox_Character::on_draw()
 
 		if (player().m_guild_rank >= 0)
 		{
-			statusBuf += "(";
-			statusBuf += player().m_guild_name;
-			statusBuf += player().m_guild_rank == 0 ? DEF_MSG_GUILDMASTER1 : DEF_MSG_GUILDSMAN1;
+			std::string suffix = player().m_guild_rank == 0 ? DEF_MSG_GUILDMASTER1 : DEF_MSG_GUILDSMAN1;
+			std::string full_guild = "(" + player().m_guild_name + suffix;
+			std::string candidate = statusBuf + full_guild;
+			constexpr int max_status_width = 240;
+			auto metrics = hb::shared::text::measure_text(GameFont::Default, candidate.c_str());
+
+			if (metrics.width > max_status_width)
+			{
+				std::string base_with_ellipsis = statusBuf + "(..." + suffix;
+				auto base_metrics = hb::shared::text::measure_text(GameFont::Default, base_with_ellipsis.c_str());
+				int remaining = max_status_width - base_metrics.width;
+
+				if (remaining > 0)
+				{
+					int fit = hb::shared::text::get_fitting_char_count(GameFont::Default,
+						player().m_guild_name.c_str(), remaining);
+					statusBuf += "(" + player().m_guild_name.substr(0, fit) + "..." + suffix;
+				}
+				else
+				{
+					statusBuf += "(..." + suffix;
+				}
+			}
+			else
+			{
+				statusBuf += full_guild;
+			}
 		}
 	}
 	put_aligned_string(sX, sX + 275, sY + 69, statusBuf.c_str(), GameColors::UILabel);
