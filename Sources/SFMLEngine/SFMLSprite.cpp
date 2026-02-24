@@ -405,6 +405,11 @@ void SFMLSprite::DrawInternal(sf::RenderTexture* target, int x, int y, int frame
         sf::Color color = sprite.getColor();
         color.a = 127;  // 50% alpha for averaging blend
         sprite.setColor(color);
+    } else if (params.m_blend_mode == hb::shared::sprite::BlendMode::Multiply) {
+        // Multiply blend: result = src * dst (darkening effect)
+        // Dark sprite pixels darken the background, white pixels preserve it
+        // Used for dark fog, shadows, ground darkening (DDraw PutDarkSprite)
+        states.blendMode = sf::BlendMultiply;
     } else {
         states.blendMode = sf::BlendAlpha;
     }
