@@ -470,15 +470,17 @@ bool DialogBoxManager::handle_double_click()
 	short mouse_x = static_cast<short>(hb::shared::input::get_mouse_x());
 	short mouse_y = static_cast<short>(hb::shared::input::get_mouse_y());
 
-	return for_each_top_to_bottom([&](IDialogBox* dlg) -> bool {
+	bool consumed = false;
+	for_each_top_to_bottom([&](IDialogBox* dlg) -> bool {
 		if (mouse_x > dlg->m_x && mouse_x < dlg->m_x + dlg->m_size_x &&
 			mouse_y > dlg->m_y && mouse_y < dlg->m_y + dlg->m_size_y)
 		{
-			dlg->on_double_click();
+			consumed = dlg->on_double_click();
 			return true;
 		}
 		return false;
 	});
+	return consumed;
 }
 
 PressResult DialogBoxManager::handle_press(int dlg_id)
@@ -528,8 +530,8 @@ int DialogBoxManager::handle_mouse_down()
 		{
 			int id = static_cast<int>(dlg->get_id());
 
-			// Bring dialog to front
-			enable_dialog_box(id, 0, 0, 0);
+			// Bring dialog to front (don't re-trigger on_enable which resets dialog state)
+			bring_to_front(id);
 
 			// Set up drag tracking
 			CursorTarget::set_prev_position(mouse_x, mouse_y);
