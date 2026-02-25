@@ -59,6 +59,8 @@ private:
 	bool on_click_mode13(short sX, short sY);
 	bool on_click_mode_ok_only(short sX, short sY);
 
+	int get_centered_input_x(int sX) const;
+
 	static constexpr int ADJX = -13;
 	static constexpr int ADJY = 30;
 };
