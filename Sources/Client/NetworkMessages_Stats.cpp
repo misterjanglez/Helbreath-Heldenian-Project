@@ -135,7 +135,6 @@ namespace NetworkMessageHandlers {
 		game->m_player->m_mag = pkt->mag;
 		game->m_player->m_charisma = pkt->chr;
 
-		game->m_player->m_lu_point = hb::shared::calc::level_up_points(game->m_formula_engine, hb::shared::calc::level{(double)game->m_player->m_level}, hb::shared::calc::total_stats{(double)(game->m_player->m_str + game->m_player->m_vit + game->m_player->m_dex + game->m_player->m_int + game->m_player->m_mag + game->m_player->m_charisma)});
 		game->m_player->m_lu_str = game->m_player->m_lu_vit = game->m_player->m_lu_dex = game->m_player->m_lu_int = game->m_player->m_lu_mag = game->m_player->m_lu_char = 0;
 
 		txt = std::format(NOTIFYMSG_LEVELUP1, game->m_player->m_level);
@@ -158,5 +157,12 @@ namespace NetworkMessageHandlers {
 		game->get_floating_text().add_notify_text(notify_text_type::LevelUp, "Level up!", game->m_cur_time,
 			game->m_player->m_player_object_id, game->m_map_data.get());
 		return;
+	}
+	void HandleLevelUpPoints(CGame* game, char* data)
+	{
+		const auto* pkt = hb::net::PacketCast<hb::net::PacketNotifyLevelUpPoints>(
+			data, sizeof(hb::net::PacketNotifyLevelUpPoints));
+		if (!pkt) return;
+		game->m_player->m_lu_point = pkt->lu_point;
 	}
 } // namespace NetworkMessageHandlers

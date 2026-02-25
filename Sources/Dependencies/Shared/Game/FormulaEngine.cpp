@@ -512,11 +512,7 @@ validation_result formula_engine::validate() const
 
 	// 2. Required formulas exist
 	static const std::vector<std::string> required = {
-		"max_hp", "max_mp", "max_sp", "max_load", "level_exp",
-		"level_up_pool", "max_stat_value", "levelup_stat_gain",
-		"base_stat_total", "angelic_bonus",
-		"attack_delay", "swing_time", "swing_str_divisor",
-		"swing_frames", "base_frame_time", "delay_per_frame", "run_frame_time"
+		"max_hp", "max_mp", "max_sp", "max_load", "level_exp"
 	};
 	for (const auto& req : required)
 	{

@@ -9,6 +9,7 @@
 #include "ItemSpriteMetadata.h"
 #include "lan_eng.h"
 #include "SharedCalculations.h"
+#include "BalanceConstants.h"
 #include <format>
 #include <string>
 #include "IInput.h"
@@ -317,7 +318,8 @@ void DialogBox_Character::on_draw()
 
 	// Max load
 	int total_weight = inventory_manager::get().calc_total_weight();
-	valueBuf = std::format("{}/{}", (total_weight / 100), max_load);
+	int wups = hb::shared::balance::weight_units_per_stone;
+	valueBuf = std::format("{}/{}", (total_weight / wups), max_load);
 	put_aligned_string(sX + 180, sX + 250, sY + 240, valueBuf.c_str(), GameColors::UILabel);
 
 	// Enemy Kills

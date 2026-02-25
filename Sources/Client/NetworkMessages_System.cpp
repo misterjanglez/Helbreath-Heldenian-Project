@@ -1,5 +1,4 @@
 ﻿#include "Game.h"
-#include "SharedCalculations.h"
 #include "FloatingTextManager.h"
 #include "GameModeManager.h"
 #include "AudioManager.h"
@@ -108,8 +107,6 @@ void HandleSettingSuccess(CGame* game, char* data)
 	game->m_player->m_playerStatus.attack_delay = pkt->attack_delay;
 	txt = "Your stat has been changed.";
 	game->add_event_list(txt.c_str(), 10);
-	// CLEROTH - LU
-	game->m_player->m_lu_point = hb::shared::calc::level_up_points(game->m_formula_engine, hb::shared::calc::level{(double)game->m_player->m_level}, hb::shared::calc::total_stats{(double)(game->m_player->m_str + game->m_player->m_vit + game->m_player->m_dex + game->m_player->m_int + game->m_player->m_mag + game->m_player->m_charisma)});
 	game->m_player->m_lu_str = game->m_player->m_lu_vit = game->m_player->m_lu_dex = game->m_player->m_lu_int = game->m_player->m_lu_mag = game->m_player->m_lu_char = 0;
 }
 

@@ -210,6 +210,11 @@ bool Screen_Login::on_net_response(uint16_t response_type, char* data)
         m_game->change_game_mode(GameMode::LogResMsg);
         return true;
 
+    case LogResMsg::PasswordMismatch:
+        std::snprintf(m_game->m_msg, sizeof(m_game->m_msg), "%s", "11");
+        m_game->change_game_mode(GameMode::LogResMsg);
+        return true;
+
     case LogResMsg::NotExistingWorldServer:
         std::snprintf(m_game->m_msg, sizeof(m_game->m_msg), "%s", "1Y");
         m_game->change_game_mode(GameMode::LogResMsg);

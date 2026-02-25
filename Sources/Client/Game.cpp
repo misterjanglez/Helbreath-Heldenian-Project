@@ -12,6 +12,7 @@
 #include "PacketSendHelpers.h"
 
 #include "SharedCalculations.h"
+#include "BalanceConstants.h"
 #include "Log.h"
 #include "ClientLogChannels.h"
 #include "ItemSpriteMetadata.h"
@@ -5805,14 +5806,10 @@ void CGame::process_motion_commands(uint16_t action_type)
 				m_player->m_Controller.set_command_time(GameClock::get_time_ms());
 				// Compute expected swing duration (must match server's check_client_attack_frequency formula)
 				{
-					int base_swing = hb::shared::calc::swing_time(m_formula_engine,
-						hb::shared::calc::attack_delay_value{(double)m_player->m_playerStatus.attack_delay});
-					int frames = hb::shared::calc::swing_frames(m_formula_engine);
-					int bft = hb::shared::calc::base_frame_time(m_formula_engine);
-					int rft = hb::shared::calc::run_frame_time(m_formula_engine);
+					int base_swing = hb::shared::calc::swing_time(m_player->m_playerStatus.attack_delay);
 					int effective_swing = base_swing;
-					if (m_player->m_playerStatus.frozen) effective_swing += frames * (bft >> 2);
-					if (m_player->m_playerStatus.haste)  effective_swing -= frames * static_cast<int>(rft / 2.3);
+					if (m_player->m_playerStatus.frozen) effective_swing += hb::shared::balance::swing_frames * (hb::shared::balance::base_frame_time >> 2);
+					if (m_player->m_playerStatus.haste)  effective_swing -= hb::shared::balance::swing_frames * static_cast<int>(hb::shared::balance::run_frame_time / 2.3);
 					m_player->m_Controller.set_attack_end_time(GameClock::get_time_ms() + effective_swing);
 				}
 			}
@@ -5868,14 +5865,10 @@ void CGame::process_motion_commands(uint16_t action_type)
 					m_player->m_Controller.set_command_time(GameClock::get_time_ms());
 					// Compute expected swing duration (must match server's check_client_attack_frequency formula)
 					{
-						int base_swing = hb::shared::calc::swing_time(m_formula_engine,
-							hb::shared::calc::attack_delay_value{(double)m_player->m_playerStatus.attack_delay});
-						int frames = hb::shared::calc::swing_frames(m_formula_engine);
-						int bft = hb::shared::calc::base_frame_time(m_formula_engine);
-						int rft = hb::shared::calc::run_frame_time(m_formula_engine);
+						int base_swing = hb::shared::calc::swing_time(m_player->m_playerStatus.attack_delay);
 						int effective_swing = base_swing;
-						if (m_player->m_playerStatus.frozen) effective_swing += frames * (bft >> 2);
-						if (m_player->m_playerStatus.haste)  effective_swing -= frames * static_cast<int>(rft / 2.3);
+						if (m_player->m_playerStatus.frozen) effective_swing += hb::shared::balance::swing_frames * (hb::shared::balance::base_frame_time >> 2);
+						if (m_player->m_playerStatus.haste)  effective_swing -= hb::shared::balance::swing_frames * static_cast<int>(hb::shared::balance::run_frame_time / 2.3);
 						m_player->m_Controller.set_attack_end_time(GameClock::get_time_ms() + effective_swing);
 					}
 					m_player->m_Controller.set_prev_move(m_player->m_player_x, m_player->m_player_y);

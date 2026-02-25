@@ -12,6 +12,7 @@
 #include "GameFonts.h"
 #include "TextLibExt.h"
 #include "AudioManager.h"
+#include "BalanceConstants.h"
 
 using namespace hb::shared::net;
 using namespace hb::shared::item;
@@ -173,7 +174,8 @@ void DialogBox_Shop::draw_item_details(short sX, short sY, short mouse_x, short 
     auto shopPrice = std::format(DRAW_DIALOGBOX_SHOP7, cost);
     hb::shared::text::draw_text(GameFont::Default, sX + 140, sY + 98, shopPrice.c_str(), hb::shared::text::TextStyle::from_color(GameColors::UILabel));
 
-    int weight = shop_manager::get().get_item_list()[item_index]->m_weight / 100;
+    int wups = hb::shared::balance::weight_units_per_stone;
+    int weight = shop_manager::get().get_item_list()[item_index]->m_weight / wups;
     auto shopWeight = std::format(DRAW_DIALOGBOX_SHOP8, weight);
     hb::shared::text::draw_text(GameFont::Default, sX + 140, sY + 113, shopWeight.c_str(), hb::shared::text::TextStyle::from_color(GameColors::UILabel));
 
@@ -226,13 +228,14 @@ void DialogBox_Shop::draw_weapon_stats(short sX, short sY, int item_index, bool&
     auto damage_str = std::format(": {}-{}", range.min, range.max);
     hb::shared::text::draw_text(GameFont::Default, sX + 140, sY + 145, damage_str.c_str(), hb::shared::text::TextStyle::from_color(GameColors::UILabel));
 
-    temp = shop_manager::get().get_item_list()[item_index]->m_weight / 100;
-    if (shop_manager::get().get_item_list()[item_index]->m_speed == 0) std::snprintf(temp_buf, sizeof(temp_buf), ": 0(10~10)");
-    else std::snprintf(temp_buf, sizeof(temp_buf), ": %d(%d ~ %d)", shop_manager::get().get_item_list()[item_index]->m_speed, temp, shop_manager::get().get_item_list()[item_index]->m_speed * 13);
+    int str_divisor = hb::shared::balance::swing_str_divisor;
+    int wups = hb::shared::balance::weight_units_per_stone;
+    temp = shop_manager::get().get_item_list()[item_index]->m_weight / wups;
+    std::snprintf(temp_buf, sizeof(temp_buf), ": %d(%d ~ %d)", shop_manager::get().get_item_list()[item_index]->m_speed, temp, shop_manager::get().get_item_list()[item_index]->m_speed * str_divisor);
     hb::shared::text::draw_text(GameFont::Default, sX + 140, sY + 160, temp_buf, hb::shared::text::TextStyle::from_color(GameColors::UILabel));
 
-    if ((shop_manager::get().get_item_list()[item_index]->m_weight / 100) > player().m_str) {
-        auto strWarn = std::format(DRAW_DIALOGBOX_SHOP11, (shop_manager::get().get_item_list()[item_index]->m_weight / 100));
+    if ((shop_manager::get().get_item_list()[item_index]->m_weight / wups) > player().m_str) {
+        auto strWarn = std::format(DRAW_DIALOGBOX_SHOP11, (shop_manager::get().get_item_list()[item_index]->m_weight / wups));
         hb::shared::text::draw_text_aligned(GameFont::Default, sX + 25, sY + 258, (sX + 240) - (sX + 25), 15, strWarn.c_str(), hb::shared::text::TextStyle::from_color(GameColors::UIWarningRed), hb::shared::text::Align::TopCenter);
         hb::shared::text::draw_text_aligned(GameFont::Default, sX + 26, sY + 258, (sX + 241) - (sX + 26), 15, strWarn.c_str(), hb::shared::text::TextStyle::from_color(GameColors::UIWarningRed), hb::shared::text::Align::TopCenter);
         flag_red_shown = true;
@@ -248,8 +251,9 @@ void DialogBox_Shop::draw_shield_stats(short sX, short sY, int item_index, bool&
     std::snprintf(temp, sizeof(temp), ": +%d%%", shop_manager::get().get_item_list()[item_index]->m_item_effect_value1);
     hb::shared::text::draw_text(GameFont::Default, sX + 140, sY + 145, temp, hb::shared::text::TextStyle::from_color(GameColors::UILabel));
 
-    if ((shop_manager::get().get_item_list()[item_index]->m_weight / 100) > player().m_str) {
-        auto strWarn = std::format(DRAW_DIALOGBOX_SHOP11, (shop_manager::get().get_item_list()[item_index]->m_weight / 100));
+    int wups = hb::shared::balance::weight_units_per_stone;
+    if ((shop_manager::get().get_item_list()[item_index]->m_weight / wups) > player().m_str) {
+        auto strWarn = std::format(DRAW_DIALOGBOX_SHOP11, (shop_manager::get().get_item_list()[item_index]->m_weight / wups));
         hb::shared::text::draw_text_aligned(GameFont::Default, sX + 25, sY + 258, (sX + 240) - (sX + 25), 15, strWarn.c_str(), hb::shared::text::TextStyle::from_color(GameColors::UIWarningRed), hb::shared::text::Align::TopCenter);
         hb::shared::text::draw_text_aligned(GameFont::Default, sX + 26, sY + 258, (sX + 241) - (sX + 26), 15, strWarn.c_str(), hb::shared::text::TextStyle::from_color(GameColors::UIWarningRed), hb::shared::text::Align::TopCenter);
         flag_red_shown = true;
@@ -344,8 +348,9 @@ void DialogBox_Shop::draw_armor_stats(short sX, short sY, int item_index, bool& 
         break;
     }
 
-    if ((shop_manager::get().get_item_list()[item_index]->m_weight / 100) > player().m_str) {
-        auto strWarn2 = std::format(DRAW_DIALOGBOX_SHOP11, (shop_manager::get().get_item_list()[item_index]->m_weight / 100));
+    int wups = hb::shared::balance::weight_units_per_stone;
+    if ((shop_manager::get().get_item_list()[item_index]->m_weight / wups) > player().m_str) {
+        auto strWarn2 = std::format(DRAW_DIALOGBOX_SHOP11, (shop_manager::get().get_item_list()[item_index]->m_weight / wups));
         hb::shared::text::draw_text_aligned(GameFont::Default, sX + 25, sY + 288, (sX + 240) - (sX + 25), 15, strWarn2.c_str(), hb::shared::text::TextStyle::from_color(GameColors::UIWarningRed), hb::shared::text::Align::TopCenter);
         hb::shared::text::draw_text_aligned(GameFont::Default, sX + 26, sY + 288, (sX + 241) - (sX + 26), 15, strWarn2.c_str(), hb::shared::text::TextStyle::from_color(GameColors::UIWarningRed), hb::shared::text::Align::TopCenter);
         flag_red_shown = true;

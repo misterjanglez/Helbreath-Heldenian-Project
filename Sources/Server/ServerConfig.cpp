@@ -108,6 +108,7 @@ bool load_server_config(const std::string& path, server_config& cfg)
 		read_value(ch, "creation_stat_bonus", cfg.character.creation_stat_bonus);
 		read_value(ch, "levelup_stat_gain", cfg.character.levelup_stat_gain);
 		read_value(ch, "max_level", cfg.character.max_level);
+		read_value(ch, "max_stat_value", cfg.character.max_stat_value);
 		read_value(ch, "starting_luck", cfg.character.starting_luck);
 	}
 

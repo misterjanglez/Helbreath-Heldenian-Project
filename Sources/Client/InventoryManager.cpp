@@ -11,6 +11,7 @@
 #include <format>
 #include "Screen_OnGame.h"
 #include "AudioManager.h"
+#include "BalanceConstants.h"
 
 using namespace hb::shared::net;
 using hb::shared::item::ItemType;
@@ -69,7 +70,7 @@ int inventory_manager::calc_total_weight()
 				int lp = m_game->m_player->m_item_list[i]->get_light_percent();
 				int item_w = (lp > 0) ? cfg->m_weight * (100 - lp) / 100 : cfg->m_weight;
 				temp = static_cast<int64_t>(item_w) * static_cast<int64_t>(m_game->m_player->m_item_list[i]->m_count);
-				if (m_game->m_player->m_item_list[i]->m_id_num == hb::shared::item::ItemId::Gold) temp = temp / 20;
+				if (m_game->m_player->m_item_list[i]->m_id_num == hb::shared::item::ItemId::Gold) temp = temp / hb::shared::balance::gold_weight_divisor;
 				weight += temp;
 			}
 			else if (cfg)
@@ -216,7 +217,8 @@ void inventory_manager::equip_item(int item_id)
 	}
 	int light_pct = m_game->m_player->m_item_list[item_id]->get_light_percent();
 	int equip_weight = (light_pct > 0) ? cfg->m_weight * (100 - light_pct) / 100 : cfg->m_weight;
-	if (equip_weight / 100 > m_game->m_player->m_str + m_game->m_player->m_angelic_str)
+	int wups = hb::shared::balance::weight_units_per_stone;
+	if (equip_weight / wups > m_game->m_player->m_str + m_game->m_player->m_angelic_str)
 	{
 		m_game->add_event_list(BITEMDROP_CHARACTER2, 10);
 		return;

@@ -44,6 +44,7 @@ struct server_config
 		int creation_stat_bonus = 4;
 		int levelup_stat_gain = 3;
 		int max_level = 180;
+		int max_stat_value = 570;
 		int starting_luck = 10;
 	} character;
 

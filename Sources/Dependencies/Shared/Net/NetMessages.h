@@ -351,6 +351,7 @@ namespace Notify
 		SpellInterrupted                        = 0x0BF7,
 		ItemObtainedBulk                        = 0x0BF8,
 		TeleportApproved                        = 0x0BF9,
+		LevelUpPoints                           = 0x0BFA,
 		RepairAllPrices                         = 0x0F11,
 		MobKills                                = 0x0A68,
 #ifdef TESTER_ONLY

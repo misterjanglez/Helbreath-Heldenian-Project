@@ -12,6 +12,7 @@
 #include "CommonTypes.h"
 #include "GameFonts.h"
 #include "TextLibExt.h"
+#include "SpriteLoader.h"
 using namespace hb::client::sprite_id;
 
 Screen_Splash::Screen_Splash(CGame* game)
@@ -23,7 +24,9 @@ void Screen_Splash::on_initialize()
 {
     GameModeManager::set_current_mode(GameMode::Splash);
 
-    m_game->m_sprite[SplashScreen] = hb::shared::sprite::Sprites::create("new-dialog", 3, false);
+    hb::shared::sprite::SpriteLoader::open_pak("interface/new-dialog", [&](hb::shared::sprite::SpriteLoader& loader) {
+        m_game->m_sprite[SplashScreen] = loader.get_sprite(3, false);
+        });
 
     m_credits = {{
         { "Centuu - HelbreathServer starting base", "https://github.com/centuu/HelbreathServer" },

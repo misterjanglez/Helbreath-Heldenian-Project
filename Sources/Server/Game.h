@@ -385,14 +385,11 @@ public:
 	void level_up_settings_handler(int client_h, char * data, size_t msg_size);
 	bool check_level_up(int client_h);
 	uint32_t get_level_exp(int level);
-	void time_mana_points_up(int client_h);
-	void time_stamina_points_up(int client_h);
 	void quit();
 	void release_follow_mode(short owner_h, char owner_type);
 	void request_teleport_handler(int client_h, const char * data, const char * map_name = 0, int dX = -1, int dY = -1);
 	void request_teleport_auth_handler(int client_h, const char * data);
 	void toggle_combat_mode_handler(int client_h);
-	void time_hit_points_up(int client_h);
 	void on_start_game_signal();
 	uint32_t dice(uint32_t iThrow, uint32_t range);
 	bool init_npc_attr(class CNpc * npc, int npc_config_id, short sClass, char sa);
@@ -510,6 +507,7 @@ public:
 	class SkillManager * m_skill_manager; // Skill mastery/profession
 	class WarManager * m_war_manager; // Crusade/Heldenian/Apocalypse/FightZone
 	class StatusEffectManager * m_status_effect_manager; // Status effect flags
+	class RegenManager * m_regen_manager; // Player HP/MP/SP regen, hunger, poison
 
 	hb::shared::net::ConcurrentMsgQueue m_msgQueue;
 	int             m_total_maps;

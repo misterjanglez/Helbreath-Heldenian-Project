@@ -97,6 +97,11 @@ namespace net {
 		uint16_t seconds_left;
 	};
 
+	struct HB_PACKED PacketNotifyLevelUpPoints {
+		PacketHeader header;
+		uint16_t lu_point;
+	};
+
 	struct HB_PACKED PacketNotifyReqGuildNameAnswer {
 		PacketHeader header;
 		int16_t guild_rank;

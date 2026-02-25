@@ -28,6 +28,7 @@
 		"creation_stat_bonus": 4,
 		"levelup_stat_gain": 3,
 		"max_level": 180,
+		"max_stat_value": 570,
 		"starting_luck": 10
 	},
 	"gameplay": {

@@ -18,6 +18,7 @@
 #include "ItemNameFormatter.h"
 #include "ItemTooltip.h"
 #include "ConfigManager.h"
+#include "BalanceConstants.h"
 #include "IInput.h"
 #include "GlobalDef.h"
 #include "lan_eng.h"
@@ -918,12 +919,13 @@ void Screen_OnGame::render_item_tooltip()
     // Required Str (use cfg base weight, apply light attribute from item instance)
     int light_pct = item->get_light_percent();
     int eff_weight = (light_pct > 0) ? cfg->m_weight * (100 - light_pct) / 100 : cfg->m_weight;
-    if (is_equippable && eff_weight >= 1100)
+    int wups = hb::shared::balance::weight_units_per_stone;
+    if (is_equippable && eff_weight >= hb::shared::balance::equip_str_threshold)
     {
-        int req_str = static_cast<int>(std::ceil(eff_weight / 100.0f));
+        int req_str = static_cast<int>(std::ceil(eff_weight / static_cast<float>(wups)));
         if (cfg->get_equip_pos() == EquipPos::RightHand || cfg->get_equip_pos() == EquipPos::TwoHand)
         {
-            int full_speed_str = cfg->m_speed * 13;
+            int full_speed_str = cfg->m_speed * hb::shared::balance::swing_str_divisor;
             G_cTxt = std::format("Required Str: {} ({} full speed)", req_str, full_speed_str);
         }
         else

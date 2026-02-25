@@ -12,6 +12,7 @@
 #include "DynamicObjectManager.h"
 #include "Packet/SharedPackets.h"
 #include "SharedCalculations.h"
+#include "BalanceConstants.h"
 #include "Log.h"
 #include "ServerLogChannels.h"
 
@@ -2119,14 +2120,10 @@ bool CombatManager::check_client_attack_frequency(int client_h, uint32_t client_
 		constexpr int TOLERANCE_MS = 50;
 
 		const auto& status = m_game->m_client_list[client_h]->m_status;
-		int base_swing = hb::shared::calc::swing_time(m_game->m_formula_engine,
-			hb::shared::calc::attack_delay_value{(double)status.attack_delay});
-		int frames = hb::shared::calc::swing_frames(m_game->m_formula_engine);
-		int bft = hb::shared::calc::base_frame_time(m_game->m_formula_engine);
-		int rft = hb::shared::calc::run_frame_time(m_game->m_formula_engine);
+		int base_swing = hb::shared::calc::swing_time(status.attack_delay);
 		int effective_swing = base_swing;
-		if (status.frozen) effective_swing += frames * (bft >> 2);
-		if (status.haste)  effective_swing -= frames * static_cast<int>(rft / 2.3);
+		if (status.frozen) effective_swing += hb::shared::balance::swing_frames * (hb::shared::balance::base_frame_time >> 2);
+		if (status.haste)  effective_swing -= hb::shared::balance::swing_frames * static_cast<int>(hb::shared::balance::run_frame_time / 2.3);
 
 		int expectedSwingTime = effective_swing;
 		int threshold = expectedSwingTime - TOLERANCE_MS;

@@ -18,6 +18,7 @@
 #include "Packet/SharedPackets.h"
 #include "SHA256.h"
 #include "SharedCalculations.h"
+#include "BalanceConstants.h"
 #include "Item/ItemAttributes.h"
 #include "ObjectIDRange.h"
 #include "DirectionHelpers.h"
@@ -34,6 +35,7 @@
 #include "SkillManager.h"
 #include "WarManager.h"
 #include "StatusEffectManager.h"
+#include "RegenManager.h"
 #include "Log.h"
 #include "ServerLogChannels.h"
 
@@ -299,12 +301,14 @@ CGame::CGame()
 	m_skill_manager = new SkillManager();
 	m_war_manager = new WarManager();
 	m_status_effect_manager = new StatusEffectManager();
+	m_regen_manager = new RegenManager();
 	m_combat_manager->set_game(this);
 	m_item_manager->set_game(this);
 	m_magic_manager->set_game(this);
 	m_skill_manager->set_game(this);
 	m_war_manager->set_game(this);
 	m_status_effect_manager->set_game(this);
+	m_regen_manager->set_game(this);
 
 	for(int i = 0; i < hb::shared::limits::MaxMagicType; i++)
 		m_magic_config_list[i] = 0;
@@ -1863,7 +1867,7 @@ void CGame::request_init_data_handler(int client_h, char* data, char key, size_t
 	stats = (m_client_list[client_h]->m_str + m_client_list[client_h]->m_dex + m_client_list[client_h]->m_vit +
 		m_client_list[client_h]->m_int + m_client_list[client_h]->m_mag + m_client_list[client_h]->m_charisma);
 
-	m_client_list[client_h]->m_levelup_pool = (m_client_list[client_h]->m_level - 1) * 3 - (stats - 70);
+	m_client_list[client_h]->m_levelup_pool = (m_client_list[client_h]->m_level - 1) * m_levelup_stat_gain - (stats - hb::shared::balance::base_stat_total);
 	char_pkt->lu_point = static_cast<std::uint16_t>(m_client_list[client_h]->m_levelup_pool);
 	char_pkt->lu_unused[0] = static_cast<std::uint8_t>(m_client_list[client_h]->m_var);
 	char_pkt->lu_unused[1] = 0;
@@ -3739,7 +3743,7 @@ int CGame::compose_move_map_data(short sX, short sY, int client_h, direction dir
 
 void CGame::check_client_response_time()
 {
-	int plus_time, max_super_attack, value;
+	int max_super_attack, value;
 	uint32_t time;
 	short item_index;
 	static uint32_t s_dwLastIdleLog = 0;
@@ -3795,43 +3799,11 @@ void CGame::check_client_response_time()
 				m_client_list[i]->m_time_left_rating--;
 				if (m_client_list[i]->m_time_left_rating < 0) m_client_list[i]->m_time_left_rating = 0;
 
-				if (((time - m_client_list[i]->m_hunger_time) > (uint32_t)m_hunger_consume_interval) && (m_client_list[i]->m_is_killed == false)) {
-					m_client_list[i]->m_hunger_status--;
-					if (m_client_list[i]->m_hunger_status <= 0) m_client_list[i]->m_hunger_status = 0;
-					m_client_list[i]->m_hunger_time = time;
-
-					send_notify_msg(0, i, Notify::Hunger, m_client_list[i]->m_hunger_status, 0, 0, 0);
-				}
+				m_regen_manager->process_client_tick(i, time);
 
 				if (check_character_data(i) == false) {
 					delete_client(i, true, true);
 					break;
-				}
-
-				if ((m_client_list[i]->m_hunger_status <= 30) && (m_client_list[i]->m_hunger_status >= 0))
-					plus_time = (30 - m_client_list[i]->m_hunger_status) * 1000;
-				else plus_time = 0;
-
-				plus_time = abs(plus_time);
-
-				if ((time - m_client_list[i]->m_hp_time) > (uint32_t)(m_health_regen_interval + plus_time)) {
-					time_hit_points_up(i);
-					m_client_list[i]->m_hp_time = time;
-				}
-
-				if ((time - m_client_list[i]->m_mp_time) > (uint32_t)(m_mana_regen_interval + plus_time)) {
-					time_mana_points_up(i);
-					m_client_list[i]->m_mp_time = time;
-				}
-
-				if ((time - m_client_list[i]->m_sp_time) > (uint32_t)(m_stamina_regen_interval + plus_time)) {
-					time_stamina_points_up(i);
-					m_client_list[i]->m_sp_time = time;
-				}
-
-				if ((m_client_list[i]->m_is_poisoned) && ((time - m_client_list[i]->m_poison_time) > (uint32_t)m_poison_damage_interval)) {
-					m_combat_manager->poison_effect(i, 0);
-					m_client_list[i]->m_poison_time = time;
 				}
 
 				if ((m_map_list[m_client_list[i]->m_map_index]->m_is_fight_zone == false) &&
@@ -5153,14 +5125,10 @@ int CGame::client_motion_attack_handler(int client_h, short sX, short sY, short 
 			constexpr int BATCH_TOLERANCE_MS = 100;
 
 			const auto& status = m_client_list[client_h]->m_status;
-			int base_swing = hb::shared::calc::swing_time(m_formula_engine,
-				hb::shared::calc::attack_delay_value{(double)status.attack_delay});
-			int frames = hb::shared::calc::swing_frames(m_formula_engine);
-			int bft = hb::shared::calc::base_frame_time(m_formula_engine);
-			int rft = hb::shared::calc::run_frame_time(m_formula_engine);
+			int base_swing = hb::shared::calc::swing_time(status.attack_delay);
 			int effective_swing = base_swing;
-			if (status.frozen) effective_swing += frames * (bft >> 2);
-			if (status.haste)  effective_swing -= frames * static_cast<int>(rft / 2.3);
+			if (status.frozen) effective_swing += hb::shared::balance::swing_frames * (hb::shared::balance::base_frame_time >> 2);
+			if (status.haste)  effective_swing -= hb::shared::balance::swing_frames * static_cast<int>(hb::shared::balance::run_frame_time / 2.3);
 
 			int singleSwingTime = effective_swing;
 			int batchThreshold = 7 * singleSwingTime - BATCH_TOLERANCE_MS;
@@ -6014,8 +5982,8 @@ void CGame::client_common_handler(int client_h, char* data)
 			m_client_list[client_h]->m_dex = 10;
 			m_client_list[client_h]->m_mag = 10;
 			m_client_list[client_h]->m_charisma = 10;
-			// Recalculate levelup pool: total available = (level-1)*3, base stats = 70, now 60
-			m_client_list[client_h]->m_levelup_pool = (m_client_list[client_h]->m_level - 1) * 3 + 10;
+			// Recalculate levelup pool: total available = (level-1)*gain, base stats = 70, now 60
+			m_client_list[client_h]->m_levelup_pool = (m_client_list[client_h]->m_level - 1) * m_levelup_stat_gain + 10;
 			// Clamp HP/MP/SP to new maximums — check_character_data() kicks if HP > max
 			m_client_list[client_h]->m_hp = get_max_hp(client_h);
 			m_client_list[client_h]->m_mp = get_max_mp(client_h);
@@ -6023,6 +5991,7 @@ void CGame::client_common_handler(int client_h, char* data)
 			// LevelUp refreshes all stats on client, Exp refreshes XP bar
 			send_notify_msg(0, client_h, Notify::LevelUp, 0, 0, 0, 0);
 			send_notify_msg(0, client_h, Notify::Exp, 0, 0, 0, 0);
+			send_notify_msg(0, client_h, Notify::LevelUpPoints, 0, 0, 0, 0);
 			hb::logger::log<log_channel::commands>("[TesterMenu] '{}' reset stats (lu_pool={})",
 				m_client_list[client_h]->m_char_name, m_client_list[client_h]->m_levelup_pool);
 			break;
@@ -6135,7 +6104,7 @@ void CGame::client_common_handler(int client_h, char* data)
 			int total_stats = m_client_list[client_h]->m_str + m_client_list[client_h]->m_int
 				+ m_client_list[client_h]->m_vit + m_client_list[client_h]->m_dex
 				+ m_client_list[client_h]->m_mag + m_client_list[client_h]->m_charisma;
-			m_client_list[client_h]->m_levelup_pool = (target_level - 1) * 3 - (total_stats - 70);
+			m_client_list[client_h]->m_levelup_pool = (target_level - 1) * m_levelup_stat_gain - (total_stats - hb::shared::balance::base_stat_total);
 			if (m_client_list[client_h]->m_levelup_pool < 0)
 				m_client_list[client_h]->m_levelup_pool = 0;
 
@@ -6148,6 +6117,7 @@ void CGame::client_common_handler(int client_h, char* data)
 			send_notify_msg(0, client_h, Notify::SuperAttackLeft, 0, 0, 0, 0);
 			send_notify_msg(0, client_h, Notify::LevelUp, 0, 0, 0, 0);
 			send_notify_msg(0, client_h, Notify::Exp, 0, 0, 0, 0);
+			send_notify_msg(0, client_h, Notify::LevelUpPoints, 0, 0, 0, 0);
 			hb::logger::log<log_channel::commands>("[TesterMenu] '{}' set level to {} (lu_pool={})",
 				m_client_list[client_h]->m_char_name, target_level, m_client_list[client_h]->m_levelup_pool);
 			break;
@@ -6598,6 +6568,16 @@ void CGame::send_notify_msg(int from_h, int to_h, uint16_t msg_type, uint32_t v1
 		hb::net::PacketNotifyEmpty pkt{};
 		pkt.header.msg_id = MsgId::Notify;
 		pkt.header.msg_type = msg_type;
+		ret = m_client_list[to_h]->m_socket->send_msg(reinterpret_cast<char*>(&pkt), sizeof(pkt));
+	}
+	break;
+
+	case Notify::LevelUpPoints:
+	{
+		hb::net::PacketNotifyLevelUpPoints pkt{};
+		pkt.header.msg_id = MsgId::Notify;
+		pkt.header.msg_type = msg_type;
+		pkt.lu_point = static_cast<uint16_t>(m_client_list[to_h]->m_levelup_pool);
 		ret = m_client_list[to_h]->m_socket->send_msg(reinterpret_cast<char*>(&pkt), sizeof(pkt));
 	}
 	break;
@@ -8323,77 +8303,6 @@ uint32_t CGame::dice(uint32_t iThrow, uint32_t range)
 	return ret;
 }
 
-void CGame::time_mana_points_up(int client_h)
-{
-	int max_mp, total;
-	double v1, v2, v3;
-
-	if (m_client_list[client_h] == 0) return;
-	if (m_client_list[client_h]->m_is_killed) return;
-	if (m_client_list[client_h]->m_is_init_complete == false) return;
-	if (m_client_list[client_h]->m_hunger_status <= 0) return;
-	if (m_client_list[client_h]->m_skill_using_status[19]) return;
-
-	max_mp = get_max_mp(client_h); // v1.4
-	if (m_client_list[client_h]->m_mp < max_mp) {
-		total = dice(1, (m_client_list[client_h]->m_mag + m_client_list[client_h]->m_angelic_mag));
-		if (m_client_list[client_h]->m_add_mp != 0) {
-			v2 = (double)total;
-			v3 = (double)m_client_list[client_h]->m_add_mp;
-			v1 = (v3 / 100.0f) * v2;
-			total += (int)v1;
-		}
-
-		m_client_list[client_h]->m_mp += total;
-
-		if (m_client_list[client_h]->m_mp > max_mp)
-			m_client_list[client_h]->m_mp = max_mp;
-
-		send_notify_msg(0, client_h, Notify::Mp, 0, 0, 0, 0);
-	}
-}
-
-// 05/29/2004 - Hypnotoad - fixed infinite sp bug
-void CGame::time_stamina_points_up(int client_h)
-{
-	int max_sp, total = 0;
-	double v1, v2, v3;
-
-	if (m_client_list[client_h] == 0) return;
-	if (m_client_list[client_h]->m_is_killed) return;
-	if (m_client_list[client_h]->m_is_init_complete == false) return;
-	if (m_client_list[client_h]->m_hunger_status <= 0) return;
-	if (m_client_list[client_h]->m_skill_using_status[19]) return;
-
-	max_sp = get_max_sp(client_h);
-	if (m_client_list[client_h]->m_sp < max_sp) {
-
-		total = dice(1, (m_client_list[client_h]->m_vit / 3)); // Staminar Point 10 1D(Vit/3) .
-		if (m_client_list[client_h]->m_add_sp != 0) {
-			v2 = (double)total;
-			v3 = (double)m_client_list[client_h]->m_add_sp;
-			v1 = (v3 / 100.0f) * v2;
-			total += (int)v1;
-		}
-
-		if (m_client_list[client_h]->m_level <= 20) {
-			total += 15;
-		}
-		else if (m_client_list[client_h]->m_level <= 40) {
-			total += 10;
-		}
-		else if (m_client_list[client_h]->m_level <= 60) {
-			total += 5;
-		}
-
-		m_client_list[client_h]->m_sp += total;
-		if (m_client_list[client_h]->m_sp > max_sp)
-			m_client_list[client_h]->m_sp = max_sp;
-
-		send_notify_msg(0, client_h, Notify::Sp, 0, 0, 0, 0);
-	}
-}
-
 void CGame::toggle_combat_mode_handler(int client_h)
 {
 	if (m_client_list[client_h] == 0) return;
@@ -9050,7 +8959,7 @@ bool CGame::check_level_up(int client_h)
 		if (m_client_list[client_h]->m_level < m_max_level)
 		{
 			m_client_list[client_h]->m_level++;
-			m_client_list[client_h]->m_levelup_pool += hb::shared::calc::levelup_stat_gain(m_formula_engine);
+			m_client_list[client_h]->m_levelup_pool += m_levelup_stat_gain;
 //			if ( (m_client_list[client_h]->m_cLU_Str + m_client_list[client_h]->m_cLU_Vit + m_client_list[client_h]->m_cLU_Dex + 
 //	  		      m_client_list[client_h]->m_cLU_Int + m_client_list[client_h]->m_cLU_Mag + m_client_list[client_h]->m_cLU_Char) <= TotalLevelUpPoint) {
 
@@ -9068,13 +8977,11 @@ bool CGame::check_level_up(int client_h)
 
 			send_notify_msg(0, client_h, Notify::SuperAttackLeft, 0, 0, 0, 0);
 			send_notify_msg(0, client_h, Notify::LevelUp, 0, 0, 0, 0);
+			send_notify_msg(0, client_h, Notify::LevelUpPoints, 0, 0, 0, 0);
 
 			m_client_list[client_h]->m_next_level_exp = m_level_exp_table[m_client_list[client_h]->m_level + 1]; //get_level_exp(m_client_list[client_h]->m_level + 1);
 
 			m_item_manager->calc_total_item_effect(client_h, -1, false);
-
-			//std::snprintf(G_cTxt, sizeof(G_cTxt), "(!) Level up: Player (%s) Level (%d) Experience(%d) Next Level Experience(%d)", m_client_list[client_h]->m_char_name,m_client_list[client_h]->m_level, m_client_list[client_h]->m_exp, m_client_list[client_h]->m_next_level_exp);
-			//PutLogFileList(G_cTxt);
 		}
 		else {
 			m_client_list[client_h]->m_gizon_item_upgrade_left++;
@@ -9123,7 +9030,7 @@ void CGame::state_change_handler(int client_h, char* data, size_t msg_size)
 		return;
 	}
 
-	int majestic_cost = total_reduction / hb::shared::calc::levelup_stat_gain(m_formula_engine);
+	int majestic_cost = total_reduction / m_levelup_stat_gain;
 	if (majestic_cost > m_client_list[client_h]->m_gizon_item_upgrade_left)
 	{
 		send_notify_msg(0, client_h, Notify::StateChangeFailed, 0, 0, 0, 0);
@@ -9138,8 +9045,8 @@ void CGame::state_change_handler(int client_h, char* data, size_t msg_size)
 	int old_mag = m_client_list[client_h]->m_mag;
 	int old_char = m_client_list[client_h]->m_charisma;
 
-	int expected_stats = (m_max_level - 1) * hb::shared::calc::levelup_stat_gain(m_formula_engine)
-		+ hb::shared::calc::base_stat_total(m_formula_engine);
+	int expected_stats = (m_max_level - 1) * m_levelup_stat_gain
+		+ hb::shared::balance::base_stat_total;
 	if (old_str + old_vit + old_dex + old_int + old_mag + old_char != expected_stats)
 		return;
 
@@ -9180,6 +9087,7 @@ void CGame::state_change_handler(int client_h, char* data, size_t msg_size)
 	m_client_list[client_h]->m_mp = get_max_mp(client_h);
 	m_client_list[client_h]->m_sp = get_max_sp(client_h);
 
+	send_notify_msg(0, client_h, Notify::LevelUpPoints, 0, 0, 0, 0);
 	send_notify_msg(0, client_h, Notify::StateChangeSuccess, 0, 0, 0, 0);
 }
 
@@ -9334,18 +9242,19 @@ void CGame::level_up_settings_handler(int client_h, char* data, size_t msg_size)
 		m_client_list[client_h]->m_int + m_client_list[client_h]->m_mag + m_client_list[client_h]->m_charisma;
 
 	// (  +   >   ) ..  ..      ..
-	if (total_setting + m_client_list[client_h]->m_levelup_pool > ((m_client_list[client_h]->m_level - 1) * 3 + 70))
+	if (total_setting + m_client_list[client_h]->m_levelup_pool > ((m_client_list[client_h]->m_level - 1) * m_levelup_stat_gain + hb::shared::balance::base_stat_total))
 	{
-		m_client_list[client_h]->m_levelup_pool = (m_client_list[client_h]->m_level - 1) * 3 + 70 - total_setting;
+		m_client_list[client_h]->m_levelup_pool = (m_client_list[client_h]->m_level - 1) * m_levelup_stat_gain + hb::shared::balance::base_stat_total - total_setting;
 
 		if (m_client_list[client_h]->m_levelup_pool < 0)
 			m_client_list[client_h]->m_levelup_pool = 0;
+		send_notify_msg(0, client_h, Notify::LevelUpPoints, 0, 0, 0, 0);
 		send_notify_msg(0, client_h, Notify::SettingFailed, 0, 0, 0, 0);
 		return;
 	}
 
 	// (  +    D >   )  ..
-	if (total_setting + (str + vit + dex + cInt + mag + cChar) > ((m_client_list[client_h]->m_level - 1) * 3 + 70))
+	if (total_setting + (str + vit + dex + cInt + mag + cChar) > ((m_client_list[client_h]->m_level - 1) * m_levelup_stat_gain + hb::shared::balance::base_stat_total))
 	{
 		send_notify_msg(0, client_h, Notify::SettingFailed, 0, 0, 0, 0);
 		return;
@@ -9370,12 +9279,12 @@ void CGame::level_up_settings_handler(int client_h, char* data, size_t msg_size)
 	if (weapon_index != -1 && m_client_list[client_h]->m_item_list[weapon_index] != nullptr)
 	{
 		m_client_list[client_h]->m_status.attack_delay = static_cast<uint8_t>(hb::shared::calc::attack_delay(
-			m_formula_engine,
-			hb::shared::calc::weapon_speed{(double)m_client_list[client_h]->m_item_list[weapon_index]->m_speed},
-			hb::shared::calc::str{(double)m_client_list[client_h]->m_str},
-			hb::shared::calc::angelic_str{(double)m_client_list[client_h]->m_angelic_str}));
+			m_client_list[client_h]->m_item_list[weapon_index]->m_speed,
+			m_client_list[client_h]->m_str,
+			m_client_list[client_h]->m_angelic_str));
 	}
 
+	send_notify_msg(0, client_h, Notify::LevelUpPoints, 0, 0, 0, 0);
 	send_notify_msg(0, client_h, Notify::SettingSuccess, 0, 0, 0, 0);
 
 }
@@ -9452,7 +9361,8 @@ int CGame::calc_max_load(int client_h)
 	return hb::shared::calc::max_load(m_formula_engine,
 		hb::shared::calc::str{(double)m_client_list[client_h]->m_str},
 		hb::shared::calc::angelic_str{(double)m_client_list[client_h]->m_angelic_str},
-		hb::shared::calc::level{(double)m_client_list[client_h]->m_level});
+		hb::shared::calc::level{(double)m_client_list[client_h]->m_level})
+		* hb::shared::balance::weight_units_per_stone;
 }
 
 void CGame::request_full_object_data(int client_h, char* data)
@@ -9722,7 +9632,7 @@ void CGame::restore_player_characteristics(int client_h)
 		m_client_list[client_h]->m_vit + m_client_list[client_h]->m_dex +
 		m_client_list[client_h]->m_mag + m_client_list[client_h]->m_charisma;
 
-	original_point = (m_client_list[client_h]->m_level - 1) * 3 + 70;
+	original_point = (m_client_list[client_h]->m_level - 1) * m_levelup_stat_gain + hb::shared::balance::base_stat_total;
 
 	to_be_restored_point = original_point - cur_point;
 
@@ -13412,52 +13322,6 @@ void CGame::party_operation(char* data)
 	}
 }
 
-void CGame::time_hit_points_up(int client_h)
-{
-	int max_hp, temp, total;
-	double v1, v2, v3;
-
-	if (m_client_list[client_h] == 0) return;
-
-	if (m_client_list[client_h]->m_is_init_complete == false) return;
-
-	if (m_client_list[client_h]->m_hunger_status <= 0) return;
-
-	if (m_client_list[client_h]->m_is_killed) return;
-
-	if (m_client_list[client_h]->m_skill_using_status[19]) return;
-
-	max_hp = get_max_hp(client_h);
-
-	if (m_client_list[client_h]->m_hp < max_hp) {
-
-		temp = dice(1, (m_client_list[client_h]->m_vit));
-
-		if (temp < (m_client_list[client_h]->m_vit / 2)) temp = (m_client_list[client_h]->m_vit / 2);
-
-		if (m_client_list[client_h]->m_side_effect_max_hp_down != 0)
-
-			temp -= (temp / m_client_list[client_h]->m_side_effect_max_hp_down);
-
-		total = temp + m_client_list[client_h]->m_hp_stock;
-
-		if (m_client_list[client_h]->m_add_hp != 0) {
-			v2 = (double)total;
-			v3 = (double)m_client_list[client_h]->m_add_hp;
-			v1 = (v3 / 100.0f) * v2;
-			total += (int)v1;
-		}
-
-		m_client_list[client_h]->m_hp += total;
-
-		if (m_client_list[client_h]->m_hp > max_hp) m_client_list[client_h]->m_hp = max_hp;
-
-		if (m_client_list[client_h]->m_hp <= 0) m_client_list[client_h]->m_hp = 0;
-		send_notify_msg(0, client_h, Notify::Hp, 0, 0, 0, 0);
-	}
-	m_client_list[client_h]->m_hp_stock = 0;
-}
-
 /*void CGame::CalculateEnduranceDecrement(short target_h, short attacker_h, char target_type, int armor_type)
 {
  short item_index;
@@ -14175,7 +14039,13 @@ void CGame::apply_server_config(const server_config& cfg)
 	m_creation_stat_bonus = cfg.character.creation_stat_bonus;
 	m_levelup_stat_gain = cfg.character.levelup_stat_gain;
 	m_max_level = cfg.character.max_level;
-	m_max_stat_value = m_base_stat_value + m_creation_stat_bonus + (m_levelup_stat_gain * m_max_level) + 16;
+	m_max_stat_value = cfg.character.max_stat_value;
+	{
+		int expected = m_base_stat_value + m_creation_stat_bonus
+			+ (m_levelup_stat_gain * m_max_level) + hb::shared::balance::angelic_bonus;
+		if (m_max_stat_value != expected)
+			hb::logger::warn("max_stat_value ({}) differs from computed value ({})", m_max_stat_value, expected);
+	}
 
 	// Gameplay
 	m_nighttime_duration = cfg.gameplay.nighttime_duration;
