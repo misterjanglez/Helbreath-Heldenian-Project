@@ -432,6 +432,9 @@ std::array<bool, hb::shared::limits::MaxItems> m_is_item_equipped{};
 	short m_max_stats;
 	int m_max_level;
 	int m_max_bank_items;
+	int m_base_stat_value = 10;
+	int m_max_creation_stat_value = 4;
+	int m_creation_stat_points = 10;
 
 	// Formula engine — populated from balance config cache (sent at login + validated at enter-game)
 	hb::shared::formula_engine m_formula_engine;

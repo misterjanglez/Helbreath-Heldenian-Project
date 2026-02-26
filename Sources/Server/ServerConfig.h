@@ -41,7 +41,8 @@ struct server_config
 	struct
 	{
 		int base_stat_value = 10;
-		int creation_stat_bonus = 4;
+		int max_creation_stat_value = 4;
+		int creation_stat_points = 10;
 		int levelup_stat_gain = 3;
 		int max_level = 180;
 		int max_stat_value = 570;

@@ -3518,8 +3518,8 @@ int CMapData::object_frame_counter(const std::string& player_name, short view_po
 									m_game->m_effect_manager->add_effect(EffectType::MAGE_HERO_SET, m_pivot_x + dX, m_pivot_y + dY
 										, m_pivot_x + dX, m_pivot_y + dY, 0, 1);
 								}
-								if (m_data[dX][dY].m_v1 >= 70) // effet gros sorts autour du caster
-									m_game->m_effect_manager->add_effect(EffectType::BUFF_EFFECT_LIGHT, (m_pivot_x + dX) * 32, (m_pivot_y + dY) * 32, 0, 0, 0, 0);
+								//if (m_data[dX][dY].m_v1 >= 70) // effet gros sorts autour du caster
+								//	m_game->m_effect_manager->add_effect(EffectType::BUFF_EFFECT_LIGHT, (m_pivot_x + dX) * 32, (m_pivot_y + dY) * 32, 0, 0, 0, 0);
 								if (m_data[dX][dY].m_v1 == 82) // lumi�re si MassMagicMissile autour du caster
 								{
 									m_game->m_effect_manager->add_effect(EffectType::MASS_MM_AURA_CASTER, (m_pivot_x + dX) * 32, (m_pivot_y + dY) * 32, 0, 0, 0, 0);

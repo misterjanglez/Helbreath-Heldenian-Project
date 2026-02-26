@@ -24,9 +24,6 @@ struct angelic_str      { double value; static constexpr const char* key() { ret
 struct angelic_mag      { double value; static constexpr const char* key() { return "angelic_mag"; } };
 struct angelic_int      { double value; static constexpr const char* key() { return "angelic_int"; } };
 struct angelic_dex      { double value; static constexpr const char* key() { return "angelic_dex"; } };
-struct angelic_chr      { double value; static constexpr const char* key() { return "angelic_chr"; } };
-struct weapon_speed     { double value; static constexpr const char* key() { return "weapon_speed"; } };
-struct attack_delay_value { double value; static constexpr const char* key() { return "attack_delay_value"; } };
 
 // Fold variadic args into stat_map
 template <typename Arg>
@@ -80,6 +77,72 @@ template <typename... Args>
 uint32_t level_exp(const formula_engine& fe, Args&&... args)
 {
 	return static_cast<uint32_t>(fe.evaluate("level_exp", build_stat_map(std::forward<Args>(args)...)));
+}
+
+// ============================================================================
+// HP Regen (DB formulas)
+// ============================================================================
+
+template <typename... Args>
+int hp_regen_max_roll(const formula_engine& fe, Args&&... args)
+{
+	return fe.evaluate("hp_regen_max_roll", build_stat_map(std::forward<Args>(args)...));
+}
+
+template <typename... Args>
+int hp_regen_min_roll(const formula_engine& fe, Args&&... args)
+{
+	return fe.evaluate("hp_regen_min_roll", build_stat_map(std::forward<Args>(args)...));
+}
+
+template <typename... Args>
+int hp_regen_roll_variance(const formula_engine& fe, Args&&... args)
+{
+	return fe.evaluate("hp_regen_roll_variance", build_stat_map(std::forward<Args>(args)...));
+}
+
+// ============================================================================
+// MP Regen (DB formulas)
+// ============================================================================
+
+template <typename... Args>
+int mp_regen_max_roll(const formula_engine& fe, Args&&... args)
+{
+	return fe.evaluate("mp_regen_max_roll", build_stat_map(std::forward<Args>(args)...));
+}
+
+template <typename... Args>
+int mp_regen_min_roll(const formula_engine& fe, Args&&... args)
+{
+	return fe.evaluate("mp_regen_min_roll", build_stat_map(std::forward<Args>(args)...));
+}
+
+template <typename... Args>
+int mp_regen_roll_variance(const formula_engine& fe, Args&&... args)
+{
+	return fe.evaluate("mp_regen_roll_variance", build_stat_map(std::forward<Args>(args)...));
+}
+
+// ============================================================================
+// SP Regen (DB formulas)
+// ============================================================================
+
+template <typename... Args>
+int sp_regen_max_roll(const formula_engine& fe, Args&&... args)
+{
+	return fe.evaluate("sp_regen_max_roll", build_stat_map(std::forward<Args>(args)...));
+}
+
+template <typename... Args>
+int sp_regen_min_roll(const formula_engine& fe, Args&&... args)
+{
+	return fe.evaluate("sp_regen_min_roll", build_stat_map(std::forward<Args>(args)...));
+}
+
+template <typename... Args>
+int sp_regen_roll_variance(const formula_engine& fe, Args&&... args)
+{
+	return fe.evaluate("sp_regen_roll_variance", build_stat_map(std::forward<Args>(args)...));
 }
 
 // ============================================================================

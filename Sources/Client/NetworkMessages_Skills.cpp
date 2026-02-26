@@ -384,6 +384,21 @@ namespace NetworkMessageHandlers {
 		game->add_event_list("Your stat has been changed.", 10);
 	}
 
+	void HandleForceMasteryRefresh(CGame* game, char* data)
+	{
+		const auto* pkt = hb::net::PacketCast<hb::net::PacketNotifyStateChangeSuccess>(
+			data, sizeof(hb::net::PacketNotifyStateChangeSuccess));
+		if (!pkt) return;
+		for (int i = 0; i < hb::shared::limits::MaxMagicType; i++)
+			game->m_player->m_magic_mastery[i] = pkt->magic_mastery[i];
+		for (int i = 0; i < hb::shared::limits::MaxSkillType; i++)
+		{
+			game->m_player->m_skill_mastery[i] = pkt->skill_mastery[i];
+			if (game->m_skill_cfg_list[i] != 0)
+				game->m_skill_cfg_list[i]->m_level = pkt->skill_mastery[i];
+		}
+	}
+
 	void HandleStateChangeFailed(CGame* game, char* data)
 	{
 		game->m_player->m_lu_str = game->m_player->m_lu_vit = game->m_player->m_lu_dex = game->m_player->m_lu_int = game->m_player->m_lu_mag = game->m_player->m_lu_char = 0;

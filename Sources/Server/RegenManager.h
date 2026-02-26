@@ -30,9 +30,9 @@ private:
 	void tick_poison(int client_h, uint32_t time);
 
 	// Regen formulas (pure calculations, no side effects)
-	int calc_hp_regen(int vit, int side_effect_divisor, int hp_stock, int add_hp_pct) const;
-	int calc_mp_regen(int mag, int angelic_mag, int add_mp_pct) const;
-	int calc_sp_regen(int vit, int level, int add_sp_pct) const;
+	int calc_hp_regen(int client_h) const;
+	int calc_mp_regen(int client_h) const;
+	int calc_sp_regen(int client_h) const;
 
 	// Returns additional milliseconds to add to regen intervals based on hunger.
 	// hunger <= 30: (30 - hunger) * 1000 ms penalty. hunger > 30: 0.

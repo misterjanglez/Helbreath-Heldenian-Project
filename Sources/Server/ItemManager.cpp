@@ -864,8 +864,54 @@ bool ItemManager::equip_item_handler(int client_h, short item_index, bool notify
 
 	m_game->send_event_to_near_client_type_a(client_h, hb::shared::owner_class::Player, MsgId::EventMotion, Type::NullAction, 0, 0, 0);
 	calc_total_item_effect(client_h, item_index, notify);
+	validate_equipped_items(client_h);
 	return true;
 
+}
+
+void ItemManager::validate_equipped_items(int client_h)
+{
+	auto* p = m_game->m_client_list[client_h];
+	if (p == nullptr) return;
+
+	for (int slot = 0; slot < hb::shared::item::DEF_MAXITEMEQUIPPOS; slot++)
+	{
+		short item_index = p->m_item_equipment_status[slot];
+		if (item_index < 0) continue;
+		if (p->m_item_list[item_index] == nullptr) continue;
+
+		auto* item = p->m_item_list[item_index];
+		bool must_unequip = false;
+
+		// Level check (skip custom-made items — bit 0 of attribute)
+		if (((item->m_attribute & 0x00000001) == 0) &&
+			(item->m_level_limit > p->m_level))
+			must_unequip = true;
+
+		// Weight check
+		if (!must_unequip &&
+			get_item_weight(item, 1) > (p->m_str + p->m_angelic_str) * hb::shared::balance::weight_units_per_stone)
+			must_unequip = true;
+
+		// Armor stat requirements (effect_value4 = stat type 10-15)
+		if (!must_unequip && item->m_item_effect_value4 >= 10 &&
+			item->m_item_effect_value4 <= 15)
+		{
+			int req = item->m_item_effect_value5;
+			switch (item->m_item_effect_value4)
+			{
+			case 10: must_unequip = (p->m_str + p->m_angelic_str) < req; break;
+			case 11: must_unequip = (p->m_dex + p->m_angelic_dex) < req; break;
+			case 12: must_unequip = p->m_vit < req; break;
+			case 13: must_unequip = (p->m_int + p->m_angelic_int) < req; break;
+			case 14: must_unequip = (p->m_mag + p->m_angelic_mag) < req; break;
+			case 15: must_unequip = p->m_charisma < req; break;
+			}
+		}
+
+		if (must_unequip)
+			release_item_handler(client_h, item_index, true);
+	}
 }
 
 void ItemManager::request_purchase_item_handler(int client_h, const char* item_name, int num, int item_id)
@@ -1541,6 +1587,10 @@ void ItemManager::release_item_handler(int client_h, short item_index, bool noti
 	if (m_game->m_client_list[client_h]->m_item_list[item_index]->get_item_effect_type() == ItemEffectType::DefenseSpecAbility) {
 		m_game->m_client_list[client_h]->m_appearance.shield_glare = 0;
 	}
+
+	// Notify the owning client before clearing equip state
+	if (notice)
+		m_game->send_notify_msg(0, client_h, Notify::ItemReleased, to_int(equip_pos), item_index, 0, 0);
 
 	m_game->m_client_list[client_h]->m_is_item_equipped[item_index] = false;
 	m_game->m_client_list[client_h]->m_item_equipment_status[to_int(equip_pos)] = -1;
@@ -5643,6 +5693,7 @@ void ItemManager::reload_item_configs()
 	}
 
 	CloseGameConfigDatabase(configDb);
+	m_game->build_magic_manual_index();
 	m_game->compute_config_hashes();
 	hb::logger::log("Item configs reloaded successfully");
 }

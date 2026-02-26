@@ -1,5 +1,6 @@
 #include "MagicManager.h"
 #include "Game.h"
+#include <format>
 #include "StatusEffectManager.h"
 #include "Item.h"
 #include "CombatManager.h"
@@ -270,6 +271,14 @@ void MagicManager::player_magic_handler(int client_h, int dX, int dY, short type
 	if (m_game->m_magic_config_list[type] == 0) return;
 
 	if ((item_effect == false) && (m_game->m_client_list[client_h]->m_magic_mastery[type] != 1)) return;
+
+	// Direct INT check at cast time — reject if player no longer meets the spell's INT requirement
+	if (item_effect == false && m_game->m_magic_config_list[type]->m_intelligence_limit >
+		(m_game->m_client_list[client_h]->m_int + m_game->m_client_list[client_h]->m_angelic_int))
+	{
+		m_game->m_client_list[client_h]->m_magic_mastery[type] = 0;
+		return;
+	}
 
 	// Only block offensive magic in no-attack zones; allow friendly spells (healing, buffs, teleport, create, etc.)
 	if ((m_game->m_map_list[m_game->m_client_list[client_h]->m_map_index]->m_is_attack_enabled == false)
@@ -2601,14 +2610,26 @@ int MagicManager::get_magic_number(char* magic_name, int* req_int, int* cost)
 
 bool MagicManager::check_magic_int(int client_h)
 {
+	int disabled_count = 0;
 
-	for(int i = 0; i < hb::shared::limits::MaxMagicType; i++)
+	for (int i = 0; i < hb::shared::limits::MaxMagicType; i++)
 	{
 		if (m_game->m_magic_config_list[i] != 0)
-			if (m_game->m_magic_config_list[i]->m_intelligence_limit > (m_game->m_client_list[client_h]->m_int + m_game->m_client_list[client_h]->m_angelic_int))
+		{
+			if (m_game->m_magic_config_list[i]->m_intelligence_limit >
+				(m_game->m_client_list[client_h]->m_int + m_game->m_client_list[client_h]->m_angelic_int))
 			{
+				if (m_game->m_client_list[client_h]->m_magic_mastery[i] != 0)
+					disabled_count++;
 				m_game->m_client_list[client_h]->m_magic_mastery[i] = 0;
 			}
+		}
+	}
+
+	if (disabled_count > 0)
+	{
+		auto msg = std::format("{} spell(s) disabled due to insufficient Intelligence.", disabled_count);
+		m_game->send_notify_msg(0, client_h, Notify::NoticeMsg, 0, 0, 0, msg.c_str());
 	}
 
 	return true;

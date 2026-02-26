@@ -105,7 +105,8 @@ bool load_server_config(const std::string& path, server_config& cfg)
 	{
 		auto& ch = root["character"];
 		read_value(ch, "base_stat_value", cfg.character.base_stat_value);
-		read_value(ch, "creation_stat_bonus", cfg.character.creation_stat_bonus);
+		read_value(ch, "max_creation_stat_value", cfg.character.max_creation_stat_value);
+		read_value(ch, "creation_stat_points", cfg.character.creation_stat_points);
 		read_value(ch, "levelup_stat_gain", cfg.character.levelup_stat_gain);
 		read_value(ch, "max_level", cfg.character.max_level);
 		read_value(ch, "max_stat_value", cfg.character.max_stat_value);

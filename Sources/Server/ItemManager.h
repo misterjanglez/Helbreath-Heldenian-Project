@@ -56,6 +56,7 @@ public:
 
 	// Equipment
 	bool equip_item_handler(int client_h, short item_index, bool notify = true);
+	void validate_equipped_items(int client_h);
 	void calc_total_item_effect(int client_h, int equip_item_id, bool notify = true);
 	void check_unique_item_equipment(int client_h);
 	bool check_and_convert_plus_weapon_item(int client_h, int item_index);

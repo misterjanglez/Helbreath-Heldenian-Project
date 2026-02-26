@@ -48,6 +48,16 @@ namespace net {
 		uint8_t reloadBalance;
 	};
 
+	struct HB_PACKED PacketServerConfigUpdate {
+		PacketHeader header;
+		int16_t max_stats;
+		int32_t max_level;
+		int16_t max_bank_items;
+		int16_t base_stat_value;
+		int16_t max_creation_stat_value;
+		int16_t creation_stat_points;
+	};
+
 	struct HB_PACKED PacketRequestConfigData {
 		PacketHeader header;
 		uint8_t requestItems;

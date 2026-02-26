@@ -282,7 +282,13 @@ public:
 	void push_config_reload_to_clients(bool items, bool magic, bool skills, bool npcs, bool balance = false);
 	void apply_server_config(const server_config& cfg);
 	bool reload_server_config();
+	void send_server_config_update();
 	bool reload_formulas();
+
+	void enforce_max_level(int new_max);
+	void enforce_max_stat_value(int new_max);
+	void enforce_base_stat_value();
+	void reprocess_online_player(int client_h);
 
 
 	
@@ -525,6 +531,8 @@ public:
 	class CNpc    * m_npc_config_list[hb::server::config::MaxNpcTypes];
 	class CMagic  * m_magic_config_list[hb::shared::limits::MaxMagicType];
 	class CSkill  * m_skill_config_list[hb::shared::limits::MaxSkillType];
+	std::unordered_map<int, int> m_magic_to_manual_item; // magic_index → item_id
+	void build_magic_manual_index();
 	//class CTeleport * m_pTeleportConfigList[DEF_MAXTELEPORTTYPE];
 
 	std::string m_config_hash[6];
@@ -558,6 +566,7 @@ public:
 	char m_shutdown_message[128];            // Custom message for noticement dialog
 
 	uint32_t m_weather_time, m_game_time_1, m_game_time_2, m_game_time_3, m_game_time_4, m_game_time_5, m_game_time_6;
+	uint32_t m_equip_validation_time = 0;
 	
 	// Crusade Schedule
 	bool m_is_crusade_war_starter;
@@ -765,7 +774,9 @@ public:
 
 	// Character/Leveling Settings
 	int m_base_stat_value;           // base-stat-value
-	int m_creation_stat_bonus;       // creation-stat-bonus
+	int m_max_creation_stat_value;   // max-creation-stat-value
+	int m_creation_stat_points;      // creation-stat-points
+	int m_base_stat_total;           // computed: m_base_stat_value * 6 + m_creation_stat_points
 	int m_levelup_stat_gain;         // levelup-stat-gain
 	int m_max_level;                // max-level (renamed from max-player-level)
 	int m_max_stat_value;            // calculated: base + creation + (levelup * max_level) + 16

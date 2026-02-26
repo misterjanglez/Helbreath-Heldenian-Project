@@ -117,6 +117,9 @@ using namespace hb::shared::item;
 using namespace hb::client::config;
 using namespace hb::client::sprite_id;
 
+namespace NetworkMessageHandlers {
+	void HandleServerConfigUpdate(CGame* game, char* data);
+}
 
 // Drawing order arrays moved to RenderHelpers.cpp (declared extern in RenderHelpers.h)
 
@@ -1941,6 +1944,13 @@ void CGame::log_recv_msg_handler(char* data, uint32_t msg_size)
 	if (header && header->msg_id == MsgId::BalanceConfigContents)
 	{
 		cache_process_balance_config(data, msg_size);
+		return;
+	}
+
+	// Intercept server config — sent before login response
+	if (header && header->msg_id == MsgId::ServerConfigUpdate)
+	{
+		NetworkMessageHandlers::HandleServerConfigUpdate(this, data);
 		return;
 	}
 

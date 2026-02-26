@@ -27,11 +27,11 @@
         "showLatency": true,
         "tileGrid": false,
         "toggleToChat": true,
-        "vsync": false,
+        "vsync": true,
         "zoomMap": true
     },
     "shortcuts": {
-        "magic": 0,
+        "magic": 91,
         "slots": [
             -1,
             -1,

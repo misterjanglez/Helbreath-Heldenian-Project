@@ -165,4 +165,21 @@ namespace NetworkMessageHandlers {
 		if (!pkt) return;
 		game->m_player->m_lu_point = pkt->lu_point;
 	}
+
+	void HandleForceStatRefresh(CGame* game, char* data)
+	{
+		const auto* pkt = hb::net::PacketCast<hb::net::PacketNotifyLevelUp>(
+			data, sizeof(hb::net::PacketNotifyLevelUp));
+		if (!pkt) return;
+
+		game->m_player->m_level = pkt->level;
+		game->m_player->m_str = pkt->str;
+		game->m_player->m_vit = pkt->vit;
+		game->m_player->m_dex = pkt->dex;
+		game->m_player->m_int = pkt->intel;
+		game->m_player->m_mag = pkt->mag;
+		game->m_player->m_charisma = pkt->chr;
+		game->m_player->m_playerStatus.attack_delay = pkt->attack_delay;
+		game->m_player->m_lu_str = game->m_player->m_lu_vit = game->m_player->m_lu_dex = game->m_player->m_lu_int = game->m_player->m_lu_mag = game->m_player->m_lu_char = 0;
+	}
 } // namespace NetworkMessageHandlers

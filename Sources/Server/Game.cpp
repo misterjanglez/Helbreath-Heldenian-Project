@@ -234,7 +234,9 @@ CGame::CGame()
 
 	// Character/Leveling Settings
 	m_base_stat_value = 10;
-	m_creation_stat_bonus = 4;
+	m_max_creation_stat_value = 4;
+	m_creation_stat_points = 10;
+	m_base_stat_total = m_base_stat_value * 6 + m_creation_stat_points;
 	m_levelup_stat_gain = TotalLevelUpPoint;
 	m_max_level = hb::shared::limits::PlayerMaxLevel;
 	m_max_stat_value = 0; // Calculated after config load
@@ -964,7 +966,7 @@ bool CGame::init()
 	m_elvine_mana = 0;
 
 	if (m_fishing_manager != nullptr) m_fishing_manager->m_fish_time = time;
-	m_special_event_time = m_weather_time = m_game_time_1 =
+	m_special_event_time = m_weather_time = m_equip_validation_time = m_game_time_1 =
 		m_game_time_2 = m_game_time_3 = m_game_time_4 = m_game_time_5 = m_game_time_6 = time;
 
 	m_is_special_event_time = false;
@@ -1103,6 +1105,8 @@ bool CGame::init()
 		CloseGameConfigDatabase(configDb);
 		return false;
 	}
+
+	build_magic_manual_index();
 
 	m_is_npc_available = false;
 	if (HasGameConfigRows(configDb, "npc_configs")) {
@@ -1867,7 +1871,7 @@ void CGame::request_init_data_handler(int client_h, char* data, char key, size_t
 	stats = (m_client_list[client_h]->m_str + m_client_list[client_h]->m_dex + m_client_list[client_h]->m_vit +
 		m_client_list[client_h]->m_int + m_client_list[client_h]->m_mag + m_client_list[client_h]->m_charisma);
 
-	m_client_list[client_h]->m_levelup_pool = (m_client_list[client_h]->m_level - 1) * m_levelup_stat_gain - (stats - hb::shared::balance::base_stat_total);
+	m_client_list[client_h]->m_levelup_pool = (m_client_list[client_h]->m_level - 1) * m_levelup_stat_gain - (stats - m_base_stat_total);
 	char_pkt->lu_point = static_cast<std::uint16_t>(m_client_list[client_h]->m_levelup_pool);
 	char_pkt->lu_unused[0] = static_cast<std::uint8_t>(m_client_list[client_h]->m_var);
 	char_pkt->lu_unused[1] = 0;
@@ -2411,6 +2415,20 @@ bool CGame::send_client_map_configs(int client_h)
 	}
 
 	return true;
+}
+
+void CGame::build_magic_manual_index()
+{
+	m_magic_to_manual_item.clear();
+	for (int i = 0; i < MaxItemTypes; i++)
+	{
+		if (m_item_config_list[i] == nullptr) continue;
+		if (m_item_config_list[i]->m_item_effect_type != static_cast<short>(ItemEffectType::StudyMagic)) continue;
+		int magic_idx = m_item_config_list[i]->m_item_effect_value1;
+		if (magic_idx >= 0 && magic_idx < hb::shared::limits::MaxMagicType)
+			m_magic_to_manual_item[magic_idx] = m_item_config_list[i]->m_id_num;
+	}
+	hb::logger::log("Built magic-to-manual index: {} entries", m_magic_to_manual_item.size());
 }
 
 void CGame::compute_config_hashes()
@@ -4521,6 +4539,7 @@ void CGame::init_player_data(int client_h, char* data, uint32_t size)
 
 	check_special_event(client_h);
 	m_magic_manager->check_magic_int(client_h);
+	m_item_manager->validate_equipped_items(client_h);
 
 	send_notify_msg(0, client_h, Notify::Hunger, m_client_list[client_h]->m_hunger_status, 0, 0, 0);
 
@@ -5976,24 +5995,141 @@ void CGame::client_common_handler(int client_h, char* data)
 		{
 		case 0: // Reset stats
 		{
-			m_client_list[client_h]->m_str = 10;
-			m_client_list[client_h]->m_int = 10;
-			m_client_list[client_h]->m_vit = 10;
-			m_client_list[client_h]->m_dex = 10;
-			m_client_list[client_h]->m_mag = 10;
-			m_client_list[client_h]->m_charisma = 10;
-			// Recalculate levelup pool: total available = (level-1)*gain, base stats = 70, now 60
-			m_client_list[client_h]->m_levelup_pool = (m_client_list[client_h]->m_level - 1) * m_levelup_stat_gain + 10;
-			// Clamp HP/MP/SP to new maximums — check_character_data() kicks if HP > max
-			m_client_list[client_h]->m_hp = get_max_hp(client_h);
-			m_client_list[client_h]->m_mp = get_max_mp(client_h);
-			m_client_list[client_h]->m_sp = get_max_sp(client_h);
+			auto* p = m_client_list[client_h];
+
+			// Build list of manual-based spells the player has learned
+			// Spells with gold_cost < 0 are not wizard-purchasable and have a manual item
+			struct ManualSpell { int magic_index; int item_id; };
+			std::vector<ManualSpell> manual_spells;
+
+			for (int i = 0; i < hb::shared::limits::MaxMagicType; i++)
+			{
+				if (p->m_magic_mastery[i] == 0 || m_magic_config_list[i] == nullptr) continue;
+				if (m_magic_config_list[i]->m_gold_cost >= 0) continue;
+
+				auto it = m_magic_to_manual_item.find(i);
+				if (it != m_magic_to_manual_item.end())
+					manual_spells.push_back({i, it->second});
+			}
+
+			// Pre-check: ensure enough total space (inventory + bank) for manuals
+			if (!manual_spells.empty())
+			{
+				int free_inv = 0;
+				for (int i = 0; i < hb::shared::limits::MaxItems; i++)
+					if (p->m_item_list[i] == nullptr) free_inv++;
+
+				int free_bank = 0;
+				for (int i = 0; i < hb::shared::limits::MaxBankItems; i++)
+					if (p->m_item_in_bank_list[i] == nullptr) free_bank++;
+
+				if (static_cast<int>(manual_spells.size()) > free_inv + free_bank)
+				{
+					send_notify_msg(0, client_h, Notify::NoticeMsg, 0, 0, 0,
+						"Cannot reset: not enough inventory and bank space for spell manuals.");
+					break;
+				}
+			}
+
+			// Reset stats
+			p->m_str = m_base_stat_value;
+			p->m_int = m_base_stat_value;
+			p->m_vit = m_base_stat_value;
+			p->m_dex = m_base_stat_value;
+			p->m_mag = m_base_stat_value;
+			p->m_charisma = m_base_stat_value;
+			p->m_levelup_pool = (p->m_level - 1) * m_levelup_stat_gain
+				- (m_base_stat_value * 6 - m_base_stat_total);
+			if (p->m_levelup_pool < 0) p->m_levelup_pool = 0;
+
+			// Unlearn all spells — refund gold for wizard spells, skip manual spells (handled below)
+			int unlearned = 0;
+			uint64_t total_gold_refund = 0;
+			for (int i = 0; i < hb::shared::limits::MaxMagicType; i++)
+			{
+				if (p->m_magic_mastery[i] == 0 || m_magic_config_list[i] == nullptr) continue;
+				p->m_magic_mastery[i] = 0;
+				unlearned++;
+				if (m_magic_config_list[i]->m_gold_cost > 0)
+					total_gold_refund += m_magic_config_list[i]->m_gold_cost;
+			}
+
+			// Refund gold for wizard-purchased spells
+			if (total_gold_refund > 0)
+			{
+				uint64_t gold = m_item_manager->get_item_count_by_id(client_h, hb::shared::item::ItemId::Gold);
+				m_item_manager->set_item_count_by_id(client_h, hb::shared::item::ItemId::Gold, gold + total_gold_refund);
+			}
+
+			// Return manual items — try inventory (with weight check), overflow to bank
+			int manuals_returned = 0;
+			for (auto& ms : manual_spells)
+			{
+				CItem* item = new CItem();
+				if (!m_item_manager->init_item_attr(item, ms.item_id))
+				{
+					delete item;
+					continue;
+				}
+
+				bool placed = false;
+				int item_weight = m_item_manager->get_item_weight(item, 1);
+				if (p->m_cur_weight_load + item_weight <= calc_max_load(client_h))
+				{
+					for (int i = 0; i < hb::shared::limits::MaxItems; i++)
+					{
+						if (p->m_item_list[i] == nullptr)
+						{
+							p->m_item_list[i] = item;
+							p->m_item_pos_list[i].x = 40;
+							p->m_item_pos_list[i].y = 30;
+							calc_total_weight(client_h);
+							m_item_manager->send_item_notify_msg(client_h, Notify::ItemObtained, item, 0);
+							placed = true;
+							break;
+						}
+					}
+				}
+
+				if (!placed)
+				{
+					if (!m_item_manager->set_item_to_bank_item(client_h, item))
+						delete item;
+					else
+						placed = true;
+				}
+
+				if (placed) manuals_returned++;
+			}
+
+			// Notify the player
+			if (unlearned > 0)
+			{
+				std::string msg;
+				if (manuals_returned > 0 && total_gold_refund > 0)
+					msg = std::format("{} spell(s) unlearned, {} manual(s) returned, {} gold refunded.", unlearned, manuals_returned, total_gold_refund);
+				else if (manuals_returned > 0)
+					msg = std::format("{} spell(s) unlearned, {} manual(s) returned.", unlearned, manuals_returned);
+				else
+					msg = std::format("{} spell(s) unlearned, {} gold refunded.", unlearned, total_gold_refund);
+				send_notify_msg(0, client_h, Notify::NoticeMsg, 0, 0, 0, msg.c_str());
+			}
+
+			send_notify_msg(0, client_h, Notify::ForceMasteryRefresh, 0, 0, 0, 0);
+			calc_total_weight(client_h);
+
+			// Unequip items the player no longer meets requirements for
+			m_item_manager->validate_equipped_items(client_h);
+			// Clamp HP/MP/SP to new maximums
+			p->m_hp = get_max_hp(client_h);
+			p->m_mp = get_max_mp(client_h);
+			p->m_sp = get_max_sp(client_h);
 			// LevelUp refreshes all stats on client, Exp refreshes XP bar
 			send_notify_msg(0, client_h, Notify::LevelUp, 0, 0, 0, 0);
 			send_notify_msg(0, client_h, Notify::Exp, 0, 0, 0, 0);
 			send_notify_msg(0, client_h, Notify::LevelUpPoints, 0, 0, 0, 0);
 			hb::logger::log<log_channel::commands>("[TesterMenu] '{}' reset stats (lu_pool={})",
-				m_client_list[client_h]->m_char_name, m_client_list[client_h]->m_levelup_pool);
+				p->m_char_name, p->m_levelup_pool);
 			break;
 		}
 		case 1: // Add 100 contribution
@@ -6072,7 +6208,7 @@ void CGame::client_common_handler(int client_h, char* data)
 		}
 		case 7: // Set level
 		{
-			int target_level = std::clamp(static_cast<int>(v2), 1, hb::shared::limits::PlayerMaxLevel);
+			int target_level = std::clamp(static_cast<int>(v2), 1, m_max_level);
 
 			// Traveller anti-hack kicks players at level >= 20 if not in a faction city.
 			// Teleport them to their faction city first, or clamp if no faction.
@@ -6104,7 +6240,7 @@ void CGame::client_common_handler(int client_h, char* data)
 			int total_stats = m_client_list[client_h]->m_str + m_client_list[client_h]->m_int
 				+ m_client_list[client_h]->m_vit + m_client_list[client_h]->m_dex
 				+ m_client_list[client_h]->m_mag + m_client_list[client_h]->m_charisma;
-			m_client_list[client_h]->m_levelup_pool = (target_level - 1) * m_levelup_stat_gain - (total_stats - hb::shared::balance::base_stat_total);
+			m_client_list[client_h]->m_levelup_pool = (target_level - 1) * m_levelup_stat_gain - (total_stats - m_base_stat_total);
 			if (m_client_list[client_h]->m_levelup_pool < 0)
 				m_client_list[client_h]->m_levelup_pool = 0;
 
@@ -7933,6 +8069,7 @@ void CGame::send_notify_msg(int from_h, int to_h, uint16_t msg_type, uint32_t v1
 	}
 	break;
 
+	case Notify::ForceMasteryRefresh:
 	case Notify::StateChangeSuccess:	// 2003-04-14     .. wtf korean junk
 	{
 		
@@ -7952,6 +8089,7 @@ void CGame::send_notify_msg(int from_h, int to_h, uint16_t msg_type, uint32_t v1
 	}
 	break;
 
+	case Notify::ForceStatRefresh:
 	case Notify::SettingSuccess:
 	case Notify::LevelUp:
 	{
@@ -9046,17 +9184,17 @@ void CGame::state_change_handler(int client_h, char* data, size_t msg_size)
 	int old_char = m_client_list[client_h]->m_charisma;
 
 	int expected_stats = (m_max_level - 1) * m_levelup_stat_gain
-		+ hb::shared::balance::base_stat_total;
+		+ m_base_stat_total;
 	if (old_str + old_vit + old_dex + old_int + old_mag + old_char != expected_stats)
 		return;
 
-	// Each stat must stay >= 10 and <= CharPointLimit after reduction
-	if ((old_str - str < 10) || (old_str - str > CharPointLimit)) { send_notify_msg(0, client_h, Notify::StateChangeFailed, 0, 0, 0, 0); return; }
-	if ((old_vit - vit < 10) || (old_vit - vit > CharPointLimit)) { send_notify_msg(0, client_h, Notify::StateChangeFailed, 0, 0, 0, 0); return; }
-	if ((old_dex - dex < 10) || (old_dex - dex > CharPointLimit)) { send_notify_msg(0, client_h, Notify::StateChangeFailed, 0, 0, 0, 0); return; }
-	if ((old_int - cInt < 10) || (old_int - cInt > CharPointLimit)) { send_notify_msg(0, client_h, Notify::StateChangeFailed, 0, 0, 0, 0); return; }
-	if ((old_mag - mag < 10) || (old_mag - mag > CharPointLimit)) { send_notify_msg(0, client_h, Notify::StateChangeFailed, 0, 0, 0, 0); return; }
-	if ((old_char - cChar < 10) || (old_char - cChar > CharPointLimit)) { send_notify_msg(0, client_h, Notify::StateChangeFailed, 0, 0, 0, 0); return; }
+	// Each stat must stay >= base_stat_value and <= CharPointLimit after reduction
+	if ((old_str - str < m_base_stat_value) || (old_str - str > CharPointLimit)) { send_notify_msg(0, client_h, Notify::StateChangeFailed, 0, 0, 0, 0); return; }
+	if ((old_vit - vit < m_base_stat_value) || (old_vit - vit > CharPointLimit)) { send_notify_msg(0, client_h, Notify::StateChangeFailed, 0, 0, 0, 0); return; }
+	if ((old_dex - dex < m_base_stat_value) || (old_dex - dex > CharPointLimit)) { send_notify_msg(0, client_h, Notify::StateChangeFailed, 0, 0, 0, 0); return; }
+	if ((old_int - cInt < m_base_stat_value) || (old_int - cInt > CharPointLimit)) { send_notify_msg(0, client_h, Notify::StateChangeFailed, 0, 0, 0, 0); return; }
+	if ((old_mag - mag < m_base_stat_value) || (old_mag - mag > CharPointLimit)) { send_notify_msg(0, client_h, Notify::StateChangeFailed, 0, 0, 0, 0); return; }
+	if ((old_char - cChar < m_base_stat_value) || (old_char - cChar > CharPointLimit)) { send_notify_msg(0, client_h, Notify::StateChangeFailed, 0, 0, 0, 0); return; }
 
 	// Guild masters cannot reduce CHR below 20
 	if (m_client_list[client_h]->m_guild_rank == 0)
@@ -9242,9 +9380,9 @@ void CGame::level_up_settings_handler(int client_h, char* data, size_t msg_size)
 		m_client_list[client_h]->m_int + m_client_list[client_h]->m_mag + m_client_list[client_h]->m_charisma;
 
 	// (  +   >   ) ..  ..      ..
-	if (total_setting + m_client_list[client_h]->m_levelup_pool > ((m_client_list[client_h]->m_level - 1) * m_levelup_stat_gain + hb::shared::balance::base_stat_total))
+	if (total_setting + m_client_list[client_h]->m_levelup_pool > ((m_client_list[client_h]->m_level - 1) * m_levelup_stat_gain + m_base_stat_total))
 	{
-		m_client_list[client_h]->m_levelup_pool = (m_client_list[client_h]->m_level - 1) * m_levelup_stat_gain + hb::shared::balance::base_stat_total - total_setting;
+		m_client_list[client_h]->m_levelup_pool = (m_client_list[client_h]->m_level - 1) * m_levelup_stat_gain + m_base_stat_total - total_setting;
 
 		if (m_client_list[client_h]->m_levelup_pool < 0)
 			m_client_list[client_h]->m_levelup_pool = 0;
@@ -9254,7 +9392,7 @@ void CGame::level_up_settings_handler(int client_h, char* data, size_t msg_size)
 	}
 
 	// (  +    D >   )  ..
-	if (total_setting + (str + vit + dex + cInt + mag + cChar) > ((m_client_list[client_h]->m_level - 1) * m_levelup_stat_gain + hb::shared::balance::base_stat_total))
+	if (total_setting + (str + vit + dex + cInt + mag + cChar) > ((m_client_list[client_h]->m_level - 1) * m_levelup_stat_gain + m_base_stat_total))
 	{
 		send_notify_msg(0, client_h, Notify::SettingFailed, 0, 0, 0, 0);
 		return;
@@ -9632,7 +9770,7 @@ void CGame::restore_player_characteristics(int client_h)
 		m_client_list[client_h]->m_vit + m_client_list[client_h]->m_dex +
 		m_client_list[client_h]->m_mag + m_client_list[client_h]->m_charisma;
 
-	original_point = (m_client_list[client_h]->m_level - 1) * m_levelup_stat_gain + hb::shared::balance::base_stat_total;
+	original_point = (m_client_list[client_h]->m_level - 1) * m_levelup_stat_gain + m_base_stat_total;
 
 	to_be_restored_point = original_point - cur_point;
 
@@ -9643,32 +9781,32 @@ void CGame::restore_player_characteristics(int client_h)
 		while (1) {
 			flag = false;
 
-			if ((to_be_restored_point > 0) && (m_client_list[client_h]->m_str < 10)) {
+			if ((to_be_restored_point > 0) && (m_client_list[client_h]->m_str < m_base_stat_value)) {
 				m_client_list[client_h]->m_str++;
 				to_be_restored_point--;
 				flag = true;
 			}
-			if ((to_be_restored_point > 0) && (m_client_list[client_h]->m_mag < 10)) {
+			if ((to_be_restored_point > 0) && (m_client_list[client_h]->m_mag < m_base_stat_value)) {
 				m_client_list[client_h]->m_mag++;
 				to_be_restored_point--;
 				flag = true;
 			}
-			if ((to_be_restored_point > 0) && (m_client_list[client_h]->m_int < 10)) {
+			if ((to_be_restored_point > 0) && (m_client_list[client_h]->m_int < m_base_stat_value)) {
 				m_client_list[client_h]->m_int++;
 				to_be_restored_point--;
 				flag = true;
 			}
-			if ((to_be_restored_point > 0) && (m_client_list[client_h]->m_dex < 10)) {
+			if ((to_be_restored_point > 0) && (m_client_list[client_h]->m_dex < m_base_stat_value)) {
 				m_client_list[client_h]->m_dex++;
 				to_be_restored_point--;
 				flag = true;
 			}
-			if ((to_be_restored_point > 0) && (m_client_list[client_h]->m_vit < 10)) {
+			if ((to_be_restored_point > 0) && (m_client_list[client_h]->m_vit < m_base_stat_value)) {
 				m_client_list[client_h]->m_vit++;
 				to_be_restored_point--;
 				flag = true;
 			}
-			if ((to_be_restored_point > 0) && (m_client_list[client_h]->m_charisma < 10)) {
+			if ((to_be_restored_point > 0) && (m_client_list[client_h]->m_charisma < m_base_stat_value)) {
 				m_client_list[client_h]->m_charisma++;
 				to_be_restored_point--;
 				flag = true;
@@ -9862,37 +10000,37 @@ void CGame::restore_player_characteristics(int client_h)
 			while (to_be_restored_point != 0) {
 				switch (dice(1, 6)) {
 				case 1:
-					if (m_client_list[client_h]->m_str > 10) {
+					if (m_client_list[client_h]->m_str > m_base_stat_value) {
 						m_client_list[client_h]->m_str--;
 						to_be_restored_point++;
 					}
 					break;
 				case 2:
-					if (m_client_list[client_h]->m_vit > 10) {
+					if (m_client_list[client_h]->m_vit > m_base_stat_value) {
 						m_client_list[client_h]->m_vit--;
 						to_be_restored_point++;
 					}
 					break;
 				case 3:
-					if (m_client_list[client_h]->m_dex > 10) {
+					if (m_client_list[client_h]->m_dex > m_base_stat_value) {
 						m_client_list[client_h]->m_dex--;
 						to_be_restored_point++;
 					}
 					break;
 				case 4:
-					if (m_client_list[client_h]->m_mag > 10) {
+					if (m_client_list[client_h]->m_mag > m_base_stat_value) {
 						m_client_list[client_h]->m_mag--;
 						to_be_restored_point++;
 					}
 					break;
 				case 5:
-					if (m_client_list[client_h]->m_int > 10) {
+					if (m_client_list[client_h]->m_int > m_base_stat_value) {
 						m_client_list[client_h]->m_int--;
 						to_be_restored_point++;
 					}
 					break;
 				case 6:
-					if (m_client_list[client_h]->m_charisma > 10) {
+					if (m_client_list[client_h]->m_charisma > m_base_stat_value) {
 						m_client_list[client_h]->m_charisma--;
 						to_be_restored_point++;
 					}
@@ -11977,6 +12115,18 @@ void CGame::on_timer(char type)
 		m_weather_time = time;
 	}
 
+	// Periodic equipment validation — catches cascading invalidations
+	if ((time - m_equip_validation_time) > 10000)
+	{
+		for (int i = 1; i < MaxClients; i++)
+		{
+			if (m_client_list[i] == nullptr) continue;
+			if (!m_client_list[i]->m_is_init_complete) continue;
+			m_item_manager->validate_equipped_items(i);
+		}
+		m_equip_validation_time = time;
+	}
+
 	if ((m_heldenian_running) && (m_is_heldenian_mode)) {
 		m_war_manager->set_heldenian_mode();
 	}
@@ -13703,7 +13853,7 @@ void CGame::force_recall_process() {
 				}
 			}
 			//check gizon errors
-			if (m_client_list[i]->m_level < 180) {
+			if (m_client_list[i]->m_level < m_max_level) {
 				if (m_client_list[i]->m_gizon_item_upgrade_left > 0) {
 					m_client_list[i]->m_gizon_item_upgrade_left = 0;
 				}
@@ -14036,16 +14186,12 @@ void CGame::apply_server_config(const server_config& cfg)
 
 	// Character
 	m_base_stat_value = cfg.character.base_stat_value;
-	m_creation_stat_bonus = cfg.character.creation_stat_bonus;
+	m_max_creation_stat_value = cfg.character.max_creation_stat_value;
+	m_creation_stat_points = cfg.character.creation_stat_points;
+	m_base_stat_total = m_base_stat_value * 6 + m_creation_stat_points;
 	m_levelup_stat_gain = cfg.character.levelup_stat_gain;
 	m_max_level = cfg.character.max_level;
 	m_max_stat_value = cfg.character.max_stat_value;
-	{
-		int expected = m_base_stat_value + m_creation_stat_bonus
-			+ (m_levelup_stat_gain * m_max_level) + hb::shared::balance::angelic_bonus;
-		if (m_max_stat_value != expected)
-			hb::logger::warn("max_stat_value ({}) differs from computed value ({})", m_max_stat_value, expected);
-	}
 
 	// Gameplay
 	m_nighttime_duration = cfg.gameplay.nighttime_duration;
@@ -14083,6 +14229,269 @@ void CGame::apply_server_config(const server_config& cfg)
 	}
 }
 
+void CGame::enforce_max_level(int new_max)
+{
+	int base = m_base_stat_value;
+	int gain = m_levelup_stat_gain;
+	int base_total = m_base_stat_total;
+	int online_count = 0;
+
+	// Online characters
+	for (int i = 1; i < hb::server::config::MaxClients; i++)
+	{
+		if (m_client_list[i] == nullptr) continue;
+		if (!m_client_list[i]->m_is_init_complete) continue;
+		if (m_client_list[i]->m_level <= new_max) continue;
+
+		m_client_list[i]->m_level = new_max;
+		m_client_list[i]->m_str = base;
+		m_client_list[i]->m_int = base;
+		m_client_list[i]->m_vit = base;
+		m_client_list[i]->m_dex = base;
+		m_client_list[i]->m_mag = base;
+		m_client_list[i]->m_charisma = base;
+		m_client_list[i]->m_levelup_pool = (new_max - 1) * gain - (base * 6 - base_total);
+
+		reprocess_online_player(i);
+		g_login->local_save_player_data(i);
+		online_count++;
+	}
+
+	if (online_count > 0)
+		hb::logger::log("enforce_max_level: clamped {} online character(s) to level {}", online_count, new_max);
+
+	// Offline characters — iterate all account DBs
+	int offline_count = 0;
+	std::error_code ec;
+	for (const auto& entry : std::filesystem::directory_iterator("accounts", ec))
+	{
+		if (!entry.is_regular_file() || entry.path().extension() != ".db")
+			continue;
+
+		std::string db_path = entry.path().string();
+		sqlite3* db = nullptr;
+		if (sqlite3_open(db_path.c_str(), &db) != SQLITE_OK)
+		{
+			if (db) sqlite3_close(db);
+			continue;
+		}
+
+		const char* sql =
+			"UPDATE characters SET "
+			"level = ?1, str = ?2, intl = ?2, vit = ?2, dex = ?2, mag = ?2, chr = ?2, "
+			"lu_pool = (?1 - 1) * ?3 - (?2 * 6 - ?4) "
+			"WHERE level > ?1";
+
+		sqlite3_stmt* stmt = nullptr;
+		if (sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) == SQLITE_OK)
+		{
+			sqlite3_bind_int(stmt, 1, new_max);
+			sqlite3_bind_int(stmt, 2, base);
+			sqlite3_bind_int(stmt, 3, gain);
+			sqlite3_bind_int(stmt, 4, base_total);
+			sqlite3_step(stmt);
+			offline_count += sqlite3_changes(db);
+			sqlite3_finalize(stmt);
+		}
+
+		sqlite3_close(db);
+	}
+
+	if (offline_count > 0)
+		hb::logger::log("enforce_max_level: clamped {} offline character(s) to level {}", offline_count, new_max);
+}
+
+void CGame::enforce_max_stat_value(int new_max)
+{
+	int online_count = 0;
+
+	// Online characters
+	for (int i = 1; i < hb::server::config::MaxClients; i++)
+	{
+		if (m_client_list[i] == nullptr) continue;
+		if (!m_client_list[i]->m_is_init_complete) continue;
+
+		bool clamped = false;
+		int* stats[] = {
+			&m_client_list[i]->m_str, &m_client_list[i]->m_int,
+			&m_client_list[i]->m_vit, &m_client_list[i]->m_dex,
+			&m_client_list[i]->m_mag, &m_client_list[i]->m_charisma
+		};
+
+		for (auto* stat : stats)
+		{
+			if (*stat > new_max)
+			{
+				m_client_list[i]->m_levelup_pool += (*stat - new_max);
+				*stat = new_max;
+				clamped = true;
+			}
+		}
+
+		if (clamped)
+		{
+			reprocess_online_player(i);
+			g_login->local_save_player_data(i);
+			online_count++;
+		}
+	}
+
+	if (online_count > 0)
+		hb::logger::log("enforce_max_stat_value: clamped {} online character(s) to max stat {}", online_count, new_max);
+
+	// Offline characters — iterate all account DBs
+	int offline_count = 0;
+	std::error_code ec;
+	for (const auto& entry : std::filesystem::directory_iterator("accounts", ec))
+	{
+		if (!entry.is_regular_file() || entry.path().extension() != ".db")
+			continue;
+
+		std::string db_path = entry.path().string();
+		sqlite3* db = nullptr;
+		if (sqlite3_open(db_path.c_str(), &db) != SQLITE_OK)
+		{
+			if (db) sqlite3_close(db);
+			continue;
+		}
+
+		const char* sql =
+			"UPDATE characters SET "
+			"lu_pool = lu_pool "
+			"+ CASE WHEN str > ?1 THEN str - ?1 ELSE 0 END "
+			"+ CASE WHEN intl > ?1 THEN intl - ?1 ELSE 0 END "
+			"+ CASE WHEN vit > ?1 THEN vit - ?1 ELSE 0 END "
+			"+ CASE WHEN dex > ?1 THEN dex - ?1 ELSE 0 END "
+			"+ CASE WHEN mag > ?1 THEN mag - ?1 ELSE 0 END "
+			"+ CASE WHEN chr > ?1 THEN chr - ?1 ELSE 0 END, "
+			"str = MIN(str, ?1), intl = MIN(intl, ?1), vit = MIN(vit, ?1), "
+			"dex = MIN(dex, ?1), mag = MIN(mag, ?1), chr = MIN(chr, ?1) "
+			"WHERE str > ?1 OR intl > ?1 OR vit > ?1 OR dex > ?1 OR mag > ?1 OR chr > ?1";
+
+		sqlite3_stmt* stmt = nullptr;
+		if (sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) == SQLITE_OK)
+		{
+			sqlite3_bind_int(stmt, 1, new_max);
+			sqlite3_step(stmt);
+			offline_count += sqlite3_changes(db);
+			sqlite3_finalize(stmt);
+		}
+
+		sqlite3_close(db);
+	}
+
+	if (offline_count > 0)
+		hb::logger::log("enforce_max_stat_value: clamped {} offline character(s) to max stat {}", offline_count, new_max);
+}
+
+void CGame::enforce_base_stat_value()
+{
+	int base = m_base_stat_value;
+	int gain = m_levelup_stat_gain;
+	int base_total = m_base_stat_total;
+	int online_count = 0;
+
+	// Online characters — reset all stats to base, recalculate levelup pool
+	for (int i = 1; i < hb::server::config::MaxClients; i++)
+	{
+		if (m_client_list[i] == nullptr) continue;
+		if (!m_client_list[i]->m_is_init_complete) continue;
+
+		m_client_list[i]->m_str = base;
+		m_client_list[i]->m_int = base;
+		m_client_list[i]->m_vit = base;
+		m_client_list[i]->m_dex = base;
+		m_client_list[i]->m_mag = base;
+		m_client_list[i]->m_charisma = base;
+		m_client_list[i]->m_levelup_pool = (m_client_list[i]->m_level - 1) * gain - (base * 6 - base_total);
+		if (m_client_list[i]->m_levelup_pool < 0) m_client_list[i]->m_levelup_pool = 0;
+
+		reprocess_online_player(i);
+		g_login->local_save_player_data(i);
+		online_count++;
+	}
+
+	if (online_count > 0)
+		hb::logger::log("enforce_base_stat_value: reset {} online character(s) to base stat {}", online_count, base);
+
+	// Offline characters — iterate all account DBs
+	int offline_count = 0;
+	std::error_code ec;
+	for (const auto& entry : std::filesystem::directory_iterator("accounts", ec))
+	{
+		if (!entry.is_regular_file() || entry.path().extension() != ".db")
+			continue;
+
+		std::string db_path = entry.path().string();
+		sqlite3* db = nullptr;
+		if (sqlite3_open(db_path.c_str(), &db) != SQLITE_OK)
+		{
+			if (db) sqlite3_close(db);
+			continue;
+		}
+
+		const char* sql =
+			"UPDATE characters SET "
+			"str = ?1, intl = ?1, vit = ?1, dex = ?1, mag = ?1, chr = ?1, "
+			"lu_pool = MAX(0, (level - 1) * ?2 - (?1 * 6 - ?3))";
+
+		sqlite3_stmt* stmt = nullptr;
+		if (sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) == SQLITE_OK)
+		{
+			sqlite3_bind_int(stmt, 1, base);
+			sqlite3_bind_int(stmt, 2, gain);
+			sqlite3_bind_int(stmt, 3, base_total);
+			sqlite3_step(stmt);
+			offline_count += sqlite3_changes(db);
+			sqlite3_finalize(stmt);
+		}
+
+		sqlite3_close(db);
+	}
+
+	if (offline_count > 0)
+		hb::logger::log("enforce_base_stat_value: reset {} offline character(s) to base stat {}", offline_count, base);
+}
+
+void CGame::reprocess_online_player(int client_h)
+{
+	auto* p = m_client_list[client_h];
+	if (p == nullptr) return;
+
+	// Recalculate item bonuses with current stats
+	m_item_manager->calc_total_item_effect(client_h, -1, false);
+
+	// Unequip items the player no longer meets requirements for
+	m_item_manager->validate_equipped_items(client_h);
+
+	// Disable spells requiring more INT than the player has
+	m_magic_manager->check_magic_int(client_h);
+
+	// Recompute level-up pool from current stats
+	int stats = p->m_str + p->m_dex + p->m_vit + p->m_int + p->m_mag + p->m_charisma;
+	p->m_levelup_pool = (p->m_level - 1) * m_levelup_stat_gain - (stats - m_base_stat_total);
+	if (p->m_levelup_pool < 0) p->m_levelup_pool = 0;
+
+	// Clamp HP/MP/SP to new maximums
+	int max_hp = get_max_hp(client_h);
+	int max_mp = get_max_mp(client_h);
+	int max_sp = get_max_sp(client_h);
+	if (p->m_hp > max_hp) p->m_hp = max_hp;
+	if (p->m_mp > max_mp) p->m_mp = max_mp;
+	if (p->m_sp > max_sp) p->m_sp = max_sp;
+
+	// Refresh mastery arrays on client (magic + skill) without triggering majestic path
+	send_notify_msg(0, client_h, Notify::ForceMasteryRefresh, 0, 0, 0, 0);
+
+	// Force-update client-side stats, level, and pool
+	send_notify_msg(0, client_h, Notify::ForceStatRefresh, 0, 0, 0, 0);
+	send_notify_msg(0, client_h, Notify::LevelUpPoints, 0, 0, 0, 0);
+
+	// Notify the player
+	send_notify_msg(0, client_h, Notify::NoticeMsg, 0, 0, 0,
+		"Server config updated. Your character has been adjusted.");
+}
+
 bool CGame::reload_server_config()
 {
 	server_config cfg;
@@ -14091,9 +14500,70 @@ bool CGame::reload_server_config()
 		hb::logger::error("Failed to reload server_config.json");
 		return false;
 	}
+
+	// Check if realm settings were modified — these require a restart
+	const auto& cur = m_server_config.realm;
+	const auto& fresh = cfg.realm;
+	bool realm_changed = false;
+
+	if (cur.name != fresh.name || cur.login_listen_ip != fresh.login_listen_ip ||
+		cur.login_listen_port != fresh.login_listen_port || cur.game_listen_ip != fresh.game_listen_ip ||
+		cur.game_listen_port != fresh.game_listen_port || cur.game_connection_ip != fresh.game_connection_ip ||
+		cur.game_connection_port != fresh.game_connection_port)
+	{
+		realm_changed = true;
+	}
+
+	// Preserve current realm — socket bindings can't change at runtime
+	cfg.realm = m_server_config.realm;
+
+	// Capture old limits before applying to detect changes
+	int old_max_level = m_max_level;
+	int old_max_stat = m_max_stat_value;
+	int old_base_stat = m_base_stat_value;
+
 	apply_server_config(cfg);
+
+	// Enforce new limits on existing characters
+	// Base stat change requires full reset (level first if needed, then base, then stat cap)
+	if (m_base_stat_value != old_base_stat)
+		enforce_base_stat_value();
+	else if (m_max_level < old_max_level)
+		enforce_max_level(m_max_level);
+	if (m_max_stat_value < old_max_stat)
+		enforce_max_stat_value(m_max_stat_value);
+
+	if (realm_changed)
+		hb::logger::warn("Realm settings were modified in server_config.json but will not take effect until server restart");
+
+	send_server_config_update();
+
 	hb::logger::log("server_config.json reloaded successfully");
 	return true;
+}
+
+void CGame::send_server_config_update()
+{
+	hb::net::PacketServerConfigUpdate pkt{};
+	pkt.header.msg_id = MsgId::ServerConfigUpdate;
+	pkt.header.msg_type = MsgType::Confirm;
+	pkt.max_stats = static_cast<int16_t>(m_max_stat_value);
+	pkt.max_level = static_cast<int32_t>(m_max_level);
+	pkt.max_bank_items = static_cast<int16_t>(m_max_bank_items);
+	pkt.base_stat_value = static_cast<int16_t>(m_base_stat_value);
+	pkt.max_creation_stat_value = static_cast<int16_t>(m_max_creation_stat_value);
+	pkt.creation_stat_points = static_cast<int16_t>(m_creation_stat_points);
+
+	int count = 0;
+	for (int i = 1; i < MaxClients; i++)
+	{
+		if (m_client_list[i] == nullptr) continue;
+		if (!m_client_list[i]->m_is_init_complete) continue;
+		m_client_list[i]->m_socket->send_msg(reinterpret_cast<char*>(&pkt), sizeof(pkt));
+		count++;
+	}
+
+	hb::logger::log("Server config update pushed to {} client(s)", count);
 }
 
 bool CGame::reload_formulas()
@@ -14127,6 +14597,23 @@ bool CGame::reload_formulas()
 
 	m_formula_engine = std::move(temp_engine);
 	compute_balance_hash();
+
+	// Clamp all online players' resources to new maximums so stale values
+	// don't trigger the hack detection in check_character_data()
+	for (int i = 1; i < hb::server::config::MaxClients; i++)
+	{
+		if (m_client_list[i] == nullptr) continue;
+		if (!m_client_list[i]->m_is_init_complete) continue;
+
+		int max_hp = get_max_hp(i);
+		int max_mp = get_max_mp(i);
+		int max_sp = get_max_sp(i);
+
+		if (m_client_list[i]->m_hp > max_hp) m_client_list[i]->m_hp = max_hp;
+		if (m_client_list[i]->m_mp > max_mp) m_client_list[i]->m_mp = max_mp;
+		if (m_client_list[i]->m_sp > max_sp) m_client_list[i]->m_sp = max_sp;
+	}
+
 	hb::logger::log("Formulas reloaded from gamedata.db (balance hash updated)");
 	return true;
 }

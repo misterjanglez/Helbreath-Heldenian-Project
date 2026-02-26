@@ -22,6 +22,7 @@ using namespace hb::client::net;
 
 namespace NetworkMessageHandlers {
 	void HandlePlayerCharacterContents(CGame* game, char* data);
+	void HandleServerConfigUpdate(CGame* game, char* data);
 }
 
 bool Screen_OnGame::on_game_msg(uint32_t msg_id, uint16_t msg_type, char* data, uint32_t msg_size)
@@ -66,6 +67,10 @@ bool Screen_OnGame::on_game_msg(uint32_t msg_id, uint16_t msg_type, char* data, 
 
 	case MsgId::PlayerCharacterContents:
 		NetworkMessageHandlers::HandlePlayerCharacterContents(m_game, data);
+		return true;
+
+	case MsgId::ServerConfigUpdate:
+		NetworkMessageHandlers::HandleServerConfigUpdate(m_game, data);
 		return true;
 
 	case MsgId::ResponseCivilRight:

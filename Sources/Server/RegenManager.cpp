@@ -4,6 +4,8 @@
 #include "Game.h"
 #include "Client.h"
 #include "CombatManager.h"
+#include "SharedCalculations.h"
+#include <algorithm>
 
 using namespace hb::shared::net;
 
@@ -54,12 +56,7 @@ void RegenManager::tick_hp(int client_h, uint32_t time, int hunger_delay_ms)
 			int max_hp = m_game->get_max_hp(client_h);
 			if (m_game->m_client_list[client_h]->m_hp < max_hp)
 			{
-				int amount = calc_hp_regen(
-					m_game->m_client_list[client_h]->m_vit,
-					m_game->m_client_list[client_h]->m_side_effect_max_hp_down,
-					m_game->m_client_list[client_h]->m_hp_stock,
-					m_game->m_client_list[client_h]->m_add_hp
-				);
+				int amount = calc_hp_regen(client_h);
 				m_game->m_client_list[client_h]->m_hp += amount;
 				if (m_game->m_client_list[client_h]->m_hp > max_hp)
 					m_game->m_client_list[client_h]->m_hp = max_hp;
@@ -82,11 +79,7 @@ void RegenManager::tick_mp(int client_h, uint32_t time, int hunger_delay_ms)
 			int max_mp = m_game->get_max_mp(client_h);
 			if (m_game->m_client_list[client_h]->m_mp < max_mp)
 			{
-				int amount = calc_mp_regen(
-					m_game->m_client_list[client_h]->m_mag,
-					m_game->m_client_list[client_h]->m_angelic_mag,
-					m_game->m_client_list[client_h]->m_add_mp
-				);
+				int amount = calc_mp_regen(client_h);
 				m_game->m_client_list[client_h]->m_mp += amount;
 				if (m_game->m_client_list[client_h]->m_mp > max_mp)
 					m_game->m_client_list[client_h]->m_mp = max_mp;
@@ -106,11 +99,7 @@ void RegenManager::tick_sp(int client_h, uint32_t time, int hunger_delay_ms)
 			int max_sp = m_game->get_max_sp(client_h);
 			if (m_game->m_client_list[client_h]->m_sp < max_sp)
 			{
-				int amount = calc_sp_regen(
-					m_game->m_client_list[client_h]->m_vit,
-					m_game->m_client_list[client_h]->m_level,
-					m_game->m_client_list[client_h]->m_add_sp
-				);
+				int amount = calc_sp_regen(client_h);
 				m_game->m_client_list[client_h]->m_sp += amount;
 				if (m_game->m_client_list[client_h]->m_sp > max_sp)
 					m_game->m_client_list[client_h]->m_sp = max_sp;
@@ -131,34 +120,134 @@ void RegenManager::tick_poison(int client_h, uint32_t time)
 	}
 }
 
-int RegenManager::calc_hp_regen(int vit, int side_effect_divisor, int hp_stock, int add_hp_pct) const
+int RegenManager::calc_hp_regen(int client_h) const
 {
-	int base = m_game->dice(1, vit);
-	if (base < (vit / 2)) base = (vit / 2);
-	if (side_effect_divisor != 0)
-		base -= (base / side_effect_divisor);
-	int total = base + hp_stock;
-	total = apply_percent_bonus(total, add_hp_pct);
+	auto* p = m_game->m_client_list[client_h];
+
+	// Evaluate formulas from engine
+	int ceiling = hb::shared::calc::hp_regen_max_roll(m_game->m_formula_engine,
+		hb::shared::calc::vit{(double)p->m_vit});
+	int base_floor = hb::shared::calc::hp_regen_min_roll(m_game->m_formula_engine,
+		hb::shared::calc::vit{(double)p->m_vit});
+	int variance = hb::shared::calc::hp_regen_roll_variance(m_game->m_formula_engine,
+		hb::shared::calc::vit{(double)p->m_vit});
+
+	if (ceiling <= 0) return 0;
+
+	// Pick outcome type first: 1=low, 2=high, 3=average
+	int pick = m_game->dice(1, 3);
+
+	// Roll 3 times for the selected outcome
+	int rolls[3];
+	for (int i = 0; i < 3; i++)
+	{
+		int roll = m_game->dice(1, ceiling);
+		rolls[i] = std::max(base_floor, roll);
+	}
+
+	int base;
+	if (pick == 1)
+		base = std::min({rolls[0], rolls[1], rolls[2]});
+	else if (pick == 2)
+		base = std::max({rolls[0], rolls[1], rolls[2]});
+	else
+		base = (rolls[0] + rolls[1] + rolls[2]) / 3;
+
+	// Add variance bonus: [0, variance]
+	if (variance > 0)
+		base += m_game->dice(1, variance + 1) - 1;
+
+	// Existing modifiers
+	if (p->m_side_effect_max_hp_down != 0)
+		base -= (base / p->m_side_effect_max_hp_down);
+	int total = base + p->m_hp_stock;
+	total = apply_percent_bonus(total, p->m_add_hp);
 	return total;
 }
 
-int RegenManager::calc_mp_regen(int mag, int angelic_mag, int add_mp_pct) const
+int RegenManager::calc_mp_regen(int client_h) const
 {
-	int total = m_game->dice(1, (mag + angelic_mag));
-	total = apply_percent_bonus(total, add_mp_pct);
+	auto* p = m_game->m_client_list[client_h];
+
+	// Evaluate formulas from engine
+	int ceiling = hb::shared::calc::mp_regen_max_roll(m_game->m_formula_engine,
+		hb::shared::calc::mag{(double)p->m_mag},
+		hb::shared::calc::angelic_mag{(double)p->m_angelic_mag});
+	int base_floor = hb::shared::calc::mp_regen_min_roll(m_game->m_formula_engine,
+		hb::shared::calc::mag{(double)p->m_mag},
+		hb::shared::calc::angelic_mag{(double)p->m_angelic_mag});
+	int variance = hb::shared::calc::mp_regen_roll_variance(m_game->m_formula_engine,
+		hb::shared::calc::mag{(double)p->m_mag},
+		hb::shared::calc::angelic_mag{(double)p->m_angelic_mag});
+
+	if (ceiling <= 0) return 0;
+
+	// Pick outcome type first: 1=low, 2=high, 3=average
+	int pick = m_game->dice(1, 3);
+
+	// Roll 3 times for the selected outcome
+	int rolls[3];
+	for (int i = 0; i < 3; i++)
+	{
+		int roll = m_game->dice(1, ceiling);
+		rolls[i] = std::max(base_floor, roll);
+	}
+
+	int base;
+	if (pick == 1)
+		base = std::min({rolls[0], rolls[1], rolls[2]});
+	else if (pick == 2)
+		base = std::max({rolls[0], rolls[1], rolls[2]});
+	else
+		base = (rolls[0] + rolls[1] + rolls[2]) / 3;
+
+	// Add variance bonus: [0, variance]
+	if (variance > 0)
+		base += m_game->dice(1, variance + 1) - 1;
+
+	int total = apply_percent_bonus(base, p->m_add_mp);
 	return total;
 }
 
-int RegenManager::calc_sp_regen(int vit, int level, int add_sp_pct) const
+int RegenManager::calc_sp_regen(int client_h) const
 {
-	int total = m_game->dice(1, (vit / 3));
-	total = apply_percent_bonus(total, add_sp_pct);
-	if (level <= 20)
-		total += 15;
-	else if (level <= 40)
-		total += 10;
-	else if (level <= 60)
-		total += 5;
+	auto* p = m_game->m_client_list[client_h];
+
+	// Evaluate formulas from engine
+	int ceiling = hb::shared::calc::sp_regen_max_roll(m_game->m_formula_engine,
+		hb::shared::calc::vit{(double)p->m_vit});
+	int base_floor = hb::shared::calc::sp_regen_min_roll(m_game->m_formula_engine,
+		hb::shared::calc::vit{(double)p->m_vit});
+	int variance = hb::shared::calc::sp_regen_roll_variance(m_game->m_formula_engine,
+		hb::shared::calc::vit{(double)p->m_vit});
+
+	if (ceiling <= 0) return 0;
+
+	// Pick outcome type first: 1=low, 2=high, 3=average
+	int pick = m_game->dice(1, 3);
+
+	// Roll 3 times for the selected outcome
+	int rolls[3];
+	for (int i = 0; i < 3; i++)
+	{
+		int roll = m_game->dice(1, ceiling);
+		rolls[i] = std::max(base_floor, roll);
+	}
+
+	int base;
+	if (pick == 1)
+		base = std::min({rolls[0], rolls[1], rolls[2]});
+	else if (pick == 2)
+		base = std::max({rolls[0], rolls[1], rolls[2]});
+	else
+		base = (rolls[0] + rolls[1] + rolls[2]) / 3;
+
+	// Add variance bonus: [0, variance]
+	if (variance > 0)
+		base += m_game->dice(1, variance + 1) - 1;
+
+	int total = apply_percent_bonus(base, p->m_add_sp);
+
 	return total;
 }
 

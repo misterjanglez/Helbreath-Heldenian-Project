@@ -16,6 +16,7 @@ using namespace std;
 #include "PasswordHash.h"
 #include "../../Dependencies/Shared/Packet/SharedPackets.h"
 #include "Log.h"
+#include "ServerLogChannels.h"
 #include "Item/ItemEnums.h"
 #include "version_info.h"
 #include "Game.h"
@@ -133,6 +134,7 @@ void LoginServer::request_login(int h, char* data)
 	{
 		// Send balance config BEFORE login response — login response closes the socket
 		send_balance_config(h);
+		send_server_config(h);
 
 		char data[512] = {};
 		char* cp2 = data;
@@ -303,6 +305,29 @@ void LoginServer::response_character(int h, char* data)
 
 	if (string(world_name) != WORLDNAMELS)
 		return;
+
+	// Validate creation stats against server config
+	{
+		int total = str + vit + dex + intl + mag + chr;
+		int expected_total = G_pGame->m_base_stat_total;
+		int min_stat = G_pGame->m_base_stat_value;
+		int max_stat = min_stat + G_pGame->m_max_creation_stat_value;
+
+		if (total != expected_total
+			|| str < min_stat || str > max_stat
+			|| vit < min_stat || vit > max_stat
+			|| dex < min_stat || dex > max_stat
+			|| intl < min_stat || intl > max_stat
+			|| mag < min_stat || mag > max_stat
+			|| chr < min_stat || chr > max_stat)
+		{
+			hb::logger::warn<hb::log_channel::security>(
+				"Invalid creation stats from account '{}': total={} expected={} stats=({},{},{},{},{},{})",
+				acc, total, expected_total, (int)str, (int)vit, (int)dex, (int)intl, (int)mag, (int)chr);
+			send_login_msg(LogResMsg::NewCharacterFailed, LogResMsg::NewCharacterFailed, 0, 0, h);
+			return;
+		}
+	}
 
 	hb::logger::log("Request create new Character: {}", name);
 
@@ -801,6 +826,23 @@ void LoginServer::send_balance_config(int h)
 	std::memcpy(buf.data() + sizeof(hb::net::PacketHeader), serialized.data(), serialized.size());
 
 	G_pGame->_lclients[h]->sock->send_msg(buf.data(), static_cast<int>(buf.size()));
+}
+
+void LoginServer::send_server_config(int h)
+{
+	if (!G_pGame->_lclients[h]) return;
+
+	hb::net::PacketServerConfigUpdate pkt{};
+	pkt.header.msg_id = MsgId::ServerConfigUpdate;
+	pkt.header.msg_type = MsgType::Confirm;
+	pkt.max_stats = static_cast<int16_t>(G_pGame->m_max_stat_value);
+	pkt.max_level = static_cast<int32_t>(G_pGame->m_max_level);
+	pkt.max_bank_items = static_cast<int16_t>(G_pGame->m_max_bank_items);
+	pkt.base_stat_value = static_cast<int16_t>(G_pGame->m_base_stat_value);
+	pkt.max_creation_stat_value = static_cast<int16_t>(G_pGame->m_max_creation_stat_value);
+	pkt.creation_stat_points = static_cast<int16_t>(G_pGame->m_creation_stat_points);
+
+	G_pGame->_lclients[h]->sock->send_msg(reinterpret_cast<char*>(&pkt), sizeof(pkt));
 }
 
 void LoginServer::request_enter_game(int h, char* data)

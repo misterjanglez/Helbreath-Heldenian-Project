@@ -2,7 +2,6 @@
 
 namespace hb::shared::balance
 {
-	constexpr int base_stat_total        = 70;
 	constexpr int angelic_bonus          = 16;
 	constexpr int swing_str_divisor      = 13;
 	constexpr int swing_frames           = 8;

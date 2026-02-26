@@ -44,6 +44,7 @@ namespace MsgId
 		BalanceConfigContents                   = 0x0FA314E7,
 		RequestConfigData                       = 0x0FA314E3,
 		NotifyConfigReload                      = 0x0FA314E5,
+		ServerConfigUpdate                      = 0x0FA314E8,
 		PlayerItemListContents                  = 0x0FA314DD,
 		PlayerCharacterContents                 = 0x0FA40000,
 		CommandCheckConnection                  = 0x03203203,
@@ -352,6 +353,8 @@ namespace Notify
 		ItemObtainedBulk                        = 0x0BF8,
 		TeleportApproved                        = 0x0BF9,
 		LevelUpPoints                           = 0x0BFA,
+		ForceStatRefresh                        = 0x0BFB,
+		ForceMasteryRefresh                     = 0x0BFC,
 		RepairAllPrices                         = 0x0F11,
 		MobKills                                = 0x0A68,
 #ifdef TESTER_ONLY
