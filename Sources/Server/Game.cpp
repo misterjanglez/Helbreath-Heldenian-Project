@@ -987,6 +987,7 @@ bool CGame::init()
 		return false;
 	}
 	apply_server_config(cfg);
+	save_server_config("server_config.json", cfg);
 
 	sqlite3* configDb = nullptr;
 	std::string configDbPath;
@@ -4495,6 +4496,23 @@ void CGame::init_player_data(int client_h, char* data, uint32_t size)
 	}
 
 	restore_player_characteristics(client_h);
+
+	// Clamp stats to max_stat_value on login
+	{
+		int* stats[] = {
+			&m_client_list[client_h]->m_str, &m_client_list[client_h]->m_int,
+			&m_client_list[client_h]->m_vit, &m_client_list[client_h]->m_dex,
+			&m_client_list[client_h]->m_mag, &m_client_list[client_h]->m_charisma
+		};
+		for (auto* stat : stats)
+		{
+			if (*stat > m_max_stat_value)
+			{
+				m_client_list[client_h]->m_levelup_pool += (*stat - m_max_stat_value);
+				*stat = m_max_stat_value;
+			}
+		}
+	}
 
 	restore_player_rating(client_h);
 

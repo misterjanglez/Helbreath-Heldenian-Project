@@ -180,7 +180,7 @@ Key rules:
 - **Wire protocol structs**: Exception — Hungarian without `m_` to match binary format.
 - Legacy code retains old conventions until actively refactored. Do not reformat untouched code.
 
-After every `bak.py commit`, update `CHANGELOG.md` with a brief bullet list of changes under category headers. See `CLAUDE_CHANGELOG.md` for format guide and examples.
+After every `bak.py commit`, update `CHANGELOG.md` with a brief summary. When the user requests a Discord post, write a player-facing changelog instead. See `CLAUDE_CHANGELOG.md` for both formats.
 
 ## Logging
 
