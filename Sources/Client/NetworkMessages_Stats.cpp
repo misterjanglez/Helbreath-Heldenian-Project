@@ -4,6 +4,7 @@
 #include "NetworkMessageManager.h"
 #include "Packet/SharedPackets.h"
 #include "lan_eng.h"
+#include "Log.h"
 #include <cstdio>
 #include <cstring>
 #include <cmath>
@@ -20,32 +21,32 @@ namespace NetworkMessageHandlers {
 		std::string txt;
 
 		prev_hp = game->m_player->m_hp;
-	const auto* pkt = hb::net::PacketCast<hb::net::PacketNotifyHP>(
-		data, sizeof(hb::net::PacketNotifyHP));
-	if (!pkt) return;
-	game->m_player->m_hp = static_cast<int>(pkt->hp);
-	game->m_player->m_hunger_status = static_cast<int>(pkt->hunger);
+		const auto* pkt = hb::net::PacketCast<hb::net::PacketNotifyHP>(
+			data, sizeof(hb::net::PacketNotifyHP));
+		if (!pkt) return;
+		game->m_player->m_hp = static_cast<int>(pkt->hp);
+		game->m_player->m_hunger_status = static_cast<int>(pkt->hunger);
 
-	if (game->m_player->m_hp > prev_hp)
-	{
-		if ((game->m_player->m_hp - prev_hp) < 10) return;
-		txt = std::format(NOTIFYMSG_HP_UP, game->m_player->m_hp - prev_hp);
-		game->add_event_list(txt.c_str(), 10);
-		audio_manager::get().play_game_sound(sound_type::effect, 21, 0);
-	}
-	else
-	{
-		if ((game->on_game()->m_logout_count > 0) && (game->m_force_disconn == false))
+		if (game->m_player->m_hp > prev_hp)
 		{
-			game->on_game()->m_logout_count = -1;
-			game->add_event_list(NOTIFYMSG_HP2, 10);
+			if ((game->m_player->m_hp - prev_hp) < 10) return;
+			txt = std::format(NOTIFYMSG_HP_UP, game->m_player->m_hp - prev_hp);
+			game->add_event_list(txt.c_str(), 10);
+			audio_manager::get().play_game_sound(sound_type::effect, 21, 0);
 		}
-		game->m_damaged_time = GameClock::get_time_ms();
-		if (game->m_player->m_hp < 20) game->add_event_list(NOTIFYMSG_HP3, 10);
-		if ((prev_hp - game->m_player->m_hp) < 10) return;
-		txt = std::format(NOTIFYMSG_HP_DOWN, prev_hp - game->m_player->m_hp);
-		game->add_event_list(txt.c_str(), 10);
-	}
+		else if (game->m_player->m_hp < prev_hp)
+		{
+			if ((game->on_game()->m_logout_count > 0) && (game->m_force_disconn == false))
+			{
+				game->on_game()->m_logout_count = -1;
+				game->add_event_list(NOTIFYMSG_HP2, 10);
+			}
+			game->m_damaged_time = GameClock::get_time_ms();
+			if (game->m_player->m_hp < 20) game->add_event_list(NOTIFYMSG_HP3, 10);
+			if ((prev_hp - game->m_player->m_hp) < 10) return;
+			txt = std::format(NOTIFYMSG_HP_DOWN, prev_hp - game->m_player->m_hp);
+			game->add_event_list(txt.c_str(), 10);
+		}
 	}
 
 	void HandleMP(CGame* game, char* data)
@@ -57,6 +58,7 @@ namespace NetworkMessageHandlers {
 			data, sizeof(hb::net::PacketNotifyMP));
 		if (!pkt) return;
 		game->m_player->m_mp = static_cast<int>(pkt->mp);
+
 		if (abs(game->m_player->m_mp - prev_mp) < 10) return;
 		if (game->m_player->m_mp > prev_mp)
 		{
@@ -80,6 +82,7 @@ namespace NetworkMessageHandlers {
 			data, sizeof(hb::net::PacketNotifySP));
 		if (!pkt) return;
 		game->m_player->m_sp = static_cast<int>(pkt->sp);
+
 		if (abs(game->m_player->m_sp - prev_sp) < 10) return;
 		if (game->m_player->m_sp > prev_sp)
 		{

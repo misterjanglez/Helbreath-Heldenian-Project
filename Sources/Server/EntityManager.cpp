@@ -787,7 +787,8 @@ void CEntityManager::process_entities()
 
             if (abs(m_npc_list[i]->m_magic_level) > 0) {
                 if ((time - m_npc_list[i]->m_mp_up_time) > MpUpTime) {
-                    m_npc_list[i]->m_mp_up_time = time;
+                    m_npc_list[i]->m_mp_up_time += MpUpTime;
+                    if (time - m_npc_list[i]->m_mp_up_time > MpUpTime) m_npc_list[i]->m_mp_up_time = time;
                     m_npc_list[i]->m_mana += m_game->dice(1, (m_npc_list[i]->m_max_mana / 5));
 
                     if (m_npc_list[i]->m_mana > m_npc_list[i]->m_max_mana)
@@ -796,7 +797,8 @@ void CEntityManager::process_entities()
             }
 
             if (((time - m_npc_list[i]->m_hp_up_time) > HpUpTime) && (m_npc_list[i]->m_is_killed == false)) {
-                m_npc_list[i]->m_hp_up_time = time;
+                m_npc_list[i]->m_hp_up_time += HpUpTime;
+                if (time - m_npc_list[i]->m_hp_up_time > HpUpTime) m_npc_list[i]->m_hp_up_time = time;
 
                 max_hp = m_game->dice(m_npc_list[i]->m_hit_dice, 8) + m_npc_list[i]->m_hit_dice;
                 if (m_npc_list[i]->m_hp < max_hp) {

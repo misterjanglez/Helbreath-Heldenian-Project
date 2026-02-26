@@ -5,6 +5,7 @@
 #include "Client.h"
 #include "CombatManager.h"
 #include "SharedCalculations.h"
+#include "Log.h"
 #include <algorithm>
 
 using namespace hb::shared::net;
@@ -42,7 +43,7 @@ void RegenManager::tick_hunger(int client_h, uint32_t time)
 		m_game->m_client_list[client_h]->m_hunger_status--;
 		if (m_game->m_client_list[client_h]->m_hunger_status <= 0)
 			m_game->m_client_list[client_h]->m_hunger_status = 0;
-		m_game->m_client_list[client_h]->m_hunger_time = time;
+		m_game->m_client_list[client_h]->m_hunger_time += m_game->m_hunger_consume_interval;
 		m_game->send_notify_msg(0, client_h, Notify::Hunger, m_game->m_client_list[client_h]->m_hunger_status, 0, 0, 0);
 	}
 }
@@ -66,7 +67,7 @@ void RegenManager::tick_hp(int client_h, uint32_t time, int hunger_delay_ms)
 			}
 		}
 		m_game->m_client_list[client_h]->m_hp_stock = 0;
-		m_game->m_client_list[client_h]->m_hp_time = time;
+		m_game->m_client_list[client_h]->m_hp_time += (uint32_t)(m_game->m_health_regen_interval + hunger_delay_ms);
 	}
 }
 
@@ -86,7 +87,7 @@ void RegenManager::tick_mp(int client_h, uint32_t time, int hunger_delay_ms)
 				m_game->send_notify_msg(0, client_h, Notify::Mp, 0, 0, 0, 0);
 			}
 		}
-		m_game->m_client_list[client_h]->m_mp_time = time;
+		m_game->m_client_list[client_h]->m_mp_time += (uint32_t)(m_game->m_mana_regen_interval + hunger_delay_ms);
 	}
 }
 
@@ -106,7 +107,7 @@ void RegenManager::tick_sp(int client_h, uint32_t time, int hunger_delay_ms)
 				m_game->send_notify_msg(0, client_h, Notify::Sp, 0, 0, 0, 0);
 			}
 		}
-		m_game->m_client_list[client_h]->m_sp_time = time;
+		m_game->m_client_list[client_h]->m_sp_time += (uint32_t)(m_game->m_stamina_regen_interval + hunger_delay_ms);
 	}
 }
 
@@ -116,7 +117,7 @@ void RegenManager::tick_poison(int client_h, uint32_t time)
 		(time - m_game->m_client_list[client_h]->m_poison_time) > (uint32_t)m_game->m_poison_damage_interval)
 	{
 		m_game->m_combat_manager->poison_effect(client_h, 0);
-		m_game->m_client_list[client_h]->m_poison_time = time;
+		m_game->m_client_list[client_h]->m_poison_time += m_game->m_poison_damage_interval;
 	}
 }
 

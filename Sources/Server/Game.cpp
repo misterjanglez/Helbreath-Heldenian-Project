@@ -3827,12 +3827,14 @@ void CGame::check_client_response_time()
 				if ((m_map_list[m_client_list[i]->m_map_index]->m_is_fight_zone == false) &&
 					((time - m_client_list[i]->m_auto_save_time) > (uint32_t)m_autosave_interval)) {
 					g_login->local_save_player_data(i); //send_msg_to_ls(ServerMsgId::RequestSavePlayerData, i);
-					m_client_list[i]->m_auto_save_time = time;
+					m_client_list[i]->m_auto_save_time += m_autosave_interval;
+					if (time - m_client_list[i]->m_auto_save_time > (uint32_t)m_autosave_interval) m_client_list[i]->m_auto_save_time = time;
 				}
 
 				// ExpStock
 				if ((time - m_client_list[i]->m_exp_stock_time) > (uint32_t)ExpStockTime) {
-					m_client_list[i]->m_exp_stock_time = time;
+					m_client_list[i]->m_exp_stock_time += ExpStockTime;
+					if (time - m_client_list[i]->m_exp_stock_time > (uint32_t)ExpStockTime) m_client_list[i]->m_exp_stock_time = time;
 					calc_exp_stock(i);
 					m_item_manager->check_unique_item_equipment(i);
 					m_war_manager->check_crusade_result_calculation(i);
@@ -3853,7 +3855,8 @@ void CGame::check_client_response_time()
 					}
 
 					m_client_list[i]->m_auto_exp_amount = 0;
-					m_client_list[i]->m_auto_exp_time = time;
+					m_client_list[i]->m_auto_exp_time += AutoExpTime;
+					if (time - m_client_list[i]->m_auto_exp_time > (uint32_t)AutoExpTime) m_client_list[i]->m_auto_exp_time = time;
 				}
 
 				// v1.432
@@ -10279,7 +10282,8 @@ void CGame::notice_handler()
 	if (m_total_notice_msg <= 1) return;
 
 	if ((time - m_notice_time) > NoticeTime) {
-		m_notice_time = time;
+		m_notice_time += NoticeTime;
+		if (time - m_notice_time > NoticeTime) m_notice_time = time;
 		do {
 			msg_index = dice(1, m_total_notice_msg) - 1;
 		} while (msg_index == m_prev_send_notice_msg);
@@ -10508,7 +10512,8 @@ void CGame::special_event_handler()
 	time = GameClock::GetTimeMS();
 
 	if ((time - m_special_event_time) < SpecialEventTime) return; // SpecialEventTime
-	m_special_event_time = time;
+	m_special_event_time += SpecialEventTime;
+	if (time - m_special_event_time > SpecialEventTime) m_special_event_time = time;
 	m_is_special_event_time = true;
 
 	switch (dice(1, 180)) {
@@ -11990,8 +11995,9 @@ void CGame::on_timer(char type)
 	if ((time - m_game_time_2) > 1000) {
 		check_client_response_time();
 		check_day_or_night_mode();
-		m_game_time_2 = time;
-		// v1.41 
+		m_game_time_2 += 1000;
+		if (time - m_game_time_2 > 1000) m_game_time_2 = time;
+		// v1.41
 
 		// v1.41
 		if (m_is_game_started == false) {
@@ -12078,7 +12084,8 @@ void CGame::on_timer(char type)
 	}
 	if ((time - m_game_time_6) > 1000) {
 		m_delay_event_manager->delay_event_processor();
-		m_game_time_6 = time;
+		m_game_time_6 += 1000;
+		if (time - m_game_time_6 > 1000) m_game_time_6 = time;
 
 		// v2.05
 		if (m_final_shutdown_count != 0) {
@@ -12099,7 +12106,8 @@ void CGame::on_timer(char type)
 		notice_handler();
 		special_event_handler();
 		m_war_manager->energy_sphere_processor();
-		m_game_time_3 = time;
+		m_game_time_3 += 1000;
+		if (time - m_game_time_3 > 1000) m_game_time_3 = time;
 	}
 
 	if ((time - m_game_time_4) > 600) {
@@ -12107,12 +12115,14 @@ void CGame::on_timer(char type)
 		if (m_entity_manager != NULL)
 			m_entity_manager->process_spawns();
 
-		m_game_time_4 = time;
+		m_game_time_4 += 600;
+		if (time - m_game_time_4 > 600) m_game_time_4 = time;
 	}
 
 	if ((time - m_game_time_5) > 1000 * 60 * 3) {
 
-		m_game_time_5 = time;
+		m_game_time_5 += 1000 * 60 * 3;
+		if (time - m_game_time_5 > 1000 * 60 * 3) m_game_time_5 = time;
 
 		srand((unsigned)std::time(0));
 	}
@@ -12124,12 +12134,14 @@ void CGame::on_timer(char type)
 		m_war_manager->crusade_war_starter();
 		//ApocalypseStarter();
 		m_war_manager->apocalypse_ender();
-		m_fishing_manager->m_fish_time = time;
+		m_fishing_manager->m_fish_time += 5000;
+		if (time - m_fishing_manager->m_fish_time > 5000) m_fishing_manager->m_fish_time = time;
 	}
 
 	if ((time - m_weather_time) > 1000 * 20) {
 		weather_processor();
-		m_weather_time = time;
+		m_weather_time += 1000 * 20;
+		if (time - m_weather_time > 1000 * 20) m_weather_time = time;
 	}
 
 	// Periodic equipment validation — catches cascading invalidations
@@ -12141,7 +12153,8 @@ void CGame::on_timer(char type)
 			if (!m_client_list[i]->m_is_init_complete) continue;
 			m_item_manager->validate_equipped_items(i);
 		}
-		m_equip_validation_time = time;
+		m_equip_validation_time += 10000;
+		if (time - m_equip_validation_time > 10000) m_equip_validation_time = time;
 	}
 
 	if ((m_heldenian_running) && (m_is_heldenian_mode)) {
@@ -12149,7 +12162,8 @@ void CGame::on_timer(char type)
 	}
 	if ((time - m_can_fightzone_reserve_time) > 7200000) {
 		m_war_manager->fightzone_reserve_processor();
-		m_can_fightzone_reserve_time = time;
+		m_can_fightzone_reserve_time += 7200000;
+		if (time - m_can_fightzone_reserve_time > 7200000) m_can_fightzone_reserve_time = time;
 	}
 
 	// Scheduled shutdown: send milestone notifications, then begin disconnect
@@ -12208,7 +12222,8 @@ void CGame::on_timer(char type)
 	}
 
 	if ((time - m_map_sector_info_time) > 1000 * 10) {
-		m_map_sector_info_time = time;
+		m_map_sector_info_time += 1000 * 10;
+		if (time - m_map_sector_info_time > 1000 * 10) m_map_sector_info_time = time;
 		update_map_sector_info();
 
 		m_mining_manager->mineral_generator();
