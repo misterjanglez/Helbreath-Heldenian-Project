@@ -4558,7 +4558,6 @@ void CGame::init_player_data(int client_h, char* data, uint32_t size)
 #endif
 
 	check_special_event(client_h);
-	m_magic_manager->check_magic_int(client_h);
 	m_item_manager->validate_equipped_items(client_h);
 
 	send_notify_msg(0, client_h, Notify::Hunger, m_client_list[client_h]->m_hunger_status, 0, 0, 0);
@@ -6017,40 +6016,6 @@ void CGame::client_common_handler(int client_h, char* data)
 		{
 			auto* p = m_client_list[client_h];
 
-			// Build list of manual-based spells the player has learned
-			// Spells with gold_cost < 0 are not wizard-purchasable and have a manual item
-			struct ManualSpell { int magic_index; int item_id; };
-			std::vector<ManualSpell> manual_spells;
-
-			for (int i = 0; i < hb::shared::limits::MaxMagicType; i++)
-			{
-				if (p->m_magic_mastery[i] == 0 || m_magic_config_list[i] == nullptr) continue;
-				if (m_magic_config_list[i]->m_gold_cost >= 0) continue;
-
-				auto it = m_magic_to_manual_item.find(i);
-				if (it != m_magic_to_manual_item.end())
-					manual_spells.push_back({i, it->second});
-			}
-
-			// Pre-check: ensure enough total space (inventory + bank) for manuals
-			if (!manual_spells.empty())
-			{
-				int free_inv = 0;
-				for (int i = 0; i < hb::shared::limits::MaxItems; i++)
-					if (p->m_item_list[i] == nullptr) free_inv++;
-
-				int free_bank = 0;
-				for (int i = 0; i < hb::shared::limits::MaxBankItems; i++)
-					if (p->m_item_in_bank_list[i] == nullptr) free_bank++;
-
-				if (static_cast<int>(manual_spells.size()) > free_inv + free_bank)
-				{
-					send_notify_msg(0, client_h, Notify::NoticeMsg, 0, 0, 0,
-						"Cannot reset: not enough inventory and bank space for spell manuals.");
-					break;
-				}
-			}
-
 			// Reset stats
 			p->m_str = m_base_stat_value;
 			p->m_int = m_base_stat_value;
@@ -6062,79 +6027,8 @@ void CGame::client_common_handler(int client_h, char* data)
 				- (m_base_stat_value * 6 - m_base_stat_total);
 			if (p->m_levelup_pool < 0) p->m_levelup_pool = 0;
 
-			// Unlearn all spells — refund gold for wizard spells, skip manual spells (handled below)
-			int unlearned = 0;
-			uint64_t total_gold_refund = 0;
-			for (int i = 0; i < hb::shared::limits::MaxMagicType; i++)
-			{
-				if (p->m_magic_mastery[i] == 0 || m_magic_config_list[i] == nullptr) continue;
-				p->m_magic_mastery[i] = 0;
-				unlearned++;
-				if (m_magic_config_list[i]->m_gold_cost > 0)
-					total_gold_refund += m_magic_config_list[i]->m_gold_cost;
-			}
-
-			// Refund gold for wizard-purchased spells
-			if (total_gold_refund > 0)
-			{
-				uint64_t gold = m_item_manager->get_item_count_by_id(client_h, hb::shared::item::ItemId::Gold);
-				m_item_manager->set_item_count_by_id(client_h, hb::shared::item::ItemId::Gold, gold + total_gold_refund);
-			}
-
-			// Return manual items — try inventory (with weight check), overflow to bank
-			int manuals_returned = 0;
-			for (auto& ms : manual_spells)
-			{
-				CItem* item = new CItem();
-				if (!m_item_manager->init_item_attr(item, ms.item_id))
-				{
-					delete item;
-					continue;
-				}
-
-				bool placed = false;
-				int item_weight = m_item_manager->get_item_weight(item, 1);
-				if (p->m_cur_weight_load + item_weight <= calc_max_load(client_h))
-				{
-					for (int i = 0; i < hb::shared::limits::MaxItems; i++)
-					{
-						if (p->m_item_list[i] == nullptr)
-						{
-							p->m_item_list[i] = item;
-							p->m_item_pos_list[i].x = 40;
-							p->m_item_pos_list[i].y = 30;
-							calc_total_weight(client_h);
-							m_item_manager->send_item_notify_msg(client_h, Notify::ItemObtained, item, 0);
-							placed = true;
-							break;
-						}
-					}
-				}
-
-				if (!placed)
-				{
-					if (!m_item_manager->set_item_to_bank_item(client_h, item))
-						delete item;
-					else
-						placed = true;
-				}
-
-				if (placed) manuals_returned++;
-			}
-
-			// Notify the player
-			if (unlearned > 0)
-			{
-				std::string msg;
-				if (manuals_returned > 0 && total_gold_refund > 0)
-					msg = std::format("{} spell(s) unlearned, {} manual(s) returned, {} gold refunded.", unlearned, manuals_returned, total_gold_refund);
-				else if (manuals_returned > 0)
-					msg = std::format("{} spell(s) unlearned, {} manual(s) returned.", unlearned, manuals_returned);
-				else
-					msg = std::format("{} spell(s) unlearned, {} gold refunded.", unlearned, total_gold_refund);
-				send_notify_msg(0, client_h, Notify::NoticeMsg, 0, 0, 0, msg.c_str());
-			}
-
+			send_notify_msg(0, client_h, Notify::NoticeMsg, 0, 0, 0,
+				"Stats have been reset. Some spells may require higher Intelligence to cast.");
 			send_notify_msg(0, client_h, Notify::ForceMasteryRefresh, 0, 0, 0, 0);
 			calc_total_weight(client_h);
 
@@ -9236,7 +9130,6 @@ void CGame::state_change_handler(int client_h, char* data, size_t msg_size)
 	m_client_list[client_h]->m_vit -= vit;
 	m_client_list[client_h]->m_dex -= dex;
 	m_client_list[client_h]->m_int -= cInt;
-	if (cInt > 0) m_magic_manager->check_magic_int(client_h);
 	m_client_list[client_h]->m_mag -= mag;
 	m_client_list[client_h]->m_charisma -= cChar;
 
@@ -14495,9 +14388,6 @@ void CGame::reprocess_online_player(int client_h)
 
 	// Unequip items the player no longer meets requirements for
 	m_item_manager->validate_equipped_items(client_h);
-
-	// Disable spells requiring more INT than the player has
-	m_magic_manager->check_magic_int(client_h);
 
 	// Recompute level-up pool from current stats
 	int stats = p->m_str + p->m_dex + p->m_vit + p->m_int + p->m_mag + p->m_charisma;

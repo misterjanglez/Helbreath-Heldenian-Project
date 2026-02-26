@@ -75,6 +75,7 @@ void DialogBox_Magic::on_draw()
 
 	c_pivot = m_circle_view * 10;
 	yloc = 0;
+	int player_int = player().m_int + player().m_angelic_int;
 	for (i = 0; i < 9; i++)
 	{
 		if ((player().m_magic_mastery[c_pivot + i] != 0) && (m_game->m_magic_cfg_list[c_pivot + i] != 0))
@@ -83,8 +84,15 @@ void DialogBox_Magic::on_draw()
 			CMisc::replace_string(txt, '-', ' ');
 
 			mana_cost = magic_casting_system::get().get_mana_cost(c_pivot + i);
+			int int_req = m_game->m_magic_cfg_list[c_pivot + i]->m_value_2;
 
-			if (mana_cost > player().m_mp)
+			if (int_req > player_int)
+			{
+				hb::shared::text::draw_text(GameFont::Bitmap1, sX + 30, sY + 70 + yloc, txt, hb::shared::text::TextStyle::with_highlight(GameColors::UIMagicDisabled));
+				mana = std::format("{:3}", mana_cost);
+				hb::shared::text::draw_text(GameFont::Bitmap1, sX + 206, sY + 70 + yloc, mana.c_str(), hb::shared::text::TextStyle::with_highlight(GameColors::UIMagicDisabled));
+			}
+			else if (mana_cost > player().m_mp)
 			{
 				hb::shared::text::draw_text(GameFont::Bitmap1, sX + 30, sY + 70 + yloc, txt, hb::shared::text::TextStyle::with_highlight(GameColors::UIMagicPurple));
 				mana = std::format("{:3}", mana_cost);
@@ -223,12 +231,19 @@ bool DialogBox_Magic::on_click()
 	sY = m_y;
 	c_pivot = m_circle_view * 10;
 	yloc = 0;
+	int click_player_int = player().m_int + player().m_angelic_int;
 	for (i = 0; i < 9; i++)
 	{
 		if ((player().m_magic_mastery[c_pivot + i] != 0) && (m_game->m_magic_cfg_list[c_pivot + i] != 0))
 		{
 			if ((mouse_x >= sX + 30) && (mouse_x <= sX + 240) && (mouse_y >= sY + 70 + yloc) && (mouse_y <= sY + 70 + 18 + yloc))
 			{
+				int int_req = m_game->m_magic_cfg_list[c_pivot + i]->m_value_2;
+				if (int_req > click_player_int)
+				{
+					m_game->add_event_list(DLGBOX_CLICK_MAGIC3, 10);
+					return true;
+				}
 				magic_casting_system::get().begin_cast(c_pivot + i);
 				audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 				return true;

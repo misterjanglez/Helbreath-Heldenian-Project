@@ -276,7 +276,8 @@ void MagicManager::player_magic_handler(int client_h, int dX, int dY, short type
 	if (item_effect == false && m_game->m_magic_config_list[type]->m_intelligence_limit >
 		(m_game->m_client_list[client_h]->m_int + m_game->m_client_list[client_h]->m_angelic_int))
 	{
-		m_game->m_client_list[client_h]->m_magic_mastery[type] = 0;
+		m_game->send_notify_msg(0, client_h, Notify::NoticeMsg, 0, 0, 0,
+			"Insufficient Intelligence to cast this spell.");
 		return;
 	}
 
@@ -2606,33 +2607,6 @@ int MagicManager::get_magic_number(char* magic_name, int* req_int, int* cost)
 		}
 
 	return -1;
-}
-
-bool MagicManager::check_magic_int(int client_h)
-{
-	int disabled_count = 0;
-
-	for (int i = 0; i < hb::shared::limits::MaxMagicType; i++)
-	{
-		if (m_game->m_magic_config_list[i] != 0)
-		{
-			if (m_game->m_magic_config_list[i]->m_intelligence_limit >
-				(m_game->m_client_list[client_h]->m_int + m_game->m_client_list[client_h]->m_angelic_int))
-			{
-				if (m_game->m_client_list[client_h]->m_magic_mastery[i] != 0)
-					disabled_count++;
-				m_game->m_client_list[client_h]->m_magic_mastery[i] = 0;
-			}
-		}
-	}
-
-	if (disabled_count > 0)
-	{
-		auto msg = std::format("{} spell(s) disabled due to insufficient Intelligence.", disabled_count);
-		m_game->send_notify_msg(0, client_h, Notify::NoticeMsg, 0, 0, 0, msg.c_str());
-	}
-
-	return true;
 }
 
 int MagicManager::get_weather_magic_bonus_effect(short type, char wheather_status)

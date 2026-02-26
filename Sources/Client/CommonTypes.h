@@ -213,6 +213,7 @@ namespace GameColors
 	// Completed
 	inline constexpr hb::shared::render::Color UIMagicBlue{ 4,0,50 };
 	inline constexpr hb::shared::render::Color UIMagicPurple{ 60, 10, 60 };
+	inline constexpr hb::shared::render::Color UIMagicDisabled{ 50, 15, 15 };  // INT requirement not met
 	inline constexpr hb::shared::render::Color UIGuildGreen{ 130, 200, 130 };
 	inline constexpr hb::shared::render::Color UIWorldChat{ 255, 130, 130 };
 	inline constexpr hb::shared::render::Color UIFactionChat{ 130, 130, 255 };
