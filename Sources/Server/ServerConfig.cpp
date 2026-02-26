@@ -42,8 +42,9 @@ bool load_server_config(const std::string& path, server_config& cfg)
 
 	if (!std::filesystem::exists(file_path))
 	{
-		hb::logger::error("server_config.json not found at '{}'", file_path);
-		return false;
+		hb::logger::warn("server_config.json not found - creating with defaults at '{}'", file_path);
+		save_server_config(file_path, cfg);
+		return true;
 	}
 
 	std::ifstream file(file_path);

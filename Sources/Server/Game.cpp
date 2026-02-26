@@ -987,7 +987,6 @@ bool CGame::init()
 		return false;
 	}
 	apply_server_config(cfg);
-	save_server_config("server_config.json", cfg);
 
 	sqlite3* configDb = nullptr;
 	std::string configDbPath;
