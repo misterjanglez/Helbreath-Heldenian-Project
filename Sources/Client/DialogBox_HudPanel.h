@@ -35,8 +35,8 @@ private:
 	static constexpr int BASE_HP_BAR_X = 23;
 	static constexpr int BASE_HP_BAR_Y = 437;
 	static constexpr int BASE_MP_BAR_Y = 459;
-	static constexpr int BASE_SP_BAR_X = 148;
-	static constexpr int BASE_SP_BAR_Y = 434;
+	static constexpr int BASE_SP_BAR_X = 150;
+	static constexpr int BASE_SP_BAR_Y = 435;
 	static constexpr int BASE_HUNGER_BAR_X = 139;
 	static constexpr int BASE_HUNGER_BAR_Y = 11;
 	static constexpr int BASE_EXP_BAR_X = 0;

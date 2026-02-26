@@ -31,12 +31,12 @@ namespace client
 constexpr int major = 0;
 constexpr int minor = 2;
 constexpr int patch = 47;
-constexpr int build_number = 282;
+constexpr int build_number = 283;
 constexpr const char* stage = "alpha";
 constexpr const char* display_version = "0.2.47-alpha";
-constexpr const char* full_version = "0.2.47-alpha+build.282";
+constexpr const char* full_version = "0.2.47-alpha+build.283";
 } // namespace client
 
-constexpr const char* build_timestamp = "2026-02-26T12:32:49";
+constexpr const char* build_timestamp = "2026-02-26T10:48:13";
 
 } // namespace hb::version

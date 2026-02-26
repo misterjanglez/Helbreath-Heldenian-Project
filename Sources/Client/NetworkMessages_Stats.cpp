@@ -113,7 +113,7 @@ namespace NetworkMessageHandlers {
 			txt = std::format(EXP_INCREASED, game->m_player->m_exp - prev_exp);
 			game->add_event_list(txt.c_str(), 10);
 		}
-		else
+		else if (game->m_player->m_exp < prev_exp)
 		{
 			txt = std::format(EXP_DECREASED, prev_exp - game->m_player->m_exp);
 			game->add_event_list(txt.c_str(), 10);

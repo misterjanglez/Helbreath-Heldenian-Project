@@ -1224,6 +1224,7 @@
 
 #define	DLGBOX_CLICK_MAGIC1	"Your hands must be free for casting magic."
 #define	DLGBOX_CLICK_MAGIC2	"Can't cast while using a skill."
+#define	DLGBOX_CLICK_MAGIC3	"Insufficient Intelligence to cast this spell."
 
 
 #define	TALKING_TO_GUILDHALL_OFFICER	"Talking to Guildhall Officer..."

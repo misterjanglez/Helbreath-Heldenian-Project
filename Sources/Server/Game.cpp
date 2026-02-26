@@ -9043,8 +9043,6 @@ bool CGame::check_level_up(int client_h)
 			//addon
 			send_notify_msg(0, client_h, Notify::GizonItemUpgradeLeft, m_client_list[client_h]->m_gizon_item_upgrade_left, 1, 0, 0);
 		}
-
-		send_notify_msg(0, client_h, Notify::Exp, 0, 0, 0, 0);
 	}
 
 	return false;
