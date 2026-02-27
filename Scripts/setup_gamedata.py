@@ -49,7 +49,7 @@ def create_formula_tables(db, dry_run):
             ('max_mp',            'mag * 2 + angelic_mag * 2 + level * 2 + int * 0.5 + angelic_int * 0.5',                            'Maximum mana points'),
             ('max_sp',            'str * 2 + angelic_str * 2 + level * 2',                                                            'Maximum stamina points'),
             ('max_load',          'str * 5 + angelic_str * 5 + level * 5',                                                            'Maximum carry weight'),
-            ('level_exp',         'sum(1, level, i * (50 + i * trunc(i / 17) * trunc(i / 17)))',                                      'Total XP to reach level'),
+            ('level_exp',         'level * (50 + level * trunc(level / 17) * trunc(level / 17))',                                      'XP cost for a single level'),
             ('hp_regen_max_roll',       'vit',                                'HP regen dice ceiling'),
             ('hp_regen_min_roll',       'vit / 2',                            'HP regen hard floor clamp'),
             ('hp_regen_roll_variance',  '30 * vit / (vit + 60)',              'HP regen bonus variance (diminishing returns)'),

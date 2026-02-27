@@ -1,5 +1,6 @@
 #include "CombatManager.h"
 #include "Game.h"
+#include <algorithm>
 #include "StatusEffectManager.h"
 #include "WarManager.h"
 #include "SkillManager.h"
@@ -1405,7 +1406,7 @@ void CombatManager::effect_hp_up_spot(short attacker_h, char attacker_type, shor
 		if (m_game->m_npc_list[target_h] == 0) return;
 		if (m_game->m_npc_list[target_h]->m_hp <= 0) return;
 		if (m_game->m_npc_list[target_h]->m_is_killed) return;
-		max_hp = m_game->m_npc_list[target_h]->m_hit_dice * 4;
+		max_hp = m_game->m_npc_list[target_h]->m_max_hp;
 		if (m_game->m_npc_list[target_h]->m_hp < max_hp) {
 			m_game->m_npc_list[target_h]->m_hp += hp;
 			if (m_game->m_npc_list[target_h]->m_hp > max_hp) m_game->m_npc_list[target_h]->m_hp = max_hp;
@@ -3345,7 +3346,7 @@ uint32_t CombatManager::calculate_attack_effect(short target_h, char target_type
 			if (m_game->m_npc_list[target_h]->m_hp <= 0) {
 				m_game->m_entity_manager->on_entity_killed(target_h, attacker_h, attacker_type, damage);
 				killed = true;
-				killed_dice = m_game->m_npc_list[target_h]->m_hit_dice;
+				killed_dice = std::max(1, m_game->m_npc_list[target_h]->m_max_hp / 5);
 			}
 			else {
 				bool skip_counter =
@@ -3509,7 +3510,7 @@ uint32_t CombatManager::calculate_attack_effect(short target_h, char target_type
 					m_game->m_delay_event_manager->remove_from_delay_event_list(target_h, hb::shared::owner_class::Npc, hb::shared::magic::HoldObject);
 				}
 				else if (m_game->m_npc_list[target_h]->m_magic_effect_status[hb::shared::magic::HoldObject] == 2) {
-					if ((m_game->m_npc_list[target_h]->m_hit_dice > 50) && (m_game->dice(1, 10) == 5)) {
+					if (m_game->m_npc_list[target_h]->m_hold_resist > 0 && m_game->dice(1, 100) <= static_cast<uint32_t>(m_game->m_npc_list[target_h]->m_hold_resist)) {
 						m_game->m_npc_list[target_h]->m_magic_effect_status[hb::shared::magic::HoldObject] = 0;
 						m_game->m_delay_event_manager->remove_from_delay_event_list(target_h, hb::shared::owner_class::Npc, hb::shared::magic::HoldObject);
 					}

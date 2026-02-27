@@ -749,7 +749,6 @@ void CEntityManager::process_entities()
     if (m_game->m_on_exit_process)
         return;
 
-    int max_hp;
     uint32_t time, action_time;
 
     time = GameClock::GetTimeMS();
@@ -800,12 +799,12 @@ void CEntityManager::process_entities()
                 m_npc_list[i]->m_hp_up_time += HpUpTime;
                 if (time - m_npc_list[i]->m_hp_up_time > HpUpTime) m_npc_list[i]->m_hp_up_time = time;
 
-                max_hp = m_game->dice(m_npc_list[i]->m_hit_dice, 8) + m_npc_list[i]->m_hit_dice;
-                if (m_npc_list[i]->m_hp < max_hp) {
-                    if (m_npc_list[i]->m_is_summoned == false)
-                        m_npc_list[i]->m_hp += m_game->dice(1, m_npc_list[i]->m_hit_dice);
-
-                    if (m_npc_list[i]->m_hp > max_hp) m_npc_list[i]->m_hp = max_hp;
+                if (m_npc_list[i]->m_hp < m_npc_list[i]->m_max_hp) {
+                    if (m_npc_list[i]->m_is_summoned == false) {
+                        int regen = m_game->dice(1, (m_npc_list[i]->m_hp_max - m_npc_list[i]->m_hp_min) / 2 + 5);
+                        m_npc_list[i]->m_hp += regen;
+                    }
+                    if (m_npc_list[i]->m_hp > m_npc_list[i]->m_max_hp) m_npc_list[i]->m_hp = m_npc_list[i]->m_max_hp;
                     if (m_npc_list[i]->m_hp <= 0)     m_npc_list[i]->m_hp = 1;
                 }
             }
@@ -1619,7 +1618,8 @@ void CEntityManager::npc_behavior_flee(int npc_h)
 		m_npc_list[npc_h]->m_behavior = Behavior::Move;
 		m_npc_list[npc_h]->m_tmp_error = 0;
 		if (m_npc_list[npc_h]->m_hp <= 3) {
-			m_npc_list[npc_h]->m_hp += m_game->dice(1, m_npc_list[npc_h]->m_hit_dice);
+			int regen = m_game->dice(1, (m_npc_list[npc_h]->m_hp_max - m_npc_list[npc_h]->m_hp_min) / 2 + 5);
+			m_npc_list[npc_h]->m_hp += regen;
 			if (m_npc_list[npc_h]->m_hp <= 0) m_npc_list[npc_h]->m_hp = 1;
 		}
 		return;

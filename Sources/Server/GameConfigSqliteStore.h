@@ -1,10 +1,23 @@
 #pragma once
 
 #include <string>
+#include <vector>
 
 struct sqlite3;
 class CItem;
 class CGame;
+
+struct creation_item_entry
+{
+	int class_type;    // 0=all, 1=warrior, 2=mage, 3=master
+	int item_id;
+	int count;
+	int item_color;
+	int lifespan;      // 0 = use item's max_lifespan from config
+	int is_equipped;
+	int gender_limit;  // 0=any, 1=male only, 2=female only
+	int sort_order;
+};
 
 bool EnsureGameConfigDatabase(sqlite3** outDb, std::string& outPath, bool* outCreated);
 bool SaveItemConfigs(sqlite3* db, CItem* const* itemList, int maxItems);
@@ -34,6 +47,8 @@ bool SaveCrusadeConfig(sqlite3* db, const CGame* game);
 bool LoadCrusadeConfig(sqlite3* db, CGame* game);
 bool SaveScheduleConfig(sqlite3* db, const CGame* game);
 bool LoadScheduleConfig(sqlite3* db, CGame* game);
+bool LoadCreationItems(sqlite3* db, std::vector<creation_item_entry>& out_items);
+bool SaveCreationItems(sqlite3* db, const std::vector<creation_item_entry>& items);
 bool HasGameConfigRows(sqlite3* db, const char* tableName);
 void CloseGameConfigDatabase(sqlite3* db);
 

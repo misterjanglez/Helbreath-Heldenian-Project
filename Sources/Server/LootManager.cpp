@@ -311,8 +311,10 @@ void LootManager::apply_combat_killed_penalty(int client_h, int penalty_level, b
 
 		// if (m_game->m_client_list[client_h]->m_level == hb::shared::limits::PlayerMaxLevel) exp = 0;
 
-		m_game->m_client_list[client_h]->m_exp -= exp;
-		if (m_game->m_client_list[client_h]->m_exp < 0) m_game->m_client_list[client_h]->m_exp = 0;
+		if (exp > m_game->m_client_list[client_h]->m_exp)
+			m_game->m_client_list[client_h]->m_exp = 0;
+		else
+			m_game->m_client_list[client_h]->m_exp -= exp;
 
 		m_game->send_notify_msg(0, client_h, Notify::Exp, 0, 0, 0, 0);
 

@@ -18,6 +18,7 @@ using namespace std;
 #include "Log.h"
 #include "ServerLogChannels.h"
 #include "Item/ItemEnums.h"
+#include "CharacterClass.h"
 #include "version_info.h"
 #include "Game.h"
 #include <filesystem>
@@ -454,56 +455,57 @@ void LoginServer::response_character(int h, char* data)
 
 	bool ok = InsertCharacterState(db, state);
 
-	// Starter item IDs from gamedata.db
-	constexpr int ITEM_DAGGER = 1;
-	constexpr int ITEM_BIG_RED_POTION = 92;    // Health potion
-	constexpr int ITEM_BIG_BLUE_POTION = 94;   // Mana potion
-	constexpr int ITEM_MAP = 104;
-	constexpr int ITEM_RECALL_SCROLL = 114;
-	constexpr int ITEM_KNEE_TROUSERS_M = 460;  // Shorts for males
-	constexpr int ITEM_BODICE_W = 473;         // Bodice for females
+	// Validate and collect creation items for this class + gender
+	int player_class = static_cast<int>(req->class_type);
+	if (!hb::shared::character_class::is_valid_player_class(player_class))
+	{
+		hb::logger::warn<hb::log_channel::security>(
+			"Invalid class_type {} from account '{}'", player_class, acc);
+		CloseAccountDatabase(db);
+		send_login_msg(LogResMsg::NewCharacterFailed, LogResMsg::NewCharacterFailed, 0, 0, h);
+		return;
+	}
 
 	std::vector<AccountDbItemRow> items;
-	auto addItem = [&](int item_id, int item_color) {
+	for (const auto& entry : G_pGame->m_creation_items)
+	{
+		// Skip if not for this class (and not "all")
+		if (entry.class_type != hb::shared::character_class::all
+			&& entry.class_type != player_class)
+			continue;
+
+		// Skip if gender-restricted and doesn't match
+		if (entry.gender_limit != 0 && entry.gender_limit != gender)
+			continue;
+
+		// Validate item_id exists in config
+		if (entry.item_id <= 0 || entry.item_id >= MaxItemTypes
+			|| G_pGame->m_item_config_list[entry.item_id] == nullptr)
+		{
+			hb::logger::warn("Creation item_id {} not found in item config, skipping", entry.item_id);
+			continue;
+		}
+
 		AccountDbItemRow item = {};
 		item.slot = static_cast<int>(items.size());
-		item.item_id = item_id;
-		item.count = 1;
+		item.item_id = entry.item_id;
+		item.count = entry.count;
 		item.touch_effect_type = 0;
 		item.touch_effect_value1 = 0;
 		item.touch_effect_value2 = 0;
 		item.touch_effect_value3 = 0;
-		item.item_color = item_color;
+		item.item_color = entry.item_color;
 		item.spec_effect_value1 = 0;
 		item.spec_effect_value2 = 0;
 		item.spec_effect_value3 = 0;
-		item.cur_life_span = 300;
+		item.cur_life_span = (entry.lifespan > 0)
+			? entry.lifespan
+			: G_pGame->m_item_config_list[entry.item_id]->m_max_life_span;
 		item.attribute = 0;
 		item.pos_x = 40;
 		item.pos_y = 30;
-		item.is_equipped = 0;
+		item.is_equipped = entry.is_equipped;
 		items.push_back(item);
-	};
-
-	addItem(ITEM_DAGGER, 0);
-	addItem(ITEM_RECALL_SCROLL, 0);
-	addItem(ITEM_BIG_RED_POTION, 0);
-	addItem(ITEM_BIG_BLUE_POTION, 0);
-	addItem(ITEM_MAP, 0);
-
-	// Gender-specific clothing: males get shorts, females get bodice
-	if (gender == 1) {
-		addItem(ITEM_KNEE_TROUSERS_M, 0);
-	} else {
-		addItem(ITEM_BODICE_W, 0);
-	}
-
-	const char* equipStatus = "00000110000000000000000000000000000000000000000000";
-	const size_t equipLen = std::strlen(equipStatus);
-	for (auto& item : items) {
-		if (item.slot < static_cast<int>(equipLen) && equipStatus[item.slot] == '1') {
-			item.is_equipped = 1;
-		}
 	}
 
 	std::vector<AccountDbIndexedValue> positionsX;
@@ -518,7 +520,14 @@ void LoginServer::response_character(int h, char* data)
 		equip.index = i;
 		pos_x.value = 40;
 		pos_y.value = 30;
-		equip.value = (i < static_cast<int>(equipLen) && equipStatus[i] == '1') ? 1 : 0;
+		// Derive equip status from the items we just built
+		equip.value = 0;
+		for (const auto& it : items) {
+			if (it.slot == i) {
+				equip.value = it.is_equipped;
+				break;
+			}
+		}
 		positionsX.push_back(pos_x);
 		positionsY.push_back(pos_y);
 		equips.push_back(equip);

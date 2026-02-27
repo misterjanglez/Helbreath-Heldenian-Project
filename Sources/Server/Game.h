@@ -48,6 +48,7 @@ extern bool G_bRunning;
 #include "ConcurrentMsgQueue.h"
 #include "ServerConfig.h"
 #include "FormulaEngine.h"
+#include "GameConfigSqliteStore.h"
 
 namespace hb::server::config
 {
@@ -487,8 +488,6 @@ public:
 	char m_game_connection_ip[16];   // Optional - for future login->game server connection
 	int  m_game_connection_port;     // Optional - for future login->game server connection
 
-	uint32_t  m_level_exp_20;
-
 //private:
 	bool load_player_data_from_db(int client_h);
 	bool register_map(char * name);
@@ -527,6 +526,9 @@ public:
 	bool m_is_shop_data_available;
 	std::map<int, int> m_npc_shop_mappings;        // npc_config_id  shop_id
 	std::map<int, ShopData> m_shop_data;          // shop_id  ShopData
+
+	// Character creation items (loaded from gamedata.db)
+	std::vector<creation_item_entry> m_creation_items;
 	CItem   * m_item_config_list[hb::server::config::MaxItemTypes];
 	class CNpc    * m_npc_config_list[hb::server::config::MaxNpcTypes];
 	class CMagic  * m_magic_config_list[hb::shared::limits::MaxMagicType];

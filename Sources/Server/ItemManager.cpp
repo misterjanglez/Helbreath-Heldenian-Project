@@ -1376,8 +1376,10 @@ void ItemManager::give_item_handler(int client_h, short item_index, int amount, 
 
 							m_game->send_event_to_near_client_type_a(client_h, hb::shared::owner_class::Player, MsgId::EventMotion, Type::NullAction, 0, 0, 0);
 
-							m_game->m_client_list[client_h]->m_exp -= 300;
-							if (m_game->m_client_list[client_h]->m_exp < 0) m_game->m_client_list[client_h]->m_exp = 0;
+							if (m_game->m_client_list[client_h]->m_exp > 300)
+								m_game->m_client_list[client_h]->m_exp -= 300;
+							else
+								m_game->m_client_list[client_h]->m_exp = 0;
 							m_game->send_notify_msg(0, client_h, Notify::Exp, 0, 0, 0, 0);
 						}
 
@@ -1420,8 +1422,10 @@ void ItemManager::give_item_handler(int client_h, short item_index, int amount, 
 
 						m_game->send_event_to_near_client_type_a(client_h, hb::shared::owner_class::Player, MsgId::EventMotion, Type::NullAction, 0, 0, 0);
 
-						m_game->m_client_list[client_h]->m_exp -= 300;
-						if (m_game->m_client_list[client_h]->m_exp < 0) m_game->m_client_list[client_h]->m_exp = 0;
+						if (m_game->m_client_list[client_h]->m_exp > 300)
+							m_game->m_client_list[client_h]->m_exp -= 300;
+						else
+							m_game->m_client_list[client_h]->m_exp = 0;
 						m_game->send_notify_msg(0, client_h, Notify::Exp, 0, 0, 0, 0);
 
 						delete m_game->m_client_list[client_h]->m_item_list[item_index];

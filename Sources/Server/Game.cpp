@@ -1022,7 +1022,6 @@ bool CGame::init()
 
 	for (int i = 1; i < 1000; i++)
 		m_level_exp_table[i] = get_level_exp(i);
-	m_level_exp_20 = m_level_exp_table[20];
 
 	if (!LoadBannedListConfig(configDb, this)) {
 		hb::logger::error("Cannot start server: banned list unavailable in gamedata.db");
@@ -1094,6 +1093,14 @@ bool CGame::init()
 		hb::logger::error("Cannot start server: item configs missing in gamedata.db");
 		CloseGameConfigDatabase(configDb);
 		return false;
+	}
+
+	// Load character creation items (optional — empty table means no starter items)
+	if (HasGameConfigRows(configDb, "character_creation_items")) {
+		LoadCreationItems(configDb, m_creation_items);
+	}
+	if (m_creation_items.empty()) {
+		hb::logger::warn("No character creation items configured in gamedata.db");
 	}
 
 	m_is_build_item_available = false;
@@ -3847,7 +3854,7 @@ void CGame::check_client_response_time()
 					if (value <= 0) value = 1;
 					uint32_t value_dw = static_cast<uint32_t>(value);
 					if (m_client_list[i]->m_auto_exp_amount < value_dw) {
-						if ((m_client_list[i]->m_exp + value_dw) < m_level_exp_table[m_client_list[i]->m_level + 1]) {
+						if ((m_client_list[i]->m_exp + value_dw) < m_client_list[i]->m_next_level_exp) {
 							//m_client_list[i]->m_exp_stock += value;
 							get_exp(i, value_dw, false);
 							calc_exp_stock(i);
@@ -8199,11 +8206,12 @@ bool CGame::init_npc_attr(class CNpc* npc, int npc_config_id, short sClass, char
 
 				npc->m_type = m_npc_config_list[config_idx]->m_type;
 
-				// HitDice   .    .
-				if (m_npc_config_list[config_idx]->m_hit_dice <= 5)
-					npc->m_hp = (dice(m_npc_config_list[config_idx]->m_hit_dice, 4) + m_npc_config_list[config_idx]->m_hit_dice);
-				else npc->m_hp = ((m_npc_config_list[config_idx]->m_hit_dice * 4) + m_npc_config_list[config_idx]->m_hit_dice + dice(1, m_npc_config_list[config_idx]->m_hit_dice));
-				if (npc->m_hp == 0) npc->m_hp = 1;
+				int hp_range = m_npc_config_list[config_idx]->m_hp_max - m_npc_config_list[config_idx]->m_hp_min;
+				if (hp_range > 0)
+					npc->m_hp = dice(1, hp_range) + m_npc_config_list[config_idx]->m_hp_min;
+				else
+					npc->m_hp = m_npc_config_list[config_idx]->m_hp_min;
+				if (npc->m_hp <= 0) npc->m_hp = 1;
 
 				//50Cent - HP Bar
 				npc->m_max_hp = npc->m_hp;
@@ -8215,7 +8223,9 @@ bool CGame::init_npc_attr(class CNpc* npc, int npc_config_id, short sClass, char
 				npc->m_drop_table_id = m_npc_config_list[config_idx]->m_drop_table_id;
 				npc->m_exp = (dice(1, (m_npc_config_list[config_idx]->m_exp_dice_max - m_npc_config_list[config_idx]->m_exp_dice_min)) + m_npc_config_list[config_idx]->m_exp_dice_min);
 
-				npc->m_hit_dice = m_npc_config_list[config_idx]->m_hit_dice;
+				npc->m_hp_min = m_npc_config_list[config_idx]->m_hp_min;
+				npc->m_hp_max = m_npc_config_list[config_idx]->m_hp_max;
+				npc->m_hold_resist = m_npc_config_list[config_idx]->m_hold_resist;
 				npc->m_defense_ratio = m_npc_config_list[config_idx]->m_defense_ratio;
 				npc->m_hit_ratio = m_npc_config_list[config_idx]->m_hit_ratio;
 				npc->m_min_bravery = m_npc_config_list[config_idx]->m_min_bravery;
@@ -9010,10 +9020,20 @@ bool CGame::check_level_up(int client_h)
 	{
 		if (m_client_list[client_h]->m_level < m_max_level)
 		{
+			// Traveler cap — block level-up past 19 for unjoineded characters
+			if (m_client_list[client_h]->m_level + 1 > 19
+				&& memcmp(m_client_list[client_h]->m_location, "NONE", 4) == 0)
+			{
+				m_client_list[client_h]->m_exp = m_client_list[client_h]->m_next_level_exp - 1;
+				send_notify_msg(0, client_h, Notify::TravelerLimitedLevel, 0, 0, 0, 0);
+				break;
+			}
+
+			// Carry over remainder exp into the next level
+			m_client_list[client_h]->m_exp -= m_client_list[client_h]->m_next_level_exp;
+
 			m_client_list[client_h]->m_level++;
 			m_client_list[client_h]->m_levelup_pool += m_levelup_stat_gain;
-//			if ( (m_client_list[client_h]->m_cLU_Str + m_client_list[client_h]->m_cLU_Vit + m_client_list[client_h]->m_cLU_Dex + 
-//	  		      m_client_list[client_h]->m_cLU_Int + m_client_list[client_h]->m_cLU_Mag + m_client_list[client_h]->m_cLU_Char) <= TotalLevelUpPoint) {
 
 			if (m_client_list[client_h]->m_str > CharPointLimit)      m_client_list[client_h]->m_str = CharPointLimit;
 			if (m_client_list[client_h]->m_dex > CharPointLimit)      m_client_list[client_h]->m_dex = CharPointLimit;
@@ -9031,16 +9051,17 @@ bool CGame::check_level_up(int client_h)
 			send_notify_msg(0, client_h, Notify::LevelUp, 0, 0, 0, 0);
 			send_notify_msg(0, client_h, Notify::LevelUpPoints, 0, 0, 0, 0);
 
-			m_client_list[client_h]->m_next_level_exp = m_level_exp_table[m_client_list[client_h]->m_level + 1]; //get_level_exp(m_client_list[client_h]->m_level + 1);
+			m_client_list[client_h]->m_next_level_exp = m_level_exp_table[m_client_list[client_h]->m_level + 1];
 
 			m_item_manager->calc_total_item_effect(client_h, -1, false);
 		}
 		else {
+			// Majestic — carry over remainder, award upgrade point
+			m_client_list[client_h]->m_exp -= m_client_list[client_h]->m_next_level_exp;
 			m_client_list[client_h]->m_gizon_item_upgrade_left++;
 
 			m_client_list[client_h]->m_next_level_exp = m_level_exp_table[m_max_level + 1];
-			m_client_list[client_h]->m_exp = m_level_exp_table[m_max_level];
-			//addon
+
 			send_notify_msg(0, client_h, Notify::GizonItemUpgradeLeft, m_client_list[client_h]->m_gizon_item_upgrade_left, 1, 0, 0);
 		}
 	}
@@ -9342,11 +9363,11 @@ bool CGame::check_limited_user(int client_h)
 {
 	if (m_client_list[client_h] == 0) return false;
 
-	if ((memcmp(m_client_list[client_h]->m_location, "NONE", 4) == 0) &&
-		(m_client_list[client_h]->m_exp >= m_level_exp_20)) {
-		// 20   19 .
-
-		m_client_list[client_h]->m_exp = m_level_exp_20 - 1;
+	// Safety net — if a traveler somehow reached level 20+, clamp exp
+	if (memcmp(m_client_list[client_h]->m_location, "NONE", 4) == 0
+		&& m_client_list[client_h]->m_level >= 20)
+	{
+		m_client_list[client_h]->m_exp = 0;
 		send_notify_msg(0, client_h, Notify::TravelerLimitedLevel, 0, 0, 0, 0);
 		return true;
 	}

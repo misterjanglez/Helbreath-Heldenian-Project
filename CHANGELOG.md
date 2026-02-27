@@ -1,0 +1,5 @@
+# NPC balancing, XP rework, and database-driven creation items
+
+Changed the XP system from accumulative to per-level - each level now requires its own XP amount starting from zero instead of tracking a running total. Replaced the opaque hit_dice system with purpose-specific hp_min, hp_max, and hold_resist columns, giving fine-grained control over NPC spawn HP, regen, magic heal caps, hold magic resistance, and weapon skill XP on kill. Created a migration script for existing databases and updated the NpcEditor and ExpCurve tools for the new fields.
+
+Moved character creation starter items from hard-coded C++ into a database table in gamedata.db, allowing per-class and per-gender item assignment without recompiling. Added a character class enum and class_type field to the creation packet so the server knows which class was selected. Built a new Creation Item Manager web tool for editing starter items per class.

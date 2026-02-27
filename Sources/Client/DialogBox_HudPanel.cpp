@@ -126,16 +126,13 @@ void DialogBox_HudPanel::draw_gauge_bars()
 	sprite->DrawWidth(HUNGER_BAR_X(), m_y + HUNGER_BAR_Y(), 17, bar_height, true);
 
 	// EXP bar (horizontal — frame 18 fills from empty to full)
-	// remaining exp shrinks toward 0 as player approaches next level; 0 remaining = full bar
-	uint32_t cur_level_exp = m_game->get_level_exp(player().m_level);
+	// m_exp is progress toward next level (0 to threshold), fills left-to-right
 	uint32_t next_level_exp = m_game->get_level_exp(player().m_level + 1);
 	auto exp_frame = sprite->GetFrameRect(18);
 	int exp_width = 0;
-	if (next_level_exp > cur_level_exp)
+	if (next_level_exp > 0)
 	{
-		uint32_t exp_range = next_level_exp - cur_level_exp;
-		uint32_t remaining = (player().m_exp < next_level_exp) ? (next_level_exp - player().m_exp) : 0;
-		exp_width = exp_frame.width - (int)((uint64_t)remaining * exp_frame.width / exp_range);
+		exp_width = (int)((uint64_t)player().m_exp * exp_frame.width / next_level_exp);
 	}
 	if (exp_width < 0) exp_width = 0;
 	if (exp_width > exp_frame.width) exp_width = exp_frame.width;
@@ -184,18 +181,11 @@ void DialogBox_HudPanel::draw_status_icons()
 	std::string infoBuf;
 	if (hb::shared::input::is_ctrl_down())
 	{
-		uint32_t cur_exp = m_game->get_level_exp(player().m_level);
 		uint32_t next_exp = m_game->get_level_exp(player().m_level + 1);
-		if (player().m_exp < next_exp)
-		{
-			uint32_t exp_range = next_exp - cur_exp;
-			uint32_t exp_progress = (player().m_exp > cur_exp) ? (player().m_exp - cur_exp) : 0;
-			infoBuf = std::format("Rest Exp: {}", exp_range - exp_progress);
-		}
+		if (next_exp > player().m_exp)
+			infoBuf = std::format("Rest Exp: {}", next_exp - player().m_exp);
 		else
-		{
 			infoBuf.clear();
-		}
 	}
 	else
 	{

@@ -21,6 +21,7 @@
 #include "toggle_button.h"
 #include "IRenderer.h"
 #include "Packet/SharedPackets.h"
+#include "CharacterClass.h"
 #include "CharInfo.h"
 #include "AudioManager.h"
 #include <algorithm>
@@ -369,6 +370,14 @@ void Screen_CreateNewCharacter::submit_create_character()
     req.intl = static_cast<uint8_t>(m_game->m_new_char.stat_int);
     req.mag = static_cast<uint8_t>(m_game->m_new_char.stat_mag);
     req.chr = static_cast<uint8_t>(m_game->m_new_char.stat_chr);
+
+    // Map UI button to protocol class_type; default to warrior if none selected
+    using namespace hb::shared::character_class;
+    uint8_t cls = warrior;
+    if (m_selected_class == BTN_MAGE) cls = mage;
+    else if (m_selected_class == BTN_MASTER) cls = master;
+    req.class_type = cls;
+
     m_game->set_pending_login_packet(req);
 
     m_game->m_l_sock = std::make_unique<hb::shared::net::ASIOSocket>(m_game->m_io_pool->get_context(), game_limits::socket_block_limit);

@@ -82,7 +82,9 @@ public:
 	int  m_hp, m_max_hp;						// Hit Point 
 	uint32_t  m_exp;                    // ? ? . ExpDice  .
 
-	int  m_hit_dice;				// Hit Dice.   HP .
+	int  m_hp_min;
+	int  m_hp_max;
+	int  m_hold_resist;
 	int  m_defense_ratio;			// Defense Ratio
 	int  m_hit_ratio;				// HitRatio
 	int  m_magic_hit_ratio;

@@ -29,7 +29,7 @@ _SCRIPT_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(_SCRIPT_DIR))
 from paklib import PAKFile
 
-DEFAULT_DB = _SCRIPT_DIR.parent.parent / 'Binaries' / 'Server' / 'gameconfigs.db'
+DEFAULT_DB = _SCRIPT_DIR.parent.parent / 'Binaries' / 'Server' / 'gamedata.db'
 DEFAULT_METADATA = _SCRIPT_DIR / 'contents' / 'ItemSpriteMetadata.json'
 DEFAULT_ITEMS_DIR = _SCRIPT_DIR / 'sprites' / 'items'
 DEFAULT_ATLAS = _SCRIPT_DIR / 'sprites' / 'item_atlas.pak'
