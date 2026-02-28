@@ -14,7 +14,6 @@
 #include "BalanceConstants.h"
 
 using namespace hb::shared::net;
-using hb::shared::item::ItemType;
 using hb::shared::item::EquipPos;
 using hb::shared::item::to_int;
 
@@ -64,8 +63,7 @@ int inventory_manager::calc_total_weight()
 		if (m_game->m_player->m_item_list[i] != 0)
 		{
 			CItem* cfg = m_game->get_item_config(m_game->m_player->m_item_list[i]->m_id_num);
-			if (cfg && ((cfg->get_item_type() == ItemType::Consume)
-				|| (cfg->get_item_type() == ItemType::Arrow)))
+			if (cfg && (cfg->is_stackable()))
 			{
 				int lp = m_game->m_player->m_item_list[i]->get_light_percent();
 				int item_w = (lp > 0) ? cfg->m_weight * (100 - lp) / 100 : cfg->m_weight;
@@ -177,7 +175,7 @@ void inventory_manager::unequip_slot(int equip_pos)
 	// Remove Angelic Stats
 	CItem* cfg_eq = m_game->get_item_config(m_game->m_player->m_item_list[m_game->m_item_equipment_status[equip_pos]]->m_id_num);
 	if ((equip_pos >= 11)
-		&& (cfg_eq && cfg_eq->get_item_type() == ItemType::Equip))
+		&& (cfg_eq && cfg_eq->get_item_type() == hb::shared::item::item_type::equipment))
 	{
 		short item_id = m_game->m_item_equipment_status[equip_pos];
 		if (m_game->m_player->m_item_list[item_id]->m_id_num == hb::shared::item::ItemId::AngelicPandentSTR)
@@ -210,7 +208,7 @@ void inventory_manager::equip_item(int item_id)
 		m_game->add_event_list(BITEMDROP_CHARACTER3, 10);
 		return;
 	}
-	if (m_game->m_player->m_item_list[item_id]->m_cur_life_span == 0)
+	if (m_game->m_player->m_item_list[item_id]->m_cur_durability == 0)
 	{
 		m_game->add_event_list(BITEMDROP_CHARACTER1, 10);
 		return;
@@ -223,7 +221,7 @@ void inventory_manager::equip_item(int item_id)
 		m_game->add_event_list(BITEMDROP_CHARACTER2, 10);
 		return;
 	}
-	if (((m_game->m_player->m_item_list[item_id]->m_attribute & 0x00000001) == 0) && (cfg->m_level_limit > m_game->m_player->m_level))
+	if (((m_game->m_player->m_item_list[item_id]->m_attribute & 0x00000001) == 0) && (cfg->m_level_requirement > m_game->m_player->m_level))
 	{
 		m_game->add_event_list(BITEMDROP_CHARACTER4, 10);
 		return;
@@ -233,13 +231,13 @@ void inventory_manager::equip_item(int item_id)
 		m_game->add_event_list(BITEMDROP_CHARACTER5, 10);
 		return;
 	}
-	if (cfg->m_gender_limit != 0)
+	if (cfg->m_gender_requirement != 0)
 	{
 		switch (m_game->m_player->m_player_type) {
 		case 1:
 		case 2:
 		case 3:
-			if (cfg->m_gender_limit != 1)
+			if (cfg->m_gender_requirement != 1)
 			{
 				m_game->add_event_list(BITEMDROP_CHARACTER6, 10);
 				return;
@@ -248,7 +246,7 @@ void inventory_manager::equip_item(int item_id)
 		case 4:
 		case 5:
 		case 6:
-			if (cfg->m_gender_limit != 2)
+			if (cfg->m_gender_requirement != 2)
 			{
 				m_game->add_event_list(BITEMDROP_CHARACTER7, 10);
 				return;
@@ -295,8 +293,8 @@ void inventory_manager::equip_item(int item_id)
 	m_game->m_is_item_equipped[item_id] = true;
 
 	// Add Angelic Stats
-	if ((cfg->get_item_type() == ItemType::Equip)
-		&& (cfg->m_equip_pos >= 11))
+	if ((cfg->get_item_type() == hb::shared::item::item_type::equipment)
+		&& (cfg->get_equip_pos() >= EquipPos::LeftFinger))
 	{
 		int angel_value = (m_game->m_player->m_item_list[item_id]->m_attribute & 0xF0000000) >> 28;
 		if (m_game->m_player->m_item_list[item_id]->m_id_num == hb::shared::item::ItemId::AngelicPandentSTR)

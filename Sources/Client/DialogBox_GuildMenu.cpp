@@ -262,7 +262,7 @@ void DialogBox_GuildMenu::DrawMode9_AdmissionTicket(short sX, short sY, short si
 	short mouse_x = static_cast<short>(hb::shared::input::get_mouse_x());
 	short mouse_y = static_cast<short>(hb::shared::input::get_mouse_y());
 	CItem* cfg = m_game->get_item_config(hb::shared::item::ItemId::GuildAdmissionTicket);
-	int price = cfg ? static_cast<int>(cfg->m_price) : 0;
+	int price = cfg ? static_cast<int>(cfg->m_sell_price) : 0;
 	put_aligned_string(sX, sX + size_x, sY + ADJY + 60, DRAW_DIALOGBOX_GUILDMENU32);
 	put_aligned_string(sX, sX + size_x, sY + ADJY + 75, std::format(DRAW_DIALOGBOX_GUILDMENU33, price).c_str());
 	put_aligned_string(sX, sX + size_x, sY + ADJY + 90, DRAW_DIALOGBOX_GUILDMENU34);
@@ -281,7 +281,7 @@ void DialogBox_GuildMenu::DrawMode11_SecessionTicket(short sX, short sY, short s
 	short mouse_x = static_cast<short>(hb::shared::input::get_mouse_x());
 	short mouse_y = static_cast<short>(hb::shared::input::get_mouse_y());
 	CItem* cfg = m_game->get_item_config(hb::shared::item::ItemId::GuildSecessionTicket);
-	int price = cfg ? static_cast<int>(cfg->m_price) : 0;
+	int price = cfg ? static_cast<int>(cfg->m_sell_price) : 0;
 	put_aligned_string(sX, sX + size_x, sY + ADJY + 60, DRAW_DIALOGBOX_GUILDMENU38);
 	put_aligned_string(sX, sX + size_x, sY + ADJY + 75, std::format(DRAW_DIALOGBOX_GUILDMENU39, price).c_str());
 	put_aligned_string(sX, sX + size_x, sY + ADJY + 90, DRAW_DIALOGBOX_GUILDMENU40);

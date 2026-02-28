@@ -190,7 +190,6 @@ void MagicManager::player_magic_handler(int client_h, int dX, int dY, short type
 	int tX, tY, mana_cost, magic_attr;
 	CItem* item;
 	uint32_t time;
-	uint16_t weapon_type;
 	short eq_status;
 	int map_side = 0;
 	short id_num;
@@ -316,10 +315,8 @@ void MagicManager::player_magic_handler(int client_h, int dX, int dY, short type
 	}
 
 	if (m_game->m_client_list[client_h]->m_item_equipment_status[to_int(EquipPos::RightHand)] != -1) {
-		weapon_type = m_game->m_client_list[client_h]->get_equipped_weapon_type();
-		if ((weapon_type >= 34) && (weapon_type <= 39)) {
-		}
-		else return;
+		auto weapon_class = m_game->m_client_list[client_h]->get_equipped_weapon_class();
+		if (weapon_class != hb::shared::item::weapon_class::wand) return;
 	}
 
 	if ((m_game->m_client_list[client_h]->m_item_equipment_status[to_int(EquipPos::LeftHand)] != -1) ||

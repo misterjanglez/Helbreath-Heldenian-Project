@@ -120,9 +120,9 @@ void DialogBox_Bank::draw_item_details(short sX, short sY, short size_x, int ite
 	}
 
 	// Level limit
-	if (cfg->m_level_limit != 0) {
+	if (cfg->m_level_requirement != 0) {
 		loc += 15;
-		auto buf = std::format("{}: {}", DRAW_DIALOGBOX_SHOP24, cfg->m_level_limit);
+		auto buf = std::format("{}: {}", DRAW_DIALOGBOX_SHOP24, cfg->m_level_requirement);
 		put_aligned_string(sX + 70, sX + size_x, sY + loc, buf.c_str(), GameColors::UIDisabled);
 	}
 
@@ -146,9 +146,7 @@ void DialogBox_Bank::draw_item_details(short sX, short sY, short size_x, int ite
 		bank_draw.sprite->draw(sX + 60, sY + 68, bank_draw.frame);
 	}
 	else {
-		if ((cfg->get_equip_pos() == EquipPos::LeftHand) ||
-			(cfg->get_equip_pos() == EquipPos::RightHand) ||
-			(cfg->get_equip_pos() == EquipPos::TwoHand)) {
+		if (cfg->is_weapon()) {
 			bank_draw.sprite->draw(sX + 60, sY + 68, bank_draw.frame, hb::shared::sprite::DrawParams::tint(GameColors::Weapons[item_color].r, GameColors::Weapons[item_color].g, GameColors::Weapons[item_color].b));
 		}
 		else {
@@ -306,8 +304,7 @@ bool DialogBox_Bank::on_item_drop()
 		return false;
 	}
 
-	if (((cfg->get_item_type() == ItemType::Consume) ||
-		(cfg->get_item_type() == ItemType::Arrow)) &&
+	if ((cfg->is_stackable()) &&
 		(player().m_item_list[give.item_index]->m_count > 1))
 	{
 		auto* dropDlg = m_game->get_dialog_box_manager().get_dialog_as<DialogBox_ItemDropAmount>(DialogBoxId::ItemDropExternal);

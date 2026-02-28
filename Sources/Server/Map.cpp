@@ -90,7 +90,7 @@ CMap::CMap(class CGame* game)
 
 	m_game = game;
 
-	m_level_limit = 0;
+	m_level_requirement = 0;
 	m_upper_level_limit = 0; // v1.4
 	m_mineral_generator = false;
 

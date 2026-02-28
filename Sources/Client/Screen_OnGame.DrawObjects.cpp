@@ -256,10 +256,7 @@ void Screen_OnGame::draw_objects(short pivot_x, short pivot_y, short div_x, shor
 					}
 					else
 					{
-						int eq = m_game->m_item_config_list[item_id]->m_equip_pos;
-						bool is_weapon = (eq == hb::shared::item::to_int(hb::shared::item::EquipPos::LeftHand) ||
-							eq == hb::shared::item::to_int(hb::shared::item::EquipPos::RightHand) ||
-							eq == hb::shared::item::to_int(hb::shared::item::EquipPos::TwoHand));
+						bool is_weapon = m_game->m_item_config_list[item_id]->is_weapon();
 						const auto& tint = is_weapon ? GameColors::Weapons[item_color] : GameColors::Items[item_color];
 						auto params = hb::shared::sprite::DrawParams::tint(tint.r, tint.g, tint.b);
 						params.m_ignore_pivot = true;
@@ -1192,14 +1189,11 @@ void Screen_OnGame::dk_glare(int weapon_color, int16_t weapon_item_id, int* weap
 {
 	if (weapon_color != 9) return;
 	if (weapon_item_id <= 0) return;
-	CItem* cfg = m_game->get_item_config(weapon_item_id);
-	if (!cfg) return;
-	uint8_t appr_val = static_cast<uint8_t>(cfg->m_appearance_value);
-	if (appr_val == 14) // Sword3 (msw3/wsw3)
+	if (weapon_item_id == 745) // Dark Knight Templar
 	{
 		*weapon_glare = 3;
 	}
-	else if (appr_val == 37) // Staff3 (MStaff3/WStaff3)
+	else if (weapon_item_id == 746) // Dark Mage Templar
 	{
 		*weapon_glare = 2;
 	}

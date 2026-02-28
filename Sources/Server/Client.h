@@ -87,16 +87,16 @@ public:
 	hb::shared::entity::PlayerAppearance m_appearance;
 	hb::shared::entity::PlayerStatus m_status;
 
-	// Get the appearance_value (weapon sub-type) of the currently equipped weapon.
-	// Returns 0 if unarmed. Reads directly from equipped item, not cached appearance.
-	uint8_t get_equipped_weapon_type() const
+	// Get the weapon_class of the currently equipped weapon.
+	// Returns weapon_class::none if unarmed. Reads directly from equipped item config.
+	hb::shared::item::weapon_class::weapon_class get_equipped_weapon_class() const
 	{
 		using hb::shared::item::EquipPos;
 		using hb::shared::item::to_int;
 		int slot = m_item_equipment_status[to_int(EquipPos::RightHand)];
 		if (slot == -1) slot = m_item_equipment_status[to_int(EquipPos::TwoHand)];
-		if (slot == -1 || !m_item_list[slot]) return 0;
-		return static_cast<uint8_t>(m_item_list[slot]->m_appearance_value);
+		if (slot == -1 || !m_item_list[slot]) return hb::shared::item::weapon_class::none;
+		return m_item_list[slot]->get_weapon_class();
 	}
 
 	uint32_t m_time, m_hp_time, m_mp_time, m_sp_time, m_auto_save_time, m_hunger_time, m_warm_effect_time;

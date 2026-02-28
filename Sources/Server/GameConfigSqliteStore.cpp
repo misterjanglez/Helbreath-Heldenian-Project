@@ -174,33 +174,37 @@ bool EnsureGameConfigDatabase(sqlite3** outDb, std::string& outPath, bool* outCr
         " key TEXT PRIMARY KEY,"
         " value TEXT NOT NULL"
         ");"
-        "INSERT OR REPLACE INTO meta(key, value) VALUES('schema_version','6');"
+        "INSERT OR REPLACE INTO meta(key, value) VALUES('schema_version','7');"
         "CREATE TABLE IF NOT EXISTS items ("
         " item_id INTEGER PRIMARY KEY,"
         " name TEXT NOT NULL,"
-        " item_type INTEGER NOT NULL,"
-        " equip_pos INTEGER NOT NULL,"
-        " item_effect_type INTEGER NOT NULL,"
-        " item_effect_value1 INTEGER NOT NULL,"
-        " item_effect_value2 INTEGER NOT NULL,"
-        " item_effect_value3 INTEGER NOT NULL,"
-        " item_effect_value4 INTEGER NOT NULL,"
-        " item_effect_value5 INTEGER NOT NULL,"
-        " item_effect_value6 INTEGER NOT NULL,"
-        " max_lifespan INTEGER NOT NULL,"
-        " special_effect INTEGER NOT NULL,"
-        " price INTEGER NOT NULL,"
-        " is_for_sale INTEGER NOT NULL,"
-        " weight INTEGER NOT NULL,"
-        " appr_value INTEGER NOT NULL,"
-        " speed INTEGER NOT NULL,"
-        " level_limit INTEGER NOT NULL,"
-        " gender_limit INTEGER NOT NULL,"
-        " special_effect_value1 INTEGER NOT NULL,"
-        " special_effect_value2 INTEGER NOT NULL,"
-        " related_skill INTEGER NOT NULL,"
-        " category INTEGER NOT NULL,"
-        " item_color INTEGER NOT NULL,"
+        " item_type INTEGER NOT NULL DEFAULT 0,"
+        " item_sub_type INTEGER NOT NULL DEFAULT 0,"
+        " equip_pos INTEGER NOT NULL DEFAULT 0,"
+        " weapon_class INTEGER NOT NULL DEFAULT 0,"
+        " item_effect_type INTEGER NOT NULL DEFAULT 0,"
+        " item_effect_value1 INTEGER NOT NULL DEFAULT 0,"
+        " item_effect_value2 INTEGER NOT NULL DEFAULT 0,"
+        " item_effect_value3 INTEGER NOT NULL DEFAULT 0,"
+        " item_effect_value4 INTEGER NOT NULL DEFAULT 0,"
+        " item_effect_value5 INTEGER NOT NULL DEFAULT 0,"
+        " item_effect_value6 INTEGER NOT NULL DEFAULT 0,"
+        " durability INTEGER NOT NULL DEFAULT 0,"
+        " special_effect INTEGER NOT NULL DEFAULT 0,"
+        " sell_price INTEGER NOT NULL DEFAULT 0,"
+        " weight INTEGER NOT NULL DEFAULT 0,"
+        " swing_speed INTEGER NOT NULL DEFAULT 0,"
+        " level_requirement INTEGER NOT NULL DEFAULT 0,"
+        " gender_requirement INTEGER NOT NULL DEFAULT 0,"
+        " special_effect_value1 INTEGER NOT NULL DEFAULT 0,"
+        " special_effect_value2 INTEGER NOT NULL DEFAULT 0,"
+        " related_skill INTEGER NOT NULL DEFAULT 0,"
+        " hide_armor INTEGER NOT NULL DEFAULT 0,"
+        " is_skirt INTEGER NOT NULL DEFAULT 0,"
+        " stackable INTEGER NOT NULL DEFAULT 0,"
+        " is_dyeable INTEGER NOT NULL DEFAULT 0,"
+        " set_id INTEGER NOT NULL DEFAULT 0,"
+        " item_color INTEGER NOT NULL DEFAULT 0,"
         " display_id INTEGER NOT NULL DEFAULT -1"
         ");"
         "CREATE TABLE IF NOT EXISTS active_maps ("
@@ -445,6 +449,145 @@ bool EnsureGameConfigDatabase(sqlite3** outDb, std::string& outPath, bool* outCr
         return false;
     }
 
+    // Migrate old items schema (has appr_value) → new schema (has weapon_class etc.)
+    if (HasColumn(db, "items", "appr_value")) {
+        hb::logger::log("Migrating items table from old schema to new item type system...");
+
+        const char* migrationSql =
+            "BEGIN;"
+
+            // Create new table with the new schema
+            "CREATE TABLE items_new ("
+            " item_id INTEGER PRIMARY KEY,"
+            " name TEXT NOT NULL,"
+            " item_type INTEGER NOT NULL DEFAULT 0,"
+            " item_sub_type INTEGER NOT NULL DEFAULT 0,"
+            " equip_pos INTEGER NOT NULL DEFAULT 0,"
+            " weapon_class INTEGER NOT NULL DEFAULT 0,"
+            " item_effect_type INTEGER NOT NULL DEFAULT 0,"
+            " item_effect_value1 INTEGER NOT NULL DEFAULT 0,"
+            " item_effect_value2 INTEGER NOT NULL DEFAULT 0,"
+            " item_effect_value3 INTEGER NOT NULL DEFAULT 0,"
+            " item_effect_value4 INTEGER NOT NULL DEFAULT 0,"
+            " item_effect_value5 INTEGER NOT NULL DEFAULT 0,"
+            " item_effect_value6 INTEGER NOT NULL DEFAULT 0,"
+            " durability INTEGER NOT NULL DEFAULT 0,"
+            " special_effect INTEGER NOT NULL DEFAULT 0,"
+            " sell_price INTEGER NOT NULL DEFAULT 0,"
+            " weight INTEGER NOT NULL DEFAULT 0,"
+            " swing_speed INTEGER NOT NULL DEFAULT 0,"
+            " level_requirement INTEGER NOT NULL DEFAULT 0,"
+            " gender_requirement INTEGER NOT NULL DEFAULT 0,"
+            " special_effect_value1 INTEGER NOT NULL DEFAULT 0,"
+            " special_effect_value2 INTEGER NOT NULL DEFAULT 0,"
+            " related_skill INTEGER NOT NULL DEFAULT 0,"
+            " hide_armor INTEGER NOT NULL DEFAULT 0,"
+            " is_skirt INTEGER NOT NULL DEFAULT 0,"
+            " stackable INTEGER NOT NULL DEFAULT 0,"
+            " is_dyeable INTEGER NOT NULL DEFAULT 0,"
+            " set_id INTEGER NOT NULL DEFAULT 0,"
+            " item_color INTEGER NOT NULL DEFAULT 0,"
+            " display_id INTEGER NOT NULL DEFAULT -1"
+            ");"
+
+            // Copy data with transformations
+            // item_type mapping: 0→varies, 1→2(equip), 3→1(consumable), 5→3(material),
+            //   6→1(consumable/ammo), 7→1(consumable), 8→5(tool), 9→5(tool),
+            //   10→5(tool), 11→1(consumable/target), 12→3(material/crafted)
+            // sell_price: ABS(price) if price >= 0, else ABS(price) (old negative=not-for-sale, new: 0=unsellable handled by migration script)
+            // weapon_class: derived from appr_value ranges for equip type
+            // hide_armor: appr_value >= 100 on body armor
+            // is_skirt: appr_value == 1 on pants
+            // stackable: old types 5(Consume), 6(Arrow), 12(Material)
+            // is_dyeable: old category in (1, 3, 6, 8, 11, 12, 13, 15)
+            "INSERT INTO items_new("
+            " item_id, name, item_type, item_sub_type, equip_pos, weapon_class,"
+            " item_effect_type, item_effect_value1, item_effect_value2, item_effect_value3,"
+            " item_effect_value4, item_effect_value5, item_effect_value6,"
+            " durability, special_effect, sell_price, weight, swing_speed,"
+            " level_requirement, gender_requirement,"
+            " special_effect_value1, special_effect_value2, related_skill,"
+            " hide_armor, is_skirt, stackable, is_dyeable, set_id,"
+            " item_color, display_id)"
+            " SELECT"
+            "  item_id, name,"
+            // item_type: map old→new
+            "  CASE item_type"
+            "   WHEN 1 THEN 2"   // Equip → equipment
+            "   WHEN 3 THEN 1"   // UseDeplete → consumable
+            "   WHEN 5 THEN 3"   // Consume → material
+            "   WHEN 6 THEN 1"   // Arrow → consumable
+            "   WHEN 7 THEN 1"   // Eat → consumable
+            "   WHEN 8 THEN 5"   // UseSkill → tool
+            "   WHEN 9 THEN 5"   // UsePerm → tool
+            "   WHEN 10 THEN 5"  // UseSkillEnableDialogBox → tool
+            "   WHEN 11 THEN 1"  // UseDepleteDest → consumable
+            "   WHEN 12 THEN 3"  // Material → material
+            "   ELSE 0"          // None/Apply/Install → none (will need manual review)
+            "  END,"
+            // item_sub_type: derive from old type + equip_pos
+            "  CASE"
+            "   WHEN item_type = 6 THEN 1"   // Arrow → ammo
+            "   WHEN item_type = 11 THEN 2"  // UseDepleteDest → target
+            "   WHEN item_type = 1 AND (equip_pos = 7 OR equip_pos = 8 OR equip_pos = 9) THEN 3"  // Equip weapon → weapon
+            "   WHEN item_type = 1 AND (equip_pos IN (1,2,3,4,5,12,13)) THEN 4"  // Equip armor → armor
+            "   WHEN item_type = 1 AND (equip_pos IN (6,10,11)) THEN 5"  // Equip accessory → accessory
+            "   WHEN item_type = 12 THEN 8"  // Material → crafted
+            "   WHEN item_type = 8 THEN 10"  // UseSkill → fishing
+            "   WHEN item_type = 10 THEN 11" // UseSkillEnableDialogBox → crafting
+            "   WHEN item_type = 9 THEN 12"  // UsePerm → map
+            "   ELSE 0"
+            "  END,"
+            "  equip_pos,"
+            // weapon_class: derive from appr_value for weapons
+            "  CASE"
+            "   WHEN item_type != 1 OR equip_pos NOT IN (7,8,9) THEN 0"  // Not a weapon
+            "   WHEN appr_value >= 1 AND appr_value <= 1 THEN 1"   // dagger
+            "   WHEN appr_value = 2 THEN 2"                        // short_sword
+            "   WHEN appr_value IN (7, 18) THEN 4"                 // fencing (Esterk, KlonessEsterk)
+            "   WHEN appr_value >= 3 AND appr_value <= 19 THEN 3"  // long_sword
+            "   WHEN appr_value = 29 THEN 3"                       // long_sword variant (LightingBlade)
+            "   WHEN appr_value >= 20 AND appr_value <= 28 THEN 5" // axe
+            "   WHEN appr_value = 33 THEN 3"                       // long_sword variant (BlackShadow)
+            "   WHEN appr_value >= 30 AND appr_value <= 32 THEN 6" // hammer
+            "   WHEN appr_value >= 34 AND appr_value <= 39 THEN 7" // wand
+            "   WHEN appr_value >= 40 THEN 8"                      // bow
+            "   ELSE 0"
+            "  END,"
+            "  item_effect_type, item_effect_value1, item_effect_value2, item_effect_value3,"
+            "  item_effect_value4, item_effect_value5, item_effect_value6,"
+            "  max_lifespan, special_effect,"
+            // sell_price: only sellable items get a price (0 = cannot sell)
+            "  CASE WHEN is_for_sale = 1 THEN price ELSE 0 END,"
+            "  weight, speed, level_limit, gender_limit,"
+            "  special_effect_value1, special_effect_value2, related_skill,"
+            // hide_armor: body armor with appr_value >= 100
+            "  CASE WHEN (equip_pos = 2 OR equip_pos = 13) AND appr_value >= 100 THEN 1 ELSE 0 END,"
+            // is_skirt: pants with appr_value == 1
+            "  CASE WHEN equip_pos = 4 AND appr_value = 1 THEN 1 ELSE 0 END,"
+            // stackable: old types Consume(5), Arrow(6), Material(12)
+            "  CASE WHEN item_type IN (5, 6, 12) THEN 1 ELSE 0 END,"
+            // is_dyeable: old category in (1, 3, 6, 8, 11, 12, 13, 15)
+            "  CASE WHEN category IN (1, 3, 6, 8, 11, 12, 13, 15) THEN 1 ELSE 0 END,"
+            // set_id: default 0 (hero sets assigned by Python migration script)
+            "  0,"
+            "  item_color,"
+            "  COALESCE(display_id, -1)"
+            " FROM items;"
+
+            // Drop old table and rename new
+            "DROP TABLE items;"
+            "ALTER TABLE items_new RENAME TO items;"
+            "COMMIT;";
+
+        if (!ExecSql(db, migrationSql)) {
+            hb::logger::error("Failed to migrate items table! Database may be corrupted.");
+            sqlite3_close(db);
+            return false;
+        }
+        hb::logger::log("Items table migration complete.");
+    }
+
     if (!HasColumn(db, "npc_configs", "drop_table_id")) {
         ExecSql(db, "ALTER TABLE npc_configs ADD COLUMN drop_table_id INTEGER NOT NULL DEFAULT 0;");
     }
@@ -476,13 +619,15 @@ bool SaveItemConfigs(sqlite3* db, CItem* const* itemList, int maxItems)
 
     const char* sql =
         "INSERT INTO items("
-        " item_id, name, item_type, equip_pos, item_effect_type, item_effect_value1,"
-        " item_effect_value2, item_effect_value3, item_effect_value4, item_effect_value5,"
-        " item_effect_value6, max_lifespan, special_effect, price,"
-        " is_for_sale, weight, appr_value, speed, level_limit, gender_limit,"
-        " special_effect_value1, special_effect_value2, related_skill, category, item_color,"
-        " display_id"
-        ") VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?);";
+        " item_id, name, item_type, item_sub_type, equip_pos, weapon_class,"
+        " item_effect_type, item_effect_value1, item_effect_value2, item_effect_value3,"
+        " item_effect_value4, item_effect_value5, item_effect_value6,"
+        " durability, special_effect, sell_price, weight, swing_speed,"
+        " level_requirement, gender_requirement,"
+        " special_effect_value1, special_effect_value2, related_skill,"
+        " hide_armor, is_skirt, stackable, is_dyeable, set_id,"
+        " item_color, display_id"
+        ") VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?);";
 
     sqlite3_stmt* stmt = nullptr;
     if (sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) != SQLITE_OK) {
@@ -502,7 +647,9 @@ bool SaveItemConfigs(sqlite3* db, CItem* const* itemList, int maxItems)
         ok &= (sqlite3_bind_int(stmt, col++, itemList[i]->m_id_num) == SQLITE_OK);
         ok &= PrepareAndBindText(stmt, col++, itemList[i]->m_name);
         ok &= (sqlite3_bind_int(stmt, col++, itemList[i]->m_item_type) == SQLITE_OK);
+        ok &= (sqlite3_bind_int(stmt, col++, itemList[i]->m_item_sub_type) == SQLITE_OK);
         ok &= (sqlite3_bind_int(stmt, col++, itemList[i]->m_equip_pos) == SQLITE_OK);
+        ok &= (sqlite3_bind_int(stmt, col++, itemList[i]->m_weapon_class) == SQLITE_OK);
         ok &= (sqlite3_bind_int(stmt, col++, itemList[i]->m_item_effect_type) == SQLITE_OK);
         ok &= (sqlite3_bind_int(stmt, col++, itemList[i]->m_item_effect_value1) == SQLITE_OK);
         ok &= (sqlite3_bind_int(stmt, col++, itemList[i]->m_item_effect_value2) == SQLITE_OK);
@@ -510,19 +657,21 @@ bool SaveItemConfigs(sqlite3* db, CItem* const* itemList, int maxItems)
         ok &= (sqlite3_bind_int(stmt, col++, itemList[i]->m_item_effect_value4) == SQLITE_OK);
         ok &= (sqlite3_bind_int(stmt, col++, itemList[i]->m_item_effect_value5) == SQLITE_OK);
         ok &= (sqlite3_bind_int(stmt, col++, itemList[i]->m_item_effect_value6) == SQLITE_OK);
-        ok &= (sqlite3_bind_int(stmt, col++, itemList[i]->m_max_life_span) == SQLITE_OK);
+        ok &= (sqlite3_bind_int(stmt, col++, itemList[i]->m_durability) == SQLITE_OK);
         ok &= (sqlite3_bind_int(stmt, col++, itemList[i]->m_special_effect) == SQLITE_OK);
-        ok &= (sqlite3_bind_int(stmt, col++, static_cast<int>(itemList[i]->m_price)) == SQLITE_OK);
-        ok &= (sqlite3_bind_int(stmt, col++, itemList[i]->m_is_for_sale ? 1 : 0) == SQLITE_OK);
+        ok &= (sqlite3_bind_int(stmt, col++, static_cast<int>(itemList[i]->m_sell_price)) == SQLITE_OK);
         ok &= (sqlite3_bind_int(stmt, col++, itemList[i]->m_weight) == SQLITE_OK);
-        ok &= (sqlite3_bind_int(stmt, col++, itemList[i]->m_appearance_value) == SQLITE_OK);
-        ok &= (sqlite3_bind_int(stmt, col++, itemList[i]->m_speed) == SQLITE_OK);
-        ok &= (sqlite3_bind_int(stmt, col++, itemList[i]->m_level_limit) == SQLITE_OK);
-        ok &= (sqlite3_bind_int(stmt, col++, itemList[i]->m_gender_limit) == SQLITE_OK);
+        ok &= (sqlite3_bind_int(stmt, col++, itemList[i]->m_swing_speed) == SQLITE_OK);
+        ok &= (sqlite3_bind_int(stmt, col++, itemList[i]->m_level_requirement) == SQLITE_OK);
+        ok &= (sqlite3_bind_int(stmt, col++, itemList[i]->m_gender_requirement) == SQLITE_OK);
         ok &= (sqlite3_bind_int(stmt, col++, itemList[i]->m_special_effect_value1) == SQLITE_OK);
         ok &= (sqlite3_bind_int(stmt, col++, itemList[i]->m_special_effect_value2) == SQLITE_OK);
         ok &= (sqlite3_bind_int(stmt, col++, itemList[i]->m_related_skill) == SQLITE_OK);
-        ok &= (sqlite3_bind_int(stmt, col++, itemList[i]->m_category) == SQLITE_OK);
+        ok &= (sqlite3_bind_int(stmt, col++, itemList[i]->m_hide_armor) == SQLITE_OK);
+        ok &= (sqlite3_bind_int(stmt, col++, itemList[i]->m_is_skirt) == SQLITE_OK);
+        ok &= (sqlite3_bind_int(stmt, col++, itemList[i]->m_stackable) == SQLITE_OK);
+        ok &= (sqlite3_bind_int(stmt, col++, itemList[i]->m_is_dyeable) == SQLITE_OK);
+        ok &= (sqlite3_bind_int(stmt, col++, itemList[i]->m_set_id) == SQLITE_OK);
         ok &= (sqlite3_bind_int(stmt, col++, itemList[i]->m_item_color) == SQLITE_OK);
         ok &= (sqlite3_bind_int(stmt, col++, itemList[i]->m_display_id) == SQLITE_OK);
 
@@ -548,12 +697,14 @@ bool LoadItemConfigs(sqlite3* db, CItem** itemList, int maxItems)
     }
 
     const char* sql =
-        "SELECT item_id, name, item_type, equip_pos, item_effect_type, item_effect_value1,"
-        " item_effect_value2, item_effect_value3, item_effect_value4, item_effect_value5,"
-        " item_effect_value6, max_lifespan, special_effect, price,"
-        " is_for_sale, weight, appr_value, speed, level_limit, gender_limit,"
-        " special_effect_value1, special_effect_value2, related_skill, category, item_color,"
-        " display_id"
+        "SELECT item_id, name, item_type, item_sub_type, equip_pos, weapon_class,"
+        " item_effect_type, item_effect_value1, item_effect_value2, item_effect_value3,"
+        " item_effect_value4, item_effect_value5, item_effect_value6,"
+        " durability, special_effect, sell_price, weight, swing_speed,"
+        " level_requirement, gender_requirement,"
+        " special_effect_value1, special_effect_value2, related_skill,"
+        " hide_armor, is_skirt, stackable, is_dyeable, set_id,"
+        " item_color, display_id"
         " FROM items ORDER BY item_id;";
 
     sqlite3_stmt* stmt = nullptr;
@@ -577,7 +728,9 @@ bool LoadItemConfigs(sqlite3* db, CItem** itemList, int maxItems)
         item->m_id_num = (short)item_id;
         CopyColumnText(stmt, col++, item->m_name, sizeof(item->m_name));
         item->m_item_type = (char)sqlite3_column_int(stmt, col++);
+        item->m_item_sub_type = (char)sqlite3_column_int(stmt, col++);
         item->m_equip_pos = (char)sqlite3_column_int(stmt, col++);
+        item->m_weapon_class = (char)sqlite3_column_int(stmt, col++);
         item->m_item_effect_type = (short)sqlite3_column_int(stmt, col++);
         item->m_item_effect_value1 = (short)sqlite3_column_int(stmt, col++);
         item->m_item_effect_value2 = (short)sqlite3_column_int(stmt, col++);
@@ -585,19 +738,21 @@ bool LoadItemConfigs(sqlite3* db, CItem** itemList, int maxItems)
         item->m_item_effect_value4 = (short)sqlite3_column_int(stmt, col++);
         item->m_item_effect_value5 = (short)sqlite3_column_int(stmt, col++);
         item->m_item_effect_value6 = (short)sqlite3_column_int(stmt, col++);
-        item->m_max_life_span = (uint16_t)sqlite3_column_int(stmt, col++);
+        item->m_durability = (uint16_t)sqlite3_column_int(stmt, col++);
         item->m_special_effect = (short)sqlite3_column_int(stmt, col++);
-        item->m_price = (uint32_t)sqlite3_column_int(stmt, col++);
-        item->m_is_for_sale = (sqlite3_column_int(stmt, col++) != 0);
+        item->m_sell_price = (uint32_t)sqlite3_column_int(stmt, col++);
         item->m_weight = (uint16_t)sqlite3_column_int(stmt, col++);
-        item->m_appearance_value = (char)sqlite3_column_int(stmt, col++);
-        item->m_speed = (char)sqlite3_column_int(stmt, col++);
-        item->m_level_limit = (short)sqlite3_column_int(stmt, col++);
-        item->m_gender_limit = (char)sqlite3_column_int(stmt, col++);
+        item->m_swing_speed = (char)sqlite3_column_int(stmt, col++);
+        item->m_level_requirement = (short)sqlite3_column_int(stmt, col++);
+        item->m_gender_requirement = (char)sqlite3_column_int(stmt, col++);
         item->m_special_effect_value1 = (short)sqlite3_column_int(stmt, col++);
         item->m_special_effect_value2 = (short)sqlite3_column_int(stmt, col++);
         item->m_related_skill = (short)sqlite3_column_int(stmt, col++);
-        item->m_category = (char)sqlite3_column_int(stmt, col++);
+        item->m_hide_armor = (char)sqlite3_column_int(stmt, col++);
+        item->m_is_skirt = (char)sqlite3_column_int(stmt, col++);
+        item->m_stackable = (char)sqlite3_column_int(stmt, col++);
+        item->m_is_dyeable = (char)sqlite3_column_int(stmt, col++);
+        item->m_set_id = (int16_t)sqlite3_column_int(stmt, col++);
         item->m_item_color = (char)sqlite3_column_int(stmt, col++);
         item->m_display_id = (short)sqlite3_column_int(stmt, col++);
 

@@ -7,7 +7,6 @@
 #include <format>
 #include <string>
 
-using hb::shared::item::ItemType;
 using hb::shared::item::EquipPos;
 
 item_name_formatter& item_name_formatter::get()
@@ -47,7 +46,7 @@ ItemNameInfo item_name_formatter::format(CItem* item)
 	{
 		result.is_special = true;
 		result.name = name;
-		if (cfg->get_item_type() == ItemType::Material)
+		if (cfg->get_item_type() == hb::shared::item::item_type::material)
 			result.effects.push_back({"Purity: ", std::format("{}%", item->m_item_special_effect_value2)});
 		else
 		{

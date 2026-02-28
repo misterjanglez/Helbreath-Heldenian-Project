@@ -56,8 +56,8 @@ int DialogBox_ItemUpgrade::calculate_upgrade_cost(int item_index)
 
     // Special handling for Angelic Pendants
     CItem* cfg = m_game->get_item_config(player().m_item_list[item_index]->m_id_num);
-    if (cfg && (cfg->m_equip_pos >= 11)
-        && (cfg->get_item_type() == ItemType::Equip))
+    if (cfg && (cfg->get_equip_pos() >= EquipPos::LeftFinger)
+        && (cfg->get_item_type() == hb::shared::item::item_type::equipment))
     {
         short id = player().m_item_list[item_index]->m_id_num;
         if (id == hb::shared::item::ItemId::AngelicPandentSTR || id == hb::shared::item::ItemId::AngelicPandentDEX ||
@@ -92,9 +92,7 @@ void DialogBox_ItemUpgrade::draw_item_preview(int sX, int sY, int item_index)
     {
         upg_draw.sprite->draw(sX + 134, sY + 182, upg_draw.frame);
     }
-    else if ((cfg->get_equip_pos() == EquipPos::LeftHand)
-        || (cfg->get_equip_pos() == EquipPos::RightHand)
-        || (cfg->get_equip_pos() == EquipPos::TwoHand))
+    else if (cfg->is_weapon())
     {
         upg_draw.sprite->draw(sX + 134, sY + 182, upg_draw.frame, hb::shared::sprite::DrawParams::tint(GameColors::Weapons[item_color].r, GameColors::Weapons[item_color].g, GameColors::Weapons[item_color].b));
     }
@@ -184,9 +182,7 @@ void DialogBox_ItemUpgrade::DrawMode2_InProgress(int sX, int sY)
             {
                 upg2_draw.sprite->draw(sX + 134, sY + 182, upg2_draw.frame);
             }
-            else if ((cfg->get_equip_pos() == EquipPos::LeftHand)
-                || (cfg->get_equip_pos() == EquipPos::RightHand)
-                || (cfg->get_equip_pos() == EquipPos::TwoHand))
+            else if (cfg->is_weapon())
             {
                 upg2_draw.sprite->draw(sX + 134, sY + 182, upg2_draw.frame, hb::shared::sprite::DrawParams::tint(GameColors::Weapons[item_color].r, GameColors::Weapons[item_color].g, GameColors::Weapons[item_color].b));
             }

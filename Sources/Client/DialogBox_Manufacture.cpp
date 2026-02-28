@@ -607,7 +607,9 @@ void DialogBox_Manufacture::draw_manufacture_done(short sX, short sY)
 		put_string(sX + adj_x + 33 + 11, sY + adj_y + 200 - 45, DRAW_DIALOGBOX_SKILLDLG31, GameColors::UILabel);
 
 		std::string resultBuf;
-		if (static_cast<ItemType>(m_slot_1) == ItemType::Material) {
+		CItem* slot1_cfg = (m_slot_1 >= 0 && m_slot_1 < hb::shared::limits::MaxItems && player().m_item_list[m_slot_1])
+			? m_game->get_item_config(player().m_item_list[m_slot_1]->m_id_num) : nullptr;
+		if (slot1_cfg && slot1_cfg->get_item_type() == hb::shared::item::item_type::material) {
 			resultBuf = std::format(DRAW_DIALOGBOX_SKILLDLG32, m_result_value);
 			put_string(sX + adj_x + 33 + 11, sY + adj_y + 215 - 45, resultBuf.c_str(), GameColors::UILabel);
 		}
@@ -685,7 +687,7 @@ void DialogBox_Manufacture::draw_crafting_in_progress(short sX, short sY)
 		if (cfg) {
 			auto d = m_game->get_item_draw(cfg->m_display_id, item_atlas::pack, cfg->sprite_is_female());
 			d.sprite->draw(sX + adj_x + 55 + (1 - (rand() % 3)), sY + adj_y + 55 + (1 - (rand() % 3)), d.frame);
-			if ((cfg->get_item_type() == ItemType::Equip) && (cfg->get_equip_pos() == EquipPos::Neck))
+			if ((cfg->get_item_type() == hb::shared::item::item_type::equipment) && (cfg->get_equip_pos() == EquipPos::Neck))
 				m_game->m_contribution_price = 10;
 		}
 	}
@@ -695,7 +697,7 @@ void DialogBox_Manufacture::draw_crafting_in_progress(short sX, short sY)
 		if (cfg) {
 			auto d = m_game->get_item_draw(cfg->m_display_id, item_atlas::pack, cfg->sprite_is_female());
 			d.sprite->draw(sX + adj_x + 65 + 45 + (1 - (rand() % 3)), sY + adj_y + 40 + (1 - (rand() % 3)), d.frame);
-			if ((cfg->get_item_type() == ItemType::Equip) && (cfg->get_equip_pos() == EquipPos::Neck))
+			if ((cfg->get_item_type() == hb::shared::item::item_type::equipment) && (cfg->get_equip_pos() == EquipPos::Neck))
 				m_game->m_contribution_price = 10;
 		}
 	}
@@ -705,7 +707,7 @@ void DialogBox_Manufacture::draw_crafting_in_progress(short sX, short sY)
 		if (cfg) {
 			auto d = m_game->get_item_draw(cfg->m_display_id, item_atlas::pack, cfg->sprite_is_female());
 			d.sprite->draw(sX + adj_x + 65 + 90 + (1 - (rand() % 3)), sY + adj_y + 55 + (1 - (rand() % 3)), d.frame);
-			if ((cfg->get_item_type() == ItemType::Equip) && (cfg->get_equip_pos() == EquipPos::Neck))
+			if ((cfg->get_item_type() == hb::shared::item::item_type::equipment) && (cfg->get_equip_pos() == EquipPos::Neck))
 				m_game->m_contribution_price = 10;
 		}
 	}
@@ -715,7 +717,7 @@ void DialogBox_Manufacture::draw_crafting_in_progress(short sX, short sY)
 		if (cfg) {
 			auto d = m_game->get_item_draw(cfg->m_display_id, item_atlas::pack, cfg->sprite_is_female());
 			d.sprite->draw(sX + adj_x + 65 + (1 - (rand() % 3)), sY + adj_y + 100 + (1 - (rand() % 3)), d.frame);
-			if ((cfg->get_item_type() == ItemType::Equip) && (cfg->get_equip_pos() == EquipPos::Neck))
+			if ((cfg->get_item_type() == hb::shared::item::item_type::equipment) && (cfg->get_equip_pos() == EquipPos::Neck))
 				m_game->m_contribution_price = 10;
 		}
 	}
@@ -725,7 +727,7 @@ void DialogBox_Manufacture::draw_crafting_in_progress(short sX, short sY)
 		if (cfg) {
 			auto d = m_game->get_item_draw(cfg->m_display_id, item_atlas::pack, cfg->sprite_is_female());
 			d.sprite->draw(sX + adj_x + 65 + 45 + (1 - (rand() % 3)), sY + adj_y + 115 + (1 - (rand() % 3)), d.frame);
-			if ((cfg->get_item_type() == ItemType::Equip) && (cfg->get_equip_pos() == EquipPos::Neck))
+			if ((cfg->get_item_type() == hb::shared::item::item_type::equipment) && (cfg->get_equip_pos() == EquipPos::Neck))
 				m_game->m_contribution_price = 10;
 		}
 	}
@@ -735,7 +737,7 @@ void DialogBox_Manufacture::draw_crafting_in_progress(short sX, short sY)
 		if (cfg) {
 			auto d = m_game->get_item_draw(cfg->m_display_id, item_atlas::pack, cfg->sprite_is_female());
 			d.sprite->draw(sX + adj_x + 75 + 90 + (1 - (rand() % 3)), sY + adj_y + 100 + (1 - (rand() % 3)), d.frame);
-			if ((cfg->get_item_type() == ItemType::Equip) && (cfg->get_equip_pos() == EquipPos::Neck))
+			if ((cfg->get_item_type() == hb::shared::item::item_type::equipment) && (cfg->get_equip_pos() == EquipPos::Neck))
 				m_game->m_contribution_price = 10;
 		}
 	}
@@ -1011,7 +1013,7 @@ bool DialogBox_Manufacture::try_add_item_to_slot(int item_id, bool updateBuildSt
 
 			// Only disable non-stackable items (stackable consumables can be added multiple times)
 			CItem* cfg = m_game->get_item_config(player().m_item_list[item_id]->m_id_num);
-			if (!cfg || cfg->get_item_type() != ItemType::Consume ||
+			if (!cfg || !cfg->is_stackable() ||
 				player().m_item_list[item_id]->m_count <= 1)
 			{
 				inventory_manager::get().lock_item(item_id);
@@ -1056,7 +1058,7 @@ bool DialogBox_Manufacture::on_item_drop()
 	case mode::alchemy_waiting:
 	{
 		// Check consumable item count - can't add if all instances are already used
-		if (cfg->get_item_type() == ItemType::Consume)
+		if (cfg->is_stackable())
 		{
 			int consume_num = 0;
 			if (m_slot_1 == item_id) consume_num++;
@@ -1068,10 +1070,11 @@ bool DialogBox_Manufacture::on_item_drop()
 			if (consume_num >= static_cast<int>(player().m_item_list[item_id]->m_count)) return false;
 		}
 
-		// Only allow EAT, CONSUME, or NONE item types for alchemy
-		if (cfg->get_item_type() != ItemType::Eat &&
-			cfg->get_item_type() != ItemType::Consume &&
-			cfg->get_item_type() != ItemType::None)
+		// Only allow consumable, material, or untyped items for alchemy
+		// (type none includes legacy items like Stone of Merien used in alchemy recipes)
+		if (cfg->get_item_type() != hb::shared::item::item_type::consumable &&
+			cfg->get_item_type() != hb::shared::item::item_type::material &&
+			cfg->get_item_type() != hb::shared::item::item_type::none)
 		{
 			return false;
 		}
@@ -1084,7 +1087,7 @@ bool DialogBox_Manufacture::on_item_drop()
 	case mode::manufacture_waiting:
 	{
 		// Check consumable item count
-		if (cfg->get_item_type() == ItemType::Consume)
+		if (cfg->is_stackable())
 		{
 			int consume_num = 0;
 			if (m_slot_1 == item_id) consume_num++;
@@ -1104,10 +1107,10 @@ bool DialogBox_Manufacture::on_item_drop()
 	case mode::crafting_waiting:
 	{
 		// Only allow specific item types for crafting
-		if (cfg->get_item_type() != ItemType::None &&      // Merien Stone
-			cfg->get_item_type() != ItemType::Equip &&     // Necklaces, Rings
-			cfg->get_item_type() != ItemType::Consume &&   // Stones
-			cfg->get_item_type() != ItemType::Material)    // Craftwares
+		if (cfg->get_item_type() != hb::shared::item::item_type::material &&     // Craftwares, bars
+			cfg->get_item_type() != hb::shared::item::item_type::equipment &&     // Necklaces, Rings
+			cfg->get_item_type() != hb::shared::item::item_type::consumable &&    // Consumable stones
+			cfg->get_item_type() != hb::shared::item::item_type::none)            // Legacy untyped (Merien Stone, Xelima Stone)
 		{
 			return false;
 		}

@@ -119,8 +119,7 @@ void DialogBox_Exchange::draw_items(short sX, short sY, short mouse_x, short mou
 				ex_draw.sprite->draw(sX + xadd, sY + 130, ex_draw.frame);
 			}
 			else {
-				bool ex_is_weapon = ex_cfg && (ex_cfg->m_equip_pos == to_int(EquipPos::LeftHand) ||
-					ex_cfg->m_equip_pos == to_int(EquipPos::RightHand) || ex_cfg->m_equip_pos == to_int(EquipPos::TwoHand));
+				bool ex_is_weapon = ex_cfg && ex_cfg->is_weapon();
 				const auto& ex_tint = ex_is_weapon ? GameColors::Weapons[item_color] : GameColors::Items[item_color];
 				ex_draw.sprite->draw(sX + xadd, sY + 130, ex_draw.frame, hb::shared::sprite::DrawParams::tint(ex_tint.r, ex_tint.g, ex_tint.b));
 			}
@@ -174,11 +173,11 @@ void DialogBox_Exchange::draw_item_info(short sX, short sY, short size_x, short 
 		if (m_slots[item_index].v5 != -1) {
 			// Crafting Magins completion fix
 			CItem* magin_cfg = m_game->get_item_config(m_slots[item_index].item_id);
-			if (magin_cfg && magin_cfg->m_category == 46 && magin_cfg->get_item_type() == ItemType::Equip) {
+			if (magin_cfg && magin_cfg->get_item_sub_type() == hb::shared::item::item_sub_type::accessory && magin_cfg->get_item_type() == hb::shared::item::item_type::equipment) {
 				// Magic gems (Diamond/Emerald/Ruby/Sapphire Ware) � show completion %
 				txt = std::format(GET_ITEM_NAME2, (m_slots[item_index].v7 - 100));
 			}
-			else if (magin_cfg && magin_cfg->get_item_type() == ItemType::Material) {
+			else if (magin_cfg && magin_cfg->get_item_type() == hb::shared::item::item_type::material) {
 				txt = std::format(GET_ITEM_NAME1, (m_slots[item_index].v7 - 100));
 			}
 			else {
@@ -248,8 +247,7 @@ bool DialogBox_Exchange::on_item_drop()
 
 	// Stackable items - open quantity dialog
 	CItem* cfg = m_game->get_item_config(player().m_item_list[item_id]->m_id_num);
-	if (cfg && ((cfg->get_item_type() == ItemType::Consume) ||
-		(cfg->get_item_type() == ItemType::Arrow)) &&
+	if (cfg && (cfg->is_stackable()) &&
 		(player().m_item_list[item_id]->m_count > 1))
 	{
 		auto* dropDlg = m_game->get_dialog_box_manager().get_dialog_as<DialogBox_ItemDropAmount>(DialogBoxId::ItemDropExternal);

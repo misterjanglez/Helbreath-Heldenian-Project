@@ -271,7 +271,7 @@ bool DialogBox_Magic::on_click()
 			{
 				if (player().m_item_list[i] == 0) continue;
 				CItem* cfg = m_game->get_item_config(player().m_item_list[i]->m_id_num);
-				if (cfg && (cfg->get_item_type() == ItemType::UseSkillEnableDialogBox) &&
+				if (cfg && (cfg->get_item_type() == hb::shared::item::item_type::tool) &&
 					(player().m_item_list[i]->m_id_num == 227)) // Alchemy Bowl
 				{
 					enable_dialog_box(DialogBoxId::Manufacture, 1, 0, 0, 0);

@@ -173,7 +173,7 @@ public:
 	void draw_version();
 	bool is_item_on_hand();
 	void dynamic_object_handler(char * data);
-	bool check_item_by_type(hb::shared::item::ItemType type);
+	bool has_item_with_sub_type(hb::shared::item::item_sub_type::item_sub_type sub_type);
 	void load_text_dlg_contents(int type);
 	int  load_text_dlg_contents2(int type);
 	void request_full_object_data(uint16_t object_id);

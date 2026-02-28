@@ -124,7 +124,7 @@ hb::shared::entity::PlayerAppearance CGame::build_broadcast_appearance(int clien
 	// Compute is_skirt from equipped pants
 	short pants_slot = client->m_item_equipment_status[to_int(EquipPos::Pants)];
 	if (pants_slot >= 0 && client->m_item_list[pants_slot] != nullptr)
-		appr.is_skirt = (client->m_item_list[pants_slot]->m_appearance_value == 1);
+		appr.is_skirt = (client->m_item_list[pants_slot]->m_is_skirt != 0);
 
 	return appr;
 }
@@ -1941,15 +1941,15 @@ void CGame::request_init_data_handler(int client_h, char* data, char key, size_t
 		entry->item_type = m_client_list[client_h]->m_item_list[i]->m_item_type;
 		entry->equip_pos = m_client_list[client_h]->m_item_list[i]->m_equip_pos;
 		entry->is_equipped = static_cast<std::uint8_t>(m_client_list[client_h]->m_is_item_equipped[i]);
-		entry->level_limit = m_client_list[client_h]->m_item_list[i]->m_level_limit;
-		entry->gender_limit = m_client_list[client_h]->m_item_list[i]->m_gender_limit;
-		entry->cur_lifespan = m_client_list[client_h]->m_item_list[i]->m_cur_life_span;
+		entry->level_limit = m_client_list[client_h]->m_item_list[i]->m_level_requirement;
+		entry->gender_limit = m_client_list[client_h]->m_item_list[i]->m_gender_requirement;
+		entry->cur_lifespan = m_client_list[client_h]->m_item_list[i]->m_cur_durability;
 		entry->weight = m_client_list[client_h]->m_item_list[i]->m_weight;
 		entry->item_color = m_client_list[client_h]->m_item_list[i]->m_item_color;
 		entry->spec_value2 = static_cast<std::uint8_t>(m_client_list[client_h]->m_item_list[i]->m_item_special_effect_value2);
 		entry->attribute = m_client_list[client_h]->m_item_list[i]->m_attribute;
 		entry->item_id = m_client_list[client_h]->m_item_list[i]->m_id_num;
-		entry->max_lifespan = m_client_list[client_h]->m_item_list[i]->m_max_life_span;
+		entry->max_lifespan = m_client_list[client_h]->m_item_list[i]->m_durability;
 	}
 
 	total_item_b = 0;
@@ -1973,15 +1973,15 @@ void CGame::request_init_data_handler(int client_h, char* data, char key, size_t
 		entry->count = m_client_list[client_h]->m_item_in_bank_list[i]->m_count;
 		entry->item_type = m_client_list[client_h]->m_item_in_bank_list[i]->m_item_type;
 		entry->equip_pos = m_client_list[client_h]->m_item_in_bank_list[i]->m_equip_pos;
-		entry->level_limit = m_client_list[client_h]->m_item_in_bank_list[i]->m_level_limit;
-		entry->gender_limit = m_client_list[client_h]->m_item_in_bank_list[i]->m_gender_limit;
-		entry->cur_lifespan = m_client_list[client_h]->m_item_in_bank_list[i]->m_cur_life_span;
+		entry->level_limit = m_client_list[client_h]->m_item_in_bank_list[i]->m_level_requirement;
+		entry->gender_limit = m_client_list[client_h]->m_item_in_bank_list[i]->m_gender_requirement;
+		entry->cur_lifespan = m_client_list[client_h]->m_item_in_bank_list[i]->m_cur_durability;
 		entry->weight = m_client_list[client_h]->m_item_in_bank_list[i]->m_weight;
 		entry->item_color = m_client_list[client_h]->m_item_in_bank_list[i]->m_item_color;
 		entry->spec_value2 = static_cast<std::uint8_t>(m_client_list[client_h]->m_item_in_bank_list[i]->m_item_special_effect_value2);
 		entry->attribute = m_client_list[client_h]->m_item_in_bank_list[i]->m_attribute;
 		entry->item_id = m_client_list[client_h]->m_item_in_bank_list[i]->m_id_num;
-		entry->max_lifespan = m_client_list[client_h]->m_item_in_bank_list[i]->m_max_life_span;
+		entry->max_lifespan = m_client_list[client_h]->m_item_in_bank_list[i]->m_durability;
 	}
 
 	auto* mastery = writer.Append<hb::net::PacketResponseMasteryData>();
@@ -2430,7 +2430,7 @@ void CGame::build_magic_manual_index()
 	for (int i = 0; i < MaxItemTypes; i++)
 	{
 		if (m_item_config_list[i] == nullptr) continue;
-		if (m_item_config_list[i]->m_item_effect_type != static_cast<short>(ItemEffectType::StudyMagic)) continue;
+		if (m_item_config_list[i]->get_item_effect_type() != ItemEffectType::StudyMagic) continue;
 		int magic_idx = m_item_config_list[i]->m_item_effect_value1;
 		if (magic_idx >= 0 && magic_idx < hb::shared::limits::MaxMagicType)
 			m_magic_to_manual_item[magic_idx] = m_item_config_list[i]->m_id_num;
@@ -2476,7 +2476,9 @@ void CGame::compute_config_hashes()
 				std::memset(entry.name, 0, sizeof(entry.name));
 				std::snprintf(entry.name, sizeof(entry.name), "%s", item->m_name);
 				entry.itemType = item->m_item_type;
+				entry.itemSubType = item->m_item_sub_type;
 				entry.equipPos = item->m_equip_pos;
+				entry.weaponClass = item->m_weapon_class;
 				entry.effectType = item->m_item_effect_type;
 				entry.effectValue1 = item->m_item_effect_value1;
 				entry.effectValue2 = item->m_item_effect_value2;
@@ -2484,19 +2486,23 @@ void CGame::compute_config_hashes()
 				entry.effectValue4 = item->m_item_effect_value4;
 				entry.effectValue5 = item->m_item_effect_value5;
 				entry.effectValue6 = item->m_item_effect_value6;
-				entry.maxLifeSpan = item->m_max_life_span;
+				entry.durability = item->m_durability;
 				entry.specialEffect = item->m_special_effect;
-				entry.price = item->m_is_for_sale ? static_cast<int32_t>(item->m_price) : -static_cast<int32_t>(item->m_price);
+				entry.sellPrice = item->m_sell_price;
 				entry.weight = item->m_weight;
-				entry.apprValue = item->m_appearance_value;
-				entry.speed = item->m_speed;
-				entry.levelLimit = item->m_level_limit;
-				entry.genderLimit = item->m_gender_limit;
+				entry.swingSpeed = item->m_swing_speed;
+				entry.levelRequirement = item->m_level_requirement;
+				entry.genderRequirement = item->m_gender_requirement;
 				entry.specialEffectValue1 = item->m_special_effect_value1;
 				entry.specialEffectValue2 = item->m_special_effect_value2;
 				entry.relatedSkill = item->m_related_skill;
-				entry.category = item->m_category;
+				entry.hideArmor = item->m_hide_armor;
+				entry.isSkirt = item->m_is_skirt;
+				entry.stackable = item->m_stackable;
+				entry.isDyeable = item->m_is_dyeable;
+				entry.setId = item->m_set_id;
 				entry.itemColor = item->m_item_color;
+				entry.displayId = item->m_display_id;
 				entriesInPacket++;
 			}
 
@@ -3944,8 +3950,8 @@ void CGame::check_client_response_time()
 				}
 
 				if (m_client_list[i] == 0) break;
-				//if (m_client_list[i]->m_level < m_map_list[m_client_list[i]->m_map_index]->m_level_limit) {
-				if ((m_client_list[i]->m_level < m_map_list[m_client_list[i]->m_map_index]->m_level_limit)) {
+				//if (m_client_list[i]->m_level < m_map_list[m_client_list[i]->m_map_index]->m_level_requirement) {
+				if ((m_client_list[i]->m_level < m_map_list[m_client_list[i]->m_map_index]->m_level_requirement)) {
 					send_notify_msg(0, i, Notify::ToBeRecalled, 0, 0, 0, 0);
 					request_teleport_handler(i, "0   ");
 				}
@@ -4278,15 +4284,15 @@ bool CGame::load_player_data_from_db(int client_h)
 		m_client_list[client_h]->m_item_list[item.slot]->m_item_special_effect_value1 = item.spec_effect_value1;
 		m_client_list[client_h]->m_item_list[item.slot]->m_item_special_effect_value2 = item.spec_effect_value2;
 		m_client_list[client_h]->m_item_list[item.slot]->m_item_special_effect_value3 = item.spec_effect_value3;
-		m_client_list[client_h]->m_item_list[item.slot]->m_cur_life_span = (short)item.cur_life_span;
+		m_client_list[client_h]->m_item_list[item.slot]->m_cur_durability = (short)item.cur_life_span;
 		m_client_list[client_h]->m_item_list[item.slot]->m_attribute = item.attribute;
 
 		if ((m_client_list[client_h]->m_item_list[item.slot]->m_attribute & 0x00000001) != 0) {
-			m_client_list[client_h]->m_item_list[item.slot]->m_max_life_span = m_client_list[client_h]->m_item_list[item.slot]->m_item_special_effect_value1;
+			m_client_list[client_h]->m_item_list[item.slot]->m_durability = m_client_list[client_h]->m_item_list[item.slot]->m_item_special_effect_value1;
 		}
 		m_item_manager->adjust_rare_item_value(m_client_list[client_h]->m_item_list[item.slot]);
-		if (m_client_list[client_h]->m_item_list[item.slot]->m_cur_life_span > m_client_list[client_h]->m_item_list[item.slot]->m_max_life_span) {
-			m_client_list[client_h]->m_item_list[item.slot]->m_cur_life_span = m_client_list[client_h]->m_item_list[item.slot]->m_max_life_span;
+		if (m_client_list[client_h]->m_item_list[item.slot]->m_cur_durability > m_client_list[client_h]->m_item_list[item.slot]->m_durability) {
+			m_client_list[client_h]->m_item_list[item.slot]->m_cur_durability = m_client_list[client_h]->m_item_list[item.slot]->m_durability;
 		}
 		m_item_manager->check_and_convert_plus_weapon_item(client_h, item.slot);
 	}
@@ -4315,14 +4321,14 @@ bool CGame::load_player_data_from_db(int client_h)
 		m_client_list[client_h]->m_item_in_bank_list[item.slot]->m_item_special_effect_value1 = item.spec_effect_value1;
 		m_client_list[client_h]->m_item_in_bank_list[item.slot]->m_item_special_effect_value2 = item.spec_effect_value2;
 		m_client_list[client_h]->m_item_in_bank_list[item.slot]->m_item_special_effect_value3 = item.spec_effect_value3;
-		m_client_list[client_h]->m_item_in_bank_list[item.slot]->m_cur_life_span = (short)item.cur_life_span;
+		m_client_list[client_h]->m_item_in_bank_list[item.slot]->m_cur_durability = (short)item.cur_life_span;
 		m_client_list[client_h]->m_item_in_bank_list[item.slot]->m_attribute = item.attribute;
 		if ((m_client_list[client_h]->m_item_in_bank_list[item.slot]->m_attribute & 0x00000001) != 0) {
-			m_client_list[client_h]->m_item_in_bank_list[item.slot]->m_max_life_span = m_client_list[client_h]->m_item_in_bank_list[item.slot]->m_item_special_effect_value1;
+			m_client_list[client_h]->m_item_in_bank_list[item.slot]->m_durability = m_client_list[client_h]->m_item_in_bank_list[item.slot]->m_item_special_effect_value1;
 		}
 		m_item_manager->adjust_rare_item_value(m_client_list[client_h]->m_item_in_bank_list[item.slot]);
-		if (m_client_list[client_h]->m_item_in_bank_list[item.slot]->m_cur_life_span > m_client_list[client_h]->m_item_in_bank_list[item.slot]->m_max_life_span) {
-			m_client_list[client_h]->m_item_in_bank_list[item.slot]->m_cur_life_span = m_client_list[client_h]->m_item_in_bank_list[item.slot]->m_max_life_span;
+		if (m_client_list[client_h]->m_item_in_bank_list[item.slot]->m_cur_durability > m_client_list[client_h]->m_item_in_bank_list[item.slot]->m_durability) {
+			m_client_list[client_h]->m_item_in_bank_list[item.slot]->m_cur_durability = m_client_list[client_h]->m_item_in_bank_list[item.slot]->m_durability;
 		}
 	}
 
@@ -4374,7 +4380,7 @@ bool CGame::load_player_data_from_db(int client_h)
 
 	for(int i = 0; i < hb::shared::limits::MaxItems; i++) {
 		if ((m_client_list[client_h]->m_item_list[i] != 0) && m_client_list[client_h]->m_is_item_equipped[i]) {
-			if (m_client_list[client_h]->m_item_list[i]->get_item_type() == ItemType::Equip) {
+			if (m_client_list[client_h]->m_item_list[i]->get_item_type() == hb::shared::item::item_type::equipment) {
 				if (m_item_manager->equip_item_handler(client_h, i) == false) {
 					m_client_list[client_h]->m_is_item_equipped[i] = false;
 				}
@@ -9238,7 +9244,7 @@ void CGame::request_teleport_auth_handler(int client_h, const char* data)
 	// Destination map not on this server — still valid (server change), approve
 	if (dest_map_index >= 0) {
 		// Check level limits on destination map
-		if (m_client_list[client_h]->m_level < m_map_list[dest_map_index]->m_level_limit) {
+		if (m_client_list[client_h]->m_level < m_map_list[dest_map_index]->m_level_requirement) {
 			send_notify_msg(0, client_h, Notify::LimitedLevel, 0, 0, 0, 0);
 			return;
 		}
@@ -9349,7 +9355,7 @@ void CGame::level_up_settings_handler(int client_h, char* data, size_t msg_size)
 	if (weapon_index != -1 && m_client_list[client_h]->m_item_list[weapon_index] != nullptr)
 	{
 		m_client_list[client_h]->m_status.attack_delay = static_cast<uint8_t>(hb::shared::calc::attack_delay(
-			m_client_list[client_h]->m_item_list[weapon_index]->m_speed,
+			m_client_list[client_h]->m_item_list[weapon_index]->m_swing_speed,
 			m_client_list[client_h]->m_str,
 			m_client_list[client_h]->m_angelic_str));
 	}
@@ -9571,7 +9577,7 @@ int CGame::calc_total_weight(int client_h)
 		if (m_client_list[client_h]->m_item_list[item_index] != 0) {
 			switch (m_client_list[client_h]->m_item_list[item_index]->get_item_effect_type()) {
 			case ItemEffectType::AlterItemDrop:
-				if (m_client_list[client_h]->m_item_list[item_index]->m_cur_life_span > 0) {
+				if (m_client_list[client_h]->m_item_list[item_index]->m_cur_durability > 0) {
 					m_client_list[client_h]->m_alter_item_drop_index = item_index;
 				}
 				break;
@@ -13427,7 +13433,7 @@ void CGame::party_operation(char* data)
 		if ((target_type == hb::shared::owner_class::Player) && (m_client_list[target_h]->m_side != m_client_list[attacker_h]->m_side)) {
 			switch (m_client_list[attacker_h]->m_using_weapon_skill) {
 				case 14:
-					if ((31 == m_client_list[attacker_h]->get_equipped_weapon_type()) || (32 == m_client_list[attacker_h]->get_equipped_weapon_type())) {
+					if (m_client_list[attacker_h]->get_equipped_weapon_class() == hb::shared::item::weapon_class::hammer) {
 						item_index = m_client_list[attacker_h]->m_item_equipment_status[to_int(EquipPos::TwoHand)];
 						if ((item_index != -1) && (m_client_list[attacker_h]->m_item_list[item_index] != 0)) {
 							if (m_client_list[attacker_h]->m_item_list[item_index]->m_id_num == 761) { // BattleHammer
@@ -13462,12 +13468,12 @@ void CGame::party_operation(char* data)
 			}
 		}
 
-		if ((m_client_list[target_h]->m_side != 0) && (m_client_list[target_h]->m_item_list[armor_type]->m_cur_life_span > 0)) {
-				m_client_list[target_h]->m_item_list[armor_type]->m_cur_life_span -= down_value;
+		if ((m_client_list[target_h]->m_side != 0) && (m_client_list[target_h]->m_item_list[armor_type]->m_cur_durability > 0)) {
+				m_client_list[target_h]->m_item_list[armor_type]->m_cur_durability -= down_value;
 		}
 
-		if ((m_client_list[target_h]->m_item_list[armor_type]->m_cur_life_span <= 0) || (m_client_list[target_h]->m_item_list[armor_type]->m_cur_life_span > 64000)) {
-			m_client_list[target_h]->m_item_list[armor_type]->m_cur_life_span = 0;
+		if ((m_client_list[target_h]->m_item_list[armor_type]->m_cur_durability <= 0) || (m_client_list[target_h]->m_item_list[armor_type]->m_cur_durability > 64000)) {
+			m_client_list[target_h]->m_item_list[armor_type]->m_cur_durability = 0;
 			send_notify_msg(0, target_h, Notify::ItemLifeSpanEnd, m_client_list[target_h]->m_item_list[armor_type]->m_equip_pos, armor_type, 0, 0);
 			m_item_manager->release_item_handler(target_h, armor_type, true);
 			return;
@@ -13490,14 +13496,14 @@ void CGame::party_operation(char* data)
 		/*if (m_client_list[attacker_h] != 0) {
 		if (target_type == hb::shared::owner_class::Player) {
 		if ((m_client_list[attacker_h]->m_using_weapon_skill == 14) && (hammer_chance == 100)) {
-			if (m_client_list[target_h]->m_item_list[armor_type]->m_max_life_span < 2000) {
-				hammer_chance = dice(6, (m_client_list[target_h]->m_item_list[armor_type]->m_max_life_span - m_client_list[target_h]->m_item_list[armor_type]->m_cur_life_span));
+			if (m_client_list[target_h]->m_item_list[armor_type]->m_durability < 2000) {
+				hammer_chance = dice(6, (m_client_list[target_h]->m_item_list[armor_type]->m_durability - m_client_list[target_h]->m_item_list[armor_type]->m_cur_durability));
 			}
 			else {
-				hammer_chance = dice(4, (m_client_list[target_h]->m_item_list[armor_type]->m_max_life_span - m_client_list[target_h]->m_item_list[armor_type]->m_cur_life_span));
+				hammer_chance = dice(4, (m_client_list[target_h]->m_item_list[armor_type]->m_durability - m_client_list[target_h]->m_item_list[armor_type]->m_cur_durability));
 			}
 
-			if ((31 == m_client_list[attacker_h]->get_equipped_weapon_type()) || (32 == m_client_list[attacker_h]->get_equipped_weapon_type())) {
+			if (m_client_list[attacker_h]->get_equipped_weapon_class() == hb::shared::item::weapon_class::hammer) {
 				item_index = m_client_list[attacker_h]->m_item_equipment_status[to_int(EquipPos::TwoHand)];
 				if ((item_index != -1) && (m_client_list[attacker_h]->m_item_list[item_index] != 0)) {
 					if (m_client_list[attacker_h]->m_item_list[item_index]->m_id_num == 761) { // BattleHammer
@@ -13517,8 +13523,8 @@ void CGame::party_operation(char* data)
 			if ((m_client_list[target_h]->m_item_list[armor_type]->m_id_num == 622) || (m_client_list[target_h]->m_item_list[armor_type]->m_id_num == 621)) {
 				hammer_chance = 0;
 			}
-			if (m_client_list[target_h]->m_item_list[armor_type]->m_cur_life_span < hammer_chance) {
-				std::snprintf(G_cTxt, sizeof(G_cTxt), "(hammer_chance (%d), target armor endurance (%d)!", hammer_chance, m_client_list[target_h]->m_item_list[armor_type]->m_cur_life_span);
+			if (m_client_list[target_h]->m_item_list[armor_type]->m_cur_durability < hammer_chance) {
+				std::snprintf(G_cTxt, sizeof(G_cTxt), "(hammer_chance (%d), target armor endurance (%d)!", hammer_chance, m_client_list[target_h]->m_item_list[armor_type]->m_cur_durability);
 				PutLogList(G_cTxt);
 				m_item_manager->release_item_handler(target_h, armor_type, true);
 				send_notify_msg(0, target_h, Notify::ItemReleased, m_client_list[target_h]->m_item_list[armor_type]->m_equip_pos, armor_type, 0, 0);

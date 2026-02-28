@@ -179,9 +179,8 @@ void CraftingManager::req_create_portion_handler(int client_h, char* data)
 
 		for(int i = 0; i < 6; i++)
 			if (item_index[i] != -1) {
-				if (m_game->m_client_list[client_h]->m_item_list[item_index[i]]->get_item_type() == ItemType::Consume)
-					// v1.41 !!!
-					m_game->m_item_manager->set_item_count(client_h, item_index[i], //     m_client_list[client_h]->m_item_list[item_index[i]]->m_name,
+				if (m_game->m_client_list[client_h]->m_item_list[item_index[i]]->is_stackable())
+					m_game->m_item_manager->set_item_count(client_h, item_index[i],
 						m_game->m_client_list[client_h]->m_item_list[item_index[i]]->m_count - item_number[i]);
 				else m_game->m_item_manager->item_deplete_handler(client_h, item_index[i], false);
 			}
@@ -201,7 +200,7 @@ void CraftingManager::req_create_portion_handler(int client_h, char* data)
 					break;
 				}
 
-				//if ((item->m_price * item->m_count) > 1000)
+				//if ((item->m_sell_price * item->m_count) > 1000)
 				//	SendMsgToLS(ServerMsgId::RequestSavePlayerData, client_h);
 			}
 			else {
@@ -298,7 +297,7 @@ void CraftingManager::req_create_crafting_handler(int client_h, char* data)
 			{
 				item_purity[i] = 100; // Merien stones considered 100% purity.
 			}
-			if (m_game->m_client_list[client_h]->m_item_list[item_index[i]]->get_item_type() == ItemType::Consume)
+			if (m_game->m_client_list[client_h]->m_item_list[item_index[i]]->is_stackable())
 			{
 				item_purity[i] = -1; // Diamonds / Emeralds.etc.. never have purity
 			}
@@ -312,7 +311,7 @@ void CraftingManager::req_create_crafting_handler(int client_h, char* data)
 				, m_game->m_client_list[client_h]->m_item_list[item_index[i]]->m_id_num);
 			PutLogList(G_cTxt);*/
 
-			if ((m_game->m_client_list[client_h]->m_item_list[item_index[i]]->get_item_type() == ItemType::Equip)
+			if ((m_game->m_client_list[client_h]->m_item_list[item_index[i]]->get_item_type() == hb::shared::item::item_type::equipment)
 				&& (m_game->m_client_list[client_h]->m_item_list[item_index[i]]->get_equip_pos() == EquipPos::Neck))
 			{
 				needed_contrib = 10; // Necks Crafting requires 10 contrib
@@ -400,8 +399,8 @@ void CraftingManager::req_create_crafting_handler(int client_h, char* data)
 				}
 				else
 					// Risk to deplete any other items (not stackable ones) // DEF_ITEMTYPE_CONSUME
-					if ((m_game->m_client_list[client_h]->m_item_list[item_index[i]]->get_item_type() == ItemType::Equip)
-						|| (m_game->m_client_list[client_h]->m_item_list[item_index[i]]->get_item_type() == ItemType::Material))
+					if ((m_game->m_client_list[client_h]->m_item_list[item_index[i]]->get_item_type() == hb::shared::item::item_type::equipment)
+						|| (m_game->m_client_list[client_h]->m_item_list[item_index[i]]->get_item_type() == hb::shared::item::item_type::material))
 					{
 						if (m_game->dice(1, 100) < static_cast<uint32_t>(risk_level))
 						{
@@ -454,12 +453,12 @@ void CraftingManager::req_create_crafting_handler(int client_h, char* data)
 		{
 			if (item_index[i] != -1)
 			{
-				if (m_game->m_client_list[client_h]->m_item_list[item_index[i]]->get_item_type() == ItemType::Consume)
+				if (m_game->m_client_list[client_h]->m_item_list[item_index[i]]->is_stackable())
 				{
 					m_game->m_item_manager->set_item_count(client_h, item_index[i],
 						m_game->m_client_list[client_h]->m_item_list[item_index[i]]->m_count - item_number[i]);
 				}
-				else // So if item is not Type 5 (stackable items), you deplete item
+				else // Non-stackable items get depleted
 				{
 					m_game->m_item_manager->item_deplete_handler(client_h, item_index[i], false);
 				}
@@ -509,7 +508,7 @@ void CraftingManager::req_create_crafting_handler(int client_h, char* data)
 					m_game->delete_client(client_h, true, true);
 					break;
 				}
-				//if ((item->m_price * item->m_count) > 1000)
+				//if ((item->m_sell_price * item->m_count) > 1000)
 				//	SendMsgToLS(ServerMsgId::RequestSavePlayerData, client_h);
 			}
 			else

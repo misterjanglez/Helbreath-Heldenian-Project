@@ -54,7 +54,7 @@ namespace NetworkMessageHandlers {
 			game->m_player->m_bank_list[index] = std::make_unique<CItem>();
 			game->m_player->m_bank_list[index]->m_id_num = static_cast<short>(pkt->item_id);
 			game->m_player->m_bank_list[index]->m_count = count;
-			game->m_player->m_bank_list[index]->m_cur_life_span = cur_life_span;
+			game->m_player->m_bank_list[index]->m_cur_durability = cur_life_span;
 			game->m_player->m_bank_list[index]->m_item_color = item_color;
 			game->m_player->m_bank_list[index]->m_attribute = attribute;
 			game->m_player->m_bank_list[index]->m_item_special_effect_value2 = item_spec_effect_value2;
@@ -74,7 +74,7 @@ namespace NetworkMessageHandlers {
 			// Update existing bank item in-place (e.g., hero item sex swap)
 			game->m_player->m_bank_list[index]->m_id_num = static_cast<short>(pkt->item_id);
 			game->m_player->m_bank_list[index]->m_count = count;
-			game->m_player->m_bank_list[index]->m_cur_life_span = cur_life_span;
+			game->m_player->m_bank_list[index]->m_cur_durability = cur_life_span;
 			game->m_player->m_bank_list[index]->m_item_color = item_color;
 			game->m_player->m_bank_list[index]->m_attribute = attribute;
 			game->m_player->m_bank_list[index]->m_item_special_effect_value2 = item_spec_effect_value2;

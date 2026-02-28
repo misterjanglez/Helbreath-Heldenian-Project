@@ -63,7 +63,7 @@ static constexpr EquipSlotLayout MaleEquipSlots[] = {
 	{ EquipPos::TwoHand,     57,  186, true  },
 	{ EquipPos::Neck,        35,  120, false },
 	{ EquipPos::RightFinger, 32,  193, false },
-	{ EquipPos::LeftFinger,  98,  182, false },
+	{ EquipPos::LeftFinger,  92,  174, false },
 	{ EquipPos::Head,        72,  135, false },
 };
 
@@ -79,7 +79,7 @@ static constexpr EquipSlotLayout FemaleEquipSlots[] = {
 	{ EquipPos::TwoHand,     60,  191, true  },
 	{ EquipPos::Neck,        35,  120, false },
 	{ EquipPos::RightFinger, 32,  193, false },
-	{ EquipPos::LeftFinger,  98,  182, false },
+	{ EquipPos::LeftFinger,  92,  174, false },
 	{ EquipPos::Head,        72,  139, false },
 };
 
@@ -513,9 +513,8 @@ bool DialogBox_Character::on_double_click()
 		return false;
 
 	// Skip consumables, arrows, and stacked items
-	if (cfg->get_item_type() == ItemType::Eat ||
-		cfg->get_item_type() == ItemType::Consume ||
-		cfg->get_item_type() == ItemType::Arrow ||
+	if (cfg->get_item_type() == hb::shared::item::item_type::consumable ||
+		cfg->get_item_sub_type() == hb::shared::item::item_sub_type::ammo ||
 		item->m_count > 1)
 		return false;
 
@@ -553,8 +552,8 @@ bool DialogBox_Character::on_double_click()
 			}
 
 			// Remove Angelic Stats
-			if (cfg->m_equip_pos >= 11 &&
-				cfg->get_item_type() == ItemType::Equip)
+			if (cfg->get_equip_pos() >= EquipPos::LeftFinger &&
+				cfg->get_item_type() == hb::shared::item::item_type::equipment)
 			{
 				if (item->m_id_num == hb::shared::item::ItemId::AngelicPandentSTR)
 					player().m_angelic_str = 0;

@@ -884,7 +884,9 @@ bool CGame::cache_process_item_config(char* data, uint32_t msg_size)
 		item->m_id_num = entry.itemId;
 		std::snprintf(item->m_name, sizeof(item->m_name), "%s", entry.name);
 		item->m_item_type = entry.itemType;
+		item->m_item_sub_type = entry.itemSubType;
 		item->m_equip_pos = entry.equipPos;
+		item->m_weapon_class = entry.weaponClass;
 		item->m_item_effect_type = entry.effectType;
 		item->m_item_effect_value1 = entry.effectValue1;
 		item->m_item_effect_value2 = entry.effectValue2;
@@ -892,19 +894,21 @@ bool CGame::cache_process_item_config(char* data, uint32_t msg_size)
 		item->m_item_effect_value4 = entry.effectValue4;
 		item->m_item_effect_value5 = entry.effectValue5;
 		item->m_item_effect_value6 = entry.effectValue6;
-		item->m_max_life_span = entry.maxLifeSpan;
+		item->m_durability = entry.durability;
 		item->m_special_effect = entry.specialEffect;
-		item->m_is_for_sale = (entry.price >= 0);
-		item->m_price = static_cast<uint32_t>(entry.price >= 0 ? entry.price : -entry.price);
+		item->m_sell_price = entry.sellPrice;
 		item->m_weight = entry.weight;
-		item->m_appearance_value = entry.apprValue;
-		item->m_speed = entry.speed;
-		item->m_level_limit = entry.levelLimit;
-		item->m_gender_limit = entry.genderLimit;
+		item->m_swing_speed = entry.swingSpeed;
+		item->m_level_requirement = entry.levelRequirement;
+		item->m_gender_requirement = entry.genderRequirement;
 		item->m_special_effect_value1 = entry.specialEffectValue1;
 		item->m_special_effect_value2 = entry.specialEffectValue2;
 		item->m_related_skill = entry.relatedSkill;
-		item->m_category = entry.category;
+		item->m_hide_armor = entry.hideArmor;
+		item->m_is_skirt = entry.isSkirt;
+		item->m_stackable = entry.stackable;
+		item->m_is_dyeable = entry.isDyeable;
+		item->m_set_id = entry.setId;
 		item->m_item_color = entry.itemColor;
 		item->m_display_id = entry.displayId;
 	}
@@ -2430,15 +2434,15 @@ void CGame::init_item_list(char* packet_data)
 		{
 			m_item_equipment_status[cfg->m_equip_pos] = i;
 		}
-		m_player->m_item_list[i]->m_cur_life_span = entry.cur_lifespan;
+		m_player->m_item_list[i]->m_cur_durability = entry.cur_lifespan;
 		m_player->m_item_list[i]->m_item_color = entry.item_color;
 		m_player->m_item_list[i]->m_item_special_effect_value2 = static_cast<short>(entry.spec_value2); // v1.41
 		m_player->m_item_list[i]->m_attribute = entry.attribute;
 		m_item_order[i] = i;
 		// Snoopy: Add Angelic Stats
-		if (cfg && (cfg->get_item_type() == ItemType::Equip)
+		if (cfg && (cfg->get_item_type() == hb::shared::item::item_type::equipment)
 			&& (m_is_item_equipped[i] == true)
-			&& (cfg->m_equip_pos >= 11))
+			&& (cfg->get_equip_pos() >= EquipPos::LeftFinger))
 		{
 			angel_value = (m_player->m_item_list[i]->m_attribute & 0xF0000000) >> 28;
 			if (m_player->m_item_list[i]->m_id_num == hb::shared::item::ItemId::AngelicPandentSTR)
@@ -2470,7 +2474,7 @@ void CGame::init_item_list(char* packet_data)
 		m_player->m_bank_list[i]->m_count = entry.count;
 		m_player->m_bank_list[i]->m_x = 40;
 		m_player->m_bank_list[i]->m_y = 30;
-		m_player->m_bank_list[i]->m_cur_life_span = entry.cur_lifespan;
+		m_player->m_bank_list[i]->m_cur_durability = entry.cur_lifespan;
 		m_player->m_bank_list[i]->m_item_color = entry.item_color;
 		m_player->m_bank_list[i]->m_item_special_effect_value2 = static_cast<short>(entry.spec_value2); // v1.41
 		m_player->m_bank_list[i]->m_attribute = entry.attribute;
@@ -2995,14 +2999,12 @@ void CGame::civil_right_admission_handler(char* data)
 }
 
 
-bool CGame::check_item_by_type(ItemType type)
+bool CGame::has_item_with_sub_type(hb::shared::item::item_sub_type::item_sub_type sub_type)
 {
-	int i;
-
-	for (i = 0; i < hb::shared::limits::MaxItems; i++)
+	for (int i = 0; i < hb::shared::limits::MaxItems; i++)
 		if (m_player->m_item_list[i] != 0) {
 			CItem* cfg = get_item_config(m_player->m_item_list[i]->m_id_num);
-			if (cfg && cfg->get_item_type() == type) return true;
+			if (cfg && cfg->get_item_sub_type() == sub_type) return true;
 		}
 
 	return false;
@@ -3048,9 +3050,8 @@ bool CGame::is_item_on_hand() // Snoopy: Fixed to remove ShieldCast
 			CItem* cfg = get_item_config(m_player->m_item_list[i]->m_id_num);
 			if (cfg && cfg->get_equip_pos() == EquipPos::RightHand)
 			{
-				// Wands (appearance_value 34-39) don't count as "item on hand" for combat
-				uint8_t appr_val = static_cast<uint8_t>(cfg->m_appearance_value);
-				if ((appr_val >= 34) && (appr_val < 40)) return false;
+				// Wands don't count as "item on hand" for combat
+				if (cfg->get_weapon_class() == hb::shared::item::weapon_class::wand) return false;
 				else return true;
 			}
 		}
@@ -3503,8 +3504,7 @@ void CGame::retrieve_item_handler(char* data)
 			add_event_list(txt.c_str(), 10);
 
 			CItem* cfg_bank = get_item_config(m_player->m_bank_list[bank_item_index]->m_id_num);
-			bool stackable = cfg_bank && ((cfg_bank->get_item_type() == ItemType::Consume) ||
-				(cfg_bank->get_item_type() == ItemType::Arrow));
+			bool stackable = cfg_bank && (cfg_bank->is_stackable());
 
 			if (stackable && m_player->m_item_list[item_index] != 0)
 			{
@@ -4177,7 +4177,7 @@ void CGame::point_command_handler(int indexX, int indexY, char item_id)
 		}
 
 		CItem* cfg_pt = get_item_config(m_player->m_item_list[on_game()->m_point_command_type]->m_id_num);
-		if (cfg_pt && cfg_pt->get_item_type() == ItemType::UseSkill)
+		if (cfg_pt && cfg_pt->get_item_type() == hb::shared::item::item_type::tool)
 			on_game()->m_skill_using_status = true;
 	}
 	else if (on_game()->m_point_command_type == 200) // Normal Hand
@@ -5805,7 +5805,7 @@ void CGame::process_motion_commands(uint16_t action_type)
 
 				if ((action_type == 2) || (action_type == 25))
 				{
-					if (check_item_by_type(ItemType::Arrow) == false)
+					if (has_item_with_sub_type(hb::shared::item::item_sub_type::ammo) == false)
 						action_type = 0;
 				}
 				m_player->m_player_dir = move_dir;
@@ -6699,36 +6699,22 @@ void CGame::check_active_aura2(short sX, short sY, uint32_t time, short owner_ty
 **********************************************************************************************************************/
 int CGame::has_hero_set(const hb::shared::entity::PlayerAppearance& appr, short OwnerType)
 {
-	// Look up appearance_value for each armor slot via item config
-	auto get_appr = [this](int16_t item_id) -> int {
+	// Look up set_id for each armor slot via item config
+	auto get_set = [this](int16_t item_id) -> int16_t {
 		if (item_id <= 0) return 0;
 		CItem* cfg = get_item_config(item_id);
-		return cfg ? cfg->m_appearance_value : 0;
-		};
+		return cfg ? cfg->m_set_id : 0;
+	};
 
-	int armor = get_appr(appr.armor_item_id);
-	int leg = get_appr(appr.pants_item_id);
-	int hat = get_appr(appr.helm_item_id);
-	int berk = get_appr(appr.arm_item_id);
+	int16_t armor_set = get_set(appr.armor_item_id);
+	if (armor_set == 0) return 0;
+	int16_t leg_set = get_set(appr.pants_item_id);
+	int16_t hat_set = get_set(appr.helm_item_id);
+	int16_t berk_set = get_set(appr.arm_item_id);
 
-	switch (OwnerType) {
-	case 1:
-	case 2:
-	case 3:
-		if (armor == 8 && leg == 5 && hat == 9 && berk == 3) return 1; // Warr elv M
-		if (armor == 9 && leg == 6 && hat == 10 && berk == 4) return 1; // Warr ares M
-		if (armor == 10 && leg == 5 && hat == 11 && berk == 3) return 2; // Mage elv M
-		if (armor == 11 && leg == 6 && hat == 12 && berk == 4) return 2; // Mage ares M
-		break;
-	case 4:
-	case 5:
-	case 6:
-		if (armor == 9 && leg == 6 && hat == 9 && berk == 4) return 1; // Warr elv W
-		if (armor == 10 && leg == 7 && hat == 10 && berk == 5) return 1; // Warr ares W
-		if (armor == 11 && leg == 6 && hat == 11 && berk == 4) return 2; // Mage elv W
-		if (armor == 12 && leg == 7 && hat == 12 && berk == 5) return 2; // Mage ares W
-		break;
-	}
+	// All four pieces must have the same non-zero set_id
+	if (armor_set == leg_set && armor_set == hat_set && armor_set == berk_set)
+		return armor_set; // set_id encodes set type: 1=warrior, 2=mage
 	return 0;
 }
 /*********************************************************************************************************************

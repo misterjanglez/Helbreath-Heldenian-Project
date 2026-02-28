@@ -861,7 +861,7 @@ void Screen_OnGame::render_item_tooltip()
     if (!cfg) return;
 
     char item_color = item->m_item_color;
-    bool is_hand_item = cfg->get_equip_pos() == EquipPos::LeftHand || cfg->get_equip_pos() == EquipPos::RightHand || cfg->get_equip_pos() == EquipPos::TwoHand;
+    bool is_hand_item = cfg->is_weapon();
     auto tooltip_draw = m_game->get_item_draw(cfg->m_display_id, item_atlas::pack, cfg->sprite_is_female());
     hb::shared::sprite::ISprite* sprite = tooltip_draw.sprite;
     int16_t frame = tooltip_draw.frame;
@@ -912,7 +912,7 @@ void Screen_OnGame::render_item_tooltip()
     // Endurance
     if (is_equippable)
     {
-        G_cTxt = std::format(UPDATE_SCREEN_ONGAME10, item->m_cur_life_span, cfg->m_max_life_span);
+        G_cTxt = std::format(UPDATE_SCREEN_ONGAME10, item->m_cur_durability, cfg->m_durability);
         tooltip.add_line(G_cTxt, GameColors::InfoGrayLight);
     }
 
@@ -925,7 +925,7 @@ void Screen_OnGame::render_item_tooltip()
         int req_str = static_cast<int>(std::ceil(eff_weight / static_cast<float>(wups)));
         if (cfg->get_equip_pos() == EquipPos::RightHand || cfg->get_equip_pos() == EquipPos::TwoHand)
         {
-            int full_speed_str = cfg->m_speed * hb::shared::balance::swing_str_divisor;
+            int full_speed_str = cfg->m_swing_speed * hb::shared::balance::swing_str_divisor;
             G_cTxt = std::format("Required Str: {} ({} full speed)", req_str, full_speed_str);
         }
         else
@@ -936,9 +936,9 @@ void Screen_OnGame::render_item_tooltip()
     }
 
     // Level requirement
-    if (cfg->m_level_limit != 0)
+    if (cfg->m_level_requirement != 0)
     {
-        G_cTxt = std::format("{}: {}", DRAW_DIALOGBOX_SHOP24, cfg->m_level_limit);
+        G_cTxt = std::format("{}: {}", DRAW_DIALOGBOX_SHOP24, cfg->m_level_requirement);
         tooltip.add_line(G_cTxt, GameColors::InfoGrayLight);
     }
 
@@ -1149,7 +1149,7 @@ void Screen_OnGame::item_drop_external_screen(char item_id, short mouse_x, short
         else
         {
             CItem* cfg = m_game->get_item_config(m_game->m_player->m_item_list[item_id]->m_id_num);
-            if (cfg && ((cfg->get_item_type() == ItemType::Consume) || (cfg->get_item_type() == ItemType::Arrow))
+            if (cfg && (cfg->is_stackable())
                 && (m_game->m_player->m_item_list[item_id]->m_count > 1))
             {
                 m_game->get_dialog_box_manager().get_dialog_box(DialogBoxId::ItemDropExternal)->m_x = mouse_x - 140;
@@ -1272,7 +1272,7 @@ void Screen_OnGame::item_drop_external_screen(char item_id, short mouse_x, short
     else
     {
         CItem* cfg2 = m_game->get_item_config(m_game->m_player->m_item_list[item_id]->m_id_num);
-        if (cfg2 && ((cfg2->get_item_type() == ItemType::Consume) || (cfg2->get_item_type() == ItemType::Arrow))
+        if (cfg2 && (cfg2->is_stackable())
             && (m_game->m_player->m_item_list[item_id]->m_count > 1))
         {
             m_game->get_dialog_box_manager().get_dialog_box(DialogBoxId::ItemDropExternal)->m_x = mouse_x - 140;

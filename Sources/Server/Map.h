@@ -163,7 +163,7 @@ public:
 	char  m_weather_status;		// . 0 . 1~3  4~6  7~9
 	uint32_t m_weather_duration, m_weather_start_time;
 
-	int   m_level_limit;
+	int   m_level_requirement;
 	int   m_upper_level_limit;
 
 	class COccupyFlag * m_occupy_flag[hb::server::map::MaxOccupyFlag];

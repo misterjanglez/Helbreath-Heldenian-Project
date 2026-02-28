@@ -223,7 +223,7 @@ LogIn LoginServer::AccountLogIn(string acc, string pass, std::vector<AccountDbCh
 						entry.appearance.armor_item_id = static_cast<int16_t>(item.item_id);
 						entry.appearance.armor_display_id = config->m_display_id;
 						entry.appearance.armor_color = color;
-						entry.appearance.hide_armor = (config->m_appearance_value >= 100);
+						entry.appearance.hide_armor = (config->m_hide_armor != 0);
 						break;
 					case EquipPos::FullBody:
 						entry.appearance.armor_item_id = static_cast<int16_t>(item.item_id);
@@ -239,7 +239,7 @@ LogIn LoginServer::AccountLogIn(string acc, string pass, std::vector<AccountDbCh
 						entry.appearance.pants_item_id = static_cast<int16_t>(item.item_id);
 						entry.appearance.pants_display_id = config->m_display_id;
 						entry.appearance.pants_color = color;
-						entry.appearance.is_skirt = (config->m_appearance_value == 1);
+						entry.appearance.is_skirt = (config->m_is_skirt != 0);
 						break;
 					case EquipPos::Leggings:
 						entry.appearance.boots_item_id = static_cast<int16_t>(item.item_id);
@@ -500,7 +500,7 @@ void LoginServer::response_character(int h, char* data)
 		item.spec_effect_value3 = 0;
 		item.cur_life_span = (entry.lifespan > 0)
 			? entry.lifespan
-			: G_pGame->m_item_config_list[entry.item_id]->m_max_life_span;
+			: G_pGame->m_item_config_list[entry.item_id]->m_durability;
 		item.attribute = 0;
 		item.pos_x = 40;
 		item.pos_y = 30;

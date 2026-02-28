@@ -1718,7 +1718,7 @@ bool SaveCharacterSnapshot(sqlite3* db, const CClient* client)
         ok &= (sqlite3_bind_int(stmt, col++, client->m_item_list[i]->m_item_special_effect_value1) == SQLITE_OK);
         ok &= (sqlite3_bind_int(stmt, col++, client->m_item_list[i]->m_item_special_effect_value2) == SQLITE_OK);
         ok &= (sqlite3_bind_int(stmt, col++, client->m_item_list[i]->m_item_special_effect_value3) == SQLITE_OK);
-        ok &= (sqlite3_bind_int(stmt, col++, client->m_item_list[i]->m_cur_life_span) == SQLITE_OK);
+        ok &= (sqlite3_bind_int(stmt, col++, client->m_item_list[i]->m_cur_durability) == SQLITE_OK);
         ok &= (sqlite3_bind_int(stmt, col++, static_cast<int>(client->m_item_list[i]->m_attribute)) == SQLITE_OK);
         ok &= (sqlite3_bind_int(stmt, col++, client->m_item_pos_list[i].x) == SQLITE_OK);
         ok &= (sqlite3_bind_int(stmt, col++, client->m_item_pos_list[i].y) == SQLITE_OK);
@@ -1775,7 +1775,7 @@ bool SaveCharacterSnapshot(sqlite3* db, const CClient* client)
         ok &= (sqlite3_bind_int(stmt, col++, client->m_item_in_bank_list[i]->m_item_special_effect_value1) == SQLITE_OK);
         ok &= (sqlite3_bind_int(stmt, col++, client->m_item_in_bank_list[i]->m_item_special_effect_value2) == SQLITE_OK);
         ok &= (sqlite3_bind_int(stmt, col++, client->m_item_in_bank_list[i]->m_item_special_effect_value3) == SQLITE_OK);
-        ok &= (sqlite3_bind_int(stmt, col++, client->m_item_in_bank_list[i]->m_cur_life_span) == SQLITE_OK);
+        ok &= (sqlite3_bind_int(stmt, col++, client->m_item_in_bank_list[i]->m_cur_durability) == SQLITE_OK);
         ok &= (sqlite3_bind_int(stmt, col++, static_cast<int>(client->m_item_in_bank_list[i]->m_attribute)) == SQLITE_OK);
 
         if (ok) {

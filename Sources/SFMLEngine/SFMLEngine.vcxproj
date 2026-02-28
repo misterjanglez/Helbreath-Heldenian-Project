@@ -1,4 +1,4 @@
-<?xml version='1.0' encoding='utf-8'?>
+<?xml version="1.0" encoding="utf-8"?>
 <Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003" DefaultTargets="Build" ToolsVersion="15.0">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|x64">
@@ -39,7 +39,6 @@
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
-  
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <OutDir>$(ProjectDir)$(Configuration)_x64\</OutDir>
     <IntDir>$(Configuration)_x64\</IntDir>
@@ -52,7 +51,6 @@
     <IncludePath>$(SolutionDir)Dependencies\Shared;$(SolutionDir)Dependencies\Shared\Entity;$(SolutionDir)Dependencies\Shared\Game;$(SolutionDir)Dependencies\Shared\Net;$(SolutionDir)Dependencies\Shared\Render;$(SolutionDir)Dependencies\Shared\Util;$(SolutionDir)Dependencies\Client\Includes;$(SolutionDir)Dependencies\SFML\include;$(VC_IncludePath);$(WindowsSDK_IncludePath);</IncludePath>
     <LibraryPath>$(SolutionDir)Dependencies\SFML\lib_x64;$(VC_LibraryPath_x64);$(WindowsSDK_LibraryPath_x64);</LibraryPath>
   </PropertyGroup>
-  
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
@@ -74,7 +72,6 @@
       <OutputFile>$(OutDir)$(TargetName)$(TargetExt)</OutputFile>
     </Lib>
   </ItemDefinitionGroup>
-  
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
       <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
@@ -89,7 +86,7 @@
       <DebugInformationFormat>EditAndContinue</DebugInformationFormat>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <AdditionalIncludeDirectories>$(SolutionDir)Client;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <LanguageStandard>stdcpp17</LanguageStandard>
+      <LanguageStandard>stdcpp20</LanguageStandard>
     </ClCompile>
     <Lib>
       <OutputFile>$(OutDir)$(TargetName)$(TargetExt)</OutputFile>
@@ -104,7 +101,30 @@
     <ClInclude Include="SFMLTextRenderer.h" />
     <ClInclude Include="SFMLBitmapFont.h" />
     <ClInclude Include="SFMLInput.h" />
-  <ClInclude Include="..\Dependencies\Shared\Entity\ActionID.h" /><ClInclude Include="..\Dependencies\Shared\Entity\Appearance.h" /><ClInclude Include="..\Dependencies\Shared\Render\BitmapFontFactory.h" /><ClInclude Include="..\Dependencies\Shared\Render\ColorUtils.h" /><ClInclude Include="..\Dependencies\Shared\Render\GameGeometry.h" /><ClInclude Include="..\Dependencies\Shared\Render\IBitmapFont.h" /><ClInclude Include="..\Dependencies\Shared\Render\IInput.h" /><ClInclude Include="..\Dependencies\Shared\Render\IRenderer.h" /><ClInclude Include="..\Dependencies\Shared\Render\ISprite.h" /><ClInclude Include="..\Dependencies\Shared\Render\ISpriteFactory.h" /><ClInclude Include="..\Dependencies\Shared\Render\ITextRenderer.h" /><ClInclude Include="..\Dependencies\Shared\Render\ITexture.h" /><ClInclude Include="..\Dependencies\Shared\Render\IWindow.h" /><ClInclude Include="..\Dependencies\Shared\Render\NativeTypes.h" /><ClInclude Include="..\Dependencies\Shared\Render\NullSprite.h" /><ClInclude Include="..\Dependencies\Shared\Render\PrimitiveTypes.h" /><ClInclude Include="..\Dependencies\Shared\Render\RenderConstants.h" /><ClInclude Include="..\Dependencies\Shared\Render\RendererFactory.h" /><ClInclude Include="..\Dependencies\Shared\Render\ResolutionConfig.h" /><ClInclude Include="..\Dependencies\Shared\Render\SpriteCollection.h" /><ClInclude Include="..\Dependencies\Shared\Render\SpriteLoader.h" /><ClInclude Include="..\Dependencies\Shared\Render\SpriteTypes.h" /><ClInclude Include="..\Dependencies\Shared\Render\TextLib.h" /></ItemGroup>
+    <ClInclude Include="..\Dependencies\Shared\Entity\ActionID.h" />
+    <ClInclude Include="..\Dependencies\Shared\Entity\Appearance.h" />
+    <ClInclude Include="..\Dependencies\Shared\Render\BitmapFontFactory.h" />
+    <ClInclude Include="..\Dependencies\Shared\Render\ColorUtils.h" />
+    <ClInclude Include="..\Dependencies\Shared\Render\GameGeometry.h" />
+    <ClInclude Include="..\Dependencies\Shared\Render\IBitmapFont.h" />
+    <ClInclude Include="..\Dependencies\Shared\Render\IInput.h" />
+    <ClInclude Include="..\Dependencies\Shared\Render\IRenderer.h" />
+    <ClInclude Include="..\Dependencies\Shared\Render\ISprite.h" />
+    <ClInclude Include="..\Dependencies\Shared\Render\ISpriteFactory.h" />
+    <ClInclude Include="..\Dependencies\Shared\Render\ITextRenderer.h" />
+    <ClInclude Include="..\Dependencies\Shared\Render\ITexture.h" />
+    <ClInclude Include="..\Dependencies\Shared\Render\IWindow.h" />
+    <ClInclude Include="..\Dependencies\Shared\Render\NativeTypes.h" />
+    <ClInclude Include="..\Dependencies\Shared\Render\NullSprite.h" />
+    <ClInclude Include="..\Dependencies\Shared\Render\PrimitiveTypes.h" />
+    <ClInclude Include="..\Dependencies\Shared\Render\RenderConstants.h" />
+    <ClInclude Include="..\Dependencies\Shared\Render\RendererFactory.h" />
+    <ClInclude Include="..\Dependencies\Shared\Render\ResolutionConfig.h" />
+    <ClInclude Include="..\Dependencies\Shared\Render\SpriteCollection.h" />
+    <ClInclude Include="..\Dependencies\Shared\Render\SpriteLoader.h" />
+    <ClInclude Include="..\Dependencies\Shared\Render\SpriteTypes.h" />
+    <ClInclude Include="..\Dependencies\Shared\Render\TextLib.h" />
+  </ItemGroup>
   <ItemGroup>
     <ClCompile Include="SFMLRenderer.cpp" />
     <ClCompile Include="SFMLTexture.cpp" />
@@ -115,8 +135,9 @@
     <ClCompile Include="SFMLBitmapFont.cpp" />
     <ClCompile Include="SFMLInput.cpp" />
     <ClCompile Include="RendererFactory.cpp" />
-  <ClCompile Include="..\Dependencies\Shared\Render\ISpriteFactory.cpp" /><ClCompile Include="..\Dependencies\Shared\Render\TextLib.cpp" /></ItemGroup>
-  
+    <ClCompile Include="..\Dependencies\Shared\Render\ISpriteFactory.cpp" />
+    <ClCompile Include="..\Dependencies\Shared\Render\TextLib.cpp" />
+  </ItemGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <PostBuildEvent>
       <Command>xcopy /Y "$(OutDir)$(TargetName)$(TargetExt)" "$(SolutionDir)Dependencies\Client\Libs\x64\"
@@ -124,7 +145,6 @@ xcopy /Y "$(OutDir)$(TargetName).pdb" "$(SolutionDir)Dependencies\Client\Libs\x6
       <Message>Copying $(TargetName) to Dependencies\Client\Libs\x64</Message>
     </PostBuildEvent>
   </ItemDefinitionGroup>
-  
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <PostBuildEvent>
       <Command>xcopy /Y "$(OutDir)$(TargetName)$(TargetExt)" "$(SolutionDir)Dependencies\Client\Libs\x64\"</Command>

@@ -35,6 +35,7 @@ public:
 
         m_id_num = 0;
         m_item_type = 0;
+        m_item_sub_type = 0;
         m_equip_pos = 0;
         m_item_effect_type = 0;
 
@@ -45,7 +46,7 @@ public:
         m_item_effect_value5 = 0;
         m_item_effect_value6 = 0;
 
-        m_max_life_span = 0;
+        m_durability = 0;
         m_special_effect = 0;
         m_special_effect_value1 = 0;
         m_special_effect_value2 = 0;
@@ -55,18 +56,21 @@ public:
 
         m_display_id = -1;
 
-        m_appearance_value = 0;
-        m_speed = 0;
+        m_weapon_class = 0;
+        m_swing_speed = 0;
 
-        m_price = 0;
+        m_sell_price = 0;
         m_weight = 0;
-        m_level_limit = 0;
-        m_gender_limit = 0;
+        m_level_requirement = 0;
+        m_gender_requirement = 0;
 
         m_related_skill = 0;
 
-        m_category = 0;
-        m_is_for_sale = false;
+        m_hide_armor = 0;
+        m_is_skirt = 0;
+        m_stackable = 0;
+        m_is_dyeable = 0;
+        m_set_id = 0;
 
         m_count = 1;
         m_touch_effect_type = 0;
@@ -79,7 +83,7 @@ public:
         m_item_special_effect_value2 = 0;
         m_item_special_effect_value3 = 0;
 
-        m_cur_life_span = 0;
+        m_cur_durability = 0;
         m_attribute = 0;
     }
 
@@ -94,7 +98,8 @@ public:
     char  m_name[hb::shared::limits::ItemNameLen];    // Internal item name (from database)
 
     short m_id_num;                 // Item ID number (unique identifier)
-    char  m_item_type;              // Item type (see ItemType enum)
+    char  m_item_type;              // Item type (see item_type enum)
+    char  m_item_sub_type;          // Item sub-type (see item_sub_type enum)
     char  m_equip_pos;              // Equipment position (see EquipPos enum)
 
     //------------------------------------------------------------------------
@@ -139,7 +144,6 @@ public:
     //------------------------------------------------------------------------
 
     short m_display_id = -1;       // Atlas display ID (maps to ItemSpriteMetadata, -1 = unmapped)
-    char  m_appearance_value;             // Appearance value (for equipped items)
     char  m_item_color;             // Item color variant
 
     //------------------------------------------------------------------------
@@ -150,30 +154,44 @@ public:
     short m_y;                     // Y position
 
     //------------------------------------------------------------------------
+    // Weapon Properties
+    //------------------------------------------------------------------------
+
+    char  m_weapon_class;          // Weapon class (see weapon_class enum)
+    char  m_swing_speed;           // Weapon attack speed
+
+    //------------------------------------------------------------------------
     // Stats and Limits
     //------------------------------------------------------------------------
 
-    char  m_speed;                 // Weapon attack speed
-    uint32_t m_price;              // Base price in gold
+    uint32_t m_sell_price;         // Sell price in gold (0 = cannot sell)
     uint16_t m_weight;             // Weight (affects encumbrance)
-    short m_level_limit;            // Minimum level to use
-    char  m_gender_limit;           // Gender restriction (0=none, 1=male, 2=female)
-    short m_related_skill;          // Related skill for proficiency
+    short m_level_requirement;     // Minimum level to use
+    char  m_gender_requirement;    // Gender restriction (0=none, 1=male, 2=female)
+    short m_related_skill;         // Related skill for proficiency
 
     //------------------------------------------------------------------------
     // Durability
     //------------------------------------------------------------------------
 
-    uint16_t m_max_life_span;        // Maximum durability
-    uint16_t m_cur_life_span;        // Current durability
+    uint16_t m_durability;         // Maximum durability
+    uint16_t m_cur_durability;     // Current durability
+
+    //------------------------------------------------------------------------
+    // Behavioral Flags
+    //------------------------------------------------------------------------
+
+    char  m_hide_armor;            // Body armor hides sprite when equipped
+    char  m_is_skirt;              // Pants render as skirt for female characters
+    char  m_stackable;             // Item merges into a single slot with count
+    char  m_is_dyeable;            // Item can be a dye target
+    int16_t m_set_id;              // Equipment set ID (0 = no set)
 
     //------------------------------------------------------------------------
     // Miscellaneous
     //------------------------------------------------------------------------
 
-    char  m_category;              // Item category (for shop filtering)
-    bool  m_is_for_sale;             // Can be sold to NPC shops
-    uint64_t m_count;             // Stack count (for stackable items)
+    uint64_t m_count;              // Stack count (for stackable items)
 
     //------------------------------------------------------------------------
     // Attribute Flags
@@ -215,14 +233,34 @@ public:
         m_equip_pos = hb::shared::item::to_int(pos);
     }
 
-    hb::shared::item::ItemType get_item_type() const
+    hb::shared::item::item_type::item_type get_item_type() const
     {
         return hb::shared::item::to_item_type(m_item_type);
     }
 
-    void set_item_type(hb::shared::item::ItemType type)
+    void set_item_type(hb::shared::item::item_type::item_type type)
     {
         m_item_type = hb::shared::item::to_int(type);
+    }
+
+    hb::shared::item::item_sub_type::item_sub_type get_item_sub_type() const
+    {
+        return hb::shared::item::to_item_sub_type(m_item_sub_type);
+    }
+
+    void set_item_sub_type(hb::shared::item::item_sub_type::item_sub_type type)
+    {
+        m_item_sub_type = hb::shared::item::to_int(type);
+    }
+
+    hb::shared::item::weapon_class::weapon_class get_weapon_class() const
+    {
+        return hb::shared::item::to_weapon_class(m_weapon_class);
+    }
+
+    void set_weapon_class(hb::shared::item::weapon_class::weapon_class wc)
+    {
+        m_weapon_class = hb::shared::item::to_int(wc);
     }
 
     hb::shared::item::ItemEffectType get_item_effect_type() const
@@ -237,7 +275,7 @@ public:
 
     bool sprite_is_female() const
     {
-        return m_gender_limit == 2;
+        return m_gender_requirement == 2;
     }
 
     hb::shared::item::TouchEffectType get_touch_effect_type() const
@@ -279,10 +317,10 @@ public:
         return static_cast<uint8_t>((m_attribute >> 24) & 0x0F);
     }
 
-    // Check if item is stackable based on its type
+    // Check if item is stackable (reads the config flag)
     bool is_stackable() const
     {
-        return hb::shared::item::is_stackable_type(get_item_type());
+        return m_stackable != 0;
     }
 
     // Base damage range from dice values (throw D range + bonus)

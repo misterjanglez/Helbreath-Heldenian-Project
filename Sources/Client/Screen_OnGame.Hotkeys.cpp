@@ -23,7 +23,6 @@
 #include <string>
 
 using namespace hb::shared::net;
-using hb::shared::item::ItemType;
 namespace MouseButton = hb::shared::input::MouseButton;
 
 // ============== Hotkey Registration (Ctrl+letter combos fire on key-up) ==============
@@ -322,7 +321,7 @@ void Screen_OnGame::hotkey_use_health_potion()
 		if ((m_game->m_player->m_item_list[i] != 0) && (!inventory_manager::get().is_locked(i)))
 		{
 			CItem* cfg = m_game->get_item_config(m_game->m_player->m_item_list[i]->m_id_num);
-			if (cfg && cfg->get_item_type() == ItemType::Consume && cfg->m_item_effect_type == hb::shared::item::to_int(hb::shared::item::ItemEffectType::HP))
+			if (cfg && cfg->get_item_type() == hb::shared::item::item_type::consumable && cfg->get_item_effect_type() == hb::shared::item::ItemEffectType::HP)
 			{
 				{
 					auto pkt = hb::net::make_common_command(CommonType::ReqUseItem, m_game->m_player->m_player_x, m_game->m_player->m_player_y);
@@ -355,7 +354,7 @@ void Screen_OnGame::hotkey_use_mana_potion()
 		if ((m_game->m_player->m_item_list[i] != 0) && (!inventory_manager::get().is_locked(i)))
 		{
 			CItem* cfg = m_game->get_item_config(m_game->m_player->m_item_list[i]->m_id_num);
-			if (cfg && cfg->get_item_type() == ItemType::Consume && cfg->m_item_effect_type == hb::shared::item::to_int(hb::shared::item::ItemEffectType::MP))
+			if (cfg && cfg->get_item_type() == hb::shared::item::item_type::consumable && cfg->get_item_effect_type() == hb::shared::item::ItemEffectType::MP)
 			{
 				{
 					auto pkt = hb::net::make_common_command(CommonType::ReqUseItem, m_game->m_player->m_player_x, m_game->m_player->m_player_y);

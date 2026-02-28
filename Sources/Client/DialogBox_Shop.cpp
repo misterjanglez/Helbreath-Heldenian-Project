@@ -117,14 +117,14 @@ void DialogBox_Shop::draw_item_list(short sX, short sY)
             discount_ratio = ((player().m_charisma - 10) / 4);
             tmp1 = static_cast<double>(discount_ratio);
             tmp2 = tmp1 / 100.0f;
-            tmp1 = static_cast<double>(shop_manager::get().get_item_list()[i + m_scroll_offset]->m_price);
+            tmp1 = static_cast<double>(shop_manager::get().get_item_list()[i + m_scroll_offset]->m_sell_price);
             tmp3 = tmp1 * tmp2;
             discount_cost = static_cast<int>(tmp3);
-            cost = static_cast<int>(shop_manager::get().get_item_list()[i + m_scroll_offset]->m_price * ((100 + m_game->m_discount) / 100.));
+            cost = static_cast<int>(shop_manager::get().get_item_list()[i + m_scroll_offset]->m_sell_price * ((100 + m_game->m_discount) / 100.));
             cost = cost - discount_cost;
 
-            if (cost < static_cast<int>(shop_manager::get().get_item_list()[i + m_scroll_offset]->m_price / 2))
-                cost = static_cast<int>(shop_manager::get().get_item_list()[i + m_scroll_offset]->m_price / 2) - 1;
+            if (cost < static_cast<int>(shop_manager::get().get_item_list()[i + m_scroll_offset]->m_sell_price / 2))
+                cost = static_cast<int>(shop_manager::get().get_item_list()[i + m_scroll_offset]->m_sell_price / 2) - 1;
 
             std::snprintf(temp, sizeof(temp), "%6d", cost);
             if ((mouse_x >= sX + 20) && (mouse_x <= sX + 220) && (mouse_y >= sY + i * 18 + 65) && (mouse_y <= sY + i * 18 + 79))
@@ -138,14 +138,14 @@ int DialogBox_Shop::calculate_discounted_price(int item_index)
     int discount_ratio = ((player().m_charisma - 10) / 4);
     double tmp1 = static_cast<double>(discount_ratio);
     double tmp2 = tmp1 / 100.0f;
-    tmp1 = static_cast<double>(shop_manager::get().get_item_list()[item_index]->m_price);
+    tmp1 = static_cast<double>(shop_manager::get().get_item_list()[item_index]->m_sell_price);
     double tmp3 = tmp1 * tmp2;
     int discount_cost = static_cast<int>(tmp3);
-    int cost = static_cast<int>(shop_manager::get().get_item_list()[item_index]->m_price * ((100 + m_game->m_discount) / 100.));
+    int cost = static_cast<int>(shop_manager::get().get_item_list()[item_index]->m_sell_price * ((100 + m_game->m_discount) / 100.));
     cost = cost - discount_cost;
 
-    if (cost < static_cast<int>(shop_manager::get().get_item_list()[item_index]->m_price / 2))
-        cost = static_cast<int>(shop_manager::get().get_item_list()[item_index]->m_price / 2) - 1;
+    if (cost < static_cast<int>(shop_manager::get().get_item_list()[item_index]->m_sell_price / 2))
+        cost = static_cast<int>(shop_manager::get().get_item_list()[item_index]->m_sell_price / 2) - 1;
 
     return cost;
 }
@@ -231,7 +231,7 @@ void DialogBox_Shop::draw_weapon_stats(short sX, short sY, int item_index, bool&
     int str_divisor = hb::shared::balance::swing_str_divisor;
     int wups = hb::shared::balance::weight_units_per_stone;
     temp = shop_manager::get().get_item_list()[item_index]->m_weight / wups;
-    std::snprintf(temp_buf, sizeof(temp_buf), ": %d(%d ~ %d)", shop_manager::get().get_item_list()[item_index]->m_speed, temp, shop_manager::get().get_item_list()[item_index]->m_speed * str_divisor);
+    std::snprintf(temp_buf, sizeof(temp_buf), ": %d(%d ~ %d)", shop_manager::get().get_item_list()[item_index]->m_swing_speed, temp, shop_manager::get().get_item_list()[item_index]->m_swing_speed * str_divisor);
     hb::shared::text::draw_text(GameFont::Default, sX + 140, sY + 160, temp_buf, hb::shared::text::TextStyle::from_color(GameColors::UILabel));
 
     if ((shop_manager::get().get_item_list()[item_index]->m_weight / wups) > player().m_str) {
@@ -376,17 +376,17 @@ void DialogBox_Shop::draw_armor_stats(short sX, short sY, int item_index, bool& 
 
 void DialogBox_Shop::draw_level_requirement(short sX, short sY, int item_index, bool& flag_red_shown)
 {
-    if (shop_manager::get().get_item_list()[item_index]->m_level_limit != 0) {
-        if (player().m_level >= shop_manager::get().get_item_list()[item_index]->m_level_limit) {
+    if (shop_manager::get().get_item_list()[item_index]->m_level_requirement != 0) {
+        if (player().m_level >= shop_manager::get().get_item_list()[item_index]->m_level_requirement) {
             hb::shared::text::draw_text(GameFont::Default, sX + 90, sY + 190, DRAW_DIALOGBOX_SHOP24, hb::shared::text::TextStyle::from_color(GameColors::UILabel));
             hb::shared::text::draw_text(GameFont::Default, sX + 91, sY + 190, DRAW_DIALOGBOX_SHOP24, hb::shared::text::TextStyle::from_color(GameColors::UILabel));
-            auto lvlReq = std::format(DRAW_DIALOGBOX_SHOP25, shop_manager::get().get_item_list()[item_index]->m_level_limit);
+            auto lvlReq = std::format(DRAW_DIALOGBOX_SHOP25, shop_manager::get().get_item_list()[item_index]->m_level_requirement);
             hb::shared::text::draw_text(GameFont::Default, sX + 140, sY + 190, lvlReq.c_str(), hb::shared::text::TextStyle::from_color(GameColors::UILabel));
         }
         else {
             hb::shared::text::draw_text(GameFont::Default, sX + 90, sY + 190, DRAW_DIALOGBOX_SHOP24, hb::shared::text::TextStyle::from_color(GameColors::UILabel));
             hb::shared::text::draw_text(GameFont::Default, sX + 91, sY + 190, DRAW_DIALOGBOX_SHOP24, hb::shared::text::TextStyle::from_color(GameColors::UILabel));
-            auto lvlReq = std::format(DRAW_DIALOGBOX_SHOP25, shop_manager::get().get_item_list()[item_index]->m_level_limit);
+            auto lvlReq = std::format(DRAW_DIALOGBOX_SHOP25, shop_manager::get().get_item_list()[item_index]->m_level_requirement);
             hb::shared::text::draw_text(GameFont::Default, sX + 140, sY + 190, lvlReq.c_str(), hb::shared::text::TextStyle::from_color(GameColors::UIWarningRed));
             if (flag_red_shown == false) {
                 hb::shared::text::draw_text_aligned(GameFont::Default, sX + 25, sY + 258, (sX + 240) - (sX + 25), 15, DRAW_DIALOGBOX_SHOP26, hb::shared::text::TextStyle::from_color(GameColors::UIWarningRed), hb::shared::text::Align::TopCenter);
@@ -402,7 +402,7 @@ int DialogBox_Shop::get_max_quantity() const
 	if (m_mode <= 0) return 1;
 	int item_index = m_mode - 1;
 	CItem* shop_item = shop_manager::get().get_item_list()[item_index].get();
-	if (shop_item != nullptr && is_true_stack_type(shop_item->get_item_type()))
+	if (shop_item != nullptr && shop_item->is_stackable())
 		return 9999;
 	return (50 - inventory_manager::get().get_total_item_count());
 }

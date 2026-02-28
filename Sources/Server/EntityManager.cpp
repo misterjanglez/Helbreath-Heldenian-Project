@@ -506,7 +506,7 @@ void CEntityManager::on_entity_killed(int entity_handle, short attacker_h, char 
     short attacker_weapon;
     if (attacker_type == hb::shared::owner_class::Player) {
         if (m_game->m_client_list[attacker_h] != NULL)
-            attacker_weapon = m_game->m_client_list[attacker_h]->get_equipped_weapon_type();
+            attacker_weapon = hb::shared::item::to_int(m_game->m_client_list[attacker_h]->get_equipped_weapon_class());
         else
             attacker_weapon = 1;
     }

@@ -342,9 +342,9 @@ void LootManager::penalty_item_drop(int client_h, int total, bool is_s_aattacked
 	if ((m_game->m_client_list[client_h]->m_alter_item_drop_index != -1) && (m_game->m_client_list[client_h]->m_item_list[m_game->m_client_list[client_h]->m_alter_item_drop_index] != 0)) {
 		// Testcode
 		if (m_game->m_client_list[client_h]->m_item_list[m_game->m_client_list[client_h]->m_alter_item_drop_index]->get_item_effect_type() == ItemEffectType::AlterItemDrop) {
-			if (m_game->m_client_list[client_h]->m_item_list[m_game->m_client_list[client_h]->m_alter_item_drop_index]->m_cur_life_span > 0) {
-				m_game->m_client_list[client_h]->m_item_list[m_game->m_client_list[client_h]->m_alter_item_drop_index]->m_cur_life_span--;
-				m_game->send_notify_msg(0, client_h, Notify::CurLifeSpan, m_game->m_client_list[client_h]->m_alter_item_drop_index, m_game->m_client_list[client_h]->m_item_list[m_game->m_client_list[client_h]->m_alter_item_drop_index]->m_cur_life_span, 0, 0);
+			if (m_game->m_client_list[client_h]->m_item_list[m_game->m_client_list[client_h]->m_alter_item_drop_index]->m_cur_durability > 0) {
+				m_game->m_client_list[client_h]->m_item_list[m_game->m_client_list[client_h]->m_alter_item_drop_index]->m_cur_durability--;
+				m_game->send_notify_msg(0, client_h, Notify::CurLifeSpan, m_game->m_client_list[client_h]->m_alter_item_drop_index, m_game->m_client_list[client_h]->m_item_list[m_game->m_client_list[client_h]->m_alter_item_drop_index]->m_cur_durability, 0, 0);
 			}
 			m_game->m_item_manager->drop_item_handler(client_h, m_game->m_client_list[client_h]->m_alter_item_drop_index, -1, m_game->m_client_list[client_h]->m_item_list[m_game->m_client_list[client_h]->m_alter_item_drop_index]->m_name);
 
@@ -357,9 +357,9 @@ void LootManager::penalty_item_drop(int client_h, int total, bool is_s_aattacked
 			for(int i = 0; i < hb::shared::limits::MaxItems; i++)
 				if ((m_game->m_client_list[client_h]->m_item_list[i] != 0) && (m_game->m_client_list[client_h]->m_item_list[i]->get_item_effect_type() == ItemEffectType::AlterItemDrop)) {
 					m_game->m_client_list[client_h]->m_alter_item_drop_index = i;
-					if (m_game->m_client_list[client_h]->m_item_list[m_game->m_client_list[client_h]->m_alter_item_drop_index]->m_cur_life_span > 0) {
-						m_game->m_client_list[client_h]->m_item_list[m_game->m_client_list[client_h]->m_alter_item_drop_index]->m_cur_life_span--;
-						m_game->send_notify_msg(0, client_h, Notify::CurLifeSpan, m_game->m_client_list[client_h]->m_alter_item_drop_index, m_game->m_client_list[client_h]->m_item_list[m_game->m_client_list[client_h]->m_alter_item_drop_index]->m_cur_life_span, 0, 0);
+					if (m_game->m_client_list[client_h]->m_item_list[m_game->m_client_list[client_h]->m_alter_item_drop_index]->m_cur_durability > 0) {
+						m_game->m_client_list[client_h]->m_item_list[m_game->m_client_list[client_h]->m_alter_item_drop_index]->m_cur_durability--;
+						m_game->send_notify_msg(0, client_h, Notify::CurLifeSpan, m_game->m_client_list[client_h]->m_alter_item_drop_index, m_game->m_client_list[client_h]->m_item_list[m_game->m_client_list[client_h]->m_alter_item_drop_index]->m_cur_durability, 0, 0);
 					}
 					m_game->m_item_manager->drop_item_handler(client_h, m_game->m_client_list[client_h]->m_alter_item_drop_index, -1, m_game->m_client_list[client_h]->m_item_list[m_game->m_client_list[client_h]->m_alter_item_drop_index]->m_name);
 					m_game->m_client_list[client_h]->m_alter_item_drop_index = -1;
