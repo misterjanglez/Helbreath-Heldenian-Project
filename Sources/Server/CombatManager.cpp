@@ -1673,6 +1673,15 @@ void CombatManager::poison_effect(int client_h, int v1)
 	if (m_game->m_client_list[client_h]->m_is_killed) return;
 	if (m_game->m_client_list[client_h]->m_is_init_complete == false) return;
 
+	// GM mode: instantly cure poison instead of taking damage
+	if (m_game->m_client_list[client_h]->m_is_gm_mode)
+	{
+		m_game->m_client_list[client_h]->m_is_poisoned = false;
+		m_game->m_status_effect_manager->set_poison_flag(client_h, hb::shared::owner_class::Player, false);
+		m_game->send_notify_msg(0, client_h, Notify::MagicEffectOff, hb::shared::magic::Poison, 0, 0, 0);
+		return;
+	}
+
 	poison_level = m_game->m_client_list[client_h]->m_poison_level;
 
 	damage = m_game->dice(1, poison_level);

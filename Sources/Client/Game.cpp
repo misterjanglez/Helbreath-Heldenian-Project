@@ -4700,6 +4700,12 @@ void CGame::command_processor(short mouse_x, short mouse_y, short tile_x, short 
 	}
 	if (m_player->m_hp <= 0) return;
 
+	// Block all movement and input while a teleport is in progress.
+	// Without this, the player can walk off the teleport tile during the
+	// auth wait or fade, causing the server-side search_teleport_dest to fail.
+	if (teleport_manager::get().is_active())
+		return;
+
 	if (m_player->m_damage_move != 0)
 	{
 		m_player->m_Controller.set_command(Type::DamageMove);
@@ -5628,6 +5634,10 @@ bool CGame::process_right_click(short mouse_x, short mouse_y, short tile_x, shor
 
 void CGame::process_motion_commands(uint16_t action_type)
 {
+	// Block all movement during an active teleport to prevent walking off
+	// the teleport tile or sending stale movement to the server.
+	if (teleport_manager::get().is_active()) return;
+
 	direction move_dir = direction{};
 	std::string dest_name;
 	short dest_owner_type = 0;
@@ -5950,6 +5960,12 @@ void CGame::request_teleport_and_wait_data()
 {
 	if (teleport_manager::get().is_requested()) return;
 	if (teleport_manager::get().is_active()) return;
+
+	// Stop all movement and clear cursor state so the player doesn't
+	// walk off the teleport tile while waiting for server approval.
+	m_player->m_Controller.set_command(Type::stop);
+	m_player->m_Controller.reset_command_count();
+	CursorTarget::set_cursor_status(CursorStatus::Null);
 
 	teleport_manager::get().request_auth(m_player->m_player_x, m_player->m_player_y);
 }

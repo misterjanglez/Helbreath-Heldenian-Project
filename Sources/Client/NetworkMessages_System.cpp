@@ -292,15 +292,11 @@ void HandleNpcTalk(CGame* game, char* data)
 
 void HandleTravelerLimitedLevel(CGame* game, char* data)
 {
-	if (teleport_manager::get().get_state() == teleport_state::awaiting_auth)
-		teleport_manager::get().on_auth_rejected();
 	game->add_event_list(NOTIFY_MSG_HANDLER64, 10);
 }
 
 void HandleLimitedLevel(CGame* game, char* data)
 {
-	if (teleport_manager::get().get_state() == teleport_state::awaiting_auth)
-		teleport_manager::get().on_auth_rejected();
 	game->add_event_list(NOTIFYMSG_LIMITED_LEVEL1, 10);
 }
 

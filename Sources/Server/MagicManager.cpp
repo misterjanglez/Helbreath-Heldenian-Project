@@ -871,6 +871,7 @@ void MagicManager::player_magic_handler(int client_h, int dX, int dY, short type
 						switch (owner_type) {
 						case hb::shared::owner_class::Player:
 							if (m_game->m_client_list[owner_h] == 0) { magic_noeffect(); return; }
+							if (m_game->m_client_list[owner_h]->m_is_gm_mode) break;
 							if ((m_game->m_client_list[owner_h]->m_hp > 0) && (m_game->m_combat_manager->check_resisting_ice_success(m_game->m_client_list[client_h]->m_dir, owner_h, owner_type, result) == false)) {
 								if (m_game->m_client_list[owner_h]->m_magic_effect_status[hb::shared::magic::Ice] == 0) {
 									m_game->m_client_list[owner_h]->m_magic_effect_status[hb::shared::magic::Ice] = 1;
@@ -937,6 +938,7 @@ void MagicManager::player_magic_handler(int client_h, int dX, int dY, short type
 						switch (owner_type) {
 						case hb::shared::owner_class::Player:
 							if (m_game->m_client_list[owner_h] == 0) { magic_noeffect(); return; }
+							if (m_game->m_client_list[owner_h]->m_is_gm_mode) break;
 							if ((m_game->m_client_list[owner_h]->m_hp > 0) && (m_game->m_combat_manager->check_resisting_ice_success(m_game->m_client_list[client_h]->m_dir, owner_h, owner_type, result) == false)) {
 								if (m_game->m_client_list[owner_h]->m_magic_effect_status[hb::shared::magic::Ice] == 0) {
 									m_game->m_client_list[owner_h]->m_magic_effect_status[hb::shared::magic::Ice] = 1;
@@ -1003,6 +1005,7 @@ void MagicManager::player_magic_handler(int client_h, int dX, int dY, short type
 						switch (owner_type) {
 						case hb::shared::owner_class::Player:
 							if (m_game->m_client_list[owner_h] == 0) { magic_noeffect(); return; }
+							if (m_game->m_client_list[owner_h]->m_is_gm_mode) break;
 							if ((m_game->m_client_list[owner_h]->m_hp > 0) && (m_game->m_combat_manager->check_resisting_ice_success(m_game->m_client_list[client_h]->m_dir, owner_h, owner_type, result) == false)) {
 								if (m_game->m_client_list[owner_h]->m_magic_effect_status[hb::shared::magic::Ice] == 0) {
 									m_game->m_client_list[owner_h]->m_magic_effect_status[hb::shared::magic::Ice] = 1;
@@ -1069,6 +1072,7 @@ void MagicManager::player_magic_handler(int client_h, int dX, int dY, short type
 						switch (owner_type) {
 						case hb::shared::owner_class::Player:
 							if (m_game->m_client_list[owner_h] == 0) { magic_noeffect(); return; }
+							if (m_game->m_client_list[owner_h]->m_is_gm_mode) break;
 							if ((m_game->m_client_list[owner_h]->m_hp > 0) && (m_game->m_combat_manager->check_resisting_ice_success(m_game->m_client_list[client_h]->m_dir, owner_h, owner_type, result) == false)) {
 								if (m_game->m_client_list[owner_h]->m_magic_effect_status[hb::shared::magic::Ice] == 0) {
 									m_game->m_client_list[owner_h]->m_magic_effect_status[hb::shared::magic::Ice] = 1;
@@ -1135,6 +1139,7 @@ void MagicManager::player_magic_handler(int client_h, int dX, int dY, short type
 						switch (owner_type) {
 						case hb::shared::owner_class::Player:
 							if (m_game->m_client_list[owner_h] == 0) { magic_noeffect(); return; }
+							if (m_game->m_client_list[owner_h]->m_is_gm_mode) break;
 							if ((m_game->m_client_list[owner_h]->m_hp > 0) && (m_game->m_combat_manager->check_resisting_ice_success(m_game->m_client_list[client_h]->m_dir, owner_h, owner_type, result) == false)) {
 								if (m_game->m_client_list[owner_h]->m_magic_effect_status[hb::shared::magic::Ice] == 0) {
 									m_game->m_client_list[owner_h]->m_magic_effect_status[hb::shared::magic::Ice] = 1;
@@ -1172,6 +1177,7 @@ void MagicManager::player_magic_handler(int client_h, int dX, int dY, short type
 						switch (owner_type) {
 						case hb::shared::owner_class::Player:
 							if (m_game->m_client_list[owner_h] == 0) { magic_noeffect(); return; }
+							if (m_game->m_client_list[owner_h]->m_is_gm_mode) break;
 							if ((m_game->m_client_list[owner_h]->m_hp > 0) && (m_game->m_combat_manager->check_resisting_ice_success(m_game->m_client_list[client_h]->m_dir, owner_h, owner_type, result) == false)) {
 								if (m_game->m_client_list[owner_h]->m_magic_effect_status[hb::shared::magic::Ice] == 0) {
 									m_game->m_client_list[owner_h]->m_magic_effect_status[hb::shared::magic::Ice] = 1;
@@ -1304,6 +1310,7 @@ void MagicManager::player_magic_handler(int client_h, int dX, int dY, short type
 			switch (owner_type) {
 			case hb::shared::owner_class::Player:
 				if (m_game->m_client_list[owner_h] == 0) { magic_noeffect(); return; }
+				if (m_game->m_client_list[owner_h]->m_is_gm_mode) { magic_noeffect(); return; }
 				if (m_game->m_client_list[owner_h]->m_magic_effect_status[hb::shared::magic::Inhibition] != 0) { magic_noeffect(); return; }
 				if (m_game->m_client_list[owner_h]->m_magic_effect_status[hb::shared::magic::Protect] == 5) { magic_noeffect(); return; }
 				if (m_game->m_client_list[client_h]->m_side == m_game->m_client_list[owner_h]->m_side) { magic_noeffect(); return; }
@@ -1958,6 +1965,7 @@ void MagicManager::player_magic_handler(int client_h, int dX, int dY, short type
 				switch (owner_type) {
 				case hb::shared::owner_class::Player:
 					if (m_game->m_client_list[owner_h] == 0) { magic_noeffect(); return; }
+					if (m_game->m_client_list[owner_h]->m_is_gm_mode) { magic_noeffect(); return; }
 					if (m_game->m_client_list[owner_h]->m_magic_effect_status[hb::shared::magic::HoldObject] != 0) { magic_noeffect(); return; }
 					if (m_game->m_client_list[owner_h]->m_add_poison_resistance >= 500) { magic_noeffect(); return; }
 					if (memcmp(m_game->m_client_list[client_h]->m_location, "NONE", 4) == 0) { magic_noeffect(); return; }
@@ -2268,6 +2276,7 @@ void MagicManager::player_magic_handler(int client_h, int dX, int dY, short type
 				switch (owner_type) {
 				case hb::shared::owner_class::Player:
 					if (m_game->m_client_list[owner_h] == 0) { magic_noeffect(); return; }
+					if (m_game->m_client_list[owner_h]->m_is_gm_mode) { magic_noeffect(); return; }
 					if (memcmp(m_game->m_client_list[client_h]->m_location, "NONE", 4) == 0) { magic_noeffect(); return; }
 
 					m_game->m_combat_manager->analyze_criminal_action(client_h, dX, dY);
@@ -2417,6 +2426,7 @@ void MagicManager::player_magic_handler(int client_h, int dX, int dY, short type
 						switch (owner_type) {
 						case hb::shared::owner_class::Player:
 							if (m_game->m_client_list[owner_h] == 0) { magic_noeffect(); return; }
+							if (m_game->m_client_list[owner_h]->m_is_gm_mode) break;
 							if ((m_game->m_client_list[owner_h]->m_hp > 0) && (m_game->m_combat_manager->check_resisting_ice_success(m_game->m_client_list[client_h]->m_dir, owner_h, owner_type, result) == false)) {
 								if (m_game->m_client_list[owner_h]->m_magic_effect_status[hb::shared::magic::Ice] == 0) {
 									m_game->m_client_list[owner_h]->m_magic_effect_status[hb::shared::magic::Ice] = 1;

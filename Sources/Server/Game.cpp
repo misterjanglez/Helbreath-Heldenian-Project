@@ -3914,6 +3914,9 @@ void CGame::check_client_response_time()
 				m_client_list[i]->m_dead_penalty_time -= 3;
 				if (m_client_list[i]->m_dead_penalty_time < 0) m_client_list[i]->m_dead_penalty_time = 0;
 
+				// GMs with /gm on bypass all forced recalls and level restrictions
+				if (!m_client_list[i]->m_is_gm_mode) {
+
 				if ((m_client_list[i]->m_is_war_location) && is_enemy_zone(i)) {
 					// Crusade
 					if (m_is_crusade_mode == false)
@@ -4063,6 +4066,8 @@ void CGame::check_client_response_time()
 						request_teleport_handler(i, "0   ");
 					}
 				}
+
+				} // end GM bypass
 
 				if (m_client_list[i] == 0) break;
 				m_client_list[i]->m_super_attack_count++;
@@ -8425,17 +8430,19 @@ void CGame::request_teleport_handler(int client_h, const char* data, const char*
 		send_notify_msg(0, client_h, Notify::NoRecall, 0, 0, 0, 0);
 		return;
 	}
-	if ((memcmp(m_client_list[client_h]->m_location, "elvine", 6) == 0)
-		&& (m_client_list[client_h]->m_time_left_force_recall > 0)
-		&& (memcmp(m_map_list[m_client_list[client_h]->m_map_index]->m_location_name, "aresden", 7) == 0)
-		&& ((data[0] == '1') || (data[0] == '3'))
-		&& (m_is_crusade_mode == false)) return;
+	if (!m_client_list[client_h]->m_is_gm_mode) {
+		if ((memcmp(m_client_list[client_h]->m_location, "elvine", 6) == 0)
+			&& (m_client_list[client_h]->m_time_left_force_recall > 0)
+			&& (memcmp(m_map_list[m_client_list[client_h]->m_map_index]->m_location_name, "aresden", 7) == 0)
+			&& ((data[0] == '1') || (data[0] == '3'))
+			&& (m_is_crusade_mode == false)) return;
 
-	if ((memcmp(m_client_list[client_h]->m_location, "aresden", 7) == 0)
-		&& (m_client_list[client_h]->m_time_left_force_recall > 0)
-		&& (memcmp(m_map_list[m_client_list[client_h]->m_map_index]->m_location_name, "elvine", 6) == 0)
-		&& ((data[0] == '1') || (data[0] == '3'))
-		&& (m_is_crusade_mode == false)) return;
+		if ((memcmp(m_client_list[client_h]->m_location, "aresden", 7) == 0)
+			&& (m_client_list[client_h]->m_time_left_force_recall > 0)
+			&& (memcmp(m_map_list[m_client_list[client_h]->m_map_index]->m_location_name, "elvine", 6) == 0)
+			&& ((data[0] == '1') || (data[0] == '3'))
+			&& (m_is_crusade_mode == false)) return;
+	}
 
 	is_locked_map_notify = false;
 
@@ -8471,6 +8478,20 @@ void CGame::request_teleport_handler(int client_h, const char* data, const char*
 
 	std::memset(dest_map_name, 0, sizeof(dest_map_name));
 	ret_ok = m_map_list[m_client_list[client_h]->m_map_index]->search_teleport_dest(sX, sY, dest_map_name, &dest_x, &dest_y, &dir);
+
+	// For client-initiated tile teleports: if the player slightly overshot the
+	// teleport tile (walked through it), check the 8 adjacent tiles as a fallback.
+	// Force recall calls pass data[0] as '0'-'3'; client packets do not.
+	if (!ret_ok && map_name == 0 && !(data[0] >= '0' && data[0] <= '3')) {
+		static const short adj_dx[] = { 1, 1, 0, -1, -1, -1, 0, 1 };
+		static const short adj_dy[] = { 0, 1, 1, 1, 0, -1, -1, -1 };
+		for (int adj = 0; adj < 8; adj++) {
+			std::memset(dest_map_name, 0, sizeof(dest_map_name));
+			ret_ok = m_map_list[m_client_list[client_h]->m_map_index]->search_teleport_dest(
+				sX + adj_dx[adj], sY + adj_dy[adj], dest_map_name, &dest_x, &dest_y, &dir);
+			if (ret_ok) break;
+		}
+	}
 
 	// Crusade
 	if ((strcmp(m_client_list[client_h]->m_locked_map_name, "NONE") != 0) && (m_client_list[client_h]->m_locked_map_time > 0)) {
@@ -9194,20 +9215,22 @@ void CGame::request_teleport_auth_handler(int client_h, const char* data)
 		return;
 	}
 
-	// Crusade force-recall restrictions (enemy city)
-	if ((memcmp(m_client_list[client_h]->m_location, "elvine", 6) == 0)
-		&& (m_client_list[client_h]->m_time_left_force_recall > 0)
-		&& (memcmp(m_map_list[m_client_list[client_h]->m_map_index]->m_location_name, "aresden", 7) == 0)
-		&& (m_is_crusade_mode == false)) {
-		send_notify_msg(0, client_h, Notify::NoticeMsg, 0, 0, 0, "Teleport not available");
-		return;
-	}
-	if ((memcmp(m_client_list[client_h]->m_location, "aresden", 7) == 0)
-		&& (m_client_list[client_h]->m_time_left_force_recall > 0)
-		&& (memcmp(m_map_list[m_client_list[client_h]->m_map_index]->m_location_name, "elvine", 6) == 0)
-		&& (m_is_crusade_mode == false)) {
-		send_notify_msg(0, client_h, Notify::NoticeMsg, 0, 0, 0, "Teleport not available");
-		return;
+	// Crusade force-recall restrictions (enemy city) — GMs bypass
+	if (!m_client_list[client_h]->m_is_gm_mode) {
+		if ((memcmp(m_client_list[client_h]->m_location, "elvine", 6) == 0)
+			&& (m_client_list[client_h]->m_time_left_force_recall > 0)
+			&& (memcmp(m_map_list[m_client_list[client_h]->m_map_index]->m_location_name, "aresden", 7) == 0)
+			&& (m_is_crusade_mode == false)) {
+			send_notify_msg(0, client_h, Notify::NoticeMsg, 0, 0, 0, "Teleport not available");
+			return;
+		}
+		if ((memcmp(m_client_list[client_h]->m_location, "aresden", 7) == 0)
+			&& (m_client_list[client_h]->m_time_left_force_recall > 0)
+			&& (memcmp(m_map_list[m_client_list[client_h]->m_map_index]->m_location_name, "elvine", 6) == 0)
+			&& (m_is_crusade_mode == false)) {
+			send_notify_msg(0, client_h, Notify::NoticeMsg, 0, 0, 0, "Teleport not available");
+			return;
+		}
 	}
 
 	// Check teleport tile exists at current position
@@ -9217,6 +9240,17 @@ void CGame::request_teleport_auth_handler(int client_h, const char* data)
 	int dest_x, dest_y;
 	direction dir;
 	bool ret_ok = m_map_list[m_client_list[client_h]->m_map_index]->search_teleport_dest(sX, sY, dest_map_name, &dest_x, &dest_y, &dir);
+	// 1-tile margin: if the player walked through a teleport tile, check adjacent tiles
+	if (!ret_ok) {
+		static const short adj_dx[] = { 1, 1, 0, -1, -1, -1, 0, 1 };
+		static const short adj_dy[] = { 0, 1, 1, 1, 0, -1, -1, -1 };
+		for (int adj = 0; adj < 8; adj++) {
+			std::memset(dest_map_name, 0, sizeof(dest_map_name));
+			ret_ok = m_map_list[m_client_list[client_h]->m_map_index]->search_teleport_dest(
+				sX + adj_dx[adj], sY + adj_dy[adj], dest_map_name, &dest_x, &dest_y, &dir);
+			if (ret_ok) break;
+		}
+	}
 	if (!ret_ok) {
 		send_notify_msg(0, client_h, Notify::NoticeMsg, 0, 0, 0, "No teleport at this location");
 		return;
@@ -9242,15 +9276,21 @@ void CGame::request_teleport_auth_handler(int client_h, const char* data)
 	}
 
 	// Destination map not on this server — still valid (server change), approve
-	if (dest_map_index >= 0) {
-		// Check level limits on destination map
+	if (dest_map_index >= 0 && !m_client_list[client_h]->m_is_gm_mode) {
+		// Check level limits on destination map (GMs bypass)
 		if (m_client_list[client_h]->m_level < m_map_list[dest_map_index]->m_level_requirement) {
-			send_notify_msg(0, client_h, Notify::LimitedLevel, 0, 0, 0, 0);
+			char msg[128];
+			std::snprintf(msg, sizeof(msg), "You must be at least level %d to enter this area.",
+				m_map_list[dest_map_index]->m_level_requirement);
+			send_notify_msg(0, client_h, Notify::NoticeMsg, 0, 0, 0, msg);
 			return;
 		}
 		if ((m_map_list[dest_map_index]->m_upper_level_limit != 0) &&
 			(m_client_list[client_h]->m_level > m_map_list[dest_map_index]->m_upper_level_limit)) {
-			send_notify_msg(0, client_h, Notify::TravelerLimitedLevel, 0, 0, 0, 0);
+			char msg[128];
+			std::snprintf(msg, sizeof(msg), "Your level is too high to enter this area. (Max level: %d)",
+				m_map_list[dest_map_index]->m_upper_level_limit);
+			send_notify_msg(0, client_h, Notify::NoticeMsg, 0, 0, 0, msg);
 			return;
 		}
 	}
