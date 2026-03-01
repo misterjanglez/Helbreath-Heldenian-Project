@@ -25,7 +25,6 @@ namespace NetworkMessageHandlers {
 			data, sizeof(hb::net::PacketNotifyHP));
 		if (!pkt) return;
 		game->m_player->m_hp = static_cast<int>(pkt->hp);
-		game->m_player->m_hunger_status = static_cast<int>(pkt->hunger);
 
 		if (game->m_player->m_hp > prev_hp)
 		{

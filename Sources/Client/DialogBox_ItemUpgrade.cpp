@@ -60,8 +60,8 @@ int DialogBox_ItemUpgrade::calculate_upgrade_cost(int item_index)
         && (cfg->get_item_type() == hb::shared::item::item_type::equipment))
     {
         short id = player().m_item_list[item_index]->m_id_num;
-        if (id == hb::shared::item::ItemId::AngelicPandentSTR || id == hb::shared::item::ItemId::AngelicPandentDEX ||
-            id == hb::shared::item::ItemId::AngelicPandentINT || id == hb::shared::item::ItemId::AngelicPandentMAG)
+        if (id == hb::shared::item::ItemId::AngelicPendantSTR || id == hb::shared::item::ItemId::AngelicPendantDEX ||
+            id == hb::shared::item::ItemId::AngelicPendantINT || id == hb::shared::item::ItemId::AngelicPendantMAG)
         {
             value = (player().m_item_list[item_index]->m_attribute & 0xF0000000) >> 28;
             switch (value) {

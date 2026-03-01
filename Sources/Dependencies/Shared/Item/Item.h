@@ -70,6 +70,7 @@ public:
         m_is_skirt = 0;
         m_stackable = 0;
         m_is_dyeable = 0;
+        m_armor_class = 0;
         m_set_id = 0;
 
         m_count = 1;
@@ -185,6 +186,7 @@ public:
     char  m_is_skirt;              // Pants render as skirt for female characters
     char  m_stackable;             // Item merges into a single slot with count
     char  m_is_dyeable;            // Item can be a dye target
+    char  m_armor_class;           // Armor class (0=none, 1=clothing, 2=armor)
     int16_t m_set_id;              // Equipment set ID (0 = no set)
 
     //------------------------------------------------------------------------

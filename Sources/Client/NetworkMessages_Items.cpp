@@ -346,8 +346,8 @@ namespace NetworkMessageHandlers {
 
 		{
 			short id = game->m_player->m_item_list[item_index]->m_id_num;
-			if (id == hb::shared::item::ItemId::AngelicPandentSTR || id == hb::shared::item::ItemId::AngelicPandentDEX ||
-				id == hb::shared::item::ItemId::AngelicPandentINT || id == hb::shared::item::ItemId::AngelicPandentMAG)
+			if (id == hb::shared::item::ItemId::AngelicPendantSTR || id == hb::shared::item::ItemId::AngelicPendantDEX ||
+				id == hb::shared::item::ItemId::AngelicPendantINT || id == hb::shared::item::ItemId::AngelicPendantMAG)
 				audio_manager::get().play_game_sound(sound_type::effect, 53, 0);
 			else
 				audio_manager::get().play_game_sound(sound_type::effect, 29, 0);

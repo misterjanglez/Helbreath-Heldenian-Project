@@ -7955,7 +7955,6 @@ void CGame::send_notify_msg(int from_h, int to_h, uint16_t msg_type, uint32_t v1
 		pkt.header.msg_id = MsgId::Notify;
 		pkt.header.msg_type = msg_type;
 		pkt.hp = static_cast<uint32_t>(m_client_list[to_h]->m_hp);
-		pkt.hunger = static_cast<uint32_t>(m_client_list[to_h]->m_hunger_status);
 		ret = m_client_list[to_h]->m_socket->send_msg(reinterpret_cast<char*>(&pkt), sizeof(pkt));
 		break;
 	}
@@ -9549,6 +9548,7 @@ void CGame::request_full_object_data(int client_h, char* data)
 		pkt.appearance = m_npc_list[object_id]->m_appearance;
 
 		pkt.status = m_npc_list[object_id]->m_status;
+		pkt.status.relationship = m_entity_manager->get_npc_relationship(object_id, client_h);
 		pkt.loc = m_npc_list[object_id]->m_is_killed ? 1 : 0;
 
 		ret = m_client_list[client_h]->m_socket->send_msg(reinterpret_cast<char*>(&pkt), sizeof(pkt));
@@ -13939,10 +13939,10 @@ void CGame::lotery_handler(int client_h)
 
 	switch(item_id) {
 	//Angels
-	case 908: //AngelicPandent(STR)
-	case 909: //AngelicPandent(DEX)
-		case 910: //AngelicPandent(INT)
-		case 911: //AngelicPandent(MAG)
+	case 908: //AngelicPendant(STR)
+	case 909: //AngelicPendant(DEX)
+		case 910: //AngelicPendant(INT)
+		case 911: //AngelicPendant(MAG)
 		if(m_client_list[client_h]->m_gizon_item_upgrade_left<5) return;
 		m_client_list[client_h]->m_gizon_item_upgrade_left -= 5;
 		break;
@@ -14022,10 +14022,10 @@ void CGame::lotery_handler(int client_h)
 	temp = m_client_list[client_h]->m_item_equipment_status[to_int(EquipPos::LeftFinger)];
 	angel_temp = m_client_list[client_h]->m_item_list[temp];
 	if ((temp != -1) && (angel_temp != 0)) {
-		if(angel_temp->m_id_num >= 908){ //AngelicPandent(STR)
-				if(angel_temp->m_id_num >= 909){ //AngelicPandent(DEX)
-				if(angel_temp->m_id_num >= 910){ //AngelicPandent(INT)
-				if(angel_temp->m_id_num >= 911){ //AngelicPandent(MAG)
+		if(angel_temp->m_id_num >= 908){ //AngelicPendant(STR)
+				if(angel_temp->m_id_num >= 909){ //AngelicPendant(DEX)
+				if(angel_temp->m_id_num >= 910){ //AngelicPendant(INT)
+				if(angel_temp->m_id_num >= 911){ //AngelicPendant(MAG)
 
 				return angel_temp->m_id_num;
 			} else {
@@ -14078,10 +14078,10 @@ void CGame::get_angel_handler(int client_h, char* data, size_t msg_size)
 	if (m_client_list[client_h]->m_gizon_item_upgrade_left < 5) return;
 
 	switch (angel) {
-	case 1: item_id = hb::shared::item::ItemId::AngelicPandentSTR; break;
-	case 2: item_id = hb::shared::item::ItemId::AngelicPandentDEX; break;
-	case 3: item_id = hb::shared::item::ItemId::AngelicPandentINT; break;
-	case 4: item_id = hb::shared::item::ItemId::AngelicPandentMAG; break;
+	case 1: item_id = hb::shared::item::ItemId::AngelicPendantSTR; break;
+	case 2: item_id = hb::shared::item::ItemId::AngelicPendantDEX; break;
+	case 3: item_id = hb::shared::item::ItemId::AngelicPendantINT; break;
+	case 4: item_id = hb::shared::item::ItemId::AngelicPendantMAG; break;
 	default:
 		hb::logger::log("NPC craft request for invalid item");
 		return;

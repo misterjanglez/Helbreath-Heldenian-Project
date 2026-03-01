@@ -552,7 +552,6 @@ namespace net {
 	struct HB_PACKED PacketNotifyHP {
 		PacketHeader header;
 		uint32_t hp;
-		uint32_t hunger;
 		uint8_t padding[2];
 	};
 

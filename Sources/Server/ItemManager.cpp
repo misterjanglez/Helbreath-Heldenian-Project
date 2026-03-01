@@ -165,6 +165,7 @@ bool ItemManager::send_client_item_configs(int client_h)
 			entry.isSkirt = item->m_is_skirt;
 			entry.stackable = item->m_stackable;
 			entry.isDyeable = item->m_is_dyeable;
+			entry.armorClass = item->m_armor_class;
 			entry.setId = item->m_set_id;
 			entry.itemColor = item->m_item_color;
 			entry.displayId = item->m_display_id;
@@ -268,6 +269,7 @@ bool ItemManager::init_item_attr(CItem* item, const char* item_name)
 				item->m_is_skirt = m_game->m_item_config_list[i]->m_is_skirt;
 				item->m_stackable = m_game->m_item_config_list[i]->m_stackable;
 				item->m_is_dyeable = m_game->m_item_config_list[i]->m_is_dyeable;
+				item->m_armor_class = m_game->m_item_config_list[i]->m_armor_class;
 				item->m_set_id = m_game->m_item_config_list[i]->m_set_id;
 				item->m_item_color = m_game->m_item_config_list[i]->m_item_color;
 				item->m_display_id = m_game->m_item_config_list[i]->m_display_id;
@@ -315,6 +317,7 @@ bool ItemManager::init_item_attr(CItem* item, int item_id)
 	item->m_is_skirt = config->m_is_skirt;
 	item->m_stackable = config->m_stackable;
 	item->m_is_dyeable = config->m_is_dyeable;
+	item->m_armor_class = config->m_armor_class;
 	item->m_set_id = config->m_set_id;
 	item->m_item_color = config->m_item_color;
 	item->m_display_id = config->m_display_id;
@@ -2193,6 +2196,7 @@ void ItemManager::use_item_handler(int client_h, short item_index, short dX, sho
 			m_game->m_client_list[client_h]->m_hunger_status += m_game->dice(v1, v2) + v3;
 			if (m_game->m_client_list[client_h]->m_hunger_status > 100) m_game->m_client_list[client_h]->m_hunger_status = 100;
 			if (m_game->m_client_list[client_h]->m_hunger_status < 0)   m_game->m_client_list[client_h]->m_hunger_status = 0;
+			m_game->send_notify_msg(0, client_h, Notify::Hunger, m_game->m_client_list[client_h]->m_hunger_status, 0, 0, 0);
 			break;
 
 		case ItemEffectType::StudySkill:
@@ -3555,25 +3559,25 @@ void ItemManager::calc_total_item_effect(int client_h, int equip_item_id, bool n
 					Magic Sapphire: Completion rate / 10 = Functions rate.(%) ? Maximum 10%.*/
 
 					// ******* Angel Code - Begin ******* //			
-				case 16: // Angel STR//AngelicPandent(STR)
+				case 16: // Angel STR//AngelicPendant(STR)
 					temp = (m_game->m_client_list[client_h]->m_item_list[item_index]->m_attribute & 0xF0000000) >> 28;
 					m_game->m_client_list[client_h]->m_angelic_str = temp + 1;
 					m_game->m_status_effect_manager->set_angel_flag(client_h, hb::shared::owner_class::Player, 1, temp);
 					m_game->send_notify_msg(0, client_h, Notify::SettingSuccess, 0, 0, 0, 0);
 					break;
-				case 17: // Angel DEX //AngelicPandent(DEX)
+				case 17: // Angel DEX //AngelicPendant(DEX)
 					temp = (m_game->m_client_list[client_h]->m_item_list[item_index]->m_attribute & 0xF0000000) >> 28;
 					m_game->m_client_list[client_h]->m_angelic_dex = temp + 1;
 					m_game->m_status_effect_manager->set_angel_flag(client_h, hb::shared::owner_class::Player, 2, temp);
 					m_game->send_notify_msg(0, client_h, Notify::SettingSuccess, 0, 0, 0, 0);
 					break;
-				case 18: // Angel INT//AngelicPandent(INT)
+				case 18: // Angel INT//AngelicPendant(INT)
 					temp = (m_game->m_client_list[client_h]->m_item_list[item_index]->m_attribute & 0xF0000000) >> 28;
 					m_game->m_client_list[client_h]->m_angelic_int = temp + 1;
 					m_game->m_status_effect_manager->set_angel_flag(client_h, hb::shared::owner_class::Player, 3, temp);
 					m_game->send_notify_msg(0, client_h, Notify::SettingSuccess, 0, 0, 0, 0);
 					break;
-				case 19: // Angel MAG//AngelicPandent(MAG)
+				case 19: // Angel MAG//AngelicPendant(MAG)
 					temp = (m_game->m_client_list[client_h]->m_item_list[item_index]->m_attribute & 0xF0000000) >> 28;
 					m_game->m_client_list[client_h]->m_angelic_mag = temp + 1;
 					m_game->m_status_effect_manager->set_angel_flag(client_h, hb::shared::owner_class::Player, 4, temp);
@@ -3785,10 +3789,14 @@ bool ItemManager::deplete_dest_type_item_use_effect(int client_h, int dX, int dY
 	case ItemEffectType::Dye:
 		if ((dest_item_id >= 0) && (dest_item_id < hb::shared::limits::MaxItems)) {
 			if (m_game->m_client_list[client_h]->m_item_list[dest_item_id] != 0) {
-				if (m_game->m_client_list[client_h]->m_item_list[dest_item_id]->m_is_dyeable != 0) {
-					m_game->m_client_list[client_h]->m_item_list[dest_item_id]->m_item_color =
+				auto* dest = m_game->m_client_list[client_h]->m_item_list[dest_item_id];
+				bool is_dye_removal = (m_game->m_client_list[client_h]->m_item_list[item_index]->m_item_effect_value1 == 0);
+				if (dest->m_is_dyeable != 0
+					&& (is_dye_removal || dest->m_armor_class == armor_class::clothing))
+				{
+					dest->m_item_color =
 						static_cast<char>(m_game->m_client_list[client_h]->m_item_list[item_index]->m_item_effect_value1);
-					m_game->send_notify_msg(0, client_h, Notify::ItemColorChange, dest_item_id, m_game->m_client_list[client_h]->m_item_list[dest_item_id]->m_item_color, 0, 0);
+					m_game->send_notify_msg(0, client_h, Notify::ItemColorChange, dest_item_id, dest->m_item_color, 0, 0);
 					return true;
 				}
 				else {
@@ -3802,10 +3810,11 @@ bool ItemManager::deplete_dest_type_item_use_effect(int client_h, int dX, int dY
 	case ItemEffectType::ArmorDye:
 		if ((dest_item_id >= 0) && (dest_item_id < hb::shared::limits::MaxItems)) {
 			if (m_game->m_client_list[client_h]->m_item_list[dest_item_id] != 0) {
-				if (m_game->m_client_list[client_h]->m_item_list[dest_item_id]->m_is_dyeable != 0) {
-					m_game->m_client_list[client_h]->m_item_list[dest_item_id]->m_item_color =
+				auto* dest = m_game->m_client_list[client_h]->m_item_list[dest_item_id];
+				if (dest->m_is_dyeable != 0 && dest->m_armor_class == armor_class::armor) {
+					dest->m_item_color =
 						static_cast<char>(m_game->m_client_list[client_h]->m_item_list[item_index]->m_item_effect_value1);
-					m_game->send_notify_msg(0, client_h, Notify::ItemColorChange, dest_item_id, m_game->m_client_list[client_h]->m_item_list[dest_item_id]->m_item_color, 0, 0);
+					m_game->send_notify_msg(0, client_h, Notify::ItemColorChange, dest_item_id, dest->m_item_color, 0, 0);
 					return true;
 				}
 				else {
@@ -3819,10 +3828,11 @@ bool ItemManager::deplete_dest_type_item_use_effect(int client_h, int dX, int dY
 	case ItemEffectType::WeaponDye:
 		if ((dest_item_id >= 0) && (dest_item_id < hb::shared::limits::MaxItems)) {
 			if (m_game->m_client_list[client_h]->m_item_list[dest_item_id] != 0) {
-				if (m_game->m_client_list[client_h]->m_item_list[dest_item_id]->m_is_dyeable != 0) {
-					m_game->m_client_list[client_h]->m_item_list[dest_item_id]->m_item_color =
+				auto* dest = m_game->m_client_list[client_h]->m_item_list[dest_item_id];
+				if (dest->m_is_dyeable != 0 && is_weapon_slot(dest->get_equip_pos())) {
+					dest->m_item_color =
 						static_cast<char>(m_game->m_client_list[client_h]->m_item_list[item_index]->m_item_effect_value1);
-					m_game->send_notify_msg(0, client_h, Notify::ItemColorChange, dest_item_id, m_game->m_client_list[client_h]->m_item_list[dest_item_id]->m_item_color, 0, 0);
+					m_game->send_notify_msg(0, client_h, Notify::ItemColorChange, dest_item_id, dest->m_item_color, 0, 0);
 					return true;
 				}
 				else {
@@ -5056,6 +5066,7 @@ bool ItemManager::copy_item_contents(CItem* copy, CItem* original)
 	copy->m_is_skirt = original->m_is_skirt;
 	copy->m_stackable = original->m_stackable;
 	copy->m_is_dyeable = original->m_is_dyeable;
+	copy->m_armor_class = original->m_armor_class;
 	copy->m_set_id = original->m_set_id;
 
 	copy->m_count = original->m_count;
@@ -5722,10 +5733,10 @@ void ItemManager::request_item_upgrade_handler(int client_h, int item_index)
 			m_game->send_notify_msg(0, client_h, Notify::ItemUpgradeFail, 2, 0, 0, 0);
 			return; // Pendants are EffectType 14
 
-		case 16: // AngelicPandent(STR)
-		case 17: // AngelicPandent(DEX)
-		case 18: // AngelicPandent(INT)
-		case 19: // AngelicPandent(MAG)
+		case 16: // AngelicPendant(STR)
+		case 17: // AngelicPendant(DEX)
+		case 18: // AngelicPendant(INT)
+		case 19: // AngelicPendant(MAG)
 			if (m_game->m_client_list[client_h]->m_gizon_item_upgrade_left <= 0)
 			{
 				m_game->send_notify_msg(0, client_h, Notify::ItemUpgradeFail, 3, 0, 0, 0);

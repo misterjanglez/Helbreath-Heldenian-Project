@@ -178,13 +178,13 @@ void inventory_manager::unequip_slot(int equip_pos)
 		&& (cfg_eq && cfg_eq->get_item_type() == hb::shared::item::item_type::equipment))
 	{
 		short item_id = m_game->m_item_equipment_status[equip_pos];
-		if (m_game->m_player->m_item_list[item_id]->m_id_num == hb::shared::item::ItemId::AngelicPandentSTR)
+		if (m_game->m_player->m_item_list[item_id]->m_id_num == hb::shared::item::ItemId::AngelicPendantSTR)
 			m_game->m_player->m_angelic_str = 0;
-		else if (m_game->m_player->m_item_list[item_id]->m_id_num == hb::shared::item::ItemId::AngelicPandentDEX)
+		else if (m_game->m_player->m_item_list[item_id]->m_id_num == hb::shared::item::ItemId::AngelicPendantDEX)
 			m_game->m_player->m_angelic_dex = 0;
-		else if (m_game->m_player->m_item_list[item_id]->m_id_num == hb::shared::item::ItemId::AngelicPandentINT)
+		else if (m_game->m_player->m_item_list[item_id]->m_id_num == hb::shared::item::ItemId::AngelicPendantINT)
 			m_game->m_player->m_angelic_int = 0;
-		else if (m_game->m_player->m_item_list[item_id]->m_id_num == hb::shared::item::ItemId::AngelicPandentMAG)
+		else if (m_game->m_player->m_item_list[item_id]->m_id_num == hb::shared::item::ItemId::AngelicPendantMAG)
 			m_game->m_player->m_angelic_mag = 0;
 	}
 
@@ -297,13 +297,13 @@ void inventory_manager::equip_item(int item_id)
 		&& (cfg->get_equip_pos() >= EquipPos::LeftFinger))
 	{
 		int angel_value = (m_game->m_player->m_item_list[item_id]->m_attribute & 0xF0000000) >> 28;
-		if (m_game->m_player->m_item_list[item_id]->m_id_num == hb::shared::item::ItemId::AngelicPandentSTR)
+		if (m_game->m_player->m_item_list[item_id]->m_id_num == hb::shared::item::ItemId::AngelicPendantSTR)
 			m_game->m_player->m_angelic_str = 1 + angel_value;
-		else if (m_game->m_player->m_item_list[item_id]->m_id_num == hb::shared::item::ItemId::AngelicPandentDEX)
+		else if (m_game->m_player->m_item_list[item_id]->m_id_num == hb::shared::item::ItemId::AngelicPendantDEX)
 			m_game->m_player->m_angelic_dex = 1 + angel_value;
-		else if (m_game->m_player->m_item_list[item_id]->m_id_num == hb::shared::item::ItemId::AngelicPandentINT)
+		else if (m_game->m_player->m_item_list[item_id]->m_id_num == hb::shared::item::ItemId::AngelicPendantINT)
 			m_game->m_player->m_angelic_int = 1 + angel_value;
-		else if (m_game->m_player->m_item_list[item_id]->m_id_num == hb::shared::item::ItemId::AngelicPandentMAG)
+		else if (m_game->m_player->m_item_list[item_id]->m_id_num == hb::shared::item::ItemId::AngelicPendantMAG)
 			m_game->m_player->m_angelic_mag = 1 + angel_value;
 	}
 
@@ -312,8 +312,8 @@ void inventory_manager::equip_item(int item_id)
 	m_game->add_event_list(G_cTxt.c_str(), 10);
 	{
 		short id = m_game->m_player->m_item_list[item_id]->m_id_num;
-		if (id == hb::shared::item::ItemId::AngelicPandentSTR || id == hb::shared::item::ItemId::AngelicPandentDEX ||
-			id == hb::shared::item::ItemId::AngelicPandentINT || id == hb::shared::item::ItemId::AngelicPandentMAG)
+		if (id == hb::shared::item::ItemId::AngelicPendantSTR || id == hb::shared::item::ItemId::AngelicPendantDEX ||
+			id == hb::shared::item::ItemId::AngelicPendantINT || id == hb::shared::item::ItemId::AngelicPendantMAG)
 			audio_manager::get().play_game_sound(sound_type::effect, 52, 0);
 		else
 			audio_manager::get().play_game_sound(sound_type::effect, 28, 0);

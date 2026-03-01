@@ -203,6 +203,7 @@ bool EnsureGameConfigDatabase(sqlite3** outDb, std::string& outPath, bool* outCr
         " is_skirt INTEGER NOT NULL DEFAULT 0,"
         " stackable INTEGER NOT NULL DEFAULT 0,"
         " is_dyeable INTEGER NOT NULL DEFAULT 0,"
+        " armor_class INTEGER NOT NULL DEFAULT 0,"
         " set_id INTEGER NOT NULL DEFAULT 0,"
         " item_color INTEGER NOT NULL DEFAULT 0,"
         " display_id INTEGER NOT NULL DEFAULT -1"
@@ -485,6 +486,7 @@ bool EnsureGameConfigDatabase(sqlite3** outDb, std::string& outPath, bool* outCr
             " is_skirt INTEGER NOT NULL DEFAULT 0,"
             " stackable INTEGER NOT NULL DEFAULT 0,"
             " is_dyeable INTEGER NOT NULL DEFAULT 0,"
+            " armor_class INTEGER NOT NULL DEFAULT 0,"
             " set_id INTEGER NOT NULL DEFAULT 0,"
             " item_color INTEGER NOT NULL DEFAULT 0,"
             " display_id INTEGER NOT NULL DEFAULT -1"
@@ -507,7 +509,7 @@ bool EnsureGameConfigDatabase(sqlite3** outDb, std::string& outPath, bool* outCr
             " durability, special_effect, sell_price, weight, swing_speed,"
             " level_requirement, gender_requirement,"
             " special_effect_value1, special_effect_value2, related_skill,"
-            " hide_armor, is_skirt, stackable, is_dyeable, set_id,"
+            " hide_armor, is_skirt, stackable, is_dyeable, armor_class, set_id,"
             " item_color, display_id)"
             " SELECT"
             "  item_id, name,"
@@ -569,6 +571,8 @@ bool EnsureGameConfigDatabase(sqlite3** outDb, std::string& outPath, bool* outCr
             "  CASE WHEN item_type IN (5, 6, 12) THEN 1 ELSE 0 END,"
             // is_dyeable: old category in (1, 3, 6, 8, 11, 12, 13, 15)
             "  CASE WHEN category IN (1, 3, 6, 8, 11, 12, 13, 15) THEN 1 ELSE 0 END,"
+            // armor_class: default 0 (user populates via database after migration)
+            "  0,"
             // set_id: default 0 (hero sets assigned by Python migration script)
             "  0,"
             "  item_color,"
@@ -625,9 +629,9 @@ bool SaveItemConfigs(sqlite3* db, CItem* const* itemList, int maxItems)
         " durability, special_effect, sell_price, weight, swing_speed,"
         " level_requirement, gender_requirement,"
         " special_effect_value1, special_effect_value2, related_skill,"
-        " hide_armor, is_skirt, stackable, is_dyeable, set_id,"
+        " hide_armor, is_skirt, stackable, is_dyeable, armor_class, set_id,"
         " item_color, display_id"
-        ") VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?);";
+        ") VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?);";
 
     sqlite3_stmt* stmt = nullptr;
     if (sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) != SQLITE_OK) {
@@ -671,6 +675,7 @@ bool SaveItemConfigs(sqlite3* db, CItem* const* itemList, int maxItems)
         ok &= (sqlite3_bind_int(stmt, col++, itemList[i]->m_is_skirt) == SQLITE_OK);
         ok &= (sqlite3_bind_int(stmt, col++, itemList[i]->m_stackable) == SQLITE_OK);
         ok &= (sqlite3_bind_int(stmt, col++, itemList[i]->m_is_dyeable) == SQLITE_OK);
+        ok &= (sqlite3_bind_int(stmt, col++, itemList[i]->m_armor_class) == SQLITE_OK);
         ok &= (sqlite3_bind_int(stmt, col++, itemList[i]->m_set_id) == SQLITE_OK);
         ok &= (sqlite3_bind_int(stmt, col++, itemList[i]->m_item_color) == SQLITE_OK);
         ok &= (sqlite3_bind_int(stmt, col++, itemList[i]->m_display_id) == SQLITE_OK);
@@ -703,7 +708,7 @@ bool LoadItemConfigs(sqlite3* db, CItem** itemList, int maxItems)
         " durability, special_effect, sell_price, weight, swing_speed,"
         " level_requirement, gender_requirement,"
         " special_effect_value1, special_effect_value2, related_skill,"
-        " hide_armor, is_skirt, stackable, is_dyeable, set_id,"
+        " hide_armor, is_skirt, stackable, is_dyeable, armor_class, set_id,"
         " item_color, display_id"
         " FROM items ORDER BY item_id;";
 
@@ -752,6 +757,7 @@ bool LoadItemConfigs(sqlite3* db, CItem** itemList, int maxItems)
         item->m_is_skirt = (char)sqlite3_column_int(stmt, col++);
         item->m_stackable = (char)sqlite3_column_int(stmt, col++);
         item->m_is_dyeable = (char)sqlite3_column_int(stmt, col++);
+        item->m_armor_class = (char)sqlite3_column_int(stmt, col++);
         item->m_set_id = (int16_t)sqlite3_column_int(stmt, col++);
         item->m_item_color = (char)sqlite3_column_int(stmt, col++);
         item->m_display_id = (short)sqlite3_column_int(stmt, col++);

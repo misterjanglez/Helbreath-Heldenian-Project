@@ -908,6 +908,7 @@ bool CGame::cache_process_item_config(char* data, uint32_t msg_size)
 		item->m_is_skirt = entry.isSkirt;
 		item->m_stackable = entry.stackable;
 		item->m_is_dyeable = entry.isDyeable;
+		item->m_armor_class = entry.armorClass;
 		item->m_set_id = entry.setId;
 		item->m_item_color = entry.itemColor;
 		item->m_display_id = entry.displayId;
@@ -2445,13 +2446,13 @@ void CGame::init_item_list(char* packet_data)
 			&& (cfg->get_equip_pos() >= EquipPos::LeftFinger))
 		{
 			angel_value = (m_player->m_item_list[i]->m_attribute & 0xF0000000) >> 28;
-			if (m_player->m_item_list[i]->m_id_num == hb::shared::item::ItemId::AngelicPandentSTR)
+			if (m_player->m_item_list[i]->m_id_num == hb::shared::item::ItemId::AngelicPendantSTR)
 				m_player->m_angelic_str = 1 + angel_value;
-			else if (m_player->m_item_list[i]->m_id_num == hb::shared::item::ItemId::AngelicPandentDEX)
+			else if (m_player->m_item_list[i]->m_id_num == hb::shared::item::ItemId::AngelicPendantDEX)
 				m_player->m_angelic_dex = 1 + angel_value;
-			else if (m_player->m_item_list[i]->m_id_num == hb::shared::item::ItemId::AngelicPandentINT)
+			else if (m_player->m_item_list[i]->m_id_num == hb::shared::item::ItemId::AngelicPendantINT)
 				m_player->m_angelic_int = 1 + angel_value;
-			else if (m_player->m_item_list[i]->m_id_num == hb::shared::item::ItemId::AngelicPandentMAG)
+			else if (m_player->m_item_list[i]->m_id_num == hb::shared::item::ItemId::AngelicPendantMAG)
 				m_player->m_angelic_mag = 1 + angel_value;
 		}
 	}

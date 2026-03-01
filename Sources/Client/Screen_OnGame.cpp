@@ -885,6 +885,40 @@ void Screen_OnGame::render_item_tooltip()
     auto name_color = itemInfo.is_special ? GameColors::UIItemName_Special : GameColors::UIWhite;
     tooltip.add_line(itemInfo.name, name_color);
 
+    // Item classification
+    if (cfg->m_armor_class == armor_class::clothing)
+    {
+        const char* slot = equip_pos_name(cfg->get_equip_pos());
+        G_cTxt = std::format("Clothing - {}", slot);
+        tooltip.add_line(G_cTxt, GameColors::InfoGrayLight);
+    }
+    else if (cfg->m_armor_class == armor_class::armor)
+    {
+        const char* slot = equip_pos_name(cfg->get_equip_pos());
+        G_cTxt = std::format("Armor - {}", slot);
+        tooltip.add_line(G_cTxt, GameColors::InfoGrayLight);
+    }
+    else if (cfg->is_weapon())
+    {
+        const char* slot = equip_pos_name(cfg->get_equip_pos());
+        G_cTxt = std::format("Weapon - {}", slot);
+        tooltip.add_line(G_cTxt, GameColors::InfoGrayLight);
+    }
+    else if (cfg->get_item_sub_type() == item_sub_type::angelic)
+    {
+        tooltip.add_line("Accessory - Angelic Pendant", GameColors::InfoGrayLight);
+    }
+    else if (cfg->get_item_sub_type() == item_sub_type::pendant)
+    {
+        tooltip.add_line("Accessory - Pendant", GameColors::InfoGrayLight);
+    }
+    else if (cfg->is_accessory())
+    {
+        const char* slot = equip_pos_name(cfg->get_equip_pos());
+        G_cTxt = std::format("Accessory - {}", slot);
+        tooltip.add_line(G_cTxt, GameColors::InfoGrayLight);
+    }
+
     // Attribute effects (label in gray, value in green)
     for (const auto& eff : itemInfo.effects)
     {

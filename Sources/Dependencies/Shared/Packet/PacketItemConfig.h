@@ -44,6 +44,7 @@ struct HB_PACKED PacketItemConfigEntry
 	int8_t   isSkirt;               // Pants render as skirt
 	int8_t   stackable;             // Item is stackable
 	int8_t   isDyeable;             // Item can be dyed
+	int8_t   armorClass;            // Armor class (0=none, 1=clothing, 2=armor)
 	int16_t  setId;                 // Equipment set ID (0 = no set)
 	int8_t   itemColor;             // Item color variant
 	int16_t  displayId;             // Atlas display ID (maps to ItemSpriteMetadata)

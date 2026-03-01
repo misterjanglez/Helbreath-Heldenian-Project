@@ -73,7 +73,9 @@ enum item_sub_type : int8_t
 	currency     = 9,   // Gold, gold sacks
 	fishing      = 10,  // Fishing Rod
 	crafting     = 11,  // Alchemy Bowl, Smith's Anvil, Crafting Vessel
-	map          = 12   // Map
+	map          = 12,  // Map
+	pendant      = 13,  // Pendants (generic)
+	angelic      = 14   // Angelic Pendants
 };
 }
 
@@ -92,6 +94,18 @@ enum weapon_class : int8_t
 	hammer      = 6,   // Skill: Hammer (14)
 	wand        = 7,   // Skill: Wand (21)
 	bow         = 8    // Skill: Bow (6)
+};
+}
+
+//------------------------------------------------------------------------
+// Armor Class — distinguishes clothing from armor for dye targeting
+//------------------------------------------------------------------------
+namespace armor_class {
+enum armor_class : int8_t
+{
+	none     = 0,
+	clothing = 1,   // Capes, shirts, boots — regular dye target
+	armor    = 2    // Plate, chain, shields — armor dye target
 };
 }
 
@@ -179,6 +193,28 @@ enum class TouchEffectType : int16_t
 // Helper Functions
 //------------------------------------------------------------------------
 
+// Equipment slot display name
+constexpr const char* equip_pos_name(EquipPos pos)
+{
+    switch (pos)
+    {
+    case EquipPos::Head:        return "Head";
+    case EquipPos::Body:        return "Body";
+    case EquipPos::Arms:        return "Arms";
+    case EquipPos::Pants:       return "Pants";
+    case EquipPos::Leggings:    return "Leggings";
+    case EquipPos::Neck:        return "Neck";
+    case EquipPos::LeftHand:    return "Left Hand";
+    case EquipPos::RightHand:   return "Right Hand";
+    case EquipPos::TwoHand:     return "Two Hand";
+    case EquipPos::RightFinger: return "Ring";
+    case EquipPos::LeftFinger:  return "Ring";
+    case EquipPos::Back:        return "Back";
+    case EquipPos::FullBody:    return "Full Body";
+    default:                    return "";
+    }
+}
+
 // Check if equipment position is a weapon slot
 constexpr bool is_weapon_slot(EquipPos pos)
 {
@@ -235,6 +271,7 @@ constexpr int8_t to_int(EquipPos pos) { return static_cast<int8_t>(pos); }
 constexpr int8_t to_int(item_type::item_type type) { return static_cast<int8_t>(type); }
 constexpr int8_t to_int(item_sub_type::item_sub_type type) { return static_cast<int8_t>(type); }
 constexpr int8_t to_int(weapon_class::weapon_class type) { return static_cast<int8_t>(type); }
+constexpr int8_t to_int(armor_class::armor_class type) { return static_cast<int8_t>(type); }
 constexpr int16_t to_int(ItemEffectType type) { return static_cast<int16_t>(type); }
 constexpr int16_t to_int(TouchEffectType type) { return static_cast<int16_t>(type); }
 
@@ -242,6 +279,7 @@ constexpr EquipPos to_equip_pos(int8_t val) { return static_cast<EquipPos>(val);
 constexpr item_type::item_type to_item_type(int8_t val) { return static_cast<item_type::item_type>(val); }
 constexpr item_sub_type::item_sub_type to_item_sub_type(int8_t val) { return static_cast<item_sub_type::item_sub_type>(val); }
 constexpr weapon_class::weapon_class to_weapon_class(int8_t val) { return static_cast<weapon_class::weapon_class>(val); }
+constexpr armor_class::armor_class to_armor_class(int8_t val) { return static_cast<armor_class::armor_class>(val); }
 constexpr ItemEffectType to_item_effect_type(int16_t val) { return static_cast<ItemEffectType>(val); }
 constexpr TouchEffectType to_touch_effect_type(int16_t val) { return static_cast<TouchEffectType>(val); }
 
@@ -323,10 +361,10 @@ namespace ItemId
     constexpr short LightingBlade = 881;
     constexpr short MagicNecklaceDFp15 = 1086;
     constexpr short MagicNecklaceRM30 = 1101;
-    constexpr short AngelicPandentSTR = 1108;
-    constexpr short AngelicPandentDEX = 1109;
-    constexpr short AngelicPandentINT = 1110;
-    constexpr short AngelicPandentMAG = 1111;
+    constexpr short AngelicPendantSTR = 1108;
+    constexpr short AngelicPendantDEX = 1109;
+    constexpr short AngelicPendantINT = 1110;
+    constexpr short AngelicPendantMAG = 1111;
 
     // DK Weapon IDs — used for glare visual effect
     constexpr short DarkKnightSword = 745;   // Dark Knight Templar (appr_val was 14, glare 3)
@@ -401,10 +439,10 @@ inline bool is_special_item(short i_dnum)
     case ItemId::LightingBlade:
     case ItemId::MagicNecklaceDFp15:
     case ItemId::MagicNecklaceRM30:
-    case ItemId::AngelicPandentSTR:
-    case ItemId::AngelicPandentDEX:
-    case ItemId::AngelicPandentINT:
-    case ItemId::AngelicPandentMAG:
+    case ItemId::AngelicPendantSTR:
+    case ItemId::AngelicPendantDEX:
+    case ItemId::AngelicPendantINT:
+    case ItemId::AngelicPendantMAG:
         return true;
     default:
         // Also check ranges for items between known IDs

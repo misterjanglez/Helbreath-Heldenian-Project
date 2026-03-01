@@ -73,6 +73,10 @@ void DialogBox_Magic::on_draw()
 	put_aligned_string(sX + 3, sX + 256, sY + 50, circle_name);
 	put_aligned_string(sX + 4, sX + 257, sY + 50, circle_name);
 
+	// Column headers
+	hb::shared::text::draw_text(GameFont::Default, sX + 30, sY + 57, "Spell", hb::shared::text::TextStyle::from_color(GameColors::UILabel).with_bold());
+	hb::shared::text::draw_text(GameFont::Default, sX + 206, sY + 57, "Cost", hb::shared::text::TextStyle::from_color(GameColors::UILabel).with_bold());
+
 	c_pivot = m_circle_view * 10;
 	yloc = 0;
 	int player_int = player().m_int + player().m_angelic_int;
