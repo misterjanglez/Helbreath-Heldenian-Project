@@ -266,8 +266,8 @@ void inventory_manager::equip_item(int item_id)
 	case EquipPos::Head:
 	case EquipPos::Body:
 	case EquipPos::Arms:
-	case EquipPos::Pants:
 	case EquipPos::Leggings:
+	case EquipPos::Boots:
 	case EquipPos::Back:
 		unequip_slot(to_int(EquipPos::FullBody));
 		break;
@@ -275,8 +275,8 @@ void inventory_manager::equip_item(int item_id)
 		unequip_slot(to_int(EquipPos::Head));
 		unequip_slot(to_int(EquipPos::Body));
 		unequip_slot(to_int(EquipPos::Arms));
-		unequip_slot(to_int(EquipPos::Pants));
 		unequip_slot(to_int(EquipPos::Leggings));
+		unequip_slot(to_int(EquipPos::Boots));
 		unequip_slot(to_int(EquipPos::Back));
 		break;
 	case EquipPos::LeftHand:

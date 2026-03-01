@@ -18,6 +18,7 @@
 #include "PacketResponse.h"
 #include "PacketShop.h"
 #include "PacketConfigCache.h"
+#include "PacketColorPaletteConfig.h"
 #include "PacketPartyOp.h"
 #include "PacketChat.h"
 #include "PacketGuild.h"

@@ -146,12 +146,8 @@ void DialogBox_Bank::draw_item_details(short sX, short sY, short size_x, int ite
 		bank_draw.sprite->draw(sX + 60, sY + 68, bank_draw.frame);
 	}
 	else {
-		if (cfg->is_weapon()) {
-			bank_draw.sprite->draw(sX + 60, sY + 68, bank_draw.frame, hb::shared::sprite::DrawParams::tint(GameColors::Weapons[item_color].r, GameColors::Weapons[item_color].g, GameColors::Weapons[item_color].b));
-		}
-		else {
-			bank_draw.sprite->draw(sX + 60, sY + 68, bank_draw.frame, hb::shared::sprite::DrawParams::tint(GameColors::Items[item_color].r, GameColors::Items[item_color].g, GameColors::Items[item_color].b));
-		}
+		const auto& tint = m_game->m_color_palette[item_color];
+		bank_draw.sprite->draw(sX + 60, sY + 68, bank_draw.frame, hb::shared::sprite::DrawParams::tint(tint.r, tint.g, tint.b));
 	}
 }
 

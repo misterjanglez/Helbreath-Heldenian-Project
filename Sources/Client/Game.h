@@ -391,6 +391,10 @@ std::array<bool, hb::shared::limits::MaxItems> m_is_item_equipped{};
 	bool cache_process_npc_config(char* data, uint32_t msg_size);
 	bool cache_process_map_config(char* data, uint32_t msg_size);
 	bool cache_process_balance_config(char* data, uint32_t msg_size);
+	bool cache_process_color_palette(char* data, uint32_t msg_size);
+
+	std::array<hb::shared::render::Color, 256> m_color_palette{};
+	bool m_color_palette_loaded = false;
 
 	struct NpcConfig { short npcType = 0; std::string name; bool valid = false; };
 	std::array<NpcConfig, hb::shared::limits::MaxNpcConfigs> m_npc_config_list{};   // indexed by npc_id
@@ -407,7 +411,7 @@ std::array<bool, hb::shared::limits::MaxItems> m_is_item_equipped{};
 
 	bool ensure_config_loaded(int type);
 	bool try_replay_cache_for_config(int type);
-	void request_configs_from_server(bool items, bool magic, bool skills, bool npcs = false, bool maps = false, bool balance = false);
+	void request_configs_from_server(bool items, bool magic, bool skills, bool npcs = false, bool maps = false, bool balance = false, bool color_palette = false);
 	void check_configs_ready_and_enter_game();
 
 	bool ensure_item_configs_loaded()  { return ensure_config_loaded(0); }

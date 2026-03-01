@@ -7,6 +7,14 @@ struct sqlite3;
 class CItem;
 class CGame;
 
+struct color_palette_entry
+{
+	uint8_t color_id;
+	uint8_t r;
+	uint8_t g;
+	uint8_t b;
+};
+
 struct creation_item_entry
 {
 	int class_type;    // 0=all, 1=warrior, 2=mage, 3=master
@@ -49,6 +57,7 @@ bool SaveScheduleConfig(sqlite3* db, const CGame* game);
 bool LoadScheduleConfig(sqlite3* db, CGame* game);
 bool LoadCreationItems(sqlite3* db, std::vector<creation_item_entry>& out_items);
 bool SaveCreationItems(sqlite3* db, const std::vector<creation_item_entry>& items);
+bool LoadColorPalette(sqlite3* db, std::vector<color_palette_entry>& out_entries);
 bool HasGameConfigRows(sqlite3* db, const char* tableName);
 void CloseGameConfigDatabase(sqlite3* db);
 

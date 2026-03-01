@@ -2,7 +2,7 @@
 //
 // Replaces divergent DEF_ macros from Client/Item.h and Server/Item.h
 // Naming decisions:
-//   - Slot 5: Leggings (matches item data: PlateLeggings, ChainHose)
+//   - Slot 5: Boots (Shoes, Long Boots)
 //   - Slot 13: FullBody (describes slot purpose, not behavior)
 //
 //////////////////////////////////////////////////////////////////////
@@ -22,8 +22,8 @@ enum class EquipPos : int8_t
     Head      = 1,
     Body      = 2,
     Arms      = 3,
-    Pants     = 4,
-    Leggings  = 5,   // Leg armor (ChainHose, PlateLeggings)
+    Leggings  = 4,   // Lower body (Trousers, Skirts, Chain Hose, Plate Leggings)
+    Boots     = 5,   // Footwear (Shoes, Long Boots)
     Neck      = 6,
     LeftHand  = 7,
     RightHand = 8,
@@ -201,8 +201,8 @@ constexpr const char* equip_pos_name(EquipPos pos)
     case EquipPos::Head:        return "Head";
     case EquipPos::Body:        return "Body";
     case EquipPos::Arms:        return "Arms";
-    case EquipPos::Pants:       return "Pants";
     case EquipPos::Leggings:    return "Leggings";
+    case EquipPos::Boots:       return "Boots";
     case EquipPos::Neck:        return "Neck";
     case EquipPos::LeftHand:    return "Left Hand";
     case EquipPos::RightHand:   return "Right Hand";
@@ -229,8 +229,8 @@ constexpr bool is_armor_slot(EquipPos pos)
     return pos == EquipPos::Head ||
            pos == EquipPos::Body ||
            pos == EquipPos::Arms ||
-           pos == EquipPos::Pants ||
            pos == EquipPos::Leggings ||
+           pos == EquipPos::Boots ||
            pos == EquipPos::Back ||
            pos == EquipPos::FullBody;
 }

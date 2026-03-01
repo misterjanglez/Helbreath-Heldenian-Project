@@ -52,8 +52,7 @@ void DialogBox_SellOrRepair::on_draw()
 				sell_draw.sprite->draw(sX + 62 + 15, sY + 84 + 30, sell_draw.frame);
 			else
 			{
-				bool sell_is_weapon = sell_cfg && sell_cfg->is_weapon();
-				const auto& sell_tint = sell_is_weapon ? GameColors::Weapons[item_color] : GameColors::Items[item_color];
+				const auto& sell_tint = m_game->m_color_palette[item_color];
 				sell_draw.sprite->draw(sX + 62 + 15, sY + 84 + 30, sell_draw.frame, hb::shared::sprite::DrawParams::tint(sell_tint.r, sell_tint.g, sell_tint.b));
 			}
 		}
@@ -101,8 +100,7 @@ void DialogBox_SellOrRepair::on_draw()
 				rep_draw.sprite->draw(sX + 62 + 15, sY + 84 + 30, rep_draw.frame);
 			else
 			{
-				bool rep_is_weapon = rep_cfg && rep_cfg->is_weapon();
-				const auto& rep_tint = rep_is_weapon ? GameColors::Weapons[item_color] : GameColors::Items[item_color];
+				const auto& rep_tint = m_game->m_color_palette[item_color];
 				rep_draw.sprite->draw(sX + 62 + 15, sY + 84 + 30, rep_draw.frame, hb::shared::sprite::DrawParams::tint(rep_tint.r, rep_tint.g, rep_tint.b));
 			}
 		}

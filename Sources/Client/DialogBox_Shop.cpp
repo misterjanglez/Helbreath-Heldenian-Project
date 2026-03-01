@@ -191,9 +191,9 @@ void DialogBox_Shop::draw_item_details(short sX, short sY, short mouse_x, short 
 
     case EquipPos::Head:
     case EquipPos::Body:
-    case EquipPos::Leggings:
+    case EquipPos::Boots:
     case EquipPos::Arms:
-    case EquipPos::Pants:
+    case EquipPos::Leggings:
         draw_armor_stats(sX, sY, item_index, flag_stat_low, flag_red_shown);
         break;
 

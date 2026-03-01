@@ -133,9 +133,10 @@ void LoginServer::request_login(int h, char* data)
 	{
 	case LogIn::Ok:
 	{
-		// Send balance config BEFORE login response — login response closes the socket
+		// Send configs BEFORE login response — login response closes the socket
 		send_balance_config(h);
 		send_server_config(h);
+		send_color_palette(h);
 
 		char data[512] = {};
 		char* cp2 = data;
@@ -235,13 +236,13 @@ LogIn LoginServer::AccountLogIn(string acc, string pass, std::vector<AccountDbCh
 						entry.appearance.arm_display_id = config->m_display_id;
 						entry.appearance.arm_color = color;
 						break;
-					case EquipPos::Pants:
+					case EquipPos::Leggings:
 						entry.appearance.pants_item_id = static_cast<int16_t>(item.item_id);
 						entry.appearance.pants_display_id = config->m_display_id;
 						entry.appearance.pants_color = color;
 						entry.appearance.is_skirt = (config->m_is_skirt != 0);
 						break;
-					case EquipPos::Leggings:
+					case EquipPos::Boots:
 						entry.appearance.boots_item_id = static_cast<int16_t>(item.item_id);
 						entry.appearance.boots_display_id = config->m_display_id;
 						entry.appearance.boots_color = color;
@@ -852,6 +853,51 @@ void LoginServer::send_server_config(int h)
 	pkt.creation_stat_points = static_cast<int16_t>(G_pGame->m_creation_stat_points);
 
 	G_pGame->_lclients[h]->sock->send_msg(reinterpret_cast<char*>(&pkt), sizeof(pkt));
+}
+
+void LoginServer::send_color_palette(int h)
+{
+	if (!G_pGame->_lclients[h]) return;
+	if (G_pGame->m_color_palette.empty()) return;
+
+	constexpr size_t headerSize = sizeof(hb::net::PacketColorPaletteConfigHeader);
+	constexpr size_t entrySize = sizeof(hb::net::PacketColorPaletteConfigEntry);
+	constexpr size_t maxEntriesPerPacket = (7000 - headerSize) / entrySize;
+
+	size_t totalColors = G_pGame->m_color_palette.size();
+	size_t colorsSent = 0;
+	uint16_t packetIndex = 0;
+
+	while (colorsSent < totalColors)
+	{
+		std::vector<char> buf(headerSize + maxEntriesPerPacket * entrySize, 0);
+
+		auto* pktHeader = reinterpret_cast<hb::net::PacketColorPaletteConfigHeader*>(buf.data());
+		pktHeader->header.msg_id = MsgId::ColorPaletteConfigContents;
+		pktHeader->header.msg_type = MsgType::Confirm;
+		pktHeader->totalColors = static_cast<uint16_t>(totalColors);
+		pktHeader->packetIndex = packetIndex;
+
+		auto* entries = reinterpret_cast<hb::net::PacketColorPaletteConfigEntry*>(buf.data() + headerSize);
+		uint16_t entriesInPacket = 0;
+
+		for (size_t i = colorsSent; i < totalColors && entriesInPacket < maxEntriesPerPacket; i++)
+		{
+			entries[entriesInPacket].colorId = G_pGame->m_color_palette[i].color_id;
+			entries[entriesInPacket].r = G_pGame->m_color_palette[i].r;
+			entries[entriesInPacket].g = G_pGame->m_color_palette[i].g;
+			entries[entriesInPacket].b = G_pGame->m_color_palette[i].b;
+			entriesInPacket++;
+		}
+
+		pktHeader->colorCount = entriesInPacket;
+		size_t packetSize = headerSize + (entriesInPacket * entrySize);
+
+		G_pGame->_lclients[h]->sock->send_msg(buf.data(), static_cast<int>(packetSize));
+
+		colorsSent += entriesInPacket;
+		packetIndex++;
+	}
 }
 
 void LoginServer::request_enter_game(int h, char* data)

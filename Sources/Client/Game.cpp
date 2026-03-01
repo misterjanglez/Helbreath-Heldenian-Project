@@ -1179,6 +1179,45 @@ bool CGame::cache_process_balance_config(char* data, uint32_t msg_size)
 	return true;
 }
 
+bool CGame::cache_process_color_palette(char* data, uint32_t msg_size)
+{
+	LocalCacheManager::get().accumulate_packet(ConfigCacheType::ColorPalette, data, msg_size);
+
+	constexpr size_t headerSize = sizeof(hb::net::PacketColorPaletteConfigHeader);
+	constexpr size_t entrySize = sizeof(hb::net::PacketColorPaletteConfigEntry);
+
+	if (msg_size < headerSize) return false;
+
+	const auto* pktHeader = reinterpret_cast<const hb::net::PacketColorPaletteConfigHeader*>(data);
+	uint16_t colorCount = pktHeader->colorCount;
+	uint16_t totalColors = pktHeader->totalColors;
+
+	if (msg_size < headerSize + colorCount * entrySize) return false;
+
+	const auto* entries = reinterpret_cast<const hb::net::PacketColorPaletteConfigEntry*>(data + headerSize);
+
+	for (uint16_t i = 0; i < colorCount; i++)
+	{
+		uint8_t id = entries[i].colorId;
+		m_color_palette[id] = hb::shared::render::Color(entries[i].r, entries[i].g, entries[i].b);
+	}
+
+	// Check if all packets received
+	// Use packet index to determine: if this is the last packet, finalize
+	uint16_t lastEntryId = (colorCount > 0) ? entries[colorCount - 1].colorId : 0;
+	size_t entriesProcessed = pktHeader->packetIndex * ((7000 - headerSize) / entrySize) + colorCount;
+
+	if (entriesProcessed >= totalColors && !LocalCacheManager::get().is_replaying())
+	{
+		LocalCacheManager::get().finalize_and_save(ConfigCacheType::ColorPalette);
+	}
+
+	m_color_palette_loaded = true;
+	hb::logger::log<hb::log_channel::network>("Color palette loaded ({} entries in packet, {} total)", colorCount, totalColors);
+
+	return true;
+}
+
 void CGame::game_recv_msg_handler(uint32_t msg_size, char* data)
 {
 	const auto* header = hb::net::PacketCast<hb::net::PacketHeader>(data, sizeof(hb::net::PacketHeader));
@@ -1343,8 +1382,24 @@ void CGame::game_recv_msg_handler(uint32_t msg_size, char* data)
 			need_balance = true;
 		}
 
-		if (need_items || need_magic || need_skills || need_npcs || need_maps || need_balance) {
-			request_configs_from_server(need_items, need_magic, need_skills, need_npcs, need_maps, need_balance);
+		bool need_color_palette = false;
+		if (cachePkt->colorPaletteCacheValid) {
+			bool replay_ok = LocalCacheManager::get().replay_from_cache(ConfigCacheType::ColorPalette,
+				[](char* p, uint32_t s, void* c) -> bool {
+					return static_cast<ReplayCtx*>(c)->game->cache_process_color_palette(p, s);
+				}, &ctx);
+			if (!replay_ok || !m_color_palette_loaded) {
+				LocalCacheManager::get().reset_accumulator(ConfigCacheType::ColorPalette);
+				need_color_palette = true;
+			}
+		}
+		else {
+			LocalCacheManager::get().reset_accumulator(ConfigCacheType::ColorPalette);
+			need_color_palette = true;
+		}
+
+		if (need_items || need_magic || need_skills || need_npcs || need_maps || need_balance || need_color_palette) {
+			request_configs_from_server(need_items, need_magic, need_skills, need_npcs, need_maps, need_balance, need_color_palette);
 			m_config_request_time = GameClock::get_time_ms();
 		}
 		else {
@@ -1381,6 +1436,10 @@ void CGame::game_recv_msg_handler(uint32_t msg_size, char* data)
 			LocalCacheManager::get().reset_accumulator(ConfigCacheType::BalanceConfig);
 			m_formula_engine.clear();
 		}
+		if (reloadPkt->reloadColorPalette) {
+			LocalCacheManager::get().reset_accumulator(ConfigCacheType::ColorPalette);
+			m_color_palette_loaded = false;
+		}
 
 		set_top_msg((char*)"Administration kicked off a config reload, some lag may occur.", 5);
 	}
@@ -1413,6 +1472,10 @@ void CGame::game_recv_msg_handler(uint32_t msg_size, char* data)
 		break;
 	case MsgId::BalanceConfigContents:
 		cache_process_balance_config(data, msg_size);
+		break;
+	case MsgId::ColorPaletteConfigContents:
+		cache_process_color_palette(data, msg_size);
+		check_configs_ready_and_enter_game();
 		break;
 	case MsgId::ResponseInitPlayer:
 		init_player_response_handler(data);
@@ -1495,6 +1558,8 @@ void CGame::init_player_response_handler(char* data)
 			LocalCacheManager::get().get_hash(ConfigCacheType::Maps).c_str());
 		std::snprintf(req.balanceConfigHash, sizeof(req.balanceConfigHash), "%s",
 			LocalCacheManager::get().get_hash(ConfigCacheType::BalanceConfig).c_str());
+		std::snprintf(req.colorPaletteConfigHash, sizeof(req.colorPaletteConfigHash), "%s",
+			LocalCacheManager::get().get_hash(ConfigCacheType::ColorPalette).c_str());
 		send_game_packet(req);
 		change_game_mode(GameMode::WaitingInitData);
 	}
@@ -1953,6 +2018,13 @@ void CGame::log_recv_msg_handler(char* data, uint32_t msg_size)
 		return;
 	}
 
+	// Intercept color palette — sent before login response
+	if (header && header->msg_id == MsgId::ColorPaletteConfigContents)
+	{
+		cache_process_color_palette(data, msg_size);
+		return;
+	}
+
 	// Intercept server config — sent before login response
 	if (header && header->msg_id == MsgId::ServerConfigUpdate)
 	{
@@ -2293,7 +2365,7 @@ hb::shared::sprite::BoundRect CGame::draw_object_on_move_for_menu(int indexX, in
 		if (color == 0)
 			m_sprite[idx]->draw(sX, sY, dirFrame);
 		else
-			m_sprite[idx]->draw(sX, sY, dirFrame, hb::shared::sprite::DrawParams::tint(GameColors::Items[color].r, GameColors::Items[color].g, GameColors::Items[color].b));
+			m_sprite[idx]->draw(sX, sY, dirFrame, hb::shared::sprite::DrawParams::tint(m_color_palette[color].r, m_color_palette[color].g, m_color_palette[color].b));
 	};
 
 	auto drawEquipLayer = [&](int idx, int color) {
@@ -2301,7 +2373,7 @@ hb::shared::sprite::BoundRect CGame::draw_object_on_move_for_menu(int indexX, in
 		if (color == 0)
 			m_equip_sprites[idx]->draw(sX, sY, dirFrame);
 		else
-			m_equip_sprites[idx]->draw(sX, sY, dirFrame, hb::shared::sprite::DrawParams::tint(GameColors::Items[color].r, GameColors::Items[color].g, GameColors::Items[color].b));
+			m_equip_sprites[idx]->draw(sX, sY, dirFrame, hb::shared::sprite::DrawParams::tint(m_color_palette[color].r, m_color_palette[color].g, m_color_palette[color].b));
 	};
 
 	auto drawWeapon = [&]() {
@@ -2309,7 +2381,7 @@ hb::shared::sprite::BoundRect CGame::draw_object_on_move_for_menu(int indexX, in
 		if (eq.weaponColor == 0)
 			m_equip_sprites[eq.weapon]->draw(sX, sY, dirFrame);
 		else
-			m_equip_sprites[eq.weapon]->draw(sX, sY, dirFrame, hb::shared::sprite::DrawParams::tint(GameColors::Weapons[eq.weaponColor].r, GameColors::Weapons[eq.weaponColor].g, GameColors::Weapons[eq.weaponColor].b));
+			m_equip_sprites[eq.weapon]->draw(sX, sY, dirFrame, hb::shared::sprite::DrawParams::tint(m_color_palette[eq.weaponColor].r, m_color_palette[eq.weaponColor].g, m_color_palette[eq.weaponColor].b));
 	};
 
 	auto drawMantle = [&](int order) {
@@ -2348,7 +2420,7 @@ hb::shared::sprite::BoundRect CGame::draw_object_on_move_for_menu(int indexX, in
 	// Hair (cosmetic, from m_sprite, only if no helm)
 	if (eq.hair != -1 && eq.helm == -1)
 	{
-		const auto& hc = GameColors::Hair[hairColor];
+		const auto& hc = m_color_palette[hairColor];
 		m_sprite[eq.hair]->draw(sX, sY, dirFrame, hb::shared::sprite::DrawParams::tint(hc.r, hc.g, hc.b));
 	}
 
@@ -3266,7 +3338,7 @@ bool CGame::try_replay_cache_for_config(int type)
 	return false;
 }
 
-void CGame::request_configs_from_server(bool items, bool magic, bool skills, bool npcs, bool maps, bool balance)
+void CGame::request_configs_from_server(bool items, bool magic, bool skills, bool npcs, bool maps, bool balance, bool color_palette)
 {
 	if (!m_g_sock) return;
 	hb::net::PacketRequestConfigData pkt{};
@@ -3278,6 +3350,7 @@ void CGame::request_configs_from_server(bool items, bool magic, bool skills, boo
 	pkt.requestNpcs = npcs ? 1 : 0;
 	pkt.requestMaps = maps ? 1 : 0;
 	pkt.requestBalance = balance ? 1 : 0;
+	pkt.requestColorPalette = color_palette ? 1 : 0;
 	m_g_sock->send_msg(reinterpret_cast<char*>(&pkt), sizeof(pkt));
 }
 

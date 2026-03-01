@@ -443,6 +443,12 @@ bool EnsureGameConfigDatabase(sqlite3** outDb, std::string& outPath, bool* outCr
         " sort_order INTEGER NOT NULL DEFAULT 0,"
         " PRIMARY KEY (class_type, item_id, gender_limit)"
         ");"
+        "CREATE TABLE IF NOT EXISTS color_palette ("
+        " color_id INTEGER PRIMARY KEY,"
+        " r INTEGER NOT NULL,"
+        " g INTEGER NOT NULL,"
+        " b INTEGER NOT NULL"
+        ");"
         "COMMIT;";
 
     if (!ExecSql(db, schemaSql)) {
@@ -1360,6 +1366,34 @@ bool LoadCreationItems(sqlite3* db, std::vector<creation_item_entry>& out_items)
 
     sqlite3_finalize(stmt);
     hb::logger::log("- {} character creation items loaded", (int)out_items.size());
+    return true;
+}
+
+bool LoadColorPalette(sqlite3* db, std::vector<color_palette_entry>& out_entries)
+{
+    if (db == nullptr) return false;
+
+    out_entries.clear();
+
+    const char* sql = "SELECT color_id, r, g, b FROM color_palette ORDER BY color_id;";
+
+    sqlite3_stmt* stmt = nullptr;
+    if (sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) != SQLITE_OK) {
+        hb::logger::warn("Failed to prepare color_palette query");
+        return false;
+    }
+
+    while (sqlite3_step(stmt) == SQLITE_ROW) {
+        color_palette_entry entry = {};
+        entry.color_id = static_cast<uint8_t>(sqlite3_column_int(stmt, 0));
+        entry.r        = static_cast<uint8_t>(sqlite3_column_int(stmt, 1));
+        entry.g        = static_cast<uint8_t>(sqlite3_column_int(stmt, 2));
+        entry.b        = static_cast<uint8_t>(sqlite3_column_int(stmt, 3));
+        out_entries.push_back(entry);
+    }
+
+    sqlite3_finalize(stmt);
+    hb::logger::log("- {} color palette entries loaded", (int)out_entries.size());
     return true;
 }
 

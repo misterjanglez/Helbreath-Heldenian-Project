@@ -672,7 +672,7 @@ bool ItemManager::equip_item_handler(int client_h, short item_index, bool notify
 
 	equip_pos = m_game->m_client_list[client_h]->m_item_list[item_index]->get_equip_pos();
 
-	if ((equip_pos == EquipPos::Body) || (equip_pos == EquipPos::Leggings) ||
+	if ((equip_pos == EquipPos::Body) || (equip_pos == EquipPos::Boots) ||
 		(equip_pos == EquipPos::Arms) || (equip_pos == EquipPos::Head)) {
 		switch (m_game->m_client_list[client_h]->m_item_list[item_index]->m_item_effect_value4) {
 		case 10: // Str
@@ -787,11 +787,11 @@ bool ItemManager::equip_item_handler(int client_h, short item_index, bool notify
 		if (m_game->m_client_list[client_h]->m_item_equipment_status[to_int(EquipPos::Arms)] != -1) {
 			release_item_handler(client_h, m_game->m_client_list[client_h]->m_item_equipment_status[to_int(EquipPos::Arms)], false);
 		}
+		if (m_game->m_client_list[client_h]->m_item_equipment_status[to_int(EquipPos::Boots)] != -1) {
+			release_item_handler(client_h, m_game->m_client_list[client_h]->m_item_equipment_status[to_int(EquipPos::Boots)], false);
+		}
 		if (m_game->m_client_list[client_h]->m_item_equipment_status[to_int(EquipPos::Leggings)] != -1) {
 			release_item_handler(client_h, m_game->m_client_list[client_h]->m_item_equipment_status[to_int(EquipPos::Leggings)], false);
-		}
-		if (m_game->m_client_list[client_h]->m_item_equipment_status[to_int(EquipPos::Pants)] != -1) {
-			release_item_handler(client_h, m_game->m_client_list[client_h]->m_item_equipment_status[to_int(EquipPos::Pants)], false);
 		}
 		if (m_game->m_client_list[client_h]->m_item_equipment_status[to_int(EquipPos::Back)] != -1) {
 			release_item_handler(client_h, m_game->m_client_list[client_h]->m_item_equipment_status[to_int(EquipPos::Back)], false);
@@ -799,7 +799,7 @@ bool ItemManager::equip_item_handler(int client_h, short item_index, bool notify
 	}
 	else {
 		if (equip_pos == EquipPos::Head || equip_pos == EquipPos::Body || equip_pos == EquipPos::Arms ||
-			equip_pos == EquipPos::Leggings || equip_pos == EquipPos::Pants || equip_pos == EquipPos::Back) {
+			equip_pos == EquipPos::Boots || equip_pos == EquipPos::Leggings || equip_pos == EquipPos::Back) {
 			if (m_game->m_client_list[client_h]->m_item_equipment_status[to_int(EquipPos::FullBody)] != -1) {
 				release_item_handler(client_h, m_game->m_client_list[client_h]->m_item_equipment_status[to_int(EquipPos::FullBody)], false);
 			}
@@ -823,8 +823,8 @@ bool ItemManager::equip_item_handler(int client_h, short item_index, bool notify
 			appr.hide_armor = (item->m_hide_armor != 0);
 			break;
 		case EquipPos::Arms:      appr.arm_color = color; break;
-		case EquipPos::Pants:     appr.pants_color = color; break;
-		case EquipPos::Leggings:  appr.boots_color = color; break;
+		case EquipPos::Leggings:     appr.pants_color = color; break;
+		case EquipPos::Boots:  appr.boots_color = color; break;
 		case EquipPos::LeftHand:  appr.shield_color = color; break;
 		case EquipPos::RightHand:
 		case EquipPos::TwoHand:   appr.weapon_color = color; break;
@@ -1583,10 +1583,10 @@ void ItemManager::release_item_handler(int client_h, short item_index, bool noti
 	case EquipPos::Arms:
 		m_game->m_client_list[client_h]->m_appearance.arm_color = 0;
 		break;
-	case EquipPos::Pants:
+	case EquipPos::Leggings:
 		m_game->m_client_list[client_h]->m_appearance.pants_color = 0;
 		break;
-	case EquipPos::Leggings:
+	case EquipPos::Boots:
 		m_game->m_client_list[client_h]->m_appearance.boots_color = 0;
 		break;
 	case EquipPos::Head:
@@ -3549,7 +3549,7 @@ void ItemManager::calc_total_item_effect(int client_h, int equip_item_id, bool n
 					m_game->m_client_list[client_h]->m_damage_absorption_armor[to_int(EquipPos::Head)] += temp;
 					m_game->m_client_list[client_h]->m_damage_absorption_armor[to_int(EquipPos::Body)] += temp;
 					m_game->m_client_list[client_h]->m_damage_absorption_armor[to_int(EquipPos::Arms)] += temp;
-					m_game->m_client_list[client_h]->m_damage_absorption_armor[to_int(EquipPos::Pants)] += temp;
+					m_game->m_client_list[client_h]->m_damage_absorption_armor[to_int(EquipPos::Leggings)] += temp;
 					break;
 
 					/*Functions rates confirm.
@@ -4835,14 +4835,14 @@ bool ItemManager::generate_item_attributes(CItem* item)
 		int cumul = 0;
 
 		struct { int weight; AttributePrefixType type; int color; int minVal; } attackPrimary[] = {
-			{ 299,  AttributePrefixType::Light,      2, 4 },
-			{ 700,  AttributePrefixType::Strong,     3, 2 },
-			{ 1500, AttributePrefixType::Critical,   5, 5 },
-			{ 2000, AttributePrefixType::Agile,      1, 0 },
-			{ 2000, AttributePrefixType::Righteous,  7, 0 },
-			{ 1600, AttributePrefixType::Poisoning,  4, 4 },
-			{ 1600, AttributePrefixType::Sharp,      6, 0 },
-			{ 301,  AttributePrefixType::Ancient,    8, 0 },
+			{ 299,  AttributePrefixType::Light,      16, 4 },
+			{ 700,  AttributePrefixType::Strong,     16, 2 },
+			{ 1500, AttributePrefixType::Critical,   18, 5 },
+			{ 2000, AttributePrefixType::Agile,      16, 0 },
+			{ 2000, AttributePrefixType::Righteous,  20, 0 },
+			{ 1600, AttributePrefixType::Poisoning,  17, 4 },
+			{ 1600, AttributePrefixType::Sharp,      19, 0 },
+			{ 301,  AttributePrefixType::Ancient,    21, 0 },
 		};
 
 		for (auto& entry : attackPrimary) {
@@ -6536,7 +6536,7 @@ char ItemManager::check_hero_item_equipped(int client_h)
 	hero_helm = m_game->m_client_list[client_h]->m_item_equipment_status[to_int(EquipPos::Head)];
 	hero_armor = m_game->m_client_list[client_h]->m_item_equipment_status[to_int(EquipPos::Body)];
 	hero_hauberk = m_game->m_client_list[client_h]->m_item_equipment_status[to_int(EquipPos::Arms)];
-	hero_leggings = m_game->m_client_list[client_h]->m_item_equipment_status[to_int(EquipPos::Pants)];
+	hero_leggings = m_game->m_client_list[client_h]->m_item_equipment_status[to_int(EquipPos::Leggings)];
 
 	if ((hero_helm < 0) || (hero_leggings < 0) || (hero_armor < 0) || (hero_hauberk < 0)) return 0;
 

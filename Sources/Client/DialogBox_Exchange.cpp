@@ -119,8 +119,7 @@ void DialogBox_Exchange::draw_items(short sX, short sY, short mouse_x, short mou
 				ex_draw.sprite->draw(sX + xadd, sY + 130, ex_draw.frame);
 			}
 			else {
-				bool ex_is_weapon = ex_cfg && ex_cfg->is_weapon();
-				const auto& ex_tint = ex_is_weapon ? GameColors::Weapons[item_color] : GameColors::Items[item_color];
+				const auto& ex_tint = m_game->m_color_palette[item_color];
 				ex_draw.sprite->draw(sX + xadd, sY + 130, ex_draw.frame, hb::shared::sprite::DrawParams::tint(ex_tint.r, ex_tint.g, ex_tint.b));
 			}
 

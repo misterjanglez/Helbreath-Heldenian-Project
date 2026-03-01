@@ -279,8 +279,9 @@ public:
 
 	void reload_npc_configs();
 	void reload_shop_configs();
-	void send_config_reload_notification(bool items, bool magic, bool skills, bool npcs, bool balance = false);
-	void push_config_reload_to_clients(bool items, bool magic, bool skills, bool npcs, bool balance = false);
+	void send_config_reload_notification(bool items, bool magic, bool skills, bool npcs, bool balance = false, bool colors = false);
+	void push_config_reload_to_clients(bool items, bool magic, bool skills, bool npcs, bool balance = false, bool colors = false);
+	void reload_color_palette();
 	void apply_server_config(const server_config& cfg);
 	bool reload_server_config();
 	void send_server_config_update();
@@ -537,10 +538,14 @@ public:
 	void build_magic_manual_index();
 	//class CTeleport * m_pTeleportConfigList[DEF_MAXTELEPORTTYPE];
 
-	std::string m_config_hash[6];
+	std::string m_config_hash[7];
 	void compute_config_hashes();
 	void compute_balance_hash();
+	void compute_color_palette_hash();
 	bool send_client_balance_config(int client_h);
+	bool send_client_color_palette(int client_h);
+
+	std::vector<color_palette_entry> m_color_palette;
 
 	class hb::shared::net::ASIOSocket* _lsock;
 

@@ -42,6 +42,7 @@ namespace MsgId
 		NpcConfigContents                       = 0x0FA314E4,
 		MapConfigContents                       = 0x0FA314E6,
 		BalanceConfigContents                   = 0x0FA314E7,
+		ColorPaletteConfigContents              = 0x0FA314E9,
 		RequestConfigData                       = 0x0FA314E3,
 		NotifyConfigReload                      = 0x0FA314E5,
 		ServerConfigUpdate                      = 0x0FA314E8,

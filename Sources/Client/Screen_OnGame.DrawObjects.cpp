@@ -256,8 +256,7 @@ void Screen_OnGame::draw_objects(short pivot_x, short pivot_y, short div_x, shor
 					}
 					else
 					{
-						bool is_weapon = m_game->m_item_config_list[item_id]->is_weapon();
-						const auto& tint = is_weapon ? GameColors::Weapons[item_color] : GameColors::Items[item_color];
+						const auto& tint = m_game->m_color_palette[item_color];
 						auto params = hb::shared::sprite::DrawParams::tint(tint.r, tint.g, tint.b);
 						params.m_ignore_pivot = true;
 						ground_draw.sprite->draw(cx, cy, ground_draw.frame, params);
@@ -885,7 +884,7 @@ void Screen_OnGame::draw_character_body(CGame& game, short sX, short sY, short t
 	if (type <= 3)
 	{
 		game.m_sprite[ItemEquipPivotPoint + 0]->draw(sX, sY, type - 1);
-		const auto& hcM = GameColors::Hair[game.m_entity_state.m_appearance.hair_color];
+		const auto& hcM = game.m_color_palette[game.m_entity_state.m_appearance.hair_color];
 		game.m_sprite[ItemEquipPivotPoint + 18]->draw(sX, sY, game.m_entity_state.m_appearance.hair_style, hb::shared::sprite::DrawParams::tint(hcM.r, hcM.g, hcM.b));
 
 		game.m_sprite[ItemEquipPivotPoint + 19]->draw(sX, sY, game.m_entity_state.m_appearance.underwear_type);
@@ -893,7 +892,7 @@ void Screen_OnGame::draw_character_body(CGame& game, short sX, short sY, short t
 	else
 	{
 		game.m_sprite[ItemEquipPivotPoint + 40]->draw(sX, sY, type - 4);
-		const auto& hcF = GameColors::Hair[game.m_entity_state.m_appearance.hair_color];
+		const auto& hcF = game.m_color_palette[game.m_entity_state.m_appearance.hair_color];
 		game.m_sprite[ItemEquipPivotPoint + 18 + 40]->draw(sX, sY, game.m_entity_state.m_appearance.hair_style, hb::shared::sprite::DrawParams::tint(hcF.r, hcF.g, hcF.b));
 		game.m_sprite[ItemEquipPivotPoint + 19 + 40]->draw(sX, sY, game.m_entity_state.m_appearance.underwear_type);
 	}

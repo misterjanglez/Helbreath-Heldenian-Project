@@ -48,7 +48,7 @@ void Screen_CreateNewCharacter::on_initialize()
     m_game->m_new_char.gender = rand() % 2 + 1;
     m_game->m_new_char.skin_col = rand() % 3 + 1;
     m_game->m_new_char.hair_style = rand() % 8;
-    m_game->m_new_char.hair_col = rand() % 16;
+    m_game->m_new_char.hair_col = 32 + (rand() % 16);
     m_game->m_new_char.under_col = rand() % 8;
     m_game->m_new_char.stat_str = static_cast<int8_t>(m_game->m_base_stat_value);
     m_game->m_new_char.stat_vit = static_cast<int8_t>(m_game->m_base_stat_value);
@@ -117,14 +117,14 @@ void Screen_CreateNewCharacter::on_initialize()
         if (m_game->m_new_char.hair_style > 7) m_game->m_new_char.hair_style = 0;
     });
 
-    // Hair color: 0-15 wrap
+    // Hair color: 32-47 wrap (unified palette hair range)
     auto* tog_hair_color = m_controls.add<cc::toggle_button>(TOG_HAIR_COLOR,
         cc::rect{ 316, 217 + (16 * 3), 43, 15 }, cc::rect{ 0, 0, 21, 15 }, cc::rect{ 22, 0, 21, 15 });
     tog_hair_color->set_click_sound([this] { audio_manager::get().play_game_sound(sound_type::effect, 14, 5); });
     tog_hair_color->set_on_change([this](int, int delta) {
         m_game->m_new_char.hair_col += delta;
-        if (m_game->m_new_char.hair_col < 0) m_game->m_new_char.hair_col = 15;
-        if (m_game->m_new_char.hair_col > 15) m_game->m_new_char.hair_col = 0;
+        if (m_game->m_new_char.hair_col < 32) m_game->m_new_char.hair_col = 47;
+        if (m_game->m_new_char.hair_col > 47) m_game->m_new_char.hair_col = 32;
     });
 
     // Underwear color: 0-7 wrap

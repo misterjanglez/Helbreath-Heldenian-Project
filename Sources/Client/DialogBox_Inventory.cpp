@@ -62,7 +62,6 @@ void DialogBox_Inventory::draw_inventory_item(CItem* item, int itemIdx, int base
 
 	char item_color = item->m_item_color;
 	bool disabled = inventory_manager::get().is_locked(itemIdx);
-	bool is_weapon = cfg->is_weapon();
 
 	int drawX = baseX + ITEM_OFFSET_X + item->m_x;
 	int drawY = baseY + ITEM_OFFSET_Y + item->m_y;
@@ -71,8 +70,8 @@ void DialogBox_Inventory::draw_inventory_item(CItem* item, int itemIdx, int base
 	int16_t frame = inv_draw.frame;
 	uint32_t time = m_game->m_cur_time;
 
-	// Select color arrays (weapons use different color set)
-	const hb::shared::render::Color* colors = is_weapon ? GameColors::Weapons : GameColors::Items;
+	// Unified color palette — index already encodes correct color for weapons and armor
+	const auto* colors = m_game->m_color_palette.data();
 
 	if (item_color == 0)
 	{
@@ -584,25 +583,11 @@ bool DialogBox_Inventory::on_item_drop()
 			}
 	}
 
-	// If item was equipped, unequip it
+	// If item was equipped, unequip it — server will send Notify::ItemReleased with message + sound
 	if (m_game->m_is_item_equipped[selected_id])
 	{
 		CItem* cfg = m_game->get_item_config(player().m_item_list[selected_id]->m_id_num);
 		if (cfg == nullptr) return false;
-
-		std::string txt;
-		auto itemInfo2 = item_name_formatter::get().format(player().m_item_list[selected_id].get());
-		txt = std::format(ITEM_EQUIPMENT_RELEASED, itemInfo2.name.c_str());
-		add_event_list(txt.c_str(), 10);
-
-		{
-			short id = player().m_item_list[selected_id]->m_id_num;
-			if (id == hb::shared::item::ItemId::AngelicPendantSTR || id == hb::shared::item::ItemId::AngelicPendantDEX ||
-				id == hb::shared::item::ItemId::AngelicPendantINT || id == hb::shared::item::ItemId::AngelicPendantMAG)
-				audio_manager::get().play_game_sound(sound_type::effect, 53, 0);
-			else
-				audio_manager::get().play_game_sound(sound_type::effect, 29, 0);
-		}
 
 		// Remove Angelic Stats
 		if (cfg->get_equip_pos() >= EquipPos::LeftFinger &&

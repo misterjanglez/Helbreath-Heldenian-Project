@@ -1994,7 +1994,7 @@ void CombatManager::armor_life_decrement(int attacker_h, int target_h, char owne
 		}
 	}
 
-	temp = m_game->m_client_list[target_h]->m_item_equipment_status[to_int(EquipPos::Pants)];
+	temp = m_game->m_client_list[target_h]->m_item_equipment_status[to_int(EquipPos::Leggings)];
 	if ((temp != -1) && (m_game->m_client_list[target_h]->m_item_list[temp] != 0)) {
 		if (m_game->m_client_list[target_h]->m_item_list[temp]->m_cur_durability > 0) {
 			if (m_game->m_client_list[target_h]->m_item_list[temp]->m_cur_durability < static_cast<uint16_t>(value))
@@ -2009,7 +2009,7 @@ void CombatManager::armor_life_decrement(int attacker_h, int target_h, char owne
 		}
 	}
 
-	temp = m_game->m_client_list[target_h]->m_item_equipment_status[to_int(EquipPos::Leggings)];
+	temp = m_game->m_client_list[target_h]->m_item_equipment_status[to_int(EquipPos::Boots)];
 	if ((temp != -1) && (m_game->m_client_list[target_h]->m_item_list[temp] != 0)) {
 		if (m_game->m_client_list[target_h]->m_item_list[temp]->m_cur_durability > 0) {
 			if (m_game->m_client_list[target_h]->m_item_list[temp]->m_cur_durability < static_cast<uint16_t>(value))
@@ -2960,12 +2960,12 @@ uint32_t CombatManager::calculate_attack_effect(short target_h, char target_type
 					}
 					break;
 				case 2:
-					if ((m_game->m_client_list[target_h]->m_damage_absorption_armor[to_int(EquipPos::Pants)] +
-						m_game->m_client_list[target_h]->m_damage_absorption_armor[to_int(EquipPos::Leggings)]) > 0) {
-						if ((m_game->m_client_list[target_h]->m_damage_absorption_armor[to_int(EquipPos::Pants)] +
-							m_game->m_client_list[target_h]->m_damage_absorption_armor[to_int(EquipPos::Leggings)]) >= 80)
+					if ((m_game->m_client_list[target_h]->m_damage_absorption_armor[to_int(EquipPos::Leggings)] +
+						m_game->m_client_list[target_h]->m_damage_absorption_armor[to_int(EquipPos::Boots)]) > 0) {
+						if ((m_game->m_client_list[target_h]->m_damage_absorption_armor[to_int(EquipPos::Leggings)] +
+							m_game->m_client_list[target_h]->m_damage_absorption_armor[to_int(EquipPos::Boots)]) >= 80)
 							tmp1 = 80.0f;
-						else tmp1 = (double)(m_game->m_client_list[target_h]->m_damage_absorption_armor[to_int(EquipPos::Pants)] + m_game->m_client_list[target_h]->m_damage_absorption_armor[to_int(EquipPos::Leggings)]);
+						else tmp1 = (double)(m_game->m_client_list[target_h]->m_damage_absorption_armor[to_int(EquipPos::Leggings)] + m_game->m_client_list[target_h]->m_damage_absorption_armor[to_int(EquipPos::Boots)]);
 						tmp2 = (double)iAP_SM;
 						tmp3 = (tmp1 / 100.0f) * tmp2;
 
@@ -3094,12 +3094,12 @@ uint32_t CombatManager::calculate_attack_effect(short target_h, char target_type
 					break;
 
 				case 2:
-					temp = m_game->m_client_list[target_h]->m_item_equipment_status[to_int(EquipPos::Pants)];
+					temp = m_game->m_client_list[target_h]->m_item_equipment_status[to_int(EquipPos::Leggings)];
 					if ((temp != -1) && (m_game->m_client_list[target_h]->m_item_list[temp] != 0)) {
 						calculate_endurance_decrement(target_h, attacker_h, attacker_type, target_type, temp);
 					}
 					else {
-						temp = m_game->m_client_list[target_h]->m_item_equipment_status[to_int(EquipPos::Leggings)];
+						temp = m_game->m_client_list[target_h]->m_item_equipment_status[to_int(EquipPos::Boots)];
 						if ((temp != -1) && (m_game->m_client_list[target_h]->m_item_list[temp] != 0)) {
 							calculate_endurance_decrement(target_h, attacker_h, attacker_type, target_type, temp);
 						}

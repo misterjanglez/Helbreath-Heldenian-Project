@@ -92,13 +92,10 @@ void DialogBox_ItemUpgrade::draw_item_preview(int sX, int sY, int item_index)
     {
         upg_draw.sprite->draw(sX + 134, sY + 182, upg_draw.frame);
     }
-    else if (cfg->is_weapon())
-    {
-        upg_draw.sprite->draw(sX + 134, sY + 182, upg_draw.frame, hb::shared::sprite::DrawParams::tint(GameColors::Weapons[item_color].r, GameColors::Weapons[item_color].g, GameColors::Weapons[item_color].b));
-    }
     else
     {
-        upg_draw.sprite->draw(sX + 134, sY + 182, upg_draw.frame, hb::shared::sprite::DrawParams::tint(GameColors::Items[item_color].r, GameColors::Items[item_color].g, GameColors::Items[item_color].b));
+        const auto& upg_tint = m_game->m_color_palette[item_color];
+        upg_draw.sprite->draw(sX + 134, sY + 182, upg_draw.frame, hb::shared::sprite::DrawParams::tint(upg_tint.r, upg_tint.g, upg_tint.b));
     }
 
     auto itemInfo = item_name_formatter::get().format(player().m_item_list[item_index].get());
@@ -182,13 +179,10 @@ void DialogBox_ItemUpgrade::DrawMode2_InProgress(int sX, int sY)
             {
                 upg2_draw.sprite->draw(sX + 134, sY + 182, upg2_draw.frame);
             }
-            else if (cfg->is_weapon())
-            {
-                upg2_draw.sprite->draw(sX + 134, sY + 182, upg2_draw.frame, hb::shared::sprite::DrawParams::tint(GameColors::Weapons[item_color].r, GameColors::Weapons[item_color].g, GameColors::Weapons[item_color].b));
-            }
             else
             {
-                upg2_draw.sprite->draw(sX + 134, sY + 182, upg2_draw.frame, hb::shared::sprite::DrawParams::tint(GameColors::Items[item_color].r, GameColors::Items[item_color].g, GameColors::Items[item_color].b));
+                const auto& upg2_tint = m_game->m_color_palette[item_color];
+                upg2_draw.sprite->draw(sX + 134, sY + 182, upg2_draw.frame, hb::shared::sprite::DrawParams::tint(upg2_tint.r, upg2_tint.g, upg2_tint.b));
             }
 
             // Flickering effect

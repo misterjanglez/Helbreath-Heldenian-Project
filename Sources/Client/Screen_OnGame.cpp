@@ -861,19 +861,14 @@ void Screen_OnGame::render_item_tooltip()
     if (!cfg) return;
 
     char item_color = item->m_item_color;
-    bool is_hand_item = cfg->is_weapon();
     auto tooltip_draw = m_game->get_item_draw(cfg->m_display_id, item_atlas::pack, cfg->sprite_is_female());
     hb::shared::sprite::ISprite* sprite = tooltip_draw.sprite;
     int16_t frame = tooltip_draw.frame;
     bool is_equippable = cfg->is_armor() || cfg->is_weapon() || cfg->is_accessory();
 
     if (item_color != 0) {
-        if (is_hand_item) {
-            sprite->draw(m_sMsX - CursorTarget::get_drag_dist_x(), m_sMsY - CursorTarget::get_drag_dist_y(), frame, hb::shared::sprite::DrawParams::tint(GameColors::Weapons[item_color].r, GameColors::Weapons[item_color].g, GameColors::Weapons[item_color].b));
-        }
-        else {
-            sprite->draw(m_sMsX - CursorTarget::get_drag_dist_x(), m_sMsY - CursorTarget::get_drag_dist_y(), frame, hb::shared::sprite::DrawParams::tint(GameColors::Items[item_color].r, GameColors::Items[item_color].g, GameColors::Items[item_color].b));
-        }
+        const auto& drag_tint = m_game->m_color_palette[item_color];
+        sprite->draw(m_sMsX - CursorTarget::get_drag_dist_x(), m_sMsY - CursorTarget::get_drag_dist_y(), frame, hb::shared::sprite::DrawParams::tint(drag_tint.r, drag_tint.g, drag_tint.b));
     }
     else sprite->draw(m_sMsX - CursorTarget::get_drag_dist_x(), m_sMsY - CursorTarget::get_drag_dist_y(), frame);
 
@@ -889,12 +884,18 @@ void Screen_OnGame::render_item_tooltip()
     if (cfg->m_armor_class == armor_class::clothing)
     {
         const char* slot = equip_pos_name(cfg->get_equip_pos());
+        if (cfg->get_equip_pos() == EquipPos::Leggings)
+            slot = cfg->m_is_skirt ? "Skirt" : "Pants";
+        else if (cfg->get_equip_pos() == EquipPos::Body)
+            slot = (cfg->m_gender_requirement == 2) ? "Bodice" : "Shirt";
         G_cTxt = std::format("Clothing - {}", slot);
         tooltip.add_line(G_cTxt, GameColors::InfoGrayLight);
     }
     else if (cfg->m_armor_class == armor_class::armor)
     {
         const char* slot = equip_pos_name(cfg->get_equip_pos());
+        if (cfg->get_equip_pos() == EquipPos::Body)
+            slot = "Chest";
         G_cTxt = std::format("Armor - {}", slot);
         tooltip.add_line(G_cTxt, GameColors::InfoGrayLight);
     }

@@ -105,8 +105,8 @@ hb::shared::entity::PlayerAppearance CGame::build_broadcast_appearance(int clien
 	fill_slot(EquipPos::Body,      armor_id,  armor_disp);
 	fill_slot(EquipPos::FullBody,  armor_id,  armor_disp);
 	fill_slot(EquipPos::Arms,      arm_id,    arm_disp);
-	fill_slot(EquipPos::Pants,     pants_id,  pants_disp);
-	fill_slot(EquipPos::Leggings,  boots_id,  boots_disp);
+	fill_slot(EquipPos::Leggings,     pants_id,  pants_disp);
+	fill_slot(EquipPos::Boots,  boots_id,  boots_disp);
 	fill_slot(EquipPos::RightHand, weapon_id, weapon_disp);
 	fill_slot(EquipPos::TwoHand,   weapon_id, weapon_disp);
 	fill_slot(EquipPos::LeftHand,  shield_id, shield_disp);
@@ -122,7 +122,7 @@ hb::shared::entity::PlayerAppearance CGame::build_broadcast_appearance(int clien
 	appr.mantle_item_id = mantle_id;   appr.mantle_display_id = mantle_disp;
 
 	// Compute is_skirt from equipped pants
-	short pants_slot = client->m_item_equipment_status[to_int(EquipPos::Pants)];
+	short pants_slot = client->m_item_equipment_status[to_int(EquipPos::Leggings)];
 	if (pants_slot >= 0 && client->m_item_list[pants_slot] != nullptr)
 		appr.is_skirt = (client->m_item_list[pants_slot]->m_is_skirt != 0);
 
@@ -1103,6 +1103,14 @@ bool CGame::init()
 		hb::logger::warn("No character creation items configured in gamedata.db");
 	}
 
+	// Load color palette (optional — migration script seeds the table)
+	if (HasGameConfigRows(configDb, "color_palette")) {
+		LoadColorPalette(configDb, m_color_palette);
+	}
+	if (m_color_palette.empty()) {
+		hb::logger::warn("No color palette entries found in gamedata.db");
+	}
+
 	m_is_build_item_available = false;
 	if (HasGameConfigRows(configDb, "builditem_configs")) {
 		m_is_build_item_available = LoadBuildItemConfigs(configDb, this);
@@ -1818,7 +1826,7 @@ void CGame::request_init_data_handler(int client_h, char* data, char key, size_t
 
 	// Send configs FIRST so the client has item/magic/skill definitions
 	// before receiving player data that references them.
-	std::string clientItemHash, clientMagicHash, clientSkillHash, clientNpcHash, clientMapHash, clientBalanceHash;
+	std::string clientItemHash, clientMagicHash, clientSkillHash, clientNpcHash, clientMapHash, clientBalanceHash, clientColorPaletteHash;
 	if (msg_size >= sizeof(hb::net::PacketRequestInitDataEx)) {
 		const auto* exReq = reinterpret_cast<const hb::net::PacketRequestInitDataEx*>(data);
 		clientItemHash = exReq->itemConfigHash;
@@ -1827,6 +1835,7 @@ void CGame::request_init_data_handler(int client_h, char* data, char key, size_t
 		clientNpcHash = exReq->npcConfigHash;
 		clientMapHash = exReq->mapConfigHash;
 		clientBalanceHash = exReq->balanceConfigHash;
+		clientColorPaletteHash = exReq->colorPaletteConfigHash;
 	}
 
 	bool item_cache_valid    = (!clientItemHash.empty() && clientItemHash == m_config_hash[0]);
@@ -1835,6 +1844,7 @@ void CGame::request_init_data_handler(int client_h, char* data, char key, size_t
 	bool npc_cache_valid     = (!clientNpcHash.empty() && clientNpcHash == m_config_hash[3]);
 	bool map_cache_valid     = (!clientMapHash.empty() && clientMapHash == m_config_hash[4]);
 	bool balance_cache_valid = (!clientBalanceHash.empty() && clientBalanceHash == m_config_hash[5]);
+	bool color_palette_cache_valid = (!clientColorPaletteHash.empty() && clientColorPaletteHash == m_config_hash[6]);
 
 	{
 		hb::net::PacketResponseConfigCacheStatus cacheStatus{};
@@ -1846,6 +1856,7 @@ void CGame::request_init_data_handler(int client_h, char* data, char key, size_t
 		cacheStatus.npcCacheValid = npc_cache_valid ? 1 : 0;
 		cacheStatus.mapCacheValid = map_cache_valid ? 1 : 0;
 		cacheStatus.balanceCacheValid = balance_cache_valid ? 1 : 0;
+		cacheStatus.colorPaletteCacheValid = color_palette_cache_valid ? 1 : 0;
 		m_client_list[client_h]->m_socket->send_msg(
 			reinterpret_cast<char*>(&cacheStatus), sizeof(cacheStatus));
 	}
@@ -1856,6 +1867,7 @@ void CGame::request_init_data_handler(int client_h, char* data, char key, size_t
 	if (!npc_cache_valid)     send_client_npc_configs(client_h);
 	if (!map_cache_valid)     send_client_map_configs(client_h);
 	if (!balance_cache_valid) send_client_balance_config(client_h);
+	if (!color_palette_cache_valid) send_client_color_palette(client_h);
 
 	// Now send player data (configs are guaranteed loaded on client)
 	writer.Reset();
@@ -2745,6 +2757,7 @@ void CGame::compute_config_hashes()
 	}
 
 	compute_balance_hash();
+	compute_color_palette_hash();
 
 	hb::logger::log("Config hashes computed:");
 	hb::logger::log("- Items: {}", m_config_hash[0]);
@@ -2753,6 +2766,7 @@ void CGame::compute_config_hashes()
 	hb::logger::log("- Npcs: {}", m_config_hash[3]);
 	hb::logger::log("- Maps: {}", m_config_hash[4]);
 	hb::logger::log("- Balance: {}", m_config_hash[5]);
+	hb::logger::log("- ColorPalette: {}", m_config_hash[6]);
 }
 
 void CGame::compute_balance_hash()
@@ -2783,6 +2797,115 @@ bool CGame::send_client_balance_config(int client_h)
 	std::memcpy(buf.data() + sizeof(hb::net::PacketHeader), serialized.data(), serialized.size());
 
 	m_client_list[client_h]->m_socket->send_msg(buf.data(), static_cast<int>(buf.size()));
+	return true;
+}
+
+void CGame::compute_color_palette_hash()
+{
+	if (m_color_palette.empty())
+	{
+		m_config_hash[6].clear();
+		return;
+	}
+
+	// Build the same packet data the client would receive, then hash it
+	constexpr size_t headerSize = sizeof(hb::net::PacketColorPaletteConfigHeader);
+	constexpr size_t entrySize = sizeof(hb::net::PacketColorPaletteConfigEntry);
+	size_t totalColors = m_color_palette.size();
+
+	std::vector<uint8_t> allData;
+	size_t colorsSent = 0;
+	uint16_t packetIndex = 0;
+	constexpr size_t maxEntriesPerPacket = (7000 - headerSize) / entrySize;
+
+	while (colorsSent < totalColors)
+	{
+		char buf[7000]{};
+		auto* pktHeader = reinterpret_cast<hb::net::PacketColorPaletteConfigHeader*>(buf);
+		pktHeader->header.msg_id = MsgId::ColorPaletteConfigContents;
+		pktHeader->header.msg_type = MsgType::Confirm;
+		pktHeader->totalColors = static_cast<uint16_t>(totalColors);
+		pktHeader->packetIndex = packetIndex;
+
+		auto* entries = reinterpret_cast<hb::net::PacketColorPaletteConfigEntry*>(buf + headerSize);
+		uint16_t entriesInPacket = 0;
+
+		for (size_t i = colorsSent; i < totalColors && entriesInPacket < maxEntriesPerPacket; i++)
+		{
+			entries[entriesInPacket].colorId = m_color_palette[i].color_id;
+			entries[entriesInPacket].r = m_color_palette[i].r;
+			entries[entriesInPacket].g = m_color_palette[i].g;
+			entries[entriesInPacket].b = m_color_palette[i].b;
+			entriesInPacket++;
+		}
+
+		pktHeader->colorCount = entriesInPacket;
+		size_t packetSize = headerSize + (entriesInPacket * entrySize);
+		allData.insert(allData.end(), buf, buf + packetSize);
+
+		colorsSent += entriesInPacket;
+		packetIndex++;
+	}
+
+	m_config_hash[6] = allData.empty() ? std::string{} : hb::shared::util::sha256(allData.data(), allData.size());
+}
+
+bool CGame::send_client_color_palette(int client_h)
+{
+	if (m_client_list[client_h] == nullptr) return false;
+	if (m_color_palette.empty()) return false;
+
+	constexpr size_t maxPacketSize = 7000;
+	constexpr size_t headerSize = sizeof(hb::net::PacketColorPaletteConfigHeader);
+	constexpr size_t entrySize = sizeof(hb::net::PacketColorPaletteConfigEntry);
+	constexpr size_t maxEntriesPerPacket = (maxPacketSize - headerSize) / entrySize;
+
+	size_t totalColors = m_color_palette.size();
+	size_t colorsSent = 0;
+	uint16_t packetIndex = 0;
+
+	while (colorsSent < totalColors)
+	{
+		std::memset(G_cData50000, 0, sizeof(G_cData50000));
+
+		auto* pktHeader = reinterpret_cast<hb::net::PacketColorPaletteConfigHeader*>(G_cData50000);
+		pktHeader->header.msg_id = MsgId::ColorPaletteConfigContents;
+		pktHeader->header.msg_type = MsgType::Confirm;
+		pktHeader->totalColors = static_cast<uint16_t>(totalColors);
+		pktHeader->packetIndex = packetIndex;
+
+		auto* entries = reinterpret_cast<hb::net::PacketColorPaletteConfigEntry*>(G_cData50000 + headerSize);
+		uint16_t entriesInPacket = 0;
+
+		for (size_t i = colorsSent; i < totalColors && entriesInPacket < maxEntriesPerPacket; i++)
+		{
+			entries[entriesInPacket].colorId = m_color_palette[i].color_id;
+			entries[entriesInPacket].r = m_color_palette[i].r;
+			entries[entriesInPacket].g = m_color_palette[i].g;
+			entries[entriesInPacket].b = m_color_palette[i].b;
+			entriesInPacket++;
+		}
+
+		pktHeader->colorCount = entriesInPacket;
+		size_t packetSize = headerSize + (entriesInPacket * entrySize);
+
+		int ret = m_client_list[client_h]->m_socket->send_msg(G_cData50000, static_cast<int>(packetSize));
+		switch (ret) {
+		case sock::Event::QueueFull:
+		case sock::Event::SocketError:
+		case sock::Event::CriticalError:
+		case sock::Event::SocketClosed:
+			hb::logger::log("Failed to send color palette: Client({})", client_h);
+			delete_client(client_h, true, true);
+			delete m_client_list[client_h];
+			m_client_list[client_h] = 0;
+			return false;
+		}
+
+		colorsSent += entriesInPacket;
+		packetIndex++;
+	}
+
 	return true;
 }
 
@@ -5651,6 +5774,7 @@ void CGame::msg_process()
 				if (reqPkt->requestNpcs)    send_client_npc_configs(client_h);
 				if (reqPkt->requestMaps)    send_client_map_configs(client_h);
 				if (reqPkt->requestBalance) send_client_balance_config(client_h);
+				if (reqPkt->requestColorPalette) send_client_color_palette(client_h);
 			}
 			break;
 
@@ -6316,18 +6440,18 @@ void CGame::client_common_handler(int client_h, char* data)
 			item->m_attribute = attribute;
 			m_item_manager->adjust_rare_item_value(item);
 
-			// Set item color based on prefix type — matches generate_item_attributes() color table
+			// Set item color based on prefix type — unified palette weapon indices (16-21)
 			switch (parsed.prefixType)
 			{
-			case hb::shared::item::AttributePrefixType::Agile:      item->m_item_color = 1; break;
-			case hb::shared::item::AttributePrefixType::Light:       item->m_item_color = 2; break;
-			case hb::shared::item::AttributePrefixType::Strong:      item->m_item_color = 3; break;
-			case hb::shared::item::AttributePrefixType::Poisoning:   item->m_item_color = 4; break;
-			case hb::shared::item::AttributePrefixType::Critical:    item->m_item_color = 5; break;
-			case hb::shared::item::AttributePrefixType::Special:     item->m_item_color = 5; break;
-			case hb::shared::item::AttributePrefixType::Sharp:       item->m_item_color = 6; break;
-			case hb::shared::item::AttributePrefixType::Righteous:   item->m_item_color = 7; break;
-			case hb::shared::item::AttributePrefixType::Ancient:     item->m_item_color = 8; break;
+			case hb::shared::item::AttributePrefixType::Agile:      item->m_item_color = 16; break;
+			case hb::shared::item::AttributePrefixType::Light:       item->m_item_color = 16; break;
+			case hb::shared::item::AttributePrefixType::Strong:      item->m_item_color = 16; break;
+			case hb::shared::item::AttributePrefixType::Poisoning:   item->m_item_color = 17; break;
+			case hb::shared::item::AttributePrefixType::Critical:    item->m_item_color = 18; break;
+			case hb::shared::item::AttributePrefixType::Special:     item->m_item_color = 18; break;
+			case hb::shared::item::AttributePrefixType::Sharp:       item->m_item_color = 19; break;
+			case hb::shared::item::AttributePrefixType::Righteous:   item->m_item_color = 20; break;
+			case hb::shared::item::AttributePrefixType::Ancient:     item->m_item_color = 21; break;
 			default: break;
 			}
 
@@ -10788,7 +10912,7 @@ void CGame::check_special_event(int client_h)
 				item->m_touch_effect_value1 = m_client_list[client_h]->m_char_id_num1;
 				item->m_touch_effect_value2 = m_client_list[client_h]->m_char_id_num2;
 				item->m_touch_effect_value3 = m_client_list[client_h]->m_char_id_num3;
-				item->m_item_color = 9;
+				item->m_item_color = 14;
 
 				m_client_list[client_h]->m_special_event_id = 0;
 			}
@@ -12787,7 +12911,7 @@ void CGame::reload_shop_configs()
 		hb::logger::log("Shop configs reloaded (no shop data found)");
 }
 
-void CGame::send_config_reload_notification(bool items, bool magic, bool skills, bool npcs, bool balance)
+void CGame::send_config_reload_notification(bool items, bool magic, bool skills, bool npcs, bool balance, bool colors)
 {
 	hb::net::PacketNotifyConfigReload pkt{};
 	pkt.header.msg_id = MsgId::NotifyConfigReload;
@@ -12797,6 +12921,7 @@ void CGame::send_config_reload_notification(bool items, bool magic, bool skills,
 	pkt.reloadSkills = skills ? 1 : 0;
 	pkt.reloadNpcs = npcs ? 1 : 0;
 	pkt.reloadBalance = balance ? 1 : 0;
+	pkt.reloadColorPalette = colors ? 1 : 0;
 
 	for(int i = 1; i < MaxClients; i++)
 	{
@@ -12805,7 +12930,7 @@ void CGame::send_config_reload_notification(bool items, bool magic, bool skills,
 	}
 }
 
-void CGame::push_config_reload_to_clients(bool items, bool magic, bool skills, bool npcs, bool balance)
+void CGame::push_config_reload_to_clients(bool items, bool magic, bool skills, bool npcs, bool balance, bool colors)
 {
 	int count = 0;
 	for(int i = 1; i < MaxClients; i++)
@@ -12817,11 +12942,25 @@ void CGame::push_config_reload_to_clients(bool items, bool magic, bool skills, b
 			if (skills)  m_skill_manager->send_client_skill_configs(i);
 			if (npcs)    send_client_npc_configs(i);
 			if (balance) send_client_balance_config(i);
+			if (colors)  send_client_color_palette(i);
 			count++;
 		}
 	}
 
 	hb::logger::log("Config reload pushed to {} client(s)", count);
+}
+
+void CGame::reload_color_palette()
+{
+	sqlite3* configDb = nullptr;
+	std::string dbPath;
+	bool created = false;
+	if (!EnsureGameConfigDatabase(&configDb, dbPath, &created)) return;
+
+	m_color_palette.clear();
+	LoadColorPalette(configDb, m_color_palette);
+	compute_color_palette_hash();
+	CloseGameConfigDatabase(configDb);
 }
 
 /*void CGame::ApocalypseStarter()
