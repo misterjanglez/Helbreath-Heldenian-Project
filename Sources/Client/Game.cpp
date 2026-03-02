@@ -198,6 +198,16 @@ CGame::CGame(hb::shared::types::NativeInstance native_instance, int icon_resourc
 	std::fill(std::begin(m_item_drop_id), std::end(m_item_drop_id), short{ 0 });
 	m_item_drop = false;
 
+	// Initialize attribute multiplier fallbacks (hardcoded defaults matching original values)
+	std::memset(m_prefix_multiplier, 0, sizeof(m_prefix_multiplier));
+	std::memset(m_secondary_multiplier, 0, sizeof(m_secondary_multiplier));
+	m_prefix_multiplier[1] = 1; m_prefix_multiplier[2] = 5; m_prefix_multiplier[6] = 4;
+	m_prefix_multiplier[7] = 1; m_prefix_multiplier[8] = 7; m_prefix_multiplier[9] = 1;
+	m_prefix_multiplier[10] = 3; m_prefix_multiplier[11] = 1; m_prefix_multiplier[12] = 1;
+	for (int i = 1; i <= 7; i++) m_secondary_multiplier[i] = 7;
+	m_secondary_multiplier[8] = 3; m_secondary_multiplier[9] = 3; m_secondary_multiplier[10] = 1;
+	m_secondary_multiplier[11] = 10; m_secondary_multiplier[12] = 10;
+
 	combat_system::get().set_game(*this);
 	inventory_manager::get().set_game(this);
 	magic_casting_system::get().set_game(this);
@@ -289,6 +299,7 @@ bool CGame::on_initialize()
 	weather_manager::get().initialize();
 	ChatManager::get().initialize();
 	item_name_formatter::get().set_item_configs(m_item_config_list);
+	item_name_formatter::get().set_multipliers(m_prefix_multiplier, m_secondary_multiplier);
 	LocalCacheManager::get().initialize();
 
 	return true;
@@ -1218,6 +1229,60 @@ bool CGame::cache_process_color_palette(char* data, uint32_t msg_size)
 	return true;
 }
 
+bool CGame::cache_process_attribute_types(char* data, uint32_t msg_size)
+{
+	LocalCacheManager::get().accumulate_packet(ConfigCacheType::AttributeTypes, data, msg_size);
+
+	constexpr size_t headerSize = sizeof(hb::net::PacketAttributeTypeConfigHeader);
+
+	if (msg_size < headerSize) return false;
+
+	const auto* pktHeader = reinterpret_cast<const hb::net::PacketAttributeTypeConfigHeader*>(data);
+	uint16_t entryCount = pktHeader->entryCount;
+	uint8_t entryType = pktHeader->entryType;
+
+	if (entryType == 0)
+	{
+		// Prefix entries
+		constexpr size_t entrySize = sizeof(hb::net::PacketAttributePrefixTypeEntry);
+		if (msg_size < headerSize + entryCount * entrySize) return false;
+
+		const auto* entries = reinterpret_cast<const hb::net::PacketAttributePrefixTypeEntry*>(data + headerSize);
+		for (uint16_t i = 0; i < entryCount; i++)
+		{
+			if (entries[i].prefix_id < 16)
+				m_prefix_multiplier[entries[i].prefix_id] = entries[i].multiplier;
+		}
+	}
+	else if (entryType == 1)
+	{
+		// Secondary entries
+		constexpr size_t entrySize = sizeof(hb::net::PacketAttributeSecondaryTypeEntry);
+		if (msg_size < headerSize + entryCount * entrySize) return false;
+
+		const auto* entries = reinterpret_cast<const hb::net::PacketAttributeSecondaryTypeEntry*>(data + headerSize);
+		for (uint16_t i = 0; i < entryCount; i++)
+		{
+			if (entries[i].secondary_id < 16)
+				m_secondary_multiplier[entries[i].secondary_id] = entries[i].multiplier;
+		}
+	}
+
+	// Finalize cache after receiving data (both prefix and secondary come as separate packets)
+	if (!LocalCacheManager::get().is_replaying())
+	{
+		// For attribute types we get at most 2 packets (prefix + secondary).
+		// Finalize after the secondary packet (entryType==1) or if only one type was sent.
+		if (entryType == 1)
+			LocalCacheManager::get().finalize_and_save(ConfigCacheType::AttributeTypes);
+	}
+
+	m_attribute_types_loaded = true;
+	hb::logger::log<hb::log_channel::network>("Attribute types loaded (type={}, {} entries)", entryType, entryCount);
+
+	return true;
+}
+
 void CGame::game_recv_msg_handler(uint32_t msg_size, char* data)
 {
 	const auto* header = hb::net::PacketCast<hb::net::PacketHeader>(data, sizeof(hb::net::PacketHeader));
@@ -1398,8 +1463,24 @@ void CGame::game_recv_msg_handler(uint32_t msg_size, char* data)
 			need_color_palette = true;
 		}
 
-		if (need_items || need_magic || need_skills || need_npcs || need_maps || need_balance || need_color_palette) {
-			request_configs_from_server(need_items, need_magic, need_skills, need_npcs, need_maps, need_balance, need_color_palette);
+		bool need_attribute_types = false;
+		if (cachePkt->attributeTypeCacheValid) {
+			bool replay_ok = LocalCacheManager::get().replay_from_cache(ConfigCacheType::AttributeTypes,
+				[](char* p, uint32_t s, void* c) -> bool {
+					return static_cast<ReplayCtx*>(c)->game->cache_process_attribute_types(p, s);
+				}, &ctx);
+			if (!replay_ok || !m_attribute_types_loaded) {
+				LocalCacheManager::get().reset_accumulator(ConfigCacheType::AttributeTypes);
+				need_attribute_types = true;
+			}
+		}
+		else {
+			LocalCacheManager::get().reset_accumulator(ConfigCacheType::AttributeTypes);
+			need_attribute_types = true;
+		}
+
+		if (need_items || need_magic || need_skills || need_npcs || need_maps || need_balance || need_color_palette || need_attribute_types) {
+			request_configs_from_server(need_items, need_magic, need_skills, need_npcs, need_maps, need_balance, need_color_palette, need_attribute_types);
 			m_config_request_time = GameClock::get_time_ms();
 		}
 		else {
@@ -1440,6 +1521,10 @@ void CGame::game_recv_msg_handler(uint32_t msg_size, char* data)
 			LocalCacheManager::get().reset_accumulator(ConfigCacheType::ColorPalette);
 			m_color_palette_loaded = false;
 		}
+		if (reloadPkt->reloadAttributeTypes) {
+			LocalCacheManager::get().reset_accumulator(ConfigCacheType::AttributeTypes);
+			m_attribute_types_loaded = false;
+		}
 
 		set_top_msg((char*)"Administration kicked off a config reload, some lag may occur.", 5);
 	}
@@ -1476,6 +1561,9 @@ void CGame::game_recv_msg_handler(uint32_t msg_size, char* data)
 	case MsgId::ColorPaletteConfigContents:
 		cache_process_color_palette(data, msg_size);
 		check_configs_ready_and_enter_game();
+		break;
+	case MsgId::AttributeTypeConfigContents:
+		cache_process_attribute_types(data, msg_size);
 		break;
 	case MsgId::ResponseInitPlayer:
 		init_player_response_handler(data);
@@ -1560,6 +1648,8 @@ void CGame::init_player_response_handler(char* data)
 			LocalCacheManager::get().get_hash(ConfigCacheType::BalanceConfig).c_str());
 		std::snprintf(req.colorPaletteConfigHash, sizeof(req.colorPaletteConfigHash), "%s",
 			LocalCacheManager::get().get_hash(ConfigCacheType::ColorPalette).c_str());
+		std::snprintf(req.attributeTypeConfigHash, sizeof(req.attributeTypeConfigHash), "%s",
+			LocalCacheManager::get().get_hash(ConfigCacheType::AttributeTypes).c_str());
 		send_game_packet(req);
 		change_game_mode(GameMode::WaitingInitData);
 	}
@@ -1828,7 +1918,14 @@ void CGame::read_map_data(short pivot_x, short pivot_y, const char* packet_data)
 			if (!item) return;
 			item_id = item->item_id;
 			item_color = static_cast<char>(item->color);
-			item_attr = item->attribute;
+			// Reconstruct packed attribute for ground item display
+			item_attr = 0;
+			if (item->custom_made) item_attr |= 0x00000001;
+			item_attr |= (static_cast<uint32_t>(item->secondary_value) & 0x0F) << 8;
+			item_attr |= (static_cast<uint32_t>(item->secondary_type) & 0x0F) << 12;
+			item_attr |= (static_cast<uint32_t>(item->prefix_value) & 0x0F) << 16;
+			item_attr |= (static_cast<uint32_t>(item->prefix_type) & 0x0F) << 20;
+			item_attr |= (static_cast<uint32_t>(item->enchant_bonus) & 0x0F) << 28;
 			cursor += sizeof(hb::net::PacketMapDataItem);
 			m_map_data->set_item(pivot_x + map_x, pivot_y + map_y, item_id, item_color, item_attr, false);
 		}
@@ -2022,6 +2119,13 @@ void CGame::log_recv_msg_handler(char* data, uint32_t msg_size)
 	if (header && header->msg_id == MsgId::ColorPaletteConfigContents)
 	{
 		cache_process_color_palette(data, msg_size);
+		return;
+	}
+
+	// Intercept attribute types — sent before login response
+	if (header && header->msg_id == MsgId::AttributeTypeConfigContents)
+	{
+		cache_process_attribute_types(data, msg_size);
 		return;
 	}
 
@@ -2510,14 +2614,14 @@ void CGame::init_item_list(char* packet_data)
 		m_player->m_item_list[i]->m_cur_durability = entry.cur_lifespan;
 		m_player->m_item_list[i]->m_item_color = entry.item_color;
 		m_player->m_item_list[i]->m_item_special_effect_value2 = static_cast<short>(entry.spec_value2); // v1.41
-		m_player->m_item_list[i]->m_attribute = entry.attribute;
+		m_player->m_item_list[i]->load_attributes_from(entry);
 		m_item_order[i] = i;
 		// Snoopy: Add Angelic Stats
 		if (cfg && (cfg->get_item_type() == hb::shared::item::item_type::equipment)
 			&& (m_is_item_equipped[i] == true)
 			&& (cfg->get_equip_pos() >= EquipPos::LeftFinger))
 		{
-			angel_value = (m_player->m_item_list[i]->m_attribute & 0xF0000000) >> 28;
+			angel_value = m_player->m_item_list[i]->m_enchant_bonus;
 			if (m_player->m_item_list[i]->m_id_num == hb::shared::item::ItemId::AngelicPendantSTR)
 				m_player->m_angelic_str = 1 + angel_value;
 			else if (m_player->m_item_list[i]->m_id_num == hb::shared::item::ItemId::AngelicPendantDEX)
@@ -2550,7 +2654,7 @@ void CGame::init_item_list(char* packet_data)
 		m_player->m_bank_list[i]->m_cur_durability = entry.cur_lifespan;
 		m_player->m_bank_list[i]->m_item_color = entry.item_color;
 		m_player->m_bank_list[i]->m_item_special_effect_value2 = static_cast<short>(entry.spec_value2); // v1.41
-		m_player->m_bank_list[i]->m_attribute = entry.attribute;
+		m_player->m_bank_list[i]->load_attributes_from(entry);
 	}
 
 	const auto* mastery = reinterpret_cast<const hb::net::PacketResponseMasteryData*>(bankEntries + total_items);
@@ -3338,7 +3442,7 @@ bool CGame::try_replay_cache_for_config(int type)
 	return false;
 }
 
-void CGame::request_configs_from_server(bool items, bool magic, bool skills, bool npcs, bool maps, bool balance, bool color_palette)
+void CGame::request_configs_from_server(bool items, bool magic, bool skills, bool npcs, bool maps, bool balance, bool color_palette, bool attribute_types)
 {
 	if (!m_g_sock) return;
 	hb::net::PacketRequestConfigData pkt{};
@@ -3351,6 +3455,7 @@ void CGame::request_configs_from_server(bool items, bool magic, bool skills, boo
 	pkt.requestMaps = maps ? 1 : 0;
 	pkt.requestBalance = balance ? 1 : 0;
 	pkt.requestColorPalette = color_palette ? 1 : 0;
+	pkt.requestAttributeTypes = attribute_types ? 1 : 0;
 	m_g_sock->send_msg(reinterpret_cast<char*>(&pkt), sizeof(pkt));
 }
 
@@ -6243,7 +6348,9 @@ void CGame::init_data_response_handler(char* packet_data)
 void CGame::motion_event_handler(char* packet_data)
 {
 	uint16_t event_type = 0, object_id = 0;
-	short map_x = -1, map_y = -1, owner_type = 0, value1 = 0, value2 = 0, value3 = 0;
+	short map_x = -1, map_y = -1, owner_type = 0;
+	int value1 = 0;
+	short value2 = 0, value3 = 0;
 	short npc_config_id = -1;
 	hb::shared::entity::PlayerStatus status;
 	direction move_dir = direction{};

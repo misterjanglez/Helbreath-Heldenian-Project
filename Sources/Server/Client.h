@@ -150,12 +150,12 @@ public:
 		int32_t price;
 	} m_repair_all[hb::shared::limits::MaxItems];
 
-	char m_attack_dice_throw_sm;
-	char m_attack_dice_range_sm;
-	char m_attack_dice_throw_l;
-	char m_attack_dice_range_l;
-	char m_attack_bonus_sm;
-	char m_attack_bonus_l;
+	int m_attack_dice_throw_sm;
+	int m_attack_dice_range_sm;
+	int m_attack_dice_throw_l;
+	int m_attack_dice_range_l;
+	int m_attack_bonus_sm;
+	int m_attack_bonus_l;
 
 	CItem * m_item_list[hb::shared::limits::MaxItems];
 	hb::shared::geometry::GamePoint m_item_pos_list[hb::shared::limits::MaxItems];

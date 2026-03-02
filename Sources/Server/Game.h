@@ -279,9 +279,10 @@ public:
 
 	void reload_npc_configs();
 	void reload_shop_configs();
-	void send_config_reload_notification(bool items, bool magic, bool skills, bool npcs, bool balance = false, bool colors = false);
-	void push_config_reload_to_clients(bool items, bool magic, bool skills, bool npcs, bool balance = false, bool colors = false);
+	void send_config_reload_notification(bool items, bool magic, bool skills, bool npcs, bool balance = false, bool colors = false, bool attribute_types = false);
+	void push_config_reload_to_clients(bool items, bool magic, bool skills, bool npcs, bool balance = false, bool colors = false, bool attribute_types = false);
 	void reload_color_palette();
+	void reload_attribute_types();
 	void apply_server_config(const server_config& cfg);
 	bool reload_server_config();
 	void send_server_config_update();
@@ -403,6 +404,9 @@ public:
 	bool init_npc_attr(class CNpc * npc, int npc_config_id, short sClass, char sa);
 	int get_npc_config_id_by_name(const char * npc_name) const;
 	void send_notify_msg(int from_h, int to_h, uint16_t msg_type, uint32_t v1, uint64_t v2, uint32_t v3, const char * string, uint32_t v4 = 0, uint32_t v5 = 0, uint32_t v6 = 0, uint32_t v7 = 0, uint32_t v8 = 0, uint32_t v9 = 0, const char * string2 = 0);
+	void send_item_attribute_change(int client_h, int item_index, CItem* item, uint32_t spec_value1 = 0, uint32_t spec_value2 = 0);
+	void send_gizon_item_change(int client_h, int item_index, CItem* item);
+	void send_exchange_item_notify(int from_h, int to_h, uint16_t msg_type, int item_index, CItem* item, int amount);
 
 	void broadcast_server_message(const char* message);
 	int  client_motion_stop_handler(int client_h, short sX, short sY, direction dir);
@@ -431,7 +435,7 @@ public:
 	int compose_move_map_data(short sX, short sY, int client_h, direction dir, char * data);
 	void send_event_to_near_client_type_b(uint32_t msg_id, uint16_t msg_type, char map_index, short sX, short sY, short v1, short v2, short v3, short v4 = 0);
 	void send_event_to_near_client_type_b(uint32_t msg_id, uint16_t msg_type, char map_index, short sX, short sY, short v1, short v2, short v3, uint32_t v4 = 0);
-	void send_event_to_near_client_type_a(short owner_h, char owner_type, uint32_t msg_id, uint16_t msg_type, short v1, short v2, short v3);
+	void send_event_to_near_client_type_a(short owner_h, char owner_type, uint32_t msg_id, uint16_t msg_type, int v1, short v2, short v3);
 	void delete_client(int client_h, bool save, bool notify, bool count_logout = true, bool force_close_conn = false);
 	int  compose_init_map_data(short sX, short sY, int client_h, char * data);
 	void fill_player_map_object(hb::net::PacketMapDataObjectPlayer& obj, short owner_h, int viewer_h);
@@ -538,14 +542,21 @@ public:
 	void build_magic_manual_index();
 	//class CTeleport * m_pTeleportConfigList[DEF_MAXTELEPORTTYPE];
 
-	std::string m_config_hash[7];
+	std::string m_config_hash[8];
 	void compute_config_hashes();
 	void compute_balance_hash();
 	void compute_color_palette_hash();
+	void compute_attribute_types_hash();
 	bool send_client_balance_config(int client_h);
 	bool send_client_color_palette(int client_h);
+	bool send_client_attribute_types(int client_h);
 
 	std::vector<color_palette_entry> m_color_palette;
+	std::vector<attribute_prefix_type_entry> m_attribute_prefix_types;
+	std::vector<attribute_secondary_type_entry> m_attribute_secondary_types;
+	uint8_t m_prefix_multiplier[16]{};
+	uint8_t m_secondary_multiplier[16]{};
+	void build_multiplier_lookup();
 
 	class hb::shared::net::ASIOSocket* _lsock;
 

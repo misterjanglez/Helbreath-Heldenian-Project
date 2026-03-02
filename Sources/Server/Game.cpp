@@ -1111,6 +1111,15 @@ bool CGame::init()
 		hb::logger::warn("No color palette entries found in gamedata.db");
 	}
 
+	// Load attribute type multipliers (optional — migration script seeds the tables)
+	if (HasGameConfigRows(configDb, "attribute_prefix_types")) {
+		LoadAttributePrefixTypes(configDb, m_attribute_prefix_types);
+	}
+	if (HasGameConfigRows(configDb, "attribute_secondary_types")) {
+		LoadAttributeSecondaryTypes(configDb, m_attribute_secondary_types);
+	}
+	build_multiplier_lookup();
+
 	m_is_build_item_available = false;
 	if (HasGameConfigRows(configDb, "builditem_configs")) {
 		m_is_build_item_available = LoadBuildItemConfigs(configDb, this);
@@ -1826,7 +1835,7 @@ void CGame::request_init_data_handler(int client_h, char* data, char key, size_t
 
 	// Send configs FIRST so the client has item/magic/skill definitions
 	// before receiving player data that references them.
-	std::string clientItemHash, clientMagicHash, clientSkillHash, clientNpcHash, clientMapHash, clientBalanceHash, clientColorPaletteHash;
+	std::string clientItemHash, clientMagicHash, clientSkillHash, clientNpcHash, clientMapHash, clientBalanceHash, clientColorPaletteHash, clientAttributeTypeHash;
 	if (msg_size >= sizeof(hb::net::PacketRequestInitDataEx)) {
 		const auto* exReq = reinterpret_cast<const hb::net::PacketRequestInitDataEx*>(data);
 		clientItemHash = exReq->itemConfigHash;
@@ -1836,6 +1845,7 @@ void CGame::request_init_data_handler(int client_h, char* data, char key, size_t
 		clientMapHash = exReq->mapConfigHash;
 		clientBalanceHash = exReq->balanceConfigHash;
 		clientColorPaletteHash = exReq->colorPaletteConfigHash;
+		clientAttributeTypeHash = exReq->attributeTypeConfigHash;
 	}
 
 	bool item_cache_valid    = (!clientItemHash.empty() && clientItemHash == m_config_hash[0]);
@@ -1845,6 +1855,7 @@ void CGame::request_init_data_handler(int client_h, char* data, char key, size_t
 	bool map_cache_valid     = (!clientMapHash.empty() && clientMapHash == m_config_hash[4]);
 	bool balance_cache_valid = (!clientBalanceHash.empty() && clientBalanceHash == m_config_hash[5]);
 	bool color_palette_cache_valid = (!clientColorPaletteHash.empty() && clientColorPaletteHash == m_config_hash[6]);
+	bool attribute_type_cache_valid = (!clientAttributeTypeHash.empty() && clientAttributeTypeHash == m_config_hash[7]);
 
 	{
 		hb::net::PacketResponseConfigCacheStatus cacheStatus{};
@@ -1857,6 +1868,7 @@ void CGame::request_init_data_handler(int client_h, char* data, char key, size_t
 		cacheStatus.mapCacheValid = map_cache_valid ? 1 : 0;
 		cacheStatus.balanceCacheValid = balance_cache_valid ? 1 : 0;
 		cacheStatus.colorPaletteCacheValid = color_palette_cache_valid ? 1 : 0;
+		cacheStatus.attributeTypeCacheValid = attribute_type_cache_valid ? 1 : 0;
 		m_client_list[client_h]->m_socket->send_msg(
 			reinterpret_cast<char*>(&cacheStatus), sizeof(cacheStatus));
 	}
@@ -1868,6 +1880,7 @@ void CGame::request_init_data_handler(int client_h, char* data, char key, size_t
 	if (!map_cache_valid)     send_client_map_configs(client_h);
 	if (!balance_cache_valid) send_client_balance_config(client_h);
 	if (!color_palette_cache_valid) send_client_color_palette(client_h);
+	if (!attribute_type_cache_valid) send_client_attribute_types(client_h);
 
 	// Now send player data (configs are guaranteed loaded on client)
 	writer.Reset();
@@ -1959,7 +1972,7 @@ void CGame::request_init_data_handler(int client_h, char* data, char key, size_t
 		entry->weight = m_client_list[client_h]->m_item_list[i]->m_weight;
 		entry->item_color = m_client_list[client_h]->m_item_list[i]->m_item_color;
 		entry->spec_value2 = static_cast<std::uint8_t>(m_client_list[client_h]->m_item_list[i]->m_item_special_effect_value2);
-		entry->attribute = m_client_list[client_h]->m_item_list[i]->m_attribute;
+		m_client_list[client_h]->m_item_list[i]->copy_attributes_to(*entry);
 		entry->item_id = m_client_list[client_h]->m_item_list[i]->m_id_num;
 		entry->max_lifespan = m_client_list[client_h]->m_item_list[i]->m_durability;
 	}
@@ -1991,7 +2004,7 @@ void CGame::request_init_data_handler(int client_h, char* data, char key, size_t
 		entry->weight = m_client_list[client_h]->m_item_in_bank_list[i]->m_weight;
 		entry->item_color = m_client_list[client_h]->m_item_in_bank_list[i]->m_item_color;
 		entry->spec_value2 = static_cast<std::uint8_t>(m_client_list[client_h]->m_item_in_bank_list[i]->m_item_special_effect_value2);
-		entry->attribute = m_client_list[client_h]->m_item_in_bank_list[i]->m_attribute;
+		m_client_list[client_h]->m_item_in_bank_list[i]->copy_attributes_to(*entry);
 		entry->item_id = m_client_list[client_h]->m_item_in_bank_list[i]->m_id_num;
 		entry->max_lifespan = m_client_list[client_h]->m_item_in_bank_list[i]->m_durability;
 	}
@@ -2758,6 +2771,7 @@ void CGame::compute_config_hashes()
 
 	compute_balance_hash();
 	compute_color_palette_hash();
+	compute_attribute_types_hash();
 
 	hb::logger::log("Config hashes computed:");
 	hb::logger::log("- Items: {}", m_config_hash[0]);
@@ -2767,6 +2781,7 @@ void CGame::compute_config_hashes()
 	hb::logger::log("- Maps: {}", m_config_hash[4]);
 	hb::logger::log("- Balance: {}", m_config_hash[5]);
 	hb::logger::log("- ColorPalette: {}", m_config_hash[6]);
+	hb::logger::log("- AttributeTypes: {}", m_config_hash[7]);
 }
 
 void CGame::compute_balance_hash()
@@ -2907,6 +2922,200 @@ bool CGame::send_client_color_palette(int client_h)
 	}
 
 	return true;
+}
+
+void CGame::build_multiplier_lookup()
+{
+	// Default all to 1 (safe fallback)
+	for (int i = 0; i < 16; i++)
+	{
+		m_prefix_multiplier[i] = 1;
+		m_secondary_multiplier[i] = 1;
+	}
+	// None types get 0
+	m_prefix_multiplier[0] = 0;
+	m_secondary_multiplier[0] = 0;
+
+	for (const auto& e : m_attribute_prefix_types)
+	{
+		if (e.prefix_id < 16)
+			m_prefix_multiplier[e.prefix_id] = e.multiplier;
+	}
+	for (const auto& e : m_attribute_secondary_types)
+	{
+		if (e.secondary_id < 16)
+			m_secondary_multiplier[e.secondary_id] = e.multiplier;
+	}
+
+	hb::logger::log("Attribute multiplier lookup built: {} prefix, {} secondary entries",
+		(int)m_attribute_prefix_types.size(), (int)m_attribute_secondary_types.size());
+}
+
+void CGame::compute_attribute_types_hash()
+{
+	if (m_attribute_prefix_types.empty() && m_attribute_secondary_types.empty())
+	{
+		m_config_hash[7].clear();
+		return;
+	}
+
+	constexpr size_t headerSize = sizeof(hb::net::PacketAttributeTypeConfigHeader);
+	constexpr size_t prefixEntrySize = sizeof(hb::net::PacketAttributePrefixTypeEntry);
+	constexpr size_t secondaryEntrySize = sizeof(hb::net::PacketAttributeSecondaryTypeEntry);
+
+	std::vector<uint8_t> allData;
+
+	// Build prefix packet data
+	if (!m_attribute_prefix_types.empty())
+	{
+		char buf[7000]{};
+		auto* pktHeader = reinterpret_cast<hb::net::PacketAttributeTypeConfigHeader*>(buf);
+		pktHeader->header.msg_id = MsgId::AttributeTypeConfigContents;
+		pktHeader->header.msg_type = MsgType::Confirm;
+		pktHeader->totalEntries = static_cast<uint16_t>(m_attribute_prefix_types.size());
+		pktHeader->packetIndex = 0;
+		pktHeader->entryType = 0;
+
+		auto* entries = reinterpret_cast<hb::net::PacketAttributePrefixTypeEntry*>(buf + headerSize);
+		uint16_t count = 0;
+		for (const auto& e : m_attribute_prefix_types)
+		{
+			entries[count].prefix_id = e.prefix_id;
+			entries[count].multiplier = e.multiplier;
+			count++;
+		}
+		pktHeader->entryCount = count;
+		size_t packetSize = headerSize + (count * prefixEntrySize);
+		allData.insert(allData.end(), buf, buf + packetSize);
+	}
+
+	// Build secondary packet data
+	if (!m_attribute_secondary_types.empty())
+	{
+		char buf[7000]{};
+		auto* pktHeader = reinterpret_cast<hb::net::PacketAttributeTypeConfigHeader*>(buf);
+		pktHeader->header.msg_id = MsgId::AttributeTypeConfigContents;
+		pktHeader->header.msg_type = MsgType::Confirm;
+		pktHeader->totalEntries = static_cast<uint16_t>(m_attribute_secondary_types.size());
+		pktHeader->packetIndex = 0;
+		pktHeader->entryType = 1;
+
+		auto* entries = reinterpret_cast<hb::net::PacketAttributeSecondaryTypeEntry*>(buf + headerSize);
+		uint16_t count = 0;
+		for (const auto& e : m_attribute_secondary_types)
+		{
+			entries[count].secondary_id = e.secondary_id;
+			entries[count].multiplier = e.multiplier;
+			count++;
+		}
+		pktHeader->entryCount = count;
+		size_t packetSize = headerSize + (count * secondaryEntrySize);
+		allData.insert(allData.end(), buf, buf + packetSize);
+	}
+
+	m_config_hash[7] = allData.empty() ? std::string{} : hb::shared::util::sha256(allData.data(), allData.size());
+}
+
+bool CGame::send_client_attribute_types(int client_h)
+{
+	if (m_client_list[client_h] == nullptr) return false;
+	if (m_attribute_prefix_types.empty() && m_attribute_secondary_types.empty()) return false;
+
+	constexpr size_t headerSize = sizeof(hb::net::PacketAttributeTypeConfigHeader);
+	constexpr size_t prefixEntrySize = sizeof(hb::net::PacketAttributePrefixTypeEntry);
+	constexpr size_t secondaryEntrySize = sizeof(hb::net::PacketAttributeSecondaryTypeEntry);
+
+	// Send prefix entries
+	if (!m_attribute_prefix_types.empty())
+	{
+		std::memset(G_cData50000, 0, sizeof(G_cData50000));
+
+		auto* pktHeader = reinterpret_cast<hb::net::PacketAttributeTypeConfigHeader*>(G_cData50000);
+		pktHeader->header.msg_id = MsgId::AttributeTypeConfigContents;
+		pktHeader->header.msg_type = MsgType::Confirm;
+		pktHeader->totalEntries = static_cast<uint16_t>(m_attribute_prefix_types.size());
+		pktHeader->packetIndex = 0;
+		pktHeader->entryType = 0;
+
+		auto* entries = reinterpret_cast<hb::net::PacketAttributePrefixTypeEntry*>(G_cData50000 + headerSize);
+		uint16_t count = 0;
+		for (const auto& e : m_attribute_prefix_types)
+		{
+			entries[count].prefix_id = e.prefix_id;
+			entries[count].multiplier = e.multiplier;
+			count++;
+		}
+		pktHeader->entryCount = count;
+		size_t packetSize = headerSize + (count * prefixEntrySize);
+
+		int ret = m_client_list[client_h]->m_socket->send_msg(G_cData50000, static_cast<int>(packetSize));
+		switch (ret) {
+		case sock::Event::QueueFull:
+		case sock::Event::SocketError:
+		case sock::Event::CriticalError:
+		case sock::Event::SocketClosed:
+			hb::logger::log("Failed to send attribute prefix types: Client({})", client_h);
+			delete_client(client_h, true, true);
+			delete m_client_list[client_h];
+			m_client_list[client_h] = 0;
+			return false;
+		}
+	}
+
+	// Send secondary entries
+	if (!m_attribute_secondary_types.empty())
+	{
+		std::memset(G_cData50000, 0, sizeof(G_cData50000));
+
+		auto* pktHeader = reinterpret_cast<hb::net::PacketAttributeTypeConfigHeader*>(G_cData50000);
+		pktHeader->header.msg_id = MsgId::AttributeTypeConfigContents;
+		pktHeader->header.msg_type = MsgType::Confirm;
+		pktHeader->totalEntries = static_cast<uint16_t>(m_attribute_secondary_types.size());
+		pktHeader->packetIndex = 0;
+		pktHeader->entryType = 1;
+
+		auto* entries = reinterpret_cast<hb::net::PacketAttributeSecondaryTypeEntry*>(G_cData50000 + headerSize);
+		uint16_t count = 0;
+		for (const auto& e : m_attribute_secondary_types)
+		{
+			entries[count].secondary_id = e.secondary_id;
+			entries[count].multiplier = e.multiplier;
+			count++;
+		}
+		pktHeader->entryCount = count;
+		size_t packetSize = headerSize + (count * secondaryEntrySize);
+
+		int ret = m_client_list[client_h]->m_socket->send_msg(G_cData50000, static_cast<int>(packetSize));
+		switch (ret) {
+		case sock::Event::QueueFull:
+		case sock::Event::SocketError:
+		case sock::Event::CriticalError:
+		case sock::Event::SocketClosed:
+			hb::logger::log("Failed to send attribute secondary types: Client({})", client_h);
+			delete_client(client_h, true, true);
+			delete m_client_list[client_h];
+			m_client_list[client_h] = 0;
+			return false;
+		}
+	}
+
+	return true;
+}
+
+void CGame::reload_attribute_types()
+{
+	sqlite3* configDb = nullptr;
+	std::string dbPath;
+	bool created = false;
+	if (!EnsureGameConfigDatabase(&configDb, dbPath, &created)) return;
+
+	m_attribute_prefix_types.clear();
+	m_attribute_secondary_types.clear();
+	LoadAttributePrefixTypes(configDb, m_attribute_prefix_types);
+	LoadAttributeSecondaryTypes(configDb, m_attribute_secondary_types);
+	build_multiplier_lookup();
+	compute_attribute_types_hash();
+	CloseGameConfigDatabase(configDb);
 }
 
 void CGame::fill_player_map_object(hb::net::PacketMapDataObjectPlayer& obj, short owner_h, int viewer_h)
@@ -3070,7 +3279,7 @@ int CGame::compose_init_map_data(short sX, short sY, int client_h, char* data)
 					hb::net::PacketMapDataItem itemObj{};
 					itemObj.item_id = tile->m_item[0]->m_id_num;
 					itemObj.color = tile->m_item[0]->m_item_color;
-					itemObj.attribute = tile->m_item[0]->m_attribute;
+					tile->m_item[0]->copy_attributes_to(itemObj);
 					std::memcpy(cp, &itemObj, sizeof(itemObj));
 					cp += sizeof(itemObj);
 					size += sizeof(itemObj);
@@ -3315,7 +3524,7 @@ void CGame::delete_client(int client_h, bool save, bool notify, bool count_logou
 	remove_client_short_cut(client_h);
 }
 
-void CGame::send_event_to_near_client_type_a(short owner_h, char owner_type, uint32_t msg_id, uint16_t msg_type, short v1, short v2, short v3)
+void CGame::send_event_to_near_client_type_a(short owner_h, char owner_type, uint32_t msg_id, uint16_t msg_type, int v1, short v2, short v3)
 {
 	int ret, short_cut_index;
 	bool flag;
@@ -3367,7 +3576,7 @@ void CGame::send_event_to_near_client_type_a(short owner_h, char owner_type, uin
 		pkt_short.header.msg_type = msg_type;
 		pkt_short.object_id = static_cast<std::uint16_t>(owner_h + hb::shared::object_id::NearbyOffset);
 		pkt_short.dir = static_cast<std::uint8_t>(m_client_list[owner_h]->m_dir);
-		pkt_short.v1 = static_cast<std::int16_t>(v1);
+		pkt_short.v1 = static_cast<std::int32_t>(v1);
 		pkt_short.v2 = static_cast<std::uint8_t>(v2);
 
 		hb::net::PacketEventMotionMove pkt_move{};
@@ -3375,7 +3584,7 @@ void CGame::send_event_to_near_client_type_a(short owner_h, char owner_type, uin
 		pkt_move.header.msg_type = msg_type;
 		pkt_move.object_id = static_cast<std::uint16_t>(owner_h + hb::shared::object_id::NearbyOffset);
 		pkt_move.dir = static_cast<std::uint8_t>(m_client_list[owner_h]->m_dir);
-		pkt_move.v1 = static_cast<std::uint8_t>(v1);
+		pkt_move.v1 = static_cast<std::int32_t>(v1);
 		pkt_move.v2 = static_cast<std::uint8_t>(v2);
 		pkt_move.x = sX;
 		pkt_move.y = sY;
@@ -3578,7 +3787,7 @@ void CGame::send_event_to_near_client_type_a(short owner_h, char owner_type, uin
 		pkt_short.header.msg_type = msg_type;
 		pkt_short.object_id = static_cast<std::uint16_t>(owner_h + 40000);
 		pkt_short.dir = static_cast<std::uint8_t>(m_npc_list[owner_h]->m_dir);
-		pkt_short.v1 = static_cast<std::int16_t>(v1);
+		pkt_short.v1 = static_cast<std::int32_t>(v1);
 		pkt_short.v2 = static_cast<std::uint8_t>(v2);
 
 		hb::net::PacketEventMotionMove pkt_move{};
@@ -3586,7 +3795,7 @@ void CGame::send_event_to_near_client_type_a(short owner_h, char owner_type, uin
 		pkt_move.header.msg_type = msg_type;
 		pkt_move.object_id = static_cast<std::uint16_t>(owner_h + 40000);
 		pkt_move.dir = static_cast<std::uint8_t>(m_npc_list[owner_h]->m_dir);
-		pkt_move.v1 = static_cast<std::uint8_t>(v1);
+		pkt_move.v1 = static_cast<std::int32_t>(v1);
 		pkt_move.v2 = static_cast<std::uint8_t>(v2);
 		pkt_move.x = sX;
 		pkt_move.y = sY;
@@ -3871,7 +4080,12 @@ int CGame::compose_move_map_data(short sX, short sY, int client_h, direction dir
 				hb::net::PacketMapDataItem itemObj{};
 				itemObj.item_id = tile->m_item[0]->m_id_num;
 				itemObj.color = tile->m_item[0]->m_item_color;
-				itemObj.attribute = tile->m_item[0]->m_attribute;
+				itemObj.custom_made = tile->m_item[0]->m_custom_made ? 1 : 0;
+				itemObj.prefix_type = static_cast<uint8_t>(tile->m_item[0]->m_prefix_type);
+				itemObj.prefix_value = tile->m_item[0]->m_prefix_value;
+				itemObj.secondary_type = static_cast<uint8_t>(tile->m_item[0]->m_secondary_type);
+				itemObj.secondary_value = tile->m_item[0]->m_secondary_value;
+				itemObj.enchant_bonus = tile->m_item[0]->m_enchant_bonus;
 				std::memcpy(cp, &itemObj, sizeof(itemObj));
 				cp += sizeof(itemObj);
 				size += sizeof(itemObj);
@@ -4413,9 +4627,9 @@ bool CGame::load_player_data_from_db(int client_h)
 		m_client_list[client_h]->m_item_list[item.slot]->m_item_special_effect_value2 = item.spec_effect_value2;
 		m_client_list[client_h]->m_item_list[item.slot]->m_item_special_effect_value3 = item.spec_effect_value3;
 		m_client_list[client_h]->m_item_list[item.slot]->m_cur_durability = (short)item.cur_life_span;
-		m_client_list[client_h]->m_item_list[item.slot]->m_attribute = item.attribute;
+		m_client_list[client_h]->m_item_list[item.slot]->load_attributes_from(item);
 
-		if ((m_client_list[client_h]->m_item_list[item.slot]->m_attribute & 0x00000001) != 0) {
+		if (m_client_list[client_h]->m_item_list[item.slot]->m_custom_made) {
 			m_client_list[client_h]->m_item_list[item.slot]->m_durability = m_client_list[client_h]->m_item_list[item.slot]->m_item_special_effect_value1;
 		}
 		m_item_manager->adjust_rare_item_value(m_client_list[client_h]->m_item_list[item.slot]);
@@ -4450,8 +4664,8 @@ bool CGame::load_player_data_from_db(int client_h)
 		m_client_list[client_h]->m_item_in_bank_list[item.slot]->m_item_special_effect_value2 = item.spec_effect_value2;
 		m_client_list[client_h]->m_item_in_bank_list[item.slot]->m_item_special_effect_value3 = item.spec_effect_value3;
 		m_client_list[client_h]->m_item_in_bank_list[item.slot]->m_cur_durability = (short)item.cur_life_span;
-		m_client_list[client_h]->m_item_in_bank_list[item.slot]->m_attribute = item.attribute;
-		if ((m_client_list[client_h]->m_item_in_bank_list[item.slot]->m_attribute & 0x00000001) != 0) {
+		m_client_list[client_h]->m_item_in_bank_list[item.slot]->load_attributes_from(item);
+		if (m_client_list[client_h]->m_item_in_bank_list[item.slot]->m_custom_made) {
 			m_client_list[client_h]->m_item_in_bank_list[item.slot]->m_durability = m_client_list[client_h]->m_item_in_bank_list[item.slot]->m_item_special_effect_value1;
 		}
 		m_item_manager->adjust_rare_item_value(m_client_list[client_h]->m_item_in_bank_list[item.slot]);
@@ -5440,11 +5654,11 @@ int CGame::client_motion_attack_handler(int client_h, short sX, short sY, short 
 				else item_index = -1;
 
 				if (item_index != -1 && m_client_list[client_h]->m_item_list[item_index] != 0) {
-					if ((m_client_list[client_h]->m_item_list[item_index]->m_attribute & 0x00F00000) != 0) {
-						type1 = (m_client_list[client_h]->m_item_list[item_index]->m_attribute & 0x00F00000) >> 20;
-						value1 = (m_client_list[client_h]->m_item_list[item_index]->m_attribute & 0x000F0000) >> 16;
-						type2 = (m_client_list[client_h]->m_item_list[item_index]->m_attribute & 0x0000F000) >> 12;
-						value2 = (m_client_list[client_h]->m_item_list[item_index]->m_attribute & 0x00000F00) >> 8;
+					if (m_client_list[client_h]->m_item_list[item_index]->m_prefix_type != hb::shared::item::AttributePrefixType::None) {
+						type1 = static_cast<int>(m_client_list[client_h]->m_item_list[item_index]->m_prefix_type);
+						value1 = m_client_list[client_h]->m_item_list[item_index]->m_prefix_value;
+						type2 = static_cast<int>(m_client_list[client_h]->m_item_list[item_index]->m_secondary_type);
+						value2 = m_client_list[client_h]->m_item_list[item_index]->m_secondary_value;
 					}
 
 					if (type1 == 2) {
@@ -5454,7 +5668,7 @@ int CGame::client_motion_attack_handler(int client_h, short sX, short sY, short 
 							if (!m_client_list[owner]->m_is_poisoned && !m_combat_manager->check_resisting_poison_success(owner, owner_type))
 							{
 								m_client_list[owner]->m_is_poisoned = true;
-								m_client_list[owner]->m_poison_level = value1 * 5;
+								m_client_list[owner]->m_poison_level = value1 * m_prefix_multiplier[2];
 								m_client_list[owner]->m_poison_time = time;
 								m_status_effect_manager->set_poison_flag(owner, owner_type, true);
 								send_notify_msg(0, owner, Notify::MagicEffectOn, hb::shared::magic::Poison, m_client_list[owner]->m_poison_level, 0, 0);
@@ -5775,6 +5989,7 @@ void CGame::msg_process()
 				if (reqPkt->requestMaps)    send_client_map_configs(client_h);
 				if (reqPkt->requestBalance) send_client_balance_config(client_h);
 				if (reqPkt->requestColorPalette) send_client_color_palette(client_h);
+				if (reqPkt->requestAttributeTypes) send_client_attribute_types(client_h);
 			}
 			break;
 
@@ -6424,8 +6639,13 @@ void CGame::client_common_handler(int client_h, char* data)
 			break;
 		}
 
-		// Parse attribute once for color lookup
-		auto parsed = hb::shared::item::parse_attribute(attribute);
+		// Unpack legacy bitmask from tester command into individual fields
+		auto prefix_type = static_cast<hb::shared::item::AttributePrefixType>((attribute >> 20) & 0x0F);
+		uint8_t prefix_value = static_cast<uint8_t>((attribute >> 16) & 0x0F);
+		auto secondary_type = static_cast<hb::shared::item::SecondaryEffectType>((attribute >> 12) & 0x0F);
+		uint8_t secondary_value = static_cast<uint8_t>((attribute >> 8) & 0x0F);
+		uint8_t enchant_bonus = static_cast<uint8_t>((attribute >> 28) & 0x0F);
+		bool custom_made = (attribute & 0x00000001) != 0;
 
 		int created = 0;
 		for (int i = 0; i < count; i++)
@@ -6437,11 +6657,16 @@ void CGame::client_common_handler(int client_h, char* data)
 				continue;
 			}
 
-			item->m_attribute = attribute;
+			item->m_custom_made = custom_made;
+			item->m_prefix_type = prefix_type;
+			item->m_prefix_value = prefix_value;
+			item->m_secondary_type = secondary_type;
+			item->m_secondary_value = secondary_value;
+			item->m_enchant_bonus = enchant_bonus;
 			m_item_manager->adjust_rare_item_value(item);
 
 			// Set item color based on prefix type — unified palette weapon indices (16-21)
-			switch (parsed.prefixType)
+			switch (item->m_prefix_type)
 			{
 			case hb::shared::item::AttributePrefixType::Agile:      item->m_item_color = 16; break;
 			case hb::shared::item::AttributePrefixType::Light:       item->m_item_color = 16; break;
@@ -6657,6 +6882,61 @@ int CGame::client_motion_stop_handler(int client_h, short sX, short sY, directio
 	}
 
 	return 1;
+}
+
+// Dedicated attribute change notify — replaces send_notify_msg for Notify::ItemAttributeChange
+void CGame::send_item_attribute_change(int client_h, int item_index, CItem* item, uint32_t spec_value1, uint32_t spec_value2)
+{
+	if (m_client_list[client_h] == nullptr) return;
+
+	hb::net::PacketNotifyItemAttributeChange pkt{};
+	pkt.header.msg_id = MsgId::Notify;
+	pkt.header.msg_type = Notify::ItemAttributeChange;
+	pkt.item_index = static_cast<int16_t>(item_index);
+	item->copy_attributes_to(pkt);
+	pkt.spec_value1 = spec_value1;
+	pkt.spec_value2 = spec_value2;
+	m_client_list[client_h]->m_socket->send_msg(reinterpret_cast<char*>(&pkt), sizeof(pkt));
+}
+
+// Dedicated gizon item change notify — replaces send_notify_msg for Notify::GizoneItemChange
+void CGame::send_gizon_item_change(int client_h, int item_index, CItem* item)
+{
+	if (m_client_list[client_h] == nullptr) return;
+
+	hb::net::PacketNotifyGizonItemChange pkt{};
+	pkt.header.msg_id = MsgId::Notify;
+	pkt.header.msg_type = Notify::GizoneItemChange;
+	pkt.item_index = static_cast<int16_t>(item_index);
+	pkt.item_type = item->m_item_type;
+	pkt.cur_lifespan = item->m_cur_durability;
+	std::memcpy(pkt.item_name, item->m_name, sizeof(pkt.item_name));
+	pkt.item_color = item->m_item_color;
+	pkt.spec_value2 = static_cast<uint8_t>(item->m_item_special_effect_value2);
+	item->copy_attributes_to(pkt);
+	pkt.item_id = item->m_id_num;
+	m_client_list[client_h]->m_socket->send_msg(reinterpret_cast<char*>(&pkt), sizeof(pkt));
+}
+
+// Dedicated exchange item notify — replaces send_notify_msg for exchange item types
+void CGame::send_exchange_item_notify(int from_h, int to_h, uint16_t msg_type, int item_index, CItem* item, int amount)
+{
+	if (m_client_list[to_h] == nullptr) return;
+
+	hb::net::PacketNotifyExchangeItem pkt{};
+	pkt.header.msg_id = MsgId::Notify;
+	pkt.header.msg_type = msg_type;
+	pkt.dir = static_cast<int16_t>(item_index);
+	pkt.amount = static_cast<int32_t>(amount);
+	pkt.color = item->m_item_color;
+	pkt.cur_life = item->m_cur_durability;
+	pkt.max_life = item->m_durability;
+	pkt.performance = static_cast<int16_t>(item->m_item_special_effect_value2 + 100);
+	std::memcpy(pkt.item_name, item->m_name, sizeof(pkt.item_name));
+	std::memcpy(pkt.char_name, m_client_list[from_h]->m_char_name, sizeof(pkt.char_name));
+	item->copy_attributes_to(pkt);
+	pkt.item_id = item->m_id_num;
+	m_client_list[to_h]->m_socket->send_msg(reinterpret_cast<char*>(&pkt), sizeof(pkt));
 }
 
 // 05/29/2004 - Hypnotoad - Purchase Dicount updated to take charisma into consideration
@@ -6918,35 +7198,16 @@ void CGame::send_notify_msg(int from_h, int to_h, uint16_t msg_type, uint32_t v1
 	}
 	break;
 
-	case Notify::ItemAttributeChange:
+	// NOTE: Notify::ItemAttributeChange now uses send_item_attribute_change() directly
+	// NOTE: Notify::GizoneItemChange now uses send_gizon_item_change() directly
 	case Notify::GizonItemUpgradeLeft:
 	{
 		hb::net::PacketNotifyItemAttributeChange pkt{};
 		pkt.header.msg_id = MsgId::Notify;
 		pkt.header.msg_type = msg_type;
 		pkt.item_index = static_cast<int16_t>(v1);
-		pkt.attribute = static_cast<uint32_t>(v2);
-		pkt.spec_value1 = v3;
-		pkt.spec_value2 = v4;
-		ret = m_client_list[to_h]->m_socket->send_msg(reinterpret_cast<char*>(&pkt), sizeof(pkt));
-	}
-	break;
-
-	case Notify::GizoneItemChange:
-	{
-		hb::net::PacketNotifyGizonItemChange pkt{};
-		pkt.header.msg_id = MsgId::Notify;
-		pkt.header.msg_type = msg_type;
-		pkt.item_index = static_cast<int16_t>(v1);
-		pkt.item_type = static_cast<uint8_t>(v2);
-		pkt.cur_lifespan = static_cast<int16_t>(v3);
-		pkt.item_color = static_cast<uint8_t>(v6);
-		pkt.spec_value2 = static_cast<uint8_t>(v7);
-		pkt.attribute = v8;
-		pkt.item_id = static_cast<int16_t>(v9);
-		if (string != 0) {
-			memcpy(pkt.item_name, string, sizeof(pkt.item_name));
-		}
+		pkt.spec_value1 = static_cast<uint32_t>(v3);
+		pkt.spec_value2 = static_cast<uint32_t>(v4);
 		ret = m_client_list[to_h]->m_socket->send_msg(reinterpret_cast<char*>(&pkt), sizeof(pkt));
 	}
 	break;
@@ -7200,47 +7461,8 @@ void CGame::send_notify_msg(int from_h, int to_h, uint16_t msg_type, uint32_t v1
 	}
 	break;
 
-	case Notify::set_exchange_item:
-	{
-		hb::net::PacketNotifyExchangeItem pkt{};
-		pkt.header.msg_id = MsgId::Notify;
-		pkt.header.msg_type = msg_type;
-		pkt.dir = static_cast<int16_t>(v1);
-		pkt.amount = static_cast<int32_t>(v4);
-		pkt.color = static_cast<uint8_t>(v5);
-		pkt.cur_life = static_cast<int16_t>(v6);
-		pkt.max_life = static_cast<int16_t>(v7);
-		pkt.performance = static_cast<int16_t>(v8);
-		if (string != 0) {
-			memcpy(pkt.item_name, string, sizeof(pkt.item_name));
-		}
-		memcpy(pkt.char_name, m_client_list[from_h]->m_char_name, sizeof(pkt.char_name));
-		pkt.attribute = static_cast<uint32_t>(v9);
-		pkt.item_id = static_cast<int16_t>(reinterpret_cast<intptr_t>(string2));
-		ret = m_client_list[to_h]->m_socket->send_msg(reinterpret_cast<char*>(&pkt), sizeof(pkt));
-	}
-	break;
-
-	case Notify::OpenExchangeWindow:
-	{
-		hb::net::PacketNotifyExchangeItem pkt{};
-		pkt.header.msg_id = MsgId::Notify;
-		pkt.header.msg_type = msg_type;
-		pkt.dir = static_cast<int16_t>(v1);
-		pkt.amount = static_cast<int32_t>(v4);
-		pkt.color = static_cast<uint8_t>(v5);
-		pkt.cur_life = static_cast<int16_t>(v6);
-		pkt.max_life = static_cast<int16_t>(v7);
-		pkt.performance = static_cast<int16_t>(v8);
-		if (string != 0) {
-			memcpy(pkt.item_name, string, sizeof(pkt.item_name));
-		}
-		memcpy(pkt.char_name, m_client_list[from_h]->m_char_name, sizeof(pkt.char_name));
-		pkt.attribute = static_cast<uint32_t>(v9);
-		pkt.item_id = static_cast<int16_t>(reinterpret_cast<intptr_t>(string2));
-		ret = m_client_list[to_h]->m_socket->send_msg(reinterpret_cast<char*>(&pkt), sizeof(pkt));
-	}
-	break;
+	// NOTE: Notify::set_exchange_item now uses send_exchange_item_notify() directly
+	// NOTE: Notify::OpenExchangeWindow now uses send_exchange_item_notify() directly
 
 	case Notify::NotFlagSpot:
 	{
@@ -7329,7 +7551,7 @@ void CGame::send_notify_msg(int from_h, int to_h, uint16_t msg_type, uint32_t v1
 		pkt.header.msg_id = MsgId::Notify;
 		pkt.header.msg_type = msg_type;
 		pkt.dir = static_cast<uint8_t>(v1);
-		pkt.amount = static_cast<int16_t>(v2);
+		pkt.amount = static_cast<int32_t>(v2);
 		pkt.weapon = static_cast<uint8_t>(v3);
 		ret = m_client_list[to_h]->m_socket->send_msg(reinterpret_cast<char*>(&pkt), sizeof(pkt));
 	}
@@ -12911,7 +13133,7 @@ void CGame::reload_shop_configs()
 		hb::logger::log("Shop configs reloaded (no shop data found)");
 }
 
-void CGame::send_config_reload_notification(bool items, bool magic, bool skills, bool npcs, bool balance, bool colors)
+void CGame::send_config_reload_notification(bool items, bool magic, bool skills, bool npcs, bool balance, bool colors, bool attribute_types)
 {
 	hb::net::PacketNotifyConfigReload pkt{};
 	pkt.header.msg_id = MsgId::NotifyConfigReload;
@@ -12922,6 +13144,7 @@ void CGame::send_config_reload_notification(bool items, bool magic, bool skills,
 	pkt.reloadNpcs = npcs ? 1 : 0;
 	pkt.reloadBalance = balance ? 1 : 0;
 	pkt.reloadColorPalette = colors ? 1 : 0;
+	pkt.reloadAttributeTypes = attribute_types ? 1 : 0;
 
 	for(int i = 1; i < MaxClients; i++)
 	{
@@ -12930,7 +13153,7 @@ void CGame::send_config_reload_notification(bool items, bool magic, bool skills,
 	}
 }
 
-void CGame::push_config_reload_to_clients(bool items, bool magic, bool skills, bool npcs, bool balance, bool colors)
+void CGame::push_config_reload_to_clients(bool items, bool magic, bool skills, bool npcs, bool balance, bool colors, bool attribute_types)
 {
 	int count = 0;
 	for(int i = 1; i < MaxClients; i++)
@@ -12943,6 +13166,7 @@ void CGame::push_config_reload_to_clients(bool items, bool magic, bool skills, b
 			if (npcs)    send_client_npc_configs(i);
 			if (balance) send_client_balance_config(i);
 			if (colors)  send_client_color_palette(i);
+			if (attribute_types) send_client_attribute_types(i);
 			count++;
 		}
 	}
@@ -14050,7 +14274,7 @@ void CGame::lotery_handler(int client_h)
 			m_client_list[client_h]->m_y, item);
 		send_event_to_near_client_type_b(MsgId::EventCommon, CommonType::ItemDrop, m_client_list[client_h]->m_map_index,
 			m_client_list[client_h]->m_x, m_client_list[client_h]->m_y,
-			item->m_id_num, 0, item->m_item_color, item->m_attribute);
+			item->m_id_num, 0, item->m_item_color, static_cast<uint32_t>(item->m_enchant_bonus));
 	}
 
 }

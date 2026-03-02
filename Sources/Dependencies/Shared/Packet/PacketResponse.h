@@ -85,7 +85,12 @@ namespace net {
 		uint16_t weight;
 		uint8_t item_color;
 		uint8_t spec_value2;
-		uint32_t attribute;
+		uint8_t custom_made;
+		uint8_t prefix_type;
+		uint8_t prefix_value;
+		uint8_t secondary_type;
+		uint8_t secondary_value;
+		uint8_t enchant_bonus;
 		int16_t item_id;           // Item ID for config lookup
 		uint16_t max_lifespan;     // Maximum durability
 	};
@@ -105,7 +110,12 @@ namespace net {
 		uint16_t weight;
 		uint8_t item_color;
 		uint8_t spec_value2;
-		uint32_t attribute;
+		uint8_t custom_made;
+		uint8_t prefix_type;
+		uint8_t prefix_value;
+		uint8_t secondary_type;
+		uint8_t secondary_value;
+		uint8_t enchant_bonus;
 		int16_t item_id;           // Item ID for config lookup
 		uint16_t max_lifespan;     // Maximum durability
 	};

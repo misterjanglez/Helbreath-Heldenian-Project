@@ -27,6 +27,18 @@ struct creation_item_entry
 	int sort_order;
 };
 
+struct attribute_prefix_type_entry
+{
+	uint8_t prefix_id;
+	uint8_t multiplier;
+};
+
+struct attribute_secondary_type_entry
+{
+	uint8_t secondary_id;
+	uint8_t multiplier;
+};
+
 bool EnsureGameConfigDatabase(sqlite3** outDb, std::string& outPath, bool* outCreated);
 bool SaveItemConfigs(sqlite3* db, CItem* const* itemList, int maxItems);
 bool LoadItemConfigs(sqlite3* db, CItem** itemList, int maxItems);
@@ -58,6 +70,8 @@ bool LoadScheduleConfig(sqlite3* db, CGame* game);
 bool LoadCreationItems(sqlite3* db, std::vector<creation_item_entry>& out_items);
 bool SaveCreationItems(sqlite3* db, const std::vector<creation_item_entry>& items);
 bool LoadColorPalette(sqlite3* db, std::vector<color_palette_entry>& out_entries);
+bool LoadAttributePrefixTypes(sqlite3* db, std::vector<attribute_prefix_type_entry>& out);
+bool LoadAttributeSecondaryTypes(sqlite3* db, std::vector<attribute_secondary_type_entry>& out);
 bool HasGameConfigRows(sqlite3* db, const char* tableName);
 void CloseGameConfigDatabase(sqlite3* db);
 

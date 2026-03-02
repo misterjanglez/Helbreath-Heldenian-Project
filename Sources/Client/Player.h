@@ -85,7 +85,8 @@ public:
     // POSITION & MOVEMENT
     short m_player_x, m_player_y;
     direction m_player_dir;
-    short m_damage_move, m_damage_move_amount;
+    short m_damage_move;
+    int m_damage_move_amount;
 
     // RESOURCES
     int m_hp, m_mp, m_sp, m_hunger_status;

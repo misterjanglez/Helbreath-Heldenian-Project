@@ -43,6 +43,7 @@ namespace MsgId
 		MapConfigContents                       = 0x0FA314E6,
 		BalanceConfigContents                   = 0x0FA314E7,
 		ColorPaletteConfigContents              = 0x0FA314E9,
+		AttributeTypeConfigContents             = 0x0FA314EA,
 		RequestConfigData                       = 0x0FA314E3,
 		NotifyConfigReload                      = 0x0FA314E5,
 		ServerConfigUpdate                      = 0x0FA314E8,

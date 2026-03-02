@@ -15,7 +15,6 @@ namespace NetworkMessageHandlers {
 	{
 		int index;
 		uint64_t count;
-		uint32_t attribute;
 		char  name[hb::shared::limits::ItemNameLen]{}, item_type, equip_pos, gender_limit, item_color;
 		bool  is_equipped;
 		short level_limit, item_effect_value2, item_spec_effect_value2;
@@ -38,7 +37,6 @@ namespace NetworkMessageHandlers {
 		weight = pkt->weight;
 		item_color = static_cast<char>(pkt->item_color);
 		item_effect_value2 = static_cast<short>(pkt->item_effect_value2);
-		attribute = pkt->attribute;
 		item_spec_effect_value2 = static_cast<short>(pkt->spec_effect_value2);
 
 		std::string str1;
@@ -56,7 +54,7 @@ namespace NetworkMessageHandlers {
 			game->m_player->m_bank_list[index]->m_count = count;
 			game->m_player->m_bank_list[index]->m_cur_durability = cur_life_span;
 			game->m_player->m_bank_list[index]->m_item_color = item_color;
-			game->m_player->m_bank_list[index]->m_attribute = attribute;
+			game->m_player->m_bank_list[index]->load_attributes_from(*pkt);
 			game->m_player->m_bank_list[index]->m_item_special_effect_value2 = item_spec_effect_value2;
 
 			if (count == 1) txt = std::format(NOTIFYMSG_ITEMTOBANK3, str1.c_str());
@@ -76,7 +74,7 @@ namespace NetworkMessageHandlers {
 			game->m_player->m_bank_list[index]->m_count = count;
 			game->m_player->m_bank_list[index]->m_cur_durability = cur_life_span;
 			game->m_player->m_bank_list[index]->m_item_color = item_color;
-			game->m_player->m_bank_list[index]->m_attribute = attribute;
+			game->m_player->m_bank_list[index]->load_attributes_from(*pkt);
 			game->m_player->m_bank_list[index]->m_item_special_effect_value2 = item_spec_effect_value2;
 		}
 	}

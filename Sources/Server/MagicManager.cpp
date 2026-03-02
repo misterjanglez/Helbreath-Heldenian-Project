@@ -395,7 +395,7 @@ void MagicManager::player_magic_handler(int client_h, int dX, int dY, short type
 
 	if (m_game->m_client_list[client_h]->m_special_weapon_effect_type == 10) {
 		dv1 = (double)result;
-		dv2 = (double)(m_game->m_client_list[client_h]->m_special_weapon_effect_value * 3);
+		dv2 = (double)(m_game->m_client_list[client_h]->m_special_weapon_effect_value * m_game->m_prefix_multiplier[10]);
 		dv3 = dv1 + dv2;
 		result = (int)dv3;
 	}
@@ -1878,7 +1878,7 @@ void MagicManager::player_magic_handler(int client_h, int dX, int dY, short type
 			m_game->m_item_manager->item_log(ItemLogAction::Drop, client_h, (int)-1, item);
 
 			m_game->send_event_to_near_client_type_b(MsgId::EventCommon, CommonType::ItemDrop, m_game->m_client_list[client_h]->m_map_index,
-				dX, dY, item->m_id_num, 0, item->m_item_color, item->m_attribute); // v1.4 color
+				dX, dY, item->m_id_num, 0, item->m_item_color, static_cast<uint32_t>(item->m_enchant_bonus)); // v1.4 color
 			break;
 
 		case hb::shared::magic::Protect:

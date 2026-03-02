@@ -449,6 +449,26 @@ bool EnsureGameConfigDatabase(sqlite3** outDb, std::string& outPath, bool* outCr
         " g INTEGER NOT NULL,"
         " b INTEGER NOT NULL"
         ");"
+        "CREATE TABLE IF NOT EXISTS attribute_prefix_types ("
+        " prefix_id INTEGER PRIMARY KEY,"
+        " name TEXT NOT NULL,"
+        " display_name TEXT NOT NULL,"
+        " effect_label TEXT NOT NULL,"
+        " effect_format TEXT NOT NULL,"
+        " min_value INTEGER NOT NULL DEFAULT 0,"
+        " max_value INTEGER NOT NULL DEFAULT 0,"
+        " weapon_color INTEGER NOT NULL DEFAULT 0,"
+        " multiplier INTEGER NOT NULL DEFAULT 1"
+        ");"
+        "CREATE TABLE IF NOT EXISTS attribute_secondary_types ("
+        " secondary_id INTEGER PRIMARY KEY,"
+        " name TEXT NOT NULL,"
+        " effect_label TEXT NOT NULL,"
+        " effect_format TEXT NOT NULL,"
+        " min_value INTEGER NOT NULL DEFAULT 0,"
+        " max_value INTEGER NOT NULL DEFAULT 0,"
+        " multiplier INTEGER NOT NULL DEFAULT 1"
+        ");"
         "COMMIT;";
 
     if (!ExecSql(db, schemaSql)) {
@@ -1394,6 +1414,62 @@ bool LoadColorPalette(sqlite3* db, std::vector<color_palette_entry>& out_entries
 
     sqlite3_finalize(stmt);
     hb::logger::log("- {} color palette entries loaded", (int)out_entries.size());
+    return true;
+}
+
+bool LoadAttributePrefixTypes(sqlite3* db, std::vector<attribute_prefix_type_entry>& out)
+{
+    if (db == nullptr) return false;
+
+    out.clear();
+
+    const char* sql = "SELECT prefix_id, multiplier FROM attribute_prefix_types ORDER BY prefix_id;";
+
+    sqlite3_stmt* stmt = nullptr;
+    if (sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) != SQLITE_OK)
+    {
+        hb::logger::warn("Failed to prepare attribute_prefix_types query");
+        return false;
+    }
+
+    while (sqlite3_step(stmt) == SQLITE_ROW)
+    {
+        attribute_prefix_type_entry entry = {};
+        entry.prefix_id  = static_cast<uint8_t>(sqlite3_column_int(stmt, 0));
+        entry.multiplier = static_cast<uint8_t>(sqlite3_column_int(stmt, 1));
+        out.push_back(entry);
+    }
+
+    sqlite3_finalize(stmt);
+    hb::logger::log("- {} attribute prefix types loaded", (int)out.size());
+    return true;
+}
+
+bool LoadAttributeSecondaryTypes(sqlite3* db, std::vector<attribute_secondary_type_entry>& out)
+{
+    if (db == nullptr) return false;
+
+    out.clear();
+
+    const char* sql = "SELECT secondary_id, multiplier FROM attribute_secondary_types ORDER BY secondary_id;";
+
+    sqlite3_stmt* stmt = nullptr;
+    if (sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) != SQLITE_OK)
+    {
+        hb::logger::warn("Failed to prepare attribute_secondary_types query");
+        return false;
+    }
+
+    while (sqlite3_step(stmt) == SQLITE_ROW)
+    {
+        attribute_secondary_type_entry entry = {};
+        entry.secondary_id = static_cast<uint8_t>(sqlite3_column_int(stmt, 0));
+        entry.multiplier   = static_cast<uint8_t>(sqlite3_column_int(stmt, 1));
+        out.push_back(entry);
+    }
+
+    sqlite3_finalize(stmt);
+    hb::logger::log("- {} attribute secondary types loaded", (int)out.size());
     return true;
 }
 

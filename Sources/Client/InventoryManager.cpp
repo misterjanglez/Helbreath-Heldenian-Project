@@ -221,7 +221,7 @@ void inventory_manager::equip_item(int item_id)
 		m_game->add_event_list(BITEMDROP_CHARACTER2, 10);
 		return;
 	}
-	if (((m_game->m_player->m_item_list[item_id]->m_attribute & 0x00000001) == 0) && (cfg->m_level_requirement > m_game->m_player->m_level))
+	if (!(m_game->m_player->m_item_list[item_id]->m_custom_made) && (cfg->m_level_requirement > m_game->m_player->m_level))
 	{
 		m_game->add_event_list(BITEMDROP_CHARACTER4, 10);
 		return;
@@ -296,7 +296,7 @@ void inventory_manager::equip_item(int item_id)
 	if ((cfg->get_item_type() == hb::shared::item::item_type::equipment)
 		&& (cfg->get_equip_pos() >= EquipPos::LeftFinger))
 	{
-		int angel_value = (m_game->m_player->m_item_list[item_id]->m_attribute & 0xF0000000) >> 28;
+		int angel_value = m_game->m_player->m_item_list[item_id]->m_enchant_bonus;
 		if (m_game->m_player->m_item_list[item_id]->m_id_num == hb::shared::item::ItemId::AngelicPendantSTR)
 			m_game->m_player->m_angelic_str = 1 + angel_value;
 		else if (m_game->m_player->m_item_list[item_id]->m_id_num == hb::shared::item::ItemId::AngelicPendantDEX)

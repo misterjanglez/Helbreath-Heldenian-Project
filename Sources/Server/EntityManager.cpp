@@ -2640,7 +2640,7 @@ bool CEntityManager::spawn_npc_drop_item(int npc_h, int item_id, int min_count, 
 	item->m_touch_effect_value3 = (short)GameClock::GetTimeMS();
 	m_map_list[m_npc_list[npc_h]->m_map_index]->set_item(m_npc_list[npc_h]->m_x, m_npc_list[npc_h]->m_y, item);
 	m_game->send_event_to_near_client_type_b(MsgId::EventCommon, CommonType::ItemDrop, m_npc_list[npc_h]->m_map_index,
-		m_npc_list[npc_h]->m_x, m_npc_list[npc_h]->m_y, item->m_id_num, 0, item->m_item_color, item->m_attribute);
+		m_npc_list[npc_h]->m_x, m_npc_list[npc_h]->m_y, item->m_id_num, 0, item->m_item_color, static_cast<uint32_t>(item->m_enchant_bonus));
 	m_game->m_item_manager->item_log(ItemLogAction::NewGenDrop, 0, m_npc_list[npc_h]->m_npc_name, item);
 	return true;
 }

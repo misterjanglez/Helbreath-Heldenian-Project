@@ -2882,14 +2882,14 @@ uint32_t CombatManager::calculate_attack_effect(short target_h, char target_type
 			case 0: break;
 			case 1:
 				if ((m_game->m_client_list[attacker_h]->m_super_attack_left > 0) && (attack_mode >= 20)) {
-					iAP_SM += m_game->m_client_list[attacker_h]->m_special_weapon_effect_value;
-					iAP_L += m_game->m_client_list[attacker_h]->m_special_weapon_effect_value;
+					iAP_SM += m_game->m_client_list[attacker_h]->m_special_weapon_effect_value * m_game->m_prefix_multiplier[1];
+					iAP_L += m_game->m_client_list[attacker_h]->m_special_weapon_effect_value * m_game->m_prefix_multiplier[1];
 				}
 				break;
 
 			case 2:
 				attacker_sa = 61;
-				attacker_s_avalue = m_game->m_client_list[attacker_h]->m_special_weapon_effect_value * 5;
+				attacker_s_avalue = m_game->m_client_list[attacker_h]->m_special_weapon_effect_value * m_game->m_prefix_multiplier[2];
 				break;
 
 			case 3:

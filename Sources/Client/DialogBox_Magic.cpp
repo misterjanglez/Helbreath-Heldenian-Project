@@ -197,10 +197,10 @@ void DialogBox_Magic::on_draw()
 		if (player().m_item_list[i] == 0) continue;
 		if (m_game->m_is_item_equipped[i] == true)
 		{
-			if (((player().m_item_list[i]->m_attribute & 0x00F00000) >> 20) == 10)
+			if (player().m_item_list[i]->m_prefix_type == hb::shared::item::AttributePrefixType::Special)
 			{
 				v1 = static_cast<double>(result);
-				v2 = static_cast<double>(((player().m_item_list[i]->m_attribute & 0x000F0000) >> 16) * 3);
+				v2 = static_cast<double>(player().m_item_list[i]->m_prefix_value * m_game->m_prefix_multiplier[10]);
 				v3 = v1 + v2;
 				result = static_cast<int>(v3);
 				break;

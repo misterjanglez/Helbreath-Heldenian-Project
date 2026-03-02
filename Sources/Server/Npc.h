@@ -99,9 +99,9 @@ public:
 	char m_action_limit;            // 1 Move   .    2    . 3 Dummy.  ,
 
 	char m_size;					// 0: Small-Medium 1: Large
-	char m_attack_dice_throw;
-	char m_attack_dice_range;
-	char m_attack_bonus;
+	int m_attack_dice_throw;
+	int m_attack_dice_range;
+	int m_attack_bonus;
 	char m_bravery;
 	char m_resist_magic;
 	char m_magic_level;

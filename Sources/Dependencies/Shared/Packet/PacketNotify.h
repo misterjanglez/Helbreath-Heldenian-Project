@@ -123,7 +123,12 @@ namespace net {
 	struct HB_PACKED PacketNotifyItemAttributeChange {
 		PacketHeader header;
 		int16_t item_index;
-		uint32_t attribute;
+		uint8_t custom_made;
+		uint8_t prefix_type;
+		uint8_t prefix_value;
+		uint8_t secondary_type;
+		uint8_t secondary_value;
+		uint8_t enchant_bonus;
 		uint32_t spec_value1;
 		uint32_t spec_value2;
 	};
@@ -135,7 +140,12 @@ namespace net {
 		int16_t cur_lifespan;
 		uint8_t item_color;
 		uint8_t spec_value2;
-		uint32_t attribute;
+		uint8_t custom_made;
+		uint8_t prefix_type;
+		uint8_t prefix_value;
+		uint8_t secondary_type;
+		uint8_t secondary_value;
+		uint8_t enchant_bonus;
 		char item_name[hb::shared::limits::ItemNameLen];
 		int16_t item_id;
 	};
@@ -183,7 +193,7 @@ namespace net {
 	struct HB_PACKED PacketNotifyDamageMove {
 		PacketHeader header;
 		uint8_t dir;
-		int16_t amount;
+		int32_t amount;
 		uint8_t weapon;
 	};
 
@@ -353,7 +363,12 @@ namespace net {
 		uint16_t weight;
 		uint8_t item_color;
 		uint8_t spec_value2;
-		uint32_t attribute;
+		uint8_t custom_made;
+		uint8_t prefix_type;
+		uint8_t prefix_value;
+		uint8_t secondary_type;
+		uint8_t secondary_value;
+		uint8_t enchant_bonus;
 		int16_t item_id;           // Item ID for config lookup
 		uint16_t max_lifespan;     // Maximum durability
 	};
@@ -391,7 +406,12 @@ namespace net {
 		uint16_t weight;
 		uint8_t item_color;
 		int16_t item_effect_value2;
-		uint32_t attribute;
+		uint8_t custom_made;
+		uint8_t prefix_type;
+		uint8_t prefix_value;
+		uint8_t secondary_type;
+		uint8_t secondary_value;
+		uint8_t enchant_bonus;
 		uint8_t spec_effect_value2;
 		uint8_t padding;
 		int16_t item_id;           // Item ID for config lookup
@@ -672,7 +692,12 @@ namespace net {
 		int16_t performance;
 		char item_name[hb::shared::limits::ItemNameLen];
 		char char_name[hb::shared::limits::CharNameLen];
-		uint32_t attribute;
+		uint8_t custom_made;
+		uint8_t prefix_type;
+		uint8_t prefix_value;
+		uint8_t secondary_type;
+		uint8_t secondary_value;
+		uint8_t enchant_bonus;
 		int16_t item_id;
 	};
 

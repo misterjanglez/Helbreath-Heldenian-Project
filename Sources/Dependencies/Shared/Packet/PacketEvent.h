@@ -90,7 +90,7 @@ namespace net {
 		PacketHeader header;
 		std::uint16_t object_id;
 		std::uint8_t dir;
-		std::uint8_t v1;
+		std::int32_t v1;
 		std::uint8_t v2;
 		std::int16_t x;
 		std::int16_t y;
@@ -100,7 +100,7 @@ namespace net {
 		PacketHeader header;
 		std::uint16_t object_id;
 		std::uint8_t dir;
-		std::int16_t v1;
+		std::int32_t v1;
 		std::uint8_t v2;
 	};
 

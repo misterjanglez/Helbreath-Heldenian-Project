@@ -11,6 +11,7 @@
 #pragma once
 
 #include "ItemEnums.h"
+#include "ItemAttributes.h"
 #include "NetConstants.h"
 #include <cstring>
 #include <cstdint>
@@ -85,7 +86,13 @@ public:
         m_item_special_effect_value3 = 0;
 
         m_cur_durability = 0;
-        m_attribute = 0;
+
+        m_custom_made = false;
+        m_prefix_type = hb::shared::item::AttributePrefixType::None;
+        m_prefix_value = 0;
+        m_secondary_type = hb::shared::item::SecondaryEffectType::None;
+        m_secondary_value = 0;
+        m_enchant_bonus = 0;
     }
 
     inline virtual ~CItem()
@@ -196,19 +203,15 @@ public:
     uint64_t m_count;              // Stack count (for stackable items)
 
     //------------------------------------------------------------------------
-    // Attribute Flags
-    //
-    // Bit layout: aaaa bbbb cccc dddd eeee ffff xxxx xxx1
-    //   1: Custom-Made Item flag
-    //   a: Item attribute type
-    //   b: Item attribute value
-    //   c: Special item flag
-    //   d: Special item flag value
-    //   e: Additional special flag
-    //   f: Additional special flag value
+    // Item Attributes (prefix, secondary, enchant)
     //------------------------------------------------------------------------
 
-    uint32_t m_attribute;
+    bool    m_custom_made      = false;
+    hb::shared::item::AttributePrefixType  m_prefix_type      = hb::shared::item::AttributePrefixType::None;
+    uint8_t m_prefix_value     = 0;
+    hb::shared::item::SecondaryEffectType  m_secondary_type   = hb::shared::item::SecondaryEffectType::None;
+    uint8_t m_secondary_value  = 0;
+    uint8_t m_enchant_bonus    = 0;
 
     //------------------------------------------------------------------------
     // Display Name Helpers
@@ -296,27 +299,80 @@ public:
 
     bool is_custom_made() const
     {
-        return (m_attribute & 0x00000001) != 0;
+        return m_custom_made;
     }
 
     void set_custom_made(bool custom)
     {
-        if (custom)
-            m_attribute |= 0x00000001;
-        else
-            m_attribute &= ~0x00000001;
+        m_custom_made = custom;
     }
 
-    // get attribute type (bits 28-31, 'a' nibble)
-    uint8_t get_attribute_type() const
+    bool has_special_attributes() const
     {
-        return static_cast<uint8_t>((m_attribute >> 28) & 0x0F);
+        return m_prefix_type != hb::shared::item::AttributePrefixType::None ||
+               m_secondary_type != hb::shared::item::SecondaryEffectType::None ||
+               m_enchant_bonus > 0 ||
+               m_custom_made;
     }
 
-    // get attribute value (bits 24-27, 'b' nibble)
-    uint8_t get_attribute_value() const
+    // Copy attribute fields to a packet or DB struct that has matching field names
+    template <typename T>
+    void copy_attributes_to(T& target) const
     {
-        return static_cast<uint8_t>((m_attribute >> 24) & 0x0F);
+        target.custom_made = m_custom_made ? 1 : 0;
+        target.prefix_type = static_cast<uint8_t>(m_prefix_type);
+        target.prefix_value = m_prefix_value;
+        target.secondary_type = static_cast<uint8_t>(m_secondary_type);
+        target.secondary_value = m_secondary_value;
+        target.enchant_bonus = m_enchant_bonus;
+    }
+
+    // Load attribute fields from a packet or DB struct that has matching field names
+    template <typename T>
+    void load_attributes_from(const T& source)
+    {
+        m_custom_made = source.custom_made != 0;
+        m_prefix_type = static_cast<hb::shared::item::AttributePrefixType>(source.prefix_type);
+        m_prefix_value = source.prefix_value;
+        m_secondary_type = static_cast<hb::shared::item::SecondaryEffectType>(source.secondary_type);
+        m_secondary_value = source.secondary_value;
+        m_enchant_bonus = source.enchant_bonus;
+    }
+
+    // Copy all attribute fields from another CItem
+    void copy_attributes_from(const CItem* other)
+    {
+        m_custom_made = other->m_custom_made;
+        m_prefix_type = other->m_prefix_type;
+        m_prefix_value = other->m_prefix_value;
+        m_secondary_type = other->m_secondary_type;
+        m_secondary_value = other->m_secondary_value;
+        m_enchant_bonus = other->m_enchant_bonus;
+    }
+
+    // Pack attributes into a uint32_t for generic event messages (e.g. SetItem ground broadcast)
+    // Uses the legacy bitmask layout for compatibility with send_event_to_near_client_type_b
+    uint32_t pack_attributes_uint32() const
+    {
+        uint32_t result = 0;
+        if (m_custom_made) result |= 0x00000001;
+        result |= (static_cast<uint32_t>(m_secondary_value) & 0x0F) << 8;
+        result |= (static_cast<uint32_t>(m_secondary_type) & 0x0F) << 12;
+        result |= (static_cast<uint32_t>(m_prefix_value) & 0x0F) << 16;
+        result |= (static_cast<uint32_t>(m_prefix_type) & 0x0F) << 20;
+        result |= (static_cast<uint32_t>(m_enchant_bonus) & 0x0F) << 28;
+        return result;
+    }
+
+    // Unpack a legacy uint32_t attribute bitmask into individual fields
+    void unpack_legacy_attribute(uint32_t attr)
+    {
+        m_custom_made = (attr & 0x00000001) != 0;
+        m_secondary_value = static_cast<uint8_t>((attr >> 8) & 0x0F);
+        m_secondary_type = static_cast<hb::shared::item::SecondaryEffectType>((attr >> 12) & 0x0F);
+        m_prefix_value = static_cast<uint8_t>((attr >> 16) & 0x0F);
+        m_prefix_type = static_cast<hb::shared::item::AttributePrefixType>((attr >> 20) & 0x0F);
+        m_enchant_bonus = static_cast<uint8_t>((attr >> 28) & 0x0F);
     }
 
     // Check if item is stackable (reads the config flag)
@@ -331,16 +387,11 @@ public:
         return parse_dice(m_item_effect_value1, m_item_effect_value2, m_item_effect_value3);
     }
 
-    // Light attribute percentage from special flag (bits 20-23 type, 16-19 value)
-    // Type 6 = light, percentage = value * 4
+    // Light attribute percentage — prefix_value is already the actual percentage
     int get_light_percent() const
     {
-        uint8_t special_type = static_cast<uint8_t>((m_attribute & 0x00F00000) >> 20);
-        if (special_type == 6)
-        {
-            uint8_t special_value = static_cast<uint8_t>((m_attribute & 0x000F0000) >> 16);
-            return special_value * 4;
-        }
+        if (m_prefix_type == hb::shared::item::AttributePrefixType::Light)
+            return m_prefix_value;
         return 0;
     }
 

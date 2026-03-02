@@ -140,7 +140,12 @@ struct AccountDbItemRow
     int spec_effect_value2;
     int spec_effect_value3;
     int cur_life_span;
-    uint32_t attribute;
+    int custom_made;
+    int prefix_type;
+    int prefix_value;
+    int secondary_type;
+    int secondary_value;
+    int enchant_bonus;
     int pos_x;
     int pos_y;
     int is_equipped;
@@ -160,7 +165,12 @@ struct AccountDbBankItemRow
     int spec_effect_value2;
     int spec_effect_value3;
     int cur_life_span;
-    uint32_t attribute;
+    int custom_made;
+    int prefix_type;
+    int prefix_value;
+    int secondary_type;
+    int secondary_value;
+    int enchant_bonus;
 };
 
 struct AccountDbIndexedValue

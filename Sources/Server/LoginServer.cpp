@@ -502,7 +502,12 @@ void LoginServer::response_character(int h, char* data)
 		item.cur_life_span = (entry.lifespan > 0)
 			? entry.lifespan
 			: G_pGame->m_item_config_list[entry.item_id]->m_durability;
-		item.attribute = 0;
+		item.custom_made = 0;
+		item.prefix_type = 0;
+		item.prefix_value = 0;
+		item.secondary_type = 0;
+		item.secondary_value = 0;
+		item.enchant_bonus = 0;
 		item.pos_x = 40;
 		item.pos_y = 30;
 		item.is_equipped = entry.is_equipped;

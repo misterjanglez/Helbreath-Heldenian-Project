@@ -209,7 +209,7 @@ void CraftingManager::req_create_portion_handler(int client_h, char* data)
 
 				m_game->send_event_to_near_client_type_b(MsgId::EventCommon, CommonType::ItemDrop, m_game->m_client_list[client_h]->m_map_index,
 					m_game->m_client_list[client_h]->m_x, m_game->m_client_list[client_h]->m_y,
-					item->m_id_num, 0, item->m_item_color, item->m_attribute); // v1.4
+					item->m_id_num, 0, item->m_item_color, static_cast<uint32_t>(item->m_enchant_bonus)); // v1.4
 
 				ret = m_game->m_item_manager->send_item_notify_msg(client_h, Notify::CannotCarryMoreItem, 0, 0);
 
@@ -479,7 +479,7 @@ void CraftingManager::req_create_crafting_handler(int client_h, char* data)
 			if (purity != 0)
 			{
 				item->m_item_special_effect_value2 = purity;
-				item->m_attribute = 1;
+				item->m_custom_made = true;
 			}
 			item->set_touch_effect_type(TouchEffectType::ID);
 			item->m_touch_effect_value1 = static_cast<short>(m_game->dice(1, 100000));
@@ -517,7 +517,7 @@ void CraftingManager::req_create_crafting_handler(int client_h, char* data)
 					m_game->m_client_list[client_h]->m_y, item);
 				m_game->send_event_to_near_client_type_b(MsgId::EventCommon, CommonType::ItemDrop, m_game->m_client_list[client_h]->m_map_index,
 					m_game->m_client_list[client_h]->m_x, m_game->m_client_list[client_h]->m_y,
-					item->m_id_num, 0, item->m_item_color, item->m_attribute);
+					item->m_id_num, 0, item->m_item_color, static_cast<uint32_t>(item->m_enchant_bonus));
 
 				ret = m_game->m_item_manager->send_item_notify_msg(client_h, Notify::CannotCarryMoreItem, 0, 0);
 

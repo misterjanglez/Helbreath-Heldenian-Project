@@ -412,7 +412,7 @@ CItem* CMap::get_item(short sX, short sY, short* remain_item_id, char* remain_it
 	{
 		*remain_item_id = tile->m_item[0]->m_id_num;
 		*remain_item_color = tile->m_item[0]->m_item_color;
-		*remain_item_attr = tile->m_item[0]->m_attribute;
+		*remain_item_attr = tile->m_item[0]->pack_attributes_uint32();
 	}
 
 	return item;
