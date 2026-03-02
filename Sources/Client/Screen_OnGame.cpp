@@ -84,9 +84,6 @@ void Screen_OnGame::destroy_player()
 
 void Screen_OnGame::on_initialize()
 {
-    // Set current mode for code that checks GameModeManager::get_mode()
-    GameModeManager::set_current_mode(GameMode::MainGame);
-
     // Create the player
     Screen_OnGame::create_player();
     m_game->m_player = s_player.get();

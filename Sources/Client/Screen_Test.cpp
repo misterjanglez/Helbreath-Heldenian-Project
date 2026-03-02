@@ -23,7 +23,6 @@ Screen_Test::Screen_Test(CGame* game)
 
 void Screen_Test::on_initialize()
 {
-	GameModeManager::set_current_mode(GameMode::Test);
 	m_scrollOffset = 0;
 
 	// Preload bitmap fonts for testing (normally done in Screen_Loading)
@@ -84,11 +83,6 @@ void Screen_Test::load_bitmap_fonts()
 		}
 	}
 }
-
-void Screen_Test::on_uninitialize()
-{
-}
-
 void Screen_Test::on_update()
 {
 	// ESC to quit

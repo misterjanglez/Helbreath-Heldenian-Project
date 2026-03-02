@@ -322,6 +322,7 @@
     <ClInclude Include="Camera.h" />
     <ClInclude Include="GameModeManager.h" />
     <ClInclude Include="GameFonts.h" />
+    <ClInclude Include="GameMode.h" />
     <ClInclude Include="IGameScreen.h" />
     <ClInclude Include="Screen_OnGame.h" />
     <ClInclude Include="SpellAoE.h" />

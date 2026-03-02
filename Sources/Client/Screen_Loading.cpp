@@ -26,7 +26,6 @@ Screen_Loading::Screen_Loading(CGame* game)
 
 void Screen_Loading::on_initialize()
 {
-    GameModeManager::set_current_mode(GameMode::Loading);
     m_iLoadingStage = 0;
 
     // Pre-load the loading screen sprite so it can render immediately
@@ -34,12 +33,6 @@ void Screen_Loading::on_initialize()
         m_game->m_sprite[InterfaceNdLoading] = loader.get_sprite(0, false);
     });
 }
-
-void Screen_Loading::on_uninitialize()
-{
-    // Nothing to clean up - resources are owned by CGame
-}
-
 void Screen_Loading::on_update()
 {
     // Process one loading stage per frame

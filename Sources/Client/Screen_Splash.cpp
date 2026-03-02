@@ -22,8 +22,6 @@ Screen_Splash::Screen_Splash(CGame* game)
 
 void Screen_Splash::on_initialize()
 {
-    GameModeManager::set_current_mode(GameMode::Splash);
-
     hb::shared::sprite::SpriteLoader::open_pak("interface/new-dialog", [&](hb::shared::sprite::SpriteLoader& loader) {
         m_game->m_sprite[SplashScreen] = loader.get_sprite(3, false);
         });

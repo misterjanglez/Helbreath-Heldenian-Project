@@ -356,6 +356,9 @@
     <ClInclude Include="IDialogBox.h">
       <Filter>DialogBox</Filter>
     </ClInclude>
+    <ClInclude Include="GameMode.h">
+      <Filter>Screens</Filter>
+    </ClInclude>
     <ClInclude Include="IGameScreen.h">
       <Filter>Screens</Filter>
     </ClInclude>

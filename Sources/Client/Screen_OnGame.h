@@ -31,6 +31,8 @@ class Screen_OnGame : public IGameScreen
 public:
     SCREEN_TYPE(Screen_OnGame)
 
+    GameMode get_game_mode() const override { return GameMode::MainGame; }
+
     explicit Screen_OnGame(CGame* game);
     ~Screen_OnGame() override = default;
 

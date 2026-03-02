@@ -42,8 +42,6 @@ Screen_CreateNewCharacter::Screen_CreateNewCharacter(CGame* game)
 
 void Screen_CreateNewCharacter::on_initialize()
 {
-    GameModeManager::set_current_mode(GameMode::CreateNewCharacter);
-
     // Initialize character creation defaults
     m_game->m_new_char.gender = rand() % 2 + 1;
     m_game->m_new_char.skin_col = rand() % 3 + 1;
@@ -281,15 +279,8 @@ void Screen_CreateNewCharacter::on_initialize()
     m_controls.set_focus(TXT_NAME);
 
     // Discard any pending input from previous screen/overlay
-    cc::input_state init_input;
-    hb::client::fill_input_state(init_input);
-    m_controls.discard_pending_input(init_input);
+    discard_pending_controls_input(m_controls);
 }
-
-void Screen_CreateNewCharacter::on_uninitialize()
-{
-}
-
 void Screen_CreateNewCharacter::on_update()
 {
     uint32_t time = GameClock::get_time_ms();
