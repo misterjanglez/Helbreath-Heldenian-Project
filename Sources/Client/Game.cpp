@@ -6225,6 +6225,7 @@ void CGame::init_data_response_handler(char* packet_data)
 	{
 		get_dialog_box_manager().get_dialog_box(DialogBoxId::GuideMap)->m_size_x = 128;
 		get_dialog_box_manager().get_dialog_box(DialogBoxId::GuideMap)->m_size_y = 128;
+		get_dialog_box_manager().enable_dialog_box(DialogBoxId::GuideMap, 0, 0, 0);
 	}
 
 	prev_location = m_cur_location;

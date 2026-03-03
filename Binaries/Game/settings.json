@@ -28,15 +28,15 @@
         "tileGrid": false,
         "toggleToChat": true,
         "vsync": false,
-        "zoomMap": true
+        "zoomMap": false
     },
     "shortcuts": {
-        "magic": 34,
+        "magic": 91,
         "slots": [
             -1,
             -1,
             -1,
-            -1,
+            191,
             -1
         ]
     },

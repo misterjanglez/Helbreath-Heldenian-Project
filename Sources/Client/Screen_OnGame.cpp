@@ -207,7 +207,8 @@ void Screen_OnGame::on_initialize()
     m_dialog_box_manager->get_dialog_as<DialogBox_GuildOperation>(DialogBoxId::GuildOperation)->reset();
     m_dialog_box_manager->get_dialog_as<DialogBox_SellList>(DialogBoxId::SellList)->reset();
     m_dialog_box_manager->get_dialog_as<DialogBox_Party>(DialogBoxId::Party)->reset_members();
-    m_dialog_box_manager->enable_dialog_box(DialogBoxId::GuideMap, 0, 0, 0);
+    // GuideMap is enabled in init_data_response_handler() after map data is loaded.
+    // Enabling it here would render before m_map_size_x/y are set, causing div-by-zero.
 
     m_network_message_manager = std::make_unique<NetworkMessageManager>(m_game);
 

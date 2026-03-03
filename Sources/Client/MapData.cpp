@@ -56,6 +56,14 @@ CMapData::CMapData(class CGame* game)
 {
 	int i;
 	m_game = game;
+	m_map_size_x = 0;
+	m_map_size_y = 0;
+	m_rect_x = 0;
+	m_rect_y = 0;
+	m_pivot_x = 0;
+	m_pivot_y = 0;
+	m_frame_check_time = 0;
+	m_frame_adjust_time = 0;
 	std::fill(std::begin(m_object_id_cache_loc_x), std::end(m_object_id_cache_loc_x), 0);
 	std::fill(std::begin(m_object_id_cache_loc_y), std::end(m_object_id_cache_loc_y), 0);
 	m_dynamic_object_frame_time = m_frame_time = GameClock::get_time_ms();
