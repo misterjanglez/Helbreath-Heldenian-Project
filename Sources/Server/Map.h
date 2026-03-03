@@ -84,7 +84,7 @@ public:
 	bool search_teleport_dest(int sX, int sY, char * map_name, int * dx, int * dy, direction * dir);
 	bool init(char * name);
 	bool is_valid_loc(short sX, short sY);
-	CItem * get_item(short sX, short sY, short* remain_item_id, char* remain_item_color, uint32_t* remain_item_attr);
+	CItem * get_item(short sX, short sY, short* remain_item_id, char* remain_item_color, uint32_t* remain_item_attr, uint64_t* remain_item_count = nullptr);
 	bool set_item(short sX, short sY, CItem * item);
 	void clear_dead_owner(short sX, short sY);
 	void clear_owner(int debug_code, short owner_h, char owner_type, short sX, short sY);

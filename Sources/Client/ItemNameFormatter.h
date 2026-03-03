@@ -8,10 +8,19 @@
 
 class CItem;
 
+enum class effect_category
+{
+	standalone,       // shown as its own tooltip line
+	inline_damage,    // appended to damage line (Sharp, Ancient, enchant)
+	inline_defense,   // appended to defence line (Strong, enchant)
+	inline_weight     // appended to weight line (Light)
+};
+
 struct tooltip_effect
 {
 	std::string label;   // e.g., "Magic Casting Probability "
 	std::string value;   // e.g., "+9%"
+	effect_category category = effect_category::standalone;
 };
 
 struct ItemNameInfo
@@ -52,6 +61,7 @@ public:
 	// format item name, returning name + attribute strings + special flag
 	ItemNameInfo format(CItem* item);
 	ItemNameInfo format(short item_id, uint32_t attribute);
+	ItemNameInfo format(short item_id, uint32_t attribute, uint16_t count);
 
 private:
 	item_name_formatter() = default;

@@ -1885,6 +1885,7 @@ void CombatManager::check_fire_bluring(char map_index, int sX, int sY)
 	CItem* item;
 	short id_num;
 	uint32_t attr;
+	uint64_t remain_item_count;
 
 	for(int ix = sX - 1; ix <= sX + 1; ix++)
 		for(int iy = sY - 1; iy <= sY + 1; iy++) {
@@ -1892,12 +1893,12 @@ void CombatManager::check_fire_bluring(char map_index, int sX, int sY)
 
 			switch (item_num) {
 			case 355:
-				item = m_game->m_map_list[map_index]->get_item(ix, iy, &id_num, &item_color, &attr);
+				item = m_game->m_map_list[map_index]->get_item(ix, iy, &id_num, &item_color, &attr, &remain_item_count);
 				if (item != 0) delete item;
 				m_game->m_dynamic_object_manager->add_dynamic_object_list(0, 0, dynamic_object::Fire, map_index, ix, iy, 6000);
 
 				m_game->send_event_to_near_client_type_b(MsgId::EventCommon, CommonType::SetItem, map_index,
-					ix, iy, id_num, 0, item_color, attr);
+					ix, iy, id_num, CItem::count_to_v2(remain_item_count), item_color, attr);
 				break;
 			}
 		}
@@ -2783,6 +2784,8 @@ uint32_t CombatManager::calculate_attack_effect(short target_h, char target_type
 					if (m_game->m_client_list[attacker_h]->m_item_list[m_game->m_client_list[attacker_h]->m_arrow_index] == 0)
 						return 0;
 
+					int arrow_id_num = m_game->m_client_list[attacker_h]->m_item_list[m_game->m_client_list[attacker_h]->m_arrow_index]->m_id_num;
+
 					if (arrow_use != true)
 						m_game->m_client_list[attacker_h]->m_item_list[m_game->m_client_list[attacker_h]->m_arrow_index]->m_count--;
 					if (m_game->m_client_list[attacker_h]->m_item_list[m_game->m_client_list[attacker_h]->m_arrow_index]->m_count <= 0) {
@@ -2793,6 +2796,13 @@ uint32_t CombatManager::calculate_attack_effect(short target_h, char target_type
 					else {
 						m_game->send_notify_msg(0, attacker_h, Notify::set_item_count, m_game->m_client_list[attacker_h]->m_arrow_index, m_game->m_client_list[attacker_h]->m_item_list[m_game->m_client_list[attacker_h]->m_arrow_index]->m_count, false, 0);
 						m_game->calc_total_weight(attacker_h);
+					}
+
+					// Poison arrows apply poison (same as weapon poison prefix, sa=61)
+					if (arrow_id_num == hb::shared::item::ItemId::PoisonArrow)
+					{
+						attacker_sa = 61;
+						attacker_s_avalue = 20;
 					}
 				}
 				if (protect == 1) return 0;

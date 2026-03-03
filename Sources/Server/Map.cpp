@@ -386,11 +386,11 @@ bool CMap::set_item(short sX, short sY, CItem* item)
 	return true;
 }
 
-CItem* CMap::get_item(short sX, short sY, short* remain_item_id, char* remain_item_color, uint32_t* remain_item_attr) //v1.4 color
+CItem* CMap::get_item(short sX, short sY, short* remain_item_id, char* remain_item_color, uint32_t* remain_item_attr, uint64_t* remain_item_count) //v1.4 color
 {
 	class CTile* tile;
 	CItem* item;
-	
+
 
 	if ((sX < 0) || (sX >= m_size_x) || (sY < 0) || (sY >= m_size_y)) return 0;
 
@@ -407,12 +407,14 @@ CItem* CMap::get_item(short sX, short sY, short* remain_item_id, char* remain_it
 		*remain_item_id = 0;
 		*remain_item_color = 0;
 		*remain_item_attr = 0;
+		if (remain_item_count) *remain_item_count = 0;
 	}
 	else
 	{
 		*remain_item_id = tile->m_item[0]->m_id_num;
 		*remain_item_color = tile->m_item[0]->m_item_color;
 		*remain_item_attr = tile->m_item[0]->pack_attributes_uint32();
+		if (remain_item_count) *remain_item_count = tile->m_item[0]->m_count;
 	}
 
 	return item;

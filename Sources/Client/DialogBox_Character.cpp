@@ -344,8 +344,7 @@ void DialogBox_Character::on_draw()
 
 	// Max load
 	int total_weight = inventory_manager::get().calc_total_weight();
-	int wups = hb::shared::balance::weight_units_per_stone;
-	valueBuf = std::format("{}/{}", (total_weight / wups), max_load);
+	valueBuf = std::format("{:.2f}/{}", CItem::weight_to_stones(total_weight), max_load);
 	put_aligned_string(sX + 180, sX + 250, sY + 240, valueBuf.c_str(), GameColors::UILabel);
 
 	// Enemy Kills

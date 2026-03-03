@@ -104,10 +104,10 @@ ItemNameInfo item_name_formatter::format(CItem* item)
 			case 3: break;
 			case 4: break;
 			case 5: result.effects.push_back({"Attack Speed -1", ""}); break;
-			case 6: result.effects.push_back({std::format("{}% light", value1 * pm), ""}); break;
-			case 7: result.effects.push_back({"Damage added", ""}); break;
-			case 8: result.effects.push_back({"Endurance ", std::format("+{}%", value1 * pm)}); break;
-			case 9: result.effects.push_back({"Extra Damage added", ""}); break;
+			case 6: result.effects.push_back({std::format("-{}%", value1 * pm), "", effect_category::inline_weight}); break;
+			case 7: result.effects.push_back({std::format("+{}", value1 * pm), "", effect_category::inline_damage}); break;
+			case 8: result.effects.push_back({std::format("+{}%", value1 * pm), "", effect_category::inline_defense}); break;
+			case 9: result.effects.push_back({std::format("+{}", value1 * pm), "", effect_category::inline_damage}); break;
 			case hb::shared::owner::Slime: result.effects.push_back({"Magic Casting Probability ", std::format("+{}%", value1 * pm)}); break;
 			case hb::shared::owner::Skeleton: result.effects.push_back({std::format("Replace {}% damage to mana", value1 * pm), ""}); break;
 			case hb::shared::owner::StoneGolem: result.effects.push_back({"Crit Increase Chance ", std::format("{}%", value1 * pm)}); break;
@@ -227,10 +227,10 @@ ItemNameInfo item_name_formatter::format(short item_id, uint32_t attribute)
 			case 3: break;
 			case 4: break;
 			case 5: result.effects.push_back({"Attack Speed -1", ""}); break;
-			case 6: result.effects.push_back({std::format("{}% light", value1 * pm), ""}); break;
-			case 7: result.effects.push_back({"Damage added", ""}); break;
-			case 8: result.effects.push_back({"Endurance ", std::format("+{}%", value1 * pm)}); break;
-			case 9: result.effects.push_back({"Extra Damage added", ""}); break;
+			case 6: result.effects.push_back({std::format("-{}%", value1 * pm), "", effect_category::inline_weight}); break;
+			case 7: result.effects.push_back({std::format("+{}", value1 * pm), "", effect_category::inline_damage}); break;
+			case 8: result.effects.push_back({std::format("+{}%", value1 * pm), "", effect_category::inline_defense}); break;
+			case 9: result.effects.push_back({std::format("+{}", value1 * pm), "", effect_category::inline_damage}); break;
 			case hb::shared::owner::Slime: result.effects.push_back({"Magic Casting Probability ", std::format("+{}%", value1 * pm)}); break;
 			case hb::shared::owner::Skeleton: result.effects.push_back({std::format("Replace {}% damage to mana", value1 * pm), ""}); break;
 			case hb::shared::owner::StoneGolem: result.effects.push_back({"Crit Increase Chance ", std::format("{}%", value1 * pm)}); break;
@@ -277,5 +277,13 @@ ItemNameInfo item_name_formatter::format(short item_id, uint32_t attribute)
 		}
 	}
 
+	return result;
+}
+
+ItemNameInfo item_name_formatter::format(short item_id, uint32_t attribute, uint16_t count)
+{
+	ItemNameInfo result = format(item_id, attribute);
+	if (count > 1)
+		result.name = std::format(DRAW_DIALOGBOX_SELLOR_REPAIR_ITEM1, count, result.name);
 	return result;
 }

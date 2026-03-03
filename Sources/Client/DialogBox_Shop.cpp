@@ -174,8 +174,7 @@ void DialogBox_Shop::draw_item_details(short sX, short sY, short mouse_x, short 
     auto shopPrice = std::format(DRAW_DIALOGBOX_SHOP7, cost);
     hb::shared::text::draw_text(GameFont::Default, sX + 140, sY + 98, shopPrice.c_str(), hb::shared::text::TextStyle::from_color(GameColors::UILabel));
 
-    int wups = hb::shared::balance::weight_units_per_stone;
-    int weight = shop_manager::get().get_item_list()[item_index]->m_weight / wups;
+    float weight = CItem::weight_to_stones(shop_manager::get().get_item_list()[item_index]->m_weight);
     auto shopWeight = std::format(DRAW_DIALOGBOX_SHOP8, weight);
     hb::shared::text::draw_text(GameFont::Default, sX + 140, sY + 113, shopWeight.c_str(), hb::shared::text::TextStyle::from_color(GameColors::UILabel));
 
@@ -199,6 +198,24 @@ void DialogBox_Shop::draw_item_details(short sX, short sY, short mouse_x, short 
 
     case EquipPos::None:
         break;
+    }
+
+    // Consumable restore display
+    auto* shop_item = shop_manager::get().get_item_list()[item_index].get();
+    auto shop_effect = shop_item->get_item_effect_type();
+    if (is_consumable_effect_type(shop_effect))
+    {
+        auto range = parse_dice(shop_item->m_item_effect_value1, shop_item->m_item_effect_value2, shop_item->m_item_effect_value3);
+        std::string restoreStr;
+        if (shop_effect == ItemEffectType::HP)
+            restoreStr = std::format(TOOLTIP_RESTORES_HP, range.min, range.max);
+        else if (shop_effect == ItemEffectType::MP)
+            restoreStr = std::format(TOOLTIP_RESTORES_MP, range.min, range.max);
+        else if (shop_effect == ItemEffectType::SP)
+            restoreStr = std::format(TOOLTIP_RESTORES_SP, range.min, range.max);
+        else
+            restoreStr = std::format(DRAW_DIALOGBOX_SHOP28, range.min, range.max);
+        hb::shared::text::draw_text(GameFont::Default, sX + 40, sY + 145, restoreStr.c_str(), hb::shared::text::TextStyle::from_color(GameColors::UILabel));
     }
 
     draw_level_requirement(sX, sY, item_index, flag_red_shown);

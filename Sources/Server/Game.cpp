@@ -1250,6 +1250,14 @@ bool CGame::init()
 		hb::logger::warn("Shop data not configured, NPCs will not have shop inventories");
 	}
 
+	// Load summon creature thresholds (optional)
+	if (HasGameConfigRows(configDb, "summon_thresholds")) {
+		LoadSummonThresholds(configDb, this);
+	}
+	if (m_summon_thresholds.empty()) {
+		hb::logger::warn("Summon thresholds not configured, Summon spell will have no creature pool");
+	}
+
 	read_notify_msg_list_file("gameconfigs/notice.txt");
 	m_notice_time = time;
 
@@ -3280,6 +3288,7 @@ int CGame::compose_init_map_data(short sX, short sY, int client_h, char* data)
 					itemObj.item_id = tile->m_item[0]->m_id_num;
 					itemObj.color = tile->m_item[0]->m_item_color;
 					tile->m_item[0]->copy_attributes_to(itemObj);
+					itemObj.count = CItem::count_to_v2(tile->m_item[0]->m_count);
 					std::memcpy(cp, &itemObj, sizeof(itemObj));
 					cp += sizeof(itemObj);
 					size += sizeof(itemObj);
@@ -4086,6 +4095,7 @@ int CGame::compose_move_map_data(short sX, short sY, int client_h, direction dir
 				itemObj.secondary_type = static_cast<uint8_t>(tile->m_item[0]->m_secondary_type);
 				itemObj.secondary_value = tile->m_item[0]->m_secondary_value;
 				itemObj.enchant_bonus = tile->m_item[0]->m_enchant_bonus;
+				itemObj.count = CItem::count_to_v2(tile->m_item[0]->m_count);
 				std::memcpy(cp, &itemObj, sizeof(itemObj));
 				cp += sizeof(itemObj);
 				size += sizeof(itemObj);
@@ -5491,8 +5501,6 @@ void CGame::chat_msg_handler_gsm(int msg_type, int v1, char* name, char* data, s
 //						   - added checks for Firebow and Directionbow to see if player is m_is_inside_warehouse, m_is_inside_wizard_tower, m_is_inside_own_town 
 //						   - added ability to attack moving object
 //						   - fixed attack unmoving object
-// Incomplete: 
-//			- Direction Bow damage disabled
 int CGame::client_motion_attack_handler(int client_h, short sX, short sY, short dX, short dY, short type, direction dir, uint16_t target_object_id, uint32_t client_time, bool response, bool is_dash)
 {
 	uint32_t time, exp;
@@ -5687,10 +5695,10 @@ int CGame::client_motion_attack_handler(int client_h, short sX, short sY, short 
 							err = 0;
 							CMisc::GetPoint2(sX, sY, dX, dY, &tX, &tY, &err, i);
 							m_map_list[m_client_list[client_h]->m_map_index]->get_owner(&owner, &owner_type, tX, tY);
-							//exp += m_combat_manager->calculate_attack_effect(owner, owner_type, client_h, hb::shared::owner_class::Player, tX, tY, type, near_attack, is_dash, true); // 1
+							exp += m_combat_manager->calculate_attack_effect(owner, owner_type, client_h, hb::shared::owner_class::Player, tX, tY, type, near_attack, is_dash, true);
 							if ((abs(tdX - dX) <= 1) && (abs(tdY - dY) <= 1)) {
 								m_map_list[m_client_list[client_h]->m_map_index]->get_owner(&owner, &owner_type, dX, dY);
-								//exp += m_combat_manager->calculate_attack_effect(owner, owner_type, client_h, hb::shared::owner_class::Player, dX, dY, type, near_attack, is_dash, false); // 0
+								exp += m_combat_manager->calculate_attack_effect(owner, owner_type, client_h, hb::shared::owner_class::Player, dX, dY, type, near_attack, is_dash, false);
 							}
 						}
 					}
@@ -12790,244 +12798,6 @@ void CGame::show_client_msg(int client_h, char* pMsg)
 	m_client_list[client_h]->m_socket->send_msg(temp, msg_size + sizeof(hb::net::PacketChatMsg));
 }
 
-void CGame::command_yellow_ball(int client_h, char* data, size_t msg_size)
-{
-	char   seps[] = "= \t\r\n";
-	char* token, buff[256], player_name[11], map_name[32];
-	int sox_h, so_x;
-
-	if (m_client_list[client_h] == 0) return;
-	if ((msg_size) <= 0) return;
-
-	so_x = 0;
-	for(int i = 0; i < hb::shared::limits::MaxItems; i++)
-		if (m_client_list[client_h]->m_item_list[i] != 0) {
-			switch (m_client_list[client_h]->m_item_list[i]->m_id_num) {
-			case 653: so_x++; sox_h = i; break;
-			}
-		}
-	if (so_x > 0) {
-
-		std::memset(player_name, 0, sizeof(player_name));
-		std::memset(buff, 0, sizeof(buff));
-		memcpy(buff, data, msg_size);
-
-		token = strtok(NULL, seps);
-
-		token = strtok(NULL, seps);
-		if (token == 0) {
-			return;
-		}
-
-		if (strlen(token) > hb::shared::limits::CharNameLen - 1) {
-			memcpy(player_name, token, hb::shared::limits::CharNameLen - 1);
-		}
-		else {
-			memcpy(player_name, token, strlen(token));
-		}
-
-		for(int i = 1; i < MaxClients; i++) {
-			if (m_client_list[i] != 0) {
-				if (hb_strnicmp(player_name, m_client_list[i]->m_char_name, hb::shared::limits::CharNameLen - 1) == 0) {
-					if (strcmp(m_client_list[client_h]->m_location, m_client_list[i]->m_location) != 0)
-						return;
-
-					std::memset(map_name, 0, sizeof(map_name));
-					strcpy(map_name, m_client_list[i]->m_map_name);
-					hb::logger::log<log_channel::items_misc>("{} IP({}) {} (null) at {}({},{})", m_client_list[i]->m_char_name, m_client_list[i]->m_ip_address, "YellowBall", m_client_list[i]->m_map_name, m_client_list[i]->m_x, m_client_list[i]->m_y);
-					m_item_manager->item_deplete_handler(client_h, sox_h, true);
-					request_teleport_handler(client_h, "2   ", map_name, m_client_list[i]->m_x, m_client_list[i]->m_y);
-					return;
-				}
-			}
-		}
-	}
-}
-
-void CGame::command_red_ball(int client_h, char* data, size_t msg_size)
-{
-	char seps[] = "= \t\r\n", name[hb::shared::limits::NpcNameLen], npc_name[hb::shared::limits::NpcNameLen], npc_waypoint[11];
-	int naming_value, tX, tY, x, npc_id;
-	int sox_h, so_x;
-
-	if (m_client_list[client_h] == 0) return;
-	if ((memcmp(m_map_list[m_client_list[client_h]->m_map_index]->m_name, "huntzone1", 9) != 0) &&
-		(memcmp(m_map_list[m_client_list[client_h]->m_map_index]->m_name, "huntzone2", 9) != 0) &&
-		(memcmp(m_map_list[m_client_list[client_h]->m_map_index]->m_name, "huntzone3", 9) != 0) &&
-		(memcmp(m_map_list[m_client_list[client_h]->m_map_index]->m_name, "huntzone4", 9) != 0)) return;
-
-	so_x = 0;
-	for(int i = 0; i < hb::shared::limits::MaxItems; i++)
-		if (m_client_list[client_h]->m_item_list[i] != 0) {
-			switch (m_client_list[client_h]->m_item_list[i]->m_id_num) {
-			case 652: so_x++; sox_h = i; break;
-			}
-		}
-	if (so_x > 0) {
-		naming_value = m_map_list[m_client_list[client_h]->m_map_index]->get_empty_naming_value();
-		if (naming_value == -1) {
-
-		}
-		else {
-
-			std::memset(npc_name, 0, sizeof(npc_name));
-			switch (dice(1, 5)) {
-			case 1: strcpy(npc_name, "Wyvern"); npc_id = 66; break;
-			case 2: strcpy(npc_name, "Hellclaw"); npc_id = 49; break;
-			case 3: strcpy(npc_name, "Fire-Wyvern"); npc_id = 73; break;
-			case 4: strcpy(npc_name, "Tigerworm"); npc_id = 50; break;
-			case 5: strcpy(npc_name, "Gagoyle"); npc_id = 52; break;
-			}
-			std::memset(name, 0, sizeof(name));
-			std::snprintf(name, sizeof(name), "XX%d", naming_value);
-			name[0] = '_';
-			name[1] = m_client_list[client_h]->m_map_index + 65;
-
-			std::memset(npc_waypoint, 0, sizeof(npc_waypoint));
-
-			tX = (int)m_client_list[client_h]->m_x;
-			tY = (int)m_client_list[client_h]->m_y;
-			int npc_config_id = get_npc_config_id_by_name(npc_name);
-			if (create_new_npc(npc_config_id, name, m_map_list[m_client_list[client_h]->m_map_index]->m_name, 0, (rand() % 9),
-				MoveType::Random, &tX, &tY, npc_waypoint, 0, 0, -1, false, false) == false) {
-				m_map_list[m_client_list[client_h]->m_map_index]->set_naming_value_empty(naming_value);
-			}
-			else {
-				hb::logger::log<log_channel::items_misc>("{} IP({}) {} (null) at {}({},{})", m_client_list[client_h]->m_char_name, m_client_list[client_h]->m_ip_address, "RedBall", m_map_list[m_client_list[client_h]->m_map_index]->m_name, tX, tY);
-			}
-		}
-
-		for (x = 1; x < MaxClients; x++)
-			if ((m_client_list[x] != 0) && (m_client_list[x]->m_is_init_complete)) {
-				send_notify_msg(0, x, Notify::SpawnEvent, tX, tY, npc_id, 0, 0, 0);
-			}
-		m_item_manager->item_deplete_handler(client_h, sox_h, true);
-	}
-}
-
-void CGame::command_blue_ball(int client_h, char* data, size_t msg_size)
-
-{
-	char seps[] = "= \t\r\n";
-	char   cName_Master[10], cName_Slave[10], npc_name[hb::shared::limits::NpcNameLen], waypoint[11], sa;
-	int    pX, pY, j, num, naming_value, npc_id;
-	int x;
-	bool   master;
-	int sox_h, so_x;
-
-	if (m_client_list[client_h] == 0) return;
-	if ((memcmp(m_map_list[m_client_list[client_h]->m_map_index]->m_name, "huntzone1", 9) != 0) &&
-		(memcmp(m_map_list[m_client_list[client_h]->m_map_index]->m_name, "huntzone2", 9) != 0) &&
-		(memcmp(m_map_list[m_client_list[client_h]->m_map_index]->m_name, "huntzone3", 9) != 0) &&
-		(memcmp(m_map_list[m_client_list[client_h]->m_map_index]->m_name, "huntzone4", 9) != 0)) return;
-
-	so_x = 0;
-	for(int i = 0; i < hb::shared::limits::MaxItems; i++)
-		if (m_client_list[client_h]->m_item_list[i] != 0) {
-			switch (m_client_list[client_h]->m_item_list[i]->m_id_num) {
-			case 654: so_x++; sox_h = i; break;
-			}
-		}
-	if (so_x > 0) {
-		naming_value = m_map_list[m_client_list[client_h]->m_map_index]->get_empty_naming_value();
-		if (naming_value == -1) {
-
-		}
-		else {
-
-			std::memset(npc_name, 0, sizeof(npc_name));
-
-			switch (dice(1, 38)) {
-			case 1: strcpy(npc_name, "Slime");			npc_id = 10; break;
-			case 2: strcpy(npc_name, "Giant-Ant");		npc_id = 15; break;
-			case 3: strcpy(npc_name, "Zombie");			npc_id = 17; break;
-			case 4: strcpy(npc_name, "Scorpion");		npc_id = 16; break;
-			case 5: strcpy(npc_name, "Skeleton");		npc_id = 11; break;
-			case 6: strcpy(npc_name, "Orc-Mage");		npc_id = 14; break;
-			case 7: strcpy(npc_name, "Clay-Golem");		npc_id = 23; break;
-			case 8: strcpy(npc_name, "Stone-Golem");	npc_id = 12; break;
-			case 9: strcpy(npc_name, "Hellbound");		npc_id = 27; break;
-			case 10: strcpy(npc_name, "Giant-Frog");	npc_id = 57; break;
-			case 11: strcpy(npc_name, "Troll");			npc_id = 28; break;
-			case 12: strcpy(npc_name, "Cyclops");		npc_id = 13; break;
-			case 13: strcpy(npc_name, "Ice-Golem");		npc_id = 65; break;
-			case 14: strcpy(npc_name, "Beholder");		npc_id = 53; break;
-			case 15: strcpy(npc_name, "Cannibal-Plant"); npc_id = 60; break;
-			case 16: strcpy(npc_name, "Orge");			npc_id = 29; break;
-			case 17: strcpy(npc_name, "Mountain-Giant"); npc_id = 58; break;
-			case 18: strcpy(npc_name, "DireBoar");		npc_id = 62; break;
-			case 19: strcpy(npc_name, "Liche");			npc_id = 30; break;
-			case 20: strcpy(npc_name, "Stalker");		npc_id = 48; break;
-			case 21: strcpy(npc_name, "WereWolf");		npc_id = 33; break;
-			case 22: strcpy(npc_name, "Dark-Elf");		npc_id = 54; break;
-			case 23: strcpy(npc_name, "Frost");			npc_id = 63; break;
-			case 24: strcpy(npc_name, "Orc");			npc_id = 14; break;
-			case 25: strcpy(npc_name, "Ettin");			npc_id = 59; break;
-			case 26: strcpy(npc_name, "Tentocle");		npc_id = 80; break;
-			case 27: strcpy(npc_name, "Giant-Crayfish"); npc_id = 74; break;
-			case 28: strcpy(npc_name, "Giant-Plant");	npc_id = 76; break;
-			case 29: strcpy(npc_name, "Rudolph");		npc_id = 61; break;
-			case 30: strcpy(npc_name, "Claw-Turtle");	npc_id = 72; break;
-			case 31: strcpy(npc_name, "Centaurus");		npc_id = 71; break;
-			case 32: strcpy(npc_name, "Barlog");		npc_id = 70; break;
-			case 33: strcpy(npc_name, "Giant-Lizard");	npc_id = 75; break;
-			case 34: strcpy(npc_name, "MasterMage-Orc"); npc_id = 77; break;
-			case 35: strcpy(npc_name, "Minotaurs");		npc_id = 78; break;
-			case 36: strcpy(npc_name, "Unicorn");		npc_id = 32; break;
-			case 37: strcpy(npc_name, "Nizie");			npc_id = 79; break;
-			}
-
-			num = 10;
-			sa = 0;
-			pX = m_client_list[client_h]->m_x;
-			pY = m_client_list[client_h]->m_y;
-
-			hb::logger::log("BlueBall event: summoning '{}' x{}", npc_name, num);
-
-			int npc_config_id = get_npc_config_id_by_name(npc_name);
-			naming_value = m_map_list[m_client_list[client_h]->m_map_index]->get_empty_naming_value();
-			if (naming_value != -1) {
-
-				std::memset(cName_Master, 0, sizeof(cName_Master));
-				std::snprintf(cName_Master, sizeof(cName_Master), "XX%d", naming_value);
-				cName_Master[0] = '_';
-				cName_Master[1] = m_client_list[client_h]->m_map_index + 65;
-				if ((master = create_new_npc(npc_config_id, cName_Master, m_map_list[m_client_list[client_h]->m_map_index]->m_name, (rand() % 3), sa, MoveType::Random, &pX, &pY, waypoint, 0, 0, -1, false, false, false, true)) == false) {
-
-					m_map_list[m_client_list[client_h]->m_map_index]->set_naming_value_empty(naming_value);
-				}
-			}
-
-			for (j = 0; j < (num - 1); j++) {
-				naming_value = m_map_list[m_client_list[client_h]->m_map_index]->get_empty_naming_value();
-				if (naming_value != -1) {
-					// Slave Mob
-					std::memset(cName_Slave, 0, sizeof(cName_Slave));
-					std::snprintf(cName_Slave, sizeof(cName_Slave), "XX%d", naming_value);
-					cName_Slave[0] = '_';
-					cName_Slave[1] = m_client_list[client_h]->m_map_index + 65;
-
-					if (create_new_npc(npc_config_id, cName_Slave, m_map_list[m_client_list[client_h]->m_map_index]->m_name, (rand() % 3), sa, MoveType::Random, &pX, &pY, waypoint, 0, 0, -1, false, false, false) == false) {
-
-						m_map_list[m_client_list[client_h]->m_map_index]->set_naming_value_empty(naming_value);
-					}
-					else {
-						// Slave
-						if (m_entity_manager != 0) m_entity_manager->set_npc_follow_mode(cName_Slave, cName_Master, hb::shared::owner_class::Npc);
-					}
-				}
-			}
-
-		}
-	}
-
-	for (x = 1; x < MaxClients; x++)
-		if ((m_client_list[x] != 0) && (m_client_list[x]->m_is_init_complete)) {
-			send_notify_msg(0, x, Notify::SpawnEvent, pX, pY, npc_id, 0, 0, 0);
-		}
-	m_item_manager->item_deplete_handler(client_h, sox_h, true);
-}
-
 /*
 at the end of client connection have a true switch
 at the start of client move handler check if the switch is true
@@ -14236,29 +14006,24 @@ void CGame::lotery_handler(int client_h)
 	CItem* item;
 	int     item_id;
 	if (m_client_list[client_h] == 0) return;
-	switch (dice(1, 22)) {
+	switch (dice(1, 17)) {
 	case 1:item_id = 656; break; // XelimaStone
 	case 2:item_id = 657; break; // MerienStone
 	case 3:item_id = 650; break; // ZemstoneOfSacrifice
-	case 4:item_id = 652; break; // RedBall
-	case 5:item_id = 654; break; // BlueBall
-	case 6:item_id = 881; break; // ArmorDye(Indigo)
-	case 7:item_id = 882; break; // ArmorDye(CrimsonRed)
-	case 8:item_id = 883; break; // ArmorDye(Gold)
-	case 9:item_id = 884; break; // ArmorDye(Aqua)
-	case 10:item_id = 885; break; // ArmorDye(Pink)
-	case 11:item_id = 886; break; // ArmorDye(Violet)
-	case 12:item_id = 887; break; // ArmorDye(Blue) 
-	case 13:item_id = 888; break; // ArmorDye(Khaki) 
-	case 14:item_id = 889; break; // ArmorDye(Yellow) 
-	case 15:item_id = 890; break; // ArmorDye(Red) 
-	case 16:item_id = 971; break; // ArmorDye(Green)
-	case 17:item_id = 972; break; // ArmorDye(Black) 
-	case 18:item_id = 973; break; // ArmorDye(Knight) 
-	case 19:item_id = 970; break; // CritCandy
-	case 20:item_id = 651; break; // GreenBall
-	case 21:item_id = 653; break; // YellowBall
-	case 22:item_id = 655; break; // PearlBall
+	case 4:item_id = 881; break; // ArmorDye(Indigo)
+	case 5:item_id = 882; break; // ArmorDye(CrimsonRed)
+	case 6:item_id = 883; break; // ArmorDye(Gold)
+	case 7:item_id = 884; break; // ArmorDye(Aqua)
+	case 8:item_id = 885; break; // ArmorDye(Pink)
+	case 9:item_id = 886; break; // ArmorDye(Violet)
+	case 10:item_id = 887; break; // ArmorDye(Blue)
+	case 11:item_id = 888; break; // ArmorDye(Khaki)
+	case 12:item_id = 889; break; // ArmorDye(Yellow)
+	case 13:item_id = 890; break; // ArmorDye(Red)
+	case 14:item_id = 971; break; // ArmorDye(Green)
+	case 15:item_id = 972; break; // ArmorDye(Black)
+	case 16:item_id = 973; break; // ArmorDye(Knight)
+	case 17:item_id = 970; break; // CritCandy
 	}
 
 	//chance
@@ -14274,7 +14039,7 @@ void CGame::lotery_handler(int client_h)
 			m_client_list[client_h]->m_y, item);
 		send_event_to_near_client_type_b(MsgId::EventCommon, CommonType::ItemDrop, m_client_list[client_h]->m_map_index,
 			m_client_list[client_h]->m_x, m_client_list[client_h]->m_y,
-			item->m_id_num, 0, item->m_item_color, static_cast<uint32_t>(item->m_enchant_bonus));
+			item->m_id_num, CItem::count_to_v2(item->m_count), item->m_item_color, static_cast<uint32_t>(item->m_enchant_bonus));
 	}
 
 }

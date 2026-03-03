@@ -1132,7 +1132,7 @@
 #define	DRAW_DIALOGBOX_SHOP3	"PRICE"
 #define	DRAW_DIALOGBOX_SHOP6	"Weight"
 #define	DRAW_DIALOGBOX_SHOP7	": {} Gold"
-#define	DRAW_DIALOGBOX_SHOP8	": {} Stone"
+#define	DRAW_DIALOGBOX_SHOP8	": {:.2f} Stone"
 #define	DRAW_DIALOGBOX_SHOP9	"Damage"
 #define	DRAW_DIALOGBOX_SHOP10	"Speed(Min.~Max.)"
 #define	DRAW_DIALOGBOX_SHOP11	"*Your STR should be at least {} to use this item."
@@ -1150,6 +1150,13 @@
 #define	DRAW_DIALOGBOX_SHOP25	": above {}"
 #define	DRAW_DIALOGBOX_SHOP26	"(Warning!) Your level is too low for this item."
 #define	DRAW_DIALOGBOX_SHOP27	"Quantity:"
+#define	DRAW_DIALOGBOX_SHOP28	"Restores Hunger: {}-{}"
+#define	TOOLTIP_WEIGHT			"Weight: {:.2f} stone"
+#define	TOOLTIP_WEIGHT_STACK	"Weight: {:.2f} stone (total: {:.2f})"
+#define	TOOLTIP_USAGES			"Usages: {}/{}"
+#define	TOOLTIP_RESTORES_HP		"Restores HP: {}-{}"
+#define	TOOLTIP_RESTORES_MP		"Restores MP: {}-{}"
+#define	TOOLTIP_RESTORES_SP		"Restores SP: {}-{}"
 
 
 

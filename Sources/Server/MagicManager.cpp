@@ -1,5 +1,6 @@
 #include "MagicManager.h"
 #include "Game.h"
+#include <algorithm>
 #include <format>
 #include "StatusEffectManager.h"
 #include "Item.h"
@@ -184,10 +185,11 @@ void MagicManager::player_magic_handler(int client_h, int dX, int dY, short type
 {
 	short sX, sY, owner_h, magic_circle, rx, ry, level_magic;
 	direction dir;
-	char owner_type, name[hb::shared::limits::CharNameLen], item_name[hb::shared::limits::ItemNameLen], npc_waypoint[11], cName_Master[hb::shared::limits::CharNameLen], npc_name[hb::shared::limits::NpcNameLen], remain_item_color, scan_message[256];
+	char owner_type, name[hb::shared::limits::CharNameLen], item_name[hb::shared::limits::ItemNameLen], npc_waypoint[11], cName_Master[hb::shared::limits::CharNameLen], remain_item_color, scan_message[256];
 	double dv1, dv2, dv3, dv4;
 	int err, ret, result, dice_res, naming_value, followers_num, erase_req, whether_bonus;
 	int tX, tY, mana_cost, magic_attr;
+	uint64_t remain_item_count;
 	CItem* item;
 	uint32_t time;
 	short eq_status;
@@ -205,8 +207,9 @@ void MagicManager::player_magic_handler(int client_h, int dX, int dY, short type
 	int casterX = m_game->m_client_list[client_h]->m_x;
 	int casterY = m_game->m_client_list[client_h]->m_y;
 
-	// Viewport clamp: reject casts outside the caster's visible area
-	if (abs(dX - casterX) > MaxCastRangeX || abs(dY - casterY) > MaxCastRangeY) return;
+	// Viewport clamp: clamp target to the caster's visible area instead of cancelling
+	dX = std::clamp(dX, casterX - MaxCastRangeX, casterX + MaxCastRangeX);
+	dY = std::clamp(dY, casterY - MaxCastRangeY, casterY + MaxCastRangeY);
 
 	// Auto-aim: snap to target's current server-side position to compensate for latency
 	if (targetObjectID != 0)
@@ -1772,82 +1775,84 @@ void MagicManager::player_magic_handler(int client_h, int dX, int dY, short type
 			break;
 
 		case hb::shared::magic::Summon:
-
+		{
 			if (m_game->m_map_list[m_game->m_client_list[client_h]->m_map_index]->m_is_fight_zone) return;
 
 			m_game->m_map_list[m_game->m_client_list[client_h]->m_map_index]->get_owner(&owner_h, &owner_type, dX, dY);
-			// Owner Master .
-			if ((owner_h != 0) && (owner_type == hb::shared::owner_class::Player)) {
-				// Master       .
-				followers_num = m_game->get_follower_number(owner_h, owner_type);
+			if ((owner_h == 0) || (owner_type != hb::shared::owner_class::Player)) break;
 
-				// Casting  Magery/20     .
-				if (followers_num >= (m_game->m_client_list[client_h]->m_skill_mastery[4] / 20)) break;
+			followers_num = m_game->get_follower_number(owner_h, owner_type);
+			if (followers_num >= (m_game->m_client_list[client_h]->m_skill_mastery[4] / 20))
+			{
+				m_game->send_notify_msg(0, client_h, Notify::NoticeMsg, 0, 0, 0,
+					"You cannot control any more creatures.");
+				break;
+			}
 
-				naming_value = m_game->m_map_list[m_game->m_client_list[client_h]->m_map_index]->get_empty_naming_value();
-				if (naming_value == -1) {
-					// NPC  .     .
-				}
-				else {
-					// NPC .
-					std::memset(name, 0, sizeof(name));
-					std::snprintf(name, sizeof(name), "XX%d", naming_value);
-					name[0] = '_';
-					name[1] = m_game->m_client_list[client_h]->m_map_index + 65;
+			naming_value = m_game->m_map_list[m_game->m_client_list[client_h]->m_map_index]->get_empty_naming_value();
+			if (naming_value == -1)
+			{
+				m_game->send_notify_msg(0, client_h, Notify::NoticeMsg, 0, 0, 0,
+					"The summoning fails - too many creatures in this area.");
+				break;
+			}
 
-					// Magery     .
-					std::memset(npc_name, 0, sizeof(npc_name));
+			// Build eligible pool from mastery-based thresholds
+			int mastery = m_game->m_client_list[client_h]->m_skill_mastery[4];
+			int total_weight = 0;
+			for (const auto& entry : m_game->m_summon_thresholds)
+			{
+				if (mastery >= entry.min_mastery)
+					total_weight += entry.weight;
+			}
 
-					switch (v1) {
-					case 0:
-						result = m_game->dice(1, m_game->m_client_list[client_h]->m_skill_mastery[4] / 10);
+			if (total_weight <= 0)
+				break;
 
-						if (result < m_game->m_client_list[client_h]->m_skill_mastery[4] / 20)
-							result = m_game->m_client_list[client_h]->m_skill_mastery[4] / 20;
-
-						switch (result) {
-						case 1: strcpy(npc_name, "Slime"); break;
-						case 2: strcpy(npc_name, "Giant-Ant"); break;
-						case 3: strcpy(npc_name, "Amphis"); break;
-						case 4: strcpy(npc_name, "Orc"); break;
-						case 5: strcpy(npc_name, "Skeleton"); break;
-						case 6:	strcpy(npc_name, "Clay-Golem"); break;
-						case 7:	strcpy(npc_name, "Stone-Golem"); break;
-						case 8: strcpy(npc_name, "Orc-Mage"); break;
-						case 9:	strcpy(npc_name, "Hellbound"); break;
-						case 10:strcpy(npc_name, "Cyclops"); break;
-						}
+			int roll = m_game->dice(1, total_weight);
+			int cumulative = 0;
+			int selected_npc_id = -1;
+			for (const auto& entry : m_game->m_summon_thresholds)
+			{
+				if (mastery >= entry.min_mastery)
+				{
+					cumulative += entry.weight;
+					if (roll <= cumulative)
+					{
+						selected_npc_id = entry.npc_id;
 						break;
-
-					case 1:	strcpy(npc_name, "Orc"); break;
-					case 2: strcpy(npc_name, "Skeleton"); break;
-					case 3: strcpy(npc_name, "Clay-Golem"); break;
-					case 4: strcpy(npc_name, "Stone-Golem"); break;
-					case 5: strcpy(npc_name, "Hellbound"); break;
-					case 6: strcpy(npc_name, "Cyclops"); break;
-					case 7: strcpy(npc_name, "Troll"); break;
-					case 8: strcpy(npc_name, "Orge"); break;
-					}
-
-					int npc_config_id = m_game->get_npc_config_id_by_name(npc_name);
-					if (m_game->create_new_npc(npc_config_id, name, m_game->m_map_list[m_game->m_client_list[client_h]->m_map_index]->m_name, 0, 0, MoveType::Random, &dX, &dY, npc_waypoint, 0, 0, m_game->m_client_list[client_h]->m_side, false, true) == false) {
-						// NameValue .
-						m_game->m_map_list[m_game->m_client_list[client_h]->m_map_index]->set_naming_value_empty(naming_value);
-					}
-					else {
-						std::memset(cName_Master, 0, sizeof(cName_Master));
-						switch (owner_type) {
-						case hb::shared::owner_class::Player:
-							memcpy(cName_Master, m_game->m_client_list[owner_h]->m_char_name, hb::shared::limits::CharNameLen - 1);
-							break;
-						case hb::shared::owner_class::Npc:
-							memcpy(cName_Master, m_game->m_npc_list[owner_h]->m_name, 5);
-							break;
-						}
-						if (m_game->m_entity_manager != 0) m_game->m_entity_manager->set_npc_follow_mode(name, cName_Master, owner_type);
 					}
 				}
 			}
+
+			if (selected_npc_id < 0)
+				break;
+
+			std::memset(name, 0, sizeof(name));
+			std::snprintf(name, sizeof(name), "XX%d", naming_value);
+			name[0] = '_';
+			name[1] = m_game->m_client_list[client_h]->m_map_index + 65;
+
+			if (m_game->create_new_npc(selected_npc_id, name, m_game->m_map_list[m_game->m_client_list[client_h]->m_map_index]->m_name, 0, 0, MoveType::Random, &dX, &dY, npc_waypoint, 0, 0, m_game->m_client_list[client_h]->m_side, false, true) == false)
+			{
+				m_game->m_map_list[m_game->m_client_list[client_h]->m_map_index]->set_naming_value_empty(naming_value);
+				m_game->send_notify_msg(0, client_h, Notify::NoticeMsg, 0, 0, 0,
+					"The summoning fails.");
+				break;
+			}
+
+			std::memset(cName_Master, 0, sizeof(cName_Master));
+			switch (owner_type)
+			{
+			case hb::shared::owner_class::Player:
+				memcpy(cName_Master, m_game->m_client_list[owner_h]->m_char_name, hb::shared::limits::CharNameLen - 1);
+				break;
+			case hb::shared::owner_class::Npc:
+				memcpy(cName_Master, m_game->m_npc_list[owner_h]->m_name, 5);
+				break;
+			}
+			if (m_game->m_entity_manager != 0) m_game->m_entity_manager->set_npc_follow_mode(name, cName_Master, owner_type);
+		}
 			break;
 
 		case hb::shared::magic::Create:
@@ -1878,7 +1883,7 @@ void MagicManager::player_magic_handler(int client_h, int dX, int dY, short type
 			m_game->m_item_manager->item_log(ItemLogAction::Drop, client_h, (int)-1, item);
 
 			m_game->send_event_to_near_client_type_b(MsgId::EventCommon, CommonType::ItemDrop, m_game->m_client_list[client_h]->m_map_index,
-				dX, dY, item->m_id_num, 0, item->m_item_color, static_cast<uint32_t>(item->m_enchant_bonus)); // v1.4 color
+				dX, dY, item->m_id_num, CItem::count_to_v2(item->m_count), item->m_item_color, static_cast<uint32_t>(item->m_enchant_bonus)); // v1.4 color
 			break;
 
 		case hb::shared::magic::Protect:
@@ -2159,7 +2164,7 @@ void MagicManager::player_magic_handler(int client_h, int dX, int dY, short type
 			m_game->m_map_list[m_game->m_client_list[client_h]->m_map_index]->get_owner(&owner_h, &owner_type, dX, dY);
 			if (owner_h != 0) break;
 
-			item = m_game->m_map_list[m_game->m_client_list[client_h]->m_map_index]->get_item(dX, dY, &id_num, &remain_item_color, &attr);
+			item = m_game->m_map_list[m_game->m_client_list[client_h]->m_map_index]->get_item(dX, dY, &id_num, &remain_item_color, &attr, &remain_item_count);
 			if (item != 0) {
 				if (m_game->m_item_manager->add_client_item_list(client_h, item, &erase_req)) {
 
@@ -2175,6 +2180,11 @@ void MagicManager::player_magic_handler(int client_h, int dX, int dY, short type
 						m_game->delete_client(client_h, true, true);
 						return;
 					}
+
+					// Broadcast remaining item state to nearby clients
+					m_game->send_event_to_near_client_type_b(MsgId::EventCommon, CommonType::SetItem,
+						m_game->m_client_list[client_h]->m_map_index,
+						dX, dY, id_num, CItem::count_to_v2(remain_item_count), remain_item_color, attr);
 				}
 				else
 				{

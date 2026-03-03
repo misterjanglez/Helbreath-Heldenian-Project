@@ -56,29 +56,18 @@ void inventory_manager::set_item_order(int where, int item_id)
 
 int inventory_manager::calc_total_weight()
 {
-	int i, cnt;
-	int64_t weight = 0, temp;
-	cnt = 0;
-	for (i = 0; i < hb::shared::limits::MaxItems; i++)
-		if (m_game->m_player->m_item_list[i] != 0)
-		{
-			CItem* cfg = m_game->get_item_config(m_game->m_player->m_item_list[i]->m_id_num);
-			if (cfg && (cfg->is_stackable()))
-			{
-				int lp = m_game->m_player->m_item_list[i]->get_light_percent();
-				int item_w = (lp > 0) ? cfg->m_weight * (100 - lp) / 100 : cfg->m_weight;
-				temp = static_cast<int64_t>(item_w) * static_cast<int64_t>(m_game->m_player->m_item_list[i]->m_count);
-				if (m_game->m_player->m_item_list[i]->m_id_num == hb::shared::item::ItemId::Gold) temp = temp / hb::shared::balance::gold_weight_divisor;
-				weight += temp;
-			}
-			else if (cfg)
-			{
-				int lp = m_game->m_player->m_item_list[i]->get_light_percent();
-				weight += (lp > 0) ? cfg->m_weight * (100 - lp) / 100 : cfg->m_weight;
-			}
-			cnt++;
-		}
+	int64_t weight = 0;
+	for (int i = 0; i < hb::shared::limits::MaxItems; i++)
+	{
+		if (m_game->m_player->m_item_list[i] == nullptr) continue;
+		CItem* item = m_game->m_player->m_item_list[i].get();
+		CItem* cfg = m_game->get_item_config(item->m_id_num);
+		if (!cfg) continue;
 
+		int lp = item->get_light_percent();
+		int eff_w = (lp > 0) ? cfg->m_weight * (100 - lp) / 100 : cfg->m_weight;
+		weight += CItem::calc_item_stack_weight(eff_w, static_cast<int>(item->m_count));
+	}
 	return static_cast<int>(std::min<int64_t>(weight, INT_MAX));
 }
 

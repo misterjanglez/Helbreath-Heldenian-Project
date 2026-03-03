@@ -167,6 +167,13 @@ struct ShopData
 	std::vector<int16_t> item_ids;   // List of item IDs available in this shop
 };
 
+struct summon_threshold_entry
+{
+	int min_mastery;
+	int npc_id;
+	int weight;
+};
+
 template <typename T>
 static bool In(const T& value, std::initializer_list<T> values) {
 	return std::any_of(values.begin(), values.end(),
@@ -301,10 +308,6 @@ public:
 	
 	
 	// Lists
-
-	void command_red_ball(int client_h, char *data,size_t msg_size);
-	void command_blue_ball(int client_h, char *data,size_t msg_size);
-	void command_yellow_ball(int client_h, char* data, size_t msg_size);
 
 	// Crusade
 
@@ -531,6 +534,9 @@ public:
 	bool m_is_shop_data_available;
 	std::map<int, int> m_npc_shop_mappings;        // npc_config_id  shop_id
 	std::map<int, ShopData> m_shop_data;          // shop_id  ShopData
+
+	// Summon Creature thresholds (loaded from gamedata.db)
+	std::vector<summon_threshold_entry> m_summon_thresholds;
 
 	// Character creation items (loaded from gamedata.db)
 	std::vector<creation_item_entry> m_creation_items;

@@ -1739,10 +1739,10 @@ void CGame::common_event_handler(char* data)
 		if (!pkt) return;
 		dw_v4 = pkt->v4;
 	}
-	if ((v1 == hb::shared::item::ItemId::Gold) && (v2 == 0)) {
+	if (v1 == hb::shared::item::ItemId::Gold) {
 		m_effect_manager->add_effect(EffectType::GOLD_DROP, sX, sY, 0, 0, 0);
 	}
-	m_map_data->set_item(sX, sY, v1, static_cast<char>(v3), dw_v4);
+	m_map_data->set_item(sX, sY, v1, static_cast<char>(v3), dw_v4, true, static_cast<uint16_t>(std::max<short>(v2, 0)));
 	break;
 
 	case CommonType::SetItem:
@@ -1751,7 +1751,7 @@ void CGame::common_event_handler(char* data)
 		if (!pkt) return;
 		dw_v4 = pkt->v4;
 	}
-	m_map_data->set_item(sX, sY, v1, static_cast<char>(v3), dw_v4, false); // v1.4 color
+	m_map_data->set_item(sX, sY, v1, static_cast<char>(v3), dw_v4, false, static_cast<uint16_t>(std::max<short>(v2, 0))); // v1.4 color
 	break;
 
 	case CommonType::Magic:
@@ -1927,7 +1927,7 @@ void CGame::read_map_data(short pivot_x, short pivot_y, const char* packet_data)
 			item_attr |= (static_cast<uint32_t>(item->prefix_type) & 0x0F) << 20;
 			item_attr |= (static_cast<uint32_t>(item->enchant_bonus) & 0x0F) << 28;
 			cursor += sizeof(hb::net::PacketMapDataItem);
-			m_map_data->set_item(pivot_x + map_x, pivot_y + map_y, item_id, item_color, item_attr, false);
+			m_map_data->set_item(pivot_x + map_x, pivot_y + map_y, item_id, item_color, item_attr, false, static_cast<uint16_t>(std::max<std::int16_t>(item->count, 0)));
 		}
 		if (header_byte & 0x08) // Dynamic object
 		{

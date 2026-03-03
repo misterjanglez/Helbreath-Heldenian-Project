@@ -53,6 +53,7 @@ bool SaveNpcConfigs(sqlite3* db, const CGame* game);
 bool LoadNpcConfigs(sqlite3* db, CGame* game);
 bool LoadDropTables(sqlite3* db, CGame* game);
 bool LoadShopConfigs(sqlite3* db, CGame* game);
+bool LoadSummonThresholds(sqlite3* db, CGame* game);
 bool SaveMagicConfigs(sqlite3* db, const CGame* game);
 bool LoadMagicConfigs(sqlite3* db, CGame* game);
 bool SaveSkillConfigs(sqlite3* db, const CGame* game);

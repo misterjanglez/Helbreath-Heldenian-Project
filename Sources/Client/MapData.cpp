@@ -3951,7 +3951,7 @@ int CMapData::object_frame_counter(const std::string& player_name, short view_po
 }
 
 
-bool CMapData::set_item(short sX, short sY, short i_dnum, char item_color, uint32_t item_attr, bool drop_effect)
+bool CMapData::set_item(short sX, short sY, short i_dnum, char item_color, uint32_t item_attr, bool drop_effect, uint16_t count)
 {
 	int dX, dY;
 	int abs_x, abs_y, dist;
@@ -3967,6 +3967,7 @@ bool CMapData::set_item(short sX, short sY, short i_dnum, char item_color, uint3
 	m_data[dX][dY].m_item_id = i_dnum;
 	m_data[dX][dY].m_item_attr = item_attr;
 	m_data[dX][dY].m_item_color = item_color;
+	m_data[dX][dY].m_item_count = count;
 
 	abs_x = abs(((m_game->m_Camera.get_x() / 32) + VIEW_CENTER_TILE_X()) - sX);
 	abs_y = abs(((m_game->m_Camera.get_y() / 32) + VIEW_CENTER_TILE_Y()) - sY);

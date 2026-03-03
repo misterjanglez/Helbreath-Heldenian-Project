@@ -361,7 +361,7 @@ void MiningManager::check_mining_action(int client_h, int dX, int dY)
 					m_game->m_client_list[client_h]->m_y, item);
 				m_game->send_event_to_near_client_type_b(MsgId::EventCommon, CommonType::ItemDrop, m_game->m_client_list[client_h]->m_map_index,
 					m_game->m_client_list[client_h]->m_x, m_game->m_client_list[client_h]->m_y,
-					item->m_id_num, 0, item->m_item_color, static_cast<uint32_t>(item->m_enchant_bonus)); // v1.4
+					item->m_id_num, CItem::count_to_v2(item->m_count), item->m_item_color, static_cast<uint32_t>(item->m_enchant_bonus)); // v1.4
 			}
 
 			m_mineral[m_game->m_dynamic_object_manager->m_dynamic_object_list[dynamic_index]->m_v1]->m_remain--;

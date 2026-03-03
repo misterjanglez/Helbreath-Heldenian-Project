@@ -426,7 +426,9 @@ void LootManager::get_reward_money_handler(int client_h)
 	//item->m_count = m_game->m_client_list[client_h]->m_reward_gold;
 
 	// (weight_left / item->m_weight)     Gold.   .
-	uint32_t maxGold = static_cast<uint32_t>(weight_left / m_game->m_item_manager->get_item_weight(item, 1));
+	int gold_weight = m_game->m_item_manager->get_item_weight(item, 1);
+	if (gold_weight <= 0) gold_weight = 1;
+	uint32_t maxGold = static_cast<uint32_t>(weight_left / gold_weight);
 	if (maxGold >= m_game->m_client_list[client_h]->m_reward_gold) {
 		item->m_count = m_game->m_client_list[client_h]->m_reward_gold;
 		reward_gold_left = 0;

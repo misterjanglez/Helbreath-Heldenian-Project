@@ -13,6 +13,7 @@
 #include "ItemEnums.h"
 #include "ItemAttributes.h"
 #include "NetConstants.h"
+#include "Game/BalanceConstants.h"
 #include <cstring>
 #include <cstdint>
 
@@ -402,6 +403,25 @@ public:
         if (light > 0)
             return static_cast<int>(m_weight) * (100 - light) / 100;
         return m_weight;
+    }
+
+    // Total weight for a stack of items (effective_weight * count), 0 for zero-weight items
+    static inline constexpr int calc_item_stack_weight(int effective_weight, int count)
+    {
+        if (effective_weight <= 0) return 0;
+        return effective_weight * count;
+    }
+
+    // Clamp item count to int16_t range for wire protocol (v2 field)
+    static inline constexpr short count_to_v2(uint64_t count)
+    {
+        return static_cast<short>(count > 32767 ? 32767 : count);
+    }
+
+    // Convert raw weight units to stones (float)
+    static inline constexpr float weight_to_stones(int raw_weight)
+    {
+        return static_cast<float>(raw_weight) / hb::shared::balance::weight_units_per_stone;
     }
 
     // Check if item is a weapon

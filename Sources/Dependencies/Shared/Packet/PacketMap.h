@@ -51,6 +51,7 @@ namespace net {
 		std::uint8_t secondary_type;
 		std::uint8_t secondary_value;
 		std::uint8_t enchant_bonus;
+		std::int16_t count;
 	};
 
 	struct HB_PACKED PacketMapDataDynamicObject {

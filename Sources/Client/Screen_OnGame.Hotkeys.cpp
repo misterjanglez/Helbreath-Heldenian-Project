@@ -150,10 +150,12 @@ bool Screen_OnGame::on_key_down(KeyCode key)
 	// Action keys — fire on initial key press for responsive input
 	switch (key) {
 	case KeyCode::NumpadAdd:
+	case KeyCode::Equal:
 		if (text_input_manager::get().is_active() == false)
 			config_manager::get().set_zoom_map_enabled(true);
 		return true;
 	case KeyCode::NumpadSubtract:
+	case KeyCode::Hyphen:
 		if (text_input_manager::get().is_active() == false)
 			config_manager::get().set_zoom_map_enabled(false);
 		return true;

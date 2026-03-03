@@ -146,6 +146,7 @@ void Screen_OnGame::draw_objects(short pivot_x, short pivot_y, short div_x, shor
 	uint32_t item_attr, item_selected_attr;
 	int item_selectedx, item_selectedy;
 	short item_id, item_selected_id = -1;
+	uint16_t item_selected_count = 0;
 
 	int res_x = LOGICAL_MAX_X();
 	int res_y = LOGICAL_MAX_Y();
@@ -265,6 +266,7 @@ void Screen_OnGame::draw_objects(short pivot_x, short pivot_y, short div_x, shor
 					if (hb::shared::input::is_shift_down() && mouse_x >= ix - 16 && mouse_y >= iy - 16 && mouse_x <= ix + 16 && mouse_y <= iy + 16) {
 						item_selected_id = item_id;
 						item_selected_attr = item_attr;
+						item_selected_count = m_game->m_map_data->m_data[dX][dY].m_item_count;
 						item_selectedx = ix;
 						item_selectedy = iy;
 					}
@@ -804,7 +806,7 @@ void Screen_OnGame::draw_objects(short pivot_x, short pivot_y, short div_x, shor
 	}
 
 	if (item_selected_id != -1) {
-		auto itemInfo = item_name_formatter::get().format(static_cast<short>(item_selected_id), item_selected_attr);
+		auto itemInfo = item_name_formatter::get().format(static_cast<short>(item_selected_id), item_selected_attr, item_selected_count);
 
 		item_tooltip tooltip;
 		auto name_color = itemInfo.is_special ? GameColors::UIItemName_Special : GameColors::UIWhite;

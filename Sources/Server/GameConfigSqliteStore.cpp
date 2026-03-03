@@ -1350,6 +1350,32 @@ bool LoadShopConfigs(sqlite3* db, CGame* game)
     return true;
 }
 
+bool LoadSummonThresholds(sqlite3* db, CGame* game)
+{
+    if (db == nullptr || game == nullptr)
+        return false;
+
+    game->m_summon_thresholds.clear();
+
+    const char* sql = "SELECT min_mastery, npc_id, weight FROM summon_thresholds ORDER BY min_mastery, npc_id;";
+
+    sqlite3_stmt* stmt = nullptr;
+    if (sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) != SQLITE_OK)
+        return false;
+
+    while (sqlite3_step(stmt) == SQLITE_ROW)
+    {
+        summon_threshold_entry entry;
+        entry.min_mastery = sqlite3_column_int(stmt, 0);
+        entry.npc_id = sqlite3_column_int(stmt, 1);
+        entry.weight = sqlite3_column_int(stmt, 2);
+        game->m_summon_thresholds.push_back(entry);
+    }
+
+    sqlite3_finalize(stmt);
+    return !game->m_summon_thresholds.empty();
+}
+
 bool LoadCreationItems(sqlite3* db, std::vector<creation_item_entry>& out_items)
 {
     if (db == nullptr) {

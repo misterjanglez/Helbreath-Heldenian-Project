@@ -273,8 +273,8 @@ void Screen_OnGame::on_update()
     m_sMsX = static_cast<short>(hb::shared::input::get_mouse_x());
     m_sMsY = static_cast<short>(hb::shared::input::get_mouse_y());
     m_sMsZ = static_cast<short>(hb::shared::input::get_mouse_wheel_delta());
-    m_cLB = hb::shared::input::is_mouse_button_down(MouseButton::Left) ? 1 : 0;
-    m_cRB = hb::shared::input::is_mouse_button_down(MouseButton::Right) ? 1 : 0;
+    m_cLB = (hb::shared::input::is_mouse_button_pressed(MouseButton::Left) || hb::shared::input::is_mouse_button_down(MouseButton::Left)) ? 1 : 0;
+    m_cRB = (hb::shared::input::is_mouse_button_pressed(MouseButton::Right) || hb::shared::input::is_mouse_button_down(MouseButton::Right)) ? 1 : 0;
 
     m_game->m_cur_time = GameClock::get_time_ms();
 
@@ -874,11 +874,19 @@ void Screen_OnGame::render_item_tooltip()
 
     item_tooltip tooltip;
 
-    // Item name
-    auto name_color = itemInfo.is_special ? GameColors::UIItemName_Special : GameColors::UIWhite;
-    tooltip.add_line(itemInfo.name, name_color);
+    // 1. Name — dye-colored for prefixed items, special color, or white
+    bool has_prefix = item->m_prefix_type != hb::shared::item::AttributePrefixType::None;
+    if (has_prefix && item_color != 0)
+    {
+        const auto& dye = m_game->m_color_palette[item_color];
+        tooltip.add_line(itemInfo.name, {dye.r, dye.g, dye.b, 255});
+    }
+    else if (itemInfo.is_special)
+        tooltip.add_line(itemInfo.name, GameColors::UIItemName_Special);
+    else
+        tooltip.add_line(itemInfo.name, GameColors::UIWhite);
 
-    // Item classification
+    // 2. Classification
     if (cfg->m_armor_class == armor_class::clothing)
     {
         const char* slot = equip_pos_name(cfg->get_equip_pos());
@@ -918,9 +926,60 @@ void Screen_OnGame::render_item_tooltip()
         tooltip.add_line(G_cTxt, GameColors::InfoGrayLight);
     }
 
-    // Attribute effects (label in gray, value in green)
+    // 3. Base combat stats with inline modifiers
+    // Collect inline modifiers from effects
+    std::string damage_mod_str;
+    std::string defense_mod_str;
+    std::string weight_mod_str;
     for (const auto& eff : itemInfo.effects)
     {
+        if (eff.category == effect_category::inline_damage)
+        {
+            if (damage_mod_str.empty()) damage_mod_str = " (";
+            else damage_mod_str += ", ";
+            damage_mod_str += eff.label;
+        }
+        else if (eff.category == effect_category::inline_defense)
+        {
+            if (defense_mod_str.empty()) defense_mod_str = " (";
+            else defense_mod_str += ", ";
+            defense_mod_str += eff.label;
+        }
+        else if (eff.category == effect_category::inline_weight)
+        {
+            if (weight_mod_str.empty()) weight_mod_str = " (";
+            else weight_mod_str += ", ";
+            weight_mod_str += eff.label;
+        }
+    }
+    if (!damage_mod_str.empty()) damage_mod_str += ")";
+    if (!defense_mod_str.empty()) defense_mod_str += ")";
+    if (!weight_mod_str.empty()) weight_mod_str += ")";
+
+    // Weapon damage
+    if (cfg->get_equip_pos() == EquipPos::RightHand || cfg->get_equip_pos() == EquipPos::TwoHand)
+    {
+        auto range = cfg->get_damage_range();
+        G_cTxt = std::format("Damage: {}-{}", range.min, range.max);
+        if (!damage_mod_str.empty())
+            tooltip.add_dual_line(G_cTxt, GameColors::InfoGrayLight, damage_mod_str, GameColors::UIItemName_Special);
+        else
+            tooltip.add_line(G_cTxt, GameColors::InfoGrayLight);
+    }
+    // Shield/armor defense
+    else if (cfg->is_armor() || cfg->get_equip_pos() == EquipPos::LeftHand)
+    {
+        G_cTxt = std::format("Defence: +{}%", cfg->m_item_effect_value1);
+        if (!defense_mod_str.empty())
+            tooltip.add_dual_line(G_cTxt, GameColors::InfoGrayLight, defense_mod_str, GameColors::UIItemName_Special);
+        else
+            tooltip.add_line(G_cTxt, GameColors::InfoGrayLight);
+    }
+
+    // 4. Standalone bonuses
+    for (const auto& eff : itemInfo.effects)
+    {
+        if (eff.category != effect_category::standalone) continue;
         if (eff.label.empty() && eff.value.empty()) continue;
         if (eff.value.empty())
             tooltip.add_line(eff.label, GameColors::InfoGrayLight);
@@ -928,34 +987,45 @@ void Screen_OnGame::render_item_tooltip()
             tooltip.add_dual_line(eff.label, GameColors::InfoGrayLight, eff.value, GameColors::UIItemName_Special);
     }
 
-    // Weapon damage
-    if (cfg->get_equip_pos() == EquipPos::RightHand || cfg->get_equip_pos() == EquipPos::TwoHand)
+    // 5. Consumable info — HP/MP/SP potions and food
+    auto effectType = cfg->get_item_effect_type();
+    if (effectType == ItemEffectType::HP)
     {
-        auto range = cfg->get_damage_range();
-        G_cTxt = std::format("Damage: {}-{}", range.min, range.max);
+        auto range = parse_dice(cfg->m_item_effect_value1, cfg->m_item_effect_value2, cfg->m_item_effect_value3);
+        G_cTxt = std::format(TOOLTIP_RESTORES_HP, range.min, range.max);
         tooltip.add_line(G_cTxt, GameColors::InfoGrayLight);
     }
-    // Shield/armor defense
-    else if (cfg->is_armor() || cfg->get_equip_pos() == EquipPos::LeftHand)
+    else if (effectType == ItemEffectType::MP)
     {
-        G_cTxt = std::format("Defence: +{}%", cfg->m_item_effect_value1);
+        auto range = parse_dice(cfg->m_item_effect_value1, cfg->m_item_effect_value2, cfg->m_item_effect_value3);
+        G_cTxt = std::format(TOOLTIP_RESTORES_MP, range.min, range.max);
+        tooltip.add_line(G_cTxt, GameColors::InfoGrayLight);
+    }
+    else if (effectType == ItemEffectType::SP)
+    {
+        auto range = parse_dice(cfg->m_item_effect_value1, cfg->m_item_effect_value2, cfg->m_item_effect_value3);
+        G_cTxt = std::format(TOOLTIP_RESTORES_SP, range.min, range.max);
+        tooltip.add_line(G_cTxt, GameColors::InfoGrayLight);
+    }
+    else if (effectType == ItemEffectType::HPStock)
+    {
+        auto range = parse_dice(cfg->m_item_effect_value1, cfg->m_item_effect_value2, cfg->m_item_effect_value3);
+        G_cTxt = std::format(DRAW_DIALOGBOX_SHOP28, range.min, range.max);
         tooltip.add_line(G_cTxt, GameColors::InfoGrayLight);
     }
 
-    // Endurance
-    if (is_equippable)
+    // 6. Requirements
+    if (cfg->m_level_requirement != 0)
     {
-        G_cTxt = std::format(UPDATE_SCREEN_ONGAME10, item->m_cur_durability, cfg->m_durability);
+        G_cTxt = std::format("{}: {}", DRAW_DIALOGBOX_SHOP24, cfg->m_level_requirement);
         tooltip.add_line(G_cTxt, GameColors::InfoGrayLight);
     }
 
-    // Required Str (use cfg base weight, apply light attribute from item instance)
     int light_pct = item->get_light_percent();
     int eff_weight = (light_pct > 0) ? cfg->m_weight * (100 - light_pct) / 100 : cfg->m_weight;
-    int wups = hb::shared::balance::weight_units_per_stone;
     if (is_equippable && eff_weight >= hb::shared::balance::equip_str_threshold)
     {
-        int req_str = static_cast<int>(std::ceil(eff_weight / static_cast<float>(wups)));
+        int req_str = static_cast<int>(std::ceil(eff_weight / static_cast<float>(hb::shared::balance::weight_units_per_stone)));
         if (cfg->get_equip_pos() == EquipPos::RightHand || cfg->get_equip_pos() == EquipPos::TwoHand)
         {
             int full_speed_str = cfg->m_swing_speed * hb::shared::balance::swing_str_divisor;
@@ -968,14 +1038,39 @@ void Screen_OnGame::render_item_tooltip()
         tooltip.add_line(G_cTxt, GameColors::InfoGrayLight);
     }
 
-    // Level requirement
-    if (cfg->m_level_requirement != 0)
+    // 7. Weight — using shared weight functions, inline light modifier
+    if (cfg->m_weight > 0)
     {
-        G_cTxt = std::format("{}: {}", DRAW_DIALOGBOX_SHOP24, cfg->m_level_requirement);
+        float unit_stones = CItem::weight_to_stones(eff_weight);
+        if (cfg->is_stackable() && item->m_count > 1)
+        {
+            int stack_raw = CItem::calc_item_stack_weight(eff_weight, static_cast<int>(item->m_count));
+            float total_stones = CItem::weight_to_stones(stack_raw);
+            G_cTxt = std::format(TOOLTIP_WEIGHT_STACK, unit_stones, total_stones);
+        }
+        else
+        {
+            G_cTxt = std::format(TOOLTIP_WEIGHT, unit_stones);
+        }
+        if (!weight_mod_str.empty())
+            tooltip.add_dual_line(G_cTxt, GameColors::InfoGrayLight, weight_mod_str, GameColors::UIItemName_Special);
+        else
+            tooltip.add_line(G_cTxt, GameColors::InfoGrayLight);
+    }
+
+    // 8. Durability / Usages
+    if (is_equippable)
+    {
+        G_cTxt = std::format(UPDATE_SCREEN_ONGAME10, item->m_cur_durability, cfg->m_durability);
+        tooltip.add_line(G_cTxt, GameColors::InfoGrayLight);
+    }
+    else if (effectType == ItemEffectType::AlterItemDrop && cfg->m_durability > 0)
+    {
+        G_cTxt = std::format(TOOLTIP_USAGES, item->m_cur_durability, cfg->m_durability);
         tooltip.add_line(G_cTxt, GameColors::InfoGrayLight);
     }
 
-    // Stack count
+    // 9. Stack count
     if (cfg->is_stackable())
     {
         auto count = std::count_if(m_game->m_player->m_item_list.begin(), m_game->m_player->m_item_list.end(),

@@ -594,7 +594,7 @@ int DialogBoxManager::handle_mouse_down()
 
 bool DialogBoxManager::handle_right_click(uint32_t time)
 {
-	if ((time - m_close_debounce_time) < 300) return false;
+	if ((time - m_close_debounce_time) < 300) return true;
 
 	short mouse_x = static_cast<short>(hb::shared::input::get_mouse_x());
 	short mouse_y = static_cast<short>(hb::shared::input::get_mouse_y());

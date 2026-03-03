@@ -32,6 +32,7 @@ public:
 
 		m_item_id = 0;
 		m_item_attr = 0;
+		m_item_count = 0;
 		m_item_color       = 0;
 
 		m_dynamic_object_type  = 0;
@@ -112,6 +113,7 @@ public:
 
 	short m_item_id;
 	uint32_t m_item_attr;
+	uint16_t m_item_count = 0;
 
 	char  m_dead_owner_frame;
 	direction m_dead_dir;
