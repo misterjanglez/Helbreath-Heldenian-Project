@@ -3951,7 +3951,7 @@ int CMapData::object_frame_counter(const std::string& player_name, short view_po
 }
 
 
-bool CMapData::set_item(short sX, short sY, short i_dnum, char item_color, uint32_t item_attr, bool drop_effect, uint16_t count)
+bool CMapData::set_item(short sX, short sY, const hb::shared::item::item_instance_data& data, bool drop_effect)
 {
 	int dX, dY;
 	int abs_x, abs_y, dist;
@@ -3964,10 +3964,7 @@ bool CMapData::set_item(short sX, short sY, short i_dnum, char item_color, uint3
 	dX = sX - m_pivot_x;
 	dY = sY - m_pivot_y;
 
-	m_data[dX][dY].m_item_id = i_dnum;
-	m_data[dX][dY].m_item_attr = item_attr;
-	m_data[dX][dY].m_item_color = item_color;
-	m_data[dX][dY].m_item_count = count;
+	m_data[dX][dY].m_item = data;
 
 	abs_x = abs(((m_game->m_Camera.get_x() / 32) + VIEW_CENTER_TILE_X()) - sX);
 	abs_y = abs(((m_game->m_Camera.get_y() / 32) + VIEW_CENTER_TILE_Y()) - sY);
@@ -3975,7 +3972,7 @@ bool CMapData::set_item(short sX, short sY, short i_dnum, char item_color, uint3
 	if (abs_x > abs_y) dist = abs_x;
 	else dist = abs_y;
 
-	if (i_dnum != 0)
+	if (data.item_id != 0)
 	{
 		if (drop_effect == true)
 		{

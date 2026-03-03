@@ -207,9 +207,8 @@ void CraftingManager::req_create_portion_handler(int client_h, char* data)
 				m_game->m_map_list[m_game->m_client_list[client_h]->m_map_index]->set_item(m_game->m_client_list[client_h]->m_x,
 					m_game->m_client_list[client_h]->m_y, item);
 
-				m_game->send_event_to_near_client_type_b(MsgId::EventCommon, CommonType::ItemDrop, m_game->m_client_list[client_h]->m_map_index,
-					m_game->m_client_list[client_h]->m_x, m_game->m_client_list[client_h]->m_y,
-					item->m_id_num, CItem::count_to_v2(item->m_count), item->m_item_color, static_cast<uint32_t>(item->m_enchant_bonus)); // v1.4
+				m_game->send_ground_item_event(CommonType::ItemDrop, m_game->m_client_list[client_h]->m_map_index,
+					m_game->m_client_list[client_h]->m_x, m_game->m_client_list[client_h]->m_y, item);
 
 				ret = m_game->m_item_manager->send_item_notify_msg(client_h, Notify::CannotCarryMoreItem, 0, 0);
 
@@ -515,9 +514,8 @@ void CraftingManager::req_create_crafting_handler(int client_h, char* data)
 			{
 				m_game->m_map_list[m_game->m_client_list[client_h]->m_map_index]->set_item(m_game->m_client_list[client_h]->m_x,
 					m_game->m_client_list[client_h]->m_y, item);
-				m_game->send_event_to_near_client_type_b(MsgId::EventCommon, CommonType::ItemDrop, m_game->m_client_list[client_h]->m_map_index,
-					m_game->m_client_list[client_h]->m_x, m_game->m_client_list[client_h]->m_y,
-					item->m_id_num, CItem::count_to_v2(item->m_count), item->m_item_color, static_cast<uint32_t>(item->m_enchant_bonus));
+				m_game->send_ground_item_event(CommonType::ItemDrop, m_game->m_client_list[client_h]->m_map_index,
+					m_game->m_client_list[client_h]->m_x, m_game->m_client_list[client_h]->m_y, item);
 
 				ret = m_game->m_item_manager->send_item_notify_msg(client_h, Notify::CannotCarryMoreItem, 0, 0);
 

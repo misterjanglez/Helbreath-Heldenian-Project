@@ -6829,6 +6829,55 @@ void CGame::send_event_to_near_client_type_b(uint32_t msg_id, uint16_t msg_type,
 	}
 }
 
+void CGame::send_ground_item_event(uint16_t msg_type, char map_index, short sX, short sY, const CItem* item)
+{
+	int short_cut_index;
+	bool flag;
+
+	hb::net::PacketEventGroundItem pkt{};
+	pkt.header.msg_id = MsgId::EventCommon;
+	pkt.header.msg_type = msg_type;
+	pkt.x = sX;
+	pkt.y = sY;
+
+	if (item != nullptr)
+	{
+		pkt.item_id = item->m_id_num;
+		pkt.count = CItem::count_to_v2(item->m_count);
+		pkt.item_color = item->m_item_color;
+		pkt.touch_effect_type = item->m_touch_effect_type;
+		pkt.touch_effect_value1 = item->m_touch_effect_value1;
+		pkt.touch_effect_value2 = item->m_touch_effect_value2;
+		pkt.touch_effect_value3 = item->m_touch_effect_value3;
+		pkt.special_effect_value1 = item->m_item_special_effect_value1;
+		pkt.special_effect_value2 = item->m_item_special_effect_value2;
+		pkt.special_effect_value3 = item->m_item_special_effect_value3;
+		pkt.cur_lifespan = item->m_cur_durability;
+		item->copy_attributes_to(pkt);
+	}
+
+	flag = true;
+	short_cut_index = 0;
+	while (flag)
+	{
+		int i = m_client_shortcut[short_cut_index];
+		short_cut_index++;
+		if (i == 0) flag = false;
+
+		if ((flag) && (m_client_list[i] != 0))
+		{
+			if ((m_client_list[i]->m_map_index == map_index) &&
+				(m_client_list[i]->m_x >= sX - hb::shared::view::CenterX) &&
+				(m_client_list[i]->m_x <= sX + hb::shared::view::CenterX) &&
+				(m_client_list[i]->m_y >= sY - (hb::shared::view::CenterY + 1)) &&
+				(m_client_list[i]->m_y <= sY + (hb::shared::view::CenterY + 1)))
+			{
+				m_client_list[i]->m_socket->send_msg(reinterpret_cast<char*>(&pkt), sizeof(pkt));
+			}
+		}
+	}
+}
+
 //  int CGame::client_motion_stop_handler(int client_h, short sX, short sY, char dir)
 //  description			:: checks if player is stopped
 //  last updated		:: October 29, 2004; 6:46 PM; Hypnotoad
@@ -14037,9 +14086,8 @@ void CGame::lotery_handler(int client_h)
 	else {
 		m_map_list[m_client_list[client_h]->m_map_index]->set_item(m_client_list[client_h]->m_x,
 			m_client_list[client_h]->m_y, item);
-		send_event_to_near_client_type_b(MsgId::EventCommon, CommonType::ItemDrop, m_client_list[client_h]->m_map_index,
-			m_client_list[client_h]->m_x, m_client_list[client_h]->m_y,
-			item->m_id_num, CItem::count_to_v2(item->m_count), item->m_item_color, static_cast<uint32_t>(item->m_enchant_bonus));
+		send_ground_item_event(CommonType::ItemDrop, m_client_list[client_h]->m_map_index,
+			m_client_list[client_h]->m_x, m_client_list[client_h]->m_y, item);
 	}
 
 }

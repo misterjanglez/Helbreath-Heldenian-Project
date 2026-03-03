@@ -17,6 +17,7 @@
 #include "Log.h"
 #include "ClientLogChannels.h"
 #include "ItemSpriteMetadata.h"
+#include "Item/ItemInstanceData.h"
 
 #include <algorithm>
 #include <charconv>
@@ -1734,24 +1735,17 @@ void CGame::common_event_handler(char* data)
 
 	switch (event_type) {
 	case CommonType::ItemDrop:
-	{
-		const auto* pkt = hb::net::PacketCast<hb::net::PacketEventCommonItem>(data, sizeof(hb::net::PacketEventCommonItem));
-		if (!pkt) return;
-		dw_v4 = pkt->v4;
-	}
-	if (v1 == hb::shared::item::ItemId::Gold) {
-		m_effect_manager->add_effect(EffectType::GOLD_DROP, sX, sY, 0, 0, 0);
-	}
-	m_map_data->set_item(sX, sY, v1, static_cast<char>(v3), dw_v4, true, static_cast<uint16_t>(std::max<short>(v2, 0)));
-	break;
-
 	case CommonType::SetItem:
 	{
-		const auto* pkt = hb::net::PacketCast<hb::net::PacketEventCommonItem>(data, sizeof(hb::net::PacketEventCommonItem));
+		const auto* pkt = hb::net::PacketCast<hb::net::PacketEventGroundItem>(
+			data, sizeof(hb::net::PacketEventGroundItem));
 		if (!pkt) return;
-		dw_v4 = pkt->v4;
+		auto idata = hb::shared::item::item_instance_data::from_ground_item_packet(*pkt);
+		bool is_drop = (event_type == CommonType::ItemDrop);
+		if (is_drop && idata.item_id == hb::shared::item::ItemId::Gold)
+			m_effect_manager->add_effect(EffectType::GOLD_DROP, sX, sY, 0, 0, 0);
+		m_map_data->set_item(sX, sY, idata, is_drop);
 	}
-	m_map_data->set_item(sX, sY, v1, static_cast<char>(v3), dw_v4, false, static_cast<uint16_t>(std::max<short>(v2, 0))); // v1.4 color
 	break;
 
 	case CommonType::Magic:
@@ -1816,7 +1810,7 @@ void CGame::request_full_object_data(uint16_t object_id)
 
 void CGame::read_map_data(short pivot_x, short pivot_y, const char* packet_data)
 {
-	char header_byte = 0, item_color = 0;
+	char header_byte = 0;
 	direction move_dir = direction{};
 	std::string name;
 	short total_entries = 0, map_x = 0, map_y = 0, owner_type = 0, dynamic_type = 0;
@@ -1825,8 +1819,6 @@ void CGame::read_map_data(short pivot_x, short pivot_y, const char* packet_data)
 	hb::shared::entity::PlayerAppearance appearance;
 	uint16_t object_id = 0;
 	uint16_t dynamic_object_id = 0;
-	short item_id = 0;
-	uint32_t item_attr = 0;
 
 	const char* cursor = packet_data;
 	m_vdl_x = pivot_x; // Valid Data Loc-X
@@ -1916,18 +1908,18 @@ void CGame::read_map_data(short pivot_x, short pivot_y, const char* packet_data)
 		{
 			const auto* item = hb::net::PacketCast<hb::net::PacketMapDataItem>(cursor, sizeof(hb::net::PacketMapDataItem));
 			if (!item) return;
-			item_id = item->item_id;
-			item_color = static_cast<char>(item->color);
-			// Reconstruct packed attribute for ground item display
-			item_attr = 0;
-			if (item->custom_made) item_attr |= 0x00000001;
-			item_attr |= (static_cast<uint32_t>(item->secondary_value) & 0x0F) << 8;
-			item_attr |= (static_cast<uint32_t>(item->secondary_type) & 0x0F) << 12;
-			item_attr |= (static_cast<uint32_t>(item->prefix_value) & 0x0F) << 16;
-			item_attr |= (static_cast<uint32_t>(item->prefix_type) & 0x0F) << 20;
-			item_attr |= (static_cast<uint32_t>(item->enchant_bonus) & 0x0F) << 28;
+			hb::shared::item::item_instance_data idata;
+			idata.item_id = item->item_id;
+			idata.count = static_cast<uint16_t>(std::max<std::int16_t>(item->count, 0));
+			idata.item_color = static_cast<int8_t>(item->color);
+			idata.custom_made = item->custom_made;
+			idata.prefix_type = item->prefix_type;
+			idata.prefix_value = item->prefix_value;
+			idata.secondary_type = item->secondary_type;
+			idata.secondary_value = item->secondary_value;
+			idata.enchant_bonus = item->enchant_bonus;
 			cursor += sizeof(hb::net::PacketMapDataItem);
-			m_map_data->set_item(pivot_x + map_x, pivot_y + map_y, item_id, item_color, item_attr, false, static_cast<uint16_t>(std::max<std::int16_t>(item->count, 0)));
+			m_map_data->set_item(pivot_x + map_x, pivot_y + map_y, idata, false);
 		}
 		if (header_byte & 0x08) // Dynamic object
 		{
@@ -4933,7 +4925,7 @@ bool CGame::process_left_click(short mouse_x, short mouse_y, short tile_x, short
 	if (on_game()->m_magic_cast_time > 0 && (current_time - on_game()->m_magic_cast_time) < 750) return true;
 
 	m_map_data->get_owner(m_mcx, m_mcy - 1, name, &object_type, &object_status, &m_comm_object_id); // v1.4
-	if (m_mc_name == m_player->m_player_name && (object_type <= 6 || (m_map_data->m_data[m_player->m_player_x - m_map_data->m_pivot_x][m_player->m_player_y - m_map_data->m_pivot_y].m_item_id != 0 && m_item_config_list[m_map_data->m_data[m_player->m_player_x - m_map_data->m_pivot_x][m_player->m_player_y - m_map_data->m_pivot_y].m_item_id] != nullptr)))
+	if (m_mc_name == m_player->m_player_name && (object_type <= 6 || (m_map_data->m_data[m_player->m_player_x - m_map_data->m_pivot_x][m_player->m_player_y - m_map_data->m_pivot_y].m_item.item_id != 0 && m_item_config_list[m_map_data->m_data[m_player->m_player_x - m_map_data->m_pivot_x][m_player->m_player_y - m_map_data->m_pivot_y].m_item.item_id] != nullptr)))
 	{
 		if ((m_player->m_player_type >= 1) && (m_player->m_player_type <= 6)/* && (!m_player->m_playerAppearance.is_walking)*/)
 		{

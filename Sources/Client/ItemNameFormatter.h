@@ -5,6 +5,7 @@
 #include <array>
 #include <string>
 #include <vector>
+#include "Item/ItemInstanceData.h"
 
 class CItem;
 
@@ -60,8 +61,8 @@ public:
 
 	// format item name, returning name + attribute strings + special flag
 	ItemNameInfo format(CItem* item);
-	ItemNameInfo format(short item_id, uint32_t attribute);
-	ItemNameInfo format(short item_id, uint32_t attribute, uint16_t count);
+	ItemNameInfo format(short item_id);
+	ItemNameInfo format(const hb::shared::item::item_instance_data& data);
 
 private:
 	item_name_formatter() = default;

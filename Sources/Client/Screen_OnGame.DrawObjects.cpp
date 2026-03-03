@@ -9,6 +9,7 @@
 #include "WeatherManager.h"
 #include "ItemNameFormatter.h"
 #include "ItemTooltip.h"
+#include "Item/ItemInstanceData.h"
 #include "ItemSpriteMetadata.h"
 #include "RenderHelpers.h"
 #include "EntityRenderState.h"
@@ -143,10 +144,9 @@ void Screen_OnGame::draw_objects(short pivot_x, short pivot_y, short div_x, shor
 	int idelay = 75;
 
 	// Item's desc on floor
-	uint32_t item_attr, item_selected_attr;
 	int item_selectedx, item_selectedy;
-	short item_id, item_selected_id = -1;
-	uint16_t item_selected_count = 0;
+	short item_id;
+	hb::shared::item::item_instance_data item_selected;
 
 	int res_x = LOGICAL_MAX_X();
 	int res_y = LOGICAL_MAX_Y();
@@ -212,7 +212,6 @@ void Screen_OnGame::draw_objects(short pivot_x, short pivot_y, short div_x, shor
 					item_id = 0;
 					ret = false;
 					item_color = 0;
-					item_attr = 0;
 				}
 				else
 				{
@@ -227,9 +226,8 @@ void Screen_OnGame::draw_objects(short pivot_x, short pivot_y, short div_x, shor
 					m_game->m_entity_state.m_chat_index = m_game->m_map_data->m_data[dX][dY].m_dead_chat_msg;
 					m_game->m_entity_state.m_status = m_game->m_map_data->m_data[dX][dY].m_deadStatus;
 					std::snprintf(m_game->m_entity_state.m_name.data(), m_game->m_entity_state.m_name.size(), "%s", m_game->m_map_data->m_data[dX][dY].m_dead_owner_name.c_str());
-					item_id = m_game->m_map_data->m_data[dX][dY].m_item_id;
-					item_attr = m_game->m_map_data->m_data[dX][dY].m_item_attr;
-					item_color = m_game->m_map_data->m_data[dX][dY].m_item_color & 0x0F;
+					item_id = m_game->m_map_data->m_data[dX][dY].m_item.item_id;
+					item_color = m_game->m_map_data->m_data[dX][dY].m_item.item_color;
 					dynamic_object = m_game->m_map_data->m_data[dX][dY].m_dynamic_object_type;
 					dynamic_object_frame = static_cast<short>(m_game->m_map_data->m_data[dX][dY].m_dynamic_object_frame);
 					dynamic_object_data1 = m_game->m_map_data->m_data[dX][dY].m_dynamic_object_data_1;
@@ -257,16 +255,14 @@ void Screen_OnGame::draw_objects(short pivot_x, short pivot_y, short div_x, shor
 					}
 					else
 					{
-						const auto& tint = m_game->m_color_palette[item_color];
+						const auto& tint = m_game->m_color_palette[static_cast<uint8_t>(item_color)];
 						auto params = hb::shared::sprite::DrawParams::tint(tint.r, tint.g, tint.b);
 						params.m_ignore_pivot = true;
 						ground_draw.sprite->draw(cx, cy, ground_draw.frame, params);
 					}
 
 					if (hb::shared::input::is_shift_down() && mouse_x >= ix - 16 && mouse_y >= iy - 16 && mouse_x <= ix + 16 && mouse_y <= iy + 16) {
-						item_selected_id = item_id;
-						item_selected_attr = item_attr;
-						item_selected_count = m_game->m_map_data->m_data[dX][dY].m_item_count;
+						item_selected = m_game->m_map_data->m_data[dX][dY].m_item;
 						item_selectedx = ix;
 						item_selectedy = iy;
 					}
@@ -805,20 +801,20 @@ void Screen_OnGame::draw_objects(short pivot_x, short pivot_y, short div_x, shor
 		}
 	}
 
-	if (item_selected_id != -1) {
-		auto itemInfo = item_name_formatter::get().format(static_cast<short>(item_selected_id), item_selected_attr, item_selected_count);
+	if (!item_selected.is_empty()) {
+		auto itemInfo = item_name_formatter::get().format(item_selected);
 
 		item_tooltip tooltip;
-		auto name_color = itemInfo.is_special ? GameColors::UIItemName_Special : GameColors::UIWhite;
-		tooltip.add_line(itemInfo.name, name_color);
-		for (const auto& eff : itemInfo.effects)
+		bool has_prefix = item_selected.prefix_type != 0;
+		if (has_prefix && item_selected.item_color != 0)
 		{
-			if (eff.label.empty() && eff.value.empty()) continue;
-			if (eff.value.empty())
-				tooltip.add_line(eff.label, GameColors::InfoGrayLight);
-			else
-				tooltip.add_dual_line(eff.label, GameColors::InfoGrayLight, eff.value, GameColors::UIItemName_Special);
+			const auto& dye = m_game->m_color_palette[static_cast<uint8_t>(item_selected.item_color)];
+			tooltip.add_line(itemInfo.name, {dye.r, dye.g, dye.b, 255});
 		}
+		else if (itemInfo.is_special)
+			tooltip.add_line(itemInfo.name, GameColors::UIItemName_Special);
+		else
+			tooltip.add_line(itemInfo.name, GameColors::UIWhite);
 		tooltip.draw(mouse_x, mouse_y + 25, m_game->m_Renderer);
 	}
 }

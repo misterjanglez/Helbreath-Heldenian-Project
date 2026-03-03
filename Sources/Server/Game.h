@@ -438,6 +438,7 @@ public:
 	int compose_move_map_data(short sX, short sY, int client_h, direction dir, char * data);
 	void send_event_to_near_client_type_b(uint32_t msg_id, uint16_t msg_type, char map_index, short sX, short sY, short v1, short v2, short v3, short v4 = 0);
 	void send_event_to_near_client_type_b(uint32_t msg_id, uint16_t msg_type, char map_index, short sX, short sY, short v1, short v2, short v3, uint32_t v4 = 0);
+	void send_ground_item_event(uint16_t msg_type, char map_index, short sX, short sY, const CItem* item);
 	void send_event_to_near_client_type_a(short owner_h, char owner_type, uint32_t msg_id, uint16_t msg_type, int v1, short v2, short v3);
 	void delete_client(int client_h, bool save, bool notify, bool count_logout = true, bool force_close_conn = false);
 	int  compose_init_map_data(short sX, short sY, int client_h, char * data);

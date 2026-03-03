@@ -377,9 +377,8 @@ void ItemManager::drop_item_handler(int client_h, short item_index, int amount, 
 		else
 			item_log(ItemLogAction::Drop, client_h, (int)-1, item, true);
 
-		m_game->send_event_to_near_client_type_b(MsgId::EventCommon, CommonType::ItemDrop, m_game->m_client_list[client_h]->m_map_index,
-			m_game->m_client_list[client_h]->m_x, m_game->m_client_list[client_h]->m_y,
-			item->m_id_num, CItem::count_to_v2(item->m_count), item->m_item_color, static_cast<uint32_t>(item->m_enchant_bonus)); // v1.4 color
+		m_game->send_ground_item_event(CommonType::ItemDrop, m_game->m_client_list[client_h]->m_map_index,
+			m_game->m_client_list[client_h]->m_x, m_game->m_client_list[client_h]->m_y, item);
 
 		m_game->send_notify_msg(0, client_h, Notify::DropItemFinCountChanged, item_index, amount, 0, 0);
 	}
@@ -409,12 +408,9 @@ void ItemManager::drop_item_handler(int client_h, short item_index, int amount, 
 			else
 				item_log(ItemLogAction::Drop, client_h, (int)-1, m_game->m_client_list[client_h]->m_item_list[item_index], true);
 
-			m_game->send_event_to_near_client_type_b(MsgId::EventCommon, CommonType::ItemDrop, m_game->m_client_list[client_h]->m_map_index,
+			m_game->send_ground_item_event(CommonType::ItemDrop, m_game->m_client_list[client_h]->m_map_index,
 				m_game->m_client_list[client_h]->m_x, m_game->m_client_list[client_h]->m_y,
-				m_game->m_client_list[client_h]->m_item_list[item_index]->m_id_num,
-				CItem::count_to_v2(m_game->m_client_list[client_h]->m_item_list[item_index]->m_count),
-				m_game->m_client_list[client_h]->m_item_list[item_index]->m_item_color,
-				static_cast<uint32_t>(m_game->m_client_list[client_h]->m_item_list[item_index]->m_enchant_bonus)); //v1.4 color
+				m_game->m_client_list[client_h]->m_item_list[item_index]);
 		}
 
 		m_game->m_client_list[client_h]->m_item_list[item_index] = 0;
@@ -430,7 +426,6 @@ void ItemManager::drop_item_handler(int client_h, short item_index, int amount, 
 
 int ItemManager::client_motion_get_item_handler(int client_h, short sX, short sY, direction dir)
 {
-	char  remain_item_color;
 	int   ret, erase_req;
 	CItem* item;
 
@@ -459,10 +454,8 @@ int ItemManager::client_motion_get_item_handler(int client_h, short sX, short sY
 	m_game->m_map_list[m_game->m_client_list[client_h]->m_map_index]->clear_owner(0, client_h, hb::shared::owner_class::Player, sX, sY);
 	m_game->m_map_list[m_game->m_client_list[client_h]->m_map_index]->set_owner(client_h, hb::shared::owner_class::Player, sX, sY);
 
-	short id_num;
-	uint32_t attribute;
-	uint64_t remain_item_count;
-	item = m_game->m_map_list[m_game->m_client_list[client_h]->m_map_index]->get_item(sX, sY, &id_num, &remain_item_color, &attribute, &remain_item_count);
+	CItem* remain = nullptr;
+	item = m_game->m_map_list[m_game->m_client_list[client_h]->m_map_index]->get_item(sX, sY, &remain);
 	if (item != 0) {
 		if (add_client_item_list(client_h, item, &erase_req)) {
 
@@ -479,9 +472,8 @@ int ItemManager::client_motion_get_item_handler(int client_h, short sX, short sY
 			}
 
 			// Broadcast remaining item state to nearby clients (clears tile if no items remain)
-			m_game->send_event_to_near_client_type_b(MsgId::EventCommon, CommonType::SetItem,
-				m_game->m_client_list[client_h]->m_map_index,
-				sX, sY, id_num, CItem::count_to_v2(remain_item_count), remain_item_color, attribute);
+			m_game->send_ground_item_event(CommonType::SetItem,
+				m_game->m_client_list[client_h]->m_map_index, sX, sY, remain);
 		}
 		else
 		{
@@ -632,12 +624,7 @@ int ItemManager::add_client_bulk_item_list(int client_h, const char* item_name, 
 		pkt.weight = first_item->m_weight;
 		pkt.item_color = first_item->m_item_color;
 		pkt.spec_value2 = static_cast<uint8_t>(first_item->m_item_special_effect_value2);
-		pkt.custom_made = first_item->m_custom_made ? 1 : 0;
-		pkt.prefix_type = static_cast<uint8_t>(first_item->m_prefix_type);
-		pkt.prefix_value = first_item->m_prefix_value;
-		pkt.secondary_type = static_cast<uint8_t>(first_item->m_secondary_type);
-		pkt.secondary_value = first_item->m_secondary_value;
-		pkt.enchant_bonus = first_item->m_enchant_bonus;
+		first_item->copy_attributes_to(pkt);
 		pkt.item_id = first_item->m_id_num;
 		pkt.max_lifespan = first_item->m_durability;
 		m_game->m_client_list[client_h]->m_socket->send_msg(reinterpret_cast<char*>(&pkt), sizeof(pkt));
@@ -1146,9 +1133,8 @@ void ItemManager::give_item_handler(int client_h, short item_index, int amount, 
 			// v1.411
 			item_log(ItemLogAction::Drop, client_h, 0, item);
 
-			m_game->send_event_to_near_client_type_b(MsgId::EventCommon, CommonType::ItemDrop, m_game->m_client_list[client_h]->m_map_index,
-				m_game->m_client_list[client_h]->m_x, m_game->m_client_list[client_h]->m_y,
-				item->m_id_num, CItem::count_to_v2(item->m_count), item->m_item_color, static_cast<uint32_t>(item->m_enchant_bonus)); //v1.4 color
+			m_game->send_ground_item_event(CommonType::ItemDrop, m_game->m_client_list[client_h]->m_map_index,
+				m_game->m_client_list[client_h]->m_x, m_game->m_client_list[client_h]->m_y, item);
 		}
 		else {
 			if (owner_type == hb::shared::owner_class::Player) {
@@ -1181,9 +1167,8 @@ void ItemManager::give_item_handler(int client_h, short item_index, int amount, 
 					// v1.411  
 					item_log(ItemLogAction::Drop, client_h, 0, item);
 
-					m_game->send_event_to_near_client_type_b(MsgId::EventCommon, CommonType::ItemDrop, m_game->m_client_list[client_h]->m_map_index,
-						m_game->m_client_list[client_h]->m_x, m_game->m_client_list[client_h]->m_y,
-						item->m_id_num, CItem::count_to_v2(item->m_count), item->m_item_color, static_cast<uint32_t>(item->m_enchant_bonus)); //v1.4 color
+					m_game->send_ground_item_event(CommonType::ItemDrop, m_game->m_client_list[client_h]->m_map_index,
+						m_game->m_client_list[client_h]->m_x, m_game->m_client_list[client_h]->m_y, item);
 
 					{
 						ret = send_item_notify_msg(owner_h, Notify::CannotCarryMoreItem, 0, 0);
@@ -1213,12 +1198,11 @@ void ItemManager::give_item_handler(int client_h, short item_index, int amount, 
 
 						m_game->m_map_list[m_game->m_client_list[client_h]->m_map_index]->set_item(m_game->m_client_list[client_h]->m_x, m_game->m_client_list[client_h]->m_y, item);
 
-						// v1.411  
+						// v1.411
 						item_log(ItemLogAction::Drop, client_h, 0, item);
 
-						m_game->send_event_to_near_client_type_b(MsgId::EventCommon, CommonType::ItemDrop, m_game->m_client_list[client_h]->m_map_index,
-							m_game->m_client_list[client_h]->m_x, m_game->m_client_list[client_h]->m_y,
-							item->m_id_num, CItem::count_to_v2(item->m_count), item->m_item_color, static_cast<uint32_t>(item->m_enchant_bonus)); // v1.4 color
+						m_game->send_ground_item_event(CommonType::ItemDrop, m_game->m_client_list[client_h]->m_map_index,
+							m_game->m_client_list[client_h]->m_x, m_game->m_client_list[client_h]->m_y, item);
 					}
 				}
 				else {
@@ -1269,12 +1253,9 @@ void ItemManager::give_item_handler(int client_h, short item_index, int amount, 
 			// v1.411  
 			item_log(ItemLogAction::Drop, client_h, 0, m_game->m_client_list[client_h]->m_item_list[item_index]);
 
-			m_game->send_event_to_near_client_type_b(MsgId::EventCommon, CommonType::ItemDrop, m_game->m_client_list[client_h]->m_map_index,
+			m_game->send_ground_item_event(CommonType::ItemDrop, m_game->m_client_list[client_h]->m_map_index,
 				m_game->m_client_list[client_h]->m_x, m_game->m_client_list[client_h]->m_y,
-				m_game->m_client_list[client_h]->m_item_list[item_index]->m_id_num,
-				CItem::count_to_v2(m_game->m_client_list[client_h]->m_item_list[item_index]->m_count),
-				m_game->m_client_list[client_h]->m_item_list[item_index]->m_item_color,
-				static_cast<uint32_t>(m_game->m_client_list[client_h]->m_item_list[item_index]->m_enchant_bonus)); // v1.4 color
+				m_game->m_client_list[client_h]->m_item_list[item_index]);
 
 			m_game->send_notify_msg(0, client_h, Notify::DropItemFinEraseItem, item_index, amount, 0, 0);
 		}
@@ -1341,12 +1322,9 @@ void ItemManager::give_item_handler(int client_h, short item_index, int amount, 
 							m_game->m_client_list[client_h]->m_item_list[item_index]);
 						item_log(ItemLogAction::Drop, client_h, 0, m_game->m_client_list[client_h]->m_item_list[item_index]);
 
-						m_game->send_event_to_near_client_type_b(MsgId::EventCommon, CommonType::ItemDrop, m_game->m_client_list[client_h]->m_map_index,
+						m_game->send_ground_item_event(CommonType::ItemDrop, m_game->m_client_list[client_h]->m_map_index,
 							m_game->m_client_list[client_h]->m_x, m_game->m_client_list[client_h]->m_y,
-							m_game->m_client_list[client_h]->m_item_list[item_index]->m_id_num,
-							CItem::count_to_v2(m_game->m_client_list[client_h]->m_item_list[item_index]->m_count),
-							m_game->m_client_list[client_h]->m_item_list[item_index]->m_item_color,
-							static_cast<uint32_t>(m_game->m_client_list[client_h]->m_item_list[item_index]->m_enchant_bonus)); // v1.4 color
+							m_game->m_client_list[client_h]->m_item_list[item_index]);
 
 						{
 							ret = send_item_notify_msg(owner_h, Notify::CannotCarryMoreItem, 0, 0);
@@ -1378,12 +1356,9 @@ void ItemManager::give_item_handler(int client_h, short item_index, int amount, 
 
 						item_log(ItemLogAction::Drop, client_h, 0, m_game->m_client_list[client_h]->m_item_list[item_index]);
 
-						m_game->send_event_to_near_client_type_b(MsgId::EventCommon, CommonType::ItemDrop, m_game->m_client_list[client_h]->m_map_index,
+						m_game->send_ground_item_event(CommonType::ItemDrop, m_game->m_client_list[client_h]->m_map_index,
 							m_game->m_client_list[client_h]->m_x, m_game->m_client_list[client_h]->m_y,
-							m_game->m_client_list[client_h]->m_item_list[item_index]->m_id_num,
-							CItem::count_to_v2(m_game->m_client_list[client_h]->m_item_list[item_index]->m_count),
-							m_game->m_client_list[client_h]->m_item_list[item_index]->m_item_color,
-							static_cast<uint32_t>(m_game->m_client_list[client_h]->m_item_list[item_index]->m_enchant_bonus)); // v1.4 color
+							m_game->m_client_list[client_h]->m_item_list[item_index]);
 					}
 				}
 				else if (m_game->m_npc_list[owner_h]->m_npc_config_id == 56) { // Shop Keeper
@@ -1415,12 +1390,9 @@ void ItemManager::give_item_handler(int client_h, short item_index, int amount, 
 
 						item_log(ItemLogAction::Drop, client_h, 0, m_game->m_client_list[client_h]->m_item_list[item_index]);
 
-						m_game->send_event_to_near_client_type_b(MsgId::EventCommon, CommonType::ItemDrop, m_game->m_client_list[client_h]->m_map_index,
+						m_game->send_ground_item_event(CommonType::ItemDrop, m_game->m_client_list[client_h]->m_map_index,
 							m_game->m_client_list[client_h]->m_x, m_game->m_client_list[client_h]->m_y,
-							m_game->m_client_list[client_h]->m_item_list[item_index]->m_id_num,
-							CItem::count_to_v2(m_game->m_client_list[client_h]->m_item_list[item_index]->m_count),
-							m_game->m_client_list[client_h]->m_item_list[item_index]->m_item_color,
-							static_cast<uint32_t>(m_game->m_client_list[client_h]->m_item_list[item_index]->m_enchant_bonus)); // v1.4 color
+							m_game->m_client_list[client_h]->m_item_list[item_index]);
 
 						std::memset(char_name, 0, sizeof(char_name));
 
@@ -1821,12 +1793,7 @@ bool ItemManager::set_item_to_bank_item(int client_h, short item_index)
 				pkt.weight = item->m_weight;
 				pkt.item_color = item->m_item_color;
 				pkt.item_effect_value2 = item->m_item_effect_value2;
-				pkt.custom_made = item->m_custom_made ? 1 : 0;
-				pkt.prefix_type = static_cast<uint8_t>(item->m_prefix_type);
-				pkt.prefix_value = item->m_prefix_value;
-				pkt.secondary_type = static_cast<uint8_t>(item->m_secondary_type);
-				pkt.secondary_value = item->m_secondary_value;
-				pkt.enchant_bonus = item->m_enchant_bonus;
+				item->copy_attributes_to(pkt);
 				pkt.spec_effect_value2 = static_cast<uint8_t>(item->m_item_special_effect_value2);
 				pkt.item_id = item->m_id_num;
 				pkt.max_lifespan = item->m_durability;
@@ -2441,12 +2408,7 @@ void ItemManager::use_item_handler(int client_h, short item_index, short dX, sho
 						pkt.weight = item->m_weight;
 						pkt.item_color = item->m_item_color;
 						pkt.item_effect_value2 = item->m_item_effect_value2;
-						pkt.custom_made = item->m_custom_made ? 1 : 0;
-						pkt.prefix_type = static_cast<uint8_t>(item->m_prefix_type);
-						pkt.prefix_value = item->m_prefix_value;
-						pkt.secondary_type = static_cast<uint8_t>(item->m_secondary_type);
-						pkt.secondary_value = item->m_secondary_value;
-						pkt.enchant_bonus = item->m_enchant_bonus;
+						item->copy_attributes_to(pkt);
 						pkt.spec_effect_value2 = static_cast<uint8_t>(item->m_item_special_effect_value2);
 						pkt.item_id = item->m_id_num;
 						pkt.max_lifespan = item->m_durability;
@@ -2610,12 +2572,7 @@ bool ItemManager::set_item_to_bank_item(int client_h, CItem* item)
 				pkt.weight = item->m_weight;
 				pkt.item_color = item->m_item_color;
 				pkt.item_effect_value2 = item->m_item_effect_value2;
-				pkt.custom_made = item->m_custom_made ? 1 : 0;
-				pkt.prefix_type = static_cast<uint8_t>(item->m_prefix_type);
-				pkt.prefix_value = item->m_prefix_value;
-				pkt.secondary_type = static_cast<uint8_t>(item->m_secondary_type);
-				pkt.secondary_value = item->m_secondary_value;
-				pkt.enchant_bonus = item->m_enchant_bonus;
+				item->copy_attributes_to(pkt);
 				pkt.spec_effect_value2 = static_cast<uint8_t>(item->m_item_special_effect_value2);
 				pkt.item_id = item->m_id_num;
 				pkt.max_lifespan = item->m_durability;
@@ -2712,8 +2669,7 @@ int ItemManager::calculate_use_skill_item_effect(int owner_h, char owner_type, c
 			if (init_item_attr(item, item_name)) {
 				m_game->m_map_list[map_index]->set_item(lX, lY, item);
 
-				m_game->send_event_to_near_client_type_b(MsgId::EventCommon, CommonType::ItemDrop, map_index,
-					lX, lY, item->m_id_num, CItem::count_to_v2(item->m_count), item->m_item_color, static_cast<uint32_t>(item->m_enchant_bonus)); //v1.4
+				m_game->send_ground_item_event(CommonType::ItemDrop, map_index, lX, lY, item);
 			}
 		}
 		break;
@@ -3097,9 +3053,8 @@ void ItemManager::req_sell_item_confirm_handler(int client_h, char item_id, int 
 		m_game->m_map_list[m_game->m_client_list[client_h]->m_map_index]->set_item(m_game->m_client_list[client_h]->m_x,
 			m_game->m_client_list[client_h]->m_y, item_gold);
 
-		m_game->send_event_to_near_client_type_b(MsgId::EventCommon, CommonType::ItemDrop, m_game->m_client_list[client_h]->m_map_index,
-			m_game->m_client_list[client_h]->m_x, m_game->m_client_list[client_h]->m_y,
-			item_gold->m_id_num, CItem::count_to_v2(item_gold->m_count), item_gold->m_item_color, static_cast<uint32_t>(item_gold->m_enchant_bonus)); // v1.4 color
+		m_game->send_ground_item_event(CommonType::ItemDrop, m_game->m_client_list[client_h]->m_map_index,
+			m_game->m_client_list[client_h]->m_x, m_game->m_client_list[client_h]->m_y, item_gold);
 
 		m_game->calc_total_weight(client_h);
 
@@ -4447,9 +4402,8 @@ bool ItemManager::add_item(int client_h, CItem* item, char mode)
 			m_game->m_client_list[client_h]->m_y,
 			item);
 
-		m_game->send_event_to_near_client_type_b(MsgId::EventCommon, CommonType::ItemDrop, m_game->m_client_list[client_h]->m_map_index,
-			m_game->m_client_list[client_h]->m_x, m_game->m_client_list[client_h]->m_y,
-			item->m_id_num, CItem::count_to_v2(item->m_count), item->m_item_color, static_cast<uint32_t>(item->m_enchant_bonus)); //v1.4 color
+		m_game->send_ground_item_event(CommonType::ItemDrop, m_game->m_client_list[client_h]->m_map_index,
+			m_game->m_client_list[client_h]->m_x, m_game->m_client_list[client_h]->m_y, item);
 
 		ret = send_item_notify_msg(client_h, Notify::CannotCarryMoreItem, 0, 0);
 
@@ -4483,12 +4437,7 @@ int ItemManager::send_item_notify_msg(int client_h, uint16_t msg_type, CItem* it
 		pkt.weight = item->m_weight;
 		pkt.item_color = item->m_item_color;
 		pkt.spec_value2 = static_cast<uint8_t>(item->m_item_special_effect_value2);
-		pkt.custom_made = item->m_custom_made ? 1 : 0;
-		pkt.prefix_type = static_cast<uint8_t>(item->m_prefix_type);
-		pkt.prefix_value = item->m_prefix_value;
-		pkt.secondary_type = static_cast<uint8_t>(item->m_secondary_type);
-		pkt.secondary_value = item->m_secondary_value;
-		pkt.enchant_bonus = item->m_enchant_bonus;
+		item->copy_attributes_to(pkt);
 		pkt.item_id = item->m_id_num;
 		pkt.max_lifespan = item->m_durability;
 		ret = m_game->m_client_list[client_h]->m_socket->send_msg(reinterpret_cast<char*>(&pkt), sizeof(pkt));
@@ -5066,12 +5015,7 @@ bool ItemManager::copy_item_contents(CItem* copy, CItem* original)
 	copy->m_item_special_effect_value2 = original->m_item_special_effect_value2;
 	copy->m_item_special_effect_value3 = original->m_item_special_effect_value3;
 	copy->m_cur_durability = original->m_cur_durability;
-	copy->m_custom_made = original->m_custom_made;
-	copy->m_prefix_type = original->m_prefix_type;
-	copy->m_prefix_value = original->m_prefix_value;
-	copy->m_secondary_type = original->m_secondary_type;
-	copy->m_secondary_value = original->m_secondary_value;
-	copy->m_enchant_bonus = original->m_enchant_bonus;
+	copy->copy_attributes_from(original);
 	copy->m_display_id = original->m_display_id;
 
 	return true;
@@ -5496,8 +5440,8 @@ void ItemManager::req_create_slate_handler(int client_h, char* data)
 		}
 		else {
 			m_game->m_map_list[m_game->m_client_list[client_h]->m_map_index]->set_item(m_game->m_client_list[client_h]->m_x, m_game->m_client_list[client_h]->m_y, item);
-			m_game->send_event_to_near_client_type_b(MsgId::EventCommon, CommonType::ItemDrop, m_game->m_client_list[client_h]->m_map_index,
-				m_game->m_client_list[client_h]->m_x, m_game->m_client_list[client_h]->m_y, item->m_id_num, CItem::count_to_v2(item->m_count), item->m_item_color, static_cast<uint32_t>(item->m_enchant_bonus));
+			m_game->send_ground_item_event(CommonType::ItemDrop, m_game->m_client_list[client_h]->m_map_index,
+				m_game->m_client_list[client_h]->m_x, m_game->m_client_list[client_h]->m_y, item);
 			ret = send_item_notify_msg(client_h, Notify::CannotCarryMoreItem, 0, 0);
 
 			switch (ret) {

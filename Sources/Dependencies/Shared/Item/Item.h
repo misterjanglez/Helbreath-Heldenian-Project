@@ -12,10 +12,12 @@
 
 #include "ItemEnums.h"
 #include "ItemAttributes.h"
+#include "ItemInstanceData.h"
 #include "NetConstants.h"
 #include "Game/BalanceConstants.h"
 #include <cstring>
 #include <cstdint>
+#include <algorithm>
 
 struct dice_range
 {
@@ -351,29 +353,23 @@ public:
         m_enchant_bonus = other->m_enchant_bonus;
     }
 
-    // Pack attributes into a uint32_t for generic event messages (e.g. SetItem ground broadcast)
-    // Uses the legacy bitmask layout for compatibility with send_event_to_near_client_type_b
-    uint32_t pack_attributes_uint32() const
+    // Populate an item_instance_data struct from this CItem's fields
+    hb::shared::item::item_instance_data to_instance_data() const
     {
-        uint32_t result = 0;
-        if (m_custom_made) result |= 0x00000001;
-        result |= (static_cast<uint32_t>(m_secondary_value) & 0x0F) << 8;
-        result |= (static_cast<uint32_t>(m_secondary_type) & 0x0F) << 12;
-        result |= (static_cast<uint32_t>(m_prefix_value) & 0x0F) << 16;
-        result |= (static_cast<uint32_t>(m_prefix_type) & 0x0F) << 20;
-        result |= (static_cast<uint32_t>(m_enchant_bonus) & 0x0F) << 28;
-        return result;
-    }
-
-    // Unpack a legacy uint32_t attribute bitmask into individual fields
-    void unpack_legacy_attribute(uint32_t attr)
-    {
-        m_custom_made = (attr & 0x00000001) != 0;
-        m_secondary_value = static_cast<uint8_t>((attr >> 8) & 0x0F);
-        m_secondary_type = static_cast<hb::shared::item::SecondaryEffectType>((attr >> 12) & 0x0F);
-        m_prefix_value = static_cast<uint8_t>((attr >> 16) & 0x0F);
-        m_prefix_type = static_cast<hb::shared::item::AttributePrefixType>((attr >> 20) & 0x0F);
-        m_enchant_bonus = static_cast<uint8_t>((attr >> 28) & 0x0F);
+        hb::shared::item::item_instance_data d;
+        d.item_id = m_id_num;
+        d.count = static_cast<uint16_t>(std::min<uint64_t>(m_count, 65535));
+        d.touch_effect_type = m_touch_effect_type;
+        d.touch_effect_value1 = m_touch_effect_value1;
+        d.touch_effect_value2 = m_touch_effect_value2;
+        d.touch_effect_value3 = m_touch_effect_value3;
+        d.item_color = m_item_color;
+        d.special_effect_value1 = m_item_special_effect_value1;
+        d.special_effect_value2 = m_item_special_effect_value2;
+        d.special_effect_value3 = m_item_special_effect_value3;
+        d.cur_lifespan = m_cur_durability;
+        copy_attributes_to(d);
+        return d;
     }
 
     // Check if item is stackable (reads the config flag)

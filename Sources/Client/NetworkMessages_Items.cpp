@@ -17,6 +17,7 @@
 #include <string>
 #include "Screen_OnGame.h"
 #include "AudioManager.h"
+#include "Item/ItemInstanceData.h"
 
 using namespace hb::shared::net;
 using namespace hb::shared::item;
@@ -141,13 +142,25 @@ namespace NetworkMessageHandlers {
 		item_color = static_cast<char>(pkt->item_color);
 		special_ev2 = static_cast<short>(pkt->spec_value2);
 
-		if (count == 1) txt = std::format(NOTIFYMSG_ITEMOBTAINED2, name);
-		else txt = std::format(NOTIFYMSG_ITEMOBTAINED1, count, name);
+		{
+			hb::shared::item::item_instance_data idata;
+			idata.item_id = pkt->item_id;
+			idata.count = static_cast<uint16_t>(std::min<uint64_t>(count, 65535));
+			idata.custom_made = pkt->custom_made;
+			idata.prefix_type = pkt->prefix_type;
+			idata.prefix_value = pkt->prefix_value;
+			idata.secondary_type = pkt->secondary_type;
+			idata.secondary_value = pkt->secondary_value;
+			idata.enchant_bonus = pkt->enchant_bonus;
+			idata.special_effect_value2 = static_cast<int16_t>(pkt->spec_value2);
+			auto info = item_name_formatter::get().format(idata);
+			txt = std::format(NOTIFYMSG_ITEMOBTAINED2, info.name);
+		}
 
 		game->add_event_list(txt.c_str(), 10);
 		audio_manager::get().play_game_sound(sound_type::effect, 20, 0);
 
-		game->m_map_data->set_item(game->m_player->m_player_x, game->m_player->m_player_y, 0, 0, 0, false);
+		game->m_map_data->set_item(game->m_player->m_player_x, game->m_player->m_player_y, {}, false);
 
 		short item_id = pkt->item_id;
 		CItem* cfg_obtained = game->get_item_config(item_id);
@@ -234,8 +247,20 @@ namespace NetworkMessageHandlers {
 
 		// One chat message for the entire batch
 		std::string txt;
-		if (total_count == 1) txt = std::format(NOTIFYMSG_ITEMOBTAINED2, name);
-		else txt = std::format(NOTIFYMSG_ITEMOBTAINED1, total_count, name);
+		{
+			hb::shared::item::item_instance_data idata;
+			idata.item_id = item_id;
+			idata.count = static_cast<uint16_t>(std::min<uint64_t>(total_count, 65535));
+			idata.custom_made = pkt->custom_made;
+			idata.prefix_type = pkt->prefix_type;
+			idata.prefix_value = pkt->prefix_value;
+			idata.secondary_type = pkt->secondary_type;
+			idata.secondary_value = pkt->secondary_value;
+			idata.enchant_bonus = pkt->enchant_bonus;
+			idata.special_effect_value2 = special_ev2;
+			auto info = item_name_formatter::get().format(idata);
+			txt = std::format(NOTIFYMSG_ITEMOBTAINED2, info.name);
+		}
 		game->add_event_list(txt.c_str(), 10);
 		audio_manager::get().play_game_sound(sound_type::effect, 20, 0);
 
@@ -759,24 +784,11 @@ namespace NetworkMessageHandlers {
 		game->add_event_list(txt.c_str(), 10);
 	}
 
-	static uint32_t pack_exchange_attribute(const hb::net::PacketNotifyExchangeItem* pkt)
-	{
-		uint32_t attr = 0;
-		if (pkt->custom_made) attr |= 0x00000001;
-		attr |= (static_cast<uint32_t>(pkt->secondary_value) & 0x0F) << 8;
-		attr |= (static_cast<uint32_t>(pkt->secondary_type) & 0x0F) << 12;
-		attr |= (static_cast<uint32_t>(pkt->prefix_value) & 0x0F) << 16;
-		attr |= (static_cast<uint32_t>(pkt->prefix_type) & 0x0F) << 20;
-		attr |= (static_cast<uint32_t>(pkt->enchant_bonus) & 0x0F) << 28;
-		return attr;
-	}
-
 	void HandleSetExchangeItem(CGame* game, char* data)
 	{
 		short dir, cur_life, max_life, performance, item_id;
 		int amount, i;
 		char color, item_name[hb::shared::limits::ItemNameLen], char_name[12];
-		uint32_t attribute;
 		std::memset(item_name, 0, sizeof(item_name));
 
 		const auto* pkt = hb::net::PacketCast<hb::net::PacketNotifyExchangeItem>(
@@ -790,7 +802,6 @@ namespace NetworkMessageHandlers {
 		performance = pkt->performance;
 		memcpy(item_name, pkt->item_name, sizeof(pkt->item_name));
 		memcpy(char_name, pkt->char_name, sizeof(pkt->char_name));
-		attribute = pack_exchange_attribute(pkt);
 		item_id = pkt->item_id;
 
 		auto* exDlg = game->get_dialog_box_manager().get_dialog_as<DialogBox_Exchange>(DialogBoxId::Exchange);
@@ -821,8 +832,15 @@ namespace NetworkMessageHandlers {
 		exDlg->m_slots[i].v7 = static_cast<int>(performance);
 		exDlg->m_slots[i].str1.assign(item_name, strnlen(item_name, hb::shared::limits::ItemNameLen));
 		exDlg->m_slots[i].str2.assign(char_name, strnlen(char_name, hb::shared::limits::CharNameLen));
-		exDlg->m_slots[i].dw_v1 = attribute;
 		exDlg->m_slots[i].item_id = item_id;
+		exDlg->m_slots[i].item_data = {};
+		exDlg->m_slots[i].item_data.item_id = item_id;
+		exDlg->m_slots[i].item_data.custom_made = pkt->custom_made;
+		exDlg->m_slots[i].item_data.prefix_type = pkt->prefix_type;
+		exDlg->m_slots[i].item_data.prefix_value = pkt->prefix_value;
+		exDlg->m_slots[i].item_data.secondary_type = pkt->secondary_type;
+		exDlg->m_slots[i].item_data.secondary_value = pkt->secondary_value;
+		exDlg->m_slots[i].item_data.enchant_bonus = pkt->enchant_bonus;
 	}
 
 	void HandleOpenExchangeWindow(CGame* game, char* data)
@@ -830,7 +848,6 @@ namespace NetworkMessageHandlers {
 		short dir, cur_life, max_life, performance, item_id;
 		int amount;
 		char color, item_name[hb::shared::limits::ItemNameLen], char_name[12];
-		uint32_t attribute;
 		std::memset(item_name, 0, sizeof(item_name));
 
 		const auto* pkt = hb::net::PacketCast<hb::net::PacketNotifyExchangeItem>(
@@ -844,7 +861,6 @@ namespace NetworkMessageHandlers {
 		performance = pkt->performance;
 		memcpy(item_name, pkt->item_name, sizeof(pkt->item_name));
 		memcpy(char_name, pkt->char_name, sizeof(pkt->char_name));
-		attribute = pack_exchange_attribute(pkt);
 		item_id = pkt->item_id;
 
 		game->get_dialog_box_manager().enable_dialog_box(DialogBoxId::Exchange, 1, 0, 0, 0);
@@ -861,7 +877,7 @@ namespace NetworkMessageHandlers {
 			exDlg->m_slots[j].v7 = -1;
 			exDlg->m_slots[j].item_id = -1;
 			exDlg->m_slots[j].inv_slot = -1;
-			exDlg->m_slots[j].dw_v1 = 0;
+			exDlg->m_slots[j].item_data.clear();
 		}
 		int i;
 		if (dir >= 1000)  // Set the item I want to exchange
@@ -887,8 +903,15 @@ namespace NetworkMessageHandlers {
 		exDlg->m_slots[i].v7 = static_cast<int>(performance);
 		exDlg->m_slots[i].str1.assign(item_name, strnlen(item_name, hb::shared::limits::ItemNameLen));
 		exDlg->m_slots[i].str2.assign(char_name, strnlen(char_name, hb::shared::limits::CharNameLen));
-		exDlg->m_slots[i].dw_v1 = attribute;
 		exDlg->m_slots[i].item_id = item_id;
+		exDlg->m_slots[i].item_data = {};
+		exDlg->m_slots[i].item_data.item_id = item_id;
+		exDlg->m_slots[i].item_data.custom_made = pkt->custom_made;
+		exDlg->m_slots[i].item_data.prefix_type = pkt->prefix_type;
+		exDlg->m_slots[i].item_data.prefix_value = pkt->prefix_value;
+		exDlg->m_slots[i].item_data.secondary_type = pkt->secondary_type;
+		exDlg->m_slots[i].item_data.secondary_value = pkt->secondary_value;
+		exDlg->m_slots[i].item_data.enchant_bonus = pkt->enchant_bonus;
 	}
 
 	void HandleCurLifeSpan(CGame* game, char* data)

@@ -185,17 +185,14 @@ void MagicManager::player_magic_handler(int client_h, int dX, int dY, short type
 {
 	short sX, sY, owner_h, magic_circle, rx, ry, level_magic;
 	direction dir;
-	char owner_type, name[hb::shared::limits::CharNameLen], item_name[hb::shared::limits::ItemNameLen], npc_waypoint[11], cName_Master[hb::shared::limits::CharNameLen], remain_item_color, scan_message[256];
+	char owner_type, name[hb::shared::limits::CharNameLen], item_name[hb::shared::limits::ItemNameLen], npc_waypoint[11], cName_Master[hb::shared::limits::CharNameLen], scan_message[256];
 	double dv1, dv2, dv3, dv4;
 	int err, ret, result, dice_res, naming_value, followers_num, erase_req, whether_bonus;
 	int tX, tY, mana_cost, magic_attr;
-	uint64_t remain_item_count;
 	CItem* item;
 	uint32_t time;
 	short eq_status;
 	int map_side = 0;
-	short id_num;
-	uint32_t attr;
 
 	time = GameClock::GetTimeMS();
 	m_game->m_client_list[client_h]->m_magic_confirm = true;
@@ -1882,8 +1879,7 @@ void MagicManager::player_magic_handler(int client_h, int dX, int dY, short type
 
 			m_game->m_item_manager->item_log(ItemLogAction::Drop, client_h, (int)-1, item);
 
-			m_game->send_event_to_near_client_type_b(MsgId::EventCommon, CommonType::ItemDrop, m_game->m_client_list[client_h]->m_map_index,
-				dX, dY, item->m_id_num, CItem::count_to_v2(item->m_count), item->m_item_color, static_cast<uint32_t>(item->m_enchant_bonus)); // v1.4 color
+			m_game->send_ground_item_event(CommonType::ItemDrop, m_game->m_client_list[client_h]->m_map_index, dX, dY, item);
 			break;
 
 		case hb::shared::magic::Protect:
@@ -2159,12 +2155,14 @@ void MagicManager::player_magic_handler(int client_h, int dX, int dY, short type
 			break;
 
 		case hb::shared::magic::Possession:
+		{
 			if (m_game->m_client_list[client_h]->m_side == 0) { magic_noeffect(); return; }
 
 			m_game->m_map_list[m_game->m_client_list[client_h]->m_map_index]->get_owner(&owner_h, &owner_type, dX, dY);
 			if (owner_h != 0) break;
 
-			item = m_game->m_map_list[m_game->m_client_list[client_h]->m_map_index]->get_item(dX, dY, &id_num, &remain_item_color, &attr, &remain_item_count);
+			CItem* remain = nullptr;
+			item = m_game->m_map_list[m_game->m_client_list[client_h]->m_map_index]->get_item(dX, dY, &remain);
 			if (item != 0) {
 				if (m_game->m_item_manager->add_client_item_list(client_h, item, &erase_req)) {
 
@@ -2182,9 +2180,8 @@ void MagicManager::player_magic_handler(int client_h, int dX, int dY, short type
 					}
 
 					// Broadcast remaining item state to nearby clients
-					m_game->send_event_to_near_client_type_b(MsgId::EventCommon, CommonType::SetItem,
-						m_game->m_client_list[client_h]->m_map_index,
-						dX, dY, id_num, CItem::count_to_v2(remain_item_count), remain_item_color, attr);
+					m_game->send_ground_item_event(CommonType::SetItem,
+						m_game->m_client_list[client_h]->m_map_index, dX, dY, remain);
 				}
 				else
 				{
@@ -2203,6 +2200,7 @@ void MagicManager::player_magic_handler(int client_h, int dX, int dY, short type
 					}
 				}
 			}
+		}
 			break;
 
 		case hb::shared::magic::Confuse:

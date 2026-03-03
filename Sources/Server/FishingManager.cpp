@@ -224,9 +224,8 @@ void FishingManager::req_get_fish_this_time_handler(int client_h)
 			m_game->m_client_list[client_h]->m_y,
 			item);
 
-		m_game->send_event_to_near_client_type_b(MsgId::EventCommon, CommonType::ItemDrop, m_game->m_client_list[client_h]->m_map_index,
-			m_game->m_client_list[client_h]->m_x, m_game->m_client_list[client_h]->m_y,
-			item->m_id_num, CItem::count_to_v2(item->m_count), item->m_item_color, static_cast<uint32_t>(item->m_enchant_bonus)); // v1.4 color
+		m_game->send_ground_item_event(CommonType::ItemDrop, m_game->m_client_list[client_h]->m_map_index,
+			m_game->m_client_list[client_h]->m_x, m_game->m_client_list[client_h]->m_y, item);
 
 		m_game->send_notify_msg(0, client_h, Notify::FishSuccess, 0, 0, 0, 0);
 		fish_h = m_game->m_client_list[client_h]->m_allocated_fish;

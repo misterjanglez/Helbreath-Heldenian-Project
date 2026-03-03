@@ -270,7 +270,7 @@ void DialogBox_Manufacture::draw_manufacture_list(short sX, short sY)
 	for (int i = 0; i < 13; i++)
 		if (build_item_manager::get().get_display_list()[i + m_scroll_view] != 0) {
 
-			auto itemInfo = item_name_formatter::get().format(m_game->find_item_id_by_name(build_item_manager::get().get_display_list()[i + m_scroll_view]->m_name.c_str()),  0);
+			auto itemInfo = item_name_formatter::get().format(m_game->find_item_id_by_name(build_item_manager::get().get_display_list()[i + m_scroll_view]->m_name.c_str()));
 			temp = itemInfo.name.c_str();
 			temp2 = std::format("{}%", build_item_manager::get().get_display_list()[i + m_scroll_view]->m_max_skill);
 
@@ -353,7 +353,7 @@ void DialogBox_Manufacture::draw_manufacture_waiting(short sX, short sY)
 		recipe_draw.sprite->draw(sX + adj_x + 62 + 5, sY + adj_y + 84 + 17, recipe_draw.frame);
 	};
 
-	auto itemInfo2 = item_name_formatter::get().format(m_game->find_item_id_by_name(build_item_manager::get().get_display_list()[m_progress]->m_name.c_str()),  0);
+	auto itemInfo2 = item_name_formatter::get().format(m_game->find_item_id_by_name(build_item_manager::get().get_display_list()[m_progress]->m_name.c_str()));
 	temp = itemInfo2.name.c_str();
 	put_string(sX + adj_x + 44 + 10 + 60, sY + adj_y + 55, temp.c_str(), GameColors::UIWhite);
 
@@ -376,7 +376,7 @@ void DialogBox_Manufacture::draw_manufacture_waiting(short sX, short sY)
 			case 5: elemName = build_item_manager::get().get_display_list()[m_progress]->m_element_name_5.c_str(); elemFlag = build_item_manager::get().get_display_list()[m_progress]->m_element_flag[5]; break;
 			case 6: elemName = build_item_manager::get().get_display_list()[m_progress]->m_element_name_6.c_str(); elemFlag = build_item_manager::get().get_display_list()[m_progress]->m_element_flag[6]; break;
 			}
-			auto itemInfo3 = item_name_formatter::get().format(m_game->find_item_id_by_name(elemName),  0);
+			auto itemInfo3 = item_name_formatter::get().format(m_game->find_item_id_by_name(elemName));
 			temp = itemInfo3.name.c_str();
 			if (elemFlag)
 				put_string(sX + adj_x + 44 + 20 + 60, sY + adj_y + 55 + loc * 15 + 5, temp.c_str(), GameColors::UILabel);
@@ -475,7 +475,7 @@ void DialogBox_Manufacture::draw_manufacture_in_progress(short sX, short sY)
 		recipe_draw.sprite->draw(sX + adj_x + 62 + 5, sY + adj_y + 84 + 17, recipe_draw.frame);
 	};
 
-	auto itemInfo4 = item_name_formatter::get().format(m_game->find_item_id_by_name(build_item_manager::get().get_display_list()[m_progress]->m_name.c_str()),  0);
+	auto itemInfo4 = item_name_formatter::get().format(m_game->find_item_id_by_name(build_item_manager::get().get_display_list()[m_progress]->m_name.c_str()));
 	temp = itemInfo4.name.c_str();
 	put_string(sX + adj_x + 44 + 10 + 60, sY + adj_y + 55, temp.c_str(), GameColors::UIWhite);
 
@@ -498,7 +498,7 @@ void DialogBox_Manufacture::draw_manufacture_in_progress(short sX, short sY)
 			case 5: elemName = build_item_manager::get().get_display_list()[m_progress]->m_element_name_5.c_str(); elemFlag = build_item_manager::get().get_display_list()[m_progress]->m_element_flag[5]; break;
 			case 6: elemName = build_item_manager::get().get_display_list()[m_progress]->m_element_name_6.c_str(); elemFlag = build_item_manager::get().get_display_list()[m_progress]->m_element_flag[6]; break;
 			}
-			auto itemInfo5 = item_name_formatter::get().format(m_game->find_item_id_by_name(elemName),  0);
+			auto itemInfo5 = item_name_formatter::get().format(m_game->find_item_id_by_name(elemName));
 			temp = itemInfo5.name.c_str();
 			if (elemFlag)
 				put_string(sX + adj_x + 44 + 20 + 60, sY + adj_y + 55 + loc * 15 + 5, temp.c_str(), GameColors::UILabel);
@@ -598,7 +598,7 @@ void DialogBox_Manufacture::draw_manufacture_done(short sX, short sY)
 		recipe_draw.sprite->draw(sX + adj_x + 62 + 5, sY + adj_y + 84 + 17, recipe_draw.frame);
 	};
 
-	auto itemInfo6 = item_name_formatter::get().format(m_game->find_item_id_by_name(build_item_manager::get().get_display_list()[m_progress]->m_name.c_str()),  0);
+	auto itemInfo6 = item_name_formatter::get().format(m_game->find_item_id_by_name(build_item_manager::get().get_display_list()[m_progress]->m_name.c_str()));
 
 	temp = itemInfo6.name.c_str();
 	put_string(sX + adj_x + 44 + 10 + 60, sY + adj_y + 55, temp.c_str(), GameColors::UIWhite);

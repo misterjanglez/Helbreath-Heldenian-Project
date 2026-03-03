@@ -1881,11 +1881,6 @@ void CombatManager::check_attack_type(int client_h, short* spType)
 void CombatManager::check_fire_bluring(char map_index, int sX, int sY)
 {
 	int item_num;
-	char  item_color;
-	CItem* item;
-	short id_num;
-	uint32_t attr;
-	uint64_t remain_item_count;
 
 	for(int ix = sX - 1; ix <= sX + 1; ix++)
 		for(int iy = sY - 1; iy <= sY + 1; iy++) {
@@ -1893,13 +1888,15 @@ void CombatManager::check_fire_bluring(char map_index, int sX, int sY)
 
 			switch (item_num) {
 			case 355:
-				item = m_game->m_map_list[map_index]->get_item(ix, iy, &id_num, &item_color, &attr, &remain_item_count);
-				if (item != 0) delete item;
+			{
+				CItem* remain = nullptr;
+				CItem* item = m_game->m_map_list[map_index]->get_item(ix, iy, &remain);
+				if (item != nullptr) delete item;
 				m_game->m_dynamic_object_manager->add_dynamic_object_list(0, 0, dynamic_object::Fire, map_index, ix, iy, 6000);
 
-				m_game->send_event_to_near_client_type_b(MsgId::EventCommon, CommonType::SetItem, map_index,
-					ix, iy, id_num, CItem::count_to_v2(remain_item_count), item_color, attr);
+				m_game->send_ground_item_event(CommonType::SetItem, map_index, ix, iy, remain);
 				break;
+			}
 			}
 		}
 }

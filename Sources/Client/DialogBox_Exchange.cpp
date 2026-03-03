@@ -133,7 +133,7 @@ void DialogBox_Exchange::draw_item_info(short sX, short sY, short size_x, short 
 	std::string txt, txt2;
 	int loc;
 
-	auto itemInfo = item_name_formatter::get().format(m_slots[item_index].item_id,  m_slots[item_index].dw_v1);
+	auto itemInfo = item_name_formatter::get().format(m_slots[item_index].item_data);
 
 	if ((mouse_x >= sX + xadd - 6) && (mouse_x <= sX + xadd + 42) && (mouse_y >= sY + 61) && (mouse_y <= sY + 200)) {
 		txt = itemInfo.name.c_str();
@@ -292,7 +292,7 @@ bool DialogBox_Exchange::on_enable(int type, int64_t v1, int v2, const char* str
 		m_slots[i].v6 = -1;
 		m_slots[i].v7 = -1;
 		m_slots[i].inv_slot = -1;
-		m_slots[i].dw_v1 = 0;
+		m_slots[i].item_data = {};
 	}
 	disable_dialog_box(DialogBoxId::ItemDropExternal);
 	disable_dialog_box(DialogBoxId::NpcActionQuery);
@@ -318,7 +318,7 @@ bool DialogBox_Exchange::on_disable()
 		m_slots[i].v7 = -1;
 		m_slots[i].item_id = -1;
 		m_slots[i].inv_slot = -1;
-		m_slots[i].dw_v1 = 0;
+		m_slots[i].item_data = {};
 	}
 	return true;
 }
@@ -336,7 +336,7 @@ void DialogBox_Exchange::reset_slots()
 		m_slots[i].v7 = -1;
 		m_slots[i].item_id = -1;
 		m_slots[i].inv_slot = -1;
-		m_slots[i].dw_v1 = 0;
+		m_slots[i].item_data = {};
 	}
 }
 
