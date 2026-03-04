@@ -1152,7 +1152,7 @@
 #define	DRAW_DIALOGBOX_SHOP27	"Quantity:"
 #define	DRAW_DIALOGBOX_SHOP28	"Restores Hunger: {}-{}"
 #define	TOOLTIP_WEIGHT			"Weight: {:.2f} stone"
-#define	TOOLTIP_WEIGHT_STACK	"Weight: {:.2f} stone (total: {:.2f})"
+#define	TOOLTIP_WEIGHT_STACK	"Weight: {:.2f} stones ({:.2f})"
 #define	TOOLTIP_USAGES			"Usages: {}/{}"
 #define	TOOLTIP_RESTORES_HP		"Restores HP: {}-{}"
 #define	TOOLTIP_RESTORES_MP		"Restores MP: {}-{}"

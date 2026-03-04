@@ -8872,9 +8872,6 @@ void CGame::request_teleport_handler(int client_h, const char* data, const char*
 		m_item_manager->clear_exchange_status(client_h);
 	}
 
-	if ((memcmp(m_client_list[client_h]->m_location, "NONE", 4) == 0) && (data[0] == '1'))
-		return;
-
 	m_combat_manager->remove_from_target(client_h, hb::shared::owner_class::Player);
 
 	// Delete all summoned NPCs belonging to this player

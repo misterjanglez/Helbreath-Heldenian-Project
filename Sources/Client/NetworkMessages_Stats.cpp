@@ -85,18 +85,12 @@ namespace NetworkMessageHandlers {
 		game->m_player->m_sp = static_cast<int>(pkt->sp);
 
 		if (!game->m_player->m_stats_initialized) return;
-		if (game->m_player->m_sp == prev_sp) return;
 
 		if (game->m_player->m_sp > prev_sp)
 		{
 			txt = std::format(NOTIFYMSG_SP_UP, game->m_player->m_sp - prev_sp);
 			game->add_event_list(txt.c_str(), 10);
 			audio_manager::get().play_game_sound(sound_type::effect, 21, 0);
-		}
-		else
-		{
-			txt = std::format(NOTIFYMSG_SP_DOWN, prev_sp - game->m_player->m_sp);
-			game->add_event_list(txt.c_str(), 10);
 		}
 	}
 

@@ -1051,7 +1051,7 @@ void Screen_OnGame::render_item_tooltip()
         {
             int stack_raw = CItem::calc_item_stack_weight(eff_weight, static_cast<int>(item->m_instance.count));
             float total_stones = CItem::weight_to_stones(stack_raw);
-            G_cTxt = std::format(TOOLTIP_WEIGHT_STACK, unit_stones, total_stones);
+            G_cTxt = std::format(TOOLTIP_WEIGHT_STACK, total_stones, unit_stones);
         }
         else
         {
