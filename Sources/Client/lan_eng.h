@@ -716,7 +716,7 @@
 #define	UPDATE_SCREEN_ONGAME7	"Too far to give the Item."
 #define	UPDATE_SCREEN_ONGAME8	"The quantity you enter is not correct."
 #define	UPDATE_SCREEN_ONGAME9	"You entered more quantity that you can carry."
-#define	UPDATE_SCREEN_ONGAME10	"Endurance: {}/{}"
+#define	UPDATE_SCREEN_ONGAME10	"Durability: {}/{}"
 #define	UPDATE_SCREEN_ONGAME12	"Press F1 for help."
 #define	UPDATE_SCREEN_ONGAME13	"Logging out...{}"
 #define	UPDATE_SCREEN_ONGAME14	"Restarting game...{}"
@@ -822,7 +822,7 @@
 
 #define	DRAW_DIALOGBOX_EXCHANGE1	"My Item"
 #define	DRAW_DIALOGBOX_EXCHANGE2	"Quantity: {}"
-#define	DRAW_DIALOGBOX_EXCHANGE3	"Endurance: {}/{}"
+#define	DRAW_DIALOGBOX_EXCHANGE3	"Durability: {}/{}"
 #define	DRAW_DIALOGBOX_EXCHANGE5	"{}'s item"
 
 #define	DRAW_DIALOGBOX_EXCHANGE9	"Please wait until other player decides"
@@ -1117,7 +1117,7 @@
 
 
 #define	DRAW_DIALOGBOX_SELLOR_REPAIR_ITEM1	"{} {}"
-#define	DRAW_DIALOGBOX_SELLOR_REPAIR_ITEM2	"Endurance: {}"
+#define	DRAW_DIALOGBOX_SELLOR_REPAIR_ITEM2	"Durability: {}"
 #define	DRAW_DIALOGBOX_SELLOR_REPAIR_ITEM3	"Value: {} Gold"
 #define	DRAW_DIALOGBOX_SELLOR_REPAIR_ITEM4	"Do you want to sell?"
 #define	DRAW_DIALOGBOX_SELLOR_REPAIR_ITEM6	"Cost: {} Gold"
@@ -1355,7 +1355,7 @@
 #define	NOTIFYMSG_ITEMDEPlETED_ERASEITEM6	"Item {}: was broken."
 
 
-#define	NOTIFYMSG_ITEMLIFE_SPANEND1	"Item {}: exhausted!"
+#define	NOTIFYMSG_ITEM_DURABILITY_END1	"Item {}: exhausted!"
 
 
 #define	NOTIFYMSG_ITEMOBTAINED1	"You got {} {}."
