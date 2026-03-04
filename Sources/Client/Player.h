@@ -90,6 +90,7 @@ public:
 
     // RESOURCES
     int m_hp, m_mp, m_sp, m_hunger_status;
+    bool m_stats_initialized = false;
 
     // BASE STATS
     int m_str, m_vit, m_dex, m_int, m_mag, m_charisma;

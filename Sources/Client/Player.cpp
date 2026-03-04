@@ -31,6 +31,7 @@ void CPlayer::reset()
     m_mp = 0;
     m_sp = 0;
     m_hunger_status = 0;
+    m_stats_initialized = false;
 
     // BASE STATS
     m_str = 0;

@@ -26,9 +26,10 @@ namespace NetworkMessageHandlers {
 		if (!pkt) return;
 		game->m_player->m_hp = static_cast<int>(pkt->hp);
 
+		if (!game->m_player->m_stats_initialized) return;
+
 		if (game->m_player->m_hp > prev_hp)
 		{
-			if ((game->m_player->m_hp - prev_hp) < 10) return;
 			txt = std::format(NOTIFYMSG_HP_UP, game->m_player->m_hp - prev_hp);
 			game->add_event_list(txt.c_str(), 10);
 			audio_manager::get().play_game_sound(sound_type::effect, 21, 0);
@@ -42,7 +43,6 @@ namespace NetworkMessageHandlers {
 			}
 			game->m_damaged_time = GameClock::get_time_ms();
 			if (game->m_player->m_hp < 20) game->add_event_list(NOTIFYMSG_HP3, 10);
-			if ((prev_hp - game->m_player->m_hp) < 10) return;
 			txt = std::format(NOTIFYMSG_HP_DOWN, prev_hp - game->m_player->m_hp);
 			game->add_event_list(txt.c_str(), 10);
 		}
@@ -58,7 +58,9 @@ namespace NetworkMessageHandlers {
 		if (!pkt) return;
 		game->m_player->m_mp = static_cast<int>(pkt->mp);
 
-		if (abs(game->m_player->m_mp - prev_mp) < 10) return;
+		if (!game->m_player->m_stats_initialized) return;
+		if (game->m_player->m_mp == prev_mp) return;
+
 		if (game->m_player->m_mp > prev_mp)
 		{
 			txt = std::format(NOTIFYMSG_MP_UP, game->m_player->m_mp - prev_mp);
@@ -82,7 +84,9 @@ namespace NetworkMessageHandlers {
 		if (!pkt) return;
 		game->m_player->m_sp = static_cast<int>(pkt->sp);
 
-		if (abs(game->m_player->m_sp - prev_sp) < 10) return;
+		if (!game->m_player->m_stats_initialized) return;
+		if (game->m_player->m_sp == prev_sp) return;
+
 		if (game->m_player->m_sp > prev_sp)
 		{
 			txt = std::format(NOTIFYMSG_SP_UP, game->m_player->m_sp - prev_sp);

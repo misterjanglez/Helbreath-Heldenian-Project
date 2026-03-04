@@ -178,6 +178,7 @@ namespace NetworkMessageHandlers {
 		game->m_player->m_hp = pkt->hp;
 		game->m_player->m_mp = pkt->mp;
 		game->m_player->m_sp = pkt->sp;
+		game->m_player->m_stats_initialized = true;
 		game->m_player->m_ac = pkt->ac;
 		game->m_player->m_thac0 = pkt->thac0;
 		game->m_player->m_level = pkt->level;
