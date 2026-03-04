@@ -151,30 +151,30 @@ ItemNameInfo item_name_formatter::format(short item_id, const hb::shared::item::
 			case 5: result.effects.push_back({"Attack Speed -1", ""}); break;
 			case 6: result.effects.push_back({std::format("-{}%", value1 * pm), "", effect_category::inline_weight}); break;
 			case 7: result.effects.push_back({std::format("+{}", value1 * pm), "", effect_category::inline_damage}); break;
-			case 8: result.effects.push_back({std::format("+{}%", value1 * pm), "", effect_category::inline_defense}); break;
+			case 8: result.effects.push_back({"Durability", std::format("+{}%", value1 * pm), effect_category::inline_durability}); break;
 			case 9: result.effects.push_back({std::format("+{}", value1 * pm), "", effect_category::inline_damage}); break;
 			case hb::shared::owner::Slime: result.effects.push_back({"Magic Casting Probability ", std::format("+{}%", value1 * pm)}); break;
 			case hb::shared::owner::Skeleton: result.effects.push_back({std::format("Replace {}% damage to mana", value1 * pm), ""}); break;
 			case hb::shared::owner::StoneGolem: result.effects.push_back({"Crit Increase Chance ", std::format("{}%", value1 * pm)}); break;
 			}
+		}
 
-			if (type2 != 0)
-			{
-				int s = (m_secondary_multiplier && type2 < 16) ? m_secondary_multiplier[type2] : 1;
-				switch (type2) {
-				case 1:  result.effects.push_back({"Poison Resistance", std::format("+{}%", value2 * s)}); break;
-				case 2:  result.effects.push_back({"Hitting Probability", std::format("+{}", value2 * s)}); break;
-				case 3:  result.effects.push_back({"Defense Ratio", std::format("+{}", value2 * s)}); break;
-				case 4:  result.effects.push_back({"HP recovery ", std::format("{}%", value2 * s)}); break;
-				case 5:  result.effects.push_back({"SP recovery ", std::format("{}%", value2 * s)}); break;
-				case 6:  result.effects.push_back({"MP recovery ", std::format("{}%", value2 * s)}); break;
-				case 7:  result.effects.push_back({"Magic Resistance", std::format("+{}%", value2 * s)}); break;
-				case 8:  result.effects.push_back({"Physical Absorption", std::format("+{}%", value2 * s)}); break;
-				case 9:  result.effects.push_back({"Magic Absorption", std::format("+{}%", value2 * s)}); break;
-				case hb::shared::owner::Slime: result.effects.push_back({"Consecutive Attack Damage", std::format("+{}", value2 * s)}); break;
-				case hb::shared::owner::Skeleton: result.effects.push_back({"Experience", std::format("+{}%", value2 * s)}); break;
-				case hb::shared::owner::StoneGolem: result.effects.push_back({"Gold", std::format("+{}%", value2 * s)}); break;
-				}
+		if (type2 != 0)
+		{
+			int s = (m_secondary_multiplier && type2 < 16) ? m_secondary_multiplier[type2] : 1;
+			switch (type2) {
+			case 1:  result.effects.push_back({"Poison Resistance", std::format("+{}%", value2 * s)}); break;
+			case 2:  result.effects.push_back({"Hitting Probability", std::format("+{}", value2 * s)}); break;
+			case 3:  result.effects.push_back({"Defense Ratio", std::format("+{}", value2 * s)}); break;
+			case 4:  result.effects.push_back({"HP recovery ", std::format("{}%", value2 * s)}); break;
+			case 5:  result.effects.push_back({"SP recovery ", std::format("{}%", value2 * s)}); break;
+			case 6:  result.effects.push_back({"MP recovery ", std::format("{}%", value2 * s)}); break;
+			case 7:  result.effects.push_back({"Magic Resistance", std::format("+{}%", value2 * s)}); break;
+			case 8:  result.effects.push_back({"Physical Absorption", std::format("+{}%", value2 * s)}); break;
+			case 9:  result.effects.push_back({"Magic Absorption", std::format("+{}%", value2 * s)}); break;
+			case hb::shared::owner::Slime: result.effects.push_back({"Consecutive Attack Damage", std::format("+{}", value2 * s)}); break;
+			case hb::shared::owner::Skeleton: result.effects.push_back({"Experience", std::format("+{}%", value2 * s)}); break;
+			case hb::shared::owner::StoneGolem: result.effects.push_back({"Gold", std::format("+{}%", value2 * s)}); break;
 			}
 		}
 	}

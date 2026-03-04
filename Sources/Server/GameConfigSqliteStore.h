@@ -31,12 +31,16 @@ struct attribute_prefix_type_entry
 {
 	uint8_t prefix_id;
 	uint8_t multiplier;
+	uint8_t min_value;
+	uint8_t max_value;
 };
 
 struct attribute_secondary_type_entry
 {
 	uint8_t secondary_id;
 	uint8_t multiplier;
+	uint8_t min_value;
+	uint8_t max_value;
 };
 
 bool EnsureGameConfigDatabase(sqlite3** outDb, std::string& outPath, bool* outCreated);

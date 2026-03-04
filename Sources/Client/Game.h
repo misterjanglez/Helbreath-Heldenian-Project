@@ -309,7 +309,6 @@ public:
 	//v2.183 Hunter Mode - Moved to CPlayer
 
 std::array<bool, hb::shared::limits::MaxItems> m_is_item_equipped{};
-	std::array<bool, hb::shared::limits::MaxItems> m_is_item_disabled{};
 	bool m_is_first_conn;
 	bool m_is_server_changing = false;
 

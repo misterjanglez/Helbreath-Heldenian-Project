@@ -2938,21 +2938,37 @@ void CGame::build_multiplier_lookup()
 	for (int i = 0; i < 16; i++)
 	{
 		m_prefix_multiplier[i] = 1;
+		m_prefix_min_value[i] = 1;
+		m_prefix_max_value[i] = 13;
 		m_secondary_multiplier[i] = 1;
+		m_secondary_min_value[i] = 1;
+		m_secondary_max_value[i] = 13;
 	}
 	// None types get 0
 	m_prefix_multiplier[0] = 0;
+	m_prefix_min_value[0] = 0;
+	m_prefix_max_value[0] = 0;
 	m_secondary_multiplier[0] = 0;
+	m_secondary_min_value[0] = 0;
+	m_secondary_max_value[0] = 0;
 
 	for (const auto& e : m_attribute_prefix_types)
 	{
 		if (e.prefix_id < 16)
+		{
 			m_prefix_multiplier[e.prefix_id] = e.multiplier;
+			m_prefix_min_value[e.prefix_id] = e.min_value;
+			m_prefix_max_value[e.prefix_id] = e.max_value;
+		}
 	}
 	for (const auto& e : m_attribute_secondary_types)
 	{
 		if (e.secondary_id < 16)
+		{
 			m_secondary_multiplier[e.secondary_id] = e.multiplier;
+			m_secondary_min_value[e.secondary_id] = e.min_value;
+			m_secondary_max_value[e.secondary_id] = e.max_value;
+		}
 	}
 
 	hb::logger::log("Attribute multiplier lookup built: {} prefix, {} secondary entries",
@@ -6403,6 +6419,7 @@ void CGame::client_common_handler(int client_h, char* data)
 			p->m_hp = get_max_hp(client_h);
 			p->m_mp = get_max_mp(client_h);
 			p->m_sp = get_max_sp(client_h);
+			send_notify_msg(0, client_h, Notify::Sp, 0, 0, 0, 0);
 			// LevelUp refreshes all stats on client, Exp refreshes XP bar
 			send_notify_msg(0, client_h, Notify::LevelUp, 0, 0, 0, 0);
 			send_notify_msg(0, client_h, Notify::Exp, 0, 0, 0, 0);
@@ -6527,6 +6544,7 @@ void CGame::client_common_handler(int client_h, char* data)
 			m_client_list[client_h]->m_hp = std::min(m_client_list[client_h]->m_hp, get_max_hp(client_h));
 			m_client_list[client_h]->m_mp = std::min(m_client_list[client_h]->m_mp, get_max_mp(client_h));
 			m_client_list[client_h]->m_sp = std::min(m_client_list[client_h]->m_sp, get_max_sp(client_h));
+			send_notify_msg(0, client_h, Notify::Sp, 0, 0, 0, 0);
 
 			// Match natural level-up notification order (check_level_up)
 			send_notify_msg(0, client_h, Notify::SuperAttackLeft, 0, 0, 0, 0);
@@ -9585,6 +9603,7 @@ void CGame::state_change_handler(int client_h, char* data, size_t msg_size)
 	m_client_list[client_h]->m_hp = get_max_hp(client_h);
 	m_client_list[client_h]->m_mp = get_max_mp(client_h);
 	m_client_list[client_h]->m_sp = get_max_sp(client_h);
+	send_notify_msg(0, client_h, Notify::Sp, 0, 0, 0, 0);
 
 	send_notify_msg(0, client_h, Notify::LevelUpPoints, 0, 0, 0, 0);
 	send_notify_msg(0, client_h, Notify::StateChangeSuccess, 0, 0, 0, 0);
@@ -12291,6 +12310,7 @@ void CGame::request_resurrect_player(int client_h, bool resurrect)
 	m_client_list[client_h]->m_mp = get_max_mp(client_h);
 	// Player's SP
 	m_client_list[client_h]->m_sp = get_max_sp(client_h);
+	send_notify_msg(0, client_h, Notify::Sp, 0, 0, 0, 0);
 	// Player's Hunger
 	m_client_list[client_h]->m_hunger_status = 100;
 

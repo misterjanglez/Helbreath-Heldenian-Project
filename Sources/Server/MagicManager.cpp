@@ -205,8 +205,9 @@ void MagicManager::player_magic_handler(int client_h, int dX, int dY, short type
 	int casterY = m_game->m_client_list[client_h]->m_y;
 
 	// Viewport clamp: clamp target to the caster's visible area instead of cancelling
+	// Y is asymmetric: CenterY = RangeY + 1, so top extends 1 tile further than RangeY
 	dX = std::clamp(dX, casterX - MaxCastRangeX, casterX + MaxCastRangeX);
-	dY = std::clamp(dY, casterY - MaxCastRangeY, casterY + MaxCastRangeY);
+	dY = std::clamp(dY, casterY - MaxCastRangeY - 1, casterY + MaxCastRangeY);
 
 	// Auto-aim: snap to target's current server-side position to compensate for latency
 	if (targetObjectID != 0)
@@ -244,7 +245,8 @@ void MagicManager::player_magic_handler(int client_h, int dX, int dY, short type
 			int distY = abs(targetY - dY);
 			// Only snap if target is within auto-aim range AND still inside the caster's viewport
 			if (distX <= MaxAutoAimRange && distY <= MaxAutoAimRange &&
-				abs(targetX - casterX) <= MaxCastRangeX && abs(targetY - casterY) <= MaxCastRangeY)
+				abs(targetX - casterX) <= MaxCastRangeX &&
+				targetY >= casterY - MaxCastRangeY - 1 && targetY <= casterY + MaxCastRangeY)
 			{
 				dX = targetX;
 				dY = targetY;

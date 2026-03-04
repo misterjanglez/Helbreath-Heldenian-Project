@@ -3700,6 +3700,7 @@ void ItemManager::calc_total_item_effect(int client_h, int equip_item_id, bool n
 	if (m_game->m_client_list[client_h]->m_hp > m_game->get_max_hp(client_h)) m_game->m_client_list[client_h]->m_hp = m_game->get_max_hp(client_h);
 	if (m_game->m_client_list[client_h]->m_mp > m_game->get_max_mp(client_h)) m_game->m_client_list[client_h]->m_mp = m_game->get_max_mp(client_h);
 	if (m_game->m_client_list[client_h]->m_sp > m_game->get_max_sp(client_h)) m_game->m_client_list[client_h]->m_sp = m_game->get_max_sp(client_h);
+	m_game->send_notify_msg(0, client_h, Notify::Sp, 0, 0, 0, 0);
 
 	//v1.432
 	if ((prev_sa_type != 0) && (m_game->m_client_list[client_h]->m_special_ability_type == 0) && (notify)) {
@@ -4749,19 +4750,27 @@ void ItemManager::adjust_rare_item_value(CItem* item)
 	}
 }
 
-int ItemManager::roll_attribute_value()
+int ItemManager::roll_attribute_value(int min_val, int max_val)
 {
-	// Weighted roll for values 1-13 (original distribution)
-	static const int weights[] = { 10000, 7400, 5000, 3000, 2000, 1000, 500, 400, 300, 200, 100, 70, 30 };
-	static const int total_weight = 30000;
+	if (max_val <= 0) return 0;
+	if (min_val >= max_val) return min_val;
 
-	int roll = rand() % total_weight;
+	// Weighted roll biased toward lower values within [min_val, max_val]
+	static const int weights[] = { 10000, 7400, 5000, 3000, 2000, 1000, 500, 400, 300, 200, 100, 70, 30 };
+
+	int range = max_val - min_val + 1;
+	int total = 0;
+	for (int i = 0; i < range; i++)
+		total += (i < 13) ? weights[i] : weights[12];
+
+	int roll = rand() % total;
 	int cumulative = 0;
-	for(int i = 0; i < 13; i++) {
-		cumulative += weights[i];
-		if (roll < cumulative) return i + 1;
+	for (int i = 0; i < range; i++)
+	{
+		cumulative += (i < 13) ? weights[i] : weights[12];
+		if (roll < cumulative) return min_val + i;
 	}
-	return 1;
+	return min_val;
 }
 
 bool ItemManager::generate_item_attributes(CItem* item)
@@ -4779,15 +4788,15 @@ bool ItemManager::generate_item_attributes(CItem* item)
 		int roll = rand() % 10000;
 		int cumul = 0;
 
-		struct { int weight; AttributePrefixType type; int color; int minVal; } attackPrimary[] = {
-			{ 299,  AttributePrefixType::Light,      16, 4 },
-			{ 700,  AttributePrefixType::Strong,     16, 2 },
-			{ 1500, AttributePrefixType::Critical,   18, 5 },
-			{ 2000, AttributePrefixType::Agile,      16, 0 },
-			{ 2000, AttributePrefixType::Righteous,  20, 0 },
-			{ 1600, AttributePrefixType::Poisoning,  17, 4 },
-			{ 1600, AttributePrefixType::Sharp,      19, 0 },
-			{ 301,  AttributePrefixType::Ancient,    21, 0 },
+		struct { int weight; AttributePrefixType type; int color; } attackPrimary[] = {
+			{ 299,  AttributePrefixType::Light,      16 },
+			{ 700,  AttributePrefixType::Strong,     16 },
+			{ 1500, AttributePrefixType::Critical,   18 },
+			{ 2000, AttributePrefixType::Agile,      16 },
+			{ 2000, AttributePrefixType::Righteous,  20 },
+			{ 1600, AttributePrefixType::Poisoning,  17 },
+			{ 1600, AttributePrefixType::Sharp,      19 },
+			{ 301,  AttributePrefixType::Ancient,    21 },
 		};
 
 		for (auto& entry : attackPrimary) {
@@ -4795,8 +4804,8 @@ bool ItemManager::generate_item_attributes(CItem* item)
 			if (roll < cumul) {
 				primaryType = entry.type;
 				item_color = entry.color;
-				primaryValue = roll_attribute_value();
-				if (primaryValue < entry.minVal) primaryValue = entry.minVal;
+				int idx = static_cast<int>(entry.type);
+				primaryValue = roll_attribute_value(m_game->m_prefix_min_value[idx], m_game->m_prefix_max_value[idx]);
 				break;
 			}
 		}
@@ -4807,10 +4816,10 @@ bool ItemManager::generate_item_attributes(CItem* item)
 		int secCumul = 0;
 
 		struct { int weight; SecondaryEffectType type; int minVal; int maxVal; int fixedVal; } attackSecondary[] = {
-			{ 4999, SecondaryEffectType::HittingProb,       3, 0, 0 },
-			{ 3500, SecondaryEffectType::ConsecutiveAttack,  0, 7, 0 },
-			{ 1000, SecondaryEffectType::GoldBonus,          0, 0, 5 },
-			{ 501,  SecondaryEffectType::ExperienceBonus,    0, 0, 2 },
+			{ 4999, SecondaryEffectType::HittingProb,       3, 13, 0 },
+			{ 3500, SecondaryEffectType::ConsecutiveAttack,  1, 7,  0 },
+			{ 1000, SecondaryEffectType::GoldBonus,          0, 0,  5 },
+			{ 501,  SecondaryEffectType::ExperienceBonus,    0, 0,  2 },
 		};
 
 		for (auto& entry : attackSecondary) {
@@ -4820,9 +4829,7 @@ bool ItemManager::generate_item_attributes(CItem* item)
 				if (entry.fixedVal > 0) {
 					secondaryValue = entry.fixedVal;
 				} else {
-					secondaryValue = roll_attribute_value();
-					if (secondaryValue < entry.minVal) secondaryValue = entry.minVal;
-					if (entry.maxVal > 0 && secondaryValue > entry.maxVal) secondaryValue = entry.maxVal;
+					secondaryValue = roll_attribute_value(entry.minVal, entry.maxVal);
 				}
 				break;
 			}
@@ -4834,11 +4841,11 @@ bool ItemManager::generate_item_attributes(CItem* item)
 		int roll = rand() % 10000;
 		int cumul = 0;
 
-		struct { int weight; AttributePrefixType type; int minVal; bool halved; } defensePrimary[] = {
-			{ 5999, AttributePrefixType::Strong,         2, false },
-			{ 3000, AttributePrefixType::Light,          4, false },
-			{ 555,  AttributePrefixType::ManaConverting,  0, true },
-			{ 446,  AttributePrefixType::CritChance,      0, true },
+		struct { int weight; AttributePrefixType type; bool halved; } defensePrimary[] = {
+			{ 5999, AttributePrefixType::Strong,         false },
+			{ 3000, AttributePrefixType::Light,          false },
+			{ 555,  AttributePrefixType::ManaConverting,  true },
+			{ 446,  AttributePrefixType::CritChance,      true },
 		};
 
 		for (auto& entry : defensePrimary) {
@@ -4846,9 +4853,9 @@ bool ItemManager::generate_item_attributes(CItem* item)
 			if (roll < cumul) {
 				primaryType = entry.type;
 				item_color = 0;
-				primaryValue = roll_attribute_value();
+				int idx = static_cast<int>(entry.type);
+				primaryValue = roll_attribute_value(m_game->m_prefix_min_value[idx], m_game->m_prefix_max_value[idx]);
 				if (entry.halved) primaryValue = primaryValue / 2;
-				if (primaryValue < entry.minVal) primaryValue = entry.minVal;
 				break;
 			}
 		}
@@ -4858,23 +4865,22 @@ bool ItemManager::generate_item_attributes(CItem* item)
 		int secRoll = rand() % 10001;
 		int secCumul = 0;
 
-		struct { int weight; SecondaryEffectType type; int minVal; } defenseSecondary[] = {
-			{ 1000, SecondaryEffectType::DefenseRatio,      3 },
-			{ 3000, SecondaryEffectType::PoisonResistance,  3 },
-			{ 1500, SecondaryEffectType::SPRecovery,        0 },
-			{ 1000, SecondaryEffectType::HPRecovery,        0 },
-			{ 1000, SecondaryEffectType::MPRecovery,        0 },
-			{ 1900, SecondaryEffectType::MagicResistance,   3 },
-			{ 400,  SecondaryEffectType::PhysicalAbsorb,    3 },
-			{ 201,  SecondaryEffectType::MagicAbsorb,       3 },
+		struct { int weight; SecondaryEffectType type; int minVal; int maxVal; } defenseSecondary[] = {
+			{ 1000, SecondaryEffectType::DefenseRatio,      3, 13 },
+			{ 3000, SecondaryEffectType::PoisonResistance,  3, 13 },
+			{ 1500, SecondaryEffectType::SPRecovery,        1, 13 },
+			{ 1000, SecondaryEffectType::HPRecovery,        1, 13 },
+			{ 1000, SecondaryEffectType::MPRecovery,        1, 13 },
+			{ 1900, SecondaryEffectType::MagicResistance,   3, 13 },
+			{ 400,  SecondaryEffectType::PhysicalAbsorb,    3, 13 },
+			{ 201,  SecondaryEffectType::MagicAbsorb,       3, 13 },
 		};
 
 		for (auto& entry : defenseSecondary) {
 			secCumul += entry.weight;
 			if (secRoll < secCumul) {
 				secondaryType = entry.type;
-				secondaryValue = roll_attribute_value();
-				if (secondaryValue < entry.minVal) secondaryValue = entry.minVal;
+				secondaryValue = roll_attribute_value(entry.minVal, entry.maxVal);
 				break;
 			}
 		}
@@ -4884,7 +4890,10 @@ bool ItemManager::generate_item_attributes(CItem* item)
 		// AttackManaSave - always type Special
 		primaryType = AttributePrefixType::Special;
 		item_color = 5;
-		primaryValue = roll_attribute_value();
+		{
+			int idx = static_cast<int>(AttributePrefixType::Special);
+			primaryValue = roll_attribute_value(m_game->m_prefix_min_value[idx], m_game->m_prefix_max_value[idx]);
+		}
 
 		// Secondary effect - 40% chance (original rate)
 		// Same secondary pool as attack weapons
@@ -4893,10 +4902,10 @@ bool ItemManager::generate_item_attributes(CItem* item)
 		int secCumul = 0;
 
 		struct { int weight; SecondaryEffectType type; int minVal; int maxVal; int fixedVal; } manaSaveSecondary[] = {
-			{ 4999, SecondaryEffectType::HittingProb,       3, 0, 0 },
-			{ 3500, SecondaryEffectType::ConsecutiveAttack,  0, 7, 0 },
-			{ 1000, SecondaryEffectType::GoldBonus,          0, 0, 5 },
-			{ 501,  SecondaryEffectType::ExperienceBonus,    0, 0, 2 },
+			{ 4999, SecondaryEffectType::HittingProb,       3, 13, 0 },
+			{ 3500, SecondaryEffectType::ConsecutiveAttack,  1, 7,  0 },
+			{ 1000, SecondaryEffectType::GoldBonus,          0, 0,  5 },
+			{ 501,  SecondaryEffectType::ExperienceBonus,    0, 0,  2 },
 		};
 
 		for (auto& entry : manaSaveSecondary) {
@@ -4906,9 +4915,7 @@ bool ItemManager::generate_item_attributes(CItem* item)
 				if (entry.fixedVal > 0) {
 					secondaryValue = entry.fixedVal;
 				} else {
-					secondaryValue = roll_attribute_value();
-					if (secondaryValue < entry.minVal) secondaryValue = entry.minVal;
-					if (entry.maxVal > 0 && secondaryValue > entry.maxVal) secondaryValue = entry.maxVal;
+					secondaryValue = roll_attribute_value(entry.minVal, entry.maxVal);
 				}
 				break;
 			}
@@ -4933,6 +4940,8 @@ bool ItemManager::generate_item_attributes(CItem* item)
 	item->m_instance.enchant_bonus = 0;
 
 	adjust_rare_item_value(item);
+	// New item: current durability should equal max durability
+	item->m_instance.cur_durability = item->m_durability;
 	return true;
 }
 

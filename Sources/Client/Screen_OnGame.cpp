@@ -931,6 +931,7 @@ void Screen_OnGame::render_item_tooltip()
     std::string damage_mod_str;
     std::string defense_mod_str;
     std::string weight_mod_str;
+    std::string durability_mod_str;
     for (const auto& eff : itemInfo.effects)
     {
         if (eff.category == effect_category::inline_damage)
@@ -950,6 +951,10 @@ void Screen_OnGame::render_item_tooltip()
             if (weight_mod_str.empty()) weight_mod_str = " (";
             else weight_mod_str += ", ";
             weight_mod_str += eff.label;
+        }
+        else if (eff.category == effect_category::inline_durability)
+        {
+            durability_mod_str = eff.value;
         }
     }
     if (!damage_mod_str.empty()) damage_mod_str += ")";
@@ -1061,8 +1066,21 @@ void Screen_OnGame::render_item_tooltip()
     // 8. Durability / Usages
     if (is_equippable)
     {
-        G_cTxt = std::format(UPDATE_SCREEN_ONGAME10, item->m_instance.cur_durability, cfg->m_durability);
-        tooltip.add_line(G_cTxt, GameColors::InfoGrayLight);
+        if (!durability_mod_str.empty())
+        {
+            // Strong prefix: show boosted durability with green values
+            int boost_pct = 0;
+            try { boost_pct = std::stoi(durability_mod_str.substr(1)); } catch (...) {}
+            int boosted_max = cfg->m_durability * (100 + boost_pct) / 100;
+            G_cTxt = std::format("Durability: {}/{}", item->m_instance.cur_durability, boosted_max);
+            std::string boost_str = std::format(" ({})", durability_mod_str);
+            tooltip.add_dual_line(G_cTxt, GameColors::UIItemName_Special, boost_str, GameColors::UIItemName_Special);
+        }
+        else
+        {
+            G_cTxt = std::format(UPDATE_SCREEN_ONGAME10, item->m_instance.cur_durability, cfg->m_durability);
+            tooltip.add_line(G_cTxt, GameColors::InfoGrayLight);
+        }
     }
     else if (effectType == ItemEffectType::AlterItemDrop && cfg->m_durability > 0)
     {

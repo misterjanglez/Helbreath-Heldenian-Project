@@ -562,7 +562,11 @@ public:
 	std::vector<attribute_prefix_type_entry> m_attribute_prefix_types;
 	std::vector<attribute_secondary_type_entry> m_attribute_secondary_types;
 	uint8_t m_prefix_multiplier[16]{};
+	uint8_t m_prefix_min_value[16]{};
+	uint8_t m_prefix_max_value[16]{};
 	uint8_t m_secondary_multiplier[16]{};
+	uint8_t m_secondary_min_value[16]{};
+	uint8_t m_secondary_max_value[16]{};
 	void build_multiplier_lookup();
 
 	class hb::shared::net::ASIOSocket* _lsock;

@@ -227,3 +227,9 @@ bool DialogBox_SellOrRepair::on_enable(int type, int64_t v1, int v2, const char*
 	}
 	return true;
 }
+
+bool DialogBox_SellOrRepair::on_disable()
+{
+	inventory_manager::get().unlock_item(m_item_index);
+	return true;
+}

@@ -11,10 +11,11 @@ class CItem;
 
 enum class effect_category
 {
-	standalone,       // shown as its own tooltip line
-	inline_damage,    // appended to damage line (Sharp, Ancient, enchant)
-	inline_defense,   // appended to defence line (Strong, enchant)
-	inline_weight     // appended to weight line (Light)
+	standalone,         // shown as its own tooltip line
+	inline_damage,      // appended to damage line (Sharp, Ancient, enchant)
+	inline_defense,     // appended to defence line (enchant)
+	inline_weight,      // appended to weight line (Light)
+	inline_durability   // applied to durability line (Strong)
 };
 
 struct tooltip_effect

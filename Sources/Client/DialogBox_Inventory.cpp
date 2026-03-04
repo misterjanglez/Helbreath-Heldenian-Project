@@ -527,7 +527,7 @@ bool DialogBox_Inventory::on_item_drop()
 		add_event_list(BITEMDROP_INVENTORY1, 10);
 		return false;
 	}
-	if (inventory_manager::get().is_locked(selected_id)) return false;
+	if (inventory_manager::get().warn_if_locked(selected_id)) return false;
 
 	// Calculate new position in inventory grid
 	short sX = m_x;

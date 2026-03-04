@@ -134,7 +134,7 @@ bool inventory_manager::check_item_operation_enabled(int item_id)
 	if (m_game->m_player->m_item_list[item_id] == 0) return false;
 	if (m_game->m_player->m_Controller.get_command() < 0) return false;
 	if (teleport_manager::get().is_requested()) return false;
-	if (is_locked(item_id)) return false;
+	if (warn_if_locked(item_id)) return false;
 
 	if ((m_game->m_player->m_item_list[item_id]->m_id_num == 867) && (m_game->on_game()->m_using_slate == true)) // Ancient Tablet
 	{
@@ -312,23 +312,43 @@ void inventory_manager::equip_item(int item_id)
 void inventory_manager::lock_item(int slot)
 {
 	if (slot >= 0 && slot < hb::shared::limits::MaxItems)
-		m_game->m_is_item_disabled[slot] = true;
+		if (auto* item = m_game->m_player->m_item_list[slot].get())
+			item->m_locked = true;
+}
+
+bool inventory_manager::try_lock_item(int slot)
+{
+	if (slot >= 0 && slot < hb::shared::limits::MaxItems)
+		if (auto* item = m_game->m_player->m_item_list[slot].get())
+			return item->try_lock();
+	return false;
 }
 
 void inventory_manager::unlock_item(int slot)
 {
 	if (slot >= 0 && slot < hb::shared::limits::MaxItems)
-		m_game->m_is_item_disabled[slot] = false;
+		if (auto* item = m_game->m_player->m_item_list[slot].get())
+			item->m_locked = false;
 }
 
 bool inventory_manager::is_locked(int slot) const
 {
 	if (slot >= 0 && slot < hb::shared::limits::MaxItems)
-		return m_game->m_is_item_disabled[slot];
+		if (auto* item = m_game->m_player->m_item_list[slot].get())
+			return item->m_locked;
 	return false;
+}
+
+bool inventory_manager::warn_if_locked(int slot)
+{
+	if (!is_locked(slot)) return false;
+	m_game->add_event_list(NOTIFY_MSG_ITEM_LOCKED, 10);
+	return true;
 }
 
 void inventory_manager::unlock_all()
 {
-	m_game->m_is_item_disabled.fill(false);
+	for (int i = 0; i < hb::shared::limits::MaxItems; i++)
+		if (auto* item = m_game->m_player->m_item_list[i].get())
+			item->m_locked = false;
 }

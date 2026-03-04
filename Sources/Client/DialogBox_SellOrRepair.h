@@ -10,6 +10,7 @@ public:
 	void on_draw() override;
 	bool on_click() override;
 	bool on_enable(int type, int64_t v1, int v2, const char* string) override;
+	bool on_disable() override;
 
 	enum class mode : uint8_t
 	{

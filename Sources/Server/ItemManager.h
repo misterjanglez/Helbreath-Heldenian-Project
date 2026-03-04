@@ -30,7 +30,7 @@ public:
 	// Item attribute generation
 	void adjust_rare_item_value(CItem* item);
 	bool generate_item_attributes(CItem* item);
-	int roll_attribute_value();
+	int roll_attribute_value(int min_val, int max_val);
 
 	// Inventory management
 	bool add_item(int client_h, CItem* item, char mode);

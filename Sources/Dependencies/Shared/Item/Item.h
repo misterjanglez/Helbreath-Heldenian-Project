@@ -163,6 +163,16 @@ public:
     int16_t m_set_id;              // Equipment set ID (0 = no set)
 
     //------------------------------------------------------------------------
+    // Client-side lock (prevents interaction while item is in a pending operation)
+    //------------------------------------------------------------------------
+
+    bool m_locked = false;
+
+    bool is_locked() const { return m_locked; }
+    bool try_lock() { if (m_locked) return false; m_locked = true; return true; }
+    void unlock() { m_locked = false; }
+
+    //------------------------------------------------------------------------
     // Instance Data (per-instance mutable fields)
     //------------------------------------------------------------------------
 

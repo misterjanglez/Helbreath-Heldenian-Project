@@ -1031,7 +1031,7 @@ bool DialogBox_Manufacture::on_item_drop()
 	int item_id = CursorTarget::get_selected_id();
 	if (item_id < 0 || item_id >= hb::shared::limits::MaxItems) return false;
 	if (player().m_item_list[item_id] == nullptr) return false;
-	if (inventory_manager::get().is_locked(item_id)) return false;
+	if (inventory_manager::get().warn_if_locked(item_id)) return false;
 	CItem* cfg = m_game->get_item_config(player().m_item_list[item_id]->m_id_num);
 	if (!cfg) return false;
 

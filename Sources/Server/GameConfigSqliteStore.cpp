@@ -1449,7 +1449,7 @@ bool LoadAttributePrefixTypes(sqlite3* db, std::vector<attribute_prefix_type_ent
 
     out.clear();
 
-    const char* sql = "SELECT prefix_id, multiplier FROM attribute_prefix_types ORDER BY prefix_id;";
+    const char* sql = "SELECT prefix_id, multiplier, min_value, max_value FROM attribute_prefix_types ORDER BY prefix_id;";
 
     sqlite3_stmt* stmt = nullptr;
     if (sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) != SQLITE_OK)
@@ -1463,6 +1463,8 @@ bool LoadAttributePrefixTypes(sqlite3* db, std::vector<attribute_prefix_type_ent
         attribute_prefix_type_entry entry = {};
         entry.prefix_id  = static_cast<uint8_t>(sqlite3_column_int(stmt, 0));
         entry.multiplier = static_cast<uint8_t>(sqlite3_column_int(stmt, 1));
+        entry.min_value  = static_cast<uint8_t>(sqlite3_column_int(stmt, 2));
+        entry.max_value  = static_cast<uint8_t>(sqlite3_column_int(stmt, 3));
         out.push_back(entry);
     }
 
@@ -1477,7 +1479,7 @@ bool LoadAttributeSecondaryTypes(sqlite3* db, std::vector<attribute_secondary_ty
 
     out.clear();
 
-    const char* sql = "SELECT secondary_id, multiplier FROM attribute_secondary_types ORDER BY secondary_id;";
+    const char* sql = "SELECT secondary_id, multiplier, min_value, max_value FROM attribute_secondary_types ORDER BY secondary_id;";
 
     sqlite3_stmt* stmt = nullptr;
     if (sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) != SQLITE_OK)
@@ -1491,6 +1493,8 @@ bool LoadAttributeSecondaryTypes(sqlite3* db, std::vector<attribute_secondary_ty
         attribute_secondary_type_entry entry = {};
         entry.secondary_id = static_cast<uint8_t>(sqlite3_column_int(stmt, 0));
         entry.multiplier   = static_cast<uint8_t>(sqlite3_column_int(stmt, 1));
+        entry.min_value    = static_cast<uint8_t>(sqlite3_column_int(stmt, 2));
+        entry.max_value    = static_cast<uint8_t>(sqlite3_column_int(stmt, 3));
         out.push_back(entry);
     }
 

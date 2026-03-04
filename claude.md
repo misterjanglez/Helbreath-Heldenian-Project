@@ -16,10 +16,10 @@ powershell -ExecutionPolicy Bypass -File Sources\build.ps1 -Target Server -Confi
 
 ### Linux (CMake — Server)
 ```bash
-./Sources/build_linux.sh                 # Incremental debug build
-./Sources/build_linux.sh release         # Release build
-./Sources/build_linux.sh clean           # Delete build directory
-./Sources/build_linux.sh clean release   # Clean then rebuild release
+./Sources/build_server_linux.sh                 # Incremental debug build
+./Sources/build_server_linux.sh release         # Release build
+./Sources/build_server_linux.sh clean           # Delete build directory
+./Sources/build_server_linux.sh clean release   # Clean then rebuild release
 ```
 - CMakeLists.txt: `Sources/Server/CMakeLists.txt`
 - Output: `Sources/Debug/HelbreathServer` or `Sources/Release/HelbreathServer` (mirrors Windows layout)
@@ -186,4 +186,4 @@ When teams are enabled, follow the structured coordinator/wing model. See `CLAUD
 
 No automated tests. Manual: run server, then client with configs in `Binaries/`.
 For network changes, rebuild both client and server.
-Both targets can be tested on Linux — server with `build_linux.sh`, client with `build_client_linux.sh`.
+Both targets can be tested on Linux — server with `build_server_linux.sh`, client with `build_client_linux.sh`.

@@ -235,6 +235,7 @@ bool DialogBox_Exchange::on_item_drop()
 
 	int item_id = CursorTarget::get_selected_id();
 	if (item_id < 0 || item_id >= hb::shared::limits::MaxItems) return false;
+	if (inventory_manager::get().warn_if_locked(item_id)) return false;
 
 	// Find first empty exchange slot
 	int slot = -1;

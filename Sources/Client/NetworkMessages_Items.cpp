@@ -711,7 +711,7 @@ namespace NetworkMessageHandlers {
 		txt = std::format(NOTIFYMSG_CANNOT_GIVE_ITEM2, itemInfo8.name.c_str(), name);
 
 		game->add_event_list(txt.c_str(), 10);
-		game->m_is_item_disabled[item_index] = false;
+		inventory_manager::get().unlock_item(item_index);
 	}
 
 	void HandleItemColorChange(CGame* game, char* data)

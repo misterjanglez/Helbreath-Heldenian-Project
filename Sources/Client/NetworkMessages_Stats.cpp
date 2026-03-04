@@ -137,6 +137,9 @@ namespace NetworkMessageHandlers {
 		game->m_player->m_mag = pkt->mag;
 		game->m_player->m_charisma = pkt->chr;
 
+		// Reset exp so the subsequent Notify::Exp (with remainder) shows as an increase, not a decrease
+		game->m_player->m_exp = 0;
+
 		game->m_player->m_lu_str = game->m_player->m_lu_vit = game->m_player->m_lu_dex = game->m_player->m_lu_int = game->m_player->m_lu_mag = game->m_player->m_lu_char = 0;
 
 		txt = std::format(NOTIFYMSG_LEVELUP1, game->m_player->m_level);

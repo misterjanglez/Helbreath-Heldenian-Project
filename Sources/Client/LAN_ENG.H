@@ -379,7 +379,7 @@
 #define	NOTIFY_MSG_HANDLER72	" You took the whole admission ticket."
 #define	NOTIFY_MSG_HANDLER73	" Your reservation of the arena {} succeeded."
 
-
+#define	NOTIFY_MSG_ITEM_LOCKED	"This item is currently in use."
 
 #define	RESERVE_FIGHTZONE_RESPONSE_HANDLER1	"You were successful on booking arena!"
 #define	RESERVE_FIGHTZONE_RESPONSE_HANDLER2	"Failed on booking arena."
