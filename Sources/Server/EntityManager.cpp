@@ -2688,12 +2688,12 @@ bool CEntityManager::spawn_npc_drop_item(int npc_h, int item_id, int min_count, 
 		delete item;
 		return false;
 	}
-	item->m_count = count;
+	item->m_instance.count = count;
 	m_game->m_item_manager->generate_item_attributes(item);
 	item->set_touch_effect_type(TouchEffectType::ID);
-	item->m_touch_effect_value1 = static_cast<short>(m_game->dice(1, 100000));
-	item->m_touch_effect_value2 = static_cast<short>(m_game->dice(1, 100000));
-	item->m_touch_effect_value3 = (short)GameClock::GetTimeMS();
+	item->m_instance.touch_effect_value1 = static_cast<short>(m_game->dice(1, 100000));
+	item->m_instance.touch_effect_value2 = static_cast<short>(m_game->dice(1, 100000));
+	item->m_instance.touch_effect_value3 = (short)GameClock::GetTimeMS();
 	m_map_list[m_npc_list[npc_h]->m_map_index]->set_item(m_npc_list[npc_h]->m_x, m_npc_list[npc_h]->m_y, item);
 	m_game->send_ground_item_event(CommonType::ItemDrop, m_npc_list[npc_h]->m_map_index,
 		m_npc_list[npc_h]->m_x, m_npc_list[npc_h]->m_y, item);

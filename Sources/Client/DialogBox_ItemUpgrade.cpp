@@ -51,7 +51,7 @@ void DialogBox_ItemUpgrade::on_draw()
 
 int DialogBox_ItemUpgrade::calculate_upgrade_cost(int item_index)
 {
-    int value = player().m_item_list[item_index]->m_enchant_bonus;
+    int value = player().m_item_list[item_index]->m_instance.enchant_bonus;
     value = value * (value + 6) / 8 + 2;
 
     // Special handling for Angelic Pendants
@@ -63,7 +63,7 @@ int DialogBox_ItemUpgrade::calculate_upgrade_cost(int item_index)
         if (id == hb::shared::item::ItemId::AngelicPendantSTR || id == hb::shared::item::ItemId::AngelicPendantDEX ||
             id == hb::shared::item::ItemId::AngelicPendantINT || id == hb::shared::item::ItemId::AngelicPendantMAG)
         {
-            value = player().m_item_list[item_index]->m_enchant_bonus;
+            value = player().m_item_list[item_index]->m_instance.enchant_bonus;
             switch (value) {
             case 0: value = 10; break;
             case 1: value = 11; break;
@@ -83,7 +83,7 @@ int DialogBox_ItemUpgrade::calculate_upgrade_cost(int item_index)
 
 void DialogBox_ItemUpgrade::draw_item_preview(int sX, int sY, int item_index)
 {
-    char item_color = player().m_item_list[item_index]->m_item_color;
+    char item_color = player().m_item_list[item_index]->m_instance.item_color;
     CItem* cfg = m_game->get_item_config(player().m_item_list[item_index]->m_id_num);
     if (!cfg) return;
 
@@ -169,7 +169,7 @@ void DialogBox_ItemUpgrade::DrawMode2_InProgress(int sX, int sY)
     if (item_index != -1)
     {
         m_game->draw_new_dialog_box(InterfaceNdGame3, sX, sY, 3);
-        char item_color = player().m_item_list[item_index]->m_item_color;
+        char item_color = player().m_item_list[item_index]->m_instance.item_color;
         CItem* cfg = m_game->get_item_config(player().m_item_list[item_index]->m_id_num);
 
         if (cfg)

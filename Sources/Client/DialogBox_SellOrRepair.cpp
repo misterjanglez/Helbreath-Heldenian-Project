@@ -44,7 +44,7 @@ void DialogBox_SellOrRepair::on_draw()
 
 		item_id = m_item_index;
 
-		item_color = player().m_item_list[item_id]->m_item_color;
+		item_color = player().m_item_list[item_id]->m_instance.item_color;
 		{
 			CItem* sell_cfg = m_game->get_item_config(player().m_item_list[item_id]->m_id_num);
 			auto sell_draw = m_game->get_item_draw(sell_cfg ? sell_cfg->m_display_id : 0, item_atlas::pack, sell_cfg ? sell_cfg->sprite_is_female() : false);
@@ -92,7 +92,7 @@ void DialogBox_SellOrRepair::on_draw()
 		draw_new_dialog_box(InterfaceNdGame2, sX, sY, 2);
 		draw_new_dialog_box(InterfaceNdText, sX, sY, 10);
 		item_id = m_item_index;
-		item_color = player().m_item_list[item_id]->m_item_color;
+		item_color = player().m_item_list[item_id]->m_instance.item_color;
 		{
 			CItem* rep_cfg = m_game->get_item_config(player().m_item_list[item_id]->m_id_num);
 			auto rep_draw = m_game->get_item_draw(rep_cfg ? rep_cfg->m_display_id : 0, item_atlas::pack, rep_cfg ? rep_cfg->sprite_is_female() : false);

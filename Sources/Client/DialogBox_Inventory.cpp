@@ -60,7 +60,7 @@ void DialogBox_Inventory::draw_inventory_item(CItem* item, int itemIdx, int base
 	CItem* cfg = m_game->get_item_config(item->m_id_num);
 	if (cfg == nullptr) return;
 
-	char item_color = item->m_item_color;
+	char item_color = item->m_instance.item_color;
 	bool disabled = inventory_manager::get().is_locked(itemIdx);
 
 	int drawX = baseX + ITEM_OFFSET_X + item->m_x;
@@ -98,7 +98,7 @@ void DialogBox_Inventory::draw_inventory_item(CItem* item, int itemIdx, int base
 	if (cfg->is_stackable())
 	{
 		std::string countBuf;
-		countBuf = m_game->format_comma_number(item->m_count);
+		countBuf = m_game->format_comma_number(item->m_instance.count);
 		hb::shared::text::draw_text(GameFont::Default, baseX + COUNT_OFFSET_X + item->m_x, baseY + COUNT_OFFSET_Y + item->m_y, countBuf.c_str(), hb::shared::text::TextStyle::with_shadow(GameColors::UIDescription));
 	}
 }
@@ -197,7 +197,7 @@ bool DialogBox_Inventory::on_click()
 				if (cfg != nullptr &&
 				    cfg->get_item_type() == hb::shared::item::item_type::tool &&
 				    item->m_id_num == 236 &&
-				    item->m_cur_durability > 0)
+				    item->m_instance.cur_durability > 0)
 				{
 					enable_dialog_box(DialogBoxId::Manufacture, 3, 0, 0);
 					add_event_list(BDLBBOX_DOUBLE_CLICK_INVENTORY12, 10);
@@ -319,7 +319,7 @@ bool DialogBox_Inventory::on_double_click()
 			add_event_list(BDLBBOX_DOUBLE_CLICK_INVENTORY5, 10);
 			return true;
 		}
-		if (player().m_item_list[item_id]->m_cur_durability == 0)
+		if (player().m_item_list[item_id]->m_instance.cur_durability == 0)
 		{
 			add_event_list(BDLBBOX_DOUBLE_CLICK_INVENTORY6, 10);
 		}
@@ -346,7 +346,7 @@ bool DialogBox_Inventory::on_double_click()
 			add_event_list(BDLBBOX_DOUBLE_CLICK_INVENTORY13, 10);
 			return true;
 		}
-		if (player().m_item_list[item_id]->m_cur_durability == 0)
+		if (player().m_item_list[item_id]->m_instance.cur_durability == 0)
 		{
 			add_event_list(BDLBBOX_DOUBLE_CLICK_INVENTORY6, 10);
 		}
@@ -373,7 +373,7 @@ bool DialogBox_Inventory::on_double_click()
 			add_event_list(BDLBBOX_DOUBLE_CLICK_INVENTORY5, 10);
 			return true;
 		}
-		if (player().m_item_list[item_id]->m_cur_durability == 0)
+		if (player().m_item_list[item_id]->m_instance.cur_durability == 0)
 		{
 			add_event_list(BDLBBOX_DOUBLE_CLICK_INVENTORY6, 10);
 		}

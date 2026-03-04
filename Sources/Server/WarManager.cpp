@@ -2474,7 +2474,7 @@ void WarManager::get_occupy_flag_handler(int client_h)
 				}
 
 				// EKNum .
-				item->m_item_special_effect_value1 = ek_num;
+				item->m_instance.special_effect_value1 = ek_num;
 
 				// testcode  .
 				hb::logger::log<log_channel::events>("Flag captured: player={} flag_ek={} player_ek={}", m_game->m_client_list[client_h]->m_char_name, ek_num, m_game->m_client_list[client_h]->m_enemy_kill_count);
@@ -2845,11 +2845,11 @@ void WarManager::get_fightzone_ticket_handler(int client_h)
 		day = (m_game->m_client_list[client_h]->m_reserve_time - month * 10000) / 100;
 		hour = m_game->m_client_list[client_h]->m_reserve_time - month * 10000 - day * 100;
 
-		item->m_touch_effect_value1 = month;
-		item->m_touch_effect_value2 = day;
-		item->m_touch_effect_value3 = hour;
+		item->m_instance.touch_effect_value1 = month;
+		item->m_instance.touch_effect_value2 = day;
+		item->m_instance.touch_effect_value3 = hour;
 
-		hb::logger::log<log_channel::events>("Fight zone ticket obtained: player={} ticket={}({})({})", m_game->m_client_list[client_h]->m_char_name, item->m_touch_effect_value1, item->m_touch_effect_value2, item->m_touch_effect_value3);
+		hb::logger::log<log_channel::events>("Fight zone ticket obtained: player={} ticket={}({})({})", m_game->m_client_list[client_h]->m_char_name, item->m_instance.touch_effect_value1, item->m_instance.touch_effect_value2, item->m_instance.touch_effect_value3);
 
 		ret = m_game->m_item_manager->send_item_notify_msg(client_h, Notify::ItemObtained, item, 0);
 

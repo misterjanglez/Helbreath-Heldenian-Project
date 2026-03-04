@@ -1014,7 +1014,7 @@ bool DialogBox_Manufacture::try_add_item_to_slot(int item_id, bool updateBuildSt
 			// Only disable non-stackable items (stackable consumables can be added multiple times)
 			CItem* cfg = m_game->get_item_config(player().m_item_list[item_id]->m_id_num);
 			if (!cfg || !cfg->is_stackable() ||
-				player().m_item_list[item_id]->m_count <= 1)
+				player().m_item_list[item_id]->m_instance.count <= 1)
 			{
 				inventory_manager::get().lock_item(item_id);
 			}
@@ -1067,7 +1067,7 @@ bool DialogBox_Manufacture::on_item_drop()
 			if (m_slot_4 == item_id) consume_num++;
 			if (m_slot_5 == item_id) consume_num++;
 			if (m_slot_6 == item_id) consume_num++;
-			if (consume_num >= static_cast<int>(player().m_item_list[item_id]->m_count)) return false;
+			if (consume_num >= static_cast<int>(player().m_item_list[item_id]->m_instance.count)) return false;
 		}
 
 		// Only allow consumable, material, or untyped items for alchemy
@@ -1096,7 +1096,7 @@ bool DialogBox_Manufacture::on_item_drop()
 			if (m_slot_4 == item_id) consume_num++;
 			if (m_slot_5 == item_id) consume_num++;
 			if (m_slot_6 == item_id) consume_num++;
-			if (consume_num >= static_cast<int>(player().m_item_list[item_id]->m_count)) return false;
+			if (consume_num >= static_cast<int>(player().m_item_list[item_id]->m_instance.count)) return false;
 		}
 
 		if (!try_add_item_to_slot(item_id, true))

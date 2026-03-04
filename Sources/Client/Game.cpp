@@ -922,7 +922,7 @@ bool CGame::cache_process_item_config(char* data, uint32_t msg_size)
 		item->m_is_dyeable = entry.isDyeable;
 		item->m_armor_class = entry.armorClass;
 		item->m_set_id = entry.setId;
-		item->m_item_color = entry.itemColor;
+		item->m_instance.item_color = entry.itemColor;
 		item->m_display_id = entry.displayId;
 	}
 
@@ -1741,10 +1741,11 @@ void CGame::common_event_handler(char* data)
 			data, sizeof(hb::net::PacketEventGroundItem));
 		if (!pkt) return;
 		auto idata = hb::shared::item::item_instance_data::from_ground_item_packet(*pkt);
+		short item_id = pkt->item_id;
 		bool is_drop = (event_type == CommonType::ItemDrop);
-		if (is_drop && idata.item_id == hb::shared::item::ItemId::Gold)
+		if (is_drop && item_id == hb::shared::item::ItemId::Gold)
 			m_effect_manager->add_effect(EffectType::GOLD_DROP, sX, sY, 0, 0, 0);
-		m_map_data->set_item(sX, sY, idata, is_drop);
+		m_map_data->set_item(sX, sY, item_id, idata, is_drop);
 	}
 	break;
 
@@ -1909,8 +1910,8 @@ void CGame::read_map_data(short pivot_x, short pivot_y, const char* packet_data)
 			const auto* item = hb::net::PacketCast<hb::net::PacketMapDataItem>(cursor, sizeof(hb::net::PacketMapDataItem));
 			if (!item) return;
 			hb::shared::item::item_instance_data idata;
-			idata.item_id = item->item_id;
-			idata.count = static_cast<uint16_t>(std::max<std::int16_t>(item->count, 0));
+			short map_item_id = item->item_id;
+			idata.count = static_cast<uint64_t>(std::max<std::int16_t>(item->count, 0));
 			idata.item_color = static_cast<int8_t>(item->color);
 			idata.custom_made = item->custom_made;
 			idata.prefix_type = item->prefix_type;
@@ -1919,7 +1920,7 @@ void CGame::read_map_data(short pivot_x, short pivot_y, const char* packet_data)
 			idata.secondary_value = item->secondary_value;
 			idata.enchant_bonus = item->enchant_bonus;
 			cursor += sizeof(hb::net::PacketMapDataItem);
-			m_map_data->set_item(pivot_x + map_x, pivot_y + map_y, idata, false);
+			m_map_data->set_item(pivot_x + map_x, pivot_y + map_y, map_item_id, idata, false);
 		}
 		if (header_byte & 0x08) // Dynamic object
 		{
@@ -2593,7 +2594,7 @@ void CGame::init_item_list(char* packet_data)
 		const auto& entry = itemEntries[i];
 		m_player->m_item_list[i] = std::make_unique<CItem>();
 		m_player->m_item_list[i]->m_id_num = entry.item_id;
-		m_player->m_item_list[i]->m_count = entry.count;
+		m_player->m_item_list[i]->m_instance.count = entry.count;
 		m_player->m_item_list[i]->m_x = 40;
 		m_player->m_item_list[i]->m_y = 30;
 		if (entry.is_equipped == 0) m_is_item_equipped[i] = false;
@@ -2603,9 +2604,9 @@ void CGame::init_item_list(char* packet_data)
 		{
 			m_item_equipment_status[cfg->m_equip_pos] = i;
 		}
-		m_player->m_item_list[i]->m_cur_durability = entry.cur_lifespan;
-		m_player->m_item_list[i]->m_item_color = entry.item_color;
-		m_player->m_item_list[i]->m_item_special_effect_value2 = static_cast<short>(entry.spec_value2); // v1.41
+		m_player->m_item_list[i]->m_instance.cur_durability = entry.cur_durability;
+		m_player->m_item_list[i]->m_instance.item_color = entry.item_color;
+		m_player->m_item_list[i]->m_instance.special_effect_value2 = static_cast<short>(entry.spec_value2); // v1.41
 		m_player->m_item_list[i]->load_attributes_from(entry);
 		m_item_order[i] = i;
 		// Snoopy: Add Angelic Stats
@@ -2613,7 +2614,7 @@ void CGame::init_item_list(char* packet_data)
 			&& (m_is_item_equipped[i] == true)
 			&& (cfg->get_equip_pos() >= EquipPos::LeftFinger))
 		{
-			angel_value = m_player->m_item_list[i]->m_enchant_bonus;
+			angel_value = m_player->m_item_list[i]->m_instance.enchant_bonus;
 			if (m_player->m_item_list[i]->m_id_num == hb::shared::item::ItemId::AngelicPendantSTR)
 				m_player->m_angelic_str = 1 + angel_value;
 			else if (m_player->m_item_list[i]->m_id_num == hb::shared::item::ItemId::AngelicPendantDEX)
@@ -2640,12 +2641,12 @@ void CGame::init_item_list(char* packet_data)
 		const auto& entry = bankEntries[i];
 		m_player->m_bank_list[i] = std::make_unique<CItem>();
 		m_player->m_bank_list[i]->m_id_num = entry.item_id;
-		m_player->m_bank_list[i]->m_count = entry.count;
+		m_player->m_bank_list[i]->m_instance.count = entry.count;
 		m_player->m_bank_list[i]->m_x = 40;
 		m_player->m_bank_list[i]->m_y = 30;
-		m_player->m_bank_list[i]->m_cur_durability = entry.cur_lifespan;
-		m_player->m_bank_list[i]->m_item_color = entry.item_color;
-		m_player->m_bank_list[i]->m_item_special_effect_value2 = static_cast<short>(entry.spec_value2); // v1.41
+		m_player->m_bank_list[i]->m_instance.cur_durability = entry.cur_durability;
+		m_player->m_bank_list[i]->m_instance.item_color = entry.item_color;
+		m_player->m_bank_list[i]->m_instance.special_effect_value2 = static_cast<short>(entry.spec_value2); // v1.41
 		m_player->m_bank_list[i]->load_attributes_from(entry);
 	}
 
@@ -4925,7 +4926,7 @@ bool CGame::process_left_click(short mouse_x, short mouse_y, short tile_x, short
 	if (on_game()->m_magic_cast_time > 0 && (current_time - on_game()->m_magic_cast_time) < 750) return true;
 
 	m_map_data->get_owner(m_mcx, m_mcy - 1, name, &object_type, &object_status, &m_comm_object_id); // v1.4
-	if (m_mc_name == m_player->m_player_name && (object_type <= 6 || (m_map_data->m_data[m_player->m_player_x - m_map_data->m_pivot_x][m_player->m_player_y - m_map_data->m_pivot_y].m_item.item_id != 0 && m_item_config_list[m_map_data->m_data[m_player->m_player_x - m_map_data->m_pivot_x][m_player->m_player_y - m_map_data->m_pivot_y].m_item.item_id] != nullptr)))
+	if (m_mc_name == m_player->m_player_name && (object_type <= 6 || (m_map_data->m_data[m_player->m_player_x - m_map_data->m_pivot_x][m_player->m_player_y - m_map_data->m_pivot_y].m_item_id != 0 && m_item_config_list[m_map_data->m_data[m_player->m_player_x - m_map_data->m_pivot_x][m_player->m_player_y - m_map_data->m_pivot_y].m_item_id] != nullptr)))
 	{
 		if ((m_player->m_player_type >= 1) && (m_player->m_player_type <= 6)/* && (!m_player->m_playerAppearance.is_walking)*/)
 		{

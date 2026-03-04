@@ -77,25 +77,7 @@ public:
         m_armor_class = 0;
         m_set_id = 0;
 
-        m_count = 1;
-        m_touch_effect_type = 0;
-        m_touch_effect_value1 = 0;
-        m_touch_effect_value2 = 0;
-        m_touch_effect_value3 = 0;
-
-        m_item_color = 0;
-        m_item_special_effect_value1 = 0;
-        m_item_special_effect_value2 = 0;
-        m_item_special_effect_value3 = 0;
-
-        m_cur_durability = 0;
-
-        m_custom_made = false;
-        m_prefix_type = hb::shared::item::AttributePrefixType::None;
-        m_prefix_value = 0;
-        m_secondary_type = hb::shared::item::SecondaryEffectType::None;
-        m_secondary_value = 0;
-        m_enchant_bonus = 0;
+        // m_instance is zero-initialized by its default member initializers
     }
 
     inline virtual ~CItem()
@@ -108,7 +90,7 @@ public:
 
     char  m_name[hb::shared::limits::ItemNameLen];    // Internal item name (from database)
 
-    short m_id_num;                 // Item ID number (unique identifier)
+    short m_id_num;                 // Item ID number (unique identifier / lookup key — NOT instance data)
     char  m_item_type;              // Item type (see item_type enum)
     char  m_item_sub_type;          // Item sub-type (see item_sub_type enum)
     char  m_equip_pos;              // Equipment position (see EquipPos enum)
@@ -134,28 +116,10 @@ public:
     short m_special_effect_value2;   // Special effect value 2
 
     //------------------------------------------------------------------------
-    // Item-Specific Effects (attributes applied to item instance)
-    //------------------------------------------------------------------------
-
-    short m_item_special_effect_value1;  // Item spec effect value 1
-    short m_item_special_effect_value2;  // Item spec effect value 2
-    short m_item_special_effect_value3;  // Item spec effect value 3
-
-    //------------------------------------------------------------------------
-    // Touch Effects (triggered on first touch/acquisition)
-    //------------------------------------------------------------------------
-
-    short m_touch_effect_type;       // Touch effect type (see TouchEffectType enum)
-    short m_touch_effect_value1;     // Touch effect value 1
-    short m_touch_effect_value2;     // Touch effect value 2
-    short m_touch_effect_value3;     // Touch effect value 3
-
-    //------------------------------------------------------------------------
     // Visual Properties
     //------------------------------------------------------------------------
 
     short m_display_id = -1;       // Atlas display ID (maps to ItemSpriteMetadata, -1 = unmapped)
-    char  m_item_color;             // Item color variant
 
     //------------------------------------------------------------------------
     // Position (client-side for inventory/ground display)
@@ -182,11 +146,10 @@ public:
     short m_related_skill;         // Related skill for proficiency
 
     //------------------------------------------------------------------------
-    // Durability
+    // Durability (config — maximum)
     //------------------------------------------------------------------------
 
     uint16_t m_durability;         // Maximum durability
-    uint16_t m_cur_durability;     // Current durability
 
     //------------------------------------------------------------------------
     // Behavioral Flags
@@ -200,21 +163,10 @@ public:
     int16_t m_set_id;              // Equipment set ID (0 = no set)
 
     //------------------------------------------------------------------------
-    // Miscellaneous
+    // Instance Data (per-instance mutable fields)
     //------------------------------------------------------------------------
 
-    uint64_t m_count;              // Stack count (for stackable items)
-
-    //------------------------------------------------------------------------
-    // Item Attributes (prefix, secondary, enchant)
-    //------------------------------------------------------------------------
-
-    bool    m_custom_made      = false;
-    hb::shared::item::AttributePrefixType  m_prefix_type      = hb::shared::item::AttributePrefixType::None;
-    uint8_t m_prefix_value     = 0;
-    hb::shared::item::SecondaryEffectType  m_secondary_type   = hb::shared::item::SecondaryEffectType::None;
-    uint8_t m_secondary_value  = 0;
-    uint8_t m_enchant_bonus    = 0;
+    hb::shared::item::item_instance_data m_instance;
 
     //------------------------------------------------------------------------
     // Display Name Helpers
@@ -288,89 +240,83 @@ public:
 
     hb::shared::item::TouchEffectType get_touch_effect_type() const
     {
-        return hb::shared::item::to_touch_effect_type(m_touch_effect_type);
+        return hb::shared::item::to_touch_effect_type(m_instance.touch_effect_type);
     }
 
     void set_touch_effect_type(hb::shared::item::TouchEffectType type)
     {
-        m_touch_effect_type = hb::shared::item::to_int(type);
+        m_instance.touch_effect_type = hb::shared::item::to_int(type);
     }
 
     //------------------------------------------------------------------------
     // Attribute Helpers
     //------------------------------------------------------------------------
 
+    hb::shared::item::AttributePrefixType get_prefix_type() const
+    {
+        return static_cast<hb::shared::item::AttributePrefixType>(m_instance.prefix_type);
+    }
+
+    hb::shared::item::SecondaryEffectType get_secondary_type() const
+    {
+        return static_cast<hb::shared::item::SecondaryEffectType>(m_instance.secondary_type);
+    }
+
     bool is_custom_made() const
     {
-        return m_custom_made;
+        return m_instance.custom_made != 0;
     }
 
     void set_custom_made(bool custom)
     {
-        m_custom_made = custom;
+        m_instance.custom_made = custom ? 1 : 0;
     }
 
     bool has_special_attributes() const
     {
-        return m_prefix_type != hb::shared::item::AttributePrefixType::None ||
-               m_secondary_type != hb::shared::item::SecondaryEffectType::None ||
-               m_enchant_bonus > 0 ||
-               m_custom_made;
+        return m_instance.prefix_type != 0 ||
+               m_instance.secondary_type != 0 ||
+               m_instance.enchant_bonus > 0 ||
+               m_instance.custom_made != 0;
     }
 
     // Copy attribute fields to a packet or DB struct that has matching field names
     template <typename T>
     void copy_attributes_to(T& target) const
     {
-        target.custom_made = m_custom_made ? 1 : 0;
-        target.prefix_type = static_cast<uint8_t>(m_prefix_type);
-        target.prefix_value = m_prefix_value;
-        target.secondary_type = static_cast<uint8_t>(m_secondary_type);
-        target.secondary_value = m_secondary_value;
-        target.enchant_bonus = m_enchant_bonus;
+        target.custom_made = m_instance.custom_made;
+        target.prefix_type = m_instance.prefix_type;
+        target.prefix_value = m_instance.prefix_value;
+        target.secondary_type = m_instance.secondary_type;
+        target.secondary_value = m_instance.secondary_value;
+        target.enchant_bonus = m_instance.enchant_bonus;
     }
 
     // Load attribute fields from a packet or DB struct that has matching field names
     template <typename T>
     void load_attributes_from(const T& source)
     {
-        m_custom_made = source.custom_made != 0;
-        m_prefix_type = static_cast<hb::shared::item::AttributePrefixType>(source.prefix_type);
-        m_prefix_value = source.prefix_value;
-        m_secondary_type = static_cast<hb::shared::item::SecondaryEffectType>(source.secondary_type);
-        m_secondary_value = source.secondary_value;
-        m_enchant_bonus = source.enchant_bonus;
+        m_instance.custom_made = source.custom_made;
+        m_instance.prefix_type = source.prefix_type;
+        m_instance.prefix_value = source.prefix_value;
+        m_instance.secondary_type = source.secondary_type;
+        m_instance.secondary_value = source.secondary_value;
+        m_instance.enchant_bonus = source.enchant_bonus;
     }
 
     // Copy all attribute fields from another CItem
     void copy_attributes_from(const CItem* other)
     {
-        m_custom_made = other->m_custom_made;
-        m_prefix_type = other->m_prefix_type;
-        m_prefix_value = other->m_prefix_value;
-        m_secondary_type = other->m_secondary_type;
-        m_secondary_value = other->m_secondary_value;
-        m_enchant_bonus = other->m_enchant_bonus;
+        m_instance.custom_made = other->m_instance.custom_made;
+        m_instance.prefix_type = other->m_instance.prefix_type;
+        m_instance.prefix_value = other->m_instance.prefix_value;
+        m_instance.secondary_type = other->m_instance.secondary_type;
+        m_instance.secondary_value = other->m_instance.secondary_value;
+        m_instance.enchant_bonus = other->m_instance.enchant_bonus;
     }
 
-    // Populate an item_instance_data struct from this CItem's fields
-    hb::shared::item::item_instance_data to_instance_data() const
-    {
-        hb::shared::item::item_instance_data d;
-        d.item_id = m_id_num;
-        d.count = static_cast<uint16_t>(std::min<uint64_t>(m_count, 65535));
-        d.touch_effect_type = m_touch_effect_type;
-        d.touch_effect_value1 = m_touch_effect_value1;
-        d.touch_effect_value2 = m_touch_effect_value2;
-        d.touch_effect_value3 = m_touch_effect_value3;
-        d.item_color = m_item_color;
-        d.special_effect_value1 = m_item_special_effect_value1;
-        d.special_effect_value2 = m_item_special_effect_value2;
-        d.special_effect_value3 = m_item_special_effect_value3;
-        d.cur_lifespan = m_cur_durability;
-        copy_attributes_to(d);
-        return d;
-    }
+    // Return a const reference to the instance data
+    const hb::shared::item::item_instance_data& to_instance_data() const { return m_instance; }
 
     // Check if item is stackable (reads the config flag)
     bool is_stackable() const
@@ -387,8 +333,8 @@ public:
     // Light attribute percentage — prefix_value is already the actual percentage
     int get_light_percent() const
     {
-        if (m_prefix_type == hb::shared::item::AttributePrefixType::Light)
-            return m_prefix_value;
+        if (m_instance.prefix_type == static_cast<uint8_t>(hb::shared::item::AttributePrefixType::Light))
+            return m_instance.prefix_value;
         return 0;
     }
 

@@ -79,7 +79,7 @@ namespace NetworkMessageHandlers {
 	void HandleItemPurchased(CGame* game, char* data);
 	void HandleItemObtained(CGame* game, char* data);
 	void HandleItemObtainedBulk(CGame* game, char* data);
-	void HandleItemLifeSpanEnd(CGame* game, char* data);
+	void HandleItemDurabilityEnd(CGame* game, char* data);
 	void HandleItemReleased(CGame* game, char* data);
 	void HandleSetItemCount(CGame* game, char* data);
 	void HandleItemDepleted_EraseItem(CGame* game, char* data);
@@ -97,7 +97,7 @@ namespace NetworkMessageHandlers {
 	void HandleItemColorChange(CGame* game, char* data);
 	void HandleSetExchangeItem(CGame* game, char* data);
 	void HandleOpenExchangeWindow(CGame* game, char* data);
-	void HandleCurLifeSpan(CGame* game, char* data);
+	void HandleCurDurability(CGame* game, char* data);
 	void HandleNotEnoughGold(CGame* game, char* data);
 	void HandleCannotCarryMoreItem(CGame* game, char* data);
 	void HandleItemAttributeChange(CGame* game, char* data);
@@ -263,8 +263,8 @@ bool NetworkMessageManager::process_message(uint32_t msg_id, char* data, uint32_
 		case Notify::ItemObtained: NetworkMessageHandlers::HandleItemObtained(m_game, data); return true;
 		case Notify::ItemObtainedBulk: NetworkMessageHandlers::HandleItemObtainedBulk(m_game, data); return true;
 
-		// Items - LifeSpan/Released
-		case Notify::ItemLifeSpanEnd: NetworkMessageHandlers::HandleItemLifeSpanEnd(m_game, data); return true;
+		// Items - Durability/Released
+		case Notify::ItemDurabilityEnd: NetworkMessageHandlers::HandleItemDurabilityEnd(m_game, data); return true;
 		case Notify::ItemReleased: NetworkMessageHandlers::HandleItemReleased(m_game, data); return true;
 
 		// Items - Count/Depleted
@@ -292,7 +292,7 @@ bool NetworkMessageManager::process_message(uint32_t msg_id, char* data, uint32_
 		case Notify::ItemColorChange: NetworkMessageHandlers::HandleItemColorChange(m_game, data); return true;
 		case Notify::set_exchange_item: NetworkMessageHandlers::HandleSetExchangeItem(m_game, data); return true;
 		case Notify::OpenExchangeWindow: NetworkMessageHandlers::HandleOpenExchangeWindow(m_game, data); return true;
-		case Notify::CurLifeSpan: NetworkMessageHandlers::HandleCurLifeSpan(m_game, data); return true;
+		case Notify::CurDurability: NetworkMessageHandlers::HandleCurDurability(m_game, data); return true;
 
 		// Items - Upgrade/Attribute/Errors
 		case Notify::NotEnoughGold: NetworkMessageHandlers::HandleNotEnoughGold(m_game, data); return true;

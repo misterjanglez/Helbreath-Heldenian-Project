@@ -66,7 +66,7 @@ int inventory_manager::calc_total_weight()
 
 		int lp = item->get_light_percent();
 		int eff_w = (lp > 0) ? cfg->m_weight * (100 - lp) / 100 : cfg->m_weight;
-		weight += CItem::calc_item_stack_weight(eff_w, static_cast<int>(item->m_count));
+		weight += CItem::calc_item_stack_weight(eff_w, static_cast<int>(item->m_instance.count));
 	}
 	return static_cast<int>(std::min<int64_t>(weight, INT_MAX));
 }
@@ -197,7 +197,7 @@ void inventory_manager::equip_item(int item_id)
 		m_game->add_event_list(BITEMDROP_CHARACTER3, 10);
 		return;
 	}
-	if (m_game->m_player->m_item_list[item_id]->m_cur_durability == 0)
+	if (m_game->m_player->m_item_list[item_id]->m_instance.cur_durability == 0)
 	{
 		m_game->add_event_list(BITEMDROP_CHARACTER1, 10);
 		return;
@@ -210,7 +210,7 @@ void inventory_manager::equip_item(int item_id)
 		m_game->add_event_list(BITEMDROP_CHARACTER2, 10);
 		return;
 	}
-	if (!(m_game->m_player->m_item_list[item_id]->m_custom_made) && (cfg->m_level_requirement > m_game->m_player->m_level))
+	if (!(m_game->m_player->m_item_list[item_id]->m_instance.custom_made) && (cfg->m_level_requirement > m_game->m_player->m_level))
 	{
 		m_game->add_event_list(BITEMDROP_CHARACTER4, 10);
 		return;
@@ -285,7 +285,7 @@ void inventory_manager::equip_item(int item_id)
 	if ((cfg->get_item_type() == hb::shared::item::item_type::equipment)
 		&& (cfg->get_equip_pos() >= EquipPos::LeftFinger))
 	{
-		int angel_value = m_game->m_player->m_item_list[item_id]->m_enchant_bonus;
+		int angel_value = m_game->m_player->m_item_list[item_id]->m_instance.enchant_bonus;
 		if (m_game->m_player->m_item_list[item_id]->m_id_num == hb::shared::item::ItemId::AngelicPendantSTR)
 			m_game->m_player->m_angelic_str = 1 + angel_value;
 		else if (m_game->m_player->m_item_list[item_id]->m_id_num == hb::shared::item::ItemId::AngelicPendantDEX)

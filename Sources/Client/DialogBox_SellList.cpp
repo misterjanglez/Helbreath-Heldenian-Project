@@ -270,7 +270,7 @@ bool DialogBox_SellList::on_item_drop()
 	}
 
 	// Can't sell broken items
-	if (player().m_item_list[item_id]->m_cur_durability == 0)
+	if (player().m_item_list[item_id]->m_instance.cur_durability == 0)
 	{
 		std::string G_cTxt;
 		auto itemInfo2 = item_name_formatter::get().format(player().m_item_list[item_id].get());
@@ -282,7 +282,7 @@ bool DialogBox_SellList::on_item_drop()
 	// Stackable items - open quantity dialog
 	CItem* cfg = m_game->get_item_config(player().m_item_list[item_id]->m_id_num);
 	if (cfg && (cfg->is_stackable()) &&
-		(player().m_item_list[item_id]->m_count > 1))
+		(player().m_item_list[item_id]->m_instance.count > 1))
 	{
 		auto* dropDlg = m_game->get_dialog_box_manager().get_dialog_as<DialogBox_ItemDropAmount>(DialogBoxId::ItemDropExternal);
 		dropDlg->m_x = mouse_x - 140;
@@ -293,7 +293,7 @@ bool DialogBox_SellList::on_item_drop()
 		dropDlg->m_drop_target_type = 1001;
 		dropDlg->m_drop_target_id = item_id;
 		std::memset(dropDlg->m_target_name, 0, sizeof(dropDlg->m_target_name));
-		m_game->get_dialog_box_manager().enable_dialog_box(DialogBoxId::ItemDropExternal, item_id, static_cast<int64_t>(player().m_item_list[item_id]->m_count), 0);
+		m_game->get_dialog_box_manager().enable_dialog_box(DialogBoxId::ItemDropExternal, item_id, static_cast<int64_t>(player().m_item_list[item_id]->m_instance.count), 0);
 		inventory_manager::get().lock_item(item_id);
 	}
 	else

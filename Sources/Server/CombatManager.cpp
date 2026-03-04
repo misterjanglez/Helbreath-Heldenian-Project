@@ -618,13 +618,13 @@ void CombatManager::effect_damage_spot(short attacker_h, char attacker_type, sho
 			}
 			if (damage <= 0) damage = 0;
 
-			remain_life = m_game->m_client_list[target_h]->m_item_list[index]->m_cur_durability;
+			remain_life = m_game->m_client_list[target_h]->m_item_list[index]->m_instance.cur_durability;
 			if (remain_life <= damage) {
 				m_game->m_item_manager->item_deplete_handler(target_h, index, true);
 			}
 			else {
-				m_game->m_client_list[target_h]->m_item_list[index]->m_cur_durability -= damage;
-				m_game->send_notify_msg(0, target_h, Notify::CurLifeSpan, index, m_game->m_client_list[target_h]->m_item_list[index]->m_cur_durability, 0, 0);
+				m_game->m_client_list[target_h]->m_item_list[index]->m_instance.cur_durability -= damage;
+				m_game->send_notify_msg(0, target_h, Notify::CurDurability, index, m_game->m_client_list[target_h]->m_item_list[index]->m_instance.cur_durability, 0, 0);
 			}
 		}
 
@@ -1107,13 +1107,13 @@ void CombatManager::effect_damage_spot_damage_move(short attacker_h, char attack
 			}
 			if (damage <= 0) damage = 0;
 
-			remain_life = m_game->m_client_list[target_h]->m_item_list[index]->m_cur_durability;
+			remain_life = m_game->m_client_list[target_h]->m_item_list[index]->m_instance.cur_durability;
 			if (remain_life <= damage) {
 				m_game->m_item_manager->item_deplete_handler(target_h, index, true);
 			}
 			else {
-				m_game->m_client_list[target_h]->m_item_list[index]->m_cur_durability -= damage;
-				m_game->send_notify_msg(0, target_h, Notify::CurLifeSpan, index, m_game->m_client_list[target_h]->m_item_list[index]->m_cur_durability, 0, 0);
+				m_game->m_client_list[target_h]->m_item_list[index]->m_instance.cur_durability -= damage;
+				m_game->send_notify_msg(0, target_h, Notify::CurDurability, index, m_game->m_client_list[target_h]->m_item_list[index]->m_instance.cur_durability, 0, 0);
 			}
 		}
 
@@ -1979,75 +1979,75 @@ void CombatManager::armor_life_decrement(int attacker_h, int target_h, char owne
 
 	temp = m_game->m_client_list[target_h]->m_item_equipment_status[to_int(EquipPos::Body)];
 	if ((temp != -1) && (m_game->m_client_list[target_h]->m_item_list[temp] != 0)) {
-		if (m_game->m_client_list[target_h]->m_item_list[temp]->m_cur_durability > 0) {
-			if (m_game->m_client_list[target_h]->m_item_list[temp]->m_cur_durability < static_cast<uint16_t>(value))
-				m_game->m_client_list[target_h]->m_item_list[temp]->m_cur_durability = 0;
+		if (m_game->m_client_list[target_h]->m_item_list[temp]->m_instance.cur_durability > 0) {
+			if (m_game->m_client_list[target_h]->m_item_list[temp]->m_instance.cur_durability < static_cast<uint16_t>(value))
+				m_game->m_client_list[target_h]->m_item_list[temp]->m_instance.cur_durability = 0;
 			else
-				m_game->m_client_list[target_h]->m_item_list[temp]->m_cur_durability -= value;
-			m_game->send_notify_msg(0, target_h, Notify::CurLifeSpan, temp, m_game->m_client_list[target_h]->m_item_list[temp]->m_cur_durability, 0, 0);
+				m_game->m_client_list[target_h]->m_item_list[temp]->m_instance.cur_durability -= value;
+			m_game->send_notify_msg(0, target_h, Notify::CurDurability, temp, m_game->m_client_list[target_h]->m_item_list[temp]->m_instance.cur_durability, 0, 0);
 		}
-		if (m_game->m_client_list[target_h]->m_item_list[temp]->m_cur_durability == 0) {
-			m_game->send_notify_msg(0, target_h, Notify::ItemLifeSpanEnd, m_game->m_client_list[target_h]->m_item_list[temp]->m_equip_pos, temp, 0, 0);
+		if (m_game->m_client_list[target_h]->m_item_list[temp]->m_instance.cur_durability == 0) {
+			m_game->send_notify_msg(0, target_h, Notify::ItemDurabilityEnd, m_game->m_client_list[target_h]->m_item_list[temp]->m_equip_pos, temp, 0, 0);
 			m_game->m_item_manager->release_item_handler(target_h, temp, true);
 		}
 	}
 
 	temp = m_game->m_client_list[target_h]->m_item_equipment_status[to_int(EquipPos::Leggings)];
 	if ((temp != -1) && (m_game->m_client_list[target_h]->m_item_list[temp] != 0)) {
-		if (m_game->m_client_list[target_h]->m_item_list[temp]->m_cur_durability > 0) {
-			if (m_game->m_client_list[target_h]->m_item_list[temp]->m_cur_durability < static_cast<uint16_t>(value))
-				m_game->m_client_list[target_h]->m_item_list[temp]->m_cur_durability = 0;
+		if (m_game->m_client_list[target_h]->m_item_list[temp]->m_instance.cur_durability > 0) {
+			if (m_game->m_client_list[target_h]->m_item_list[temp]->m_instance.cur_durability < static_cast<uint16_t>(value))
+				m_game->m_client_list[target_h]->m_item_list[temp]->m_instance.cur_durability = 0;
 			else
-				m_game->m_client_list[target_h]->m_item_list[temp]->m_cur_durability -= value;
-			m_game->send_notify_msg(0, target_h, Notify::CurLifeSpan, temp, m_game->m_client_list[target_h]->m_item_list[temp]->m_cur_durability, 0, 0);
+				m_game->m_client_list[target_h]->m_item_list[temp]->m_instance.cur_durability -= value;
+			m_game->send_notify_msg(0, target_h, Notify::CurDurability, temp, m_game->m_client_list[target_h]->m_item_list[temp]->m_instance.cur_durability, 0, 0);
 		}
-		if (m_game->m_client_list[target_h]->m_item_list[temp]->m_cur_durability == 0) {
-			m_game->send_notify_msg(0, target_h, Notify::ItemLifeSpanEnd, m_game->m_client_list[target_h]->m_item_list[temp]->m_equip_pos, temp, 0, 0);
+		if (m_game->m_client_list[target_h]->m_item_list[temp]->m_instance.cur_durability == 0) {
+			m_game->send_notify_msg(0, target_h, Notify::ItemDurabilityEnd, m_game->m_client_list[target_h]->m_item_list[temp]->m_equip_pos, temp, 0, 0);
 			m_game->m_item_manager->release_item_handler(target_h, temp, true);
 		}
 	}
 
 	temp = m_game->m_client_list[target_h]->m_item_equipment_status[to_int(EquipPos::Boots)];
 	if ((temp != -1) && (m_game->m_client_list[target_h]->m_item_list[temp] != 0)) {
-		if (m_game->m_client_list[target_h]->m_item_list[temp]->m_cur_durability > 0) {
-			if (m_game->m_client_list[target_h]->m_item_list[temp]->m_cur_durability < static_cast<uint16_t>(value))
-				m_game->m_client_list[target_h]->m_item_list[temp]->m_cur_durability = 0;
+		if (m_game->m_client_list[target_h]->m_item_list[temp]->m_instance.cur_durability > 0) {
+			if (m_game->m_client_list[target_h]->m_item_list[temp]->m_instance.cur_durability < static_cast<uint16_t>(value))
+				m_game->m_client_list[target_h]->m_item_list[temp]->m_instance.cur_durability = 0;
 			else
-				m_game->m_client_list[target_h]->m_item_list[temp]->m_cur_durability -= value;
-			m_game->send_notify_msg(0, target_h, Notify::CurLifeSpan, temp, m_game->m_client_list[target_h]->m_item_list[temp]->m_cur_durability, 0, 0);
+				m_game->m_client_list[target_h]->m_item_list[temp]->m_instance.cur_durability -= value;
+			m_game->send_notify_msg(0, target_h, Notify::CurDurability, temp, m_game->m_client_list[target_h]->m_item_list[temp]->m_instance.cur_durability, 0, 0);
 		}
-		if (m_game->m_client_list[target_h]->m_item_list[temp]->m_cur_durability == 0) {
-			m_game->send_notify_msg(0, target_h, Notify::ItemLifeSpanEnd, m_game->m_client_list[target_h]->m_item_list[temp]->m_equip_pos, temp, 0, 0);
+		if (m_game->m_client_list[target_h]->m_item_list[temp]->m_instance.cur_durability == 0) {
+			m_game->send_notify_msg(0, target_h, Notify::ItemDurabilityEnd, m_game->m_client_list[target_h]->m_item_list[temp]->m_equip_pos, temp, 0, 0);
 			m_game->m_item_manager->release_item_handler(target_h, temp, true);
 		}
 	}
 
 	temp = m_game->m_client_list[target_h]->m_item_equipment_status[to_int(EquipPos::Arms)];
 	if ((temp != -1) && (m_game->m_client_list[target_h]->m_item_list[temp] != 0)) {
-		if (m_game->m_client_list[target_h]->m_item_list[temp]->m_cur_durability > 0) {
-			if (m_game->m_client_list[target_h]->m_item_list[temp]->m_cur_durability < static_cast<uint16_t>(value))
-				m_game->m_client_list[target_h]->m_item_list[temp]->m_cur_durability = 0;
+		if (m_game->m_client_list[target_h]->m_item_list[temp]->m_instance.cur_durability > 0) {
+			if (m_game->m_client_list[target_h]->m_item_list[temp]->m_instance.cur_durability < static_cast<uint16_t>(value))
+				m_game->m_client_list[target_h]->m_item_list[temp]->m_instance.cur_durability = 0;
 			else
-				m_game->m_client_list[target_h]->m_item_list[temp]->m_cur_durability -= value;
-			m_game->send_notify_msg(0, target_h, Notify::CurLifeSpan, temp, m_game->m_client_list[target_h]->m_item_list[temp]->m_cur_durability, 0, 0);
+				m_game->m_client_list[target_h]->m_item_list[temp]->m_instance.cur_durability -= value;
+			m_game->send_notify_msg(0, target_h, Notify::CurDurability, temp, m_game->m_client_list[target_h]->m_item_list[temp]->m_instance.cur_durability, 0, 0);
 		}
-		if (m_game->m_client_list[target_h]->m_item_list[temp]->m_cur_durability == 0) {
-			m_game->send_notify_msg(0, target_h, Notify::ItemLifeSpanEnd, m_game->m_client_list[target_h]->m_item_list[temp]->m_equip_pos, temp, 0, 0);
+		if (m_game->m_client_list[target_h]->m_item_list[temp]->m_instance.cur_durability == 0) {
+			m_game->send_notify_msg(0, target_h, Notify::ItemDurabilityEnd, m_game->m_client_list[target_h]->m_item_list[temp]->m_equip_pos, temp, 0, 0);
 			m_game->m_item_manager->release_item_handler(target_h, temp, true);
 		}
 	}
 
 	temp = m_game->m_client_list[target_h]->m_item_equipment_status[to_int(EquipPos::Head)];
 	if ((temp != -1) && (m_game->m_client_list[target_h]->m_item_list[temp] != 0)) {
-		if (m_game->m_client_list[target_h]->m_item_list[temp]->m_cur_durability > 0) {
-			if (m_game->m_client_list[target_h]->m_item_list[temp]->m_cur_durability < static_cast<uint16_t>(value))
-				m_game->m_client_list[target_h]->m_item_list[temp]->m_cur_durability = 0;
+		if (m_game->m_client_list[target_h]->m_item_list[temp]->m_instance.cur_durability > 0) {
+			if (m_game->m_client_list[target_h]->m_item_list[temp]->m_instance.cur_durability < static_cast<uint16_t>(value))
+				m_game->m_client_list[target_h]->m_item_list[temp]->m_instance.cur_durability = 0;
 			else
-				m_game->m_client_list[target_h]->m_item_list[temp]->m_cur_durability -= value;
-			m_game->send_notify_msg(0, target_h, Notify::CurLifeSpan, temp, m_game->m_client_list[target_h]->m_item_list[temp]->m_cur_durability, 0, 0);
+				m_game->m_client_list[target_h]->m_item_list[temp]->m_instance.cur_durability -= value;
+			m_game->send_notify_msg(0, target_h, Notify::CurDurability, temp, m_game->m_client_list[target_h]->m_item_list[temp]->m_instance.cur_durability, 0, 0);
 		}
-		if (m_game->m_client_list[target_h]->m_item_list[temp]->m_cur_durability == 0) {
-			m_game->send_notify_msg(0, target_h, Notify::ItemLifeSpanEnd, m_game->m_client_list[target_h]->m_item_list[temp]->m_equip_pos, temp, 0, 0);
+		if (m_game->m_client_list[target_h]->m_item_list[temp]->m_instance.cur_durability == 0) {
+			m_game->send_notify_msg(0, target_h, Notify::ItemDurabilityEnd, m_game->m_client_list[target_h]->m_item_list[temp]->m_equip_pos, temp, 0, 0);
 			m_game->m_item_manager->release_item_handler(target_h, temp, true);
 		}
 	}
@@ -2138,7 +2138,7 @@ bool CombatManager::check_client_attack_frequency(int client_h, uint32_t client_
 	return false;
 }
 
-bool CombatManager::calculate_endurance_decrement(short target_h, short attacker_h, char attacker_type, char target_type, int armor_type)
+bool CombatManager::calculate_durability_decrement(short target_h, short attacker_h, char attacker_type, char target_type, int armor_type)
 {
 	int down_value = 1, hammer_chance = 100, item_index;
 	auto wc = weapon_class::none;
@@ -2193,25 +2193,25 @@ bool CombatManager::calculate_endurance_decrement(short target_h, short attacker
 			break;
 		}
 	}
-	if (m_game->m_client_list[target_h]->m_item_list[armor_type]->m_cur_durability > 0) {
-		if (m_game->m_client_list[target_h]->m_item_list[armor_type]->m_cur_durability < static_cast<uint16_t>(down_value))
-			m_game->m_client_list[target_h]->m_item_list[armor_type]->m_cur_durability = 0;
+	if (m_game->m_client_list[target_h]->m_item_list[armor_type]->m_instance.cur_durability > 0) {
+		if (m_game->m_client_list[target_h]->m_item_list[armor_type]->m_instance.cur_durability < static_cast<uint16_t>(down_value))
+			m_game->m_client_list[target_h]->m_item_list[armor_type]->m_instance.cur_durability = 0;
 		else
-			m_game->m_client_list[target_h]->m_item_list[armor_type]->m_cur_durability -= down_value;
-		m_game->send_notify_msg(0, target_h, Notify::CurLifeSpan, armor_type, m_game->m_client_list[target_h]->m_item_list[armor_type]->m_cur_durability, 0, 0);
+			m_game->m_client_list[target_h]->m_item_list[armor_type]->m_instance.cur_durability -= down_value;
+		m_game->send_notify_msg(0, target_h, Notify::CurDurability, armor_type, m_game->m_client_list[target_h]->m_item_list[armor_type]->m_instance.cur_durability, 0, 0);
 	}
-	if (m_game->m_client_list[target_h]->m_item_list[armor_type]->m_cur_durability == 0) {
-		m_game->m_client_list[target_h]->m_item_list[armor_type]->m_cur_durability = 0;
-		m_game->send_notify_msg(0, target_h, Notify::ItemLifeSpanEnd, m_game->m_client_list[target_h]->m_item_list[armor_type]->m_equip_pos, armor_type, 0, 0);
+	if (m_game->m_client_list[target_h]->m_item_list[armor_type]->m_instance.cur_durability == 0) {
+		m_game->m_client_list[target_h]->m_item_list[armor_type]->m_instance.cur_durability = 0;
+		m_game->send_notify_msg(0, target_h, Notify::ItemDurabilityEnd, m_game->m_client_list[target_h]->m_item_list[armor_type]->m_equip_pos, armor_type, 0, 0);
 		m_game->m_item_manager->release_item_handler(target_h, armor_type, true);
 		return true;
 	}
 	if ((attacker_type == hb::shared::owner_class::Player) && (target_type == hb::shared::owner_class::Player) && (m_game->m_client_list[attacker_h]->m_using_weapon_skill == 14) && (hammer_chance == 100)) {
 		if (m_game->m_client_list[target_h]->m_item_list[armor_type]->m_durability < 2000) {
-			hammer_chance = m_game->dice(6, (m_game->m_client_list[target_h]->m_item_list[armor_type]->m_durability - m_game->m_client_list[target_h]->m_item_list[armor_type]->m_cur_durability));
+			hammer_chance = m_game->dice(6, (m_game->m_client_list[target_h]->m_item_list[armor_type]->m_durability - m_game->m_client_list[target_h]->m_item_list[armor_type]->m_instance.cur_durability));
 		}
 		else {
-			hammer_chance = m_game->dice(4, (m_game->m_client_list[target_h]->m_item_list[armor_type]->m_durability - m_game->m_client_list[target_h]->m_item_list[armor_type]->m_cur_durability));
+			hammer_chance = m_game->dice(4, (m_game->m_client_list[target_h]->m_item_list[armor_type]->m_durability - m_game->m_client_list[target_h]->m_item_list[armor_type]->m_instance.cur_durability));
 		}
 		if (wc == weapon_class::hammer) {
 			item_index = m_game->m_client_list[attacker_h]->m_item_equipment_status[to_int(EquipPos::TwoHand)];
@@ -2238,7 +2238,7 @@ bool CombatManager::calculate_endurance_decrement(short target_h, short attacker
 				hammer_chance = 0;
 				break;
 			}
-			if (m_game->m_client_list[target_h]->m_item_list[armor_type]->m_cur_durability < hammer_chance) {
+			if (m_game->m_client_list[target_h]->m_item_list[armor_type]->m_instance.cur_durability < hammer_chance) {
 				m_game->m_item_manager->release_item_handler(target_h, armor_type, true);
 				m_game->send_notify_msg(0, target_h, Notify::ItemReleased, m_game->m_client_list[target_h]->m_item_list[armor_type]->m_equip_pos, armor_type, 0, 0);
 			}
@@ -2533,12 +2533,11 @@ uint32_t CombatManager::calculate_attack_effect(short target_h, char target_type
 		iAP_SM = 0;
 		iAP_L = 0;
 
-		if (m_game->m_npc_list[attacker_h]->m_attack_dice_throw >= 0)
+		int npc_min = m_game->m_npc_list[attacker_h]->m_min_damage;
+		int npc_max = m_game->m_npc_list[attacker_h]->m_max_damage;
+		if (npc_max > 0)
 		{
-			iAP_L = iAP_SM = m_game->dice(
-				static_cast<uint32_t>(m_game->m_npc_list[attacker_h]->m_attack_dice_throw),
-				static_cast<uint32_t>(m_game->m_npc_list[attacker_h]->m_attack_dice_range)
-			);
+			iAP_L = iAP_SM = npc_min + (rand() % (npc_max - npc_min + 1));
 		}
 
 		attacker_hit_ratio = m_game->m_npc_list[attacker_h]->m_hit_ratio;
@@ -2784,14 +2783,14 @@ uint32_t CombatManager::calculate_attack_effect(short target_h, char target_type
 					int arrow_id_num = m_game->m_client_list[attacker_h]->m_item_list[m_game->m_client_list[attacker_h]->m_arrow_index]->m_id_num;
 
 					if (arrow_use != true)
-						m_game->m_client_list[attacker_h]->m_item_list[m_game->m_client_list[attacker_h]->m_arrow_index]->m_count--;
-					if (m_game->m_client_list[attacker_h]->m_item_list[m_game->m_client_list[attacker_h]->m_arrow_index]->m_count <= 0) {
+						m_game->m_client_list[attacker_h]->m_item_list[m_game->m_client_list[attacker_h]->m_arrow_index]->m_instance.count--;
+					if (m_game->m_client_list[attacker_h]->m_item_list[m_game->m_client_list[attacker_h]->m_arrow_index]->m_instance.count <= 0) {
 
 						m_game->m_item_manager->item_deplete_handler(attacker_h, m_game->m_client_list[attacker_h]->m_arrow_index, false);
 						m_game->m_client_list[attacker_h]->m_arrow_index = m_game->m_item_manager->get_arrow_item_index(attacker_h);
 					}
 					else {
-						m_game->send_notify_msg(0, attacker_h, Notify::set_item_count, m_game->m_client_list[attacker_h]->m_arrow_index, m_game->m_client_list[attacker_h]->m_item_list[m_game->m_client_list[attacker_h]->m_arrow_index]->m_count, false, 0);
+						m_game->send_notify_msg(0, attacker_h, Notify::set_item_count, m_game->m_client_list[attacker_h]->m_arrow_index, m_game->m_client_list[attacker_h]->m_item_list[m_game->m_client_list[attacker_h]->m_arrow_index]->m_instance.count, false, 0);
 						m_game->calc_total_weight(attacker_h);
 					}
 
@@ -3018,12 +3017,12 @@ uint32_t CombatManager::calculate_attack_effect(short target_h, char target_type
 
 						temp = m_game->m_client_list[target_h]->m_item_equipment_status[to_int(EquipPos::LeftHand)];
 						if ((temp != -1) && (m_game->m_client_list[target_h]->m_item_list[temp] != 0)) {
-							if (m_game->m_client_list[target_h]->m_item_list[temp]->m_cur_durability > 0) {
-								m_game->m_client_list[target_h]->m_item_list[temp]->m_cur_durability--;
-								m_game->send_notify_msg(0, target_h, Notify::CurLifeSpan, temp, m_game->m_client_list[target_h]->m_item_list[temp]->m_cur_durability, 0, 0);
+							if (m_game->m_client_list[target_h]->m_item_list[temp]->m_instance.cur_durability > 0) {
+								m_game->m_client_list[target_h]->m_item_list[temp]->m_instance.cur_durability--;
+								m_game->send_notify_msg(0, target_h, Notify::CurDurability, temp, m_game->m_client_list[target_h]->m_item_list[temp]->m_instance.cur_durability, 0, 0);
 							}
-							if (m_game->m_client_list[target_h]->m_item_list[temp]->m_cur_durability == 0) {
-								m_game->send_notify_msg(0, target_h, Notify::ItemLifeSpanEnd, m_game->m_client_list[target_h]->m_item_list[temp]->m_equip_pos, temp, 0, 0);
+							if (m_game->m_client_list[target_h]->m_item_list[temp]->m_instance.cur_durability == 0) {
+								m_game->send_notify_msg(0, target_h, Notify::ItemDurabilityEnd, m_game->m_client_list[target_h]->m_item_list[temp]->m_equip_pos, temp, 0, 0);
 								m_game->m_item_manager->release_item_handler(target_h, temp, true);
 							}
 						}
@@ -3031,7 +3030,7 @@ uint32_t CombatManager::calculate_attack_effect(short target_h, char target_type
 				}
 
 				iAP_SM = iAP_SM - (iAP_Abs_Armor + iAP_Abs_Shield);
-				if (iAP_SM <= 0) iAP_SM = 1;
+				if (iAP_SM < 0) iAP_SM = 0;
 
 				if ((attacker_type == hb::shared::owner_class::Player) && (m_game->m_client_list[attacker_h] != 0) && (m_game->m_client_list[attacker_h]->m_is_special_ability_enabled)) {
 					switch (m_game->m_client_list[attacker_h]->m_special_ability_type) {
@@ -3075,7 +3074,7 @@ uint32_t CombatManager::calculate_attack_effect(short target_h, char target_type
 						if (m_game->m_client_list[attacker_h]->m_item_equipment_status[to_int(EquipPos::TwoHand)] != -1)
 							weapon_index = m_game->m_client_list[attacker_h]->m_item_equipment_status[to_int(EquipPos::TwoHand)];
 						else weapon_index = m_game->m_client_list[attacker_h]->m_item_equipment_status[to_int(EquipPos::RightHand)];
-						if (weapon_index != -1)	m_game->m_client_list[attacker_h]->m_item_list[weapon_index]->m_cur_durability = 0;
+						if (weapon_index != -1)	m_game->m_client_list[attacker_h]->m_item_list[weapon_index]->m_instance.cur_durability = 0;
 						break;
 					case 51:
 						if (hit_point == m_game->m_client_list[target_h]->m_special_ability_equip_pos)
@@ -3096,19 +3095,19 @@ uint32_t CombatManager::calculate_attack_effect(short target_h, char target_type
 				case 1:
 					temp = m_game->m_client_list[target_h]->m_item_equipment_status[to_int(EquipPos::Body)];
 					if ((temp != -1) && (m_game->m_client_list[target_h]->m_item_list[temp] != 0)) {
-						calculate_endurance_decrement(target_h, attacker_h, attacker_type, target_type, temp);
+						calculate_durability_decrement(target_h, attacker_h, attacker_type, target_type, temp);
 					}
 					break;
 
 				case 2:
 					temp = m_game->m_client_list[target_h]->m_item_equipment_status[to_int(EquipPos::Leggings)];
 					if ((temp != -1) && (m_game->m_client_list[target_h]->m_item_list[temp] != 0)) {
-						calculate_endurance_decrement(target_h, attacker_h, attacker_type, target_type, temp);
+						calculate_durability_decrement(target_h, attacker_h, attacker_type, target_type, temp);
 					}
 					else {
 						temp = m_game->m_client_list[target_h]->m_item_equipment_status[to_int(EquipPos::Boots)];
 						if ((temp != -1) && (m_game->m_client_list[target_h]->m_item_list[temp] != 0)) {
-							calculate_endurance_decrement(target_h, attacker_h, attacker_type, target_type, temp);
+							calculate_durability_decrement(target_h, attacker_h, attacker_type, target_type, temp);
 						}
 					}
 					break;
@@ -3116,14 +3115,14 @@ uint32_t CombatManager::calculate_attack_effect(short target_h, char target_type
 				case 3:
 					temp = m_game->m_client_list[target_h]->m_item_equipment_status[to_int(EquipPos::Arms)];
 					if ((temp != -1) && (m_game->m_client_list[target_h]->m_item_list[temp] != 0)) {
-						calculate_endurance_decrement(target_h, attacker_h, attacker_type, target_type, temp);
+						calculate_durability_decrement(target_h, attacker_h, attacker_type, target_type, temp);
 					}
 					break;
 
 				case 4:
 					temp = m_game->m_client_list[target_h]->m_item_equipment_status[to_int(EquipPos::Head)];
 					if ((temp != -1) && (m_game->m_client_list[target_h]->m_item_list[temp] != 0)) {
-						calculate_endurance_decrement(target_h, attacker_h, attacker_type, target_type, temp);
+						calculate_durability_decrement(target_h, attacker_h, attacker_type, target_type, temp);
 					}
 					break;
 				}
@@ -3580,14 +3579,14 @@ uint32_t CombatManager::calculate_attack_effect(short target_h, char target_type
 						}
 					}
 
-					if (m_game->m_client_list[attacker_h]->m_item_list[weapon_index]->m_cur_durability < wep_life_off)
-						m_game->m_client_list[attacker_h]->m_item_list[weapon_index]->m_cur_durability = 0;
-					else m_game->m_client_list[attacker_h]->m_item_list[weapon_index]->m_cur_durability -= wep_life_off;
+					if (m_game->m_client_list[attacker_h]->m_item_list[weapon_index]->m_instance.cur_durability < wep_life_off)
+						m_game->m_client_list[attacker_h]->m_item_list[weapon_index]->m_instance.cur_durability = 0;
+					else m_game->m_client_list[attacker_h]->m_item_list[weapon_index]->m_instance.cur_durability -= wep_life_off;
 
-					m_game->send_notify_msg(0, attacker_h, Notify::CurLifeSpan, weapon_index, m_game->m_client_list[attacker_h]->m_item_list[weapon_index]->m_cur_durability, 0, 0);
+					m_game->send_notify_msg(0, attacker_h, Notify::CurDurability, weapon_index, m_game->m_client_list[attacker_h]->m_item_list[weapon_index]->m_instance.cur_durability, 0, 0);
 
-					if (m_game->m_client_list[attacker_h]->m_item_list[weapon_index]->m_cur_durability == 0) {
-						m_game->send_notify_msg(0, attacker_h, Notify::ItemLifeSpanEnd, m_game->m_client_list[attacker_h]->m_item_list[weapon_index]->m_equip_pos, weapon_index, 0, 0);
+					if (m_game->m_client_list[attacker_h]->m_item_list[weapon_index]->m_instance.cur_durability == 0) {
+						m_game->send_notify_msg(0, attacker_h, Notify::ItemDurabilityEnd, m_game->m_client_list[attacker_h]->m_item_list[weapon_index]->m_equip_pos, weapon_index, 0, 0);
 						m_game->m_item_manager->release_item_handler(attacker_h, weapon_index, true);
 					}
 				}

@@ -102,7 +102,7 @@ void CmdGiveItem::execute(CGame* game, const char* args)
 			hb::console::error("Failed to initialize item ID: {}.", item_id);
 			return;
 		}
-		item->m_count = amount;
+		item->m_instance.count = amount;
 
 		if (game->m_item_manager->add_item(client_h, item, 0) == false)
 		{

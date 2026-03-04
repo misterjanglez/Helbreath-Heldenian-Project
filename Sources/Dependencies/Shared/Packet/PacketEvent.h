@@ -161,7 +161,7 @@ namespace net {
 		std::int16_t special_effect_value1;
 		std::int16_t special_effect_value2;
 		std::int16_t special_effect_value3;
-		std::uint16_t cur_lifespan;
+		std::uint16_t cur_durability;
 		std::uint8_t custom_made;
 		std::uint8_t prefix_type;
 		std::uint8_t prefix_value;

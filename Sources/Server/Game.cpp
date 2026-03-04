@@ -1970,19 +1970,19 @@ void CGame::request_init_data_handler(int client_h, char* data, char key, size_t
 		}
 		auto* entry = writer.Append<hb::net::PacketResponseItemListEntry>();
 		std::memcpy(entry->name, m_client_list[client_h]->m_item_list[i]->m_name, sizeof(entry->name));
-		entry->count = m_client_list[client_h]->m_item_list[i]->m_count;
+		entry->count = m_client_list[client_h]->m_item_list[i]->m_instance.count;
 		entry->item_type = m_client_list[client_h]->m_item_list[i]->m_item_type;
 		entry->equip_pos = m_client_list[client_h]->m_item_list[i]->m_equip_pos;
 		entry->is_equipped = static_cast<std::uint8_t>(m_client_list[client_h]->m_is_item_equipped[i]);
 		entry->level_limit = m_client_list[client_h]->m_item_list[i]->m_level_requirement;
 		entry->gender_limit = m_client_list[client_h]->m_item_list[i]->m_gender_requirement;
-		entry->cur_lifespan = m_client_list[client_h]->m_item_list[i]->m_cur_durability;
+		entry->cur_durability = m_client_list[client_h]->m_item_list[i]->m_instance.cur_durability;
 		entry->weight = m_client_list[client_h]->m_item_list[i]->m_weight;
-		entry->item_color = m_client_list[client_h]->m_item_list[i]->m_item_color;
-		entry->spec_value2 = static_cast<std::uint8_t>(m_client_list[client_h]->m_item_list[i]->m_item_special_effect_value2);
+		entry->item_color = m_client_list[client_h]->m_item_list[i]->m_instance.item_color;
+		entry->spec_value2 = static_cast<std::uint8_t>(m_client_list[client_h]->m_item_list[i]->m_instance.special_effect_value2);
 		m_client_list[client_h]->m_item_list[i]->copy_attributes_to(*entry);
 		entry->item_id = m_client_list[client_h]->m_item_list[i]->m_id_num;
-		entry->max_lifespan = m_client_list[client_h]->m_item_list[i]->m_durability;
+		entry->max_durability = m_client_list[client_h]->m_item_list[i]->m_durability;
 	}
 
 	total_item_b = 0;
@@ -2003,18 +2003,18 @@ void CGame::request_init_data_handler(int client_h, char* data, char key, size_t
 		}
 		auto* entry = writer.Append<hb::net::PacketResponseBankItemEntry>();
 		std::memcpy(entry->name, m_client_list[client_h]->m_item_in_bank_list[i]->m_name, sizeof(entry->name));
-		entry->count = m_client_list[client_h]->m_item_in_bank_list[i]->m_count;
+		entry->count = m_client_list[client_h]->m_item_in_bank_list[i]->m_instance.count;
 		entry->item_type = m_client_list[client_h]->m_item_in_bank_list[i]->m_item_type;
 		entry->equip_pos = m_client_list[client_h]->m_item_in_bank_list[i]->m_equip_pos;
 		entry->level_limit = m_client_list[client_h]->m_item_in_bank_list[i]->m_level_requirement;
 		entry->gender_limit = m_client_list[client_h]->m_item_in_bank_list[i]->m_gender_requirement;
-		entry->cur_lifespan = m_client_list[client_h]->m_item_in_bank_list[i]->m_cur_durability;
+		entry->cur_durability = m_client_list[client_h]->m_item_in_bank_list[i]->m_instance.cur_durability;
 		entry->weight = m_client_list[client_h]->m_item_in_bank_list[i]->m_weight;
-		entry->item_color = m_client_list[client_h]->m_item_in_bank_list[i]->m_item_color;
-		entry->spec_value2 = static_cast<std::uint8_t>(m_client_list[client_h]->m_item_in_bank_list[i]->m_item_special_effect_value2);
+		entry->item_color = m_client_list[client_h]->m_item_in_bank_list[i]->m_instance.item_color;
+		entry->spec_value2 = static_cast<std::uint8_t>(m_client_list[client_h]->m_item_in_bank_list[i]->m_instance.special_effect_value2);
 		m_client_list[client_h]->m_item_in_bank_list[i]->copy_attributes_to(*entry);
 		entry->item_id = m_client_list[client_h]->m_item_in_bank_list[i]->m_id_num;
-		entry->max_lifespan = m_client_list[client_h]->m_item_in_bank_list[i]->m_durability;
+		entry->max_durability = m_client_list[client_h]->m_item_in_bank_list[i]->m_durability;
 	}
 
 	auto* mastery = writer.Append<hb::net::PacketResponseMasteryData>();
@@ -2534,7 +2534,7 @@ void CGame::compute_config_hashes()
 				entry.stackable = item->m_stackable;
 				entry.isDyeable = item->m_is_dyeable;
 				entry.setId = item->m_set_id;
-				entry.itemColor = item->m_item_color;
+				entry.itemColor = item->m_instance.item_color;
 				entry.displayId = item->m_display_id;
 				entriesInPacket++;
 			}
@@ -3286,9 +3286,9 @@ int CGame::compose_init_map_data(short sX, short sY, int client_h, char* data)
 				if (tile->m_item[0] != 0) {
 					hb::net::PacketMapDataItem itemObj{};
 					itemObj.item_id = tile->m_item[0]->m_id_num;
-					itemObj.color = tile->m_item[0]->m_item_color;
+					itemObj.color = tile->m_item[0]->m_instance.item_color;
 					tile->m_item[0]->copy_attributes_to(itemObj);
-					itemObj.count = CItem::count_to_v2(tile->m_item[0]->m_count);
+					itemObj.count = CItem::count_to_v2(tile->m_item[0]->m_instance.count);
 					std::memcpy(cp, &itemObj, sizeof(itemObj));
 					cp += sizeof(itemObj);
 					size += sizeof(itemObj);
@@ -4088,14 +4088,14 @@ int CGame::compose_move_map_data(short sX, short sY, int client_h, direction dir
 			if (tile->m_item[0] != 0) {
 				hb::net::PacketMapDataItem itemObj{};
 				itemObj.item_id = tile->m_item[0]->m_id_num;
-				itemObj.color = tile->m_item[0]->m_item_color;
-				itemObj.custom_made = tile->m_item[0]->m_custom_made ? 1 : 0;
-				itemObj.prefix_type = static_cast<uint8_t>(tile->m_item[0]->m_prefix_type);
-				itemObj.prefix_value = tile->m_item[0]->m_prefix_value;
-				itemObj.secondary_type = static_cast<uint8_t>(tile->m_item[0]->m_secondary_type);
-				itemObj.secondary_value = tile->m_item[0]->m_secondary_value;
-				itemObj.enchant_bonus = tile->m_item[0]->m_enchant_bonus;
-				itemObj.count = CItem::count_to_v2(tile->m_item[0]->m_count);
+				itemObj.color = tile->m_item[0]->m_instance.item_color;
+				itemObj.custom_made = tile->m_item[0]->m_instance.custom_made ? 1 : 0;
+				itemObj.prefix_type = static_cast<uint8_t>(tile->m_item[0]->m_instance.prefix_type);
+				itemObj.prefix_value = tile->m_item[0]->m_instance.prefix_value;
+				itemObj.secondary_type = static_cast<uint8_t>(tile->m_item[0]->m_instance.secondary_type);
+				itemObj.secondary_value = tile->m_item[0]->m_instance.secondary_value;
+				itemObj.enchant_bonus = tile->m_item[0]->m_instance.enchant_bonus;
+				itemObj.count = CItem::count_to_v2(tile->m_item[0]->m_instance.count);
 				std::memcpy(cp, &itemObj, sizeof(itemObj));
 				cp += sizeof(itemObj);
 				size += sizeof(itemObj);
@@ -4627,24 +4627,24 @@ bool CGame::load_player_data_from_db(int client_h)
 			m_client_list[client_h]->m_item_list[item.slot] = 0;
 			continue;
 		}
-		m_client_list[client_h]->m_item_list[item.slot]->m_count = item.count;
-		m_client_list[client_h]->m_item_list[item.slot]->m_touch_effect_type = item.touch_effect_type;
-		m_client_list[client_h]->m_item_list[item.slot]->m_touch_effect_value1 = item.touch_effect_value1;
-		m_client_list[client_h]->m_item_list[item.slot]->m_touch_effect_value2 = item.touch_effect_value2;
-		m_client_list[client_h]->m_item_list[item.slot]->m_touch_effect_value3 = item.touch_effect_value3;
-		m_client_list[client_h]->m_item_list[item.slot]->m_item_color = item.item_color;
-		m_client_list[client_h]->m_item_list[item.slot]->m_item_special_effect_value1 = item.spec_effect_value1;
-		m_client_list[client_h]->m_item_list[item.slot]->m_item_special_effect_value2 = item.spec_effect_value2;
-		m_client_list[client_h]->m_item_list[item.slot]->m_item_special_effect_value3 = item.spec_effect_value3;
-		m_client_list[client_h]->m_item_list[item.slot]->m_cur_durability = (short)item.cur_life_span;
+		m_client_list[client_h]->m_item_list[item.slot]->m_instance.count = item.count;
+		m_client_list[client_h]->m_item_list[item.slot]->m_instance.touch_effect_type = item.touch_effect_type;
+		m_client_list[client_h]->m_item_list[item.slot]->m_instance.touch_effect_value1 = item.touch_effect_value1;
+		m_client_list[client_h]->m_item_list[item.slot]->m_instance.touch_effect_value2 = item.touch_effect_value2;
+		m_client_list[client_h]->m_item_list[item.slot]->m_instance.touch_effect_value3 = item.touch_effect_value3;
+		m_client_list[client_h]->m_item_list[item.slot]->m_instance.item_color = item.item_color;
+		m_client_list[client_h]->m_item_list[item.slot]->m_instance.special_effect_value1 = item.spec_effect_value1;
+		m_client_list[client_h]->m_item_list[item.slot]->m_instance.special_effect_value2 = item.spec_effect_value2;
+		m_client_list[client_h]->m_item_list[item.slot]->m_instance.special_effect_value3 = item.spec_effect_value3;
+		m_client_list[client_h]->m_item_list[item.slot]->m_instance.cur_durability = (short)item.cur_durability;
 		m_client_list[client_h]->m_item_list[item.slot]->load_attributes_from(item);
 
-		if (m_client_list[client_h]->m_item_list[item.slot]->m_custom_made) {
-			m_client_list[client_h]->m_item_list[item.slot]->m_durability = m_client_list[client_h]->m_item_list[item.slot]->m_item_special_effect_value1;
+		if (m_client_list[client_h]->m_item_list[item.slot]->m_instance.custom_made) {
+			m_client_list[client_h]->m_item_list[item.slot]->m_durability = m_client_list[client_h]->m_item_list[item.slot]->m_instance.special_effect_value1;
 		}
 		m_item_manager->adjust_rare_item_value(m_client_list[client_h]->m_item_list[item.slot]);
-		if (m_client_list[client_h]->m_item_list[item.slot]->m_cur_durability > m_client_list[client_h]->m_item_list[item.slot]->m_durability) {
-			m_client_list[client_h]->m_item_list[item.slot]->m_cur_durability = m_client_list[client_h]->m_item_list[item.slot]->m_durability;
+		if (m_client_list[client_h]->m_item_list[item.slot]->m_instance.cur_durability > m_client_list[client_h]->m_item_list[item.slot]->m_durability) {
+			m_client_list[client_h]->m_item_list[item.slot]->m_instance.cur_durability = m_client_list[client_h]->m_item_list[item.slot]->m_durability;
 		}
 		m_item_manager->check_and_convert_plus_weapon_item(client_h, item.slot);
 	}
@@ -4664,23 +4664,23 @@ bool CGame::load_player_data_from_db(int client_h)
 			m_client_list[client_h]->m_item_in_bank_list[item.slot] = 0;
 			continue;
 		}
-		m_client_list[client_h]->m_item_in_bank_list[item.slot]->m_count = item.count;
-		m_client_list[client_h]->m_item_in_bank_list[item.slot]->m_touch_effect_type = item.touch_effect_type;
-		m_client_list[client_h]->m_item_in_bank_list[item.slot]->m_touch_effect_value1 = item.touch_effect_value1;
-		m_client_list[client_h]->m_item_in_bank_list[item.slot]->m_touch_effect_value2 = item.touch_effect_value2;
-		m_client_list[client_h]->m_item_in_bank_list[item.slot]->m_touch_effect_value3 = item.touch_effect_value3;
-		m_client_list[client_h]->m_item_in_bank_list[item.slot]->m_item_color = item.item_color;
-		m_client_list[client_h]->m_item_in_bank_list[item.slot]->m_item_special_effect_value1 = item.spec_effect_value1;
-		m_client_list[client_h]->m_item_in_bank_list[item.slot]->m_item_special_effect_value2 = item.spec_effect_value2;
-		m_client_list[client_h]->m_item_in_bank_list[item.slot]->m_item_special_effect_value3 = item.spec_effect_value3;
-		m_client_list[client_h]->m_item_in_bank_list[item.slot]->m_cur_durability = (short)item.cur_life_span;
+		m_client_list[client_h]->m_item_in_bank_list[item.slot]->m_instance.count = item.count;
+		m_client_list[client_h]->m_item_in_bank_list[item.slot]->m_instance.touch_effect_type = item.touch_effect_type;
+		m_client_list[client_h]->m_item_in_bank_list[item.slot]->m_instance.touch_effect_value1 = item.touch_effect_value1;
+		m_client_list[client_h]->m_item_in_bank_list[item.slot]->m_instance.touch_effect_value2 = item.touch_effect_value2;
+		m_client_list[client_h]->m_item_in_bank_list[item.slot]->m_instance.touch_effect_value3 = item.touch_effect_value3;
+		m_client_list[client_h]->m_item_in_bank_list[item.slot]->m_instance.item_color = item.item_color;
+		m_client_list[client_h]->m_item_in_bank_list[item.slot]->m_instance.special_effect_value1 = item.spec_effect_value1;
+		m_client_list[client_h]->m_item_in_bank_list[item.slot]->m_instance.special_effect_value2 = item.spec_effect_value2;
+		m_client_list[client_h]->m_item_in_bank_list[item.slot]->m_instance.special_effect_value3 = item.spec_effect_value3;
+		m_client_list[client_h]->m_item_in_bank_list[item.slot]->m_instance.cur_durability = (short)item.cur_durability;
 		m_client_list[client_h]->m_item_in_bank_list[item.slot]->load_attributes_from(item);
-		if (m_client_list[client_h]->m_item_in_bank_list[item.slot]->m_custom_made) {
-			m_client_list[client_h]->m_item_in_bank_list[item.slot]->m_durability = m_client_list[client_h]->m_item_in_bank_list[item.slot]->m_item_special_effect_value1;
+		if (m_client_list[client_h]->m_item_in_bank_list[item.slot]->m_instance.custom_made) {
+			m_client_list[client_h]->m_item_in_bank_list[item.slot]->m_durability = m_client_list[client_h]->m_item_in_bank_list[item.slot]->m_instance.special_effect_value1;
 		}
 		m_item_manager->adjust_rare_item_value(m_client_list[client_h]->m_item_in_bank_list[item.slot]);
-		if (m_client_list[client_h]->m_item_in_bank_list[item.slot]->m_cur_durability > m_client_list[client_h]->m_item_in_bank_list[item.slot]->m_durability) {
-			m_client_list[client_h]->m_item_in_bank_list[item.slot]->m_cur_durability = m_client_list[client_h]->m_item_in_bank_list[item.slot]->m_durability;
+		if (m_client_list[client_h]->m_item_in_bank_list[item.slot]->m_instance.cur_durability > m_client_list[client_h]->m_item_in_bank_list[item.slot]->m_durability) {
+			m_client_list[client_h]->m_item_in_bank_list[item.slot]->m_instance.cur_durability = m_client_list[client_h]->m_item_in_bank_list[item.slot]->m_durability;
 		}
 	}
 
@@ -5662,11 +5662,11 @@ int CGame::client_motion_attack_handler(int client_h, short sX, short sY, short 
 				else item_index = -1;
 
 				if (item_index != -1 && m_client_list[client_h]->m_item_list[item_index] != 0) {
-					if (m_client_list[client_h]->m_item_list[item_index]->m_prefix_type != hb::shared::item::AttributePrefixType::None) {
-						type1 = static_cast<int>(m_client_list[client_h]->m_item_list[item_index]->m_prefix_type);
-						value1 = m_client_list[client_h]->m_item_list[item_index]->m_prefix_value;
-						type2 = static_cast<int>(m_client_list[client_h]->m_item_list[item_index]->m_secondary_type);
-						value2 = m_client_list[client_h]->m_item_list[item_index]->m_secondary_value;
+					if (m_client_list[client_h]->m_item_list[item_index]->m_instance.prefix_type != static_cast<uint8_t>(hb::shared::item::AttributePrefixType::None)) {
+						type1 = static_cast<int>(m_client_list[client_h]->m_item_list[item_index]->m_instance.prefix_type);
+						value1 = m_client_list[client_h]->m_item_list[item_index]->m_instance.prefix_value;
+						type2 = static_cast<int>(m_client_list[client_h]->m_item_list[item_index]->m_instance.secondary_type);
+						value2 = m_client_list[client_h]->m_item_list[item_index]->m_instance.secondary_value;
 					}
 
 					if (type1 == 2) {
@@ -6443,7 +6443,7 @@ void CGame::client_common_handler(int client_h, char* data)
 			CItem* gold_item = new CItem();
 			if (m_item_manager->init_item_attr(gold_item, hb::shared::item::ItemId::Gold))
 			{
-				gold_item->m_count = 1000000;
+				gold_item->m_instance.count = 1000000;
 				int erase_req = 0;
 				if (m_item_manager->add_client_item_list(client_h, gold_item, &erase_req))
 				{
@@ -6665,26 +6665,26 @@ void CGame::client_common_handler(int client_h, char* data)
 				continue;
 			}
 
-			item->m_custom_made = custom_made;
-			item->m_prefix_type = prefix_type;
-			item->m_prefix_value = prefix_value;
-			item->m_secondary_type = secondary_type;
-			item->m_secondary_value = secondary_value;
-			item->m_enchant_bonus = enchant_bonus;
+			item->m_instance.custom_made = custom_made ? 1 : 0;
+			item->m_instance.prefix_type = static_cast<uint8_t>(prefix_type);
+			item->m_instance.prefix_value = prefix_value;
+			item->m_instance.secondary_type = static_cast<uint8_t>(secondary_type);
+			item->m_instance.secondary_value = secondary_value;
+			item->m_instance.enchant_bonus = enchant_bonus;
 			m_item_manager->adjust_rare_item_value(item);
 
 			// Set item color based on prefix type — unified palette weapon indices (16-21)
-			switch (item->m_prefix_type)
+			switch (static_cast<hb::shared::item::AttributePrefixType>(item->m_instance.prefix_type))
 			{
-			case hb::shared::item::AttributePrefixType::Agile:      item->m_item_color = 16; break;
-			case hb::shared::item::AttributePrefixType::Light:       item->m_item_color = 16; break;
-			case hb::shared::item::AttributePrefixType::Strong:      item->m_item_color = 16; break;
-			case hb::shared::item::AttributePrefixType::Poisoning:   item->m_item_color = 17; break;
-			case hb::shared::item::AttributePrefixType::Critical:    item->m_item_color = 18; break;
-			case hb::shared::item::AttributePrefixType::Special:     item->m_item_color = 18; break;
-			case hb::shared::item::AttributePrefixType::Sharp:       item->m_item_color = 19; break;
-			case hb::shared::item::AttributePrefixType::Righteous:   item->m_item_color = 20; break;
-			case hb::shared::item::AttributePrefixType::Ancient:     item->m_item_color = 21; break;
+			case hb::shared::item::AttributePrefixType::Agile:      item->m_instance.item_color = 16; break;
+			case hb::shared::item::AttributePrefixType::Light:       item->m_instance.item_color = 16; break;
+			case hb::shared::item::AttributePrefixType::Strong:      item->m_instance.item_color = 16; break;
+			case hb::shared::item::AttributePrefixType::Poisoning:   item->m_instance.item_color = 17; break;
+			case hb::shared::item::AttributePrefixType::Critical:    item->m_instance.item_color = 18; break;
+			case hb::shared::item::AttributePrefixType::Special:     item->m_instance.item_color = 18; break;
+			case hb::shared::item::AttributePrefixType::Sharp:       item->m_instance.item_color = 19; break;
+			case hb::shared::item::AttributePrefixType::Righteous:   item->m_instance.item_color = 20; break;
+			case hb::shared::item::AttributePrefixType::Ancient:     item->m_instance.item_color = 21; break;
 			default: break;
 			}
 
@@ -6843,16 +6843,16 @@ void CGame::send_ground_item_event(uint16_t msg_type, char map_index, short sX, 
 	if (item != nullptr)
 	{
 		pkt.item_id = item->m_id_num;
-		pkt.count = CItem::count_to_v2(item->m_count);
-		pkt.item_color = item->m_item_color;
-		pkt.touch_effect_type = item->m_touch_effect_type;
-		pkt.touch_effect_value1 = item->m_touch_effect_value1;
-		pkt.touch_effect_value2 = item->m_touch_effect_value2;
-		pkt.touch_effect_value3 = item->m_touch_effect_value3;
-		pkt.special_effect_value1 = item->m_item_special_effect_value1;
-		pkt.special_effect_value2 = item->m_item_special_effect_value2;
-		pkt.special_effect_value3 = item->m_item_special_effect_value3;
-		pkt.cur_lifespan = item->m_cur_durability;
+		pkt.count = CItem::count_to_v2(item->m_instance.count);
+		pkt.item_color = item->m_instance.item_color;
+		pkt.touch_effect_type = item->m_instance.touch_effect_type;
+		pkt.touch_effect_value1 = item->m_instance.touch_effect_value1;
+		pkt.touch_effect_value2 = item->m_instance.touch_effect_value2;
+		pkt.touch_effect_value3 = item->m_instance.touch_effect_value3;
+		pkt.special_effect_value1 = item->m_instance.special_effect_value1;
+		pkt.special_effect_value2 = item->m_instance.special_effect_value2;
+		pkt.special_effect_value3 = item->m_instance.special_effect_value3;
+		pkt.cur_durability = item->m_instance.cur_durability;
 		item->copy_attributes_to(pkt);
 	}
 
@@ -6966,10 +6966,10 @@ void CGame::send_gizon_item_change(int client_h, int item_index, CItem* item)
 	pkt.header.msg_type = Notify::GizoneItemChange;
 	pkt.item_index = static_cast<int16_t>(item_index);
 	pkt.item_type = item->m_item_type;
-	pkt.cur_lifespan = item->m_cur_durability;
+	pkt.cur_durability = item->m_instance.cur_durability;
 	std::memcpy(pkt.item_name, item->m_name, sizeof(pkt.item_name));
-	pkt.item_color = item->m_item_color;
-	pkt.spec_value2 = static_cast<uint8_t>(item->m_item_special_effect_value2);
+	pkt.item_color = item->m_instance.item_color;
+	pkt.spec_value2 = static_cast<uint8_t>(item->m_instance.special_effect_value2);
 	item->copy_attributes_to(pkt);
 	pkt.item_id = item->m_id_num;
 	m_client_list[client_h]->m_socket->send_msg(reinterpret_cast<char*>(&pkt), sizeof(pkt));
@@ -6985,10 +6985,10 @@ void CGame::send_exchange_item_notify(int from_h, int to_h, uint16_t msg_type, i
 	pkt.header.msg_type = msg_type;
 	pkt.dir = static_cast<int16_t>(item_index);
 	pkt.amount = static_cast<int32_t>(amount);
-	pkt.color = item->m_item_color;
-	pkt.cur_life = item->m_cur_durability;
-	pkt.max_life = item->m_durability;
-	pkt.performance = static_cast<int16_t>(item->m_item_special_effect_value2 + 100);
+	pkt.color = item->m_instance.item_color;
+	pkt.cur_durability = item->m_instance.cur_durability;
+	pkt.max_durability = item->m_durability;
+	pkt.performance = static_cast<int16_t>(item->m_instance.special_effect_value2 + 100);
 	std::memcpy(pkt.item_name, item->m_name, sizeof(pkt.item_name));
 	std::memcpy(pkt.char_name, m_client_list[from_h]->m_char_name, sizeof(pkt.char_name));
 	item->copy_attributes_to(pkt);
@@ -7006,13 +7006,13 @@ void CGame::send_notify_msg(int from_h, int to_h, uint16_t msg_type, uint32_t v1
 
 	// !!! v1, v2, v3 DWORD .
 	switch (msg_type) {
-	case Notify::CurLifeSpan:
+	case Notify::CurDurability:
 	{
-		hb::net::PacketNotifyCurLifeSpan pkt{};
+		hb::net::PacketNotifyCurDurability pkt{};
 		pkt.header.msg_id = MsgId::Notify;
 		pkt.header.msg_type = msg_type;
 		pkt.item_index = static_cast<int32_t>(v1);
-		pkt.cur_lifespan = static_cast<int32_t>(v2);
+		pkt.cur_durability = static_cast<int32_t>(v2);
 		ret = m_client_list[to_h]->m_socket->send_msg(reinterpret_cast<char*>(&pkt), sizeof(pkt));
 		break;
 	}
@@ -8318,9 +8318,9 @@ void CGame::send_notify_msg(int from_h, int to_h, uint16_t msg_type, uint32_t v1
 		ret = m_client_list[to_h]->m_socket->send_msg(reinterpret_cast<char*>(&pkt), sizeof(pkt));
 		break;
 	}
-	case Notify::ItemLifeSpanEnd:
+	case Notify::ItemDurabilityEnd:
 	{
-		hb::net::PacketNotifyItemLifeSpanEnd pkt{};
+		hb::net::PacketNotifyItemDurabilityEnd pkt{};
 		pkt.header.msg_id = MsgId::Notify;
 		pkt.header.msg_type = msg_type;
 		pkt.equip_pos = static_cast<int16_t>(v1);
@@ -8642,8 +8642,8 @@ bool CGame::init_npc_attr(class CNpc* npc, int npc_config_id, short sClass, char
 				npc->m_defense_ratio = m_npc_config_list[config_idx]->m_defense_ratio;
 				npc->m_hit_ratio = m_npc_config_list[config_idx]->m_hit_ratio;
 				npc->m_min_bravery = m_npc_config_list[config_idx]->m_min_bravery;
-				npc->m_attack_dice_throw = m_npc_config_list[config_idx]->m_attack_dice_throw;
-				npc->m_attack_dice_range = m_npc_config_list[config_idx]->m_attack_dice_range;
+				npc->m_min_damage = m_npc_config_list[config_idx]->m_min_damage;
+				npc->m_max_damage = m_npc_config_list[config_idx]->m_max_damage;
 				npc->m_size = m_npc_config_list[config_idx]->m_size;
 				npc->m_side = m_npc_config_list[config_idx]->m_side;
 				npc->m_action_limit = m_npc_config_list[config_idx]->m_action_limit;
@@ -10020,7 +10020,7 @@ int CGame::calc_total_weight(int client_h)
 		if (m_client_list[client_h]->m_item_list[item_index] != 0) {
 			switch (m_client_list[client_h]->m_item_list[item_index]->get_item_effect_type()) {
 			case ItemEffectType::AlterItemDrop:
-				if (m_client_list[client_h]->m_item_list[item_index]->m_cur_durability > 0) {
+				if (m_client_list[client_h]->m_item_list[item_index]->m_instance.cur_durability > 0) {
 					m_client_list[client_h]->m_alter_item_drop_index = item_index;
 				}
 				break;
@@ -10031,7 +10031,7 @@ int CGame::calc_total_weight(int client_h)
 	for(int i = 0; i < hb::shared::limits::MaxItems; i++)
 		if (m_client_list[client_h]->m_item_list[i] != 0) {
 
-			weight += m_item_manager->get_item_weight(m_client_list[client_h]->m_item_list[i], static_cast<int>(m_client_list[client_h]->m_item_list[i]->m_count));
+			weight += m_item_manager->get_item_weight(m_client_list[client_h]->m_item_list[i], static_cast<int>(m_client_list[client_h]->m_item_list[i]->m_instance.count));
 		}
 
 	m_client_list[client_h]->m_cur_weight_load = weight;
@@ -10701,10 +10701,11 @@ void CGame::calc_exp_stock(int client_h)
 	m_client_list[client_h]->m_auto_exp_amount += m_client_list[client_h]->m_exp_stock;
 	m_client_list[client_h]->m_exp_stock = 0;
 
+	is_level_up = check_level_up(client_h);
+
 	if (check_limited_user(client_h) == false) {
 		send_notify_msg(0, client_h, Notify::Exp, 0, 0, 0, 0);
 	}
-	is_level_up = check_level_up(client_h);
 
 	if ((is_level_up) && (m_client_list[client_h]->m_level <= 5)) {
 		// Gold .  1~5 100 Gold .
@@ -10713,7 +10714,7 @@ void CGame::calc_exp_stock(int client_h)
 			delete item;
 			return;
 		}
-		else item->m_count = (uint32_t)100000;
+		else item->m_instance.count = (uint32_t)100000;
 		m_item_manager->add_item(client_h, item, 0);
 	}
 
@@ -10724,7 +10725,7 @@ void CGame::calc_exp_stock(int client_h)
 			delete item;
 			return;
 		}
-		else item->m_count = (uint32_t)100000;
+		else item->m_instance.count = (uint32_t)100000;
 		m_item_manager->add_item(client_h, item, 0);
 	}
 }
@@ -11188,10 +11189,10 @@ void CGame::check_special_event(int client_h)
 				hb::logger::log<log_channel::events>("get MemorialRing : Char({})", m_client_list[client_h]->m_char_name);
 
 				item->set_touch_effect_type(TouchEffectType::UniqueOwner);
-				item->m_touch_effect_value1 = m_client_list[client_h]->m_char_id_num1;
-				item->m_touch_effect_value2 = m_client_list[client_h]->m_char_id_num2;
-				item->m_touch_effect_value3 = m_client_list[client_h]->m_char_id_num3;
-				item->m_item_color = 14;
+				item->m_instance.touch_effect_value1 = m_client_list[client_h]->m_char_id_num1;
+				item->m_instance.touch_effect_value2 = m_client_list[client_h]->m_char_id_num2;
+				item->m_instance.touch_effect_value3 = m_client_list[client_h]->m_char_id_num3;
+				item->m_instance.item_color = 14;
 
 				m_client_list[client_h]->m_special_event_id = 0;
 			}
@@ -13690,13 +13691,13 @@ void CGame::party_operation(char* data)
 			}
 		}
 
-		if ((m_client_list[target_h]->m_side != 0) && (m_client_list[target_h]->m_item_list[armor_type]->m_cur_durability > 0)) {
-				m_client_list[target_h]->m_item_list[armor_type]->m_cur_durability -= down_value;
+		if ((m_client_list[target_h]->m_side != 0) && (m_client_list[target_h]->m_item_list[armor_type]->m_instance.cur_durability > 0)) {
+				m_client_list[target_h]->m_item_list[armor_type]->m_instance.cur_durability -= down_value;
 		}
 
-		if ((m_client_list[target_h]->m_item_list[armor_type]->m_cur_durability <= 0) || (m_client_list[target_h]->m_item_list[armor_type]->m_cur_durability > 64000)) {
-			m_client_list[target_h]->m_item_list[armor_type]->m_cur_durability = 0;
-			send_notify_msg(0, target_h, Notify::ItemLifeSpanEnd, m_client_list[target_h]->m_item_list[armor_type]->m_equip_pos, armor_type, 0, 0);
+		if ((m_client_list[target_h]->m_item_list[armor_type]->m_instance.cur_durability <= 0) || (m_client_list[target_h]->m_item_list[armor_type]->m_instance.cur_durability > 64000)) {
+			m_client_list[target_h]->m_item_list[armor_type]->m_instance.cur_durability = 0;
+			send_notify_msg(0, target_h, Notify::ItemDurabilityEnd, m_client_list[target_h]->m_item_list[armor_type]->m_equip_pos, armor_type, 0, 0);
 			m_item_manager->release_item_handler(target_h, armor_type, true);
 			return;
 		}
@@ -13719,10 +13720,10 @@ void CGame::party_operation(char* data)
 		if (target_type == hb::shared::owner_class::Player) {
 		if ((m_client_list[attacker_h]->m_using_weapon_skill == 14) && (hammer_chance == 100)) {
 			if (m_client_list[target_h]->m_item_list[armor_type]->m_durability < 2000) {
-				hammer_chance = dice(6, (m_client_list[target_h]->m_item_list[armor_type]->m_durability - m_client_list[target_h]->m_item_list[armor_type]->m_cur_durability));
+				hammer_chance = dice(6, (m_client_list[target_h]->m_item_list[armor_type]->m_durability - m_client_list[target_h]->m_item_list[armor_type]->m_instance.cur_durability));
 			}
 			else {
-				hammer_chance = dice(4, (m_client_list[target_h]->m_item_list[armor_type]->m_durability - m_client_list[target_h]->m_item_list[armor_type]->m_cur_durability));
+				hammer_chance = dice(4, (m_client_list[target_h]->m_item_list[armor_type]->m_durability - m_client_list[target_h]->m_item_list[armor_type]->m_instance.cur_durability));
 			}
 
 			if (m_client_list[attacker_h]->get_equipped_weapon_class() == hb::shared::item::weapon_class::hammer) {
@@ -13745,8 +13746,8 @@ void CGame::party_operation(char* data)
 			if ((m_client_list[target_h]->m_item_list[armor_type]->m_id_num == 622) || (m_client_list[target_h]->m_item_list[armor_type]->m_id_num == 621)) {
 				hammer_chance = 0;
 			}
-			if (m_client_list[target_h]->m_item_list[armor_type]->m_cur_durability < hammer_chance) {
-				std::snprintf(G_cTxt, sizeof(G_cTxt), "(hammer_chance (%d), target armor endurance (%d)!", hammer_chance, m_client_list[target_h]->m_item_list[armor_type]->m_cur_durability);
+			if (m_client_list[target_h]->m_item_list[armor_type]->m_instance.cur_durability < hammer_chance) {
+				std::snprintf(G_cTxt, sizeof(G_cTxt), "(hammer_chance (%d), target armor endurance (%d)!", hammer_chance, m_client_list[target_h]->m_item_list[armor_type]->m_instance.cur_durability);
 				PutLogList(G_cTxt);
 				m_item_manager->release_item_handler(target_h, armor_type, true);
 				send_notify_msg(0, target_h, Notify::ItemReleased, m_client_list[target_h]->m_item_list[armor_type]->m_equip_pos, armor_type, 0, 0);
@@ -14148,9 +14149,9 @@ void CGame::lotery_handler(int client_h)
 		   PutLogFileList(G_cTxt);
 
 		   item->set_touch_effect_type(TouchEffectType::UniqueOwner);
-		   item->m_touch_effect_value1 = m_client_list[client_h]->m_char_id_num1;
-		   item->m_touch_effect_value2 = m_client_list[client_h]->m_char_id_num2;
-		   item->m_touch_effect_value3 = m_client_list[client_h]->m_char_id_num3;
+		   item->m_instance.touch_effect_value1 = m_client_list[client_h]->m_char_id_num1;
+		   item->m_instance.touch_effect_value2 = m_client_list[client_h]->m_char_id_num2;
+		   item->m_instance.touch_effect_value3 = m_client_list[client_h]->m_char_id_num3;
 
 		   ret = m_item_manager->send_item_notify_msg(client_h, Notify::ItemObtained, item, 0);
 
@@ -14271,9 +14272,9 @@ void CGame::get_angel_handler(int client_h, char* data, size_t msg_size)
 		m_client_list[client_h]->m_gizon_item_upgrade_left -= 5;
 
 		item->set_touch_effect_type(TouchEffectType::UniqueOwner);
-		item->m_touch_effect_value1 = m_client_list[client_h]->m_char_id_num1;
-		item->m_touch_effect_value2 = m_client_list[client_h]->m_char_id_num2;
-		item->m_touch_effect_value3 = m_client_list[client_h]->m_char_id_num3;
+		item->m_instance.touch_effect_value1 = m_client_list[client_h]->m_char_id_num1;
+		item->m_instance.touch_effect_value2 = m_client_list[client_h]->m_char_id_num2;
+		item->m_instance.touch_effect_value3 = m_client_list[client_h]->m_char_id_num3;
 		if (m_item_manager->add_client_item_list(client_h, item, &erase_req))
 		{
 			if (m_client_list[client_h]->m_cur_weight_load < 0) m_client_list[client_h]->m_cur_weight_load = 0;

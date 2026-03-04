@@ -85,10 +85,10 @@ namespace net {
 		uint8_t padding[2];
 	};
 
-	struct HB_PACKED PacketNotifyCurLifeSpan {
+	struct HB_PACKED PacketNotifyCurDurability {
 		PacketHeader header;
 		int32_t item_index;
-		int32_t cur_lifespan;
+		int32_t cur_durability;
 		uint8_t padding[2];
 	};
 
@@ -137,7 +137,7 @@ namespace net {
 		PacketHeader header;
 		int16_t item_index;
 		uint8_t item_type;
-		int16_t cur_lifespan;
+		int16_t cur_durability;
 		uint8_t item_color;
 		uint8_t spec_value2;
 		uint8_t custom_made;
@@ -359,7 +359,7 @@ namespace net {
 		uint8_t is_equipped;
 		int16_t level_limit;
 		uint8_t gender_limit;
-		uint16_t cur_lifespan;
+		uint16_t cur_durability;
 		uint16_t weight;
 		uint8_t item_color;
 		uint8_t spec_value2;
@@ -370,7 +370,8 @@ namespace net {
 		uint8_t secondary_value;
 		uint8_t enchant_bonus;
 		int16_t item_id;           // Item ID for config lookup
-		uint16_t max_lifespan;     // Maximum durability
+		uint16_t max_durability;
+
 	};
 
 	struct HB_PACKED PacketNotifyItemPurchased {
@@ -383,12 +384,12 @@ namespace net {
 		uint8_t is_equipped;
 		int16_t level_limit;
 		uint8_t gender_limit;
-		uint16_t cur_lifespan;
+		uint16_t cur_durability;
 		uint16_t weight;
 		uint8_t item_color;
 		uint16_t cost;
 		int16_t item_id;           // Item ID for config lookup
-		uint16_t max_lifespan;     // Maximum durability
+		uint16_t max_durability;
 	};
 
 	struct HB_PACKED PacketNotifyItemToBank {
@@ -402,7 +403,7 @@ namespace net {
 		uint8_t is_equipped;
 		int16_t level_limit;
 		uint8_t gender_limit;
-		uint16_t cur_lifespan;
+		uint16_t cur_durability;
 		uint16_t weight;
 		uint8_t item_color;
 		int16_t item_effect_value2;
@@ -415,7 +416,7 @@ namespace net {
 		uint8_t spec_effect_value2;
 		uint8_t padding;
 		int16_t item_id;           // Item ID for config lookup
-		uint16_t max_lifespan;     // Maximum durability
+		uint16_t max_durability;
 	};
 
 	struct HB_PACKED PacketNotifyRatingPlayer {
@@ -620,7 +621,7 @@ namespace net {
 		uint8_t padding[2];
 	};
 
-	struct HB_PACKED PacketNotifyItemLifeSpanEnd {
+	struct HB_PACKED PacketNotifyItemDurabilityEnd {
 		PacketHeader header;
 		int16_t equip_pos;
 		int16_t item_index;
@@ -687,8 +688,8 @@ namespace net {
 		int16_t dir;
 		int32_t amount;
 		uint8_t color;
-		int16_t cur_life;
-		int16_t max_life;
+		int16_t cur_durability;
+		int16_t max_durability;
 		int16_t performance;
 		char item_name[hb::shared::limits::ItemNameLen];
 		char char_name[hb::shared::limits::CharNameLen];

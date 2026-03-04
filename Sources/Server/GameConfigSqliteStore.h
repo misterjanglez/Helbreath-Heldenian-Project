@@ -21,7 +21,7 @@ struct creation_item_entry
 	int item_id;
 	int count;
 	int item_color;
-	int lifespan;      // 0 = use item's max_lifespan from config
+	int durability;    // 0 = use item's max_durability from config
 	int is_equipped;
 	int gender_limit;  // 0=any, 1=male only, 2=female only
 	int sort_order;

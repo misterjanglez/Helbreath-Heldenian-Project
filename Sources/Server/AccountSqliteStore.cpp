@@ -159,7 +159,7 @@ static bool MigrateItemNamesToIds(sqlite3* db)
         " spec_effect_value1 INTEGER NOT NULL,"
         " spec_effect_value2 INTEGER NOT NULL,"
         " spec_effect_value3 INTEGER NOT NULL,"
-        " cur_lifespan INTEGER NOT NULL,"
+        " cur_durability INTEGER NOT NULL,"
         " custom_made INTEGER NOT NULL DEFAULT 0,"
         " prefix_type INTEGER NOT NULL DEFAULT 0,"
         " prefix_value INTEGER NOT NULL DEFAULT 0,"
@@ -184,7 +184,7 @@ static bool MigrateItemNamesToIds(sqlite3* db)
         "SELECT character_name, slot, item_name, count, touch_effect_type,"
         " touch_effect_value1, touch_effect_value2, touch_effect_value3,"
         " item_color, spec_effect_value1, spec_effect_value2, spec_effect_value3,"
-        " cur_lifespan, custom_made, prefix_type, prefix_value,"
+        " cur_durability, custom_made, prefix_type, prefix_value,"
         " secondary_type, secondary_value, enchant_bonus,"
         " pos_x, pos_y, is_equipped FROM character_items";
 
@@ -254,7 +254,7 @@ static bool MigrateItemNamesToIds(sqlite3* db)
         " spec_effect_value1 INTEGER NOT NULL,"
         " spec_effect_value2 INTEGER NOT NULL,"
         " spec_effect_value3 INTEGER NOT NULL,"
-        " cur_lifespan INTEGER NOT NULL,"
+        " cur_durability INTEGER NOT NULL,"
         " custom_made INTEGER NOT NULL DEFAULT 0,"
         " prefix_type INTEGER NOT NULL DEFAULT 0,"
         " prefix_value INTEGER NOT NULL DEFAULT 0,"
@@ -275,7 +275,7 @@ static bool MigrateItemNamesToIds(sqlite3* db)
         "SELECT character_name, slot, item_name, count, touch_effect_type,"
         " touch_effect_value1, touch_effect_value2, touch_effect_value3,"
         " item_color, spec_effect_value1, spec_effect_value2, spec_effect_value3,"
-        " cur_lifespan, custom_made, prefix_type, prefix_value,"
+        " cur_durability, custom_made, prefix_type, prefix_value,"
         " secondary_type, secondary_value, enchant_bonus FROM character_bank_items";
 
     if (sqlite3_prepare_v2(db, readSql, -1, &readStmt, nullptr) != SQLITE_OK) {
@@ -436,7 +436,7 @@ bool EnsureAccountDatabase(const char* account_name, sqlite3** outDb, std::strin
         " spec_effect_value1 INTEGER NOT NULL,"
         " spec_effect_value2 INTEGER NOT NULL,"
         " spec_effect_value3 INTEGER NOT NULL,"
-        " cur_lifespan INTEGER NOT NULL,"
+        " cur_durability INTEGER NOT NULL,"
         " custom_made INTEGER NOT NULL DEFAULT 0,"
         " prefix_type INTEGER NOT NULL DEFAULT 0,"
         " prefix_value INTEGER NOT NULL DEFAULT 0,"
@@ -462,7 +462,7 @@ bool EnsureAccountDatabase(const char* account_name, sqlite3** outDb, std::strin
         " spec_effect_value1 INTEGER NOT NULL,"
         " spec_effect_value2 INTEGER NOT NULL,"
         " spec_effect_value3 INTEGER NOT NULL,"
-        " cur_lifespan INTEGER NOT NULL,"
+        " cur_durability INTEGER NOT NULL,"
         " custom_made INTEGER NOT NULL DEFAULT 0,"
         " prefix_type INTEGER NOT NULL DEFAULT 0,"
         " prefix_value INTEGER NOT NULL DEFAULT 0,"
@@ -803,7 +803,7 @@ bool LoadCharacterItems(sqlite3* db, const char* character_name, std::vector<Acc
     const char* sql =
         "SELECT slot, item_id, count, touch_effect_type, touch_effect_value1, touch_effect_value2, "
         "touch_effect_value3, item_color, spec_effect_value1, spec_effect_value2, spec_effect_value3, "
-        "cur_lifespan, custom_made, prefix_type, prefix_value, secondary_type, secondary_value, "
+        "cur_durability, custom_made, prefix_type, prefix_value, secondary_type, secondary_value, "
         "enchant_bonus, pos_x, pos_y, is_equipped "
         "FROM character_items WHERE character_name = ? COLLATE NOCASE ORDER BY slot;";
 
@@ -828,7 +828,7 @@ bool LoadCharacterItems(sqlite3* db, const char* character_name, std::vector<Acc
         row.spec_effect_value1 = sqlite3_column_int(stmt, col++);
         row.spec_effect_value2 = sqlite3_column_int(stmt, col++);
         row.spec_effect_value3 = sqlite3_column_int(stmt, col++);
-        row.cur_life_span = sqlite3_column_int(stmt, col++);
+        row.cur_durability = sqlite3_column_int(stmt, col++);
         row.custom_made = sqlite3_column_int(stmt, col++);
         row.prefix_type = sqlite3_column_int(stmt, col++);
         row.prefix_value = sqlite3_column_int(stmt, col++);
@@ -854,7 +854,7 @@ bool LoadCharacterBankItems(sqlite3* db, const char* character_name, std::vector
     const char* sql =
         "SELECT slot, item_id, count, touch_effect_type, touch_effect_value1, touch_effect_value2, "
         "touch_effect_value3, item_color, spec_effect_value1, spec_effect_value2, spec_effect_value3, "
-        "cur_lifespan, custom_made, prefix_type, prefix_value, secondary_type, secondary_value, "
+        "cur_durability, custom_made, prefix_type, prefix_value, secondary_type, secondary_value, "
         "enchant_bonus "
         "FROM character_bank_items WHERE character_name = ? COLLATE NOCASE ORDER BY slot;";
 
@@ -879,7 +879,7 @@ bool LoadCharacterBankItems(sqlite3* db, const char* character_name, std::vector
         row.spec_effect_value1 = sqlite3_column_int(stmt, col++);
         row.spec_effect_value2 = sqlite3_column_int(stmt, col++);
         row.spec_effect_value3 = sqlite3_column_int(stmt, col++);
-        row.cur_life_span = sqlite3_column_int(stmt, col++);
+        row.cur_durability = sqlite3_column_int(stmt, col++);
         row.custom_made = sqlite3_column_int(stmt, col++);
         row.prefix_type = sqlite3_column_int(stmt, col++);
         row.prefix_value = sqlite3_column_int(stmt, col++);
@@ -1180,7 +1180,7 @@ bool InsertCharacterItems(sqlite3* db, const char* character_name, const std::ve
         "INSERT INTO character_items("
         " character_name, slot, item_id, count, touch_effect_type, touch_effect_value1, touch_effect_value2,"
         " touch_effect_value3, item_color, spec_effect_value1, spec_effect_value2, spec_effect_value3,"
-        " cur_lifespan, custom_made, prefix_type, prefix_value, secondary_type, secondary_value,"
+        " cur_durability, custom_made, prefix_type, prefix_value, secondary_type, secondary_value,"
         " enchant_bonus, pos_x, pos_y, is_equipped"
         ") VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?);";
 
@@ -1206,7 +1206,7 @@ bool InsertCharacterItems(sqlite3* db, const char* character_name, const std::ve
         ok &= (sqlite3_bind_int(stmt, col++, item.spec_effect_value1) == SQLITE_OK);
         ok &= (sqlite3_bind_int(stmt, col++, item.spec_effect_value2) == SQLITE_OK);
         ok &= (sqlite3_bind_int(stmt, col++, item.spec_effect_value3) == SQLITE_OK);
-        ok &= (sqlite3_bind_int(stmt, col++, item.cur_life_span) == SQLITE_OK);
+        ok &= (sqlite3_bind_int(stmt, col++, item.cur_durability) == SQLITE_OK);
         ok &= (sqlite3_bind_int(stmt, col++, item.custom_made) == SQLITE_OK);
         ok &= (sqlite3_bind_int(stmt, col++, item.prefix_type) == SQLITE_OK);
         ok &= (sqlite3_bind_int(stmt, col++, item.prefix_value) == SQLITE_OK);
@@ -1236,7 +1236,7 @@ bool InsertCharacterBankItems(sqlite3* db, const char* character_name, const std
         "INSERT INTO character_bank_items("
         " character_name, slot, item_id, count, touch_effect_type, touch_effect_value1, touch_effect_value2,"
         " touch_effect_value3, item_color, spec_effect_value1, spec_effect_value2, spec_effect_value3,"
-        " cur_lifespan, custom_made, prefix_type, prefix_value, secondary_type, secondary_value,"
+        " cur_durability, custom_made, prefix_type, prefix_value, secondary_type, secondary_value,"
         " enchant_bonus"
         ") VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?);";
 
@@ -1262,7 +1262,7 @@ bool InsertCharacterBankItems(sqlite3* db, const char* character_name, const std
         ok &= (sqlite3_bind_int(stmt, col++, item.spec_effect_value1) == SQLITE_OK);
         ok &= (sqlite3_bind_int(stmt, col++, item.spec_effect_value2) == SQLITE_OK);
         ok &= (sqlite3_bind_int(stmt, col++, item.spec_effect_value3) == SQLITE_OK);
-        ok &= (sqlite3_bind_int(stmt, col++, item.cur_life_span) == SQLITE_OK);
+        ok &= (sqlite3_bind_int(stmt, col++, item.cur_durability) == SQLITE_OK);
         ok &= (sqlite3_bind_int(stmt, col++, item.custom_made) == SQLITE_OK);
         ok &= (sqlite3_bind_int(stmt, col++, item.prefix_type) == SQLITE_OK);
         ok &= (sqlite3_bind_int(stmt, col++, item.prefix_value) == SQLITE_OK);
@@ -1735,7 +1735,7 @@ bool SaveCharacterSnapshot(sqlite3* db, const CClient* client)
         "INSERT INTO character_items("
         " character_name, slot, item_id, count, touch_effect_type, touch_effect_value1, touch_effect_value2,"
         " touch_effect_value3, item_color, spec_effect_value1, spec_effect_value2, spec_effect_value3,"
-        " cur_lifespan, custom_made, prefix_type, prefix_value, secondary_type, secondary_value,"
+        " cur_durability, custom_made, prefix_type, prefix_value, secondary_type, secondary_value,"
         " enchant_bonus, pos_x, pos_y, is_equipped"
         ") VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?);";
 
@@ -1757,22 +1757,22 @@ bool SaveCharacterSnapshot(sqlite3* db, const CClient* client)
         ok &= PrepareAndBindText(stmt, col++, client->m_char_name);
         ok &= (sqlite3_bind_int(stmt, col++, i) == SQLITE_OK);
         ok &= (sqlite3_bind_int(stmt, col++, client->m_item_list[i]->m_id_num) == SQLITE_OK);
-        ok &= (sqlite3_bind_int64(stmt, col++, static_cast<int64_t>(client->m_item_list[i]->m_count)) == SQLITE_OK);
-        ok &= (sqlite3_bind_int(stmt, col++, client->m_item_list[i]->m_touch_effect_type) == SQLITE_OK);
-        ok &= (sqlite3_bind_int(stmt, col++, client->m_item_list[i]->m_touch_effect_value1) == SQLITE_OK);
-        ok &= (sqlite3_bind_int(stmt, col++, client->m_item_list[i]->m_touch_effect_value2) == SQLITE_OK);
-        ok &= (sqlite3_bind_int(stmt, col++, client->m_item_list[i]->m_touch_effect_value3) == SQLITE_OK);
-        ok &= (sqlite3_bind_int(stmt, col++, client->m_item_list[i]->m_item_color) == SQLITE_OK);
-        ok &= (sqlite3_bind_int(stmt, col++, client->m_item_list[i]->m_item_special_effect_value1) == SQLITE_OK);
-        ok &= (sqlite3_bind_int(stmt, col++, client->m_item_list[i]->m_item_special_effect_value2) == SQLITE_OK);
-        ok &= (sqlite3_bind_int(stmt, col++, client->m_item_list[i]->m_item_special_effect_value3) == SQLITE_OK);
-        ok &= (sqlite3_bind_int(stmt, col++, client->m_item_list[i]->m_cur_durability) == SQLITE_OK);
-        ok &= (sqlite3_bind_int(stmt, col++, client->m_item_list[i]->m_custom_made ? 1 : 0) == SQLITE_OK);
-        ok &= (sqlite3_bind_int(stmt, col++, static_cast<int>(client->m_item_list[i]->m_prefix_type)) == SQLITE_OK);
-        ok &= (sqlite3_bind_int(stmt, col++, client->m_item_list[i]->m_prefix_value) == SQLITE_OK);
-        ok &= (sqlite3_bind_int(stmt, col++, static_cast<int>(client->m_item_list[i]->m_secondary_type)) == SQLITE_OK);
-        ok &= (sqlite3_bind_int(stmt, col++, client->m_item_list[i]->m_secondary_value) == SQLITE_OK);
-        ok &= (sqlite3_bind_int(stmt, col++, client->m_item_list[i]->m_enchant_bonus) == SQLITE_OK);
+        ok &= (sqlite3_bind_int64(stmt, col++, static_cast<int64_t>(client->m_item_list[i]->m_instance.count)) == SQLITE_OK);
+        ok &= (sqlite3_bind_int(stmt, col++, client->m_item_list[i]->m_instance.touch_effect_type) == SQLITE_OK);
+        ok &= (sqlite3_bind_int(stmt, col++, client->m_item_list[i]->m_instance.touch_effect_value1) == SQLITE_OK);
+        ok &= (sqlite3_bind_int(stmt, col++, client->m_item_list[i]->m_instance.touch_effect_value2) == SQLITE_OK);
+        ok &= (sqlite3_bind_int(stmt, col++, client->m_item_list[i]->m_instance.touch_effect_value3) == SQLITE_OK);
+        ok &= (sqlite3_bind_int(stmt, col++, client->m_item_list[i]->m_instance.item_color) == SQLITE_OK);
+        ok &= (sqlite3_bind_int(stmt, col++, client->m_item_list[i]->m_instance.special_effect_value1) == SQLITE_OK);
+        ok &= (sqlite3_bind_int(stmt, col++, client->m_item_list[i]->m_instance.special_effect_value2) == SQLITE_OK);
+        ok &= (sqlite3_bind_int(stmt, col++, client->m_item_list[i]->m_instance.special_effect_value3) == SQLITE_OK);
+        ok &= (sqlite3_bind_int(stmt, col++, client->m_item_list[i]->m_instance.cur_durability) == SQLITE_OK);
+        ok &= (sqlite3_bind_int(stmt, col++, client->m_item_list[i]->m_instance.custom_made ? 1 : 0) == SQLITE_OK);
+        ok &= (sqlite3_bind_int(stmt, col++, static_cast<int>(client->m_item_list[i]->m_instance.prefix_type)) == SQLITE_OK);
+        ok &= (sqlite3_bind_int(stmt, col++, client->m_item_list[i]->m_instance.prefix_value) == SQLITE_OK);
+        ok &= (sqlite3_bind_int(stmt, col++, static_cast<int>(client->m_item_list[i]->m_instance.secondary_type)) == SQLITE_OK);
+        ok &= (sqlite3_bind_int(stmt, col++, client->m_item_list[i]->m_instance.secondary_value) == SQLITE_OK);
+        ok &= (sqlite3_bind_int(stmt, col++, client->m_item_list[i]->m_instance.enchant_bonus) == SQLITE_OK);
         ok &= (sqlite3_bind_int(stmt, col++, client->m_item_pos_list[i].x) == SQLITE_OK);
         ok &= (sqlite3_bind_int(stmt, col++, client->m_item_pos_list[i].y) == SQLITE_OK);
         ok &= (sqlite3_bind_int(stmt, col++, client->m_is_item_equipped[i] ? 1 : 0) == SQLITE_OK);
@@ -1800,7 +1800,7 @@ bool SaveCharacterSnapshot(sqlite3* db, const CClient* client)
         "INSERT INTO character_bank_items("
         " character_name, slot, item_id, count, touch_effect_type, touch_effect_value1, touch_effect_value2,"
         " touch_effect_value3, item_color, spec_effect_value1, spec_effect_value2, spec_effect_value3,"
-        " cur_lifespan, custom_made, prefix_type, prefix_value, secondary_type, secondary_value,"
+        " cur_durability, custom_made, prefix_type, prefix_value, secondary_type, secondary_value,"
         " enchant_bonus"
         ") VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?);";
 
@@ -1820,22 +1820,22 @@ bool SaveCharacterSnapshot(sqlite3* db, const CClient* client)
         ok &= PrepareAndBindText(stmt, col++, client->m_char_name);
         ok &= (sqlite3_bind_int(stmt, col++, i) == SQLITE_OK);
         ok &= (sqlite3_bind_int(stmt, col++, client->m_item_in_bank_list[i]->m_id_num) == SQLITE_OK);
-        ok &= (sqlite3_bind_int64(stmt, col++, static_cast<int64_t>(client->m_item_in_bank_list[i]->m_count)) == SQLITE_OK);
-        ok &= (sqlite3_bind_int(stmt, col++, client->m_item_in_bank_list[i]->m_touch_effect_type) == SQLITE_OK);
-        ok &= (sqlite3_bind_int(stmt, col++, client->m_item_in_bank_list[i]->m_touch_effect_value1) == SQLITE_OK);
-        ok &= (sqlite3_bind_int(stmt, col++, client->m_item_in_bank_list[i]->m_touch_effect_value2) == SQLITE_OK);
-        ok &= (sqlite3_bind_int(stmt, col++, client->m_item_in_bank_list[i]->m_touch_effect_value3) == SQLITE_OK);
-        ok &= (sqlite3_bind_int(stmt, col++, client->m_item_in_bank_list[i]->m_item_color) == SQLITE_OK);
-        ok &= (sqlite3_bind_int(stmt, col++, client->m_item_in_bank_list[i]->m_item_special_effect_value1) == SQLITE_OK);
-        ok &= (sqlite3_bind_int(stmt, col++, client->m_item_in_bank_list[i]->m_item_special_effect_value2) == SQLITE_OK);
-        ok &= (sqlite3_bind_int(stmt, col++, client->m_item_in_bank_list[i]->m_item_special_effect_value3) == SQLITE_OK);
-        ok &= (sqlite3_bind_int(stmt, col++, client->m_item_in_bank_list[i]->m_cur_durability) == SQLITE_OK);
-        ok &= (sqlite3_bind_int(stmt, col++, client->m_item_in_bank_list[i]->m_custom_made ? 1 : 0) == SQLITE_OK);
-        ok &= (sqlite3_bind_int(stmt, col++, static_cast<int>(client->m_item_in_bank_list[i]->m_prefix_type)) == SQLITE_OK);
-        ok &= (sqlite3_bind_int(stmt, col++, client->m_item_in_bank_list[i]->m_prefix_value) == SQLITE_OK);
-        ok &= (sqlite3_bind_int(stmt, col++, static_cast<int>(client->m_item_in_bank_list[i]->m_secondary_type)) == SQLITE_OK);
-        ok &= (sqlite3_bind_int(stmt, col++, client->m_item_in_bank_list[i]->m_secondary_value) == SQLITE_OK);
-        ok &= (sqlite3_bind_int(stmt, col++, client->m_item_in_bank_list[i]->m_enchant_bonus) == SQLITE_OK);
+        ok &= (sqlite3_bind_int64(stmt, col++, static_cast<int64_t>(client->m_item_in_bank_list[i]->m_instance.count)) == SQLITE_OK);
+        ok &= (sqlite3_bind_int(stmt, col++, client->m_item_in_bank_list[i]->m_instance.touch_effect_type) == SQLITE_OK);
+        ok &= (sqlite3_bind_int(stmt, col++, client->m_item_in_bank_list[i]->m_instance.touch_effect_value1) == SQLITE_OK);
+        ok &= (sqlite3_bind_int(stmt, col++, client->m_item_in_bank_list[i]->m_instance.touch_effect_value2) == SQLITE_OK);
+        ok &= (sqlite3_bind_int(stmt, col++, client->m_item_in_bank_list[i]->m_instance.touch_effect_value3) == SQLITE_OK);
+        ok &= (sqlite3_bind_int(stmt, col++, client->m_item_in_bank_list[i]->m_instance.item_color) == SQLITE_OK);
+        ok &= (sqlite3_bind_int(stmt, col++, client->m_item_in_bank_list[i]->m_instance.special_effect_value1) == SQLITE_OK);
+        ok &= (sqlite3_bind_int(stmt, col++, client->m_item_in_bank_list[i]->m_instance.special_effect_value2) == SQLITE_OK);
+        ok &= (sqlite3_bind_int(stmt, col++, client->m_item_in_bank_list[i]->m_instance.special_effect_value3) == SQLITE_OK);
+        ok &= (sqlite3_bind_int(stmt, col++, client->m_item_in_bank_list[i]->m_instance.cur_durability) == SQLITE_OK);
+        ok &= (sqlite3_bind_int(stmt, col++, client->m_item_in_bank_list[i]->m_instance.custom_made ? 1 : 0) == SQLITE_OK);
+        ok &= (sqlite3_bind_int(stmt, col++, static_cast<int>(client->m_item_in_bank_list[i]->m_instance.prefix_type)) == SQLITE_OK);
+        ok &= (sqlite3_bind_int(stmt, col++, client->m_item_in_bank_list[i]->m_instance.prefix_value) == SQLITE_OK);
+        ok &= (sqlite3_bind_int(stmt, col++, static_cast<int>(client->m_item_in_bank_list[i]->m_instance.secondary_type)) == SQLITE_OK);
+        ok &= (sqlite3_bind_int(stmt, col++, client->m_item_in_bank_list[i]->m_instance.secondary_value) == SQLITE_OK);
+        ok &= (sqlite3_bind_int(stmt, col++, client->m_item_in_bank_list[i]->m_instance.enchant_bonus) == SQLITE_OK);
 
         if (ok) {
             ok = sqlite3_step(stmt) == SQLITE_DONE;

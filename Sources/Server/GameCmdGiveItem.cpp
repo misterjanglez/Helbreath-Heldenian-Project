@@ -66,7 +66,7 @@ bool GameCmdGiveItem::execute(CGame* game, int client_h, const char* args)
 		CItem* item = new CItem();
 		if (game->m_item_manager->init_item_attr(item, item_name))
 		{
-			item->m_count = amount;
+			item->m_instance.count = amount;
 			int erase_req = 0;
 			if (game->m_item_manager->add_client_item_list(target_h, item, &erase_req))
 			{

@@ -499,8 +499,8 @@ void LoginServer::response_character(int h, char* data)
 		item.spec_effect_value1 = 0;
 		item.spec_effect_value2 = 0;
 		item.spec_effect_value3 = 0;
-		item.cur_life_span = (entry.lifespan > 0)
-			? entry.lifespan
+		item.cur_durability = (entry.durability > 0)
+			? entry.durability
 			: G_pGame->m_item_config_list[entry.item_id]->m_durability;
 		item.custom_made = 0;
 		item.prefix_type = 0;

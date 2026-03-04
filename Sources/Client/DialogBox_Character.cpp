@@ -140,7 +140,7 @@ void DialogBox_Character::draw_equipped_item(hb::shared::item::EquipPos equipPos
 	CItem* cfg = m_game->get_item_config(item->m_id_num);
 	if (cfg == nullptr) return;
 
-	char item_color = item->m_item_color;
+	char item_color = item->m_instance.item_color;
 	bool disabled = inventory_manager::get().is_locked(itemIdx);
 
 	// Unified color palette — index already encodes correct color for weapons and armor
@@ -514,7 +514,7 @@ bool DialogBox_Character::on_double_click()
 	// Skip consumables, arrows, and stacked items
 	if (cfg->get_item_type() == hb::shared::item::item_type::consumable ||
 		cfg->get_item_sub_type() == hb::shared::item::item_sub_type::ammo ||
-		item->m_count > 1)
+		item->m_instance.count > 1)
 		return false;
 
 	// Check if at repair shop

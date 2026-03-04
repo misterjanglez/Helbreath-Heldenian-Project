@@ -139,7 +139,7 @@ struct AccountDbItemRow
     int spec_effect_value1;
     int spec_effect_value2;
     int spec_effect_value3;
-    int cur_life_span;
+    int cur_durability;
     int custom_made;
     int prefix_type;
     int prefix_value;
@@ -164,7 +164,7 @@ struct AccountDbBankItemRow
     int spec_effect_value1;
     int spec_effect_value2;
     int spec_effect_value3;
-    int cur_life_span;
+    int cur_durability;
     int custom_made;
     int prefix_type;
     int prefix_value;

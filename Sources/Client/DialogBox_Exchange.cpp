@@ -133,7 +133,7 @@ void DialogBox_Exchange::draw_item_info(short sX, short sY, short size_x, short 
 	std::string txt, txt2;
 	int loc;
 
-	auto itemInfo = item_name_formatter::get().format(m_slots[item_index].item_data);
+	auto itemInfo = item_name_formatter::get().format(static_cast<short>(m_slots[item_index].item_id), m_slots[item_index].item_data);
 
 	if ((mouse_x >= sX + xadd - 6) && (mouse_x <= sX + xadd + 42) && (mouse_y >= sY + 61) && (mouse_y <= sY + 200)) {
 		txt = itemInfo.name.c_str();
@@ -247,7 +247,7 @@ bool DialogBox_Exchange::on_item_drop()
 	// Stackable items - open quantity dialog
 	CItem* cfg = m_game->get_item_config(player().m_item_list[item_id]->m_id_num);
 	if (cfg && (cfg->is_stackable()) &&
-		(player().m_item_list[item_id]->m_count > 1))
+		(player().m_item_list[item_id]->m_instance.count > 1))
 	{
 		auto* dropDlg = m_game->get_dialog_box_manager().get_dialog_as<DialogBox_ItemDropAmount>(DialogBoxId::ItemDropExternal);
 		dropDlg->m_x = mouse_x - 140;
@@ -260,7 +260,7 @@ bool DialogBox_Exchange::on_item_drop()
 		m_slots[slot].inv_slot = item_id;
 		std::memset(dropDlg->m_target_name, 0, sizeof(dropDlg->m_target_name));
 		m_game->get_dialog_box_manager().enable_dialog_box(DialogBoxId::ItemDropExternal, item_id,
-			static_cast<int64_t>(player().m_item_list[item_id]->m_count), 0);
+			static_cast<int64_t>(player().m_item_list[item_id]->m_instance.count), 0);
 	}
 	else
 	{

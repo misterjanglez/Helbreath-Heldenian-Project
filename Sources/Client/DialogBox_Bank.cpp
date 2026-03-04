@@ -140,7 +140,7 @@ void DialogBox_Bank::draw_item_details(short sX, short sY, short size_x, int ite
 	}
 
 	// draw item sprite
-	char item_color = item->m_item_color;
+	char item_color = item->m_instance.item_color;
 	auto bank_draw = m_game->get_item_draw(cfg->m_display_id, item_atlas::pack, cfg->sprite_is_female());
 	if (item_color == 0) {
 		bank_draw.sprite->draw(sX + 60, sY + 68, bank_draw.frame);
@@ -301,7 +301,7 @@ bool DialogBox_Bank::on_item_drop()
 	}
 
 	if ((cfg->is_stackable()) &&
-		(player().m_item_list[give.item_index]->m_count > 1))
+		(player().m_item_list[give.item_index]->m_instance.count > 1))
 	{
 		auto* dropDlg = m_game->get_dialog_box_manager().get_dialog_as<DialogBox_ItemDropAmount>(DialogBoxId::ItemDropExternal);
 		dropDlg->m_x = mouse_x - 140;
@@ -313,7 +313,7 @@ bool DialogBox_Bank::on_item_drop()
 		dropDlg->m_drop_target_id = give.item_index;
 		std::memset(dropDlg->m_target_name, 0, sizeof(dropDlg->m_target_name));
 		m_game->get_dialog_box_manager().enable_dialog_box(DialogBoxId::ItemDropExternal, give.item_index,
-			static_cast<int64_t>(player().m_item_list[give.item_index]->m_count), 0);
+			static_cast<int64_t>(player().m_item_list[give.item_index]->m_instance.count), 0);
 	}
 	else
 	{

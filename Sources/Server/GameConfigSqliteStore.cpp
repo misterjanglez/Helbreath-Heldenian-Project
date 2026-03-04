@@ -241,8 +241,8 @@ bool EnsureGameConfigDatabase(sqlite3** outDb, std::string& outPath, bool* outCr
         " exp_max INTEGER NOT NULL,"
         " gold_min INTEGER NOT NULL,"
         " gold_max INTEGER NOT NULL,"
-        " attack_dice_throw INTEGER NOT NULL,"
-        " attack_dice_range INTEGER NOT NULL,"
+        " min_damage INTEGER NOT NULL,"
+        " max_damage INTEGER NOT NULL,"
         " npc_size INTEGER NOT NULL,"
         " side INTEGER NOT NULL,"
         " action_limit INTEGER NOT NULL,"
@@ -437,7 +437,7 @@ bool EnsureGameConfigDatabase(sqlite3** outDb, std::string& outPath, bool* outCr
         " item_id INTEGER NOT NULL,"
         " count INTEGER NOT NULL DEFAULT 1,"
         " item_color INTEGER NOT NULL DEFAULT 0,"
-        " lifespan INTEGER NOT NULL DEFAULT 0,"
+        " durability INTEGER NOT NULL DEFAULT 0,"
         " is_equipped INTEGER NOT NULL DEFAULT 0,"
         " gender_limit INTEGER NOT NULL DEFAULT 0,"
         " sort_order INTEGER NOT NULL DEFAULT 0,"
@@ -584,7 +584,7 @@ bool EnsureGameConfigDatabase(sqlite3** outDb, std::string& outPath, bool* outCr
             "  END,"
             "  item_effect_type, item_effect_value1, item_effect_value2, item_effect_value3,"
             "  item_effect_value4, item_effect_value5, item_effect_value6,"
-            "  max_lifespan, special_effect,"
+            "  max_durability, special_effect,"
             // sell_price: only sellable items get a price (0 = cannot sell)
             "  CASE WHEN is_for_sale = 1 THEN price ELSE 0 END,"
             "  weight, speed, level_limit, gender_limit,"
@@ -703,7 +703,7 @@ bool SaveItemConfigs(sqlite3* db, CItem* const* itemList, int maxItems)
         ok &= (sqlite3_bind_int(stmt, col++, itemList[i]->m_is_dyeable) == SQLITE_OK);
         ok &= (sqlite3_bind_int(stmt, col++, itemList[i]->m_armor_class) == SQLITE_OK);
         ok &= (sqlite3_bind_int(stmt, col++, itemList[i]->m_set_id) == SQLITE_OK);
-        ok &= (sqlite3_bind_int(stmt, col++, itemList[i]->m_item_color) == SQLITE_OK);
+        ok &= (sqlite3_bind_int(stmt, col++, itemList[i]->m_instance.item_color) == SQLITE_OK);
         ok &= (sqlite3_bind_int(stmt, col++, itemList[i]->m_display_id) == SQLITE_OK);
 
         if (!ok || sqlite3_step(stmt) != SQLITE_DONE) {
@@ -785,7 +785,7 @@ bool LoadItemConfigs(sqlite3* db, CItem** itemList, int maxItems)
         item->m_is_dyeable = (char)sqlite3_column_int(stmt, col++);
         item->m_armor_class = (char)sqlite3_column_int(stmt, col++);
         item->m_set_id = (int16_t)sqlite3_column_int(stmt, col++);
-        item->m_item_color = (char)sqlite3_column_int(stmt, col++);
+        item->m_instance.item_color = (char)sqlite3_column_int(stmt, col++);
         item->m_display_id = (short)sqlite3_column_int(stmt, col++);
 
         itemList[item_id] = item;
@@ -1076,7 +1076,7 @@ bool SaveNpcConfigs(sqlite3* db, const CGame* game)
     const char* sql =
         "INSERT INTO npc_configs("
         " npc_id, name, npc_type, hp_min, hp_max, hold_resist, defense_ratio, hit_ratio, min_bravery,"
-        " exp_min, exp_max, gold_min, gold_max, attack_dice_throw, attack_dice_range,"
+        " exp_min, exp_max, gold_min, gold_max, min_damage, max_damage,"
         " npc_size, side, action_limit, action_time, resist_magic, magic_level,"
         " day_of_week_limit, chat_msg_presence, target_search_range, regen_time,"
         " attribute, abs_damage, max_mana, magic_hit_ratio, attack_range, drop_table_id"
@@ -1111,8 +1111,8 @@ bool SaveNpcConfigs(sqlite3* db, const CGame* game)
         ok &= (sqlite3_bind_int(stmt, col++, static_cast<int>(npc->m_exp_dice_max)) == SQLITE_OK);
         ok &= (sqlite3_bind_int(stmt, col++, static_cast<int>(npc->m_gold_dice_min)) == SQLITE_OK);
         ok &= (sqlite3_bind_int(stmt, col++, static_cast<int>(npc->m_gold_dice_max)) == SQLITE_OK);
-        ok &= (sqlite3_bind_int(stmt, col++, npc->m_attack_dice_throw) == SQLITE_OK);
-        ok &= (sqlite3_bind_int(stmt, col++, npc->m_attack_dice_range) == SQLITE_OK);
+        ok &= (sqlite3_bind_int(stmt, col++, npc->m_min_damage) == SQLITE_OK);
+        ok &= (sqlite3_bind_int(stmt, col++, npc->m_max_damage) == SQLITE_OK);
         ok &= (sqlite3_bind_int(stmt, col++, npc->m_size) == SQLITE_OK);
         ok &= (sqlite3_bind_int(stmt, col++, npc->m_side) == SQLITE_OK);
         ok &= (sqlite3_bind_int(stmt, col++, npc->m_action_limit) == SQLITE_OK);
@@ -1158,7 +1158,7 @@ bool LoadNpcConfigs(sqlite3* db, CGame* game)
 
     const char* sql =
         "SELECT npc_id, name, npc_type, hp_min, hp_max, hold_resist, defense_ratio, hit_ratio, min_bravery,"
-        " exp_min, exp_max, gold_min, gold_max, attack_dice_throw, attack_dice_range,"
+        " exp_min, exp_max, gold_min, gold_max, min_damage, max_damage,"
         " npc_size, side, action_limit, action_time, resist_magic, magic_level,"
         " day_of_week_limit, chat_msg_presence, target_search_range, regen_time,"
         " attribute, abs_damage, max_mana, magic_hit_ratio, attack_range, drop_table_id"
@@ -1190,8 +1190,8 @@ bool LoadNpcConfigs(sqlite3* db, CGame* game)
         npc->m_exp_dice_max = sqlite3_column_int(stmt, col++);
         npc->m_gold_dice_min = sqlite3_column_int(stmt, col++);
         npc->m_gold_dice_max = sqlite3_column_int(stmt, col++);
-        npc->m_attack_dice_throw = (char)sqlite3_column_int(stmt, col++);
-        npc->m_attack_dice_range = (char)sqlite3_column_int(stmt, col++);
+        npc->m_min_damage = sqlite3_column_int(stmt, col++);
+        npc->m_max_damage = sqlite3_column_int(stmt, col++);
         npc->m_size = (char)sqlite3_column_int(stmt, col++);
         npc->m_side = (char)sqlite3_column_int(stmt, col++);
         npc->m_action_limit = (char)sqlite3_column_int(stmt, col++);
@@ -1385,7 +1385,7 @@ bool LoadCreationItems(sqlite3* db, std::vector<creation_item_entry>& out_items)
     out_items.clear();
 
     const char* sql =
-        "SELECT class_type, item_id, count, item_color, lifespan,"
+        "SELECT class_type, item_id, count, item_color, durability,"
         " is_equipped, gender_limit, sort_order"
         " FROM character_creation_items"
         " ORDER BY sort_order, class_type, item_id;";
@@ -1403,7 +1403,7 @@ bool LoadCreationItems(sqlite3* db, std::vector<creation_item_entry>& out_items)
         entry.item_id       = sqlite3_column_int(stmt, col++);
         entry.count         = sqlite3_column_int(stmt, col++);
         entry.item_color    = sqlite3_column_int(stmt, col++);
-        entry.lifespan      = sqlite3_column_int(stmt, col++);
+        entry.durability      = sqlite3_column_int(stmt, col++);
         entry.is_equipped   = sqlite3_column_int(stmt, col++);
         entry.gender_limit  = sqlite3_column_int(stmt, col++);
         entry.sort_order    = sqlite3_column_int(stmt, col++);
@@ -1516,7 +1516,7 @@ bool SaveCreationItems(sqlite3* db, const std::vector<creation_item_entry>& item
 
     const char* sql =
         "INSERT INTO character_creation_items("
-        " class_type, item_id, count, item_color, lifespan,"
+        " class_type, item_id, count, item_color, durability,"
         " is_equipped, gender_limit, sort_order"
         ") VALUES(?,?,?,?,?,?,?,?);";
 
@@ -1534,7 +1534,7 @@ bool SaveCreationItems(sqlite3* db, const std::vector<creation_item_entry>& item
         sqlite3_bind_int(stmt, col++, entry.item_id);
         sqlite3_bind_int(stmt, col++, entry.count);
         sqlite3_bind_int(stmt, col++, entry.item_color);
-        sqlite3_bind_int(stmt, col++, entry.lifespan);
+        sqlite3_bind_int(stmt, col++, entry.durability);
         sqlite3_bind_int(stmt, col++, entry.is_equipped);
         sqlite3_bind_int(stmt, col++, entry.gender_limit);
         sqlite3_bind_int(stmt, col++, entry.sort_order);

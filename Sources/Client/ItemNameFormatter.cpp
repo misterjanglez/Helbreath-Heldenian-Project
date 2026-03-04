@@ -34,7 +34,7 @@ CItem* item_name_formatter::get_config(int item_id) const
 
 ItemNameInfo item_name_formatter::format(CItem* item)
 {
-	auto result = format(item->to_instance_data());
+	auto result = format(item->m_id_num, item->to_instance_data());
 
 	// Mana save effect comes from item config, not instance data
 	CItem* cfg = get_config(item->m_id_num);
@@ -76,13 +76,13 @@ ItemNameInfo item_name_formatter::format(short item_id)
 	return result;
 }
 
-ItemNameInfo item_name_formatter::format(const hb::shared::item::item_instance_data& data)
+ItemNameInfo item_name_formatter::format(short item_id, const hb::shared::item::item_instance_data& data)
 {
 	ItemNameInfo result;
 	std::string txt;
 	uint32_t type1, type2, value1, value2, value3;
 
-	CItem* cfg = get_config(data.item_id);
+	CItem* cfg = get_config(item_id);
 	if (!cfg || cfg->m_name[0] == '\0')
 	{
 		result.name = "Unknown Item";
@@ -90,7 +90,7 @@ ItemNameInfo item_name_formatter::format(const hb::shared::item::item_instance_d
 	}
 	const char* name = cfg->m_name;
 
-	if (hb::shared::item::is_special_item(data.item_id)) result.is_special = true;
+	if (hb::shared::item::is_special_item(item_id)) result.is_special = true;
 
 	if (data.custom_made)
 	{

@@ -62,7 +62,7 @@ public:
 	// format item name, returning name + attribute strings + special flag
 	ItemNameInfo format(CItem* item);
 	ItemNameInfo format(short item_id);
-	ItemNameInfo format(const hb::shared::item::item_instance_data& data);
+	ItemNameInfo format(short item_id, const hb::shared::item::item_instance_data& data);
 
 private:
 	item_name_formatter() = default;

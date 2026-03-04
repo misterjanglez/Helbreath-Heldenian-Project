@@ -103,7 +103,7 @@ void CraftingManager::req_create_portion_handler(int client_h, char* data)
 			if (item_index[i] < 0) return;
 			if ((item_index[i] >= 0) && (item_index[i] >= hb::shared::limits::MaxItems)) return;
 			if (m_game->m_client_list[client_h]->m_item_list[item_index[i]] == 0) return;
-			if (m_game->m_client_list[client_h]->m_item_list[item_index[i]]->m_count < static_cast<uint64_t>(item_number[i])) return;
+			if (m_game->m_client_list[client_h]->m_item_list[item_index[i]]->m_instance.count < static_cast<uint64_t>(item_number[i])) return;
 		}
 
 	// . Bubble Sort
@@ -181,7 +181,7 @@ void CraftingManager::req_create_portion_handler(int client_h, char* data)
 			if (item_index[i] != -1) {
 				if (m_game->m_client_list[client_h]->m_item_list[item_index[i]]->is_stackable())
 					m_game->m_item_manager->set_item_count(client_h, item_index[i],
-						m_game->m_client_list[client_h]->m_item_list[item_index[i]]->m_count - item_number[i]);
+						m_game->m_client_list[client_h]->m_item_list[item_index[i]]->m_instance.count - item_number[i]);
 				else m_game->m_item_manager->item_deplete_handler(client_h, item_index[i], false);
 			}
 
@@ -200,7 +200,7 @@ void CraftingManager::req_create_portion_handler(int client_h, char* data)
 					break;
 				}
 
-				//if ((item->m_sell_price * item->m_count) > 1000)
+				//if ((item->m_sell_price * item->m_instance.count) > 1000)
 				//	SendMsgToLS(ServerMsgId::RequestSavePlayerData, client_h);
 			}
 			else {
@@ -290,8 +290,8 @@ void CraftingManager::req_create_crafting_handler(int client_h, char* data)
 			if (item_index[i] < 0) return;
 			if ((item_index[i] >= 0) && (item_index[i] >= hb::shared::limits::MaxItems)) return;
 			if (m_game->m_client_list[client_h]->m_item_list[item_index[i]] == 0) return;
-			if (m_game->m_client_list[client_h]->m_item_list[item_index[i]]->m_count < static_cast<uint64_t>(item_number[i])) return;
-			item_purity[i] = m_game->m_client_list[client_h]->m_item_list[item_index[i]]->m_item_special_effect_value2;
+			if (m_game->m_client_list[client_h]->m_item_list[item_index[i]]->m_instance.count < static_cast<uint64_t>(item_number[i])) return;
+			item_purity[i] = m_game->m_client_list[client_h]->m_item_list[item_index[i]]->m_instance.special_effect_value2;
 			if (m_game->m_client_list[client_h]->m_item_list[item_index[i]]->m_id_num == 657) // Stone of Merien
 			{
 				item_purity[i] = 100; // Merien stones considered 100% purity.
@@ -455,7 +455,7 @@ void CraftingManager::req_create_crafting_handler(int client_h, char* data)
 				if (m_game->m_client_list[client_h]->m_item_list[item_index[i]]->is_stackable())
 				{
 					m_game->m_item_manager->set_item_count(client_h, item_index[i],
-						m_game->m_client_list[client_h]->m_item_list[item_index[i]]->m_count - item_number[i]);
+						m_game->m_client_list[client_h]->m_item_list[item_index[i]]->m_instance.count - item_number[i]);
 				}
 				else // Non-stackable items get depleted
 				{
@@ -477,24 +477,24 @@ void CraftingManager::req_create_crafting_handler(int client_h, char* data)
 		{	// // Snoopy: Added Purity to Oils/Elixirs
 			if (purity != 0)
 			{
-				item->m_item_special_effect_value2 = purity;
-				item->m_custom_made = true;
+				item->m_instance.special_effect_value2 = purity;
+				item->m_instance.custom_made = 1;
 			}
 			item->set_touch_effect_type(TouchEffectType::ID);
-			item->m_touch_effect_value1 = static_cast<short>(m_game->dice(1, 100000));
-			item->m_touch_effect_value2 = static_cast<short>(m_game->dice(1, 100000));
-			// item->m_touch_effect_value3 = GameClock::GetTimeMS();
+			item->m_instance.touch_effect_value1 = static_cast<short>(m_game->dice(1, 100000));
+			item->m_instance.touch_effect_value2 = static_cast<short>(m_game->dice(1, 100000));
+			// item->m_instance.touch_effect_value3 = GameClock::GetTimeMS();
 			hb::time::local_time SysTime{};
 			char temp[256];
 			SysTime = hb::time::local_time::now();
 			std::memset(temp, 0, sizeof(temp));
 			std::snprintf(temp, sizeof(temp), "%d%2d", (short)SysTime.month, (short)SysTime.day);
-			item->m_touch_effect_value3 = atoi(temp);
+			item->m_instance.touch_effect_value3 = atoi(temp);
 
 			// SNOOPY log anything above WAREs
 			if (need_log)
 			{
-				hb::logger::log<log_channel::events>("Player '{}' crafting '{}' purity={}", m_game->m_client_list[client_h]->m_char_name, item->m_name, item->m_item_special_effect_value2);
+				hb::logger::log<log_channel::events>("Player '{}' crafting '{}' purity={}", m_game->m_client_list[client_h]->m_char_name, item->m_name, item->m_instance.special_effect_value2);
 			}
 			if (m_game->m_item_manager->add_client_item_list(client_h, item, &erase_req))
 			{
@@ -507,7 +507,7 @@ void CraftingManager::req_create_crafting_handler(int client_h, char* data)
 					m_game->delete_client(client_h, true, true);
 					break;
 				}
-				//if ((item->m_sell_price * item->m_count) > 1000)
+				//if ((item->m_sell_price * item->m_instance.count) > 1000)
 				//	SendMsgToLS(ServerMsgId::RequestSavePlayerData, client_h);
 			}
 			else

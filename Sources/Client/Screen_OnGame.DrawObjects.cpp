@@ -146,6 +146,7 @@ void Screen_OnGame::draw_objects(short pivot_x, short pivot_y, short div_x, shor
 	// Item's desc on floor
 	int item_selectedx, item_selectedy;
 	short item_id;
+	short item_selected_id = 0;
 	hb::shared::item::item_instance_data item_selected;
 
 	int res_x = LOGICAL_MAX_X();
@@ -226,7 +227,7 @@ void Screen_OnGame::draw_objects(short pivot_x, short pivot_y, short div_x, shor
 					m_game->m_entity_state.m_chat_index = m_game->m_map_data->m_data[dX][dY].m_dead_chat_msg;
 					m_game->m_entity_state.m_status = m_game->m_map_data->m_data[dX][dY].m_deadStatus;
 					std::snprintf(m_game->m_entity_state.m_name.data(), m_game->m_entity_state.m_name.size(), "%s", m_game->m_map_data->m_data[dX][dY].m_dead_owner_name.c_str());
-					item_id = m_game->m_map_data->m_data[dX][dY].m_item.item_id;
+					item_id = m_game->m_map_data->m_data[dX][dY].m_item_id;
 					item_color = m_game->m_map_data->m_data[dX][dY].m_item.item_color;
 					dynamic_object = m_game->m_map_data->m_data[dX][dY].m_dynamic_object_type;
 					dynamic_object_frame = static_cast<short>(m_game->m_map_data->m_data[dX][dY].m_dynamic_object_frame);
@@ -262,6 +263,7 @@ void Screen_OnGame::draw_objects(short pivot_x, short pivot_y, short div_x, shor
 					}
 
 					if (hb::shared::input::is_shift_down() && mouse_x >= ix - 16 && mouse_y >= iy - 16 && mouse_x <= ix + 16 && mouse_y <= iy + 16) {
+						item_selected_id = m_game->m_map_data->m_data[dX][dY].m_item_id;
 						item_selected = m_game->m_map_data->m_data[dX][dY].m_item;
 						item_selectedx = ix;
 						item_selectedy = iy;
@@ -801,8 +803,8 @@ void Screen_OnGame::draw_objects(short pivot_x, short pivot_y, short div_x, shor
 		}
 	}
 
-	if (!item_selected.is_empty()) {
-		auto itemInfo = item_name_formatter::get().format(item_selected);
+	if (item_selected_id != 0) {
+		auto itemInfo = item_name_formatter::get().format(item_selected_id, item_selected);
 
 		item_tooltip tooltip;
 		bool has_prefix = item_selected.prefix_type != 0;

@@ -1871,9 +1871,9 @@ void MagicManager::player_magic_handler(int client_h, int dX, int dY, short type
 			m_game->m_item_manager->init_item_attr(item, item_name);
 
 			item->set_touch_effect_type(TouchEffectType::ID);
-			item->m_touch_effect_value1 = static_cast<short>(m_game->dice(1, 100000));
-			item->m_touch_effect_value2 = static_cast<short>(m_game->dice(1, 100000));
-			item->m_touch_effect_value3 = (short)GameClock::GetTimeMS();
+			item->m_instance.touch_effect_value1 = static_cast<short>(m_game->dice(1, 100000));
+			item->m_instance.touch_effect_value2 = static_cast<short>(m_game->dice(1, 100000));
+			item->m_instance.touch_effect_value3 = (short)GameClock::GetTimeMS();
 
 			m_game->m_map_list[m_game->m_client_list[client_h]->m_map_index]->set_item(dX, dY, item);
 

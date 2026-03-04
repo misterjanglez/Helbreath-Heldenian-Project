@@ -31,6 +31,7 @@ public:
 		m_dead_owner_frame = -1;
 		m_dead_owner_time = 0;
 
+		m_item_id = 0;
 		m_item.clear();
 
 		m_dynamic_object_type  = 0;
@@ -108,6 +109,7 @@ public:
 	short m_v3;								// +B50
 	short m_dynamic_object_type;
 
+	int16_t m_item_id = 0;                       // Item ID (lookup key — separate from instance data)
 	hb::shared::item::item_instance_data m_item;
 
 	char  m_dead_owner_frame;

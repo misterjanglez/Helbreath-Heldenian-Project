@@ -81,7 +81,7 @@ namespace net {
 		uint8_t is_equipped;
 		int16_t level_limit;
 		uint8_t gender_limit;
-		uint16_t cur_lifespan;
+		uint16_t cur_durability;
 		uint16_t weight;
 		uint8_t item_color;
 		uint8_t spec_value2;
@@ -92,7 +92,7 @@ namespace net {
 		uint8_t secondary_value;
 		uint8_t enchant_bonus;
 		int16_t item_id;           // Item ID for config lookup
-		uint16_t max_lifespan;     // Maximum durability
+		uint16_t max_durability;     // Maximum durability
 	};
 
 	struct HB_PACKED PacketResponseBankItemListHeader {
@@ -106,7 +106,7 @@ namespace net {
 		uint8_t equip_pos;
 		int16_t level_limit;
 		uint8_t gender_limit;
-		uint16_t cur_lifespan;
+		uint16_t cur_durability;
 		uint16_t weight;
 		uint8_t item_color;
 		uint8_t spec_value2;
@@ -117,7 +117,7 @@ namespace net {
 		uint8_t secondary_value;
 		uint8_t enchant_bonus;
 		int16_t item_id;           // Item ID for config lookup
-		uint16_t max_lifespan;     // Maximum durability
+		uint16_t max_durability;     // Maximum durability
 	};
 
 	struct HB_PACKED PacketResponseMasteryData {

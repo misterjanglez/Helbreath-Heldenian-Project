@@ -328,13 +328,13 @@ void Screen_OnGame::on_update()
                 uint64_t parsed_amount = 0;
                 auto [ptr, ec] = std::from_chars(m_game->m_amount_string.data(), m_game->m_amount_string.data() + m_game->m_amount_string.size(), parsed_amount);
                 if (ec != std::errc{}) return;
-                uint64_t item_count = m_game->m_player->m_item_list[m_game->get_dialog_box_manager().get_dialog_as<DialogBox_ItemDropAmount>(DialogBoxId::ItemDropExternal)->m_item_index]->m_count;
+                uint64_t item_count = m_game->m_player->m_item_list[m_game->get_dialog_box_manager().get_dialog_as<DialogBox_ItemDropAmount>(DialogBoxId::ItemDropExternal)->m_item_index]->m_instance.count;
                 if (parsed_amount > item_count) parsed_amount = item_count;
                 amount = static_cast<int>(std::min<uint64_t>(parsed_amount, INT_MAX));
             }
 
             if (amount != 0) {
-                if (m_game->m_player->m_item_list[m_game->get_dialog_box_manager().get_dialog_as<DialogBox_ItemDropAmount>(DialogBoxId::ItemDropExternal)->m_item_index]->m_count >= static_cast<uint64_t>(amount)) {
+                if (m_game->m_player->m_item_list[m_game->get_dialog_box_manager().get_dialog_as<DialogBox_ItemDropAmount>(DialogBoxId::ItemDropExternal)->m_item_index]->m_instance.count >= static_cast<uint64_t>(amount)) {
                     if (m_game->get_dialog_box_manager().get_dialog_as<DialogBox_ItemDropAmount>(DialogBoxId::ItemDropExternal)->m_drop_x != 0) {
                         absX = abs(m_game->get_dialog_box_manager().get_dialog_as<DialogBox_ItemDropAmount>(DialogBoxId::ItemDropExternal)->m_drop_x - m_game->m_player->m_player_x);
                         absY = abs(m_game->get_dialog_box_manager().get_dialog_as<DialogBox_ItemDropAmount>(DialogBoxId::ItemDropExternal)->m_drop_y - m_game->m_player->m_player_y);
@@ -858,7 +858,7 @@ void Screen_OnGame::render_item_tooltip()
     CItem* cfg = m_game->get_item_config(item->m_id_num);
     if (!cfg) return;
 
-    char item_color = item->m_item_color;
+    char item_color = item->m_instance.item_color;
     auto tooltip_draw = m_game->get_item_draw(cfg->m_display_id, item_atlas::pack, cfg->sprite_is_female());
     hb::shared::sprite::ISprite* sprite = tooltip_draw.sprite;
     int16_t frame = tooltip_draw.frame;
@@ -875,7 +875,7 @@ void Screen_OnGame::render_item_tooltip()
     item_tooltip tooltip;
 
     // 1. Name — dye-colored for prefixed items, special color, or white
-    bool has_prefix = item->m_prefix_type != hb::shared::item::AttributePrefixType::None;
+    bool has_prefix = item->m_instance.prefix_type != static_cast<uint8_t>(hb::shared::item::AttributePrefixType::None);
     if (has_prefix && item_color != 0)
     {
         const auto& dye = m_game->m_color_palette[item_color];
@@ -1042,9 +1042,9 @@ void Screen_OnGame::render_item_tooltip()
     if (cfg->m_weight > 0)
     {
         float unit_stones = CItem::weight_to_stones(eff_weight);
-        if (cfg->is_stackable() && item->m_count > 1)
+        if (cfg->is_stackable() && item->m_instance.count > 1)
         {
-            int stack_raw = CItem::calc_item_stack_weight(eff_weight, static_cast<int>(item->m_count));
+            int stack_raw = CItem::calc_item_stack_weight(eff_weight, static_cast<int>(item->m_instance.count));
             float total_stones = CItem::weight_to_stones(stack_raw);
             G_cTxt = std::format(TOOLTIP_WEIGHT_STACK, unit_stones, total_stones);
         }
@@ -1061,12 +1061,12 @@ void Screen_OnGame::render_item_tooltip()
     // 8. Durability / Usages
     if (is_equippable)
     {
-        G_cTxt = std::format(UPDATE_SCREEN_ONGAME10, item->m_cur_durability, cfg->m_durability);
+        G_cTxt = std::format(UPDATE_SCREEN_ONGAME10, item->m_instance.cur_durability, cfg->m_durability);
         tooltip.add_line(G_cTxt, GameColors::InfoGrayLight);
     }
     else if (effectType == ItemEffectType::AlterItemDrop && cfg->m_durability > 0)
     {
-        G_cTxt = std::format(TOOLTIP_USAGES, item->m_cur_durability, cfg->m_durability);
+        G_cTxt = std::format(TOOLTIP_USAGES, item->m_instance.cur_durability, cfg->m_durability);
         tooltip.add_line(G_cTxt, GameColors::InfoGrayLight);
     }
 
@@ -1278,7 +1278,7 @@ void Screen_OnGame::item_drop_external_screen(char item_id, short mouse_x, short
         {
             CItem* cfg = m_game->get_item_config(m_game->m_player->m_item_list[item_id]->m_id_num);
             if (cfg && (cfg->is_stackable())
-                && (m_game->m_player->m_item_list[item_id]->m_count > 1))
+                && (m_game->m_player->m_item_list[item_id]->m_instance.count > 1))
             {
                 m_game->get_dialog_box_manager().get_dialog_box(DialogBoxId::ItemDropExternal)->m_x = mouse_x - 140;
                 m_game->get_dialog_box_manager().get_dialog_box(DialogBoxId::ItemDropExternal)->m_y = mouse_y - 70;
@@ -1304,7 +1304,7 @@ void Screen_OnGame::item_drop_external_screen(char item_id, short mouse_x, short
                     dropDlg->m_drop_target_id = 0;
                     std::memset(dropDlg->m_target_name, 0, sizeof(dropDlg->m_target_name));
                 }
-                m_game->get_dialog_box_manager().enable_dialog_box(DialogBoxId::ItemDropExternal, item_id, static_cast<int64_t>(m_game->m_player->m_item_list[item_id]->m_count), 0);
+                m_game->get_dialog_box_manager().enable_dialog_box(DialogBoxId::ItemDropExternal, item_id, static_cast<int64_t>(m_game->m_player->m_item_list[item_id]->m_instance.count), 0);
             }
             else
             {
@@ -1378,7 +1378,7 @@ void Screen_OnGame::item_drop_external_screen(char item_id, short mouse_x, short
                             m_game->get_dialog_box_manager().get_dialog_box(DialogBoxId::ItemDropConfirm)->m_x = mouse_x - 140;
                             m_game->get_dialog_box_manager().get_dialog_box(DialogBoxId::ItemDropConfirm)->m_y = mouse_y - 70;
                             if (m_game->get_dialog_box_manager().get_dialog_box(DialogBoxId::ItemDropConfirm)->m_y < 0) m_game->get_dialog_box_manager().get_dialog_box(DialogBoxId::ItemDropConfirm)->m_y = 0;
-                            m_game->get_dialog_box_manager().enable_dialog_box(DialogBoxId::ItemDropConfirm, item_id, static_cast<int64_t>(m_game->m_player->m_item_list[item_id]->m_count), 0);
+                            m_game->get_dialog_box_manager().enable_dialog_box(DialogBoxId::ItemDropConfirm, item_id, static_cast<int64_t>(m_game->m_player->m_item_list[item_id]->m_instance.count), 0);
                         }
                         else
                         {
@@ -1401,7 +1401,7 @@ void Screen_OnGame::item_drop_external_screen(char item_id, short mouse_x, short
     {
         CItem* cfg2 = m_game->get_item_config(m_game->m_player->m_item_list[item_id]->m_id_num);
         if (cfg2 && (cfg2->is_stackable())
-            && (m_game->m_player->m_item_list[item_id]->m_count > 1))
+            && (m_game->m_player->m_item_list[item_id]->m_instance.count > 1))
         {
             m_game->get_dialog_box_manager().get_dialog_box(DialogBoxId::ItemDropExternal)->m_x = mouse_x - 140;
             m_game->get_dialog_box_manager().get_dialog_box(DialogBoxId::ItemDropExternal)->m_y = mouse_y - 70;
@@ -1414,7 +1414,7 @@ void Screen_OnGame::item_drop_external_screen(char item_id, short mouse_x, short
                 dropDlg2->m_drop_target_id = 0;
                 std::memset(dropDlg2->m_target_name, 0, sizeof(dropDlg2->m_target_name));
             }
-            m_game->get_dialog_box_manager().enable_dialog_box(DialogBoxId::ItemDropExternal, item_id, static_cast<int64_t>(m_game->m_player->m_item_list[item_id]->m_count), 0);
+            m_game->get_dialog_box_manager().enable_dialog_box(DialogBoxId::ItemDropExternal, item_id, static_cast<int64_t>(m_game->m_player->m_item_list[item_id]->m_instance.count), 0);
         }
         else
         {
@@ -1423,7 +1423,7 @@ void Screen_OnGame::item_drop_external_screen(char item_id, short mouse_x, short
                 m_game->get_dialog_box_manager().get_dialog_box(DialogBoxId::ItemDropConfirm)->m_x = mouse_x - 140;
                 m_game->get_dialog_box_manager().get_dialog_box(DialogBoxId::ItemDropConfirm)->m_y = mouse_y - 70;
                 if (m_game->get_dialog_box_manager().get_dialog_box(DialogBoxId::ItemDropConfirm)->m_y < 0) m_game->get_dialog_box_manager().get_dialog_box(DialogBoxId::ItemDropConfirm)->m_y = 0;
-                m_game->get_dialog_box_manager().enable_dialog_box(DialogBoxId::ItemDropConfirm, item_id, static_cast<int64_t>(m_game->m_player->m_item_list[item_id]->m_count), 0);
+                m_game->get_dialog_box_manager().enable_dialog_box(DialogBoxId::ItemDropConfirm, item_id, static_cast<int64_t>(m_game->m_player->m_item_list[item_id]->m_instance.count), 0);
             }
             else
             {
