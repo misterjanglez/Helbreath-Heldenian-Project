@@ -117,7 +117,7 @@ namespace GameColors
 	// Additional UI Colors
 	// ====================================================================
 
-	inline constexpr hb::shared::render::Color UIMenuHighlight{ 250, 250, 0 };  // Teleport menu highlight (DialogBox_CityHallMenu, DialogBox_GuildHallMenu)
+	inline constexpr hb::shared::render::Color UIMenuHighlight{ 250, 250, 0 };  // Teleport menu highlight (DialogBox_CityHallMenu, DialogBox_CommandHallMenu)
 	inline constexpr hb::shared::render::Color UINoticeRed{ 100, 10, 10 };      // Notice message text (DialogBox_Noticement)
 	inline constexpr hb::shared::render::Color UITooltip{ 250, 250, 220 };      // Tooltip text (DialogBox_HudPanel)
 	inline constexpr hb::shared::render::Color UIDisabledMed{ 120, 120, 120 };      // Grayed out text (DialogBox_Manufacture)

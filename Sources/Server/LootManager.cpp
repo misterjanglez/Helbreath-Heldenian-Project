@@ -156,7 +156,7 @@ void LootManager::enemy_kill_reward_handler(int attacker_h, int client_h)
 	if (m_game->m_client_list[attacker_h]->m_player_kill_count != 0) {
 	}
 	else {
-		if (m_game->m_client_list[client_h]->m_guild_rank == -1) {
+		{
 			reward_exp = (m_game->dice(3, (3 * m_game->get_exp_level(m_game->m_client_list[client_h]->m_exp))) + m_game->get_exp_level(m_game->m_client_list[client_h]->m_exp)) / 3;
 
 			if (m_game->m_is_crusade_mode) {
@@ -180,61 +180,6 @@ void LootManager::enemy_kill_reward_handler(int attacker_h, int client_h)
 					if (memcmp(m_game->m_client_list[client_h]->m_location, m_game->m_client_list[client_h]->m_map_name, 10) != 0) {
 						m_game->m_client_list[attacker_h]->m_enemy_kill_count += m_game->m_enemy_kill_adjust;
 					}
-					if (m_game->m_enemy_kill_mode) {
-						m_game->m_client_list[attacker_h]->m_enemy_kill_count += m_game->m_enemy_kill_adjust;
-					}
-				}
-				m_game->m_client_list[attacker_h]->m_reward_gold += m_game->dice(1, (m_game->get_exp_level(m_game->m_client_list[client_h]->m_exp)));
-				if (m_game->m_client_list[attacker_h]->m_reward_gold > MaxRewardGold)
-					m_game->m_client_list[attacker_h]->m_reward_gold = MaxRewardGold;
-				if (m_game->m_client_list[attacker_h]->m_reward_gold < 0)
-					m_game->m_client_list[attacker_h]->m_reward_gold = 0;
-			}
-			else {
-				m_game->m_client_list[attacker_h]->m_exp += reward_exp;
-				if (m_game->get_exp_level(m_game->m_client_list[client_h]->m_exp) >= iEK_Level) {
-					if ((memcmp(m_game->m_client_list[client_h]->m_location, m_game->m_client_list[client_h]->m_map_name, 10) != 0)
-						&& (m_game->m_enemy_kill_mode == false)) {
-						m_game->m_client_list[attacker_h]->m_enemy_kill_count += m_game->m_enemy_kill_adjust;
-					}
-
-					if (m_game->m_enemy_kill_mode) {
-						m_game->m_client_list[attacker_h]->m_enemy_kill_count += m_game->m_enemy_kill_adjust;
-					}
-				}
-				m_game->m_client_list[attacker_h]->m_reward_gold += m_game->dice(1, (m_game->get_exp_level(m_game->m_client_list[client_h]->m_exp)));
-				if (m_game->m_client_list[attacker_h]->m_reward_gold > MaxRewardGold)
-					m_game->m_client_list[attacker_h]->m_reward_gold = MaxRewardGold;
-				if (m_game->m_client_list[attacker_h]->m_reward_gold < 0)
-					m_game->m_client_list[attacker_h]->m_reward_gold = 0;
-			}
-		}
-		else {
-			reward_exp = (m_game->dice(3, (3 * m_game->get_exp_level(m_game->m_client_list[client_h]->m_exp))) + m_game->get_exp_level(m_game->m_client_list[client_h]->m_exp)) / 3;
-
-			if (m_game->m_is_crusade_mode) {
-				m_game->m_client_list[attacker_h]->m_exp += (reward_exp / 3) * 4;
-				m_game->m_client_list[attacker_h]->m_war_contribution += (reward_exp - (reward_exp / 3)) * 12;
-
-				if (m_game->m_client_list[attacker_h]->m_war_contribution > m_game->m_max_war_contribution)
-					m_game->m_client_list[attacker_h]->m_war_contribution = m_game->m_max_war_contribution;
-
-				m_game->m_client_list[attacker_h]->m_construction_point += m_game->m_client_list[client_h]->m_level / 2;
-
-				if (m_game->m_client_list[attacker_h]->m_construction_point > m_game->m_max_construction_points)
-					m_game->m_client_list[attacker_h]->m_construction_point = m_game->m_max_construction_points;
-
-				//testcode
-				hb::logger::log("Enemy player killed by player, construction +{}, war contribution +{}", m_game->m_client_list[client_h]->m_level / 2, (reward_exp - (reward_exp / 3)) * 6);
-
-				m_game->send_notify_msg(0, attacker_h, Notify::ConstructionPoint, m_game->m_client_list[attacker_h]->m_construction_point, m_game->m_client_list[attacker_h]->m_war_contribution, 0, 0);
-
-				if (m_game->get_exp_level(m_game->m_client_list[client_h]->m_exp) >= iEK_Level) {
-					if ((memcmp(m_game->m_client_list[client_h]->m_location, m_game->m_client_list[client_h]->m_map_name, 10) != 0)
-						&& (m_game->m_enemy_kill_mode == false)) {
-						m_game->m_client_list[attacker_h]->m_enemy_kill_count += m_game->m_enemy_kill_adjust;
-					}
-
 					if (m_game->m_enemy_kill_mode) {
 						m_game->m_client_list[attacker_h]->m_enemy_kill_count += m_game->m_enemy_kill_adjust;
 					}

@@ -130,14 +130,6 @@ namespace net {
 		uint8_t item_ids[6];
 	};
 
-	struct HB_PACKED PacketRequestGuildAction : packet_base {
-		PacketHeader header;
-		char player[hb::shared::limits::CharNameLen];
-		char account[hb::shared::limits::AccountNameLen];
-		char password[hb::shared::limits::AccountPassLen];
-		char guild[hb::shared::limits::GuildNameLen];
-	};
-
 	struct HB_PACKED PacketRequestRetrieveItem : packet_base {
 		PacketHeader header;
 		uint8_t item_slot;
@@ -146,11 +138,6 @@ namespace net {
 	struct HB_PACKED PacketRequestNoticement : packet_base {
 		PacketHeader header;
 		int32_t value;
-	};
-
-	struct HB_PACKED PacketRequestFightzoneReserve : packet_base {
-		PacketHeader header;
-		int32_t fightzone;
 	};
 
 	struct HB_PACKED PacketRequestStateChange : packet_base {

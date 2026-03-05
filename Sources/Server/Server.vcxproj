@@ -182,7 +182,7 @@
     <ClInclude Include="ServerConfig.h" />
     <ClInclude Include="GlobalDef.h" />
     <ClInclude Include="MapInfoSqliteStore.h" />
-    <ClInclude Include="GuildsMan.h" />
+
     <ClInclude Include="Item.h" />
     <ClInclude Include="LoginServer.h" />
     <ClInclude Include="Magic.h" />

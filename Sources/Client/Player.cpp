@@ -16,9 +16,6 @@ void CPlayer::reset()
     m_player_name.clear();
     m_player_object_id = 0;
     m_player_type = 0;
-    m_guild_name.clear();
-    m_guild_rank = -1;
-
     // POSITION & MOVEMENT
     m_player_x = 0;
     m_player_y = 0;

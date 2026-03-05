@@ -99,8 +99,6 @@
 #include "DialogBox_Skill.h"
 #include "DialogBox_Bank.h"
 #include "DialogBox_Magic.h"
-#include "DialogBox_GuildMenu.h"
-#include "DialogBox_GuildOperation.h"
 #include "DialogBox_SellList.h"
 #include "DialogBox_Party.h"
 #include "DialogBox_ItemDropAmount.h"
@@ -1758,10 +1756,6 @@ void CGame::common_event_handler(char* data)
 	m_effect_manager->add_effect(static_cast<EffectType>(v3), sX, sY, v1, v2, 0, dw_v4);
 	break;
 
-	case CommonType::ClearGuildName:
-		if (auto* on_game = GameModeManager::get_active_screen_as<Screen_OnGame>())
-			on_game->get_guild_manager().clear_name_cache();
-		break;
 	}
 }
 
@@ -1771,11 +1765,7 @@ Screen_OnGame* CGame::on_game()
 	return get_active_screen_as<Screen_OnGame>();
 }
 
-// create_new_guild_response_handler MOVED to Screen_OnGame.Network.cpp
 // init_player_characteristics MOVED to NetworkMessages_Player.cpp
-// disband_guild_response_handler MOVED to Screen_OnGame.Network.cpp
-
-// put_guild_operation_list / shift_guild_operation_list REMOVED — use DialogBox_GuildOperation::put/shift
 
 // enable_dialog_box / disable_dialog_box wrappers REMOVED — callers use get_dialog_box_manager() directly
 
@@ -3613,40 +3603,7 @@ void CGame::handle_key_down(KeyCode _key)
 	if (screen) screen->on_key_down(_key);
 }
 
-void CGame::reserve_fightzone_response_handler(char* data)
-{
-	const auto* pkt = hb::net::PacketCast<hb::net::PacketResponseFightzoneReserve>(
-		data, sizeof(hb::net::PacketResponseFightzoneReserve));
-	if (!pkt) return;
-	switch (pkt->header.msg_type) {
-	case MsgType::Confirm:
-		add_event_list(RESERVE_FIGHTZONE_RESPONSE_HANDLER1, 10);
-		get_dialog_box_manager().get_dialog_as<DialogBox_GuildMenu>(DialogBoxId::GuildMenu)->m_mode = DialogBox_GuildMenu::mode::fightzone_reserved;
-		on_game()->m_fightzone_number = on_game()->m_fightzone_number_temp;
-		break;
-
-	case MsgType::Reject:
-		add_event_list(RESERVE_FIGHTZONE_RESPONSE_HANDLER2, 10);
-		on_game()->m_fightzone_number_temp = 0;
-
-		if (pkt->result == 0) {
-			get_dialog_box_manager().get_dialog_as<DialogBox_GuildMenu>(DialogBoxId::GuildMenu)->m_mode = DialogBox_GuildMenu::mode::fightzone_won;
-		}
-		else if (pkt->result == -1) {
-			get_dialog_box_manager().get_dialog_as<DialogBox_GuildMenu>(DialogBoxId::GuildMenu)->m_mode = DialogBox_GuildMenu::mode::fightzone_lost;
-		}
-		else if (pkt->result == -2) {
-			get_dialog_box_manager().get_dialog_as<DialogBox_GuildMenu>(DialogBoxId::GuildMenu)->m_mode = DialogBox_GuildMenu::mode::fightzone_draw;
-		}
-		else if (pkt->result == -3) {
-			get_dialog_box_manager().get_dialog_as<DialogBox_GuildMenu>(DialogBoxId::GuildMenu)->m_mode = DialogBox_GuildMenu::mode::fightzone_denied;
-		}
-		else if (pkt->result == -4) {
-			get_dialog_box_manager().get_dialog_as<DialogBox_GuildMenu>(DialogBoxId::GuildMenu)->m_mode = DialogBox_GuildMenu::mode::fightzone_canceled;
-		}
-		break;
-	}
-}
+// reserve_fightzone_response_handler removed with guild/fightzone system
 
 
 // UpdateScreen_OnLogResMsg removed - replaced by Overlay_LogResMsg
@@ -4684,12 +4641,6 @@ void CGame::command_processor(short mouse_x, short mouse_y, short tile_x, short 
 				{
 				}
 
-				if ((CursorTarget::GetSelectedType() == SelectedObjectType::DialogBox) &&
-					(CursorTarget::get_selected_id() == 7) && (get_dialog_box_manager().get_dialog_as<DialogBox_GuildMenu>(DialogBoxId::GuildMenu)->m_mode == DialogBox_GuildMenu::mode::create_guild))
-				{
-					text_input_manager::get().end_input();
-					get_dialog_box_manager().get_dialog_as<DialogBox_GuildMenu>(DialogBoxId::GuildMenu)->m_mode = DialogBox_GuildMenu::mode::confirm_cancel;
-				}
 				// Query Drop Item Amount
 				if ((CursorTarget::GetSelectedType() == SelectedObjectType::DialogBox) &&
 					(CursorTarget::get_selected_id() == 17) && (get_dialog_box_manager().get_dialog_as<DialogBox_ItemDropAmount>(DialogBoxId::ItemDropExternal)->m_mode == DialogBox_ItemDropAmount::mode::input))
@@ -4728,19 +4679,6 @@ void CGame::command_processor(short mouse_x, short mouse_y, short tile_x, short 
 			CursorTarget::set_cursor_status(CursorStatus::Null);
 			switch (CursorTarget::GetSelectedType()) {
 			case SelectedObjectType::DialogBox:
-				if ((CursorTarget::GetSelectedType() == SelectedObjectType::DialogBox) &&
-					(CursorTarget::get_selected_id() == 7) && (get_dialog_box_manager().get_dialog_as<DialogBox_GuildMenu>(DialogBoxId::GuildMenu)->m_mode == DialogBox_GuildMenu::mode::confirm_cancel))
-				{
-					auto* guild_dlg = get_dialog_box_manager().get_dialog_as<DialogBox_GuildMenu>(DialogBoxId::GuildMenu);
-					dialog_x = guild_dlg->m_x;
-					dialog_y = guild_dlg->m_y;
-					auto underline_metrics = hb::shared::text::measure_text(GameFont::Default, "____________________");
-					int input_x = dialog_x + (guild_dlg->m_size_x - underline_metrics.width) / 2;
-					m_player->m_guild_name.clear();
-					text_input_manager::get().start_input(input_x, dialog_y + 140, 21, m_player->m_guild_name, false, hb::client::guild_name_allowed_chars);
-					guild_dlg->m_mode = DialogBox_GuildMenu::mode::create_guild;
-				}
-
 				if ((CursorTarget::GetSelectedType() == SelectedObjectType::DialogBox) &&
 					(CursorTarget::get_selected_id() == 17) && (get_dialog_box_manager().get_dialog_as<DialogBox_ItemDropAmount>(DialogBoxId::ItemDropExternal)->m_mode == DialogBox_ItemDropAmount::mode::selected))
 				{	// Query Drop Item Amount
@@ -6177,9 +6115,6 @@ void CGame::init_data_response_handler(char* packet_data)
 	if (m_effect_manager) m_effect_manager->clear_all_effects();
 
 	weather_manager::get().reset_particles();
-
-	if (auto* on_game = GameModeManager::get_active_screen_as<Screen_OnGame>())
-		on_game->get_guild_manager().clear_name_cache();
 
 	get_floating_text().clear_all();
 

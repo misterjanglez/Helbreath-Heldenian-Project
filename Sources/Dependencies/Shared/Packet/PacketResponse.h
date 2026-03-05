@@ -10,11 +10,6 @@
 namespace hb {
 namespace net {
 	HB_PACK_BEGIN
-	struct HB_PACKED PacketResponseFightzoneReserve {
-		PacketHeader header;
-		int32_t result;
-	};
-
 	struct HB_PACKED PacketResponseInitPlayer {
 		PacketHeader header;
 	};
@@ -155,10 +150,7 @@ namespace net {
 		int32_t pk_count;
 		uint32_t reward_gold;
 		char location[hb::shared::limits::MapNameLen];
-		char guild_name[hb::shared::limits::GuildNameLen];
-		int32_t guild_rank;
 		uint8_t super_attack_left;
-		int32_t fightzone_number;
 		int16_t max_stats;
 		int32_t max_level;
 		int16_t max_bank_items;

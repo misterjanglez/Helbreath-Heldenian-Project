@@ -22,5 +22,4 @@
 #include "PacketAttributeTypeConfig.h"
 #include "PacketPartyOp.h"
 #include "PacketChat.h"
-#include "PacketGuild.h"
 #include "PacketCrusade.h"

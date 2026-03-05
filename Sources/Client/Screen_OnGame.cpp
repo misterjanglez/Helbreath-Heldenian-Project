@@ -26,8 +26,6 @@
 #include "TextLibExt.h"
 #include "SpellAoE.h"
 #include "Magic.h"
-#include "DialogBox_GuildMenu.h"
-#include "DialogBox_GuildOperation.h"
 #include "DialogBox_ItemDropAmount.h"
 #include "DialogBox_Party.h"
 #include "DialogBox_SellList.h"
@@ -155,8 +153,6 @@ void Screen_OnGame::on_initialize()
 
     m_logout_count = -1;
     m_logout_count_time = 0;
-    m_fightzone_number = 0;
-    m_fightzone_number_temp = 0;
     m_quest.who = 0;
     m_quest.quest_type = 0;
     m_quest.contribution = 0;
@@ -204,7 +200,6 @@ void Screen_OnGame::on_initialize()
     // Reset dialog state that init_game_settings couldn't do (dialogs didn't exist yet)
     m_dialog_box_manager->get_dialog_as<DialogBox_Skill>(DialogBoxId::Skill)->m_is_down_skill_pending = false;
     m_dialog_box_manager->reset_all_for_map_change();
-    m_dialog_box_manager->get_dialog_as<DialogBox_GuildOperation>(DialogBoxId::GuildOperation)->reset();
     m_dialog_box_manager->get_dialog_as<DialogBox_SellList>(DialogBoxId::SellList)->reset();
     m_dialog_box_manager->get_dialog_as<DialogBox_Party>(DialogBoxId::Party)->reset_members();
     // GuideMap is enabled in init_data_response_handler() after map data is loaded.
@@ -215,8 +210,6 @@ void Screen_OnGame::on_initialize()
     register_hotkeys();
 
     m_guild_manager.set_game(m_game);
-    m_guild_manager.clear_name_cache();
-
     m_fishing_manager.set_game(m_game);
     m_crafting_manager.set_game(m_game);
     m_quest_manager.set_game(m_game);
@@ -287,25 +280,7 @@ void Screen_OnGame::on_update()
     // Enter key handling
     if (hb::shared::input::is_key_pressed(KeyCode::Enter) == true)
     {
-        if ((m_game->get_dialog_box_manager().is_enabled(DialogBoxId::GuildMenu) == true) && (m_game->get_dialog_box_manager().get_dialog_as<DialogBox_GuildMenu>(DialogBoxId::GuildMenu)->m_mode == DialogBox_GuildMenu::mode::create_guild) && (m_game->get_dialog_box_manager().get_top_id() == DialogBoxId::GuildMenu)) {
-            text_input_manager::get().end_input();
-            if (m_game->m_player->m_guild_name.empty()) return;
-            if (m_game->m_player->m_guild_name != "NONE") {
-                {
-			hb::net::PacketRequestGuildAction req{};
-			req.header.msg_id = MsgId::request_create_new_guild;
-			req.header.msg_type = MsgType::Confirm;
-			std::snprintf(req.player, sizeof(req.player), "%s", m_game->m_player->m_player_name.c_str());
-			std::snprintf(req.account, sizeof(req.account), "%s", m_game->m_account_name.c_str());
-			std::snprintf(req.password, sizeof(req.password), "%s", m_game->m_account_password.c_str());
-			std::snprintf(req.guild, sizeof(req.guild), "%s", m_game->m_player->m_guild_name.c_str());
-			CMisc::replace_string(req.guild, ' ', '_');
-			m_game->send_game_packet(req);
-		}
-                m_game->get_dialog_box_manager().get_dialog_as<DialogBox_GuildMenu>(DialogBoxId::GuildMenu)->m_mode = DialogBox_GuildMenu::mode::creating;
-            }
-        }
-        else if ((m_game->get_dialog_box_manager().is_enabled(DialogBoxId::ItemDropExternal) == true) && (m_game->get_dialog_box_manager().get_dialog_as<DialogBox_ItemDropAmount>(DialogBoxId::ItemDropExternal)->m_mode == DialogBox_ItemDropAmount::mode::input) && (m_game->get_dialog_box_manager().get_top_id() == DialogBoxId::ItemDropExternal)) {
+        if ((m_game->get_dialog_box_manager().is_enabled(DialogBoxId::ItemDropExternal) == true) && (m_game->get_dialog_box_manager().get_dialog_as<DialogBox_ItemDropAmount>(DialogBoxId::ItemDropExternal)->m_mode == DialogBox_ItemDropAmount::mode::input) && (m_game->get_dialog_box_manager().get_top_id() == DialogBoxId::ItemDropExternal)) {
             text_input_manager::get().end_input();
 
             if (m_skill_using_status == true) {

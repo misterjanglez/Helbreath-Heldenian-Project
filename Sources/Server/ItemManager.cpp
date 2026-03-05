@@ -12,7 +12,6 @@
 #include "LootManager.h"
 #include "CraftingManager.h"
 #include "QuestManager.h"
-#include "GuildManager.h"
 #include "FishingManager.h"
 #include "MiningManager.h"
 #include "Packet/SharedPackets.h"
@@ -1262,46 +1261,11 @@ void ItemManager::give_item_handler(int client_h, short item_index, int amount, 
 		else {
 			// . @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 
-			bool guild_item_handled = false;
-
 			if (owner_type == hb::shared::owner_class::Player) {
 				memcpy(char_name, m_game->m_client_list[owner_h]->m_char_name, hb::shared::limits::CharNameLen - 1);
 				item = m_game->m_client_list[client_h]->m_item_list[item_index];
 
-				if (item->m_id_num == 88) {
-
-					// client_h  owner_h   .
-					// owner_h         .
-					if ((m_game->m_client_list[client_h]->m_guild_rank == -1) &&
-						(memcmp(m_game->m_client_list[client_h]->m_location, "NONE", 4) != 0) &&
-						(memcmp(m_game->m_client_list[client_h]->m_location, m_game->m_client_list[owner_h]->m_location, 10) == 0) &&
-						(m_game->m_client_list[owner_h]->m_guild_rank == 0)) {
-						m_game->send_notify_msg(client_h, owner_h, Notify::QueryJoinGuildReqPermission, 0, 0, 0, 0);
-						m_game->send_notify_msg(0, client_h, Notify::GiveItemFinEraseItem, item_index, 1, 0, char_name);
-
-						item_log(ItemLogAction::Deplete, client_h, (int)-1, item);
-
-						guild_item_handled = true;
-					}
-				}
-
-				if (!guild_item_handled && (m_game->m_is_crusade_mode == false) && (m_game->m_client_list[client_h]->m_item_list[item_index]->m_id_num == 89)) {
-
-					// client_h  owner_h   .
-					// owner_h  client_h    client_h
-					if ((memcmp(m_game->m_client_list[client_h]->m_guild_name, m_game->m_client_list[owner_h]->m_guild_name, 20) == 0) &&
-						(m_game->m_client_list[client_h]->m_guild_rank != -1) &&
-						(m_game->m_client_list[owner_h]->m_guild_rank == 0)) {
-						m_game->send_notify_msg(client_h, owner_h, Notify::QueryDismissGuildReqPermission, 0, 0, 0, 0);
-						m_game->send_notify_msg(0, client_h, Notify::GiveItemFinEraseItem, item_index, 1, 0, char_name);
-
-						item_log(ItemLogAction::Deplete, client_h, (int)-1, item);
-
-						guild_item_handled = true;
-					}
-				}
-
-				if (!guild_item_handled) {
+				{
 					if (add_client_item_list(owner_h, item, &erase_req)) {
 
 						item_log(ItemLogAction::Give, client_h, owner_h, item);
@@ -1362,75 +1326,17 @@ void ItemManager::give_item_handler(int client_h, short item_index, int amount, 
 					}
 				}
 				else if (m_game->m_npc_list[owner_h]->m_npc_config_id == 56) { // Shop Keeper
-					if ((m_game->m_is_crusade_mode == false) && (m_game->m_client_list[client_h]->m_item_list[item_index]->m_id_num == 89)) {
+					m_game->m_map_list[m_game->m_client_list[client_h]->m_map_index]->set_item(m_game->m_client_list[client_h]->m_x,
+						m_game->m_client_list[client_h]->m_y,
+						m_game->m_client_list[client_h]->m_item_list[item_index]);
 
-						if ((m_game->m_client_list[client_h]->m_guild_rank != 0) && (m_game->m_client_list[client_h]->m_guild_rank != -1)) {
-							m_game->send_notify_msg(client_h, client_h, CommonType::DismissGuildApprove, 0, 0, 0, 0);
+					item_log(ItemLogAction::Drop, client_h, 0, m_game->m_client_list[client_h]->m_item_list[item_index]);
 
-							std::memset(m_game->m_client_list[client_h]->m_guild_name, 0, sizeof(m_game->m_client_list[client_h]->m_guild_name));
-							memcpy(m_game->m_client_list[client_h]->m_guild_name, "NONE", 4);
-							m_game->m_client_list[client_h]->m_guild_rank = -1;
-							m_game->m_client_list[client_h]->m_guild_guid = -1;
+					m_game->send_ground_item_event(CommonType::ItemDrop, m_game->m_client_list[client_h]->m_map_index,
+						m_game->m_client_list[client_h]->m_x, m_game->m_client_list[client_h]->m_y,
+						m_game->m_client_list[client_h]->m_item_list[item_index]);
 
-							m_game->send_event_to_near_client_type_a(client_h, hb::shared::owner_class::Player, MsgId::EventMotion, Type::NullAction, 0, 0, 0);
-
-							if (m_game->m_client_list[client_h]->m_exp > 300)
-								m_game->m_client_list[client_h]->m_exp -= 300;
-							else
-								m_game->m_client_list[client_h]->m_exp = 0;
-							m_game->send_notify_msg(0, client_h, Notify::Exp, 0, 0, 0, 0);
-						}
-
-						delete m_game->m_client_list[client_h]->m_item_list[item_index];
-					}
-					else {
-						m_game->m_map_list[m_game->m_client_list[client_h]->m_map_index]->set_item(m_game->m_client_list[client_h]->m_x,
-							m_game->m_client_list[client_h]->m_y,
-							m_game->m_client_list[client_h]->m_item_list[item_index]);
-
-						item_log(ItemLogAction::Drop, client_h, 0, m_game->m_client_list[client_h]->m_item_list[item_index]);
-
-						m_game->send_ground_item_event(CommonType::ItemDrop, m_game->m_client_list[client_h]->m_map_index,
-							m_game->m_client_list[client_h]->m_x, m_game->m_client_list[client_h]->m_y,
-							m_game->m_client_list[client_h]->m_item_list[item_index]);
-
-						std::memset(char_name, 0, sizeof(char_name));
-
-					}
-				}
-				else if (m_game->m_npc_list[owner_h]->m_type == 26) { // Kennedy (GuildHall Officer)
-					if ((m_game->m_is_crusade_mode == false) && (m_game->m_client_list[client_h]->m_item_list[item_index]->m_id_num == hb::shared::item::ItemId::GuildSecessionTicket)) {
-
-						if ((m_game->m_client_list[client_h]->m_guild_rank == 0) || (m_game->m_client_list[client_h]->m_guild_rank == -1)) {
-							// Guild master cannot leave via ticket (must disband), guildless players can't use it
-							m_game->send_notify_msg(0, client_h, Notify::CannotGiveItem, item_index, amount, 0, char_name);
-							m_game->calc_total_weight(client_h);
-							return;
-						}
-
-						m_game->send_notify_msg(client_h, client_h, CommonType::DismissGuildApprove, 0, 0, 0, 0);
-
-						std::memset(m_game->m_client_list[client_h]->m_guild_name, 0, sizeof(m_game->m_client_list[client_h]->m_guild_name));
-						memcpy(m_game->m_client_list[client_h]->m_guild_name, "NONE", 4);
-						m_game->m_client_list[client_h]->m_guild_rank = -1;
-						m_game->m_client_list[client_h]->m_guild_guid = -1;
-
-						m_game->send_event_to_near_client_type_a(client_h, hb::shared::owner_class::Player, MsgId::EventMotion, Type::NullAction, 0, 0, 0);
-
-						if (m_game->m_client_list[client_h]->m_exp > 300)
-							m_game->m_client_list[client_h]->m_exp -= 300;
-						else
-							m_game->m_client_list[client_h]->m_exp = 0;
-						m_game->send_notify_msg(0, client_h, Notify::Exp, 0, 0, 0, 0);
-
-						delete m_game->m_client_list[client_h]->m_item_list[item_index];
-					}
-					else {
-						// Kennedy only accepts secession tickets — reject other items
-						m_game->send_notify_msg(0, client_h, Notify::CannotGiveItem, item_index, amount, 0, char_name);
-						m_game->calc_total_weight(client_h);
-						return;
-					}
+					std::memset(char_name, 0, sizeof(char_name));
 				}
 				else {
 					// NPC cannot receive items — reject and keep item in inventory
@@ -1440,9 +1346,7 @@ void ItemManager::give_item_handler(int client_h, short item_index, int amount, 
 				}
 			}
 
-			if (!guild_item_handled) {
-				m_game->send_notify_msg(0, client_h, Notify::GiveItemFinEraseItem, item_index, amount, 0, char_name);
-			}
+			m_game->send_notify_msg(0, client_h, Notify::GiveItemFinEraseItem, item_index, amount, 0, char_name);
 		}
 
 		if (m_game->m_client_list[client_h] == 0) return;

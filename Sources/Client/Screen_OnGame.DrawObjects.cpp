@@ -22,7 +22,6 @@
 #include "Packet/SharedPackets.h"
 #include "PacketSendHelpers.h"
 #include "NetMessages.h"
-#include "GuildManager.h"
 
 
 
@@ -1013,10 +1012,9 @@ void Screen_OnGame::draw_npc_name(short screen_x, short screen_y, short owner_ty
 
 void Screen_OnGame::draw_object_name(short screen_x, short screen_y, const char* name, const hb::shared::entity::PlayerStatus& status, uint16_t object_id)
 {
-	std::string guild_text;
 	std::string text, text2;
 	uint8_t red = 0, green = 0, blue = 0;
-	int guild_index = 0, y_offset = 0;
+	int y_offset = 0;
 	bool is_pk = false, is_citizen = false, is_aresden = false, is_hunter = false;
 	auto relationship = status.relationship;
 	if (IsHostile(relationship))
@@ -1059,18 +1057,6 @@ void Screen_OnGame::draw_object_name(short screen_x, short screen_y, const char*
 
 	if (object_id == m_game->m_player->m_player_object_id)
 	{
-		if (m_game->m_player->m_guild_rank == 0)
-		{
-			guild_text = std::format(DEF_MSG_GUILDMASTER, m_game->m_player->m_guild_name);//" Guildmaster)"
-			hb::shared::text::draw_text(GameFont::Default, screen_x, screen_y + 14, guild_text.c_str(), hb::shared::text::TextStyle::with_shadow(GameColors::InfoGrayLight));
-			y_offset = 14;
-		}
-		if (m_game->m_player->m_guild_rank > 0)
-		{
-			guild_text = std::format(DEF_MSG_GUILDSMAN, m_game->m_player->m_guild_name);//" Guildsman)"
-			hb::shared::text::draw_text(GameFont::Default, screen_x, screen_y + 14, guild_text.c_str(), hb::shared::text::TextStyle::with_shadow(GameColors::InfoGrayLight));
-			y_offset = 14;
-		}
 		if (m_game->m_player->m_pk_count != 0)
 		{
 			is_pk = true;
@@ -1091,39 +1077,6 @@ void Screen_OnGame::draw_object_name(short screen_x, short screen_y, const char*
 		is_citizen = status.citizen;
 		is_aresden = status.aresden;
 		is_hunter = status.hunter;
-		if (m_is_crusade_mode == false || !IsHostile(relationship))
-		{
-			auto& gm = get_guild_manager();
-			if (gm.find_guild_name(name, m_game->m_cur_time, &guild_index) == true)
-			{
-				auto& entry = gm.get_name_entry(guild_index);
-				if (!entry.guild_name.empty())
-				{
-					if (entry.guild_name != "NONE")
-					{
-						if (entry.guild_rank == 0)
-						{
-							guild_text = std::format(DEF_MSG_GUILDMASTER, entry.guild_name);
-							hb::shared::text::draw_text(GameFont::Default, screen_x, screen_y + 14, guild_text.c_str(), hb::shared::text::TextStyle::with_shadow(GameColors::InfoGrayLight));
-							y_offset = 14;
-						}
-						else if (entry.guild_rank > 0)
-						{
-							guild_text = std::format(DEF_MSG_GUILDSMAN, entry.guild_name);
-							hb::shared::text::draw_text(GameFont::Default, screen_x, screen_y + 14, guild_text.c_str(), hb::shared::text::TextStyle::with_shadow(GameColors::InfoGrayLight));
-							y_offset = 14;
-						}
-					}
-				}
-			}
-			else
-			{
-				auto pkt = hb::net::make_common_command(CommonType::ReqGuildName, m_game->m_player->m_player_x, m_game->m_player->m_player_y);
-				pkt.v1 = m_game->m_entity_state.m_object_id;
-				pkt.v2 = guild_index;
-				m_game->send_game_packet(pkt);
-			}
-		}
 	}
 
 	if (is_citizen == false)

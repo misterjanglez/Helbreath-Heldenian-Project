@@ -62,9 +62,6 @@ struct AccountDbCharacterState
     char character_name[11];
     char profile[256];
     char location[11];
-    char guild_name[21];
-    int guild_guid;
-    int guild_rank;
     char map_name[11];
     int map_x;
     int map_y;
@@ -111,9 +108,6 @@ struct AccountDbCharacterState
     int quest_completed;
     int special_event_id;
     int super_attack_left;
-    int fightzone_number;
-    int reserve_time;
-    int fightzone_ticket_number;
     int special_ability_time;
     char locked_map_name[11];
     int locked_map_time;

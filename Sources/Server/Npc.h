@@ -173,8 +173,7 @@ case 8:  "Hi-Explosive"
 	int	  m_build_count;			// ?      .  m_min_bravery.
 	int   m_mana_stock;
 	bool  m_is_master;
-	int   m_guild_guid;
-	
+
 	char m_crop_type;
 	char m_crop_skill;
 

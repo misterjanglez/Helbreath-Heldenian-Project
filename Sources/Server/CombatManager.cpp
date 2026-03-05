@@ -53,15 +53,6 @@ void CombatManager::remove_from_target(short target_h, char target_type, int cod
 
 	for(int i = 0; i < MaxNpcs; i++)
 		if (m_game->m_npc_list[i] != 0) {
-			if ((m_game->m_npc_list[i]->m_guild_guid != 0) && (target_type == hb::shared::owner_class::Player) &&
-				(m_game->m_client_list[target_h]->m_guild_guid == m_game->m_npc_list[i]->m_guild_guid)) {
-
-				if (m_game->m_npc_list[i]->m_action_limit == 0) {
-					m_game->m_npc_list[i]->m_is_summoned = true;
-					m_game->m_npc_list[i]->m_summoned_time = time;
-				}
-			}
-
 			if ((m_game->m_npc_list[i]->m_target_index == target_h) &&
 				(m_game->m_npc_list[i]->m_target_type == target_type)) {
 
@@ -135,12 +126,6 @@ void CombatManager::client_killed_handler(int client_h, int attacker_h, char att
 	if (m_game->m_client_list[client_h] == 0) return;
 	if (m_game->m_client_list[client_h]->m_is_init_complete == false) return;
 	if (m_game->m_client_list[client_h]->m_is_killed) return;
-
-	// 2002-7-4
-	if (memcmp(m_game->m_map_list[m_game->m_client_list[client_h]->m_map_index]->m_name, "fight", 5) == 0) {
-		m_game->m_client_list[client_h]->m_fightzone_dead_time = GameClock::GetTimeMS();
-		hb::logger::log("Fight zone dead time: {}", m_game->m_client_list[client_h]->m_fightzone_dead_time);
-	}
 
 	m_game->m_client_list[client_h]->m_is_killed = true;
 	// HP 0.
@@ -247,51 +232,25 @@ void CombatManager::client_killed_handler(int client_h, int attacker_h, char att
 			}
 		}
 		else {
-			if (m_game->m_client_list[client_h]->m_guild_rank == -1) {
-				if (memcmp(m_game->m_client_list[attacker_h]->m_location, "NONE", 4) == 0) {
-					if (m_game->m_client_list[client_h]->m_player_kill_count == 0) {
-						m_game->m_loot_manager->apply_pk_penalty(attacker_h, client_h);
-					}
-					else {
-
-					}
+			if (memcmp(m_game->m_client_list[attacker_h]->m_location, "NONE", 4) == 0) {
+				if (m_game->m_client_list[client_h]->m_player_kill_count == 0) {
+					m_game->m_loot_manager->apply_pk_penalty(attacker_h, client_h);
 				}
 				else {
-					if (memcmp(m_game->m_client_list[client_h]->m_location, m_game->m_client_list[attacker_h]->m_location, 10) == 0) {
-						if (m_game->m_client_list[client_h]->m_player_kill_count == 0) {
-							m_game->m_loot_manager->apply_pk_penalty(attacker_h, client_h);
-						}
-						else {
-							m_game->m_loot_manager->pk_kill_reward_handler(attacker_h, client_h);
-						}
-					}
-					else {
-						m_game->m_loot_manager->enemy_kill_reward_handler(attacker_h, client_h);
-					}
+
 				}
 			}
 			else {
-				// , ,   -> PK /   ->
-				if (memcmp(m_game->m_client_list[attacker_h]->m_location, "NONE", 4) == 0) {
+				if (memcmp(m_game->m_client_list[client_h]->m_location, m_game->m_client_list[attacker_h]->m_location, 10) == 0) {
 					if (m_game->m_client_list[client_h]->m_player_kill_count == 0) {
 						m_game->m_loot_manager->apply_pk_penalty(attacker_h, client_h);
 					}
 					else {
-
+						m_game->m_loot_manager->pk_kill_reward_handler(attacker_h, client_h);
 					}
 				}
 				else {
-					if (memcmp(m_game->m_client_list[client_h]->m_location, m_game->m_client_list[attacker_h]->m_location, 10) == 0) {
-						if (m_game->m_client_list[client_h]->m_player_kill_count == 0) {
-							m_game->m_loot_manager->apply_pk_penalty(attacker_h, client_h);
-						}
-						else {
-							m_game->m_loot_manager->pk_kill_reward_handler(attacker_h, client_h);
-						}
-					}
-					else {
-						m_game->m_loot_manager->enemy_kill_reward_handler(attacker_h, client_h);
-					}
+					m_game->m_loot_manager->enemy_kill_reward_handler(attacker_h, client_h);
 				}
 			}
 		}
@@ -356,24 +315,6 @@ void CombatManager::client_killed_handler(int client_h, int attacker_h, char att
 		else if ((m_game->m_client_list[client_h]->m_player_kill_count >= 12)) {
 			// Slaughterer 
 			m_game->m_loot_manager->apply_combat_killed_penalty(client_h, 12, is_s_aattacked);
-		}
-		if (m_game->m_npc_list[attacker_h]->m_guild_guid != 0) {
-
-			if (m_game->m_npc_list[attacker_h]->m_side != m_game->m_client_list[client_h]->m_side) {
-				for(int i = 1; i < MaxClients; i++)
-					if ((m_game->m_client_list[i] != 0) && (m_game->m_client_list[i]->m_guild_guid == m_game->m_npc_list[attacker_h]->m_guild_guid) &&
-						(m_game->m_client_list[i]->m_crusade_duty == 3)) {
-						m_game->m_client_list[i]->m_construction_point += (m_game->m_client_list[client_h]->m_level / 2);
-
-						if (m_game->m_client_list[i]->m_construction_point > m_game->m_max_construction_points)
-							m_game->m_client_list[i]->m_construction_point = m_game->m_max_construction_points;
-
-						//testcode
-						hb::logger::log("Enemy player killed by NPC, construction +{}", (m_game->m_client_list[client_h]->m_level / 2));
-						m_game->send_notify_msg(0, i, Notify::ConstructionPoint, m_game->m_client_list[i]->m_construction_point, m_game->m_client_list[i]->m_war_contribution, 0, 0);
-						return;
-					}
-			}
 		}
 		char txt[128];
 		std::memset(txt, 0, sizeof(txt));
@@ -540,10 +481,7 @@ void CombatManager::effect_damage_spot(short attacker_h, char attacker_type, sho
 				}
 				else {
 					if (m_game->m_map_list[m_game->m_client_list[attacker_h]->m_map_index]->m_is_fight_zone) {
-						if (m_game->m_client_list[attacker_h]->m_guild_guid != m_game->m_client_list[target_h]->m_guild_guid) {
 
-						}
-						else return;
 					}
 					else return;
 				}
@@ -1030,9 +968,6 @@ void CombatManager::effect_damage_spot_damage_move(short attacker_h, char attack
 				}
 				else {
 					if (m_game->m_map_list[m_game->m_client_list[attacker_h]->m_map_index]->m_is_fight_zone) {
-						if (m_game->m_client_list[attacker_h]->m_guild_guid != m_game->m_client_list[target_h]->m_guild_guid) {
-						}
-						else return;
 					}
 					else return;
 				}
@@ -1770,20 +1705,13 @@ int CombatManager::get_player_relationship_raw(int client_h, int opponent_h)
 			}
 		}
 		else {
-			if ((memcmp(m_game->m_client_list[client_h]->m_guild_name, m_game->m_client_list[opponent_h]->m_guild_name, 20) == 0) &&
-				(memcmp(m_game->m_client_list[client_h]->m_guild_name, "NONE", 4) != 0)) {
-				if (m_game->m_client_list[opponent_h]->m_guild_rank == 0)
-					ret = 5;
-				else ret = 3;
+			// Guild system removed - same-faction players are allies (ret=1), different faction are enemies
+			if ((memcmp(m_game->m_client_list[client_h]->m_location, m_game->m_client_list[opponent_h]->m_location, 10) == 0) &&
+				(memcmp(m_game->m_client_list[client_h]->m_location, "NONE", 4) != 0) &&
+				(memcmp(m_game->m_client_list[opponent_h]->m_location, "NONE", 4) != 0)) {
+				ret = 4;
 			}
-			else
-				if ((memcmp(m_game->m_client_list[client_h]->m_location, m_game->m_client_list[opponent_h]->m_location, 10) == 0) &&
-					(memcmp(m_game->m_client_list[client_h]->m_guild_name, "NONE", 4) != 0) &&
-					(memcmp(m_game->m_client_list[opponent_h]->m_guild_name, "NONE", 4) != 0) &&
-					(memcmp(m_game->m_client_list[client_h]->m_guild_name, m_game->m_client_list[opponent_h]->m_guild_name, 20) != 0)) {
-					ret = 4;
-				}
-				else ret = 1;
+			else ret = 1;
 		}
 	}
 
@@ -2602,11 +2530,8 @@ uint32_t CombatManager::calculate_attack_effect(short target_h, char target_type
 			}
 			else {
 				if (m_game->m_map_list[m_game->m_client_list[attacker_h]->m_map_index]->m_is_fight_zone) {
-					if (m_game->m_client_list[attacker_h]->m_guild_guid == m_game->m_client_list[target_h]->m_guild_guid) return 0;
-					else {
-						iAP_SM = iAP_SM / 2;
-						iAP_L = iAP_L / 2;
-					}
+					iAP_SM = iAP_SM / 2;
+					iAP_L = iAP_L / 2;
 				}
 				else return 0;
 			}

@@ -39,7 +39,7 @@
 #include "DialogBox_Soldier.h"
 #include "DialogBox_Slates.h"
 #include "DialogBox_ChangeStatsMajestic.h"
-#include "DialogBox_GuildHallMenu.h"
+#include "DialogBox_CommandHallMenu.h"
 #include "DialogBox_SellOrRepair.h"
 #include "DialogBox_Manufacture.h"
 #include "DialogBox_StatusOverlay.h"
@@ -105,7 +105,7 @@ void DialogBoxManager::initialize_dialog_boxes()
 	register_dialog_box(std::make_unique<DialogBox_Soldier>(&m_game));
 	register_dialog_box(std::make_unique<DialogBox_Slates>(&m_game));
 	register_dialog_box(std::make_unique<DialogBox_ChangeStatsMajestic>(&m_game));
-	register_dialog_box(std::make_unique<DialogBox_GuildHallMenu>(&m_game));
+	register_dialog_box(std::make_unique<DialogBox_CommandHallMenu>(&m_game));
 	register_dialog_box(std::make_unique<DialogBox_SellOrRepair>(&m_game));
 	register_dialog_box(std::make_unique<DialogBox_Manufacture>(&m_game));
 #ifdef TESTER_ONLY
@@ -415,7 +415,7 @@ void DialogBoxManager::disable_npc_dialogs()
 	disable_dialog_box(DialogBoxId::NpcActionQuery);
 	disable_dialog_box(DialogBoxId::NpcTalk);
 	disable_dialog_box(DialogBoxId::SellOrRepair);
-	disable_dialog_box(DialogBoxId::GuildHallMenu);
+	disable_dialog_box(DialogBoxId::CommandHallMenu);
 	disable_dialog_box(DialogBoxId::ItemUpgrade);
 	disable_dialog_box(DialogBoxId::Manufacture);
 	disable_dialog_box(DialogBoxId::Exchange);

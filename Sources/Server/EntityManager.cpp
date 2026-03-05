@@ -121,7 +121,6 @@ int CEntityManager::create_entity(
     int spot_mob_index, char change_side,
     bool hide_gen_mode, bool is_summoned,
     bool firm_berserk, bool is_master,
-    int guild_guid,
     bool bypass_mob_limit)
 {
     if (!m_initialized) return -1;
@@ -293,7 +292,6 @@ int CEntityManager::create_entity(
 
             m_npc_list[i]->m_bravery = (rand() % 3) + m_npc_list[i]->m_min_bravery;
             m_npc_list[i]->m_spot_mob_index = spot_mob_index;
-            m_npc_list[i]->m_guild_guid = guild_guid;
 
             // Generate and assign GUID
             m_entity_guid[i] = generate_entity_guid();
@@ -555,11 +553,11 @@ void CEntityManager::apply_crusade_contribution(int entity_handle, short attacke
             break;
 
         case hb::shared::owner_class::Npc:
-            if (m_game->m_npc_list[attacker_h]->m_guild_guid != 0) {
+            if (m_game->m_npc_list[attacker_h]->m_side != 0) {
                 if (m_game->m_npc_list[attacker_h]->m_side != entity->m_side) {
                     for(int i = 1; i < MaxClients; i++) {
                         if ((m_game->m_client_list[i] != nullptr) &&
-                            (m_game->m_client_list[i]->m_guild_guid == m_game->m_npc_list[attacker_h]->m_guild_guid) &&
+                            (m_game->m_client_list[i]->m_side == m_game->m_npc_list[attacker_h]->m_side) &&
                             (m_game->m_client_list[i]->m_crusade_duty == 3)) {
                             m_game->m_client_list[i]->m_construction_point += construction_point;
                             if (m_game->m_client_list[i]->m_construction_point > MaxConstructionPoint)
@@ -2511,13 +2509,6 @@ void CEntityManager::delete_npc_internal(int npc_h)
 
 	if (is_crusade_structure(m_npc_list[npc_h]->m_type)) {
 		m_map_list[m_npc_list[npc_h]->m_map_index]->remove_crusade_structure_info(m_npc_list[npc_h]->m_x, m_npc_list[npc_h]->m_y);
-		for(int i = 0; i < MaxGuilds; i++)
-			if (m_game->m_guild_teleport_loc[i].m_v1 == m_npc_list[npc_h]->m_guild_guid) {
-				m_game->m_guild_teleport_loc[i].m_time = time;
-				m_game->m_guild_teleport_loc[i].m_v2--;
-				if (m_game->m_guild_teleport_loc[i].m_v2 < 0) m_game->m_guild_teleport_loc[i].m_v2 = 0;
-				break;
-			}
 	}
 	else if (m_npc_list[npc_h]->m_type == 64) {
 		m_map_list[m_npc_list[npc_h]->m_map_index]->remove_crops_total_sum();

@@ -247,7 +247,6 @@ CGame::CGame()
 
 	// Gameplay Settings
 	m_nighttime_duration = NightTime;
-	m_starting_guild_rank = m_starting_guild_rank;
 	m_grand_magic_mana_consumption = GmgManaConsumeUnit;
 	m_max_construction_points = m_max_construction_points;
 	m_max_summon_points = MaxSummonPoints;
@@ -910,9 +909,6 @@ bool CGame::init()
 		std::memset(m_banned_list[i].banned_ip_address, 0, sizeof(m_banned_list[i].banned_ip_address));
 	}
 
-	for(int i = 0; i < MaxGuilds; i++)
-		m_guild_teleport_loc[i].m_v1 = 0;
-
 	for(int i = 0; i < hb::shared::limits::MaxCrusadeStructures; i++) {
 		m_middle_crusade_structure_info[i].type = 0;
 		m_middle_crusade_structure_info[i].side = 0;
@@ -972,12 +968,6 @@ bool CGame::init()
 	m_is_special_event_time = false;
 
 	SysTime = hb::time::local_time::now();
-	m_can_fightzone_reserve_time = time - ((SysTime.hour % 2) * 60 * 60 + SysTime.minute * 60) * 1000;
-
-	for(int i = 0; i < MaxFightZone; i++)
-		m_fight_zone_reserve[i] = 0;
-
-	m_fightzone_no_force_recall = 0;
 
 	// Load server_config.json (balance settings, timing, combat, etc.)
 	server_config cfg;
@@ -1923,10 +1913,7 @@ void CGame::request_init_data_handler(int client_h, char* data, char key, size_t
 	char_pkt->pk_count = m_client_list[client_h]->m_player_kill_count;
 	char_pkt->reward_gold = m_client_list[client_h]->m_reward_gold;
 	std::memcpy(char_pkt->location, m_client_list[client_h]->m_location, sizeof(char_pkt->location));
-	std::memcpy(char_pkt->guild_name, m_client_list[client_h]->m_guild_name, sizeof(char_pkt->guild_name));
-	char_pkt->guild_rank = m_client_list[client_h]->m_guild_rank;
 	char_pkt->super_attack_left = static_cast<std::uint8_t>(m_client_list[client_h]->m_super_attack_left);
-	char_pkt->fightzone_number = m_client_list[client_h]->m_fightzone_number;
 	char_pkt->max_stats = m_max_stat_value;
 	char_pkt->max_level = m_max_level;
 	char_pkt->max_bank_items = m_max_bank_items;
@@ -2138,15 +2125,6 @@ void CGame::request_init_data_handler(int client_h, char* data, char key, size_t
 		}
 
 	}
-	else if ((m_map_list[m_client_list[client_h]->m_map_index]->m_is_fight_zone) &&
-		(m_fightzone_no_force_recall == 0) ) {
-
-		m_client_list[client_h]->m_war_begin_time = GameClock::GetTimeMS();
-		m_client_list[client_h]->m_is_war_location = true;
-
-		SysTime = hb::time::local_time::now();
-		m_client_list[client_h]->m_time_left_force_recall = 2 * 60 * 20 - ((SysTime.hour % 2) * 20 * 60 + SysTime.minute * 20) - 2 * 20;
-	}
 	else
 	{
 		m_client_list[client_h]->m_is_war_location = false;
@@ -2186,14 +2164,7 @@ void CGame::request_init_data_handler(int client_h, char* data, char key, size_t
 		}
 	}
 	else {
-		if (m_map_list[m_client_list[client_h]->m_map_index]->m_is_fight_zone &&
-			m_fightzone_no_force_recall == false) {
-			m_client_list[client_h]->m_war_begin_time = GameClock::GetTimeMS();
-			m_client_list[client_h]->m_is_war_location = true;
-			SysTime = hb::time::local_time::now();
-			m_client_list[client_h]->m_time_left_force_recall = 2 * 60 * 20 - ((SysTime.hour % 2) * 20 * 60 + SysTime.minute * 20) - 2 * 20;
-		}
-		else {
+		{
 			if (memcmp(m_map_list[m_client_list[client_h]->m_map_index]->m_location_name, "arejail", 7) == 0 ||
 				memcmp(m_map_list[m_client_list[client_h]->m_map_index]->m_location_name, "elvjail", 7) == 0) {
 				m_client_list[client_h]->m_is_war_location = true;
@@ -4520,11 +4491,6 @@ bool CGame::load_player_data_from_db(int client_h)
 	std::memset(m_client_list[client_h]->m_location, 0, sizeof(m_client_list[client_h]->m_location));
 	std::snprintf(m_client_list[client_h]->m_location, sizeof(m_client_list[client_h]->m_location), "%s", state.location);
 
-	std::memset(m_client_list[client_h]->m_guild_name, 0, sizeof(m_client_list[client_h]->m_guild_name));
-	std::snprintf(m_client_list[client_h]->m_guild_name, sizeof(m_client_list[client_h]->m_guild_name), "%s", state.guild_name);
-	m_client_list[client_h]->m_guild_guid = state.guild_guid;
-	m_client_list[client_h]->m_guild_rank = state.guild_rank;
-
 	std::memset(m_client_list[client_h]->m_map_name, 0, sizeof(m_client_list[client_h]->m_map_name));
 	std::snprintf(m_client_list[client_h]->m_map_name, sizeof(m_client_list[client_h]->m_map_name), "%s", state.map_name);
 	m_client_list[client_h]->m_map_index = -1;
@@ -4585,9 +4551,6 @@ bool CGame::load_player_data_from_db(int client_h)
 	m_client_list[client_h]->m_is_quest_completed = (state.quest_completed != 0);
 	m_client_list[client_h]->m_special_event_id = state.special_event_id;
 	m_client_list[client_h]->m_super_attack_left = state.super_attack_left;
-	m_client_list[client_h]->m_fightzone_number = state.fightzone_number;
-	m_client_list[client_h]->m_reserve_time = state.reserve_time;
-	m_client_list[client_h]->m_fightzone_ticket_number = state.fightzone_ticket_number;
 	m_client_list[client_h]->m_special_ability_time = state.special_ability_time;
 	std::memset(m_client_list[client_h]->m_locked_map_name, 0, sizeof(m_client_list[client_h]->m_locked_map_name));
 	std::snprintf(m_client_list[client_h]->m_locked_map_name, sizeof(m_client_list[client_h]->m_locked_map_name), "%s", state.locked_map_name);
@@ -4849,7 +4812,7 @@ void CGame::init_player_data(int client_h, char* data, uint32_t size)
 {
 	char quest_remain;
 	int     ret, total_points;
-	bool    ret_ok, guild_status;
+	bool    ret_ok;
 
 	if (m_client_list[client_h] == 0) return;
 	if (m_client_list[client_h]->m_is_init_complete) return;
@@ -4943,22 +4906,6 @@ void CGame::init_player_data(int client_h, char* data, uint32_t size)
 
 	send_notify_msg(0, client_h, Notify::Hunger, m_client_list[client_h]->m_hunger_status, 0, 0, 0);
 
-	if (strcmp(m_client_list[client_h]->m_guild_name, "NONE") != 0) {
-		char fn[112] = {};
-		std::memset(fn, 0, sizeof(fn));
-		std::snprintf(fn, sizeof(fn), "Guilds/AscII%d/%s.txt", m_client_list[client_h]->m_guild_name[0], m_client_list[client_h]->m_guild_name);
-		guild_status = std::filesystem::exists(fn);
-		// GuildName
-		if ((!guild_status) && (memcmp(m_client_list[client_h]->m_guild_name, "NONE", 4) != 0)) {
-			std::memset(m_client_list[client_h]->m_guild_name, 0, sizeof(m_client_list[client_h]->m_guild_name));
-			strcpy(m_client_list[client_h]->m_guild_name, "NONE");
-			m_client_list[client_h]->m_guild_rank = -1;
-			m_client_list[client_h]->m_guild_guid = -1;
-
-			send_notify_msg(0, client_h, Notify::GuildDisbanded, 0, 0, 0, m_client_list[client_h]->m_guild_name);
-		}
-	}
-
 	if (m_client_list[client_h]->m_quest > 0) {
 		// Validate quest number to prevent out-of-bounds access
 		if(m_client_list[client_h]->m_quest >= hb::server::config::MaxQuestType || !m_quest_manager->m_quest_config_list[m_client_list[client_h]->m_quest])
@@ -5032,7 +4979,7 @@ bool CGame::get_is_string_is_number(char* str)
 	return true;
 }
 
-int CGame::create_new_npc(int npc_config_id, char* name, char* map_name, short sClass, char sa, char move_type, int* offset_x, int* offset_y, char* waypoint_list, hb::shared::geometry::GameRectangle* area, int spot_mob_index, char change_side, bool hide_gen_mode, bool is_summoned, bool firm_berserk, bool is_master, int guild_guid, bool bypass_mob_limit)
+int CGame::create_new_npc(int npc_config_id, char* name, char* map_name, short sClass, char sa, char move_type, int* offset_x, int* offset_y, char* waypoint_list, hb::shared::geometry::GameRectangle* area, int spot_mob_index, char change_side, bool hide_gen_mode, bool is_summoned, bool firm_berserk, bool is_master, bool bypass_mob_limit)
 {
 	if (m_entity_manager == 0)
 		return false;
@@ -5040,7 +4987,7 @@ int CGame::create_new_npc(int npc_config_id, char* name, char* map_name, short s
 	return (m_entity_manager->create_entity(
 		npc_config_id, name, map_name, sClass, sa, move_type,
 		offset_x, offset_y, waypoint_list, area, spot_mob_index, change_side,
-		hide_gen_mode, is_summoned, firm_berserk, is_master, guild_guid, bypass_mob_limit) > 0);
+		hide_gen_mode, is_summoned, firm_berserk, is_master, bypass_mob_limit) > 0);
 }
 
 int CGame::spawn_map_npcs_from_database(sqlite3* db, int map_index)
@@ -5254,15 +5201,8 @@ void CGame::chat_msg_handler(int client_h, char* data, size_t msg_size)
 	case '^':
 		*cp = 32;
 
-		if ((m_client_list[client_h]->m_level > 10) &&
-			(m_client_list[client_h]->m_sp > 5) && m_client_list[client_h]->m_guild_rank != -1) {
-			if (m_client_list[client_h]->m_time_left_firm_stamina == 0) {
-				m_client_list[client_h]->m_sp -= 3;
-				send_notify_msg(0, client_h, Notify::Sp, 0, 0, 0, 0);
-			}
-			send_mode = 1;
-		}
-		else send_mode = 0;
+		// Guild chat removed
+		send_mode = 0;
 
 		// v1.4334
 		if (m_client_list[client_h]->m_hp < 0) send_mode = 0;
@@ -5347,7 +5287,7 @@ void CGame::chat_msg_handler(int client_h, char* data, size_t msg_size)
 	switch (send_mode)
 	{
 	case 0:  chat_type = "[Local]"; break;
-	case 1:  chat_type = "[Guild]"; break;
+	case 1:  chat_type = "[Local]"; break; // Guild chat removed, fall through to local
 	case 2:  chat_type = "[Shout]"; break;
 	case 3:  chat_type = "[Faction]"; break;
 	case 4:  chat_type = "[Party]"; break;
@@ -5393,20 +5333,7 @@ void CGame::chat_msg_handler(int client_h, char* data, size_t msg_size)
 					break;
 
 				case 1:
-					if (m_client_list[i]->m_is_init_complete == false) break;
-
-					if ((memcmp(m_client_list[i]->m_guild_name, m_client_list[client_h]->m_guild_name, 20) == 0) &&
-						(memcmp(m_client_list[i]->m_guild_name, "NONE", 4) != 0)) {
-
-						// Crusade
-						if (m_is_crusade_mode) {
-							if ((m_client_list[client_h]->m_side != 0) && (m_client_list[i]->m_side != 0) &&
-								(m_client_list[i]->m_side != m_client_list[client_h]->m_side)) {
-							}
-							else ret = m_client_list[i]->m_socket->send_msg(data, msg_size);
-						}
-						else ret = m_client_list[i]->m_socket->send_msg(data, msg_size);
-					}
+					// Guild chat removed
 					break;
 
 				case 2:
@@ -5490,13 +5417,7 @@ void CGame::chat_msg_handler_gsm(int msg_type, int v1, char* name, char* data, s
 
 	switch (msg_type) {
 	case 1:
-		for(int i = 1; i < MaxClients; i++)
-			if (m_client_list[i] != 0) {
-				if (m_client_list[i]->m_is_init_complete == false) break;
-				if ((m_client_list[i]->m_guild_guid == v1) && (m_client_list[i]->m_guild_guid != 0)) {
-					ret = m_client_list[i]->m_socket->send_msg(temp, msg_size + 22);
-				}
-			}
+		// Guild chat removed
 		break;
 
 	case 2:
@@ -5962,18 +5883,6 @@ void CGame::msg_process()
 				chat_msg_handler(client_h, data, msg_size);
 				break;
 
-			case MsgId::request_create_new_guild:
-				m_guild_manager->request_create_new_guild_handler(client_h, data, msg_size);
-				break;
-
-			case MsgId::request_disband_guild:
-				m_guild_manager->request_disband_guild_handler(client_h, data, msg_size);
-				break;
-
-			case MsgId::RequestFightZoneReserve:
-				m_war_manager->fightzone_reserve_handler(client_h, data, msg_size);
-				break;
-
 			case MsgId::LevelUpSettings:
 				level_up_settings_handler(client_h, data, msg_size);
 				break;
@@ -6133,21 +6042,6 @@ void CGame::client_common_handler(int client_h, char* data)
 	case CommonType::RequestHuntMode:
 		//DbgWnd->AddEventMsg("RECV -> Source::Client -> MsgId::CommandCommon -> MsgId::RequestCivilRight");
 		request_change_play_mode(client_h);
-		break;
-
-	case CommonType::SetGuildTeleportLoc:
-		//DbgWnd->AddEventMsg("RECV -> Source::Client -> MsgId::CommandCommon -> CommonType::SetGuildTeleportLoc");
-		m_war_manager->request_set_guild_teleport_loc_handler(client_h, v1, v2, m_client_list[client_h]->m_guild_guid, "middleland");
-		break;
-
-	case CommonType::SetGuildConstructLoc:
-		//DbgWnd->AddEventMsg("RECV -> Source::Client -> MsgId::CommandCommon -> CommonType::SetGuildConstructLoc");
-		m_war_manager->request_set_guild_construct_loc_handler(client_h, v1, v2, m_client_list[client_h]->m_guild_guid, string);
-		break;
-
-	case CommonType::GuildTeleport:
-		//DbgWnd->AddEventMsg("RECV -> Source::Client -> MsgId::CommandCommon -> CommonType::GuildTeleport");
-		m_war_manager->request_guild_teleport_handler(client_h);
 		break;
 
 	case CommonType::SummonWarUnit:
@@ -6317,26 +6211,6 @@ void CGame::client_common_handler(int client_h, char* data)
 		m_item_manager->exchange_item_handler(client_h, dir, v1, v2, v3, v4, string);
 		break;
 
-	case CommonType::JoinGuildApprove:
-		//DbgWnd->AddEventMsg("RECV -> Source::Client -> MsgId::CommandCommon -> CommonType::JoinGuildApprove");
-		m_guild_manager->join_guild_approve_handler(client_h, string);
-		break;
-
-	case CommonType::JoinGuildReject:
-		//DbgWnd->AddEventMsg("RECV -> Source::Client -> MsgId::CommandCommon -> CommonType::JoinGuildReject");
-		m_guild_manager->join_guild_reject_handler(client_h, string);
-		break;
-
-	case CommonType::DismissGuildApprove:
-		//DbgWnd->AddEventMsg("RECV -> Source::Client -> MsgId::CommandCommon -> CommonType::DismissGuildApprove");
-		m_guild_manager->dismiss_guild_approve_handler(client_h, string);
-		break;
-
-	case CommonType::DismissGuildReject:
-		//DbgWnd->AddEventMsg("RECV -> Source::Client -> MsgId::CommandCommon -> CommonType::DismissGuildReject");
-		m_guild_manager->dismiss_guild_reject_handler(client_h, string);
-		break;
-
 	case CommonType::ReleaseItem:
 		//DbgWnd->AddEventMsg("RECV -> Source::Client -> MsgId::CommandCommon -> CommonType::ReleaseItem");
 		m_item_manager->release_item_handler(client_h, v1, true);
@@ -6363,20 +6237,10 @@ void CGame::client_common_handler(int client_h, char* data)
 		toggle_safe_attack_mode_handler(client_h);
 		break;
 
-	case CommonType::ReqGetOccupyFightZoneTicket:
-		//DbgWnd->AddEventMsg("RECV -> Source::Client -> MsgId::CommandCommon -> CommonType::ReqGetOccupyFightZoneTicket");
-		m_war_manager->get_fightzone_ticket_handler(client_h);
-		break;
-
 		// Upgrade Item
 	case CommonType::UpgradeItem:
 		//DbgWnd->AddEventMsg("RECV -> Source::Client -> MsgId::CommandCommon -> CommonType::UpgradeItem");
 		m_item_manager->request_item_upgrade_handler(client_h, v1);
-		break;
-
-	case CommonType::ReqGuildName:
-		//DbgWnd->AddEventMsg("RECV -> Source::Client -> MsgId::CommandCommon -> CommonType::ReqGuildName");
-		m_guild_manager->request_guild_name_handler(client_h, v1, v2);
 		break;
 
 	case CommonType::RequestAcceptJoinParty:
@@ -7246,20 +7110,6 @@ void CGame::send_notify_msg(int from_h, int to_h, uint16_t msg_type, uint32_t v1
 		}
 		}
 		break;
-
-	case Notify::ReqGuildNameAnswer:
-	{
-		hb::net::PacketNotifyReqGuildNameAnswer pkt{};
-		pkt.header.msg_id = MsgId::Notify;
-		pkt.header.msg_type = msg_type;
-		pkt.guild_rank = static_cast<int16_t>(v1);
-		pkt.index = static_cast<int16_t>(v2);
-		if (string != 0) {
-			memcpy(pkt.guild_name, string, sizeof(pkt.guild_name));
-		}
-		ret = m_client_list[to_h]->m_socket->send_msg(reinterpret_cast<char*>(&pkt), sizeof(pkt));
-	}
-	break;
 
 	// New 06/05/2004
 	// Upgrade Notify Msg's
@@ -8250,8 +8100,6 @@ void CGame::send_notify_msg(int from_h, int to_h, uint16_t msg_type, uint32_t v1
 		pkt.exp = static_cast<uint32_t>(m_client_list[to_h]->m_exp);
 		pkt.kill_count = static_cast<uint32_t>(m_client_list[to_h]->m_enemy_kill_count);
 		memcpy(pkt.killer_name, m_client_list[v1]->m_char_name, sizeof(pkt.killer_name));
-		memcpy(pkt.killer_guild, m_client_list[v1]->m_guild_name, sizeof(pkt.killer_guild));
-		pkt.killer_rank = static_cast<int16_t>(m_client_list[v1]->m_guild_rank);
 		pkt.war_contribution = static_cast<int16_t>(m_client_list[to_h]->m_war_contribution);
 		ret = m_client_list[to_h]->m_socket->send_msg(reinterpret_cast<char*>(&pkt), sizeof(pkt));
 	}
@@ -8460,139 +8308,6 @@ void CGame::send_notify_msg(int from_h, int to_h, uint16_t msg_type, uint32_t v1
 		break;
 	}
 
-	case Notify::QueryDismissGuildReqPermission:
-	{
-		hb::net::PacketNotifyQueryDismissGuildPermission pkt{};
-		pkt.header.msg_id = MsgId::Notify;
-		pkt.header.msg_type = msg_type;
-		memcpy(pkt.name, m_client_list[from_h]->m_char_name, sizeof(pkt.name));
-		ret = m_client_list[to_h]->m_socket->send_msg(reinterpret_cast<char*>(&pkt), sizeof(pkt));
-		break;
-	}
-
-	case Notify::QueryJoinGuildReqPermission:
-	{
-		hb::net::PacketNotifyQueryJoinGuildPermission pkt{};
-		pkt.header.msg_id = MsgId::Notify;
-		pkt.header.msg_type = msg_type;
-		memcpy(pkt.name, m_client_list[from_h]->m_char_name, sizeof(pkt.name));
-		ret = m_client_list[to_h]->m_socket->send_msg(reinterpret_cast<char*>(&pkt), sizeof(pkt));
-		break;
-	}
-
-	case Notify::CannotJoinMoreGuildsman:
-	{
-		hb::net::PacketNotifyCannotJoinMoreGuildsMan pkt{};
-		pkt.header.msg_id = MsgId::Notify;
-		pkt.header.msg_type = msg_type;
-		memcpy(pkt.name, m_client_list[from_h]->m_char_name, sizeof(pkt.name));
-		ret = m_client_list[to_h]->m_socket->send_msg(reinterpret_cast<char*>(&pkt), sizeof(pkt));
-		break;
-	}
-
-	case CommonType::JoinGuildApprove:
-	{
-		hb::net::PacketNotifyJoinGuildApprove pkt{};
-		pkt.header.msg_id = MsgId::Notify;
-		pkt.header.msg_type = msg_type;
-		if (m_client_list[from_h] != 0) {
-			memcpy(pkt.guild_name, m_client_list[from_h]->m_guild_name, sizeof(pkt.guild_name));
-		}
-		else {
-			memcpy(pkt.guild_name, "?", 1);
-		}
-		pkt.rank = m_starting_guild_rank;
-		ret = m_client_list[to_h]->m_socket->send_msg(reinterpret_cast<char*>(&pkt), sizeof(pkt));
-	}
-	break;
-
-	case CommonType::JoinGuildReject:
-	case CommonType::DismissGuildApprove:
-	case CommonType::DismissGuildReject:
-		if (msg_type == CommonType::JoinGuildReject) {
-			hb::net::PacketNotifyJoinGuildReject pkt{};
-			pkt.header.msg_id = MsgId::Notify;
-			pkt.header.msg_type = msg_type;
-			if (m_client_list[from_h] != 0) {
-				memcpy(pkt.guild_name, m_client_list[from_h]->m_guild_name, sizeof(pkt.guild_name));
-			}
-			else {
-				memcpy(pkt.guild_name, "?", 1);
-			}
-			pkt.rank = m_starting_guild_rank;
-			memcpy(pkt.location, m_client_list[to_h]->m_location, sizeof(pkt.location));
-			ret = m_client_list[to_h]->m_socket->send_msg(reinterpret_cast<char*>(&pkt), sizeof(pkt));
-		}
-		else if (msg_type == CommonType::DismissGuildApprove) {
-			hb::net::PacketNotifyDismissGuildApprove pkt{};
-			pkt.header.msg_id = MsgId::Notify;
-			pkt.header.msg_type = msg_type;
-			if (m_client_list[from_h] != 0) {
-				memcpy(pkt.guild_name, m_client_list[from_h]->m_guild_name, sizeof(pkt.guild_name));
-			}
-			else {
-				memcpy(pkt.guild_name, "?", 1);
-			}
-			pkt.rank = m_starting_guild_rank;
-			memcpy(pkt.location, m_client_list[to_h]->m_location, sizeof(pkt.location));
-			ret = m_client_list[to_h]->m_socket->send_msg(reinterpret_cast<char*>(&pkt), sizeof(pkt));
-		}
-		else {
-			hb::net::PacketNotifyDismissGuildReject pkt{};
-			pkt.header.msg_id = MsgId::Notify;
-			pkt.header.msg_type = msg_type;
-			if (m_client_list[from_h] != 0) {
-				memcpy(pkt.guild_name, m_client_list[from_h]->m_guild_name, sizeof(pkt.guild_name));
-			}
-			else {
-				memcpy(pkt.guild_name, "?", 1);
-			}
-			pkt.rank = m_starting_guild_rank;
-			memcpy(pkt.location, m_client_list[to_h]->m_location, sizeof(pkt.location));
-			ret = m_client_list[to_h]->m_socket->send_msg(reinterpret_cast<char*>(&pkt), sizeof(pkt));
-		}
-		break;
-
-	case Notify::GuildDisbanded:
-	{
-		hb::net::PacketNotifyGuildDisbanded pkt{};
-		pkt.header.msg_id = MsgId::Notify;
-		pkt.header.msg_type = msg_type;
-		if (string != 0) {
-			memcpy(pkt.guild_name, string, sizeof(pkt.guild_name));
-		}
-		memcpy(pkt.location, m_client_list[to_h]->m_location, sizeof(pkt.location));
-		ret = m_client_list[to_h]->m_socket->send_msg(reinterpret_cast<char*>(&pkt), sizeof(pkt));
-	}
-	break;
-
-	case Notify::FightZoneReserve:
-	{
-		hb::net::PacketNotifyFightZoneReserve pkt{};
-		pkt.header.msg_id = MsgId::Notify;
-		pkt.header.msg_type = msg_type;
-		pkt.result = static_cast<int32_t>(v1);
-		ret = m_client_list[to_h]->m_socket->send_msg(reinterpret_cast<char*>(&pkt), sizeof(pkt));
-	}
-	break;
-
-	case Notify::NoGuildMasterLevel:
-	{
-		hb::net::PacketNotifyEmpty pkt{};
-		pkt.header.msg_id = MsgId::Notify;
-		pkt.header.msg_type = msg_type;
-		ret = m_client_list[to_h]->m_socket->send_msg(reinterpret_cast<char*>(&pkt), sizeof(pkt));
-	}
-	break;
-
-	case Notify::CannotBanGuildman:
-	{
-		hb::net::PacketNotifyEmpty pkt{};
-		pkt.header.msg_id = MsgId::Notify;
-		pkt.header.msg_type = msg_type;
-		ret = m_client_list[to_h]->m_socket->send_msg(reinterpret_cast<char*>(&pkt), sizeof(pkt));
-	}
-	break;
 	}
 
 	switch (ret) {
@@ -9222,15 +8937,6 @@ void CGame::request_teleport_handler(int client_h, const char* data, const char*
 		// New 17/05/2004
 		check_force_recall_time(client_h);
 	}
-	else if (m_map_list[m_client_list[client_h]->m_map_index]->m_is_fight_zone) {
-		m_client_list[client_h]->m_war_begin_time = GameClock::GetTimeMS();
-		m_client_list[client_h]->m_is_war_location = true;
-		set_force_recall_time(client_h);
-
-		SysTime = hb::time::local_time::now();
-		m_client_list[client_h]->m_time_left_force_recall = 2 * 20 * 60 - ((SysTime.hour % 2) * 20 * 60 + SysTime.minute * 20) - 2 * 20;
-
-	}
 	else {
 		m_client_list[client_h]->m_is_war_location = false;
 		m_client_list[client_h]->m_time_left_force_recall = 0;
@@ -9255,14 +8961,7 @@ void CGame::request_teleport_handler(int client_h, const char* data, const char*
 		}
 	}
 	else {
-		if (m_map_list[m_client_list[client_h]->m_map_index]->m_is_fight_zone &&
-			m_fightzone_no_force_recall == false) {
-			m_client_list[client_h]->m_war_begin_time = GameClock::GetTimeMS();
-			m_client_list[client_h]->m_is_war_location = true;
-			SysTime = hb::time::local_time::now();
-			m_client_list[client_h]->m_time_left_force_recall = 2 * 60 * 20 - ((SysTime.hour % 2) * 20 * 60 + SysTime.minute * 20) - 2 * 20;
-		}
-		else {
+		{
 			if (memcmp(m_map_list[m_client_list[client_h]->m_map_index]->m_location_name, "arejail", 7) == 0 ||
 				memcmp(m_map_list[m_client_list[client_h]->m_map_index]->m_location_name, "elvjail", 7) == 0) {
 				m_client_list[client_h]->m_is_war_location = true;
@@ -9572,16 +9271,6 @@ void CGame::state_change_handler(int client_h, char* data, size_t msg_size)
 	if ((old_int - cInt < m_base_stat_value) || (old_int - cInt > CharPointLimit)) { send_notify_msg(0, client_h, Notify::StateChangeFailed, 0, 0, 0, 0); return; }
 	if ((old_mag - mag < m_base_stat_value) || (old_mag - mag > CharPointLimit)) { send_notify_msg(0, client_h, Notify::StateChangeFailed, 0, 0, 0, 0); return; }
 	if ((old_char - cChar < m_base_stat_value) || (old_char - cChar > CharPointLimit)) { send_notify_msg(0, client_h, Notify::StateChangeFailed, 0, 0, 0, 0); return; }
-
-	// Guild masters cannot reduce CHR below 20
-	if (m_client_list[client_h]->m_guild_rank == 0)
-	{
-		if (old_char - cChar < 20)
-		{
-			send_notify_msg(0, client_h, Notify::StateChangeFailed, 0, 0, 0, 0);
-			return;
-		}
-	}
 
 	hb::logger::log("Majestic stat upgrade: player={} cost={} STR={} VIT={} DEX={} INT={} MAG={} CHR={}", m_client_list[client_h]->m_char_name, majestic_cost, str, vit, dex, cInt, mag, cChar);
 
@@ -11763,12 +11452,12 @@ void CGame::request_help_handler(int client_h)
 	
 
 	if (m_client_list[client_h] == 0) return;
-	if (m_client_list[client_h]->m_guild_rank == -1) return;
 	if (m_client_list[client_h]->m_crusade_duty != 1) return;
 
+	// Guild system removed - help request finds any commander on the same side
 	for(int i = 1; i < MaxClients; i++)
-		if ((m_client_list[i] != 0) && (m_client_list[i]->m_guild_rank == 0) &&
-			(m_client_list[i]->m_crusade_duty == 3) && (m_client_list[i]->m_guild_guid == m_client_list[client_h]->m_guild_guid)) {
+		if ((m_client_list[i] != 0) &&
+			(m_client_list[i]->m_crusade_duty == 3) && (m_client_list[i]->m_side == m_client_list[client_h]->m_side)) {
 			send_notify_msg(0, i, Notify::Help, m_client_list[client_h]->m_x, m_client_list[client_h]->m_y, m_client_list[client_h]->m_hp, m_client_list[client_h]->m_char_name);
 			return;
 		}
@@ -12539,12 +12228,6 @@ void CGame::on_timer(char type)
 	if ((m_heldenian_running) && (m_is_heldenian_mode)) {
 		m_war_manager->set_heldenian_mode();
 	}
-	if ((time - m_can_fightzone_reserve_time) > 7200000) {
-		m_war_manager->fightzone_reserve_processor();
-		m_can_fightzone_reserve_time += 7200000;
-		if (time - m_can_fightzone_reserve_time > 7200000) m_can_fightzone_reserve_time = time;
-	}
-
 	// Scheduled shutdown: send milestone notifications, then begin disconnect
 	if (m_shutdown_start_time != 0 && !m_on_exit_process)
 	{
@@ -14379,7 +14062,6 @@ void CGame::apply_server_config(const server_config& cfg)
 
 	// Gameplay
 	m_nighttime_duration = cfg.gameplay.nighttime_duration;
-	m_starting_guild_rank = cfg.gameplay.starting_guild_rank;
 	m_grand_magic_mana_consumption = cfg.gameplay.grand_magic_mana_cost;
 	m_max_construction_points = cfg.gameplay.max_construction_points;
 	m_max_summon_points = cfg.gameplay.max_summon_points;

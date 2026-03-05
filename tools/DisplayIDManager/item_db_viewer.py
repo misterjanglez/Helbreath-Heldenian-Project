@@ -127,7 +127,7 @@ class ItemDBViewer:
 		cur = db.cursor()
 		cur.execute(
 			'SELECT item_id, name, equip_pos, '
-			'appr_value, gender_limit, display_id '
+			'gender_requirement, display_id '
 			'FROM items ORDER BY item_id'
 		)
 		self.db_items = [dict(row) for row in cur.fetchall()]
@@ -406,9 +406,14 @@ class ItemDBViewer:
 		sel = self.listbox.curselection()
 		if not sel:
 			return
-		idx = self._visible_indices[sel[0]]
-		item = self.db_items[idx]
-		self._show_item(item)
+		try:
+			idx = self._visible_indices[sel[0]]
+			item = self.db_items[idx]
+			self._show_item(item)
+		except Exception as e:
+			import traceback
+			traceback.print_exc()
+			messagebox.showerror('Error', f'Failed to show item:\n\n{e}')
 
 	def _show_item(self, item):
 		"""Show item details, icons, and preview."""
@@ -418,10 +423,10 @@ class ItemDBViewer:
 		self._info_name.config(text=item['name'])
 
 		equip = EQUIP_POS_NAMES.get(item['equip_pos'], f"Unknown ({item['equip_pos']})")
-		gender = {0: 'Both', 1: 'Male', 2: 'Female'}.get(item['gender_limit'], '?')
+		gender = {0: 'Both', 1: 'Male', 2: 'Female'}.get(item['gender_requirement'], '?')
 		details = (
 			f"DB ID: {item['item_id']}  |  Equip: {equip}  |  Gender: {gender}\n"
-			f"Display ID: {item['display_id']}  |  Appr Value: {item['appr_value']}"
+			f"Display ID: {item['display_id']}"
 		)
 		self._info_details.config(text=details)
 

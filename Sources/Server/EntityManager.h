@@ -60,7 +60,6 @@ public:
         int spot_mob_index, char change_side,
         bool hide_gen_mode, bool is_summoned,
         bool firm_berserk, bool is_master,
-        int guild_guid,
         bool bypass_mob_limit = false
     );
 

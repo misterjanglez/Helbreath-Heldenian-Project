@@ -131,7 +131,7 @@ void DialogBox_Manufacture::draw_alchemy_waiting(short sX, short sY)
 	int adj_y = 8;
 	uint32_t time = m_game->m_cur_time;
 
-	m_game->m_sprite[InterfaceAddInterface]->draw(sX, sY, 1);
+	m_game->m_sprite[InterfaceNdInventory]->draw(sX, sY, 10);
 
 	if (m_slot_1 != -1) {
 		CItem* cfg = m_game->get_item_config(player().m_item_list[m_slot_1]->m_id_num);
@@ -180,7 +180,7 @@ void DialogBox_Manufacture::draw_alchemy_creating(short sX, short sY)
 	int adj_y = 8;
 	uint32_t time = m_game->m_cur_time;
 
-	m_game->m_sprite[InterfaceAddInterface]->draw(sX, sY, 1);
+	m_game->m_sprite[InterfaceNdInventory]->draw(sX, sY, 10);
 
 	if (m_slot_1 != -1) {
 		CItem* cfg = m_game->get_item_config(player().m_item_list[m_slot_1]->m_id_num);
@@ -393,7 +393,7 @@ void DialogBox_Manufacture::draw_manufacture_waiting(short sX, short sY)
 		{
 			int slotX = (slot % 3) * 45;
 			int slotY = (slot / 3) * 45;
-			m_game->m_sprite[InterfaceAddInterface]->draw(sX + adj_x + 55 + 30 + slotX + 13, sY + adj_y + 55 + slotY + 180, 2);
+			m_game->m_sprite[InterfaceNdGame2]->draw(sX + adj_x + 55 + 30 + slotX + 13, sY + adj_y + 55 + slotY + 180, 27);
 		}
 
 		// draw items in slots
@@ -513,7 +513,7 @@ void DialogBox_Manufacture::draw_manufacture_in_progress(short sX, short sY)
 	{
 		int slotX = (slot % 3) * 45;
 		int slotY = (slot / 3) * 45;
-		m_game->m_sprite[InterfaceAddInterface]->draw(sX + adj_x + 55 + 30 + slotX + 13, sY + adj_y + 55 + slotY + 180, 2);
+		m_game->m_sprite[InterfaceNdGame2]->draw(sX + adj_x + 55 + 30 + slotX + 13, sY + adj_y + 55 + slotY + 180, 27);
 	}
 
 	// draw items in slots
@@ -635,7 +635,7 @@ void DialogBox_Manufacture::draw_crafting_waiting(short sX, short sY)
 	int adj_y = 8;
 	uint32_t time = m_game->m_cur_time;
 
-	m_game->m_sprite[InterfaceCrafting]->draw(sX, sY, 0);
+	m_game->m_sprite[InterfaceNdInventory]->draw(sX, sY, 10);
 
 	if (m_slot_1 != -1) {
 		CItem* cfg = m_game->get_item_config(player().m_item_list[m_slot_1]->m_id_num);
@@ -679,7 +679,7 @@ void DialogBox_Manufacture::draw_crafting_in_progress(short sX, short sY)
 	int adj_y = 8;
 	uint32_t time = m_game->m_cur_time;
 
-	m_game->m_sprite[InterfaceCrafting]->draw(sX, sY, 0);
+	m_game->m_sprite[InterfaceNdInventory]->draw(sX, sY, 10);
 
 	if (m_slot_1 != -1)
 	{

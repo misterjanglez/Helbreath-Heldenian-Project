@@ -260,7 +260,7 @@ void DialogBox_Character::on_draw()
 	infoBuf += txt2;
 	put_aligned_string(sX + 24, sX + 252, sY + 52, infoBuf.c_str(), GameColors::UIDarkRed);
 
-	// Citizenship / Guild status
+	// Citizenship status
 	std::string statusBuf;
 	if (!player().m_citizen)
 	{
@@ -271,37 +271,6 @@ void DialogBox_Character::on_draw()
 		statusBuf = player().m_hunter
 			? (player().m_aresden ? DEF_MSG_ARECIVIL : DEF_MSG_ELVCIVIL)
 			: (player().m_aresden ? DEF_MSG_ARESOLDIER : DEF_MSG_ELVSOLDIER);
-
-		if (player().m_guild_rank >= 0)
-		{
-			std::string suffix = player().m_guild_rank == 0 ? DEF_MSG_GUILDMASTER1 : DEF_MSG_GUILDSMAN1;
-			std::string full_guild = "(" + player().m_guild_name + suffix;
-			std::string candidate = statusBuf + full_guild;
-			constexpr int max_status_width = 240;
-			auto metrics = hb::shared::text::measure_text(GameFont::Default, candidate.c_str());
-
-			if (metrics.width > max_status_width)
-			{
-				std::string base_with_ellipsis = statusBuf + "(..." + suffix;
-				auto base_metrics = hb::shared::text::measure_text(GameFont::Default, base_with_ellipsis.c_str());
-				int remaining = max_status_width - base_metrics.width;
-
-				if (remaining > 0)
-				{
-					int fit = hb::shared::text::get_fitting_char_count(GameFont::Default,
-						player().m_guild_name.c_str(), remaining);
-					statusBuf += "(" + player().m_guild_name.substr(0, fit) + "..." + suffix;
-				}
-				else
-				{
-					statusBuf += "(..." + suffix;
-				}
-			}
-			else
-			{
-				statusBuf += full_guild;
-			}
-		}
 	}
 	put_aligned_string(sX, sX + 275, sY + 69, statusBuf.c_str(), GameColors::UILabel);
 

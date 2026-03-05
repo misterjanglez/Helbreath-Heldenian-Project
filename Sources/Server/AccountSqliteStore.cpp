@@ -523,9 +523,6 @@ bool EnsureAccountDatabase(const char* account_name, sqlite3** outDb, std::strin
 
     if (!AddColumnIfMissing(db, "characters", "profile", "TEXT NOT NULL DEFAULT ''") ||
         !AddColumnIfMissing(db, "characters", "location", "TEXT NOT NULL DEFAULT ''") ||
-        !AddColumnIfMissing(db, "characters", "guild_name", "TEXT NOT NULL DEFAULT ''") ||
-        !AddColumnIfMissing(db, "characters", "guild_guid", "INTEGER NOT NULL DEFAULT -1") ||
-        !AddColumnIfMissing(db, "characters", "guild_rank", "INTEGER NOT NULL DEFAULT -1") ||
         !AddColumnIfMissing(db, "characters", "rating", "INTEGER NOT NULL DEFAULT 0") ||
         !AddColumnIfMissing(db, "characters", "luck", "INTEGER NOT NULL DEFAULT 0") ||
         !AddColumnIfMissing(db, "characters", "lu_pool", "INTEGER NOT NULL DEFAULT 0") ||
@@ -553,9 +550,6 @@ bool EnsureAccountDatabase(const char* account_name, sqlite3** outDb, std::strin
         !AddColumnIfMissing(db, "characters", "quest_completed", "INTEGER NOT NULL DEFAULT 0") ||
         !AddColumnIfMissing(db, "characters", "special_event_id", "INTEGER NOT NULL DEFAULT 0") ||
         !AddColumnIfMissing(db, "characters", "super_attack_left", "INTEGER NOT NULL DEFAULT 0") ||
-        !AddColumnIfMissing(db, "characters", "fightzone_number", "INTEGER NOT NULL DEFAULT 0") ||
-        !AddColumnIfMissing(db, "characters", "reserve_time", "INTEGER NOT NULL DEFAULT 0") ||
-        !AddColumnIfMissing(db, "characters", "fightzone_ticket_number", "INTEGER NOT NULL DEFAULT 0") ||
         !AddColumnIfMissing(db, "characters", "special_ability_time", "INTEGER NOT NULL DEFAULT 0") ||
         !AddColumnIfMissing(db, "characters", "locked_map_name", "TEXT NOT NULL DEFAULT ''") ||
         !AddColumnIfMissing(db, "characters", "locked_map_time", "INTEGER NOT NULL DEFAULT 0") ||
@@ -695,14 +689,14 @@ bool LoadCharacterState(sqlite3* db, const char* character_name, AccountDbCharac
     }
 
     const char* sql =
-        "SELECT account_name, character_name, profile, location, guild_name, guild_guid, guild_rank, "
+        "SELECT account_name, character_name, profile, location, "
         "map_name, map_x, map_y, hp, mp, sp, level, rating, str, intl, vit, dex, mag, chr, luck, exp, "
         "lu_pool, enemy_kill_count, pk_count, reward_gold, downskill_index, id_num1, id_num2, id_num3, "
         "gender, skin, hairstyle, haircolor, underwear, hunger_status, timeleft_rating, "
         "timeleft_force_recall, timeleft_firm_staminar, penalty_block_year, "
         "penalty_block_month, penalty_block_day, quest_number, quest_id, current_quest_count, "
         "quest_reward_type, quest_reward_amount, contribution, war_contribution, quest_completed, "
-        "special_event_id, super_attack_left, fightzone_number, reserve_time, fightzone_ticket_number, "
+        "special_event_id, super_attack_left, "
         "special_ability_time, locked_map_name, locked_map_time, crusade_job, crusade_guid, "
         "construct_point, dead_penalty_time, party_id, gizon_item_upgrade_left, "
         "underwear_type, hair_color, hair_style, skin_color "
@@ -722,9 +716,6 @@ bool LoadCharacterState(sqlite3* db, const char* character_name, AccountDbCharac
         CopyColumnText(stmt, col++, outState.character_name, sizeof(outState.character_name));
         CopyColumnText(stmt, col++, outState.profile, sizeof(outState.profile));
         CopyColumnText(stmt, col++, outState.location, sizeof(outState.location));
-        CopyColumnText(stmt, col++, outState.guild_name, sizeof(outState.guild_name));
-        outState.guild_guid = sqlite3_column_int(stmt, col++);
-        outState.guild_rank = sqlite3_column_int(stmt, col++);
         CopyColumnText(stmt, col++, outState.map_name, sizeof(outState.map_name));
         outState.map_x = sqlite3_column_int(stmt, col++);
         outState.map_y = sqlite3_column_int(stmt, col++);
@@ -771,9 +762,6 @@ bool LoadCharacterState(sqlite3* db, const char* character_name, AccountDbCharac
         outState.quest_completed = sqlite3_column_int(stmt, col++);
         outState.special_event_id = sqlite3_column_int(stmt, col++);
         outState.super_attack_left = sqlite3_column_int(stmt, col++);
-        outState.fightzone_number = sqlite3_column_int(stmt, col++);
-        outState.reserve_time = sqlite3_column_int(stmt, col++);
-        outState.fightzone_ticket_number = sqlite3_column_int(stmt, col++);
         outState.special_ability_time = sqlite3_column_int(stmt, col++);
         CopyColumnText(stmt, col++, outState.locked_map_name, sizeof(outState.locked_map_name));
         outState.locked_map_time = sqlite3_column_int(stmt, col++);
@@ -1071,18 +1059,18 @@ bool InsertCharacterState(sqlite3* db, const AccountDbCharacterState& state)
 
     const char* sql =
         "INSERT INTO characters("
-        " account_name, character_name, created_at, profile, location, guild_name, guild_guid, guild_rank, "
+        " account_name, character_name, created_at, profile, location, "
         " map_name, map_x, map_y, hp, mp, sp, level, rating, str, intl, vit, dex, mag, chr, luck, exp, "
         " lu_pool, enemy_kill_count, pk_count, reward_gold, downskill_index, id_num1, id_num2, id_num3, "
         " gender, skin, hairstyle, haircolor, underwear, hunger_status, timeleft_rating, "
         " timeleft_force_recall, timeleft_firm_staminar, penalty_block_year, "
         " penalty_block_month, penalty_block_day, quest_number, quest_id, current_quest_count, "
         " quest_reward_type, quest_reward_amount, contribution, war_contribution, quest_completed, "
-        " special_event_id, super_attack_left, fightzone_number, reserve_time, fightzone_ticket_number, "
+        " special_event_id, super_attack_left, "
         " special_ability_time, locked_map_name, locked_map_time, crusade_job, crusade_guid, "
         " construct_point, dead_penalty_time, party_id, gizon_item_upgrade_left,"
         " underwear_type, hair_color, hair_style, skin_color"
-        ") VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?);";
+        ") VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?);";
 
     sqlite3_stmt* stmt = nullptr;
     if (sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) != SQLITE_OK) {
@@ -1096,9 +1084,6 @@ bool InsertCharacterState(sqlite3* db, const AccountDbCharacterState& state)
     ok &= PrepareAndBindText(stmt, col++, timestamp);
     ok &= PrepareAndBindText(stmt, col++, state.profile);
     ok &= PrepareAndBindText(stmt, col++, state.location);
-    ok &= PrepareAndBindText(stmt, col++, state.guild_name);
-    ok &= (sqlite3_bind_int(stmt, col++, state.guild_guid) == SQLITE_OK);
-    ok &= (sqlite3_bind_int(stmt, col++, state.guild_rank) == SQLITE_OK);
     ok &= PrepareAndBindText(stmt, col++, state.map_name);
     ok &= (sqlite3_bind_int(stmt, col++, state.map_x) == SQLITE_OK);
     ok &= (sqlite3_bind_int(stmt, col++, state.map_y) == SQLITE_OK);
@@ -1145,9 +1130,6 @@ bool InsertCharacterState(sqlite3* db, const AccountDbCharacterState& state)
     ok &= (sqlite3_bind_int(stmt, col++, state.quest_completed) == SQLITE_OK);
     ok &= (sqlite3_bind_int(stmt, col++, state.special_event_id) == SQLITE_OK);
     ok &= (sqlite3_bind_int(stmt, col++, state.super_attack_left) == SQLITE_OK);
-    ok &= (sqlite3_bind_int(stmt, col++, state.fightzone_number) == SQLITE_OK);
-    ok &= (sqlite3_bind_int(stmt, col++, state.reserve_time) == SQLITE_OK);
-    ok &= (sqlite3_bind_int(stmt, col++, state.fightzone_ticket_number) == SQLITE_OK);
     ok &= (sqlite3_bind_int(stmt, col++, state.special_ability_time) == SQLITE_OK);
     ok &= PrepareAndBindText(stmt, col++, state.locked_map_name);
     ok &= (sqlite3_bind_int(stmt, col++, state.locked_map_time) == SQLITE_OK);
@@ -1589,18 +1571,18 @@ bool SaveCharacterSnapshot(sqlite3* db, const CClient* client)
 
     const char* upsertSql =
         "INSERT OR REPLACE INTO characters("
-        " account_name, character_name, created_at, profile, location, guild_name, guild_guid, guild_rank,"
+        " account_name, character_name, created_at, profile, location,"
         " map_name, map_x, map_y, hp, mp, sp, level, rating, str, intl, vit, dex, mag, chr, luck, exp,"
         " lu_pool, enemy_kill_count, pk_count, reward_gold, downskill_index, id_num1, id_num2, id_num3,"
         " gender, skin, hairstyle, haircolor, underwear, hunger_status, timeleft_rating,"
         " timeleft_force_recall, timeleft_firm_staminar, penalty_block_year,"
         " penalty_block_month, penalty_block_day, quest_number, quest_id, current_quest_count,"
         " quest_reward_type, quest_reward_amount, contribution, war_contribution, quest_completed,"
-        " special_event_id, super_attack_left, fightzone_number, reserve_time, fightzone_ticket_number,"
+        " special_event_id, super_attack_left,"
         " special_ability_time, locked_map_name, locked_map_time, crusade_job, crusade_guid,"
         " construct_point, dead_penalty_time, party_id, gizon_item_upgrade_left,"
         " underwear_type, hair_color, hair_style, skin_color"
-        ") VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?);";
+        ") VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?);";
 
     sqlite3_stmt* stmt = nullptr;
     if (sqlite3_prepare_v2(db, upsertSql, -1, &stmt, nullptr) != SQLITE_OK) {
@@ -1617,9 +1599,6 @@ bool SaveCharacterSnapshot(sqlite3* db, const CClient* client)
     ok &= PrepareAndBindText(stmt, idx++, timestamp);
     ok &= PrepareAndBindText(stmt, idx++, client->m_profile);
     ok &= PrepareAndBindText(stmt, idx++, client->m_location);
-    ok &= PrepareAndBindText(stmt, idx++, client->m_guild_name);
-    ok &= (sqlite3_bind_int(stmt, idx++, client->m_guild_guid) == SQLITE_OK);
-    ok &= (sqlite3_bind_int(stmt, idx++, client->m_guild_rank) == SQLITE_OK);
     ok &= PrepareAndBindText(stmt, idx++, client->m_map_name);
     ok &= (sqlite3_bind_int(stmt, idx++, client->m_x) == SQLITE_OK);
     ok &= (sqlite3_bind_int(stmt, idx++, client->m_y) == SQLITE_OK);
@@ -1666,9 +1645,6 @@ bool SaveCharacterSnapshot(sqlite3* db, const CClient* client)
     ok &= (sqlite3_bind_int(stmt, idx++, client->m_is_quest_completed ? 1 : 0) == SQLITE_OK);
     ok &= (sqlite3_bind_int(stmt, idx++, client->m_special_event_id) == SQLITE_OK);
     ok &= (sqlite3_bind_int(stmt, idx++, client->m_super_attack_left) == SQLITE_OK);
-    ok &= (sqlite3_bind_int(stmt, idx++, client->m_fightzone_number) == SQLITE_OK);
-    ok &= (sqlite3_bind_int(stmt, idx++, client->m_reserve_time) == SQLITE_OK);
-    ok &= (sqlite3_bind_int(stmt, idx++, client->m_fightzone_ticket_number) == SQLITE_OK);
     ok &= (sqlite3_bind_int(stmt, idx++, client->m_special_ability_time) == SQLITE_OK);
     ok &= PrepareAndBindText(stmt, idx++, client->m_locked_map_name);
     ok &= (sqlite3_bind_int(stmt, idx++, client->m_locked_map_time) == SQLITE_OK);

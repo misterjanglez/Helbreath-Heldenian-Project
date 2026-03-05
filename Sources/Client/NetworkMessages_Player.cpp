@@ -226,13 +226,7 @@ namespace NetworkMessageHandlers {
 			game->m_player->m_hunter = true;
 		}
 
-		game->m_player->m_guild_name.assign(pkt->guild_name, strnlen(pkt->guild_name, sizeof(pkt->guild_name)));
-		if (game->m_player->m_guild_name == "NONE")
-			game->m_player->m_guild_name.clear();
-		std::replace(game->m_player->m_guild_name.begin(), game->m_player->m_guild_name.end(), '_', ' ');
-		game->m_player->m_guild_rank = pkt->guild_rank;
 		game->m_player->m_super_attack_left = pkt->super_attack_left;
-		game->on_game()->m_fightzone_number = pkt->fightzone_number;
 		game->m_max_stats = pkt->max_stats;
 		game->m_max_level = pkt->max_level;
 		game->m_max_bank_items = pkt->max_bank_items;

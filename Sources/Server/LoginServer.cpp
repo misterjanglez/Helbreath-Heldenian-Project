@@ -380,9 +380,6 @@ void LoginServer::response_character(int h, char* data)
 	std::snprintf(state.character_name, sizeof(state.character_name), "%s", name);
 	std::snprintf(state.profile, sizeof(state.profile), "__________");
 	std::snprintf(state.location, sizeof(state.location), "NONE");
-	std::snprintf(state.guild_name, sizeof(state.guild_name), "NONE");
-	state.guild_guid = -1;
-	state.guild_rank = -1;
 	std::snprintf(state.map_name, sizeof(state.map_name), "default");
 	state.map_x = -1;
 	state.map_y = -1;
@@ -436,9 +433,6 @@ void LoginServer::response_character(int h, char* data)
 	state.quest_completed = 0;
 	state.special_event_id = 200081;
 	state.super_attack_left = 0;
-	state.fightzone_number = 0;
-	state.reserve_time = 0;
-	state.fightzone_ticket_number = 0;
 	state.special_ability_time = SpecialAbilityTimeSec;
 	std::snprintf(state.locked_map_name, sizeof(state.locked_map_name), "NONE");
 	state.locked_map_time = 0;

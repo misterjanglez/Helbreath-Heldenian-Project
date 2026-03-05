@@ -236,44 +236,7 @@ void HandleNoRecall(CGame* game, char* data)
 	game->add_event_list("You can not recall in this map.", 10);
 }
 
-void HandleFightZoneReserve(CGame* game, char* data)
-{
-	std::string txt;
-	const auto* pkt = hb::net::PacketCast<hb::net::PacketNotifyFightZoneReserve>(
-		data, sizeof(hb::net::PacketNotifyFightZoneReserve));
-	if (!pkt) return;
-	switch (pkt->result) {
-	case -5:
-		game->add_event_list(NOTIFY_MSG_HANDLER68, 10);
-		break;
-	case -4:
-		game->add_event_list(NOTIFY_MSG_HANDLER69, 10);
-		break;
-	case -3:
-		game->add_event_list(NOTIFY_MSG_HANDLER70, 10);
-		break;
-	case -2:
-		game->on_game()->m_fightzone_number = 0;
-		game->add_event_list(NOTIFY_MSG_HANDLER71, 10);
-		break;
-	case -1:
-		game->on_game()->m_fightzone_number = game->on_game()->m_fightzone_number * -1;
-		game->add_event_list(NOTIFY_MSG_HANDLER72, 10);
-		break;
-	case 1:
-	case 2:
-	case 3:
-	case 4:
-	case 5:
-	case 6:
-	case 7:
-	case 8:
-	case 9:
-		txt = std::format(NOTIFY_MSG_HANDLER73, pkt->result);
-		game->add_event_list(txt.c_str(), 10);
-		break;
-	}
-}
+// HandleFightZoneReserve removed with guild/fightzone system
 
 void HandleLoteryLost(CGame* game, char* data)
 {

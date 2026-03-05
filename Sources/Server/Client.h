@@ -9,7 +9,6 @@
 #include <time.h>
 #include "ASIOSocket.h"
 #include "Item.h"
-#include "GuildsMan.h"
 #include "Magic.h"
 #include "GlobalDef.h"
 #include "NetConstants.h"
@@ -76,11 +75,8 @@ public:
 	char  m_map_index;
 	short m_x, m_y;
 	
-	char  m_guild_name[21];
 	char  m_location[11];
-	int   m_guild_rank;
-	int   m_guild_guid;
-	
+
 	direction m_dir;
 	short m_type;
 	short m_original_type;
@@ -187,8 +183,6 @@ public:
 	uint32_t m_poison_time;
 	
 	int   m_penalty_block_year, m_penalty_block_month, m_penalty_block_day; // v1.4
-
-	int   m_fightzone_number , m_reserve_time, m_fightzone_ticket_number ; 
 
 	class hb::shared::net::ASIOSocket * m_socket;
 
@@ -347,9 +341,6 @@ public:
 
 	int  m_construction_point;
 
-	char m_construct_map_name[11];
-	int  m_construct_loc_x, m_construct_loc_y;
-	
 	// 2.06
 	bool m_is_player_civil;
 	bool m_is_attack_mode_change;
@@ -388,7 +379,6 @@ public:
 	// New 25/05/2004
 	bool m_is_being_resurrected;
 
-	uint32_t m_fightzone_dead_time;
 	char m_save_count;
 
 	uint32_t m_last_version_warning_time = 0;

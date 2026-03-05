@@ -102,13 +102,6 @@ namespace net {
 		uint16_t lu_point;
 	};
 
-	struct HB_PACKED PacketNotifyReqGuildNameAnswer {
-		PacketHeader header;
-		int16_t guild_rank;
-		int16_t index;
-		char guild_name[hb::shared::limits::GuildNameLen];
-	};
-
 	struct HB_PACKED PacketNotifyItemUpgradeFail {
 		PacketHeader header;
 		int16_t reason;
@@ -285,11 +278,6 @@ namespace net {
 	struct HB_PACKED PacketNotifyNotEnoughGold {
 		PacketHeader header;
 		int8_t item_index;
-	};
-
-	struct HB_PACKED PacketNotifyFightZoneReserve {
-		PacketHeader header;
-		int32_t result;
 	};
 
 	struct HB_PACKED PacketNotifySpellSkill {
@@ -554,16 +542,6 @@ namespace net {
 		char text[32];
 	};
 
-	struct HB_PACKED PacketNotifyQueryDismissGuildPermission {
-		PacketHeader header;
-		char name[hb::shared::limits::CharNameLen];
-	};
-
-	struct HB_PACKED PacketNotifyQueryJoinGuildPermission {
-		PacketHeader header;
-		char name[hb::shared::limits::CharNameLen];
-	};
-
 	struct HB_PACKED PacketNotifyTimeChange {
 		PacketHeader header;
 		uint8_t sprite_alpha;
@@ -717,8 +695,6 @@ namespace net {
 		uint32_t exp;
 		uint32_t kill_count;
 		char killer_name[hb::shared::limits::CharNameLen];
-		char killer_guild[hb::shared::limits::GuildNameLen];
-		int16_t killer_rank;
 		int16_t war_contribution;
 	};
 
@@ -870,61 +846,6 @@ namespace net {
 		int32_t v6;
 		int32_t v7;
 		int32_t v8;
-	};
-
-	struct HB_PACKED PacketNotifyCannotJoinMoreGuildsMan {
-		PacketHeader header;
-		char name[hb::shared::limits::CharNameLen];
-	};
-
-	struct HB_PACKED PacketNotifyNewGuildsMan {
-		PacketHeader header;
-		char name[hb::shared::limits::CharNameLen];
-	};
-
-	struct HB_PACKED PacketNotifyDismissGuildsMan {
-		PacketHeader header;
-		char name[hb::shared::limits::CharNameLen];
-	};
-
-	struct HB_PACKED PacketNotifyJoinGuildApprove {
-		PacketHeader header;
-		char guild_name[hb::shared::limits::GuildNameLen];
-		int16_t rank;
-	};
-
-	struct HB_PACKED PacketNotifyJoinGuildReject {
-		PacketHeader header;
-		char guild_name[hb::shared::limits::GuildNameLen];
-		int16_t rank;
-		char location[hb::shared::limits::MapNameLen];
-	};
-
-	struct HB_PACKED PacketNotifyDismissGuildApprove {
-		PacketHeader header;
-		char guild_name[hb::shared::limits::GuildNameLen];
-		int16_t rank;
-		char location[hb::shared::limits::MapNameLen];
-	};
-
-	struct HB_PACKED PacketNotifyDismissGuildReject {
-		PacketHeader header;
-		char guild_name[hb::shared::limits::GuildNameLen];
-		int16_t rank;
-		char location[hb::shared::limits::MapNameLen];
-	};
-
-	struct HB_PACKED PacketNotifyGuildDisbanded {
-		PacketHeader header;
-		char guild_name[hb::shared::limits::GuildNameLen];
-		char location[hb::shared::limits::MapNameLen];
-	};
-
-	struct HB_PACKED PacketNotifyBanGuildMan {
-		PacketHeader header;
-		char guild_name[hb::shared::limits::GuildNameLen];
-		int16_t rank;
-		char location[hb::shared::limits::MapNameLen];
 	};
 
 	struct HB_PACKED PacketNotifyTotalUsers {

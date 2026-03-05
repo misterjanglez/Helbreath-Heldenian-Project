@@ -238,7 +238,6 @@ public:
 	hb::shared::types::NativeInstance m_native_instance;
 	int m_icon_resource_id;
 
-	void reserve_fightzone_response_handler(char * data);
 	void start_bgm();  // Forwards to audio_manager based on current location
 
 	int has_hero_set(const hb::shared::entity::PlayerAppearance& appr, short OwnerType);

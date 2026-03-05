@@ -13,7 +13,6 @@
 #include "ConfigManager.h"
 #include "HotkeyManager.h"
 #include "DialogBox_ChatHistory.h"
-#include "DialogBox_GuildMenu.h"
 #include "DialogBox_ItemDropAmount.h"
 #include "InventoryManager.h"
 #include "lan_eng.h"
@@ -478,8 +477,7 @@ void Screen_OnGame::hotkey_special_ability()
 
 void Screen_OnGame::hotkey_load_backup_chat()
 {
-	if (((get_dialog_box_manager().is_enabled(DialogBoxId::GuildMenu) == true) && (get_dialog_box_manager().get_dialog_as<DialogBox_GuildMenu>(DialogBoxId::GuildMenu)->m_mode == DialogBox_GuildMenu::mode::create_guild) && (get_dialog_box_manager().get_top_id() == DialogBoxId::GuildMenu)) ||
-		((get_dialog_box_manager().is_enabled(DialogBoxId::ItemDropExternal) == true) && (get_dialog_box_manager().get_dialog_as<DialogBox_ItemDropAmount>(DialogBoxId::ItemDropExternal)->m_mode == DialogBox_ItemDropAmount::mode::input) && (get_dialog_box_manager().get_top_id() == DialogBoxId::ItemDropExternal)))
+	if ((get_dialog_box_manager().is_enabled(DialogBoxId::ItemDropExternal) == true) && (get_dialog_box_manager().get_dialog_as<DialogBox_ItemDropAmount>(DialogBoxId::ItemDropExternal)->m_mode == DialogBox_ItemDropAmount::mode::input) && (get_dialog_box_manager().get_top_id() == DialogBoxId::ItemDropExternal))
 	{
 		return;
 	}

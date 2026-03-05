@@ -87,7 +87,6 @@ constexpr int RagProtectionTime         = 7000;
 // Game config
 constexpr int MsgQueueSize              = 100000;
 constexpr int TotalLevelUpPoint         = 3;
-constexpr int GuildStartRank            = 12;
 constexpr int SsnLimitMultiplyValue     = 2;
 constexpr int CharPointLimit            = 1000;
 } // namespace hb::server::config
@@ -113,13 +112,10 @@ constexpr int MaxPortionTypes           = 500;
 constexpr int MaxQuestType              = 200;
 
 // Game limits
-constexpr int MaxGuilds                 = 1000;
 constexpr int MaxConstructNum           = 10;
 constexpr int MaxSchedule               = 10;
 constexpr int MaxApocalypse             = 7;
 constexpr int MaxHeldenian              = 10;
-constexpr int MaxFightZone              = 10;
-
 // Combat constants
 constexpr int MinimumHitRatio           = 15;
 constexpr int MaximumHitRatio           = 99;
@@ -426,7 +422,7 @@ public:
 	void chat_msg_handler(int client_h, char * data, size_t msg_size);
 	bool is_blocked_by(int sender_h, int receiver_h) const;
 	void npc_process();
-	int create_new_npc(int npc_config_id, char * name, char * map_name, short sClass, char sa, char move_type, int * offset_x, int * offset_y, char * waypoint_list, hb::shared::geometry::GameRectangle * area, int spot_mob_index, char change_side, bool hide_gen_mode, bool is_summoned = false, bool firm_berserk = false, bool is_master = false, int guild_guid = 0, bool bypass_mob_limit = false);
+	int create_new_npc(int npc_config_id, char * name, char * map_name, short sClass, char sa, char move_type, int * offset_x, int * offset_y, char * waypoint_list, hb::shared::geometry::GameRectangle * area, int spot_mob_index, char change_side, bool hide_gen_mode, bool is_summoned = false, bool firm_berserk = false, bool is_master = false, bool bypass_mob_limit = false);
 	//bool create_new_npc(char * npc_name, char * name, char * map_name, short sX, short sY);
 	int spawn_map_npcs_from_database(struct sqlite3* db, int map_index);
 	bool get_is_string_is_number(char * str);
@@ -626,11 +622,6 @@ public:
 	int   m_elvine_occupy_tiles;
 	int   m_cur_msgs, m_max_msgs;
 
-	uint32_t m_can_fightzone_reserve_time ;
-
-	int  m_fight_zone_reserve[hb::server::config::MaxFightZone] ;
-	int  m_fightzone_no_force_recall  ;
-
 	struct {
 		int64_t funds;
 		int64_t crimes;
@@ -664,8 +655,6 @@ public:
 	
 	int m_collected_mana[3];
 	int m_aresden_mana, m_elvine_mana;
-
-	class CTeleportLoc m_guild_teleport_loc[hb::server::config::MaxGuilds];
 
 	int m_last_crusade_winner; 	// New 13/05/2004
 	struct {
@@ -816,7 +805,6 @@ public:
 
 	// Gameplay Settings
 	int m_nighttime_duration;       // nighttime-duration
-	int m_starting_guild_rank;       // starting-guild-rank
 	int m_grand_magic_mana_consumption; // grand-magic-mana-consumption
 	int m_max_construction_points;   // maximum-construction-points
 	int m_max_summon_points;         // maximum-summon-points

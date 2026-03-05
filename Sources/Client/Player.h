@@ -18,7 +18,6 @@ using hb::shared::direction::direction;
 namespace hb::client::config
 {
 constexpr int PlayerNameLength = 12;
-constexpr int GuildNameLength = 22;
 constexpr int PlayerMaxMagicType = 100;
 constexpr int PlayerMaxSkillType = 60;
 } // namespace hb::client::config
@@ -79,9 +78,6 @@ public:
     std::string m_player_name;
     short m_player_object_id;
     short m_player_type;
-    std::string m_guild_name;
-    int m_guild_rank;
-
     // POSITION & MOVEMENT
     short m_player_x, m_player_y;
     direction m_player_dir;

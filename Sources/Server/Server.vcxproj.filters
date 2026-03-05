@@ -179,9 +179,7 @@
       <Filter>Database</Filter>
     </ClInclude>
     <ClInclude Include="GlobalDef.h" />
-    <ClInclude Include="GuildsMan.h">
-      <Filter>Data Types</Filter>
-    </ClInclude>
+
     <ClInclude Include="Item.h">
       <Filter>Data Types</Filter>
     </ClInclude>
