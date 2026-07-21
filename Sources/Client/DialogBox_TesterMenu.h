@@ -17,7 +17,7 @@ public:
 
 	bool on_enable(int type, int64_t v1, int v2, const char* string) override;
 private:
-	static constexpr int action_count = 10;
+	static constexpr int action_count = 11;
 	static constexpr int row_height = 18;
 	static constexpr int first_row_y = 60;
 	static constexpr int row_x1 = 20;

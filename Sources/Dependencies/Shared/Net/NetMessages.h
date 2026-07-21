@@ -161,6 +161,7 @@ namespace CommonType
 		TesterItemSearch                        = 0x0A77,
 		TesterCreateItem                        = 0x0A78,
 		TesterMapList                           = 0x0A79,
+		TesterNpcSearch                         = 0x0A7A,
 #endif // TESTER_ONLY
 		ReqRepairAll                            = 0x0F10,
 		ReqRepairAllDelete                      = 0x0F12,
@@ -358,6 +359,7 @@ namespace Notify
 		Contribution                            = 0x0A69,
 		TesterItemSearchResult                  = 0x0A6A,
 		TesterMapListResult                     = 0x0A6B,
+		TesterNpcSearchResult                   = 0x0A6C,
 #endif // TESTER_ONLY
 	};
 }

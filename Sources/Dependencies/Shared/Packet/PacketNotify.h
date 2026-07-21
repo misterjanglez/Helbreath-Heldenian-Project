@@ -956,6 +956,17 @@ namespace net {
 		int16_t count;
 		TesterMapEntry entries[100];
 	};
+
+	struct HB_PACKED TesterNpcSearchEntry {
+		int16_t npc_id;
+		char name[hb::shared::limits::NpcNameLen];
+	};
+
+	struct HB_PACKED PacketNotifyTesterNpcSearchResult {
+		PacketHeader header;
+		int16_t count;
+		TesterNpcSearchEntry entries[50];
+	};
 #endif // TESTER_ONLY
 	HB_PACK_END
 }

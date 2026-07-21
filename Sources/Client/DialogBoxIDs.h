@@ -54,7 +54,8 @@ namespace DialogBoxId
 #ifdef TESTER_ONLY
 		// TESTER MENU — dialog IDs (tester builds only)
 		TesterMenu = 53,
-		ItemCreator = 54
+		ItemCreator = 54,
+		NpcSpawner = 55
 #endif // TESTER_ONLY
 	};
 }

@@ -36,6 +36,7 @@
 #include "Log.h"
 #ifdef TESTER_ONLY
 #include "DialogBox_ItemCreator.h"
+#include "DialogBox_NpcSpawner.h"
 #endif // TESTER_ONLY
 #include <string>
 #include <memory>
@@ -471,6 +472,13 @@ void Screen_OnGame::on_update()
         {
             auto* dlg = dynamic_cast<DialogBox_ItemCreator*>(
                 m_game->get_dialog_box_manager().get_dialog_box(DialogBoxId::ItemCreator));
+            if (dlg) dlg->on_enter_pressed();
+        }
+        else if ((m_game->get_dialog_box_manager().is_enabled(DialogBoxId::NpcSpawner) == true) &&
+                 (m_game->get_dialog_box_manager().get_top_id() == DialogBoxId::NpcSpawner))
+        {
+            auto* dlg = dynamic_cast<DialogBox_NpcSpawner*>(
+                m_game->get_dialog_box_manager().get_dialog_box(DialogBoxId::NpcSpawner));
             if (dlg) dlg->on_enter_pressed();
         }
 #endif // TESTER_ONLY

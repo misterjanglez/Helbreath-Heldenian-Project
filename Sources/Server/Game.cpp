@@ -6147,6 +6147,46 @@ void CGame::client_common_handler(int client_h, char* data)
 			}
 			break;
 		}
+		case 10: // Spawn NPC (v2 = npc_config_id, v3 = amount)
+		{
+			int npc_id = static_cast<int>(v2);
+			int amount = std::clamp(static_cast<int>(v3), 1, 50);
+
+			if (npc_id < 0 || npc_id >= hb::server::config::MaxNpcTypes
+				|| m_npc_config_list[npc_id] == nullptr)
+			{
+				send_notify_msg(0, client_h, Notify::NoticeMsg, 0, 0, 0, "Invalid NPC ID.");
+				break;
+			}
+
+			char* map_name = m_map_list[m_client_list[client_h]->m_map_index]->m_name;
+			int spawned = 0;
+
+			for (int i = 0; i < amount; i++)
+			{
+				char unique_name[21];
+				std::snprintf(unique_name, sizeof(unique_name), "Tester-spawn%d", i);
+
+				int tX = m_client_list[client_h]->m_x;
+				int tY = m_client_list[client_h]->m_y;
+
+				// is_summoned=false so NPCs give EXP/drops, bypass_mob_limit=true so they don't count toward map limit
+				if (create_new_npc(npc_id, unique_name, map_name, 0, 0, hb::server::npc::MoveType::Random,
+					&tX, &tY, nullptr, nullptr, 0, -1, false, false, false, false, 0, true))
+				{
+					spawned++;
+				}
+			}
+
+			char buf[128];
+			std::snprintf(buf, sizeof(buf), "Spawned %dx %s (ID: %d)", spawned, m_npc_config_list[npc_id]->m_npc_name, npc_id);
+			send_notify_msg(0, client_h, Notify::NoticeMsg, 0, 0, 0, buf);
+
+			hb::logger::log<log_channel::commands>("[TesterMenu] '{}' spawned {}x NPC '{}' (ID {})",
+				m_client_list[client_h]->m_char_name, spawned, m_npc_config_list[npc_id]->m_npc_name, npc_id);
+			break;
+		}
+
 		default:
 			break;
 		}
@@ -6223,6 +6263,54 @@ void CGame::client_common_handler(int client_h, char* data)
 		m_client_list[client_h]->m_socket->send_msg(
 			reinterpret_cast<char*>(&result), sizeof(result));
 		hb::logger::log<log_channel::commands>("[TesterMenu] '{}' searched items '{}' ({} results)",
+			m_client_list[client_h]->m_char_name, has_filter ? string : "(all)", result.count);
+		break;
+	}
+
+	case CommonType::TesterNpcSearch:
+	{
+		if (m_client_list[client_h] == nullptr) break;
+
+		// Empty search = return first 50 NPCs; otherwise filter by substring
+		bool has_filter = (string != nullptr && string[0] != '\0');
+		char search_lower[64]{};
+		if (has_filter)
+		{
+			std::snprintf(search_lower, sizeof(search_lower), "%s", string);
+			for (int i = 0; search_lower[i]; i++)
+				search_lower[i] = static_cast<char>(std::tolower(static_cast<unsigned char>(search_lower[i])));
+		}
+
+		hb::net::PacketNotifyTesterNpcSearchResult result{};
+		result.header.msg_id = MsgId::Notify;
+		result.header.msg_type = Notify::TesterNpcSearchResult;
+		result.count = 0;
+
+		for (int i = 0; i < hb::server::config::MaxNpcTypes && result.count < 50; i++)
+		{
+			if (m_npc_config_list[i] == nullptr) continue;
+
+			if (has_filter)
+			{
+				char name_lower[64]{};
+				std::snprintf(name_lower, sizeof(name_lower), "%s", m_npc_config_list[i]->m_npc_name);
+				for (int j = 0; name_lower[j]; j++)
+					name_lower[j] = static_cast<char>(std::tolower(static_cast<unsigned char>(name_lower[j])));
+
+				if (std::strstr(name_lower, search_lower) == nullptr)
+					continue;
+			}
+
+			auto& entry = result.entries[result.count];
+			entry.npc_id = static_cast<int16_t>(i);
+			std::memset(entry.name, 0, sizeof(entry.name));
+			std::snprintf(entry.name, sizeof(entry.name), "%s", m_npc_config_list[i]->m_npc_name);
+			result.count++;
+		}
+
+		m_client_list[client_h]->m_socket->send_msg(
+			reinterpret_cast<char*>(&result), sizeof(result));
+		hb::logger::log<log_channel::commands>("[TesterMenu] '{}' searched NPCs '{}' ({} results)",
 			m_client_list[client_h]->m_char_name, has_filter ? string : "(all)", result.count);
 		break;
 	}

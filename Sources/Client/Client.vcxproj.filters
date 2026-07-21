@@ -168,6 +168,9 @@
     <ClInclude Include="DialogBox_ItemCreator.h">
       <Filter>DialogBox</Filter>
     </ClInclude>
+    <ClInclude Include="DialogBox_NpcSpawner.h">
+      <Filter>DialogBox</Filter>
+    </ClInclude>
     <ClInclude Include="DialogBox_Character.h">
       <Filter>DialogBox</Filter>
     </ClInclude>
@@ -752,6 +755,9 @@
       <Filter>DialogBox</Filter>
     </ClCompile>
     <ClCompile Include="DialogBox_ItemCreator.cpp">
+      <Filter>DialogBox</Filter>
+    </ClCompile>
+    <ClCompile Include="DialogBox_NpcSpawner.cpp">
       <Filter>DialogBox</Filter>
     </ClCompile>
     <ClCompile Include="DialogBox_Character.cpp">

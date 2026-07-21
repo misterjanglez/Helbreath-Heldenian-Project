@@ -315,6 +315,7 @@
     <ClInclude Include="DialogBox_ChangeStatsMajestic.h" />
     <ClInclude Include="DialogBox_TesterMenu.h" />
     <ClInclude Include="DialogBox_ItemCreator.h" />
+    <ClInclude Include="DialogBox_NpcSpawner.h" />
     <ClInclude Include="DialogBox_GuildHallMenu.h" />
     <ClInclude Include="DialogBox_SellOrRepair.h" />
     <ClInclude Include="DialogBox_Manufacture.h" />
@@ -513,6 +514,7 @@
     <ClCompile Include="DialogBox_ChangeStatsMajestic.cpp" />
     <ClCompile Include="DialogBox_TesterMenu.cpp" />
     <ClCompile Include="DialogBox_ItemCreator.cpp" />
+    <ClCompile Include="DialogBox_NpcSpawner.cpp" />
     <ClCompile Include="DialogBox_GuildHallMenu.cpp" />
     <ClCompile Include="DialogBox_SellOrRepair.cpp" />
     <ClCompile Include="DialogBox_Manufacture.cpp" />

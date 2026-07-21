@@ -29,6 +29,7 @@ const DialogBox_TesterMenu::action_entry DialogBox_TesterMenu::actions[action_co
 	{ "Set level" },
 	{ "Create item" },
 	{ "Teleport" },
+	{ "Spawn NPC" },
 };
 
 DialogBox_TesterMenu::DialogBox_TesterMenu(CGame* game)
@@ -262,6 +263,12 @@ bool DialogBox_TesterMenu::on_click_main_menu(short sX, short sY)
 			m_map_scroll = 0;
 			m_map_count = 0;
 			send_game_packet(hb::net::make_common_command(CommonType::TesterMapList, player().m_player_x, player().m_player_y));
+			audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
+			return true;
+		}
+		if (row == 10) // Spawn NPC
+		{
+			m_game->get_dialog_box_manager().enable_dialog_box(DialogBoxId::NpcSpawner, 0, 0, 0);
 			audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 			return true;
 		}

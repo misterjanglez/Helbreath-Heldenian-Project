@@ -6,6 +6,7 @@
 // TESTER MENU — includes (tester builds only)
 #include "DialogBox_ItemCreator.h"
 #include "DialogBox_TesterMenu.h"
+#include "DialogBox_NpcSpawner.h"
 #endif // TESTER_ONLY
 #include "lan_eng.h"
 #include <cstdio>
@@ -135,6 +136,17 @@ namespace NetworkMessageHandlers {
 		auto* dlg = dynamic_cast<DialogBox_TesterMenu*>(
 			game->get_dialog_box_manager().get_dialog_box(DialogBoxId::TesterMenu));
 		if (dlg) dlg->receive_map_list(pkt);
+	}
+
+	void HandleTesterNpcSearchResult(CGame* game, char* data)
+	{
+		const auto* pkt = hb::net::PacketCast<hb::net::PacketNotifyTesterNpcSearchResult>(
+			data, sizeof(hb::net::PacketNotifyTesterNpcSearchResult));
+		if (!pkt) return;
+
+		auto* dlg = dynamic_cast<DialogBox_NpcSpawner*>(
+			game->get_dialog_box_manager().get_dialog_box(DialogBoxId::NpcSpawner));
+		if (dlg) dlg->receive_search_results(pkt);
 	}
 #endif // TESTER_ONLY
 
