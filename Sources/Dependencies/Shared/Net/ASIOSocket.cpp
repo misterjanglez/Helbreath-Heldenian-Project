@@ -377,19 +377,32 @@ int ASIOSocket::on_read()
 		if (m_read_size == 0) {
 			m_status = sock::Status::ReadingBody;
 			uint16_t* wp = reinterpret_cast<uint16_t*>(m_rcvBuffer.data() + 1);
-			m_read_size = static_cast<uint32_t>(*wp - 3);
+			const uint16_t declared_total = *wp;
+
+			// A valid frame is [key:1][total_size:2][body:N] with total_size >= 3.
+			// declared_total < 3 means a garbage header (stream desync). Guarding it here
+			// also prevents the unsigned underflow of (declared_total - 3), which would
+			// otherwise wrap to a huge body size. Dump the raw header so the desync is
+			// diagnosable instead of collapsing into an opaque drain failure.
+			if (declared_total < 3 || static_cast<size_t>(declared_total - 3) > m_buffer_size) {
+				hb::logger::error("[ASIO] on_read: bad frame size (STREAM DESYNC). header=[{:02X} {:02X} {:02X}] declared_total={} buffer={}",
+					static_cast<unsigned char>(m_rcvBuffer[0]),
+					static_cast<unsigned char>(m_rcvBuffer[1]),
+					static_cast<unsigned char>(m_rcvBuffer[2]),
+					declared_total, static_cast<uint64_t>(m_buffer_size));
+				m_status = sock::Status::ReadingHeader;
+				m_read_size = 3;
+				m_total_read_size = 0;
+				return sock::Event::MsgSizeTooLarge;
+			}
+
+			m_read_size = static_cast<size_t>(declared_total - 3);
 
 			if (m_read_size == 0) {
 				m_status = sock::Status::ReadingHeader;
 				m_read_size = 3;
 				m_total_read_size = 0;
 				return sock::Event::ReadComplete;
-			}
-			else if (m_read_size > m_buffer_size) {
-				m_status = sock::Status::ReadingHeader;
-				m_read_size = 3;
-				m_total_read_size = 0;
-				return sock::Event::MsgSizeTooLarge;
 			}
 		}
 		return sock::Event::OnRead;
@@ -692,8 +705,11 @@ char* ASIOSocket::get_rcv_data_pointer(size_t* msg_size, char* key)
 	if (key != nullptr) *key = key_val;
 
 	uint16_t* wp = reinterpret_cast<uint16_t*>(m_rcvBuffer.data() + 1);
-	*msg_size = (*wp) - 3;
-	size_t size = (*wp) - 3;
+	// Guard the unsigned underflow when the declared frame size is < 3 (desynced/garbage
+	// header): without this, *msg_size would wrap to ~SIZE_MAX and a caller copying that
+	// many bytes would hard-crash.
+	size_t size = (*wp < 3) ? 0 : static_cast<size_t>((*wp) - 3);
+	*msg_size = size;
 
 	if (size > hb::shared::limits::MsgBufferSize) size = hb::shared::limits::MsgBufferSize;
 
@@ -737,9 +753,16 @@ int ASIOSocket::drain_to_queue()
 		case sock::Event::Block:
 			return packets_queued;
 
-		case sock::Event::SocketError:
 		case sock::Event::SocketClosed:
+			hb::logger::warn("[ASIO] drain_to_queue: connection CLOSED by peer (server dropped this client, or graceful close). packets_queued={}", packets_queued);
+			return -1;
+
+		case sock::Event::SocketError:
+			hb::logger::error("[ASIO] drain_to_queue: SOCKET ERROR (WSAErr={}). packets_queued={}", m_WSAErr, packets_queued);
+			return -1;
+
 		case sock::Event::MsgSizeTooLarge:
+			hb::logger::error("[ASIO] drain_to_queue: frame size too large (STREAM DESYNC — see on_read header dump above). packets_queued={}", packets_queued);
 			return -1;
 
 		case sock::Event::OnRead:

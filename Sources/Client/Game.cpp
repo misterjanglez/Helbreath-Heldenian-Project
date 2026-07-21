@@ -697,11 +697,12 @@ void CGame::on_game_socket_event()
 
 	switch (ret) {
 	case sock::Event::SocketClosed:
+		printf("[NET] Game socket CLOSED by peer during Poll (server dropped this client, or graceful close)\n");
 		change_game_mode(GameMode::ConnectionLost);
 		m_g_sock.reset();
 		return;
 	case sock::Event::SocketError:
-		printf("[ERROR] Game socket error\n");
+		printf("[ERROR] Game socket error during Poll (WSAErr=%d)\n", m_g_sock->m_WSAErr);
 		change_game_mode(GameMode::ConnectionLost);
 		m_g_sock.reset();
 		return;

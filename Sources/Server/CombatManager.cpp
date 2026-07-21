@@ -2122,10 +2122,12 @@ bool CombatManager::check_client_attack_frequency(int client_h, uint32_t client_
 		int base_swing = hb::shared::calc::swing_time(m_game->m_formula_engine,
 			hb::shared::calc::attack_delay_value{(double)status.attack_delay});
 		int frames = hb::shared::calc::swing_frames(m_game->m_formula_engine);
-		int bft = hb::shared::calc::base_frame_time(m_game->m_formula_engine);
 		int rft = hb::shared::calc::run_frame_time(m_game->m_formula_engine);
 		int effective_swing = base_swing;
-		if (status.frozen) effective_swing += frames * (bft >> 2);
+		// Do NOT inflate the threshold for `frozen`: this is a *minimum* legal swing gap
+		// (speed-hack detection). Frozen never lets a player swing faster, and the client
+		// does not slow attacks while frozen (only movement), so a frozen penalty here only
+		// false-positives legit frozen players and disconnects them.
 		if (status.haste)  effective_swing -= frames * static_cast<int>(rft / 2.3);
 
 		int expectedSwingTime = effective_swing;

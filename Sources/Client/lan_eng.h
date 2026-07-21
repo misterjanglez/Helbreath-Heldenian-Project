@@ -1410,7 +1410,7 @@
 #define	NOTIFYMSG_MAGICEFFECT_ON10	"You were poisoned!"
 #define	NOTIFYMSG_MAGICEFFECT_ON11	"Berserk Magic Casted!"
 #define	NOTIFYMSG_MAGICEFFECT_ON12	"Transformation magic effect, you have been transformed as a monster"
-#define	NOTIFYMSG_MAGICEFFECT_ON13	"You have been frozen! Your movement decreases to 50"
+#define	NOTIFYMSG_MAGICEFFECT_ON13	"You have been frozen! Your movement decreases by 25%"
 #define	NOTIFYMSG_MAGICEFFECT_ON14  "You are completely protected from magic!"
 // Snoopy
  #define	NOTIFYMSG_MAGICEFFECT_ON15	"You are thrown into confusion, and you are flustered yourself."
