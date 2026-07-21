@@ -26,7 +26,9 @@ from collections import defaultdict
 from datetime import datetime
 from pathlib import Path
 
-SOURCES = Path(r"Z:\Helbreath-3.82\Sources")
+# Resolve Sources/ relative to this script's location so it works on any machine
+# (bak.py lives at the repo root alongside the Sources/ directory).
+SOURCES = Path(__file__).resolve().parent / "Sources"
 BAK_RE = re.compile(r"^(.+)\.bak_([a-f0-9]{8})$")
 
 

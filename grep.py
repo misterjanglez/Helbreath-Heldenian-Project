@@ -18,8 +18,11 @@ import re
 import sys
 from pathlib import Path
 
-SOURCES = Path(r"Z:\Helbreath-3.82\Sources")
-OUTPUT_DIR = Path(r"Z:\Helbreath-3.82\Scripts\output")
+# Resolve paths relative to this script's location so it works on any machine
+# (grep.py lives at the repo root alongside Sources/ and Scripts/).
+_REPO_ROOT = Path(__file__).resolve().parent
+SOURCES = _REPO_ROOT / "Sources"
+OUTPUT_DIR = _REPO_ROOT / "Scripts" / "output"
 MAX_OUTPUT_DIR_MB = 10
 
 

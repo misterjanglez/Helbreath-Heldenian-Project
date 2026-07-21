@@ -19,7 +19,18 @@ $Platform = "x64"
 
 $ErrorActionPreference = "Stop"
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
-$msbuildPath = "C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\MSBuild\Current\Bin\MSBuild.exe"
+# Locate MSBuild via vswhere (works across VS versions/editions); fall back to a known path
+$msbuildPath = $null
+$vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+if (Test-Path $vswhere)
+{
+    $msbuildPath = & $vswhere -latest -products * -requires Microsoft.Component.MSBuild -find "MSBuild\**\Bin\MSBuild.exe" | Select-Object -First 1
+}
+if (-not $msbuildPath -or -not (Test-Path $msbuildPath))
+{
+    $msbuildPath = "C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\MSBuild\Current\Bin\MSBuild.exe"
+}
+if (-not (Test-Path $msbuildPath)) { Write-Error "MSBuild not found. Install Visual Studio or Build Tools with the MSBuild component."; exit 1 }
 $solutionPath = Join-Path $scriptDir "Helbreath.sln"
 
 # Configuration string matches the solution configs (Debug|x64, Release|x64)
@@ -37,8 +48,11 @@ Write-Host "============================================"
 Write-Host "Building: $Target | Config: $configString | Platform: $Platform"
 Write-Host "============================================"
 
-# Generate version header
-& "C:\Python314\python" "$scriptDir\version_gen.py"
+# Generate version header (resolve python from PATH; fall back to py launcher)
+$pythonExe = (Get-Command python -ErrorAction SilentlyContinue).Source
+if (-not $pythonExe) { $pythonExe = (Get-Command py -ErrorAction SilentlyContinue).Source }
+if (-not $pythonExe) { Write-Error "Python not found on PATH. Install Python 3 and ensure 'python' resolves."; exit 1 }
+& $pythonExe "$scriptDir\version_gen.py"
 
 # Determine MSBuild target
 $msbuildTarget = if ($Target -eq "All") { "" } else { "/t:$Target" }
