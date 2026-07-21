@@ -203,6 +203,16 @@ void DialogBox_GuideMap::on_draw()
 
 	draw_border(sX, sY);
 
+	// Map data may not be loaded yet on the first frame(s) after entering a map
+	// (m_map_index is set from the init packet before open_map_data_file runs, and
+	// both m_map_index and m_map_size_x start uninitialized). Every mini-map draw
+	// path below divides by m_map_size_x/y, so bail out until the map is loaded to
+	// avoid an integer divide-by-zero.
+	if (m_game->m_map_data == nullptr ||
+		m_game->m_map_data->m_map_size_x <= 0 ||
+		m_game->m_map_data->m_map_size_y <= 0)
+		return;
+
 	if (config_manager::get().is_zoom_map_enabled())
 		draw_zoomed_map(sX, sY);
 	else
