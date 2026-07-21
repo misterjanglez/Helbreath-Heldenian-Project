@@ -317,7 +317,7 @@ void DialogBox_Character::on_draw()
 
 	// Max load
 	int total_weight = inventory_manager::get().calc_total_weight();
-	valueBuf = std::format("{}/{}", (total_weight / 100), max_load);
+	valueBuf = std::format("{}/{}", (total_weight / 100), (max_load / 100));
 	put_aligned_string(sX + 180, sX + 250, sY + 240, valueBuf.c_str(), GameColors::UILabel);
 
 	// Enemy Kills

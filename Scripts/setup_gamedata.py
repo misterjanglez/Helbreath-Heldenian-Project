@@ -48,7 +48,7 @@ def create_formula_tables(db, dry_run):
             ('max_hp',            'vit * 3 + level * 2 + str * 0.5 + angelic_str * 0.5',                                            'Maximum health points'),
             ('max_mp',            'mag * 2 + angelic_mag * 2 + level * 2 + int * 0.5 + angelic_int * 0.5',                            'Maximum mana points'),
             ('max_sp',            'str * 2 + angelic_str * 2 + level * 2',                                                            'Maximum stamina points'),
-            ('max_load',          'str * 5 + angelic_str * 5 + level * 5',                                                            'Maximum carry weight'),
+            ('max_load',          'str * 500 + angelic_str * 500 + level * 500',                                                      'Maximum carry weight'),
             ('level_exp',         'sum(1, level, i * (50 + i * trunc(i / 17) * trunc(i / 17)))',                                      'Total XP to reach level'),
             ('level_up_pool',     '(level - 1) * levelup_stat_gain - (total_stats - base_stat_total)',                                'Available stat points from level-ups'),
             ('max_stat_value',    'base_stat_value + creation_stat_bonus + levelup_stat_gain * max_level + angelic_bonus',             'Maximum value for a single stat'),
