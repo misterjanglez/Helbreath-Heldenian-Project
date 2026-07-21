@@ -107,6 +107,7 @@ INSERT INTO "active_maps" VALUES (74, 'fightzone9', 1);
 INSERT INTO "active_maps" VALUES (75, 'toh1', 1);
 INSERT INTO "active_maps" VALUES (76, 'toh2', 1);
 INSERT INTO "active_maps" VALUES (77, 'toh3', 1);
+INSERT INTO "active_maps" VALUES (78, 'icebound', 1);
 
 -- ----------------------------
 -- Table structure for admin_command_permissions
@@ -2368,6 +2369,20 @@ INSERT INTO "drop_tables" VALUES (20138, 'drops_Bar-Aresden', 'Drops for Bar-Are
 INSERT INTO "drop_tables" VALUES (20139, 'drops_Bar-Elvine', 'Drops for Bar-Elvine');
 INSERT INTO "drop_tables" VALUES (20140, 'drops_AGC-Aresden', 'Drops for AGC-Aresden');
 INSERT INTO "drop_tables" VALUES (20141, 'drops_AGC-Elvine', 'Drops for AGC-Elvine');
+
+-- guaranteed_secondary: bosses whose tier-2 (second) drop is always rolled and
+-- always yields a real item (nothing-slot skipped). Added via ALTER after the
+-- 3-column INSERTs above so those inserts stay valid.
+ALTER TABLE "drop_tables" ADD COLUMN "guaranteed_secondary" INTEGER NOT NULL DEFAULT 0;
+UPDATE "drop_tables" SET "guaranteed_secondary" = 1 WHERE "drop_table_id" IN (20049, 20050, 20090, 20091, 20092);
+
+-- scatter_count: bosses whose delayed tier-2 drop is rolled N times and
+-- scattered over a 5x5 spiral around the corpse (faithful to the original
+-- Wyvern / Fire-Wyvern / Abaddon loot spread). 0 = single item on the exact
+-- tile. Hellclaw/Tigerworm keep 0 (single item, just delayed).
+ALTER TABLE "drop_tables" ADD COLUMN "scatter_count" INTEGER NOT NULL DEFAULT 0;
+UPDATE "drop_tables" SET "scatter_count" = 15 WHERE "drop_table_id" IN (20090, 20091);
+UPDATE "drop_tables" SET "scatter_count" = 20 WHERE "drop_table_id" = 20092;
 
 -- ----------------------------
 -- Table structure for event_schedule
