@@ -1726,6 +1726,13 @@ void CEntityManager::npc_behavior_stop(int npc_h)
 	}
 }
 
+// The delayed second (tier-2) drop appears at the corpse's decay time, but no
+// later than this cap. Slow-decaying bosses have a 60s regen_time, which is too
+// long to wait for loot, so their drop is placed at ~20s while the corpse still
+// lingers and respawn timing (driven by corpse removal) is unaffected. Ordinary
+// mobs decay faster than this, so they are unchanged.
+static constexpr uint32_t SecondDropMaxDelayMs = 20000;
+
 void CEntityManager::npc_behavior_dead(int npc_h)
 {
 	uint32_t time;
@@ -1739,7 +1746,20 @@ void CEntityManager::npc_behavior_dead(int npc_h)
 	}
 
 	uint32_t time_since_death = time - m_npc_list[npc_h]->m_dead_time;
+
+	// Place the delayed second-stage loot (tier-2, scattered for bosses) once
+	// its capped delay elapses. This can be before the corpse is removed, so a
+	// boss's loot lands promptly instead of a full minute later.
+	uint32_t drop_delay = m_npc_list[npc_h]->m_regen_time;
+	if (drop_delay > SecondDropMaxDelayMs) drop_delay = SecondDropMaxDelayMs;
+	if (m_npc_list[npc_h]->m_pending_drop_count > 0 && time_since_death > drop_delay) {
+		spawn_pending_drops(npc_h);
+	}
+
 	if (time_since_death > m_npc_list[npc_h]->m_regen_time) {
+		// The corpse has decayed: place any still-pending loot (no-op if it was
+		// already dropped above), then remove the NPC.
+		spawn_pending_drops(npc_h);
 		delete_entity(npc_h);
 	}
 }
@@ -2485,6 +2505,17 @@ static constexpr uint32_t BASE_PRIMARY_DROP_CHANCE = 1000;   // 10% base primary
 static constexpr uint32_t BASE_GOLD_DROP_CHANCE = 3000;      // 30% base gold drop chance
 static constexpr uint32_t BASE_SECONDARY_DROP_CHANCE = 500;  // 5% base secondary/bonus drop chance
 
+// Center-out square spiral of tile offsets for scattered boss loot, ported
+// from the original ITEMSPREAD_FIEXD_COORD table. It fills a 5x5 area (offsets
+// -2..+2) from the center outward, so the Nth scattered item lands on the Nth
+// innermost cell. Used by Wyvern / Fire-Wyvern / Abaddon when scatter_count>0.
+static constexpr int NpcScatterCoordCount = 25;
+static const short NpcScatterCoord[NpcScatterCoordCount][2] = {
+	{ 0,  0}, { 1,  0}, { 1,  1}, { 0,  1}, {-1,  1}, {-1,  0}, {-1, -1}, { 0, -1}, { 1, -1},
+	{ 2, -1}, { 2,  0}, { 2,  1}, { 2,  2}, { 1,  2}, { 0,  2}, {-1,  2}, {-2,  2}, {-2,  1},
+	{-2,  0}, {-2, -1}, {-2, -2}, {-1, -2}, { 0, -2}, { 1, -2}, { 2, -2}
+};
+
 void CEntityManager::npc_dead_item_generator(int npc_h, short attacker_h, char attacker_type)
 {
 	if (m_npc_list[npc_h] == 0) return;
@@ -2545,46 +2576,103 @@ void CEntityManager::npc_dead_item_generator(int npc_h, short attacker_h, char a
 		}
 	}
 
-	// Secondary/bonus drop (from drop table tier 2) - affected by secondary multiplier
+	// Secondary/bonus drop (from drop table tier 2).
+	//
+	// This is the "second drop": in the original game it appears a little later
+	// than the death drop, when the corpse decays. So instead of placing it now
+	// we roll it here (while the attacker is still valid) and queue it as a
+	// pending drop; spawn_pending_drops() places it in npc_behavior_dead when
+	// the corpse's regen timer elapses.
 	if (table != nullptr) {
-		// Base secondary chance, modified by player rating
-		double ratingModifier = 0.0;
-		if (m_game->m_client_list[attacker_h] != nullptr) {
-			ratingModifier = m_game->m_client_list[attacker_h]->m_rating * m_game->m_rep_drop_modifier;
-			if (ratingModifier > 1000) ratingModifier = 1000;
-			if (ratingModifier < -1000) ratingModifier = -1000;
-		}
+		// Guaranteed-drop bosses (e.g. Helclaw, Tiger Worm, Wyverns, Abaddon)
+		// always roll their tier-2 table and skip the "nothing" slot, so a real
+		// second item drops on every kill. All other NPCs use the normal
+		// rating-modified secondary chance and may roll nothing.
+		bool guaranteed = table->guaranteed_secondary;
 
-		// Calculate effective secondary drop chance with rating modifier and multiplier
-		double baseSecondary = static_cast<double>(BASE_SECONDARY_DROP_CHANCE) - ratingModifier;
-		double effectiveSecondary = baseSecondary * static_cast<double>(m_game->m_secondary_drop_rate);
-		if (effectiveSecondary > 10000.0) effectiveSecondary = 10000.0;
-		if (effectiveSecondary < 0.0) effectiveSecondary = 0.0;
-
-		if (m_game->dice(1, 10000) <= static_cast<uint32_t>(effectiveSecondary)) {
-			int min_count = 1;
-			int max_count = 1;
-			int item_id = roll_drop_table_item(table, 2, min_count, max_count);
-			if (item_id != 0) {
+		if (table->scatter_count > 0) {
+			// Scatter bosses (Wyvern / Fire-Wyvern / Abaddon): roll the tier-2
+			// table scatter_count times and spread the real hits over the 5x5
+			// spiral. The first roll skips the "nothing" slot when the table is
+			// guaranteed (preserving one guaranteed item); the remaining rolls
+			// include it as bonus attempts, so most of them miss.
+			int placed = 0;
+			for (int k = 0; k < table->scatter_count; k++) {
+				int min_count = 1;
+				int max_count = 1;
+				bool exclude_empty = (k == 0 && guaranteed);
+				int item_id = roll_drop_table_item(table, 2, min_count, max_count, exclude_empty);
+				if (item_id == 0) continue;
 				if (item_id == 90) {
 					min_count = static_cast<int>(m_npc_list[npc_h]->m_gold_dice_min);
 					max_count = static_cast<int>(m_npc_list[npc_h]->m_gold_dice_max);
 				}
-				spawn_npc_drop_item(npc_h, item_id, min_count, max_count);
+				int idx = placed;
+				if (idx >= NpcScatterCoordCount) idx = NpcScatterCoordCount - 1;
+				queue_pending_drop(npc_h, item_id, min_count, max_count,
+					NpcScatterCoord[idx][0], NpcScatterCoord[idx][1]);
+				placed++;
+			}
+		}
+		else {
+			// Ordinary single second drop, placed on the exact corpse tile.
+			bool do_secondary = guaranteed;
+
+			if (!guaranteed) {
+				// Base secondary chance, modified by player rating
+				double ratingModifier = 0.0;
+				if (m_game->m_client_list[attacker_h] != nullptr) {
+					ratingModifier = m_game->m_client_list[attacker_h]->m_rating * m_game->m_rep_drop_modifier;
+					if (ratingModifier > 1000) ratingModifier = 1000;
+					if (ratingModifier < -1000) ratingModifier = -1000;
+				}
+
+				// Calculate effective secondary drop chance with rating modifier and multiplier
+				double baseSecondary = static_cast<double>(BASE_SECONDARY_DROP_CHANCE) - ratingModifier;
+				double effectiveSecondary = baseSecondary * static_cast<double>(m_game->m_secondary_drop_rate);
+				if (effectiveSecondary > 10000.0) effectiveSecondary = 10000.0;
+				if (effectiveSecondary < 0.0) effectiveSecondary = 0.0;
+
+				do_secondary = (m_game->dice(1, 10000) <= static_cast<uint32_t>(effectiveSecondary));
+			}
+
+			if (do_secondary) {
+				int min_count = 1;
+				int max_count = 1;
+				int item_id = roll_drop_table_item(table, 2, min_count, max_count, /*exclude_empty=*/guaranteed);
+				if (item_id != 0) {
+					if (item_id == 90) {
+						min_count = static_cast<int>(m_npc_list[npc_h]->m_gold_dice_min);
+						max_count = static_cast<int>(m_npc_list[npc_h]->m_gold_dice_max);
+					}
+					queue_pending_drop(npc_h, item_id, min_count, max_count, 0, 0);
+				}
 			}
 		}
 	}
 }
 
-int CEntityManager::roll_drop_table_item(const DropTable* table, int tier, int& outMinCount, int& outMaxCount) const
+int CEntityManager::roll_drop_table_item(const DropTable* table, int tier, int& outMinCount, int& outMaxCount, bool exclude_empty) const
 {
 	if (table == nullptr) return 0;
 	if (tier < 1 || tier > 2) return 0;
+
+	// When exclude_empty is set, the item_id=0 "nothing" slot is ignored so a
+	// real item is always chosen (guaranteed-drop bosses). The roll then runs
+	// against the summed weight of the real entries only, preserving their
+	// relative rarity.
 	int total = table->total_weight[tier];
+	if (exclude_empty) {
+		total = 0;
+		for (const auto& entry : table->tierEntries[tier]) {
+			if (entry.item_id != 0) total += entry.weight;
+		}
+	}
 	if (total <= 0) return 0;
 	int roll = m_game->dice(1, total);
 	int cumulative = 0;
 	for (const auto& entry : table->tierEntries[tier]) {
+		if (exclude_empty && entry.item_id == 0) continue;
 		cumulative += entry.weight;
 		if (roll <= cumulative) {
 			outMinCount = entry.min_count;
@@ -2595,13 +2683,23 @@ int CEntityManager::roll_drop_table_item(const DropTable* table, int tier, int& 
 	return 0;
 }
 
-bool CEntityManager::spawn_npc_drop_item(int npc_h, int item_id, int min_count, int max_count)
+bool CEntityManager::spawn_npc_drop_item(int npc_h, int item_id, int min_count, int max_count, short dx, short dy)
 {
 	if (item_id <= 0) return false;
 	if (m_npc_list[npc_h] == 0) return false;
 
 	if (min_count < 0) min_count = 0;
 	if (max_count < min_count) max_count = min_count;
+
+	// Scattered drops land on an offset tile; require it to be walkable (and in
+	// bounds) so loot never ends up inside a wall. The exact corpse tile
+	// (dx==dy==0) is where the NPC stood, so it is placed unconditionally.
+	short drop_x = m_npc_list[npc_h]->m_x + dx;
+	short drop_y = m_npc_list[npc_h]->m_y + dy;
+	if ((dx != 0 || dy != 0) &&
+		m_map_list[m_npc_list[npc_h]->m_map_index]->get_is_move_allowed_tile(drop_x, drop_y) == false) {
+		return false;
+	}
 
 	CItem* item = new CItem;
 	if (m_game->m_item_manager->init_item_attr(item, item_id) == false) {
@@ -2636,11 +2734,41 @@ bool CEntityManager::spawn_npc_drop_item(int npc_h, int item_id, int min_count, 
 	item->m_touch_effect_value1 = static_cast<short>(m_game->dice(1, 100000));
 	item->m_touch_effect_value2 = static_cast<short>(m_game->dice(1, 100000));
 	item->m_touch_effect_value3 = (short)GameClock::GetTimeMS();
-	m_map_list[m_npc_list[npc_h]->m_map_index]->set_item(m_npc_list[npc_h]->m_x, m_npc_list[npc_h]->m_y, item);
+	m_map_list[m_npc_list[npc_h]->m_map_index]->set_item(drop_x, drop_y, item);
 	m_game->send_event_to_near_client_type_b(MsgId::EventCommon, CommonType::ItemDrop, m_npc_list[npc_h]->m_map_index,
-		m_npc_list[npc_h]->m_x, m_npc_list[npc_h]->m_y, item->m_id_num, 0, item->m_item_color, item->m_attribute);
+		drop_x, drop_y, item->m_id_num, 0, item->m_item_color, item->m_attribute);
 	m_game->m_item_manager->item_log(ItemLogAction::NewGenDrop, 0, m_npc_list[npc_h]->m_npc_name, item);
 	return true;
+}
+
+// Queue a tier-2 drop rolled at death for placement when the corpse decays.
+void CEntityManager::queue_pending_drop(int npc_h, int item_id, int min_count, int max_count, short dx, short dy)
+{
+	if (m_npc_list[npc_h] == 0) return;
+	CNpc* npc = m_npc_list[npc_h];
+	if (npc->m_pending_drop_count >= CNpc::MaxPendingDrops) return;
+
+	PendingDrop& d = npc->m_pending_drops[npc->m_pending_drop_count++];
+	d.item_id = item_id;
+	d.min_count = min_count;
+	d.max_count = max_count;
+	d.dx = dx;
+	d.dy = dy;
+}
+
+// Place all pending (delayed) second-stage drops for a decaying corpse. Called
+// from npc_behavior_dead once the regen timer elapses, just before the NPC is
+// removed, so the second drop appears a little after the death drop.
+void CEntityManager::spawn_pending_drops(int npc_h)
+{
+	if (m_npc_list[npc_h] == 0) return;
+	CNpc* npc = m_npc_list[npc_h];
+
+	for (int i = 0; i < npc->m_pending_drop_count; i++) {
+		const PendingDrop& d = npc->m_pending_drops[i];
+		spawn_npc_drop_item(npc_h, d.item_id, d.min_count, d.max_count, d.dx, d.dy);
+	}
+	npc->m_pending_drop_count = 0;
 }
 
 int CEntityManager::get_entity_handle_by_guid(uint32_t guid) const

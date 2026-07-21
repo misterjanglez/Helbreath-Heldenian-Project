@@ -150,6 +150,18 @@ struct DropTable
 	char description[128];
 	std::vector<DropEntry> tierEntries[3];
 	int total_weight[3];
+	// When true, the tier-2 (secondary) table is always rolled and its
+	// item_id=0 "nothing" slot is skipped, so a real second item drops on
+	// every kill. Used for guaranteed-drop bosses (Helclaw, Tiger Worm,
+	// Wyverns, Abaddon). Normal NPCs keep the gated/weighted secondary chance.
+	bool guaranteed_secondary = false;
+	// When > 0, the tier-2 drop is rolled this many times and the resulting
+	// items are scattered over a 5x5 center-out spiral around the corpse
+	// (faithful to the original Wyvern/Fire-Wyvern/Abaddon loot spread). Each
+	// roll after the first includes the "nothing" slot, so most miss. 0 keeps
+	// the single-item behavior. The scatter (and all tier-2 drops) are placed
+	// when the corpse decays, not instantly on death.
+	int scatter_count = 0;
 };
 
 // Shop system structures

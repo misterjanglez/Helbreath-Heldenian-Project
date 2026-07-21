@@ -256,7 +256,9 @@ bool EnsureGameConfigDatabase(sqlite3** outDb, std::string& outPath, bool* outCr
         "CREATE TABLE IF NOT EXISTS drop_tables ("
         " drop_table_id INTEGER PRIMARY KEY,"
         " name TEXT NOT NULL,"
-        " description TEXT NOT NULL"
+        " description TEXT NOT NULL,"
+        " guaranteed_secondary INTEGER NOT NULL DEFAULT 0,"
+        " scatter_count INTEGER NOT NULL DEFAULT 0"
         ");"
         "CREATE TABLE IF NOT EXISTS drop_entries ("
         " drop_table_id INTEGER NOT NULL,"
@@ -1020,7 +1022,15 @@ bool LoadDropTables(sqlite3* db, CGame* game)
 
     game->m_drop_tables.clear();
 
-    const char* tableSql = "SELECT drop_table_id, name, description FROM drop_tables ORDER BY drop_table_id;";
+    // Self-healing migration: ensure the guaranteed_secondary and scatter_count
+    // columns exist on older databases created before they were added. Ignore
+    // the "duplicate column" error when they are already present.
+    sqlite3_exec(db, "ALTER TABLE drop_tables ADD COLUMN guaranteed_secondary INTEGER NOT NULL DEFAULT 0;",
+        nullptr, nullptr, nullptr);
+    sqlite3_exec(db, "ALTER TABLE drop_tables ADD COLUMN scatter_count INTEGER NOT NULL DEFAULT 0;",
+        nullptr, nullptr, nullptr);
+
+    const char* tableSql = "SELECT drop_table_id, name, description, guaranteed_secondary, scatter_count FROM drop_tables ORDER BY drop_table_id;";
     sqlite3_stmt* stmt = nullptr;
     if (sqlite3_prepare_v2(db, tableSql, -1, &stmt, nullptr) != SQLITE_OK) {
         return false;
@@ -1034,6 +1044,8 @@ bool LoadDropTables(sqlite3* db, CGame* game)
         CopyColumnText(stmt, 1, table.name, sizeof(table.name));
         CopyColumnText(stmt, 2, table.description, sizeof(table.description));
         std::memset(table.total_weight, 0, sizeof(table.total_weight));
+        table.guaranteed_secondary = (sqlite3_column_int(stmt, 3) != 0);
+        table.scatter_count = sqlite3_column_int(stmt, 4);
         game->m_drop_tables[table.id] = table;
     }
     sqlite3_finalize(stmt);

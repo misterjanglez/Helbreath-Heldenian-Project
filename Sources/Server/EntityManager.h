@@ -261,8 +261,12 @@ private:
     void delete_npc_internal(int npc_h);
 
     void npc_dead_item_generator(int npc_h, short attacker_h, char attacker_type);
-    int roll_drop_table_item(const DropTable* table, int tier, int& outMinCount, int& outMaxCount) const;
-    bool spawn_npc_drop_item(int npc_h, int item_id, int min_count, int max_count);
+    int roll_drop_table_item(const DropTable* table, int tier, int& outMinCount, int& outMaxCount, bool exclude_empty = false) const;
+    bool spawn_npc_drop_item(int npc_h, int item_id, int min_count, int max_count, short dx = 0, short dy = 0);
+    // Queue a tier-2 drop rolled at death to be placed when the corpse decays.
+    void queue_pending_drop(int npc_h, int item_id, int min_count, int max_count, short dx, short dy);
+    // Place all pending (delayed) tier-2 drops for a decaying corpse.
+    void spawn_pending_drops(int npc_h);
 
     // ========================================================================
     // Spawn Point Management
