@@ -13,8 +13,8 @@
 // Server version
 #define VER_SERVER_MAJOR         0
 #define VER_SERVER_MINOR         3
-#define VER_SERVER_PATCH         0
+#define VER_SERVER_PATCH         1
 #define VER_SERVER_BUILD         247
-#define VER_SERVER_FILEVERSION   0,3,0,247
-#define VER_SERVER_DISPLAY       "0.3-alpha"
-#define VER_SERVER_FULL          "0.3.0-alpha+build.247"
+#define VER_SERVER_FILEVERSION   0,3,1,247
+#define VER_SERVER_DISPLAY       "0.3.1-alpha"
+#define VER_SERVER_FULL          "0.3.1-alpha+build.247"

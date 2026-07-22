@@ -1,3 +1,14 @@
+# Original-faithful balance restore (post-merge ratification)
+
+### Balance / Formulas
+- Applied the full restore set from `PLANS/Formula_Faithfulness_Audit.md`, reverting ShadowEvil's final-week live tuning to the original game's formulas (each verified line-by-line against `HGServer`): `max_sp` back to `(str + angelic_str) * 2 + level * 2` (his live value had halved the STR term); `level_exp` back to the original per-level curve `level * (50 + level * trunc(level/17)²)` (his cubic was ~5–6× grindier mid-game, converging only near the cap); regen rolls restored to original means — HP keeps its original `1d(vit)` floored at `vit/2` with Dev's added variance bonus removed, MP back to a plain `1d(mag + angelic_mag)` (floor and variance removed), SP back to `1d(vit/3)` (was a flatter `0.15·vit` curve).
+- `mana_regen_ms` 15000 → 20000, matching the original `DEF_MPUPTIME`; combined with the roll restore this brings MP regen down from ≈2.2× original to original rate.
+- Data-only change (formulas table + `server_config.json`) — hot-swappable per row via console `reload formulas` for A/B comparison during the Phase-6 play pass. Known remaining deviation (deliberate, would need code): the original low-level SP regen band (+15/+10/+5 under levels 20/40/60) is not restored; revisit if low-level play feels stamina-starved.
+- Seed mirrors kept in sync: `Scripts/setup_gamedata.py` and `gameconfigs-07222026.sql`.
+
+### Versioning
+- **Server → 0.3.1** (server-only gameplay change; no protocol or client impact).
+
 # Development merge — ShadowEvil's final 35 commits adopted
 
 ### Merge (branch `merge-development`)

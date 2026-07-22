@@ -47,18 +47,18 @@ def create_formula_tables(db, dry_run):
         INSERT INTO formulas(formula_id, expression, description) VALUES
             ('max_hp',            'vit * 3 + level * 2 + str * 0.5 + angelic_str * 0.5',                                            'Maximum health points'),
             ('max_mp',            'mag * 2 + angelic_mag * 2 + level * 2 + int * 0.5 + angelic_int * 0.5',                            'Maximum mana points'),
-            ('max_sp',            '(str + angelic_str) + level * 2',                                                                  'Maximum stamina points'),
+            ('max_sp',            '(str + angelic_str) * 2 + level * 2',                                                              'Maximum stamina points'),
             ('max_load',          'str * 5000 + angelic_str * 5000 + level * 5000',                                                   'Maximum carry weight'),
-            ('level_exp',         '((100 + pow(level, 2))) - 8 + 0.5 * pow(level, 3)',                                                'XP cost for a single level'),
+            ('level_exp',         'level * (50 + level * trunc(level / 17) * trunc(level / 17))',                                     'XP cost for a single level'),
             ('hp_regen_max_roll',       'vit',                                'HP regen dice ceiling'),
             ('hp_regen_min_roll',       'vit / 2',                            'HP regen hard floor clamp'),
-            ('hp_regen_roll_variance',  '30 * vit / (vit + 60)',              'HP regen bonus variance (diminishing returns)'),
+            ('hp_regen_roll_variance',  '0',                                  'HP regen bonus variance (diminishing returns)'),
             ('mp_regen_max_roll',       'mag + angelic_mag',                  'MP regen dice ceiling'),
-            ('mp_regen_min_roll',       '(mag + angelic_mag) / 2',            'MP regen hard floor clamp'),
-            ('mp_regen_roll_variance',  '30 * (mag + angelic_mag) / (mag + angelic_mag + 60)',  'MP regen bonus variance (diminishing returns)'),
-            ('sp_regen_max_roll',       'floor(vit * 0.15) + 5',              'SP regen dice ceiling'),
-            ('sp_regen_min_roll',       'floor(vit * 0.05) + 1',              'SP regen hard floor clamp'),
-            ('sp_regen_roll_variance',  '30 * vit / (vit + 500)',             'SP regen bonus variance (diminishing returns)');
+            ('mp_regen_min_roll',       '1',                                  'MP regen hard floor clamp'),
+            ('mp_regen_roll_variance',  '0',                                  'MP regen bonus variance (diminishing returns)'),
+            ('sp_regen_max_roll',       'vit / 3',                            'SP regen dice ceiling'),
+            ('sp_regen_min_roll',       '1',                                  'SP regen hard floor clamp'),
+            ('sp_regen_roll_variance',  '0',                                  'SP regen bonus variance (diminishing returns)');
     """
 
     if dry_run:

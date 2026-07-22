@@ -171,38 +171,38 @@ INSERT INTO "attribute_secondary_types" VALUES(9,'MagicAbsorb','Magic Absorption
 INSERT INTO "attribute_secondary_types" VALUES(10,'ConsecutiveAttack','Consecutive Attack Damage','+{value}',1,7,1);
 INSERT INTO "attribute_secondary_types" VALUES(11,'ExperienceBonus','Experience','+{value}%',1,2,10);
 INSERT INTO "attribute_secondary_types" VALUES(12,'GoldBonus','Gold','+{value}%',5,5,10);
-CREATE TABLE "banned_list" (
-  "ip_address" TEXT,
-  PRIMARY KEY ("ip_address")
+CREATE TABLE "banned_list" (
+  "ip_address" TEXT,
+  PRIMARY KEY ("ip_address")
 );
 INSERT INTO "banned_list" VALUES('192.118.1.1');
-CREATE TABLE "builditem_configs" (
-  "build_id" INTEGER,
-  "name" TEXT NOT NULL,
-  "skill_limit" INTEGER NOT NULL,
-  "material_id1" INTEGER NOT NULL,
-  "material_count1" INTEGER NOT NULL,
-  "material_value1" INTEGER NOT NULL,
-  "material_id2" INTEGER NOT NULL,
-  "material_count2" INTEGER NOT NULL,
-  "material_value2" INTEGER NOT NULL,
-  "material_id3" INTEGER NOT NULL,
-  "material_count3" INTEGER NOT NULL,
-  "material_value3" INTEGER NOT NULL,
-  "material_id4" INTEGER NOT NULL,
-  "material_count4" INTEGER NOT NULL,
-  "material_value4" INTEGER NOT NULL,
-  "material_id5" INTEGER NOT NULL,
-  "material_count5" INTEGER NOT NULL,
-  "material_value5" INTEGER NOT NULL,
-  "material_id6" INTEGER NOT NULL,
-  "material_count6" INTEGER NOT NULL,
-  "material_value6" INTEGER NOT NULL,
-  "average_value" INTEGER NOT NULL,
-  "max_skill" INTEGER NOT NULL,
-  "attribute" INTEGER NOT NULL,
-  "item_id" INTEGER NOT NULL,
-  PRIMARY KEY ("build_id")
+CREATE TABLE "builditem_configs" (
+  "build_id" INTEGER,
+  "name" TEXT NOT NULL,
+  "skill_limit" INTEGER NOT NULL,
+  "material_id1" INTEGER NOT NULL,
+  "material_count1" INTEGER NOT NULL,
+  "material_value1" INTEGER NOT NULL,
+  "material_id2" INTEGER NOT NULL,
+  "material_count2" INTEGER NOT NULL,
+  "material_value2" INTEGER NOT NULL,
+  "material_id3" INTEGER NOT NULL,
+  "material_count3" INTEGER NOT NULL,
+  "material_value3" INTEGER NOT NULL,
+  "material_id4" INTEGER NOT NULL,
+  "material_count4" INTEGER NOT NULL,
+  "material_value4" INTEGER NOT NULL,
+  "material_id5" INTEGER NOT NULL,
+  "material_count5" INTEGER NOT NULL,
+  "material_value5" INTEGER NOT NULL,
+  "material_id6" INTEGER NOT NULL,
+  "material_count6" INTEGER NOT NULL,
+  "material_value6" INTEGER NOT NULL,
+  "average_value" INTEGER NOT NULL,
+  "max_skill" INTEGER NOT NULL,
+  "attribute" INTEGER NOT NULL,
+  "item_id" INTEGER NOT NULL,
+  PRIMARY KEY ("build_id")
 );
 INSERT INTO "builditem_configs" VALUES(0,'SuperCoal',20,355,1,0,355,1,0,355,1,0,0,0,0,0,0,0,0,0,0,0,30,0,501);
 INSERT INTO "builditem_configs" VALUES(1,'UltraCoal',80,501,1,0,501,1,0,357,1,0,0,0,0,0,0,0,0,0,0,0,90,0,502);
@@ -350,24 +350,24 @@ INSERT INTO "color_palette" VALUES(44,200,120,110);
 INSERT INTO "color_palette" VALUES(45,120,130,210);
 INSERT INTO "color_palette" VALUES(46,120,180,120);
 INSERT INTO "color_palette" VALUES(47,150,155,110);
-CREATE TABLE "crafting_configs" (
-  "crafting_id" INTEGER,
-  "name" TEXT NOT NULL,
-  "array0" INTEGER NOT NULL,
-  "array1" INTEGER NOT NULL,
-  "array2" INTEGER NOT NULL,
-  "array3" INTEGER NOT NULL,
-  "array4" INTEGER NOT NULL,
-  "array5" INTEGER NOT NULL,
-  "array6" INTEGER NOT NULL,
-  "array7" INTEGER NOT NULL,
-  "array8" INTEGER NOT NULL,
-  "array9" INTEGER NOT NULL,
-  "array10" INTEGER NOT NULL,
-  "array11" INTEGER NOT NULL,
-  "skill_limit" INTEGER NOT NULL,
-  "difficulty" INTEGER NOT NULL,
-  PRIMARY KEY ("crafting_id")
+CREATE TABLE "crafting_configs" (
+  "crafting_id" INTEGER,
+  "name" TEXT NOT NULL,
+  "array0" INTEGER NOT NULL,
+  "array1" INTEGER NOT NULL,
+  "array2" INTEGER NOT NULL,
+  "array3" INTEGER NOT NULL,
+  "array4" INTEGER NOT NULL,
+  "array5" INTEGER NOT NULL,
+  "array6" INTEGER NOT NULL,
+  "array7" INTEGER NOT NULL,
+  "array8" INTEGER NOT NULL,
+  "array9" INTEGER NOT NULL,
+  "array10" INTEGER NOT NULL,
+  "array11" INTEGER NOT NULL,
+  "skill_limit" INTEGER NOT NULL,
+  "difficulty" INTEGER NOT NULL,
+  PRIMARY KEY ("crafting_id")
 );
 INSERT INTO "crafting_configs" VALUES(1,'MagicNecklace(DF+15)',657,1,356,1,354,1,311,2,-1,0,-1,0,10,70);
 INSERT INTO "crafting_configs" VALUES(2,'MagicNecklace(DF+20)',1086,1,657,1,356,1,354,1,311,1,-1,0,20,70);
@@ -394,13 +394,13 @@ INSERT INTO "crafting_configs" VALUES(22,'MaginDiamond',1106,1,1102,1,1102,1,657
 INSERT INTO "crafting_configs" VALUES(23,'MaginRuby',1106,1,1103,1,1103,1,657,1,-1,0,-1,0,30,70);
 INSERT INTO "crafting_configs" VALUES(24,'MagicEmerald',1106,1,1105,1,1105,1,657,1,-1,0,-1,0,30,70);
 INSERT INTO "crafting_configs" VALUES(25,'MagicSapphire',1106,1,1104,1,1104,1,657,1,-1,0,-1,0,30,70);
-CREATE TABLE "crusade_structures" (
-  "structure_id" INTEGER,
-  "map_name" TEXT NOT NULL,
-  "structure_type" INTEGER NOT NULL,
-  "pos_x" INTEGER NOT NULL,
-  "pos_y" INTEGER NOT NULL,
-  PRIMARY KEY ("structure_id")
+CREATE TABLE "crusade_structures" (
+  "structure_id" INTEGER,
+  "map_name" TEXT NOT NULL,
+  "structure_type" INTEGER NOT NULL,
+  "pos_x" INTEGER NOT NULL,
+  "pos_y" INTEGER NOT NULL,
+  PRIMARY KEY ("structure_id")
 );
 INSERT INTO "crusade_structures" VALUES(1,'aresden',40,145,128);
 INSERT INTO "crusade_structures" VALUES(2,'aresden',40,152,124);
@@ -2405,18 +2405,18 @@ CREATE TABLE formulas (
         );
 INSERT INTO "formulas" VALUES('max_hp','vit * 3 + level * 2 + str * 0.5 + angelic_str * 0.5','Maximum health points');
 INSERT INTO "formulas" VALUES('max_mp','mag * 2 + angelic_mag * 2 + level * 2 + int * 0.5 + angelic_int * 0.5','Maximum mana points');
-INSERT INTO "formulas" VALUES('max_sp','(str + angelic_str) + level * 2','Maximum stamina points');
+INSERT INTO "formulas" VALUES('max_sp','(str + angelic_str) * 2 + level * 2','Maximum stamina points');
 INSERT INTO "formulas" VALUES('max_load','str * 5000 + angelic_str * 5000 + level * 5000','Maximum carry weight');
-INSERT INTO "formulas" VALUES('level_exp','((100 + pow(level, 2))) - 8 + 0.5 * pow(level, 3)','XP cost for a single level');
+INSERT INTO "formulas" VALUES('level_exp','level * (50 + level * trunc(level / 17) * trunc(level / 17))','XP cost for a single level');
 INSERT INTO "formulas" VALUES('hp_regen_max_roll','vit','HP regen dice ceiling');
 INSERT INTO "formulas" VALUES('hp_regen_min_roll','vit / 2','HP regen hard floor clamp');
-INSERT INTO "formulas" VALUES('hp_regen_roll_variance','30 * vit / (vit + 60)','HP regen bonus variance (diminishing returns)');
+INSERT INTO "formulas" VALUES('hp_regen_roll_variance','0','HP regen bonus variance (diminishing returns)');
 INSERT INTO "formulas" VALUES('mp_regen_max_roll','mag + angelic_mag','MP regen dice ceiling');
-INSERT INTO "formulas" VALUES('mp_regen_min_roll','(mag + angelic_mag) / 2','MP regen hard floor clamp');
-INSERT INTO "formulas" VALUES('mp_regen_roll_variance','30 * (mag + angelic_mag) / (mag + angelic_mag + 60)','MP regen bonus variance (diminishing returns)');
-INSERT INTO "formulas" VALUES('sp_regen_max_roll','floor(vit * 0.15) + 5','SP regen dice ceiling');
-INSERT INTO "formulas" VALUES('sp_regen_min_roll','floor(vit * 0.05) + 1','SP regen hard floor clamp');
-INSERT INTO "formulas" VALUES('sp_regen_roll_variance','30 * vit / (vit + 500)','SP regen bonus variance (diminishing returns)');
+INSERT INTO "formulas" VALUES('mp_regen_min_roll','1','MP regen hard floor clamp');
+INSERT INTO "formulas" VALUES('mp_regen_roll_variance','0','MP regen bonus variance (diminishing returns)');
+INSERT INTO "formulas" VALUES('sp_regen_max_roll','vit / 3','SP regen dice ceiling');
+INSERT INTO "formulas" VALUES('sp_regen_min_roll','1','SP regen hard floor clamp');
+INSERT INTO "formulas" VALUES('sp_regen_roll_variance','0','SP regen bonus variance (diminishing returns)');
 CREATE TABLE "items" ( item_id INTEGER PRIMARY KEY, name TEXT NOT NULL, item_type INTEGER NOT NULL DEFAULT 0, item_sub_type INTEGER NOT NULL DEFAULT 0, equip_pos INTEGER NOT NULL DEFAULT 0, weapon_class INTEGER NOT NULL DEFAULT 0, item_effect_type INTEGER NOT NULL DEFAULT 0, item_effect_value1 INTEGER NOT NULL DEFAULT 0, item_effect_value2 INTEGER NOT NULL DEFAULT 0, item_effect_value3 INTEGER NOT NULL DEFAULT 0, item_effect_value4 INTEGER NOT NULL DEFAULT 0, item_effect_value5 INTEGER NOT NULL DEFAULT 0, item_effect_value6 INTEGER NOT NULL DEFAULT 0, durability INTEGER NOT NULL DEFAULT 0, special_effect INTEGER NOT NULL DEFAULT 0, sell_price INTEGER NOT NULL DEFAULT 0, weight INTEGER NOT NULL DEFAULT 0, swing_speed INTEGER NOT NULL DEFAULT 0, level_requirement INTEGER NOT NULL DEFAULT 0, gender_requirement INTEGER NOT NULL DEFAULT 0, special_effect_value1 INTEGER NOT NULL DEFAULT 0, special_effect_value2 INTEGER NOT NULL DEFAULT 0, related_skill INTEGER NOT NULL DEFAULT 0, hide_armor INTEGER NOT NULL DEFAULT 0, is_skirt INTEGER NOT NULL DEFAULT 0, stackable INTEGER NOT NULL DEFAULT 0, is_dyeable INTEGER NOT NULL DEFAULT 0, set_id INTEGER NOT NULL DEFAULT 0, item_color INTEGER NOT NULL DEFAULT 0, display_id INTEGER NOT NULL DEFAULT -1, armor_class INTEGER NOT NULL DEFAULT 0, attribute_pool_id INTEGER DEFAULT NULL);
 INSERT INTO "items" VALUES(1,'Dagger',2,3,8,1,1,1,5,0,1,4,0,300,0,25,2000,0,0,0,0,-10,7,0,0,0,1,0,0,41,0,1);
 INSERT INTO "items" VALUES(2,'Dagger (S.C)',2,3,8,1,1,1,4,0,1,3,0,800,0,0,2000,0,0,0,0,-10,7,0,0,0,1,0,0,41,0,1);
@@ -2963,29 +2963,29 @@ INSERT INTO "items" VALUES(1108,'Angelic Pendant (STR)',2,14,11,0,14,16,0,0,0,0,
 INSERT INTO "items" VALUES(1109,'Angelic Pendant (DEX)',2,14,11,0,14,17,0,0,0,0,0,300,0,0,2000,0,0,0,60,-10,-1,0,0,0,0,0,6,280,0,NULL);
 INSERT INTO "items" VALUES(1110,'Angelic Pendant (INT)',2,14,11,0,14,18,0,0,0,0,0,300,0,0,2000,0,0,0,60,-10,-1,0,0,0,0,0,6,281,0,NULL);
 INSERT INTO "items" VALUES(1111,'Angelic Pendant (MAG)',2,14,11,0,14,19,0,0,0,0,0,300,0,0,2000,0,0,0,60,-10,-1,0,0,0,0,0,6,282,0,NULL);
-CREATE TABLE "magic_configs" (
-  "magic_id" INTEGER,
-  "name" TEXT NOT NULL,
-  "magic_type" INTEGER NOT NULL,
-  "delay_time" INTEGER NOT NULL,
-  "last_time" INTEGER NOT NULL,
-  "value1" INTEGER NOT NULL,
-  "value2" INTEGER NOT NULL,
-  "value3" INTEGER NOT NULL,
-  "value4" INTEGER NOT NULL,
-  "value5" INTEGER NOT NULL,
-  "value6" INTEGER NOT NULL,
-  "value7" INTEGER NOT NULL,
-  "value8" INTEGER NOT NULL,
-  "value9" INTEGER NOT NULL,
-  "value10" INTEGER NOT NULL,
-  "value11" INTEGER NOT NULL,
-  "value12" INTEGER NOT NULL,
-  "int_limit" INTEGER NOT NULL,
-  "gold_cost" INTEGER NOT NULL,
-  "category" INTEGER NOT NULL,
-  "attribute" INTEGER NOT NULL,
-  PRIMARY KEY ("magic_id")
+CREATE TABLE "magic_configs" (
+  "magic_id" INTEGER,
+  "name" TEXT NOT NULL,
+  "magic_type" INTEGER NOT NULL,
+  "delay_time" INTEGER NOT NULL,
+  "last_time" INTEGER NOT NULL,
+  "value1" INTEGER NOT NULL,
+  "value2" INTEGER NOT NULL,
+  "value3" INTEGER NOT NULL,
+  "value4" INTEGER NOT NULL,
+  "value5" INTEGER NOT NULL,
+  "value6" INTEGER NOT NULL,
+  "value7" INTEGER NOT NULL,
+  "value8" INTEGER NOT NULL,
+  "value9" INTEGER NOT NULL,
+  "value10" INTEGER NOT NULL,
+  "value11" INTEGER NOT NULL,
+  "value12" INTEGER NOT NULL,
+  "int_limit" INTEGER NOT NULL,
+  "gold_cost" INTEGER NOT NULL,
+  "category" INTEGER NOT NULL,
+  "attribute" INTEGER NOT NULL,
+  PRIMARY KEY ("magic_id")
 );
 INSERT INTO "magic_configs" VALUES(0,'Magic-Missile',1,0,0,8,1,1,1,8,0,0,0,0,0,0,0,18,100,1,2);
 INSERT INTO "magic_configs" VALUES(1,'Heal',2,0,0,15,1,1,2,6,10,0,0,0,0,0,0,20,100,0,4);
@@ -3052,10 +3052,10 @@ INSERT INTO "magic_configs" VALUES(91,'Blizzard',26,0,20,170,3,3,5,1,20,7,8,16,2
 INSERT INTO "magic_configs" VALUES(94,'Resurrection',32,600,0,200,2,2,3,0,0,7,7,20,0,0,0,0,-1,1,2);
 INSERT INTO "magic_configs" VALUES(95,'Mass-Illusion-Movement',21,0,0,200,2,2,0,0,0,7,7,20,0,0,0,200,27000,1,2);
 INSERT INTO "magic_configs" VALUES(96,'Earth-Shock-Wave',30,0,0,180,2,2,5,1,20,7,8,16,0,0,0,200,-1,1,1);
-CREATE TABLE "meta" (
-  "key" TEXT,
-  "value" TEXT NOT NULL,
-  PRIMARY KEY ("key")
+CREATE TABLE "meta" (
+  "key" TEXT,
+  "value" TEXT NOT NULL,
+  PRIMARY KEY ("key")
 );
 INSERT INTO "meta" VALUES('schema_version','7');
 CREATE TABLE npc_configs (
@@ -3210,24 +3210,24 @@ INSERT INTO "npc_configs" VALUES(116,'Vince',111,51,60,0,10,20,5,0,0,0,0,1,1,0,0
 CREATE TABLE "npc_shop_mapping" (  npc_config_id INTEGER PRIMARY KEY,  shop_id INTEGER NOT NULL,  description TEXT);
 INSERT INTO "npc_shop_mapping" VALUES(56,1,'General Shop (Shopkeeper)');
 INSERT INTO "npc_shop_mapping" VALUES(62,2,'Blacksmith Shop');
-CREATE TABLE "potion_configs" (
-  "potion_id" INTEGER,
-  "name" TEXT NOT NULL,
-  "array0" INTEGER NOT NULL,
-  "array1" INTEGER NOT NULL,
-  "array2" INTEGER NOT NULL,
-  "array3" INTEGER NOT NULL,
-  "array4" INTEGER NOT NULL,
-  "array5" INTEGER NOT NULL,
-  "array6" INTEGER NOT NULL,
-  "array7" INTEGER NOT NULL,
-  "array8" INTEGER NOT NULL,
-  "array9" INTEGER NOT NULL,
-  "array10" INTEGER NOT NULL,
-  "array11" INTEGER NOT NULL,
-  "skill_limit" INTEGER NOT NULL,
-  "difficulty" INTEGER NOT NULL,
-  PRIMARY KEY ("potion_id")
+CREATE TABLE "potion_configs" (
+  "potion_id" INTEGER,
+  "name" TEXT NOT NULL,
+  "array0" INTEGER NOT NULL,
+  "array1" INTEGER NOT NULL,
+  "array2" INTEGER NOT NULL,
+  "array3" INTEGER NOT NULL,
+  "array4" INTEGER NOT NULL,
+  "array5" INTEGER NOT NULL,
+  "array6" INTEGER NOT NULL,
+  "array7" INTEGER NOT NULL,
+  "array8" INTEGER NOT NULL,
+  "array9" INTEGER NOT NULL,
+  "array10" INTEGER NOT NULL,
+  "array11" INTEGER NOT NULL,
+  "skill_limit" INTEGER NOT NULL,
+  "difficulty" INTEGER NOT NULL,
+  PRIMARY KEY ("potion_id")
 );
 INSERT INTO "potion_configs" VALUES(1,'RedPotion',220,1,192,1,191,1,-1,0,-1,0,-1,0,20,10);
 INSERT INTO "potion_configs" VALUES(2,'BluePotion',220,1,193,1,189,1,-1,0,-1,0,-1,0,20,10);
@@ -3248,35 +3248,35 @@ INSERT INTO "potion_configs" VALUES(16,'UnfreezePotion',548,1,220,1,217,1,207,1,
 INSERT INTO "potion_configs" VALUES(17,'SuperRedPotion',823,1,222,1,220,1,193,1,-1,0,-1,0,75,50);
 INSERT INTO "potion_configs" VALUES(18,'SuperBluePotion',820,1,220,1,206,1,196,1,-1,0,-1,0,75,50);
 INSERT INTO "potion_configs" VALUES(19,'SuperGreenPotion',821,1,220,1,199,1,192,1,-1,0,-1,0,70,40);
-CREATE TABLE "quest_configs" (
-  "quest_index" INTEGER,
-  "side" INTEGER NOT NULL,
-  "quest_type" INTEGER NOT NULL,
-  "target_config_id" INTEGER NOT NULL,
-  "max_count" INTEGER NOT NULL,
-  "quest_from" INTEGER NOT NULL,
-  "min_level" INTEGER NOT NULL,
-  "max_level" INTEGER NOT NULL,
-  "required_skill_num" INTEGER NOT NULL,
-  "required_skill_level" INTEGER NOT NULL,
-  "time_limit" INTEGER NOT NULL,
-  "assign_type" INTEGER NOT NULL,
-  "reward_type1" INTEGER NOT NULL,
-  "reward_amount1" INTEGER NOT NULL,
-  "reward_type2" INTEGER NOT NULL,
-  "reward_amount2" INTEGER NOT NULL,
-  "reward_type3" INTEGER NOT NULL,
-  "reward_amount3" INTEGER NOT NULL,
-  "contribution" INTEGER NOT NULL,
-  "contribution_limit" INTEGER NOT NULL,
-  "response_mode" INTEGER NOT NULL,
-  "target_name" TEXT NOT NULL,
-  "target_x" INTEGER NOT NULL,
-  "target_y" INTEGER NOT NULL,
-  "target_range" INTEGER NOT NULL,
-  "quest_id" INTEGER NOT NULL,
-  "req_contribution" INTEGER NOT NULL,
-  PRIMARY KEY ("quest_index")
+CREATE TABLE "quest_configs" (
+  "quest_index" INTEGER,
+  "side" INTEGER NOT NULL,
+  "quest_type" INTEGER NOT NULL,
+  "target_config_id" INTEGER NOT NULL,
+  "max_count" INTEGER NOT NULL,
+  "quest_from" INTEGER NOT NULL,
+  "min_level" INTEGER NOT NULL,
+  "max_level" INTEGER NOT NULL,
+  "required_skill_num" INTEGER NOT NULL,
+  "required_skill_level" INTEGER NOT NULL,
+  "time_limit" INTEGER NOT NULL,
+  "assign_type" INTEGER NOT NULL,
+  "reward_type1" INTEGER NOT NULL,
+  "reward_amount1" INTEGER NOT NULL,
+  "reward_type2" INTEGER NOT NULL,
+  "reward_amount2" INTEGER NOT NULL,
+  "reward_type3" INTEGER NOT NULL,
+  "reward_amount3" INTEGER NOT NULL,
+  "contribution" INTEGER NOT NULL,
+  "contribution_limit" INTEGER NOT NULL,
+  "response_mode" INTEGER NOT NULL,
+  "target_name" TEXT NOT NULL,
+  "target_x" INTEGER NOT NULL,
+  "target_y" INTEGER NOT NULL,
+  "target_range" INTEGER NOT NULL,
+  "quest_id" INTEGER NOT NULL,
+  "req_contribution" INTEGER NOT NULL,
+  PRIMARY KEY ("quest_index")
 );
 INSERT INTO "quest_configs" VALUES(1,1,1,2,20,4,11,20,-1,-1,-1,-1,-1,100,90,200,90,100,2,20,1,'arefarm',0,0,0,354,0);
 INSERT INTO "quest_configs" VALUES(2,2,1,2,20,4,11,20,-1,-1,-1,-1,-1,100,90,200,90,100,2,20,1,'elvfarm',0,0,0,354,0);
@@ -3558,17 +3558,17 @@ INSERT INTO "shop_items" VALUES(2,603,84);
 INSERT INTO "shop_items" VALUES(1,429,33);
 INSERT INTO "shop_items" VALUES(2,250,8);
 INSERT INTO "shop_items" VALUES(2,87,59);
-CREATE TABLE "skill_configs" (
-  "skill_id" INTEGER,
-  "name" TEXT NOT NULL,
-  "skill_type" INTEGER NOT NULL,
-  "value1" INTEGER NOT NULL,
-  "value2" INTEGER NOT NULL,
-  "value3" INTEGER NOT NULL,
-  "value4" INTEGER NOT NULL,
-  "value5" INTEGER NOT NULL,
-  "value6" INTEGER NOT NULL, is_useable INTEGER NOT NULL DEFAULT 0, use_method INTEGER NOT NULL DEFAULT 0,
-  PRIMARY KEY ("skill_id")
+CREATE TABLE "skill_configs" (
+  "skill_id" INTEGER,
+  "name" TEXT NOT NULL,
+  "skill_type" INTEGER NOT NULL,
+  "value1" INTEGER NOT NULL,
+  "value2" INTEGER NOT NULL,
+  "value3" INTEGER NOT NULL,
+  "value4" INTEGER NOT NULL,
+  "value5" INTEGER NOT NULL,
+  "value6" INTEGER NOT NULL, is_useable INTEGER NOT NULL DEFAULT 0, use_method INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY ("skill_id")
 );
 INSERT INTO "skill_configs" VALUES(0,'Mining',1,1,6,0,0,0,0,0,0);
 INSERT INTO "skill_configs" VALUES(1,'Fishing',1,2,6,0,0,0,0,0,0);
