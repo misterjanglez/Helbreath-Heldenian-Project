@@ -49,7 +49,7 @@ namespace DialogBoxId
 		ChangeStatsMajestic = 42,
 		StatusOverlay = 49,
 		Resurrect = 50,
-		GuildHallMenu = 51,
+		CommandHallMenu = 51,
 		RepairAll = 52,
 		TradingPost = 56,   // Auctioneer (Vince) — not tester-gated; id above tester range (53-55)
 #ifdef TESTER_ONLY
