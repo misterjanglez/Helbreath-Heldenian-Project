@@ -4,7 +4,7 @@
         "ambientVolume": 20,
         "masterEnabled": true,
         "masterVolume": 50,
-        "musicEnabled": false,
+        "musicEnabled": true,
         "musicVolume": 15,
         "soundEnabled": true,
         "soundVolume": 22,
@@ -12,12 +12,12 @@
         "uiVolume": 14
     },
     "display": {
-        "backgroundFpsThrottle": true,
+        "backgroundFpsThrottle": false,
         "borderless": false,
-        "captureMouse": false,
+        "captureMouse": true,
         "detailLevel": 2,
         "dialogTransparency": false,
-        "fpsLimit": 60,
+        "fpsLimit": 240,
         "fullscreen": false,
         "fullscreenStretch": false,
         "patchingGrid": false,
@@ -26,9 +26,9 @@
         "showFps": true,
         "showLatency": true,
         "tileGrid": false,
-        "toggleToChat": true,
+        "toggleToChat": false,
         "vsync": false,
-        "zoomMap": true
+        "zoomMap": false
     },
     "shortcuts": {
         "magic": 0,
