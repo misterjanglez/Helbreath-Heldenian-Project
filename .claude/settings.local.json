@@ -72,7 +72,29 @@
       "Bash(cp CHANGELOG.md Sources/Server/CMakeLists.txt Sources/Server/Server.vcxproj Sources/Server/Server.vcxproj.filters __TRACKED_VAR__/phase1_war_state/)",
       "Bash(awk '/set\\\\\\(SERVER_SOURCES/,/^\\\\\\)/' Sources/Server/CMakeLists.txt)",
       "Bash(git add *)",
-      "Bash(git commit -m ' *)"
+      "Bash(git commit -m ' *)",
+      "Bash(rm -f build_*.log Sources/build_*.log)",
+      "Bash(powershell -ExecutionPolicy Bypass -File Sources/build.ps1 -Target All -Config Debug)",
+      "Bash(gh auth *)",
+      "Bash(\"/c/Program Files/GitHub CLI/gh.exe\" --version)",
+      "Bash(\"/c/Program Files/GitHub CLI/gh.exe\" auth status)",
+      "Bash(git branch *)",
+      "Bash(mkdir -p C:/Users/miste/source/Helbreath-backups/pre-merge-2026-07-22/accounts C:/Users/miste/source/Helbreath-backups/pre-merge-2026-07-22/gameconfigs)",
+      "Bash(cp gamedata.db MapInfo.db tradingpost.db C:/Users/miste/source/Helbreath-backups/pre-merge-2026-07-22/)",
+      "Bash(cp accounts/*.db C:/Users/miste/source/Helbreath-backups/pre-merge-2026-07-22/accounts/)",
+      "Bash(cp gameconfigs/*.sql C:/Users/miste/source/Helbreath-backups/pre-merge-2026-07-22/gameconfigs/)",
+      "Bash(\"/c/Program Files/GitHub CLI/gh.exe\" repo view misterjanglez/Helbreath-Heldenian-Project --json isFork,parent,defaultBranchRef --jq '{isFork, parent: .parent.nameWithOwner, defaultBranch: .defaultBranchRef.name}')",
+      "Bash(git fetch *)",
+      "Bash(git push *)",
+      "Bash(git ls-remote *)",
+      "Bash(git config *)",
+      "Bash(\"/c/Program Files/GitHub CLI/gh.exe\" api repos/misterjanglez/Helbreath-Heldenian-Project --jq '{fork: .fork, parent: .parent.full_name}')",
+      "Bash(\"/c/Program Files/GitHub CLI/gh.exe\" auth setup-git)",
+      "Bash(cmdkey /list)",
+      "Bash(git credential-manager *)",
+      "Bash(git --version)",
+      "Bash(git merge-tree *)",
+      "Bash(git log *)"
     ]
   }
 }
