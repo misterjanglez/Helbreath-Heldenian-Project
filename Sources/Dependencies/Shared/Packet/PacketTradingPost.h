@@ -86,16 +86,24 @@ namespace net {
 		int32_t amount;     // stack amount to escrow (full count for non-stackables)
 	};
 
-	// Compact item for browse rows. The client renders the display name and
-	// attribute effects from (item_id, attribute) via item_name_formatter.
+	// Compact item for browse rows: id/count plus the name-affecting instance
+	// fields, so the client renders display names (prefix/secondary/enchant/
+	// custom/dye) via item_name_formatter without the full payload.
 	struct HB_PACKED TpItemBrief {
 		int16_t item_id;
 		uint64_t count;
-		uint32_t attribute;
+		uint8_t item_color;
+		uint8_t custom_made;
+		uint8_t prefix_type;
+		uint8_t prefix_value;
+		uint8_t secondary_type;
+		uint8_t secondary_value;
+		uint8_t enchant_bonus;
 	};
 
-	// Full item instance columns (mirror character_bank_items) for detail
-	// views, letting the client rebuild a CItem for complete tooltips.
+	// Full item instance columns (mirror character_bank_items /
+	// item_instance_data) for detail views, letting the client rebuild complete
+	// tooltips.
 	struct HB_PACKED TpItemFull {
 		int16_t item_id;
 		uint64_t count;
@@ -107,8 +115,13 @@ namespace net {
 		int16_t spec_effect_value1;
 		int16_t spec_effect_value2;
 		int16_t spec_effect_value3;
-		uint16_t cur_lifespan;
-		uint32_t attribute;
+		uint16_t cur_durability;
+		uint8_t custom_made;
+		uint8_t prefix_type;
+		uint8_t prefix_value;
+		uint8_t secondary_type;
+		uint8_t secondary_value;
+		uint8_t enchant_bonus;
 	};
 
 	//------------------------------------------------------------------------

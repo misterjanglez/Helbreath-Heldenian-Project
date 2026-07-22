@@ -37,6 +37,6 @@ constexpr const char* display_version = "0.3-alpha";
 constexpr const char* full_version = "0.3.0-alpha+build.357";
 } // namespace client
 
-constexpr const char* build_timestamp = "2026-07-22T13:28:12";
+constexpr const char* build_timestamp = "2026-07-22T13:37:12";
 
 } // namespace hb::version

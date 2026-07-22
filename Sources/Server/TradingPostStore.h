@@ -13,11 +13,11 @@ namespace hb::net { struct TpEscrowSlot; }
 namespace hb::server
 {
 	// One escrowed item's full instance column set. Mirrors the
-	// character_bank_items schema (and the TpItemFull wire struct), so the same
-	// record moves losslessly between a live CItem, tradingpost.db, and an
-	// account DB. This is the currency of every escrow transition: pulled out of
-	// inventory on escrow-in, stored as a listing/offer item, and handed back to
-	// deliver_to_bank on escrow-out.
+	// character_bank_items schema / item_instance_data (and the TpItemFull wire
+	// struct), so the same record moves losslessly between a live CItem,
+	// tradingpost.db, and an account DB. This is the currency of every escrow
+	// transition: pulled out of inventory on escrow-in, stored as a
+	// listing/offer item, and handed back to deliver_to_bank on escrow-out.
 	struct escrow_item
 	{
 		int16_t  item_id             = 0;
@@ -30,12 +30,18 @@ namespace hb::server
 		int16_t  spec_effect_value1  = 0;
 		int16_t  spec_effect_value2  = 0;
 		int16_t  spec_effect_value3  = 0;
-		uint16_t cur_lifespan        = 0;
-		uint32_t attribute           = 0;
+		uint16_t cur_durability      = 0;
+		uint8_t  custom_made         = 0;
+		uint8_t  prefix_type         = 0;
+		uint8_t  prefix_value        = 0;
+		uint8_t  secondary_type      = 0;
+		uint8_t  secondary_value     = 0;
+		uint8_t  enchant_bonus       = 0;
 	};
 
 	// One Listing summarized for a board browse row: identity + a compact preview
-	// of the escrowed bundle. The handler renders names from (item_id, attribute).
+	// of the escrowed bundle. The handler renders names from the item's
+	// name-affecting instance fields (prefix/secondary/enchant/custom/dye).
 	struct listing_brief
 	{
 		int64_t                  listing_id    = 0;

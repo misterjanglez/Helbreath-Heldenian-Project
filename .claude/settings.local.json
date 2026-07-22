@@ -93,7 +93,9 @@
       "Bash(git merge *)",
       "Bash(git grep *)",
       "Bash(git rm *)",
-      "Bash(awk '{print $1}')"
+      "Bash(awk '{print $1}')",
+      "Bash(wsl.exe --status)",
+      "Bash(wsl.exe -l -q)"
     ]
   }
 }

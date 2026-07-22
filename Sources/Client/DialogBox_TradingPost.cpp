@@ -116,6 +116,24 @@ namespace
 		return mx >= x && mx <= x + w && my >= y && my <= y + h;
 	}
 
+	// Build a display item_instance_data from a Tp wire item. TpItemBrief and
+	// TpItemFull both carry the name-affecting fields under the same names, so
+	// this duck-types over either (like CItem::load_attributes_from).
+	template <typename TWire>
+	hb::shared::item::item_instance_data tp_wire_instance(const TWire& w)
+	{
+		hb::shared::item::item_instance_data d;
+		d.count = w.count;
+		d.item_color = static_cast<int8_t>(w.item_color);
+		d.custom_made = w.custom_made;
+		d.prefix_type = w.prefix_type;
+		d.prefix_value = w.prefix_value;
+		d.secondary_type = w.secondary_type;
+		d.secondary_value = w.secondary_value;
+		d.enchant_bonus = w.enchant_bonus;
+		return d;
+	}
+
 	// Case-insensitive full-string compare (character-name identity, matching the
 	// server's COLLATE NOCASE / hb_strnicmp checks). StringCompat.h is server-only.
 	bool iequals(const char* a, const char* b)
@@ -646,9 +664,7 @@ void DialogBox_TradingPost::draw_board(int mx, int my)
 		int ic = std::min<int>(row.item_count, hb::shared::limits::TpMaxListingItems);
 		for (int k = 0; k < ic; k++)
 		{
-			// PHASE5-TP: TpItemBrief still carries the legacy packed attribute; prefix
-			// naming returns when the wire structs adopt item_instance_data fields.
-			auto info = item_name_formatter::get().format(row.items[k].item_id);
+			auto info = item_name_formatter::get().format(row.items[k].item_id, tp_wire_instance(row.items[k]));
 			if (!summary.empty()) summary += ", ";
 			summary += info.name;
 			if (row.items[k].count > 1) summary += " x" + m_game->format_comma_number(row.items[k].count);
@@ -748,14 +764,14 @@ void DialogBox_TradingPost::draw_detail(int mx, int my)
 	if (hovered_bundle >= 0)
 	{
 		const auto& it = m_detail.items[hovered_bundle];
-		auto info = item_name_formatter::get().format(it.item_id);
+		auto info = item_name_formatter::get().format(it.item_id, tp_wire_instance(it));
 		hb::shared::text::draw_text_aligned(GameFont::Default, lx, m_y + tp::det_info_y, tp::inner_w - 8, 14,
 			info.name.c_str(),
 			hb::shared::text::TextStyle::from_color(info.is_special ? GameColors::UIItemName_Special : tp_col::text_hi),
 			hb::shared::text::Align::TopLeft);
 		std::string extra = info.effect_text();
 		if (it.count > 1) extra += (extra.empty() ? "" : "   ") + std::string("Count: ") + m_game->format_comma_number(it.count);
-		if (it.cur_lifespan > 0) extra += (extra.empty() ? "" : "   ") + std::format("Dur: {}", it.cur_lifespan);
+		if (it.cur_durability > 0) extra += (extra.empty() ? "" : "   ") + std::format("Dur: {}", it.cur_durability);
 		if (!extra.empty())
 			hb::shared::text::draw_text_aligned(GameFont::Default, lx, m_y + tp::det_info_y + 14, tp::inner_w - 8, 14,
 				fit(extra, 74).c_str(), hb::shared::text::TextStyle::from_color(tp_col::text_dim),
@@ -799,7 +815,7 @@ void DialogBox_TradingPost::draw_detail(int mx, int my)
 		int oic = std::min<int>(ov.item_count, hb::shared::limits::TpMaxOfferItems);
 		if (oic > 0)
 		{
-			auto info = item_name_formatter::get().format(ov.items[0].item_id);
+			auto info = item_name_formatter::get().format(ov.items[0].item_id, tp_wire_instance(ov.items[0]));
 			label += info.name;
 			if (ov.items[0].count > 1) label += " x" + m_game->format_comma_number(ov.items[0].count);
 			if (oic > 1) label += std::format(" (+{})", oic - 1);

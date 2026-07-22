@@ -1,3 +1,28 @@
+# Development merge — ShadowEvil's final 35 commits adopted
+
+### Merge (branch `merge-development`)
+- Merged `upstream/Development` (2026-02-24 → 2026-03-04, tip `506f7f1`) into master's July line: item instance redesign (`cur_durability` + unpacked `custom_made`/`prefix`/`secondary`/`enchant` fields, `ItemInstanceData`), item type system redesign (EquipPos `Pants`→`Leggings`→`Boots` shifts, renamed equipment atlases), NPC damage/XP rework with DB-driven creation items, config push to client at login (server config, color palette, attribute types), RegenManager extraction, and the guild system full gut (shell classes kept for the SQLite rebuild). All July work preserved: Trading Post phases 1–5, war-event admin commands, boss drop system (guaranteed tier-2, delayed second drop, 5×5 scatter), anti-hack fixes, icebound activation.
+- Swing anti-hack checks kept our frozen-term removal by intent on Dev's new code-based `swing_time`/balance-constants API (both the per-swing and 7-swing-batch checks; original-source-verified — frozen never speeds swings).
+- `GameCmdSpawn`'s `create_new_npc` call had a latent pre-merge bug: its final `true` bound to the old `guild_guid` parameter, so `bypass_mob_limit` silently defaulted to `false`. The signature change makes the same call bind as its comment always intended.
+
+### Data
+- `gamedata.db` rebased onto Dev's (his balance/creation/palette/attribute data), then our July deltas re-applied by script and dump-diff verified: drop-table `guaranteed_secondary`/`scatter_count` values, `active_maps` icebound row, Vince (`npc_configs` 116) translated through Dev's own hit-dice/damage migration formulas (hp 51–60, 1–1 damage).
+- **`max_load` re-scaled for Dev's weight system**: his rework stores weights in thousandths of a stone (all DB weights ×10; `weight_units_per_stone` 100→1000), and his seed still carried the ×100-too-small regression we fixed in July. The original-faithful capacity in his units is `str*5000 + angelic_str*5000 + level*5000` (was ×500 in our hundredths units). Character-screen weight display now shows both current and max load in stones with 2 decimals (Dev's side showed raw max units).
+- `MapInfo.db` kept ours (Vince map_npcs/waypoints); Dev's only change since merge-base — the `map_teleport_locations` rework routing arebrk11/elvbrk11/middled1n exits through arefarm/elvfarm — re-applied wholesale and dump-diff verified.
+- Account DBs migrated with Dev's scripts in commit order: packed `attribute` → instance columns, `cur_lifespan` → `cur_durability`, guild/fightzone columns stripped.
+- `Scripts/setup_gamedata.py` seed now mirrors the reconciled live formulas table (Dev's in-DB tuning of `level_exp`/`max_sp`/`sp_regen_*` was newer than his own seed; swing/stat-pool rows retired to `BalanceConstants.h`/ServerConfig). Fresh `gameconfigs-07222026.sql`/`mapinfo-07222026.sql` snapshots; stale 02162026 pair retired.
+
+### Trading Post (adaptation to the item-instance model)
+- Escrow store schema (`listing_items`/`offer_items`) re-mirrors the new `character_bank_items`: `cur_durability` + the six attribute columns replace `cur_lifespan` + packed `attribute`. Escrow-in/out copies use `CItem::copy_attributes_to`/`load_attributes_from`; `build_item` mirrors the bank-row deserialization exactly (custom-made durability override included); offline Warehouse delivery writes the new `AccountDbBankItemRow` columns.
+- Wire structs reworked (protocol unreleased, compat bumped to 0.4.0 with the merge): `TpItemBrief` carries id/count + the name-affecting instance fields; `TpItemFull` fully mirrors `item_instance_data`. Client renders listing/offer names via `item_name_formatter::format(item_id, item_instance_data)` — prefixed/enchanted names and dye colors now correct in board rows, detail bundles, and offer rows; icon tint uses the server-pushed color palette.
+- Local `tradingpost.db` deleted (dev-test escrow, backed up pre-merge); the server recreates it with the new schema on startup. ADR 0001 escrow physics unchanged.
+
+### Versioning
+- **Compatibility → 0.4.0** (protocol changed in both directions: guild/fightzone message families removed, durability renames, config-push messages, Tp wire rework). **Server → 0.3.0**, **Client → 0.3.0**. Build counters continue from the max of both branches (client 357, server 247).
+
+### Pending
+- Phase-6 test matrix (login/creation on migrated accounts, TP full loop, war commands, boss drops, guild-absence sanity) and the Linux server/client build gates (no WSL distro on this machine).
+
 # Admin chat commands to start/stop war events
 
 ### Commands (Server)

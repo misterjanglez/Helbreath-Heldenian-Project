@@ -66,7 +66,13 @@ namespace
 	{
 		dst.item_id = e.item_id;
 		dst.count = e.count;
-		dst.attribute = e.attribute;
+		dst.item_color = e.item_color;
+		dst.custom_made = e.custom_made;
+		dst.prefix_type = e.prefix_type;
+		dst.prefix_value = e.prefix_value;
+		dst.secondary_type = e.secondary_type;
+		dst.secondary_value = e.secondary_value;
+		dst.enchant_bonus = e.enchant_bonus;
 	}
 
 	void fill_full(hb::net::TpItemFull& dst, const hb::server::escrow_item& e)
@@ -81,8 +87,13 @@ namespace
 		dst.spec_effect_value1 = e.spec_effect_value1;
 		dst.spec_effect_value2 = e.spec_effect_value2;
 		dst.spec_effect_value3 = e.spec_effect_value3;
-		dst.cur_lifespan = e.cur_lifespan;
-		dst.attribute = e.attribute;
+		dst.cur_durability = e.cur_durability;
+		dst.custom_made = e.custom_made;
+		dst.prefix_type = e.prefix_type;
+		dst.prefix_value = e.prefix_value;
+		dst.secondary_type = e.secondary_type;
+		dst.secondary_value = e.secondary_value;
+		dst.enchant_bonus = e.enchant_bonus;
 	}
 
 	// Build and send a PacketResponseTpBoardPage from a page of listing_briefs.

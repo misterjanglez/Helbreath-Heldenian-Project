@@ -137,8 +137,13 @@ namespace hb::server
 			" spec_effect_value1 INTEGER NOT NULL,"
 			" spec_effect_value2 INTEGER NOT NULL,"
 			" spec_effect_value3 INTEGER NOT NULL,"
-			" cur_lifespan INTEGER NOT NULL,"
-			" attribute INTEGER NOT NULL,"
+			" cur_durability INTEGER NOT NULL,"
+			" custom_made INTEGER NOT NULL,"
+			" prefix_type INTEGER NOT NULL,"
+			" prefix_value INTEGER NOT NULL,"
+			" secondary_type INTEGER NOT NULL,"
+			" secondary_value INTEGER NOT NULL,"
+			" enchant_bonus INTEGER NOT NULL,"
 			" PRIMARY KEY (listing_id, slot)"
 			");"
 			"CREATE TABLE IF NOT EXISTS offers ("
@@ -162,8 +167,13 @@ namespace hb::server
 			" spec_effect_value1 INTEGER NOT NULL,"
 			" spec_effect_value2 INTEGER NOT NULL,"
 			" spec_effect_value3 INTEGER NOT NULL,"
-			" cur_lifespan INTEGER NOT NULL,"
-			" attribute INTEGER NOT NULL,"
+			" cur_durability INTEGER NOT NULL,"
+			" custom_made INTEGER NOT NULL,"
+			" prefix_type INTEGER NOT NULL,"
+			" prefix_value INTEGER NOT NULL,"
+			" secondary_type INTEGER NOT NULL,"
+			" secondary_value INTEGER NOT NULL,"
+			" enchant_bonus INTEGER NOT NULL,"
 			" PRIMARY KEY (offer_id, slot)"
 			");"
 			"CREATE TABLE IF NOT EXISTS notices ("
@@ -199,11 +209,11 @@ namespace hb::server
 		item->m_instance.special_effect_value1 = e.spec_effect_value1;
 		item->m_instance.special_effect_value2 = e.spec_effect_value2;
 		item->m_instance.special_effect_value3 = e.spec_effect_value3;
-		item->m_instance.cur_durability = static_cast<uint16_t>(e.cur_lifespan);
-		// PHASE5-TP: escrow_item still stores the legacy packed `attribute`; the
-		// item-instance fields (custom_made/prefix/secondary/enchant) are not
-		// reconstructed until the Phase-5 schema rework. Escrowed test data is
-		// expendable (tradingpost.db is recreated with the new schema).
+		item->m_instance.cur_durability = e.cur_durability;
+		item->load_attributes_from(e);
+		if (item->m_instance.custom_made) {
+			item->m_durability = item->m_instance.special_effect_value1;
+		}
 		m_game->m_item_manager->adjust_rare_item_value(item);
 		if (item->m_instance.cur_durability > item->m_durability) {
 			item->m_instance.cur_durability = item->m_durability;
@@ -221,9 +231,11 @@ namespace hb::server
 			}
 		}
 		char buf[160];
-		std::snprintf(buf, sizeof(buf), "%s x%llu (id=%d attr=0x%08X)",
+		std::snprintf(buf, sizeof(buf), "%s x%llu (id=%d pfx=%d/%d sec=%d/%d ench=%d%s)",
 			name, static_cast<unsigned long long>(e.count),
-			static_cast<int>(e.item_id), e.attribute);
+			static_cast<int>(e.item_id), e.prefix_type, e.prefix_value,
+			e.secondary_type, e.secondary_value, e.enchant_bonus,
+			e.custom_made ? " custom" : "");
 		return buf;
 	}
 
@@ -294,8 +306,8 @@ namespace hb::server
 			e.spec_effect_value1 = it->m_instance.special_effect_value1;
 			e.spec_effect_value2 = it->m_instance.special_effect_value2;
 			e.spec_effect_value3 = it->m_instance.special_effect_value3;
-			e.cur_lifespan = it->m_instance.cur_durability;
-			e.attribute = 0; // PHASE5-TP: packed attribute retired; instance fields land with the schema rework
+			e.cur_durability = it->m_instance.cur_durability;
+			it->copy_attributes_to(e);
 			snap.push_back(e);
 			pend.push_back({ slot, static_cast<uint64_t>(amount) });
 		}
@@ -346,12 +358,13 @@ namespace hb::server
 	bool trading_post_store::insert_item_rows(const char* table, const char* id_column,
 		int64_t owner_id, const std::vector<escrow_item>& items)
 	{
-		char sql[512];
+		char sql[640];
 		std::snprintf(sql, sizeof(sql),
 			"INSERT INTO %s(%s, slot, item_id, count, touch_effect_type,"
 			" touch_effect_value1, touch_effect_value2, touch_effect_value3, item_color,"
-			" spec_effect_value1, spec_effect_value2, spec_effect_value3, cur_lifespan, attribute)"
-			" VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?);",
+			" spec_effect_value1, spec_effect_value2, spec_effect_value3, cur_durability,"
+			" custom_made, prefix_type, prefix_value, secondary_type, secondary_value, enchant_bonus)"
+			" VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?);",
 			table, id_column);
 
 		sqlite3_stmt* stmt = nullptr;
@@ -377,8 +390,13 @@ namespace hb::server
 			ok &= (sqlite3_bind_int(stmt, c++, e.spec_effect_value1) == SQLITE_OK);
 			ok &= (sqlite3_bind_int(stmt, c++, e.spec_effect_value2) == SQLITE_OK);
 			ok &= (sqlite3_bind_int(stmt, c++, e.spec_effect_value3) == SQLITE_OK);
-			ok &= (sqlite3_bind_int(stmt, c++, e.cur_lifespan) == SQLITE_OK);
-			ok &= (sqlite3_bind_int64(stmt, c++, static_cast<sqlite3_int64>(e.attribute)) == SQLITE_OK);
+			ok &= (sqlite3_bind_int(stmt, c++, e.cur_durability) == SQLITE_OK);
+			ok &= (sqlite3_bind_int(stmt, c++, e.custom_made) == SQLITE_OK);
+			ok &= (sqlite3_bind_int(stmt, c++, e.prefix_type) == SQLITE_OK);
+			ok &= (sqlite3_bind_int(stmt, c++, e.prefix_value) == SQLITE_OK);
+			ok &= (sqlite3_bind_int(stmt, c++, e.secondary_type) == SQLITE_OK);
+			ok &= (sqlite3_bind_int(stmt, c++, e.secondary_value) == SQLITE_OK);
+			ok &= (sqlite3_bind_int(stmt, c++, e.enchant_bonus) == SQLITE_OK);
 			if (ok && sqlite3_step(stmt) != SQLITE_DONE) {
 				ok = false;
 			}
@@ -603,7 +621,8 @@ namespace hb::server
 		if (sqlite3_prepare_v2(m_db,
 			"SELECT item_id, count, touch_effect_type, touch_effect_value1,"
 			" touch_effect_value2, touch_effect_value3, item_color, spec_effect_value1,"
-			" spec_effect_value2, spec_effect_value3, cur_lifespan, attribute"
+			" spec_effect_value2, spec_effect_value3, cur_durability,"
+			" custom_made, prefix_type, prefix_value, secondary_type, secondary_value, enchant_bonus"
 			" FROM offer_items WHERE offer_id=? ORDER BY slot;",
 			-1, &stmt, nullptr) != SQLITE_OK) {
 			return false;
@@ -622,8 +641,13 @@ namespace hb::server
 			e.spec_effect_value1 = static_cast<int16_t>(sqlite3_column_int(stmt, c++));
 			e.spec_effect_value2 = static_cast<int16_t>(sqlite3_column_int(stmt, c++));
 			e.spec_effect_value3 = static_cast<int16_t>(sqlite3_column_int(stmt, c++));
-			e.cur_lifespan = static_cast<uint16_t>(sqlite3_column_int(stmt, c++));
-			e.attribute = static_cast<uint32_t>(sqlite3_column_int64(stmt, c++));
+			e.cur_durability = static_cast<uint16_t>(sqlite3_column_int(stmt, c++));
+			e.custom_made = static_cast<uint8_t>(sqlite3_column_int(stmt, c++));
+			e.prefix_type = static_cast<uint8_t>(sqlite3_column_int(stmt, c++));
+			e.prefix_value = static_cast<uint8_t>(sqlite3_column_int(stmt, c++));
+			e.secondary_type = static_cast<uint8_t>(sqlite3_column_int(stmt, c++));
+			e.secondary_value = static_cast<uint8_t>(sqlite3_column_int(stmt, c++));
+			e.enchant_bonus = static_cast<uint8_t>(sqlite3_column_int(stmt, c++));
 			out_items.push_back(e);
 		}
 		sqlite3_finalize(stmt);
@@ -735,15 +759,13 @@ namespace hb::server
 			r.spec_effect_value1 = e.spec_effect_value1;
 			r.spec_effect_value2 = e.spec_effect_value2;
 			r.spec_effect_value3 = e.spec_effect_value3;
-			// PHASE5-TP: only durability carries over; attribute fields are
-			// reconstructed when escrow adopts the item-instance schema.
-			r.cur_durability = e.cur_lifespan;
-			r.custom_made = 0;
-			r.prefix_type = 0;
-			r.prefix_value = 0;
-			r.secondary_type = 0;
-			r.secondary_value = 0;
-			r.enchant_bonus = 0;
+			r.cur_durability = e.cur_durability;
+			r.custom_made = e.custom_made;
+			r.prefix_type = e.prefix_type;
+			r.prefix_value = e.prefix_value;
+			r.secondary_type = e.secondary_type;
+			r.secondary_value = e.secondary_value;
+			r.enchant_bonus = e.enchant_bonus;
 			rows.push_back(r);
 		}
 
@@ -951,7 +973,8 @@ namespace hb::server
 		if (sqlite3_prepare_v2(m_db,
 			"SELECT item_id, count, touch_effect_type, touch_effect_value1,"
 			" touch_effect_value2, touch_effect_value3, item_color, spec_effect_value1,"
-			" spec_effect_value2, spec_effect_value3, cur_lifespan, attribute"
+			" spec_effect_value2, spec_effect_value3, cur_durability,"
+			" custom_made, prefix_type, prefix_value, secondary_type, secondary_value, enchant_bonus"
 			" FROM listing_items WHERE listing_id = ? ORDER BY slot;",
 			-1, &stmt, nullptr) != SQLITE_OK) {
 			return false;
@@ -970,8 +993,13 @@ namespace hb::server
 			e.spec_effect_value1 = static_cast<int16_t>(sqlite3_column_int(stmt, c++));
 			e.spec_effect_value2 = static_cast<int16_t>(sqlite3_column_int(stmt, c++));
 			e.spec_effect_value3 = static_cast<int16_t>(sqlite3_column_int(stmt, c++));
-			e.cur_lifespan = static_cast<uint16_t>(sqlite3_column_int(stmt, c++));
-			e.attribute = static_cast<uint32_t>(sqlite3_column_int64(stmt, c++));
+			e.cur_durability = static_cast<uint16_t>(sqlite3_column_int(stmt, c++));
+			e.custom_made = static_cast<uint8_t>(sqlite3_column_int(stmt, c++));
+			e.prefix_type = static_cast<uint8_t>(sqlite3_column_int(stmt, c++));
+			e.prefix_value = static_cast<uint8_t>(sqlite3_column_int(stmt, c++));
+			e.secondary_type = static_cast<uint8_t>(sqlite3_column_int(stmt, c++));
+			e.secondary_value = static_cast<uint8_t>(sqlite3_column_int(stmt, c++));
+			e.enchant_bonus = static_cast<uint8_t>(sqlite3_column_int(stmt, c++));
 			out.push_back(e);
 		}
 		sqlite3_finalize(stmt);
