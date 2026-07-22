@@ -1410,7 +1410,7 @@
 #define	NOTIFYMSG_MAGICEFFECT_ON10	"You were poisoned!"
 #define	NOTIFYMSG_MAGICEFFECT_ON11	"Berserk Magic Casted!"
 #define	NOTIFYMSG_MAGICEFFECT_ON12	"Transformation magic effect, you have been transformed as a monster"
-#define	NOTIFYMSG_MAGICEFFECT_ON13	"You have been frozen! Your movement decreases to 50"
+#define	NOTIFYMSG_MAGICEFFECT_ON13	"You have been frozen! Your movement decreases by 25%"
 #define	NOTIFYMSG_MAGICEFFECT_ON14  "You are completely protected from magic!"
 // Snoopy
  #define	NOTIFYMSG_MAGICEFFECT_ON15	"You are thrown into confusion, and you are flustered yourself."
@@ -1712,7 +1712,7 @@
 #define DEF_MSG_CHARISMA		"Charisma"
 #define DEF_MSG_HITPOINT		"Hit Point"
 #define DEF_MSG_MANAPOINT		"Mana Point"
-#define DEF_MSG_STAMINARPOINT	"Staminar Point"
+#define DEF_MSG_STAMINAPOINT	"Stamina Point"
 
 #define DEF_MSG_GETNEXTMOVEDIR	"A civilian cannot go to a dangerous area.  You have to change play mode at the cityhall."
 #define DEF_MSG_GUIDEMAP_MIN	"(-) : Minimize map"
@@ -1808,4 +1808,32 @@
 #define RESPONSE_CHARGED_TELEPORT5 "You may not teleport to the same town."
 #define RESPONSE_CHARGED_TELEPORT6 "You need more gold to teleport."
 #define RESPONSE_CHARGED_TELEPORT7 ".........................."
+
+// --- Trading Post (Auctioneer / Vince) — result toasts + empty-state text ---
+// Player-facing vocabulary per CONTEXT.md: Listing, Offer, Finalize, Rescind,
+// Delist, seeking note, Warehouse (never "bank").
+#define TP_TOAST_OK                 "Done."
+#define TP_TOAST_LISTED             "Listing posted."
+#define TP_TOAST_OFFERED            "Offer placed."
+#define TP_TOAST_RESCINDED          "Offer rescinded; items returned to your Warehouse."
+#define TP_TOAST_FINALIZED          "Trade finalized; items delivered to your Warehouse."
+#define TP_TOAST_DELISTED           "Listing delisted; items returned to your Warehouse."
+#define TP_TOAST_TOO_MANY_LISTINGS  "You already have the maximum of 5 active Listings."
+#define TP_TOAST_LISTING_GONE       "That Listing no longer exists."
+#define TP_TOAST_OFFER_GONE         "That Offer no longer exists."
+#define TP_TOAST_SELF_TRADE         "You cannot Offer on your own account's Listing."
+#define TP_TOAST_TOO_MANY_OFFERS    "That Listing already has the maximum of 10 Offers."
+#define TP_TOAST_ALREADY_OFFERED    "You already have an active Offer on that Listing."
+#define TP_TOAST_INV_CHANGED        "Your inventory changed; please try again."
+#define TP_TOAST_INVALID_BUNDLE     "That item bundle is not valid."
+#define TP_TOAST_INVALID_NOTE       "That seeking note is not allowed."
+#define TP_TOAST_NOT_SELLER         "Only the Seller can do that."
+#define TP_TOAST_NOT_NEAR           "You must be standing near the Auctioneer."
+#define TP_TOAST_WAREHOUSE_FULL     "A Warehouse was full — the action completed; check your Warehouse."
+#define TP_TOAST_BUSY               "You are busy right now; please try again."
+#define TP_TOAST_FAILED             "The Trading Post request failed."
+#define TP_TOAST_NEED_ITEMS         "Add at least one item to the bundle first."
+#define TP_EMPTY_BOARD              "No Listings on the Trading Post yet."
+#define TP_EMPTY_MY_LISTINGS        "You have no active Listings."
+#define TP_EMPTY_MY_OFFERS          "You have no active Offers."
 
