@@ -94,7 +94,9 @@
       "Bash(git credential-manager *)",
       "Bash(git --version)",
       "Bash(git merge-tree *)",
-      "Bash(git log *)"
+      "Bash(git log *)",
+      "Bash(git checkout *)",
+      "Bash(git merge *)"
     ]
   }
 }
