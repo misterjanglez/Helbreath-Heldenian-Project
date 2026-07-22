@@ -172,6 +172,10 @@
     <ClInclude Include="GameConfigSqliteStore.h">
       <Filter>Database</Filter>
     </ClInclude>
+    <ClInclude Include="TradingPostManager.h" />
+    <ClInclude Include="TradingPostStore.h">
+      <Filter>Database</Filter>
+    </ClInclude>
     <ClInclude Include="ServerConfig.h">
       <Filter>Database</Filter>
     </ClInclude>
@@ -542,6 +546,10 @@
       <Filter>Game Chat\Commands</Filter>
     </ClCompile>
     <ClCompile Include="GameConfigSqliteStore.cpp">
+      <Filter>Database</Filter>
+    </ClCompile>
+    <ClCompile Include="TradingPostManager.cpp" />
+    <ClCompile Include="TradingPostStore.cpp">
       <Filter>Database</Filter>
     </ClCompile>
     <ClCompile Include="ServerConfig.cpp">

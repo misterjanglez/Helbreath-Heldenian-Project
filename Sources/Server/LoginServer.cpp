@@ -19,6 +19,7 @@ using namespace std;
 #include "Item/ItemEnums.h"
 #include "version_info.h"
 #include "Game.h"
+#include "TradingPostStore.h"
 #include <filesystem>
 
 using namespace hb::shared::net;
@@ -606,6 +607,14 @@ void LoginServer::delete_character(int h, char* data)
 	}
 
 	CloseAccountDatabase(db);
+
+	// Trading Post void: the account DB's ON DELETE CASCADE cannot reach
+	// tradingpost.db, so explicitly refund counterparties' Offers on this
+	// character's Listings, destroy its own escrowed items, and delete its
+	// Listings/Offers/notices (see docs/adr/0001-trading-post-physical-escrow.md).
+	if (G_pGame != nullptr && G_pGame->m_trading_post_store != nullptr) {
+		G_pGame->m_trading_post_store->void_character(name);
+	}
 
 	for (auto it = chars.begin(); it != chars.end();) {
 		if (hb_strnicmp(it->character_name, name, hb::shared::limits::CharNameLen - 1) == 0) {

@@ -86,6 +86,18 @@ namespace MsgId
 		RequestRestart                          = 0x28010EEE,
 		RequestSellItemList                     = 0x2900AD30,
 		StateChangePoint                        = 0x11A01001,
+		// Trading Post — request/response families (see PacketTradingPost.h)
+		RequestTpBoardPage                      = 0x0FA31600,
+		ResponseTpBoardPage                     = 0x0FA31601,
+		RequestTpListingDetail                  = 0x0FA31602,
+		ResponseTpListingDetail                 = 0x0FA31603,
+		RequestTpCreateListing                  = 0x0FA31604,
+		RequestTpPlaceOffer                     = 0x0FA31605,
+		RequestTpRescindOffer                   = 0x0FA31606,
+		RequestTpFinalize                       = 0x0FA31607,
+		RequestTpDelist                         = 0x0FA31608,
+		ResponseTpActionResult                  = 0x0FA31609,
+		RequestTpMyBoard                        = 0x0FA3160A,   // my Listings / my Offers (reuses ResponseTpBoardPage)
 	};
 }
 

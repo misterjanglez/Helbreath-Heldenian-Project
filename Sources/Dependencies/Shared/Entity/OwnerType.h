@@ -104,6 +104,13 @@ namespace hb::shared::owner {
 
 	constexpr short AirElemental = 110;
 
+	// Auctioneer NPC (Vince) — opens the Trading Post dialog. Interaction is the
+	// dialog, not item-drop-on-NPC, so this is deliberately NOT in
+	// can_receive_items(). Placement of the NPC itself is Phase 4; Phase 3 only
+	// needs the constant so the server can check "is the actor near an
+	// Auctioneer" (see trading_post_manager::is_near_auctioneer).
+	constexpr short auctioneer = 111;
+
 	// --- Helpers ---
 
 	inline bool is_player(short t) { return t >= PlayerFirst && t <= PlayerLast; }
@@ -113,6 +120,14 @@ namespace hb::shared::owner {
 
 	// Energy Sphere and Abaddon are always rendered invisible (alpha).
 	inline bool is_always_invisible(short t) { return t == EnergySphere || t == Abaddon; }
+
+	// Client sprite proxy: some NPC types have no dedicated sprite sheet and borrow an
+	// existing humanoid model for rendering. The auctioneer (Vince) ships without art of
+	// its own, so it is drawn using the CityHall Officer (William) body — visually distinct
+	// from the Warehouse Keeper (Howard) it stands beside. Server-side logic still keys on
+	// the true type (auctioneer) for proximity/interaction; this only affects which sprite
+	// sheet the client blits, never the entity's identity.
+	inline short sprite_render_type(short t) { return t == auctioneer ? William : t; }
 
 	// Returns true for entity types that can receive items from players.
 	// Players (give/exchange), ShopKeeper/Tom (sell/repair), Howard (bank deposit), Kennedy (guild tickets).

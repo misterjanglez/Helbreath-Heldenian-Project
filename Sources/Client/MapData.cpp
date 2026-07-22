@@ -828,6 +828,12 @@ CMapData::CMapData(class CGame* game)
 	m_stFrame[hb::shared::owner::AirElemental][Type::Dying].m_sFrameTime = 180;
 	m_stFrame[hb::shared::owner::AirElemental][Type::Dying].m_sMaxFrame = 7;
 
+	// Auctioneer (Vince) has no sprite sheet of its own; it borrows the CityHall Officer
+	// (William) body via owner::sprite_render_type. Mirror William's animation frames here
+	// so the reused sprite steps through the same idle/move cycle.
+	for (int a = 0; a < TotalAction; a++)
+		m_stFrame[hb::shared::owner::auctioneer][a] = m_stFrame[hb::shared::owner::William][a];
+
 }
 
 void CMapData::init()

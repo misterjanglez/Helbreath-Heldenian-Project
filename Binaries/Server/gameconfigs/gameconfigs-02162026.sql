@@ -3275,6 +3275,7 @@ INSERT INTO "npc_configs" VALUES (112, 'Barbarian', 88, 350, 500, 1000, 100, 222
 INSERT INTO "npc_configs" VALUES (113, 'Ancient Giant Cannon', 89, 1000, 200, 500, 100, 2222, 2222, 550, 1100, 14, 10, 1, 1, 5, 1600, 30, 0, 10, 0, 8, 3000, 2, 0, 0, 0, 9, 20140);
 INSERT INTO "npc_configs" VALUES (114, 'Ancient Giant Cannon', 89, 1000, 200, 500, 100, 2222, 2222, 550, 1100, 14, 10, 1, 2, 5, 1600, 30, 0, 10, 0, 8, 3000, 2, 0, 0, 0, 9, 20141);
 INSERT INTO "npc_configs" VALUES (115, 'Training Dummy', 34, 999999, 15, 300, 100, 0, 0, 0, 0, 0, 0, 1, 10, 3, 2100, 5, 0, 10, 0, 7, 3000, 2, 0, 0, 0, 1, 20073);
+INSERT INTO "npc_configs" VALUES (116, 'Vince', 111, 10, 10, 20, 5, 0, 0, 0, 0, 1, 1, 0, 0, 2, 30000, 0, 0, 10, 1, 0, 10000, 0, 0, 0, 0, 1, 0);
 
 -- ----------------------------
 -- Table structure for npc_shop_mapping

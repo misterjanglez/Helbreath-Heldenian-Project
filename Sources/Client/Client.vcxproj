@@ -319,6 +319,7 @@
     <ClInclude Include="DialogBox_GuildHallMenu.h" />
     <ClInclude Include="DialogBox_SellOrRepair.h" />
     <ClInclude Include="DialogBox_Manufacture.h" />
+    <ClInclude Include="DialogBox_TradingPost.h" />
     <ClInclude Include="AnimationState.h" />
     <ClInclude Include="EffectManager.h" />
     <ClInclude Include="EntityMotion.h" />
@@ -486,6 +487,7 @@
     <ClCompile Include="DialogBox_Magic.cpp" />
     <ClCompile Include="DialogBox_HudPanel.cpp" />
     <ClCompile Include="DialogBox_StatusOverlay.cpp" />
+    <ClCompile Include="DialogBox_TradingPost.cpp" />
     <ClCompile Include="DialogBox_GuideMap.cpp" />
     <ClCompile Include="DialogBox_Fishing.cpp" />
     <ClCompile Include="DialogBox_CrusadeJob.cpp" />
@@ -565,6 +567,7 @@
     <ClCompile Include="NetworkMessages_Angels.cpp" />
     <ClCompile Include="NetworkMessages_Apocalypse.cpp" />
     <ClCompile Include="NetworkMessages_Bank.cpp" />
+    <ClCompile Include="NetworkMessages_TradingPost.cpp" />
     <ClCompile Include="NetworkMessages_Combat.cpp" />
     <ClCompile Include="NetworkMessages_Crafting.cpp" />
     <ClCompile Include="NetworkMessages_Crusade.cpp" />

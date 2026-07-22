@@ -33,6 +33,7 @@
 #include "DialogBox_Skill.h"
 #include "DialogBox_Exchange.h"
 #include "DialogBox_NpcActionQuery.h"
+#include "DialogBox_TradingPost.h"
 #include "Log.h"
 #ifdef TESTER_ONLY
 #include "DialogBox_ItemCreator.h"
@@ -426,6 +427,14 @@ void Screen_OnGame::on_update()
                                     	m_game->send_game_packet(pkt);
                                     }
                                 }
+                                break;
+                            case 1003:
+                            {
+                                // Trading Post — stage the picked amount into the open dialog's bundle.
+                                auto* tp = m_game->get_dialog_box_manager().get_dialog_as<DialogBox_TradingPost>(DialogBoxId::TradingPost);
+                                int tp_slot = m_game->get_dialog_box_manager().get_dialog_as<DialogBox_ItemDropAmount>(DialogBoxId::ItemDropExternal)->m_drop_target_id;
+                                if (tp) tp->stage_item(tp_slot, amount);
+                            }
                                 break;
                             default:
                             {

@@ -17,6 +17,7 @@
 #include "PacketRequest.h"
 #include "PacketResponse.h"
 #include "PacketShop.h"
+#include "PacketTradingPost.h"
 #include "PacketConfigCache.h"
 #include "PacketPartyOp.h"
 #include "PacketChat.h"

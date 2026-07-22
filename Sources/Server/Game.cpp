@@ -13,6 +13,8 @@
 #include "MiningManager.h"
 #include "AccountSqliteStore.h"
 #include "GameConfigSqliteStore.h"
+#include "TradingPostStore.h"
+#include "TradingPostManager.h"
 #include "MapInfoSqliteStore.h"
 #include "sqlite3.h"
 #include "Packet/SharedPackets.h"
@@ -285,6 +287,10 @@ CGame::CGame()
 	m_skill_manager->set_game(this);
 	m_war_manager->set_game(this);
 	m_status_effect_manager->set_game(this);
+	m_trading_post_store = std::make_unique<hb::server::trading_post_store>();
+	m_trading_post_store->set_game(this);
+	m_trading_post_manager = std::make_unique<hb::server::trading_post_manager>();
+	m_trading_post_manager->set_game(this);
 
 	for(int i = 0; i < hb::shared::limits::MaxMagicType; i++)
 		m_magic_config_list[i] = 0;
@@ -1210,6 +1216,14 @@ bool CGame::init()
 	}
 
 	CloseGameConfigDatabase(configDb);
+
+	// Open the Trading Post escrow store (tradingpost.db). Single persistent
+	// connection owned by CGame; created with its schema on first run.
+	hb::logger::log("Opening Trading Post store (tradingpost.db)");
+	if (!m_trading_post_store->open("tradingpost.db")) {
+		hb::logger::error("Cannot start server: tradingpost.db unavailable");
+		return false;
+	}
 
 	// Load map configurations (display names, no-attack areas, static NPCs) from mapinfo.db
 	// Must be after NPC configs are loaded from gamedata.db (spawn_map_npcs needs m_npc_config_list)
@@ -4588,6 +4602,12 @@ void CGame::init_player_data(int client_h, char* data, uint32_t size)
 	}
 
 	m_client_list[client_h]->m_is_init_complete = true;
+
+	// Trading Post login hook: deliver any notices queued while the character was
+	// offline as system chat lines, then clear them.
+	if (m_trading_post_manager != nullptr) {
+		m_trading_post_manager->on_player_login(client_h);
+	}
 }
 
 void CGame::game_process()
@@ -4598,6 +4618,11 @@ void CGame::game_process()
 	msg_process();
 	force_recall_process();
 	m_delay_event_manager->delay_event_process();
+
+	// Trading Post expiry sweep — piggybacks the game tick at ~autosave cadence.
+	if (m_trading_post_manager != nullptr) {
+		m_trading_post_manager->process_expiry(GameClock::GetTimeMS());
+	}
 }
 
 // Helper function to normalize item name for comparison (removes spaces and underscores)
@@ -5505,6 +5530,39 @@ void CGame::msg_process()
 
 			case MsgId::RequestRetrieveItem:
 				m_item_manager->request_retrieve_item_handler(client_h, data);
+				break;
+
+			// Trading Post — the Auctioneer dialog protocol (see TradingPostManager).
+			case MsgId::RequestTpBoardPage:
+				m_trading_post_manager->handle_board_page(client_h, data, msg_size);
+				break;
+
+			case MsgId::RequestTpMyBoard:
+				m_trading_post_manager->handle_my_board(client_h, data, msg_size);
+				break;
+
+			case MsgId::RequestTpListingDetail:
+				m_trading_post_manager->handle_listing_detail(client_h, data, msg_size);
+				break;
+
+			case MsgId::RequestTpCreateListing:
+				m_trading_post_manager->handle_create_listing(client_h, data, msg_size);
+				break;
+
+			case MsgId::RequestTpPlaceOffer:
+				m_trading_post_manager->handle_place_offer(client_h, data, msg_size);
+				break;
+
+			case MsgId::RequestTpRescindOffer:
+				m_trading_post_manager->handle_rescind_offer(client_h, data, msg_size);
+				break;
+
+			case MsgId::RequestTpFinalize:
+				m_trading_post_manager->handle_finalize(client_h, data, msg_size);
+				break;
+
+			case MsgId::RequestTpDelist:
+				m_trading_post_manager->handle_delist(client_h, data, msg_size);
 				break;
 
 			case MsgId::RequestCivilRight:

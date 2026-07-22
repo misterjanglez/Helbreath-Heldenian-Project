@@ -61,7 +61,7 @@ EquipmentIndices EquipmentIndices::CalcNpc(const CEntityRenderState& state, int 
 {
 	EquipmentIndices eq = {};
 
-	eq.m_body_index      = Mob + (state.m_owner_type - 10) * 8 * 7 + (npcPose * 8);
+	eq.m_body_index      = Mob + (hb::shared::owner::sprite_render_type(state.m_owner_type) - 10) * 8 * 7 + (npcPose * 8);
 	eq.m_undies_index    = -1;
 	eq.m_hair_index      = -1;
 	eq.m_body_armor_index = -1;

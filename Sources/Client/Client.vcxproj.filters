@@ -195,6 +195,9 @@
     <ClInclude Include="DialogBox_Exchange.h">
       <Filter>DialogBox</Filter>
     </ClInclude>
+    <ClInclude Include="DialogBox_TradingPost.h">
+      <Filter>DialogBox</Filter>
+    </ClInclude>
     <ClInclude Include="DialogBox_Fishing.h">
       <Filter>DialogBox</Filter>
     </ClInclude>
@@ -784,6 +787,9 @@
     <ClCompile Include="DialogBox_Exchange.cpp">
       <Filter>DialogBox</Filter>
     </ClCompile>
+    <ClCompile Include="DialogBox_TradingPost.cpp">
+      <Filter>DialogBox</Filter>
+    </ClCompile>
     <ClCompile Include="DialogBox_Fishing.cpp">
       <Filter>DialogBox</Filter>
     </ClCompile>
@@ -951,6 +957,9 @@
       <Filter>Network\Messages</Filter>
     </ClCompile>
     <ClCompile Include="NetworkMessages_Bank.cpp">
+      <Filter>Network\Messages</Filter>
+    </ClCompile>
+    <ClCompile Include="NetworkMessages_TradingPost.cpp">
       <Filter>Network\Messages</Filter>
     </ClCompile>
     <ClCompile Include="NetworkMessages_Combat.cpp">

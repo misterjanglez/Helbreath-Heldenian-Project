@@ -12,9 +12,12 @@
 #include <map>
 #include <unordered_map>
 #include <string>
+#include <memory>
 #include "TimeUtils.h"
 
 namespace hb::shared::net { class IOServicePool; }
+namespace hb::server { class trading_post_store; }
+namespace hb::server { class trading_post_manager; }
 extern hb::shared::net::IOServicePool* G_pIOPool;
 extern bool G_bRunning;
 
@@ -522,6 +525,8 @@ public:
 	class SkillManager * m_skill_manager; // Skill mastery/profession
 	class WarManager * m_war_manager; // Crusade/Heldenian/Apocalypse/FightZone
 	class StatusEffectManager * m_status_effect_manager; // Status effect flags
+	std::unique_ptr<hb::server::trading_post_store> m_trading_post_store; // Trading Post escrow (tradingpost.db)
+	std::unique_ptr<hb::server::trading_post_manager> m_trading_post_manager; // Trading Post request handlers
 
 	hb::shared::net::ConcurrentMsgQueue m_msgQueue;
 	int             m_total_maps;

@@ -28,6 +28,16 @@ namespace hb::shared::limits
 	constexpr int MaxPartyMembers      = 9;
 	constexpr int MaxCharactersPerAccount = 4;
 	constexpr int MaxCrusadeStructures = 300;
+
+	// Trading Post (see PLANS/TradingPost_Plan.md)
+	constexpr int TpMaxListingItems     = 4;    // items per Listing bundle
+	constexpr int TpMaxOfferItems       = 4;    // items per Offer bundle
+	constexpr int TpMaxListingsPerChar  = 5;    // active Listings per character
+	constexpr int TpMaxOffersPerListing = 10;   // concurrent Offers per Listing
+	constexpr int TpSeekingNoteMaxChars = 60;   // max characters accepted in a seeking note
+	constexpr int TpSeekingNoteLen      = 64;   // seeking-note wire buffer (>= max chars + null)
+	constexpr int TpListingExpiryDays   = 14;   // Listing lifetime before the expiry sweep
+	constexpr int TpBoardPageRows       = 8;    // browse rows per board page
 } // namespace hb::shared::limits
 
 // View area - tiles visible to the client (Olympia style)

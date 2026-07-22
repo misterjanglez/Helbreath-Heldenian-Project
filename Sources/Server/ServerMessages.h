@@ -189,6 +189,14 @@ namespace ItemLogAction
 		UpgradeFail                             = 29,
 		UpgradeSuccess                          = 30,
 		Use                                     = 32,
+		// Trading Post escrow transitions (see PLANS/TradingPost_Plan.md)
+		TpList                                  = 33,   // items escrowed into a new Listing
+		TpDelist                                = 34,   // Listing items returned to the Seller
+		TpOffer                                 = 35,   // items escrowed into a new Offer
+		TpRescind                               = 36,   // Offer items returned by the offerer
+		TpRefund                                = 37,   // Offer items auto-returned (delist/finalize)
+		TpTradeOut                              = 38,   // winning Offer delivered to the Seller
+		TpTradeIn                               = 39,   // Listing bundle delivered to the winner
 	};
 }
 

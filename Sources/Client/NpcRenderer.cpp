@@ -9,6 +9,42 @@
 using namespace hb::client::sprite_id;
 using namespace hb::shared::direction;
 
+// The Auctioneer (Vince) has no NPC sprite sheet of his own. Instead of borrowing
+// another NPC body, render him with the PLAYER compositor: a female body wearing
+// only green boots + a green cape. He is stationary (action_limit gates movement),
+// so only the idle pose is ever drawn, which keeps this contained to draw_stop and
+// leaves his true owner type (auctioneer/111) untouched for click/hover/proximity.
+//
+// Cosmetic picks (all easy to tweak): female body variant 4 in a full plate set —
+// full_helm (0), plate_mail chest (13), hauberk arm (21), plate_leggings (27),
+// long_boots (31), and a generic cape (86). Boots + cape are tinted Items-palette
+// green (index 5); the plate pieces keep their natural colour. Unequipped slots
+// MUST be -1 (0 is a valid sprite index and would draw).
+static EquipmentIndices build_auctioneer_equipment()
+{
+	constexpr int female_type = 4;   // female body variant (1-based player type)
+	constexpr int pose = 0;          // standing idle
+	constexpr int green = 5;         // GameColors::Items green
+
+	EquipmentIndices eq = {};
+	eq.m_body_index       = 500 + (female_type - 1) * 8 * 15 + (pose * 8);
+	eq.m_undies_index     = UndiesW + pose;
+	eq.m_hair_index       = HairW + pose;
+	eq.m_helm_index       = equip_sprite::index(true, 0, pose);    // full_helm
+	eq.m_body_armor_index = equip_sprite::index(true, 13, pose);   // plate_mail (chest)
+	eq.m_arm_armor_index  = equip_sprite::index(true, 21, pose);   // hauberk (arm)
+	eq.m_pants_index      = equip_sprite::index(true, 27, pose);   // plate_leggings
+	eq.m_boots_index      = equip_sprite::index(true, 31, pose);   // long_boots
+	eq.m_mantle_index     = equip_sprite::index(true, 86, pose);   // cape
+	eq.m_weapon_index     = -1;
+	eq.m_weapon_item_id   = 0;
+	eq.m_shield_index     = -1;
+	eq.m_skirt_draw       = 0;
+	eq.m_boots_color      = green;
+	eq.m_mantle_color     = green;
+	return eq;
+}
+
 hb::shared::sprite::BoundRect CNpcRenderer::draw_stop(int indexX, int indexY, int sX, int sY, bool trans, uint32_t time)
 {
 	hb::shared::sprite::BoundRect invalidRect = {0, -1, 0, 0};
@@ -27,15 +63,26 @@ hb::shared::sprite::BoundRect CNpcRenderer::draw_stop(int indexX, int indexY, in
 	// Single-direction monster override
 	RenderHelpers::apply_direction_override(state);
 
-	// NPC body index calculation
-	EquipmentIndices eq = EquipmentIndices::CalcNpc(state, 0);
-	eq.calc_colors(state);
+	const bool is_auctioneer = (state.m_owner_type == hb::shared::owner::auctioneer);
 
-	// Special frame from NPC appearance
-	if (state.m_appearance.HasNpcSpecialState())
+	// NPC body index calculation — or the Auctioneer's female player-body composite.
+	EquipmentIndices eq{};
+	if (is_auctioneer)
 	{
-		eq.m_body_index = Mob + (state.m_owner_type - 10) * 8 * 7 + (4 * 8);
-		state.m_frame = state.m_appearance.special_frame - 1;
+		eq = build_auctioneer_equipment();
+		state.m_frame = 0;   // stand still: a stable, in-range player idle frame
+	}
+	else
+	{
+		eq = EquipmentIndices::CalcNpc(state, 0);
+		eq.calc_colors(state);
+
+		// Special frame from NPC appearance
+		if (state.m_appearance.HasNpcSpecialState())
+		{
+			eq.m_body_index = Mob + (hb::shared::owner::sprite_render_type(state.m_owner_type) - 10) * 8 * 7 + (4 * 8);
+			state.m_frame = state.m_appearance.special_frame - 1;
+		}
 	}
 
 	// Crusade FOE indicator
@@ -52,8 +99,12 @@ hb::shared::sprite::BoundRect CNpcRenderer::draw_stop(int indexX, int indexY, in
 	{
 		m_game.check_active_aura(sX, sY, time, state.m_owner_type);
 
-		// draw NPC body (shadow + body sprite)
-		RenderHelpers::draw_npc_layers(m_game, eq, state, sX, sY, inv);
+		// draw body — Auctioneer uses the player equipment compositor (green
+		// boots + green cape over a female body); all other NPCs the flat body.
+		if (is_auctioneer)
+			RenderHelpers::draw_player_layers(m_game, eq, state, sX, sY, inv, mantle_draw_order, 8, admin_invis);
+		else
+			RenderHelpers::draw_npc_layers(m_game, eq, state, sX, sY, inv);
 
 		// Crop effects
 		if (state.m_owner_type == hb::shared::owner::Crops)

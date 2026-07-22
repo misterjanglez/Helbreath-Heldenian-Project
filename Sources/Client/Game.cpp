@@ -104,6 +104,7 @@
 #include "DialogBox_Slates.h"
 #include "DialogBox_NpcActionQuery.h"
 #include "DialogBox_Manufacture.h"
+#include "DialogBox_TradingPost.h"
 
 
 using namespace hb::shared::net;
@@ -2261,7 +2262,7 @@ hb::shared::sprite::BoundRect CGame::draw_object_on_move_for_menu(int indexX, in
 		break;
 	default:  // Mob/NPC
 		if (m_entity_state.m_owner_type < 10) return {};
-		eq.body = Mob + (m_entity_state.m_owner_type - 10) * 8 * 7 + (1 * 8);
+		eq.body = Mob + (hb::shared::owner::sprite_render_type(m_entity_state.m_owner_type) - 10) * 8 * 7 + (1 * 8);
 		eq.undies = eq.hair = eq.bodyArmor = eq.armArmor = -1;
 		eq.boots = eq.pants = eq.weapon = eq.shield = eq.helm = eq.mantle = -1;
 		mob = true;
@@ -5076,6 +5077,10 @@ bool CGame::process_left_click(short mouse_x, short mouse_y, short tile_x, short
 						get_dialog_box_manager().m_give_item.target_x = m_mcx;
 						get_dialog_box_manager().m_give_item.target_y = m_mcy;
 					}	break;
+
+					case hb::shared::owner::auctioneer: // Vince the Auctioneer — opens the Trading Post
+						get_dialog_box_manager().enable_dialog_box(DialogBoxId::TradingPost, 0, 0, 0);
+						break;
 
 					case hb::shared::owner::Tom: // Tom
 					{

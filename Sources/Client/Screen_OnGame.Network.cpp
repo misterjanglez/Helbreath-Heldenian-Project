@@ -22,6 +22,9 @@ using namespace hb::client::net;
 
 namespace NetworkMessageHandlers {
 	void HandlePlayerCharacterContents(CGame* game, char* data);
+	void HandleTpBoardPage(CGame* game, char* data);
+	void HandleTpListingDetail(CGame* game, char* data);
+	void HandleTpActionResult(CGame* game, char* data);
 }
 
 bool Screen_OnGame::on_game_msg(uint32_t msg_id, uint16_t msg_type, char* data, uint32_t msg_size)
@@ -106,6 +109,19 @@ bool Screen_OnGame::on_game_msg(uint32_t msg_id, uint16_t msg_type, char* data, 
 
 	case ClientMsgId::ResponseHeldenianTpList:
 		teleport_manager::get().handle_heldenian_teleport_list(data);
+		return true;
+
+	// Trading Post (the Auctioneer / Vince) — pull-only board + action results.
+	case MsgId::ResponseTpBoardPage:
+		NetworkMessageHandlers::HandleTpBoardPage(m_game, data);
+		return true;
+
+	case MsgId::ResponseTpListingDetail:
+		NetworkMessageHandlers::HandleTpListingDetail(m_game, data);
+		return true;
+
+	case MsgId::ResponseTpActionResult:
+		NetworkMessageHandlers::HandleTpActionResult(m_game, data);
 		return true;
 	}
 
