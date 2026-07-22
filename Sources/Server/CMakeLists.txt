@@ -16,7 +16,7 @@ if(NOT CMAKE_BUILD_TYPE)
 endif()
 
 # ---------------------------------------------------------------------------
-# Server sources (57 .cpp files)
+# Server sources (63 .cpp files)
 # ---------------------------------------------------------------------------
 set(SERVER_SOURCES
     AccountSqliteStore.cpp
@@ -39,9 +39,15 @@ set(SERVER_SOURCES
     FishingManager.cpp
     Game.cpp
     GameChatCommand.cpp
+    GameCmdBeginApocalypse.cpp
+    GameCmdBeginCrusade.cpp
+    GameCmdBeginHeldenian.cpp
     GameCmdBlock.cpp
     GameCmdCome.cpp
     GameCmdCreateItem.cpp
+    GameCmdEndApocalypse.cpp
+    GameCmdEndCrusade.cpp
+    GameCmdEndHeldenian.cpp
     GameCmdGiveItem.cpp
     GameCmdGM.cpp
     GameCmdGoto.cpp

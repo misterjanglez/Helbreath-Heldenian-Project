@@ -64,8 +64,8 @@ public:
 	void local_end_heldenian_mode();
 	bool update_heldenian_status();
 	void create_heldenian_guid(uint32_t heldenian_guid, int winner_side);
-	void manual_start_heldenian_mode(int client_h, char* data, size_t msg_size);
-	void manual_end_heldenian_mode(int client_h, char* data, size_t msg_size);
+	void manual_start_heldenian_mode(int heldenian_type);
+	void manual_end_heldenian_mode();
 	bool notify_heldenian_winner();
 	void remove_heldenian_npc(int npc_h);
 	void request_heldenian_teleport(int client_h, char* data, size_t msg_size);

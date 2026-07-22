@@ -11,6 +11,12 @@
 #include "GameCmdCome.h"
 #include "GameCmdInvis.h"
 #include "GameCmdSaveAll.h"
+#include "GameCmdBeginCrusade.h"
+#include "GameCmdEndCrusade.h"
+#include "GameCmdBeginHeldenian.h"
+#include "GameCmdEndHeldenian.h"
+#include "GameCmdBeginApocalypse.h"
+#include "GameCmdEndApocalypse.h"
 #include "Game.h"
 #include "Client.h"
 #include "AdminLevel.h"
@@ -129,6 +135,12 @@ void GameChatCommandManager::register_built_in_commands()
 	register_command(std::make_unique<GameCmdCome>());
 	register_command(std::make_unique<GameCmdInvis>());
 	register_command(std::make_unique<GameCmdSaveAll>());
+	register_command(std::make_unique<GameCmdBeginCrusade>());
+	register_command(std::make_unique<GameCmdEndCrusade>());
+	register_command(std::make_unique<GameCmdBeginHeldenian>());
+	register_command(std::make_unique<GameCmdEndHeldenian>());
+	register_command(std::make_unique<GameCmdBeginApocalypse>());
+	register_command(std::make_unique<GameCmdEndApocalypse>());
 }
 
 void GameChatCommandManager::seed_command_permissions()

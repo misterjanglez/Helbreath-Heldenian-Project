@@ -1802,48 +1802,32 @@ void WarManager::create_heldenian_guid(uint32_t heldenian_guid, int winner_side)
 	if (file != 0) fclose(file);
 }
 
-void WarManager::manual_start_heldenian_mode(int client_h, char* data, size_t msg_size)
+void WarManager::manual_start_heldenian_mode(int heldenian_type)
 {
-	char heldenian_type, buff[256], * token, seps[] = "= \t\r\n";
 	hb::time::local_time SysTime{};
-	int v1;
 
 	if (m_game->m_is_heldenian_mode) return;
 	if (m_game->m_is_apocalypse_mode) return;
 	if (m_game->m_is_crusade_mode) return;
-	if ((msg_size != 0) && (data != 0)) {
-		m_game->m_heldenian_running = true;
-		SysTime = hb::time::local_time::now();
 
-		std::memset(buff, 0, sizeof(buff));
-		memcpy(buff, data, msg_size);
-		token = strtok(NULL, seps);
-		token = strtok(NULL, seps);
-		if (token != 0) {
-			v1 = atoi(token);
-			v1 += (SysTime.hour * 24 + SysTime.minute * 60);
-			m_game->m_heldenian_start_hour = (v1 / 24);
-			m_game->m_heldenian_start_minute = (v1 / 60);
-		}
-		token = strtok(NULL, seps);
-		if (token != 0) {
-			heldenian_type = atoi(token);
-			if ((heldenian_type == 1) || (heldenian_type == 2)) {
-				m_game->m_heldenian_mode_type = heldenian_type;
-			}
-		}
+	if ((heldenian_type == 1) || (heldenian_type == 2)) {
+		m_game->m_heldenian_mode_type = static_cast<char>(heldenian_type);
 	}
+
+	SysTime = hb::time::local_time::now();
+	m_game->m_heldenian_start_hour = SysTime.hour;
+	m_game->m_heldenian_start_minute = SysTime.minute;
+
+	m_game->m_heldenian_running = true;
 	global_start_heldenian_mode();
-	hb::logger::log<log_channel::events>("GM Order({}): begin Heldenian", m_game->m_client_list[client_h]->m_char_name);
 }
 
-void WarManager::manual_end_heldenian_mode(int client_h, char* data, size_t msg_size)
+void WarManager::manual_end_heldenian_mode()
 {
-	if (m_game->m_is_heldenian_mode) {
-		global_end_heldenian_mode();
-		m_game->m_heldenian_running = false;
-		hb::logger::log<log_channel::events>("GM Order({}): end Heldenian", m_game->m_client_list[client_h]->m_char_name);
-	}
+	if (m_game->m_is_heldenian_mode == false) return;
+
+	global_end_heldenian_mode();
+	m_game->m_heldenian_running = false;
 }
 
 bool WarManager::notify_heldenian_winner()

@@ -1,3 +1,13 @@
+# Admin chat commands to start/stop war events
+
+### Commands (Server)
+- Restored the original GM event triggers as six registered chat commands: `/begincrusade`, `/endcrusade [winner: 0=none 1=aresden 2=elvine]`, `/beginheldenian [type: 1=battlefield 2=castle siege]`, `/endheldenian`, `/beginapocalypse`, `/endapocalypse`. The WarManager engines for all three events were fully ported but unreachable — the original's `/begincrusadetotalwar`-family chat handlers were never carried over, the scheduled starters are gated behind flags hardwired `false`, and the manual entry points had zero call sites, so no war event could ever start.
+- Each command is a `GameChatCommand` subclass (`GameCmdBeginCrusade` … `GameCmdEndApocalypse`), default level **Developer** (DB-overridable per command), requires `/gm on`, logs the GM order to the `commands` channel. Begin commands enforce mutual exclusion — one war event at a time, matching the original's checks — and every path reports a NoticeMsg result to the invoking admin. `/begincrusade` calls `local_start_crusade_mode` directly so the automated starter's once-per-day guard can't block a manual start.
+- Rewrote `WarManager::manual_start_heldenian_mode` / `manual_end_heldenian_mode` with parsed-argument signatures (`(int heldenian_type)` / `()`). The old unreachable versions were a broken decompile port: `strtok(NULL, …)` with no initial `strtok(buff, …)` (undefined behavior) and nonsense delay math (`hour*24 + minute*60`). Manual start now sets the mode type, records the start clock, and keeps the original's mutual-exclusion guards.
+
+### Versioning
+- **Server** minor bump → 0.2.0 — new server-only functionality. No compatibility bump: no wire changes; the client already handles every notify these events emit (`Crusade`, `HeldenianTeleport`, `ApocGateStartMsg`, …).
+
 # Auctioneer (Vince) — female plate-armor player sprite
 
 ### Trading Post (Client / NPC render)

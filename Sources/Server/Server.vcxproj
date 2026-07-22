@@ -359,6 +359,12 @@
     <ClInclude Include="GameCmdCome.h" />
     <ClInclude Include="GameCmdInvis.h" />
     <ClInclude Include="GameCmdSaveAll.h" />
+    <ClInclude Include="GameCmdBeginCrusade.h" />
+    <ClInclude Include="GameCmdEndCrusade.h" />
+    <ClInclude Include="GameCmdBeginHeldenian.h" />
+    <ClInclude Include="GameCmdEndHeldenian.h" />
+    <ClInclude Include="GameCmdBeginApocalypse.h" />
+    <ClInclude Include="GameCmdEndApocalypse.h" />
     <ClInclude Include="CmdSetAdmin.h" />
     <ClInclude Include="CmdSetCmdLevel.h" />
     <ClInclude Include="CmdSaveAll.h" />
@@ -481,6 +487,12 @@
     <ClCompile Include="GameCmdCome.cpp" />
     <ClCompile Include="GameCmdInvis.cpp" />
     <ClCompile Include="GameCmdSaveAll.cpp" />
+    <ClCompile Include="GameCmdBeginCrusade.cpp" />
+    <ClCompile Include="GameCmdEndCrusade.cpp" />
+    <ClCompile Include="GameCmdBeginHeldenian.cpp" />
+    <ClCompile Include="GameCmdEndHeldenian.cpp" />
+    <ClCompile Include="GameCmdBeginApocalypse.cpp" />
+    <ClCompile Include="GameCmdEndApocalypse.cpp" />
     <ClCompile Include="CmdSetAdmin.cpp" />
     <ClCompile Include="CmdSetCmdLevel.cpp" />
     <ClCompile Include="CmdSaveAll.cpp" />

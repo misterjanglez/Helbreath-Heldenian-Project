@@ -169,6 +169,24 @@
     <ClInclude Include="GameCmdWhisper.h">
       <Filter>Game Chat\Commands</Filter>
     </ClInclude>
+    <ClInclude Include="GameCmdBeginCrusade.h">
+      <Filter>Game Chat\Commands</Filter>
+    </ClInclude>
+    <ClInclude Include="GameCmdEndCrusade.h">
+      <Filter>Game Chat\Commands</Filter>
+    </ClInclude>
+    <ClInclude Include="GameCmdBeginHeldenian.h">
+      <Filter>Game Chat\Commands</Filter>
+    </ClInclude>
+    <ClInclude Include="GameCmdEndHeldenian.h">
+      <Filter>Game Chat\Commands</Filter>
+    </ClInclude>
+    <ClInclude Include="GameCmdBeginApocalypse.h">
+      <Filter>Game Chat\Commands</Filter>
+    </ClInclude>
+    <ClInclude Include="GameCmdEndApocalypse.h">
+      <Filter>Game Chat\Commands</Filter>
+    </ClInclude>
     <ClInclude Include="GameConfigSqliteStore.h">
       <Filter>Database</Filter>
     </ClInclude>
@@ -543,6 +561,24 @@
       <Filter>Game Chat\Commands</Filter>
     </ClCompile>
     <ClCompile Include="GameCmdWhisper.cpp">
+      <Filter>Game Chat\Commands</Filter>
+    </ClCompile>
+    <ClCompile Include="GameCmdBeginCrusade.cpp">
+      <Filter>Game Chat\Commands</Filter>
+    </ClCompile>
+    <ClCompile Include="GameCmdEndCrusade.cpp">
+      <Filter>Game Chat\Commands</Filter>
+    </ClCompile>
+    <ClCompile Include="GameCmdBeginHeldenian.cpp">
+      <Filter>Game Chat\Commands</Filter>
+    </ClCompile>
+    <ClCompile Include="GameCmdEndHeldenian.cpp">
+      <Filter>Game Chat\Commands</Filter>
+    </ClCompile>
+    <ClCompile Include="GameCmdBeginApocalypse.cpp">
+      <Filter>Game Chat\Commands</Filter>
+    </ClCompile>
+    <ClCompile Include="GameCmdEndApocalypse.cpp">
       <Filter>Game Chat\Commands</Filter>
     </ClCompile>
     <ClCompile Include="GameConfigSqliteStore.cpp">
