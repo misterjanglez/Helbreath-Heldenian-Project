@@ -190,23 +190,23 @@ namespace hb::server
 			delete item;
 			return nullptr;
 		}
-		item->m_count = e.count;
-		item->m_touch_effect_type = e.touch_effect_type;
-		item->m_touch_effect_value1 = e.touch_effect_value1;
-		item->m_touch_effect_value2 = e.touch_effect_value2;
-		item->m_touch_effect_value3 = e.touch_effect_value3;
-		item->m_item_color = static_cast<char>(e.item_color);
-		item->m_item_special_effect_value1 = e.spec_effect_value1;
-		item->m_item_special_effect_value2 = e.spec_effect_value2;
-		item->m_item_special_effect_value3 = e.spec_effect_value3;
-		item->m_cur_life_span = static_cast<uint16_t>(e.cur_lifespan);
-		item->m_attribute = e.attribute;
-		if ((item->m_attribute & 0x00000001) != 0) {
-			item->m_max_life_span = item->m_item_special_effect_value1;
-		}
+		item->m_instance.count = e.count;
+		item->m_instance.touch_effect_type = e.touch_effect_type;
+		item->m_instance.touch_effect_value1 = e.touch_effect_value1;
+		item->m_instance.touch_effect_value2 = e.touch_effect_value2;
+		item->m_instance.touch_effect_value3 = e.touch_effect_value3;
+		item->m_instance.item_color = static_cast<int8_t>(e.item_color);
+		item->m_instance.special_effect_value1 = e.spec_effect_value1;
+		item->m_instance.special_effect_value2 = e.spec_effect_value2;
+		item->m_instance.special_effect_value3 = e.spec_effect_value3;
+		item->m_instance.cur_durability = static_cast<uint16_t>(e.cur_lifespan);
+		// PHASE5-TP: escrow_item still stores the legacy packed `attribute`; the
+		// item-instance fields (custom_made/prefix/secondary/enchant) are not
+		// reconstructed until the Phase-5 schema rework. Escrowed test data is
+		// expendable (tradingpost.db is recreated with the new schema).
 		m_game->m_item_manager->adjust_rare_item_value(item);
-		if (item->m_cur_life_span > item->m_max_life_span) {
-			item->m_cur_life_span = item->m_max_life_span;
+		if (item->m_instance.cur_durability > item->m_durability) {
+			item->m_instance.cur_durability = item->m_durability;
 		}
 		return item;
 	}
@@ -269,7 +269,7 @@ namespace hb::server
 				out_result = hb::net::TpResultCode::InventoryChanged;
 				return false;
 			}
-			if (amount <= 0 || static_cast<uint64_t>(amount) > it->m_count) {
+			if (amount <= 0 || static_cast<uint64_t>(amount) > it->m_instance.count) {
 				out_result = hb::net::TpResultCode::InvalidBundle;
 				return false;
 			}
@@ -286,16 +286,16 @@ namespace hb::server
 			escrow_item e;
 			e.item_id = it->m_id_num;
 			e.count = static_cast<uint64_t>(amount);
-			e.touch_effect_type = it->m_touch_effect_type;
-			e.touch_effect_value1 = it->m_touch_effect_value1;
-			e.touch_effect_value2 = it->m_touch_effect_value2;
-			e.touch_effect_value3 = it->m_touch_effect_value3;
-			e.item_color = static_cast<uint8_t>(it->m_item_color);
-			e.spec_effect_value1 = it->m_item_special_effect_value1;
-			e.spec_effect_value2 = it->m_item_special_effect_value2;
-			e.spec_effect_value3 = it->m_item_special_effect_value3;
-			e.cur_lifespan = it->m_cur_life_span;
-			e.attribute = it->m_attribute;
+			e.touch_effect_type = it->m_instance.touch_effect_type;
+			e.touch_effect_value1 = it->m_instance.touch_effect_value1;
+			e.touch_effect_value2 = it->m_instance.touch_effect_value2;
+			e.touch_effect_value3 = it->m_instance.touch_effect_value3;
+			e.item_color = static_cast<uint8_t>(it->m_instance.item_color);
+			e.spec_effect_value1 = it->m_instance.special_effect_value1;
+			e.spec_effect_value2 = it->m_instance.special_effect_value2;
+			e.spec_effect_value3 = it->m_instance.special_effect_value3;
+			e.cur_lifespan = it->m_instance.cur_durability;
+			e.attribute = 0; // PHASE5-TP: packed attribute retired; instance fields land with the schema rework
 			snap.push_back(e);
 			pend.push_back({ slot, static_cast<uint64_t>(amount) });
 		}
@@ -310,7 +310,7 @@ namespace hb::server
 			if (it == nullptr) {
 				continue;
 			}
-			const uint64_t held = it->m_count;
+			const uint64_t held = it->m_instance.count;
 			if (p.amount < held) {
 				m_game->m_item_manager->set_item_count(client_h, p.slot, held - p.amount);
 			}
@@ -735,8 +735,15 @@ namespace hb::server
 			r.spec_effect_value1 = e.spec_effect_value1;
 			r.spec_effect_value2 = e.spec_effect_value2;
 			r.spec_effect_value3 = e.spec_effect_value3;
-			r.cur_life_span = e.cur_lifespan;
-			r.attribute = e.attribute;
+			// PHASE5-TP: only durability carries over; attribute fields are
+			// reconstructed when escrow adopts the item-instance schema.
+			r.cur_durability = e.cur_lifespan;
+			r.custom_made = 0;
+			r.prefix_type = 0;
+			r.prefix_value = 0;
+			r.secondary_type = 0;
+			r.secondary_value = 0;
+			r.enchant_bonus = 0;
 			rows.push_back(r);
 		}
 

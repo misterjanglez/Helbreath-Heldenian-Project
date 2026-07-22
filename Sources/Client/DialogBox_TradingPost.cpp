@@ -529,10 +529,7 @@ void DialogBox_TradingPost::draw_item_icon(int slot_x, int slot_y, short item_id
 	}
 	else
 	{
-		bool is_weapon = (cfg->m_equip_pos == to_int(EquipPos::LeftHand)
-			|| cfg->m_equip_pos == to_int(EquipPos::RightHand)
-			|| cfg->m_equip_pos == to_int(EquipPos::TwoHand));
-		const auto& tint = is_weapon ? GameColors::Weapons[item_color] : GameColors::Items[item_color];
+		const auto& tint = m_game->m_color_palette[static_cast<uint8_t>(item_color)];
 		d.sprite->draw(cx, cy, d.frame, hb::shared::sprite::DrawParams::tint(tint.r, tint.g, tint.b));
 	}
 }
@@ -649,7 +646,9 @@ void DialogBox_TradingPost::draw_board(int mx, int my)
 		int ic = std::min<int>(row.item_count, hb::shared::limits::TpMaxListingItems);
 		for (int k = 0; k < ic; k++)
 		{
-			auto info = item_name_formatter::get().format(row.items[k].item_id, row.items[k].attribute);
+			// PHASE5-TP: TpItemBrief still carries the legacy packed attribute; prefix
+			// naming returns when the wire structs adopt item_instance_data fields.
+			auto info = item_name_formatter::get().format(row.items[k].item_id);
 			if (!summary.empty()) summary += ", ";
 			summary += info.name;
 			if (row.items[k].count > 1) summary += " x" + m_game->format_comma_number(row.items[k].count);
@@ -749,7 +748,7 @@ void DialogBox_TradingPost::draw_detail(int mx, int my)
 	if (hovered_bundle >= 0)
 	{
 		const auto& it = m_detail.items[hovered_bundle];
-		auto info = item_name_formatter::get().format(it.item_id, it.attribute);
+		auto info = item_name_formatter::get().format(it.item_id);
 		hb::shared::text::draw_text_aligned(GameFont::Default, lx, m_y + tp::det_info_y, tp::inner_w - 8, 14,
 			info.name.c_str(),
 			hb::shared::text::TextStyle::from_color(info.is_special ? GameColors::UIItemName_Special : tp_col::text_hi),
@@ -800,7 +799,7 @@ void DialogBox_TradingPost::draw_detail(int mx, int my)
 		int oic = std::min<int>(ov.item_count, hb::shared::limits::TpMaxOfferItems);
 		if (oic > 0)
 		{
-			auto info = item_name_formatter::get().format(ov.items[0].item_id, ov.items[0].attribute);
+			auto info = item_name_formatter::get().format(ov.items[0].item_id);
 			label += info.name;
 			if (ov.items[0].count > 1) label += " x" + m_game->format_comma_number(ov.items[0].count);
 			if (oic > 1) label += std::format(" (+{})", oic - 1);
@@ -854,7 +853,7 @@ void DialogBox_TradingPost::draw_create(int mx, int my)
 		if (b.inv_slot >= 0 && player().m_item_list[b.inv_slot] != nullptr)
 		{
 			CItem* it = player().m_item_list[b.inv_slot].get();
-			draw_item_icon(sx, sy, it->m_id_num, static_cast<char>(it->m_item_color));
+			draw_item_icon(sx, sy, it->m_id_num, static_cast<char>(it->m_instance.item_color));
 			if (b.amount > 1)
 				hb::shared::text::draw_text_aligned(GameFont::Default, sx, sy + tp::slot_size - 13,
 					tp::slot_size - 2, 12, ("x" + m_game->format_comma_number(static_cast<uint64_t>(b.amount))).c_str(),
@@ -1125,7 +1124,7 @@ bool DialogBox_TradingPost::on_item_drop()
 	for (auto& b : m_bundle) if (b.inv_slot == inv_slot) return false;           // already staged
 
 	CItem* cfg = m_game->get_item_config(player().m_item_list[inv_slot]->m_id_num);
-	bool stackable = cfg && cfg->is_stackable() && player().m_item_list[inv_slot]->m_count > 1;
+	bool stackable = cfg && cfg->is_stackable() && player().m_item_list[inv_slot]->m_instance.count > 1;
 
 	if (stackable)
 	{
@@ -1143,7 +1142,7 @@ bool DialogBox_TradingPost::on_item_drop()
 		drop->m_drop_target_id = inv_slot;
 		std::memset(drop->m_target_name, 0, sizeof(drop->m_target_name));
 		m_game->get_dialog_box_manager().enable_dialog_box(DialogBoxId::ItemDropExternal, inv_slot,
-			static_cast<int64_t>(player().m_item_list[inv_slot]->m_count), 0);
+			static_cast<int64_t>(player().m_item_list[inv_slot]->m_instance.count), 0);
 	}
 	else
 	{

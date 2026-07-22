@@ -6520,7 +6520,7 @@ void CGame::client_common_handler(int client_h, char* data)
 
 				// is_summoned=false so NPCs give EXP/drops, bypass_mob_limit=true so they don't count toward map limit
 				if (create_new_npc(npc_id, unique_name, map_name, 0, 0, hb::server::npc::MoveType::Random,
-					&tX, &tY, nullptr, nullptr, 0, -1, false, false, false, false, 0, true))
+					&tX, &tY, nullptr, nullptr, 0, -1, false, false, false, false, true))
 				{
 					spawned++;
 				}
