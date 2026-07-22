@@ -95,7 +95,11 @@
       "Bash(git rm *)",
       "Bash(awk '{print $1}')",
       "Bash(wsl.exe --status)",
-      "Bash(wsl.exe -l -q)"
+      "Bash(wsl.exe -l -q)",
+      "Bash(tasklist //FI \"IMAGENAME eq Server.exe\")",
+      "Bash(\"C:/Users/miste/source/Helbreath-Heldenian-Project/Sources/Debug/Server.exe\")",
+      "Bash(taskkill //F //IM Server.exe)",
+      "Bash(awk '/13:4[0-9]:/' gamelogs/server.log)"
     ]
   }
 }
