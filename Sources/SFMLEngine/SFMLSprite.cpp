@@ -287,8 +287,9 @@ void SFMLSprite::DrawInternal(sf::RenderTexture* target, int x, int y, int frame
     sprite.setPosition({static_cast<float>(drawX), static_cast<float>(drawY)});
 
     // Check if we need any color modifications
-    // Skip multiplicative tint for AdditiveOffset — shader handles the color offset
-    bool is_additive_offset = (params.m_blend_mode == hb::shared::sprite::BlendMode::AdditiveOffset);
+    // Skip multiplicative tint for the offset modes — shader handles the color offset
+    bool is_additive_offset = (params.m_blend_mode == hb::shared::sprite::BlendMode::AdditiveOffset) ||
+                            (params.m_blend_mode == hb::shared::sprite::BlendMode::AlphaOffset);
     bool needs_color_change = (params.m_alpha < 1.0f) ||
                             (params.m_has_tint && !is_additive_offset) ||
                             params.m_shadow || params.m_fade ||
@@ -306,7 +307,7 @@ void SFMLSprite::DrawInternal(sf::RenderTexture* target, int x, int y, int frame
 
         // Apply tint: SFML multiplies sprite pixels by color/255
         // (255,255,255) = no change, (0,0,0) = black, (255,200,0) = gold
-        // Skipped for AdditiveOffset — tint is passed to shader as additive offset
+        // Skipped for the offset modes — tint is passed to shader as a signed offset
         if (params.m_has_tint && !is_additive_offset)
         {
             int r = params.m_tint_r;
@@ -357,11 +358,13 @@ void SFMLSprite::DrawInternal(sf::RenderTexture* target, int x, int y, int frame
     bool wasSmooth = m_texture.isSmooth();
     bool needSmoothRestore = false;
 
-    if (params.m_blend_mode == hb::shared::sprite::BlendMode::AdditiveOffset) {
-        // Additive blend with per-pixel color offset via fragment shader
-        // Matches DDraw PutTransSpriteRGB: dest += clamp(src + (r, g, b))
-        states.blendMode = sf::BlendAdd;
-        if (!wasSmooth && !params.m_nearest_filter) {
+    if (is_additive_offset) {
+        // Per-pixel color offset via fragment shader:
+        // AdditiveOffset matches DDraw PutTransSpriteRGB: dest += clamp(src + (r, g, b))
+        // AlphaOffset matches DDraw PutSpriteRGB:         dest  = clamp(src + (r, g, b))
+        bool additive = (params.m_blend_mode == hb::shared::sprite::BlendMode::AdditiveOffset);
+        states.blendMode = additive ? sf::BlendAdd : sf::BlendAlpha;
+        if (additive && !wasSmooth && !params.m_nearest_filter) {
             m_texture.setSmooth(true);
             needSmoothRestore = true;
         }

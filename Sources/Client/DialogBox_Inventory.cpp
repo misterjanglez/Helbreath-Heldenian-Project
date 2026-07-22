@@ -60,39 +60,14 @@ void DialogBox_Inventory::draw_inventory_item(CItem* item, int itemIdx, int base
 	CItem* cfg = m_game->get_item_config(item->m_id_num);
 	if (cfg == nullptr) return;
 
-	char item_color = item->m_instance.item_color;
 	bool disabled = inventory_manager::get().is_locked(itemIdx);
 
 	int drawX = baseX + ITEM_OFFSET_X + item->m_x;
 	int drawY = baseY + ITEM_OFFSET_Y + item->m_y;
 	auto inv_draw = m_game->get_item_draw(cfg->m_display_id, item_atlas::pack, cfg->sprite_is_female());
-	auto sprite = inv_draw.sprite;
-	int16_t frame = inv_draw.frame;
-	uint32_t time = m_game->m_cur_time;
 
-	// Unified color palette — index already encodes correct color for weapons and armor
-	const auto* colors = m_game->m_color_palette.data();
-
-	if (item_color == 0)
-	{
-		// No color tint
-		if (disabled)
-			sprite->draw(drawX, drawY, frame, hb::shared::sprite::DrawParams::alpha_blend(0.25f));
-		else
-			sprite->draw(drawX, drawY, frame);
-	}
-	else
-	{
-		// Apply color tint
-		int r = colors[item_color].r;
-		int g = colors[item_color].g;
-		int b = colors[item_color].b;
-
-		if (disabled)
-			sprite->draw(drawX, drawY, frame, hb::shared::sprite::DrawParams::tinted_alpha(r, g, b, 0.7f));
-		else
-			sprite->draw(drawX, drawY, frame, hb::shared::sprite::DrawParams::tint(r, g, b));
-	}
+	m_game->draw_item_sprite(inv_draw, drawX, drawY, item->m_instance.item_color, cfg,
+		disabled ? item_draw_state::disabled : item_draw_state::normal);
 
 	// Show item count for consumables and arrows
 	if (cfg->is_stackable())

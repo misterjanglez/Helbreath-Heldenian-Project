@@ -83,20 +83,11 @@ int DialogBox_ItemUpgrade::calculate_upgrade_cost(int item_index)
 
 void DialogBox_ItemUpgrade::draw_item_preview(int sX, int sY, int item_index)
 {
-    char item_color = player().m_item_list[item_index]->m_instance.item_color;
     CItem* cfg = m_game->get_item_config(player().m_item_list[item_index]->m_id_num);
     if (!cfg) return;
 
     auto upg_draw = m_game->get_item_draw(cfg->m_display_id, item_atlas::pack, cfg->sprite_is_female());
-    if (item_color == 0)
-    {
-        upg_draw.sprite->draw(sX + 134, sY + 182, upg_draw.frame);
-    }
-    else
-    {
-        const auto& upg_tint = m_game->m_color_palette[item_color];
-        upg_draw.sprite->draw(sX + 134, sY + 182, upg_draw.frame, hb::shared::sprite::DrawParams::tint(upg_tint.r, upg_tint.g, upg_tint.b));
-    }
+    m_game->draw_item_sprite(upg_draw, sX + 134, sY + 182, player().m_item_list[item_index]->m_instance.item_color, cfg);
 
     auto itemInfo = item_name_formatter::get().format(player().m_item_list[item_index].get());
     hb::shared::text::draw_text_aligned(GameFont::Default, sX + 24, sY + 230 + 20, (sX + 248) - (sX + 24), 15, itemInfo.name.c_str(), hb::shared::text::TextStyle::from_color(GameColors::UIBlack), hb::shared::text::Align::TopCenter);
@@ -169,21 +160,12 @@ void DialogBox_ItemUpgrade::DrawMode2_InProgress(int sX, int sY)
     if (item_index != -1)
     {
         m_game->draw_new_dialog_box(InterfaceNdGame3, sX, sY, 3);
-        char item_color = player().m_item_list[item_index]->m_instance.item_color;
         CItem* cfg = m_game->get_item_config(player().m_item_list[item_index]->m_id_num);
 
         if (cfg)
         {
             auto upg2_draw = m_game->get_item_draw(cfg->m_display_id, item_atlas::pack, cfg->sprite_is_female());
-            if (item_color == 0)
-            {
-                upg2_draw.sprite->draw(sX + 134, sY + 182, upg2_draw.frame);
-            }
-            else
-            {
-                const auto& upg2_tint = m_game->m_color_palette[item_color];
-                upg2_draw.sprite->draw(sX + 134, sY + 182, upg2_draw.frame, hb::shared::sprite::DrawParams::tint(upg2_tint.r, upg2_tint.g, upg2_tint.b));
-            }
+            m_game->draw_item_sprite(upg2_draw, sX + 134, sY + 182, player().m_item_list[item_index]->m_instance.item_color, cfg);
 
             // Flickering effect
             if ((rand() % 5) == 0)

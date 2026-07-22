@@ -240,26 +240,16 @@ void Screen_OnGame::draw_objects(short pivot_x, short pivot_y, short div_x, shor
 
 				if ((ret == true) && (item_id != 0) && m_game->m_item_config_list[item_id] != 0)
 				{
-					auto ground_draw = m_game->get_item_draw(m_game->m_item_config_list[item_id]->m_display_id, item_atlas::ground, m_game->m_item_config_list[item_id]->sprite_is_female());
+					CItem* ground_cfg = m_game->m_item_config_list[item_id].get();
+					auto ground_draw = m_game->get_item_draw(ground_cfg->m_display_id, item_atlas::ground, ground_cfg->sprite_is_female());
 
 					// Center ground item sprite on tile, offset by half-tile to align with tile center
 					auto rect = ground_draw.sprite->GetFrameRect(ground_draw.frame);
 					int cx = ix + (TILE_SIZE - rect.width) / 2 - (TILE_SIZE / 2);
 					int cy = iy + (TILE_SIZE - rect.height) / 2 - (TILE_SIZE / 2);
 
-					if (item_color == 0)
-					{
-						hb::shared::sprite::DrawParams params;
-						params.m_ignore_pivot = true;
-						ground_draw.sprite->draw(cx, cy, ground_draw.frame, params);
-					}
-					else
-					{
-						const auto& tint = m_game->m_color_palette[static_cast<uint8_t>(item_color)];
-						auto params = hb::shared::sprite::DrawParams::tint(tint.r, tint.g, tint.b);
-						params.m_ignore_pivot = true;
-						ground_draw.sprite->draw(cx, cy, ground_draw.frame, params);
-					}
+					m_game->draw_item_sprite(ground_draw, cx, cy, item_color, ground_cfg,
+						item_draw_state::normal, /*on_ground=*/true);
 
 					if (hb::shared::input::is_shift_down() && mouse_x >= ix - 16 && mouse_y >= iy - 16 && mouse_x <= ix + 16 && mouse_y <= iy + 16) {
 						item_selected_id = m_game->m_map_data->m_data[dX][dY].m_item_id;

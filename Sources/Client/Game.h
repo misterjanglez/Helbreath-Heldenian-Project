@@ -77,6 +77,16 @@ struct item_draw_ref
 	int16_t frame;
 };
 
+// Draw state for item-icon sprites (see CGame::draw_item_sprite)
+namespace item_draw_state
+{
+	enum type
+	{
+		normal,		// plain, or palette-tinted when the item has a dye color
+		disabled	// locked/grayed icon (alpha 0.25 plain, tinted alpha 0.7 colored)
+	};
+}
+
 // Temporary storage for character creation screen data
 struct char_creation_data
 {
@@ -151,6 +161,16 @@ public:
 	void noticement_handler(char * data);
 	CItem* get_item_config(int item_id) const;
 	item_draw_ref get_item_draw(int16_t display_id, int atlas_type, bool is_female);
+	// Single shared draw path for item-icon and ground-item sprites: draws plain when
+	// item_color == 0, tinted with the original additive-offset coloring otherwise.
+	// item_config selects the regular vs weapon color table (original dual-palette rules);
+	// on_ground applies the ground-item table rule and draws at the exact position,
+	// ignoring the sprite's baked-in pivot. Does nothing if draw.sprite is null.
+	void draw_item_sprite(const item_draw_ref& draw, int x, int y, char item_color,
+		const CItem* item_config, item_draw_state::type state = item_draw_state::normal,
+		bool on_ground = false);
+	const hb::shared::render::Color& item_palette_color(uint8_t color, const CItem* item_config,
+		bool on_ground) const;
 	short find_item_id_by_name(const char* item_name);
 	void load_game_msg_text_contents();
 	const char* get_npc_config_name_by_id(short npcConfigId) const;
@@ -392,7 +412,15 @@ std::array<bool, hb::shared::limits::MaxItems> m_is_item_equipped{};
 	bool cache_process_color_palette(char* data, uint32_t msg_size);
 	bool cache_process_attribute_types(char* data, uint32_t msg_size);
 
+	// Server-driven palette. Entries 0-15 hold the original offset-table values —
+	// sprite tinting is additive-offset via item_palette_color/draw_item_sprite,
+	// not a raw multiplicative read. 16-21 are absolute name-text dye colors,
+	// 32-47 hair colors.
 	std::array<hb::shared::render::Color, 256> m_color_palette{};
+	// Weapon color table — the original client's second palette: 1-9 for
+	// hand-equipped items (10-15 fall back to m_color_palette), 16-21 the
+	// sprite-tint colors for prefix tints.
+	std::array<hb::shared::render::Color, 32> m_weapon_color_palette{};
 	bool m_color_palette_loaded = false;
 
 	uint8_t m_prefix_multiplier[16]{};

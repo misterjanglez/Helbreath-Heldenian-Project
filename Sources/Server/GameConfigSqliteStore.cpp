@@ -451,6 +451,12 @@ bool EnsureGameConfigDatabase(sqlite3** outDb, std::string& outPath, bool* outCr
         " g INTEGER NOT NULL,"
         " b INTEGER NOT NULL"
         ");"
+        "CREATE TABLE IF NOT EXISTS weapon_color_palette ("
+        " color_id INTEGER PRIMARY KEY,"
+        " r INTEGER NOT NULL,"
+        " g INTEGER NOT NULL,"
+        " b INTEGER NOT NULL"
+        ");"
         "CREATE TABLE IF NOT EXISTS attribute_prefix_types ("
         " prefix_id INTEGER PRIMARY KEY,"
         " name TEXT NOT NULL,"
@@ -626,6 +632,50 @@ bool EnsureGameConfigDatabase(sqlite3** outDb, std::string& outPath, bool* outCr
 
     if (!HasColumn(db, "admins", "admin_level")) {
         ExecSql(db, "ALTER TABLE admins ADD COLUMN admin_level INTEGER NOT NULL DEFAULT 1;");
+    }
+
+    // Faithful item-color restore: the original engine tints item sprites with
+    // signed offsets from a base-gray palette and keeps a separate weapon table.
+    // One-shot migration: seed the weapon table with the original values and
+    // restore regular entries 0-15 (previous data held doubled absolutes for
+    // multiplicative tinting). Regular prefix (16-21) and hair (32-47) entries
+    // keep their absolute values (used for name-text dyes).
+    // Sentinel: the weapon table missing its prefix-tint rows means the restore
+    // (or its prefix extension) hasn't run yet.
+    bool hasPrefixTintRows = false;
+    {
+        sqlite3_stmt* stmt = nullptr;
+        if (sqlite3_prepare_v2(db, "SELECT 1 FROM weapon_color_palette WHERE color_id = 16 LIMIT 1;",
+                -1, &stmt, nullptr) == SQLITE_OK) {
+            hasPrefixTintRows = (sqlite3_step(stmt) == SQLITE_ROW);
+            sqlite3_finalize(stmt);
+        }
+    }
+    if (HasGameConfigRows(db, "color_palette") && !hasPrefixTintRows) {
+        hb::logger::log("Restoring original color palette (0-15) and seeding weapon color table...");
+
+        const char* paletteSql =
+            "BEGIN;"
+            // Original regular table (index 0 = base gray the item art is authored in)
+            "INSERT OR REPLACE INTO color_palette (color_id, r, g, b) VALUES"
+            " (0,100,100,100),(1,40,40,96),(2,79,79,62),(3,135,104,30),"
+            " (4,127,18,0),(5,10,60,10),(6,40,40,40),(7,47,79,80),"
+            " (8,127,52,90),(9,90,60,90),(10,0,35,60),(11,105,90,70),"
+            " (12,94,91,53),(13,85,85,8),(14,75,10,10),(15,48,48,48);"
+            // Original weapon table (indexes 1-9; 10+ falls back to the regular table),
+            // plus the prefix tints 16-21 mapped to their original weapon colors:
+            // Agile/Light/Strong=light blue, Poisoning=green, Critical=gold,
+            // Sharp=heavy blue, Righteous=white, Ancient=violet
+            "INSERT OR REPLACE INTO weapon_color_palette (color_id, r, g, b) VALUES"
+            " (1,70,70,80),(2,70,70,80),(3,70,70,80),(4,70,100,70),"
+            " (5,130,90,10),(6,42,53,111),(7,145,145,145),(8,120,100,120),(9,75,10,10),"
+            " (16,70,70,80),(17,70,100,70),(18,130,90,10),(19,42,53,111),"
+            " (20,145,145,145),(21,120,100,120);"
+            "COMMIT;";
+
+        if (!ExecSql(db, paletteSql)) {
+            hb::logger::error("Failed to restore original color palette values!");
+        }
     }
 
     *outDb = db;
@@ -1427,17 +1477,17 @@ bool LoadCreationItems(sqlite3* db, std::vector<creation_item_entry>& out_items)
     return true;
 }
 
-bool LoadColorPalette(sqlite3* db, std::vector<color_palette_entry>& out_entries)
+static bool LoadColorPaletteTable(sqlite3* db, const char* table, std::vector<color_palette_entry>& out_entries)
 {
     if (db == nullptr) return false;
 
     out_entries.clear();
 
-    const char* sql = "SELECT color_id, r, g, b FROM color_palette ORDER BY color_id;";
+    std::string sql = std::string("SELECT color_id, r, g, b FROM ") + table + " ORDER BY color_id;";
 
     sqlite3_stmt* stmt = nullptr;
-    if (sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) != SQLITE_OK) {
-        hb::logger::warn("Failed to prepare color_palette query");
+    if (sqlite3_prepare_v2(db, sql.c_str(), -1, &stmt, nullptr) != SQLITE_OK) {
+        hb::logger::warn("Failed to prepare {} query", table);
         return false;
     }
 
@@ -1451,8 +1501,18 @@ bool LoadColorPalette(sqlite3* db, std::vector<color_palette_entry>& out_entries
     }
 
     sqlite3_finalize(stmt);
-    hb::logger::log("- {} color palette entries loaded", (int)out_entries.size());
+    hb::logger::log("- {} {} entries loaded", (int)out_entries.size(), table);
     return true;
+}
+
+bool LoadColorPalette(sqlite3* db, std::vector<color_palette_entry>& out_entries)
+{
+    return LoadColorPaletteTable(db, "color_palette", out_entries);
+}
+
+bool LoadWeaponColorPalette(sqlite3* db, std::vector<color_palette_entry>& out_entries)
+{
+    return LoadColorPaletteTable(db, "weapon_color_palette", out_entries);
 }
 
 bool LoadAttributePrefixTypes(sqlite3* db, std::vector<attribute_prefix_type_entry>& out)

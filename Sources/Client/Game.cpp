@@ -1211,12 +1211,20 @@ bool CGame::cache_process_color_palette(char* data, uint32_t msg_size)
 	for (uint16_t i = 0; i < colorCount; i++)
 	{
 		uint8_t id = entries[i].colorId;
-		m_color_palette[id] = hb::shared::render::Color(entries[i].r, entries[i].g, entries[i].b);
+		hb::shared::render::Color color(entries[i].r, entries[i].g, entries[i].b);
+		if (entries[i].tableId == hb::net::color_palette_table::weapon)
+		{
+			if (id < m_weapon_color_palette.size())
+				m_weapon_color_palette[id] = color;
+		}
+		else
+		{
+			m_color_palette[id] = color;
+		}
 	}
 
 	// Check if all packets received
 	// Use packet index to determine: if this is the last packet, finalize
-	uint16_t lastEntryId = (colorCount > 0) ? entries[colorCount - 1].colorId : 0;
 	size_t entriesProcessed = pktHeader->packetIndex * ((7000 - headerSize) / entrySize) + colorCount;
 
 	if (entriesProcessed >= totalColors && !LocalCacheManager::get().is_replaying())
@@ -3332,6 +3340,102 @@ item_draw_ref CGame::get_item_draw(int16_t display_id, int atlas_type, bool is_f
 	ref.sprite = hb::shared::sprite::GetNullSprite();
 	ref.frame = 0;
 	return ref;
+}
+
+namespace
+{
+	// Original dual-palette selection. Dialogs: hand-equipped items (left/right/two-hand)
+	// use the weapon table. Ground: only the original sprite categories swords/bows/
+	// shields/axes did — modern equivalents are the bladed/ranged/blunt weapon classes
+	// plus shields; wands and fishing rods keep the regular table, matching the original
+	// sprite grouping.
+	bool uses_weapon_color_table(const CItem& cfg, bool on_ground)
+	{
+		using namespace hb::shared::item;
+
+		if (!on_ground)
+			return cfg.is_weapon();
+
+		switch (cfg.get_weapon_class())
+		{
+		case weapon_class::dagger:
+		case weapon_class::short_sword:
+		case weapon_class::long_sword:
+		case weapon_class::fencing:
+		case weapon_class::axe:
+		case weapon_class::hammer:
+		case weapon_class::bow:
+			return true;
+		default:
+			return cfg.get_equip_pos() == EquipPos::LeftHand;	// shields
+		}
+	}
+}
+
+// Palette lookup implementing the original color tables:
+//  1-15: regular table, or weapon table (defined for 1-9 only — 10+ fall back to
+//        regular, replicating the original's unwritten weapon entries) when the
+//        dual-palette selection rule applies
+// 16-21: prefix tints — sprite-tint colors stored in the weapon table by the
+//        palette migration, server-tunable like every other entry
+//   22+: falls back to the regular table's absolute entries (hair etc.)
+const hb::shared::render::Color& CGame::item_palette_color(uint8_t color, const CItem* item_config,
+	bool on_ground) const
+{
+	if (color >= hb::net::first_prefix_color)
+	{
+		if (color <= hb::net::last_prefix_color)
+			return m_weapon_color_palette[color];
+		return m_color_palette[color];
+	}
+
+	bool weapon = color <= 9 && item_config != nullptr && uses_weapon_color_table(*item_config, on_ground);
+	return weapon ? m_weapon_color_palette[color] : m_color_palette[color];
+}
+
+void CGame::draw_item_sprite(const item_draw_ref& draw, int x, int y, char item_color,
+	const CItem* item_config, item_draw_state::type state, bool on_ground)
+{
+	if (draw.sprite == nullptr) return;
+
+	using hb::shared::sprite::DrawParams;
+	DrawParams params;
+	uint8_t color = static_cast<uint8_t>(item_color);
+	if (color == 0)
+	{
+		if (state == item_draw_state::disabled)
+			params = DrawParams::alpha_blend(0.25f);
+	}
+	else if (color <= hb::net::last_prefix_color)
+	{
+		// Original coloring: add the signed offset table[color] - base to the
+		// base-gray item art (base = regular index 0, gray 100,100,100)
+		const auto& target = item_palette_color(color, item_config, on_ground);
+		const auto& base = m_color_palette[0];
+		auto off_r = static_cast<int16_t>(target.r - base.r);
+		auto off_g = static_cast<int16_t>(target.g - base.g);
+		auto off_b = static_cast<int16_t>(target.b - base.b);
+		if (state == item_draw_state::disabled)
+		{
+			// Original disabled path: transparent-additive (PutTransSpriteRGB)
+			params = DrawParams::additive_tinted(off_r, off_g, off_b, 0.7f);
+		}
+		else
+		{
+			params = DrawParams::offset_tinted(off_r, off_g, off_b);	// PutSpriteRGB
+		}
+	}
+	else
+	{
+		// Extended entries: absolute color, multiplicative tint
+		const auto& tint = m_color_palette[color];
+		if (state == item_draw_state::disabled)
+			params = DrawParams::tinted_alpha(tint.r, tint.g, tint.b, 0.7f);
+		else
+			params = DrawParams::tint(tint.r, tint.g, tint.b);
+	}
+	params.m_ignore_pivot = on_ground;
+	draw.sprite->draw(x, y, draw.frame, params);
 }
 
 bool CGame::ensure_config_loaded(int type)

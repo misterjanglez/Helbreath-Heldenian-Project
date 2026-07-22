@@ -140,34 +140,16 @@ void DialogBox_Character::draw_equipped_item(hb::shared::item::EquipPos equipPos
 	CItem* cfg = m_game->get_item_config(item->m_id_num);
 	if (cfg == nullptr) return;
 
-	char item_color = item->m_instance.item_color;
 	bool disabled = inventory_manager::get().is_locked(itemIdx);
-
-	// Unified color palette — index already encodes correct color for weapons and armor
-	const auto* palette = m_game->m_color_palette.data();
 
 	bool is_female = (spriteOffset == 40);
 	auto equip_draw = m_game->get_item_draw(cfg->m_display_id, item_atlas::equip, is_female);
-	auto sprite = equip_draw.sprite;
-	int16_t frame = equip_draw.frame;
 
-	if (!disabled)
-	{
-		if (item_color == 0)
-			sprite->draw(drawX, drawY, frame);
-		else
-			sprite->draw(drawX, drawY, frame, hb::shared::sprite::DrawParams::tint(palette[item_color].r, palette[item_color].g, palette[item_color].b));
-	}
-	else
-	{
-		if (item_color == 0)
-			sprite->draw(drawX, drawY, frame, hb::shared::sprite::DrawParams::alpha_blend(0.25f));
-		else
-			sprite->draw(drawX, drawY, frame, hb::shared::sprite::DrawParams::tinted_alpha(palette[item_color].r, palette[item_color].g, palette[item_color].b, 0.7f));
-	}
+	m_game->draw_item_sprite(equip_draw, drawX, drawY, item->m_instance.item_color, cfg,
+		disabled ? item_draw_state::disabled : item_draw_state::normal);
 
 	if (highlight)
-		sprite->draw(drawX, drawY, frame, hb::shared::sprite::DrawParams::additive(0.35f));
+		equip_draw.sprite->draw(drawX, drawY, equip_draw.frame, hb::shared::sprite::DrawParams::additive(0.35f));
 }
 
 // Helper: draw hover button

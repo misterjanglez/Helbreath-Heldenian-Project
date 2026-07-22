@@ -852,15 +852,10 @@ void Screen_OnGame::render_item_tooltip()
 
     char item_color = item->m_instance.item_color;
     auto tooltip_draw = m_game->get_item_draw(cfg->m_display_id, item_atlas::pack, cfg->sprite_is_female());
-    hb::shared::sprite::ISprite* sprite = tooltip_draw.sprite;
-    int16_t frame = tooltip_draw.frame;
     bool is_equippable = cfg->is_armor() || cfg->is_weapon() || cfg->is_accessory();
 
-    if (item_color != 0) {
-        const auto& drag_tint = m_game->m_color_palette[item_color];
-        sprite->draw(m_sMsX - CursorTarget::get_drag_dist_x(), m_sMsY - CursorTarget::get_drag_dist_y(), frame, hb::shared::sprite::DrawParams::tint(drag_tint.r, drag_tint.g, drag_tint.b));
-    }
-    else sprite->draw(m_sMsX - CursorTarget::get_drag_dist_x(), m_sMsY - CursorTarget::get_drag_dist_y(), frame);
+    // drag-preview icon follows the cursor
+    m_game->draw_item_sprite(tooltip_draw, m_sMsX - CursorTarget::get_drag_dist_x(), m_sMsY - CursorTarget::get_drag_dist_y(), item_color, cfg);
 
     auto itemInfo = item_name_formatter::get().format(item);
 

@@ -3,18 +3,18 @@
 
 // Client version
 #define VER_CLIENT_MAJOR         0
-#define VER_CLIENT_MINOR         3
+#define VER_CLIENT_MINOR         4
 #define VER_CLIENT_PATCH         0
-#define VER_CLIENT_BUILD         357
-#define VER_CLIENT_FILEVERSION   0,3,0,357
-#define VER_CLIENT_DISPLAY       "0.3-alpha"
-#define VER_CLIENT_FULL          "0.3.0-alpha+build.357"
+#define VER_CLIENT_BUILD         358
+#define VER_CLIENT_FILEVERSION   0,4,0,358
+#define VER_CLIENT_DISPLAY       "0.4-alpha"
+#define VER_CLIENT_FULL          "0.4.0-alpha+build.358"
 
 // Server version
 #define VER_SERVER_MAJOR         0
-#define VER_SERVER_MINOR         3
-#define VER_SERVER_PATCH         1
-#define VER_SERVER_BUILD         247
-#define VER_SERVER_FILEVERSION   0,3,1,247
-#define VER_SERVER_DISPLAY       "0.3.1-alpha"
-#define VER_SERVER_FULL          "0.3.1-alpha+build.247"
+#define VER_SERVER_MINOR         4
+#define VER_SERVER_PATCH         0
+#define VER_SERVER_BUILD         248
+#define VER_SERVER_FILEVERSION   0,4,0,248
+#define VER_SERVER_DISPLAY       "0.4-alpha"
+#define VER_SERVER_FULL          "0.4.0-alpha+build.248"

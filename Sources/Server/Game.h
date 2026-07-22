@@ -571,7 +571,12 @@ public:
 	bool send_client_color_palette(int client_h);
 	bool send_client_attribute_types(int client_h);
 
+	// Exact color-palette packet stream sent to clients (both tables, chunked).
+	// Shared by the hash computation and both send paths so they stay identical.
+	std::vector<std::vector<char>> build_color_palette_packets() const;
+
 	std::vector<color_palette_entry> m_color_palette;
+	std::vector<color_palette_entry> m_weapon_color_palette;
 	std::vector<attribute_prefix_type_entry> m_attribute_prefix_types;
 	std::vector<attribute_secondary_type_entry> m_attribute_secondary_types;
 	uint8_t m_prefix_multiplier[16]{};

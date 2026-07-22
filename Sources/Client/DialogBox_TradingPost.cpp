@@ -538,18 +538,9 @@ void DialogBox_TradingPost::draw_item_icon(int slot_x, int slot_y, short item_id
 	CItem* cfg = m_game->get_item_config(item_id);
 	if (cfg == nullptr) return;
 	auto d = m_game->get_item_draw(cfg->m_display_id, item_atlas::pack, cfg->sprite_is_female());
-	if (d.sprite == nullptr) return;
 	int cx = slot_x + tp::slot_size / 2;
 	int cy = slot_y + tp::slot_size / 2;
-	if (item_color == 0)
-	{
-		d.sprite->draw(cx, cy, d.frame);
-	}
-	else
-	{
-		const auto& tint = m_game->m_color_palette[static_cast<uint8_t>(item_color)];
-		d.sprite->draw(cx, cy, d.frame, hb::shared::sprite::DrawParams::tint(tint.r, tint.g, tint.b));
-	}
+	m_game->draw_item_sprite(d, cx, cy, item_color, cfg);
 }
 
 // ============================================================================

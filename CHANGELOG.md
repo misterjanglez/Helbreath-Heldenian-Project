@@ -1,3 +1,34 @@
+# Faithful item coloring: dual palette + additive-offset rendering — issue #2
+
+### Rendering (engine + client)
+- New `BlendMode::AlphaOffset` + `DrawParams::offset_tinted` in the shared render layer — opaque draw with a signed per-channel offset, matching DDraw `PutSpriteRGB` (`dest = clamp(src + offset)`); reuses the existing colorOffset shader with alpha blending. `additive_tinted` (the `PutTransSpriteRGB` equivalent) gained an alpha parameter.
+- `draw_item_sprite` now colors item icons the original way: `pixel + (palette[color] − palette[0])` with base gray (100,100,100) at index 0, replacing the multiplicative tint. Disabled colored icons use the transparent-additive variant at alpha 0.7 (original disabled path); plain disabled unchanged. Extended entries (22+, hair) keep absolute multiplicative tinting.
+- Dual palette restored with the original selection rules: in dialogs, hand-equipped items (left/right/two-hand) use the weapon table; on the ground, sword/bow/axe/hammer weapon classes and shields do (wands/rods stay regular, matching the original sprite-category rule). Weapon indexes 10+ fall back to the regular table, replicating the original's unwritten weapon entries ("Gold, buggy" quirk).
+- Prefix tints (colors 16–21) draw with their original weapon-table colors (Agile/Light/Strong light-blue, Poisoning green, Critical gold, Sharp heavy-blue, Righteous white, Ancient violet) — stored server-side in the weapon table, so they stay DB-tunable. Name-text dye colors keep the absolute 16–21 entries, unchanged. Prefix tint still applies to all item kinds (owner decision on #2; deviation from the original's ATTACK-only gate).
+
+### Protocol
+- `PacketColorPaletteConfigEntry` gained `tableId` (0 = regular, 1 = weapon); both tables stream through the existing hash/cache/hot-reload pipeline. Shared palette band constants (`first_prefix_color`/`last_prefix_color`) live next to the packet.
+- Server-side: hash + game-send + login-send now share one `build_color_palette_packets()` builder (removes the triplicated chunking loop).
+
+### Data (gamedata.db)
+- One-shot startup migration (keyed on missing weapon-table prefix rows): restores regular entries 0–15 to the original palette values (previous rows held doubled absolutes for multiplicative tinting), creates and seeds `weapon_color_palette` (1–9 originals + 16–21 prefix tints). Entries 16–21/32–47 in the regular table untouched. No item/instance color remapping needed — the earlier unified-palette remap is exactly reversed by table selection + the 16–21 weapon mapping.
+- Known transitional look: paper-doll/equipped-weapon and hair rendering still tint multiplicatively from the regular table (issue #3's scope), so those tints render darker until #3 lands.
+
+### Versioning
+- **Compatibility → 0.5.0** (palette packet format change; old client/new server rejected at the version gate).
+- **Server → 0.4.0**, **Client → 0.4.0**.
+
+# Prefactor: unified item-sprite drawing into one shared helper
+
+### Client (refactor, no behavior change) — issue #1
+- Added `CGame::draw_item_sprite(item_draw_ref, x, y, item_color, state, ignore_pivot)` — the single place that owns item-icon coloring semantics: plain draw when `item_color == 0`, palette tint otherwise; `item_draw_state::disabled` covers the locked/grayed variants (alpha 0.25 plain / tinted-alpha 0.7 colored); `ignore_pivot` covers ground items.
+- Routed all nine inline tint sites through it: inventory, bank, character screen (equipped items), exchange, sell/repair, item upgrade (both modes), Trading Post icons, the drag-preview cursor, and ground items. The follow-up coloring-math change is now a one-place edit.
+- Verified by diff review that identical draw params reach the engine; remaining `m_color_palette` uses are out of scope (hair/paper-doll entity rendering and tooltip *text* dye color). Site-specific overlays (character-screen hover highlight, upgrade flicker) stay with their callers.
+- Cleanup along the way: dropped now-single-use `item_color` locals and dead `time` locals in the touched functions.
+
+### Versioning
+- **Client → 0.3.1** (client-only internal refactor).
+
 # Original-faithful balance restore (post-merge ratification)
 
 ### Balance / Formulas

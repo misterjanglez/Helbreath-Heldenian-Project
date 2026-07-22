@@ -866,46 +866,9 @@ void LoginServer::send_server_config(int h)
 void LoginServer::send_color_palette(int h)
 {
 	if (!G_pGame->_lclients[h]) return;
-	if (G_pGame->m_color_palette.empty()) return;
 
-	constexpr size_t headerSize = sizeof(hb::net::PacketColorPaletteConfigHeader);
-	constexpr size_t entrySize = sizeof(hb::net::PacketColorPaletteConfigEntry);
-	constexpr size_t maxEntriesPerPacket = (7000 - headerSize) / entrySize;
-
-	size_t totalColors = G_pGame->m_color_palette.size();
-	size_t colorsSent = 0;
-	uint16_t packetIndex = 0;
-
-	while (colorsSent < totalColors)
-	{
-		std::vector<char> buf(headerSize + maxEntriesPerPacket * entrySize, 0);
-
-		auto* pktHeader = reinterpret_cast<hb::net::PacketColorPaletteConfigHeader*>(buf.data());
-		pktHeader->header.msg_id = MsgId::ColorPaletteConfigContents;
-		pktHeader->header.msg_type = MsgType::Confirm;
-		pktHeader->totalColors = static_cast<uint16_t>(totalColors);
-		pktHeader->packetIndex = packetIndex;
-
-		auto* entries = reinterpret_cast<hb::net::PacketColorPaletteConfigEntry*>(buf.data() + headerSize);
-		uint16_t entriesInPacket = 0;
-
-		for (size_t i = colorsSent; i < totalColors && entriesInPacket < maxEntriesPerPacket; i++)
-		{
-			entries[entriesInPacket].colorId = G_pGame->m_color_palette[i].color_id;
-			entries[entriesInPacket].r = G_pGame->m_color_palette[i].r;
-			entries[entriesInPacket].g = G_pGame->m_color_palette[i].g;
-			entries[entriesInPacket].b = G_pGame->m_color_palette[i].b;
-			entriesInPacket++;
-		}
-
-		pktHeader->colorCount = entriesInPacket;
-		size_t packetSize = headerSize + (entriesInPacket * entrySize);
-
-		G_pGame->_lclients[h]->sock->send_msg(buf.data(), static_cast<int>(packetSize));
-
-		colorsSent += entriesInPacket;
-		packetIndex++;
-	}
+	for (auto& packet : G_pGame->build_color_palette_packets())
+		G_pGame->_lclients[h]->sock->send_msg(packet.data(), static_cast<int>(packet.size()));
 }
 
 void LoginServer::request_enter_game(int h, char* data)

@@ -103,8 +103,6 @@ void DialogBox_Exchange::on_draw()
 
 void DialogBox_Exchange::draw_items(short sX, short sY, short mouse_x, short mouse_y, int start_index, int end_index)
 {
-	uint32_t time = m_game->m_cur_time;
-	char item_color;
 	short xadd;
 
 	for (int i = start_index; i < end_index; i++) {
@@ -112,16 +110,9 @@ void DialogBox_Exchange::draw_items(short sX, short sY, short mouse_x, short mou
 		if (i > 3) xadd += 20;
 
 		if (m_slots[i].v1 != -1) {
-			item_color = m_slots[i].v4;
 			CItem* ex_cfg = m_game->get_item_config(m_slots[i].item_id);
 			auto ex_draw = m_game->get_item_draw(ex_cfg ? ex_cfg->m_display_id : 0, item_atlas::pack, ex_cfg ? ex_cfg->sprite_is_female() : false);
-			if (item_color == 0) {
-				ex_draw.sprite->draw(sX + xadd, sY + 130, ex_draw.frame);
-			}
-			else {
-				const auto& ex_tint = m_game->m_color_palette[item_color];
-				ex_draw.sprite->draw(sX + xadd, sY + 130, ex_draw.frame, hb::shared::sprite::DrawParams::tint(ex_tint.r, ex_tint.g, ex_tint.b));
-			}
+			m_game->draw_item_sprite(ex_draw, sX + xadd, sY + 130, m_slots[i].v4, ex_cfg);
 
 			draw_item_info(sX, sY, m_size_x, mouse_x, mouse_y, i, xadd);
 		}

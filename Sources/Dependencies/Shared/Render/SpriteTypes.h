@@ -43,6 +43,7 @@ enum class BlendMode {
     Alpha,          // Standard alpha blending: result = src * alpha + dst * (1-alpha)
     Additive,       // Additive blending: result = src + dst (for light effects)
     AdditiveOffset, // Additive blend with per-pixel color offset (DDraw PutTransSpriteRGB)
+    AlphaOffset,    // Alpha blend with per-pixel color offset (DDraw PutSpriteRGB)
     Average,        // 50/50 averaging: result = (src + dst) / 2 (original PutTransSprite2)
     Multiply        // Multiply blending: result = src * dst (DDraw PutDarkSprite, for dark fog/shadow)
 };
@@ -141,13 +142,26 @@ struct DrawParams {
 
     // Additive with tint offset and no color key - matches original PutTransSpriteRGB
     // Applies RGB offset to source channels before additive blending
-    static DrawParams additive_tinted(int16_t r, int16_t g, int16_t b) {
+    static DrawParams additive_tinted(int16_t r, int16_t g, int16_t b, float a = 1.0f) {
         DrawParams p;
+        p.m_alpha = a;
         p.m_tint_r = r;
         p.m_tint_g = g;
         p.m_tint_b = b;
         p.m_use_color_key = false;
         p.m_blend_mode = BlendMode::AdditiveOffset;
+        p.m_has_tint = true;
+        return p;
+    }
+
+    // Opaque draw with signed per-channel offset - matches original PutSpriteRGB
+    // dest = clamp(src + (r, g, b)); color-keyed transparency comes from the sprite's alpha channel
+    static DrawParams offset_tinted(int16_t r, int16_t g, int16_t b) {
+        DrawParams p;
+        p.m_tint_r = r;
+        p.m_tint_g = g;
+        p.m_tint_b = b;
+        p.m_blend_mode = BlendMode::AlphaOffset;
         p.m_has_tint = true;
         return p;
     }

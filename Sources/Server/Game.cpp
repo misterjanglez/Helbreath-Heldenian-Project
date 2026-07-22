@@ -1106,6 +1106,12 @@ bool CGame::init()
 	if (m_color_palette.empty()) {
 		hb::logger::warn("No color palette entries found in gamedata.db");
 	}
+	if (HasGameConfigRows(configDb, "weapon_color_palette")) {
+		LoadWeaponColorPalette(configDb, m_weapon_color_palette);
+	}
+	if (m_weapon_color_palette.empty()) {
+		hb::logger::warn("No weapon color palette entries found in gamedata.db");
+	}
 
 	// Load attribute type multipliers (optional — migration script seeds the tables)
 	if (HasGameConfigRows(configDb, "attribute_prefix_types")) {
@@ -2808,52 +2814,54 @@ bool CGame::send_client_balance_config(int client_h)
 	return true;
 }
 
-void CGame::compute_color_palette_hash()
+std::vector<std::vector<char>> CGame::build_color_palette_packets() const
 {
-	if (m_color_palette.empty())
-	{
-		m_config_hash[6].clear();
-		return;
-	}
+	std::vector<std::vector<char>> packets;
 
-	// Build the same packet data the client would receive, then hash it
+	// Combined stream: regular table entries first, then weapon table entries
+	std::vector<hb::net::PacketColorPaletteConfigEntry> entries;
+	entries.reserve(m_color_palette.size() + m_weapon_color_palette.size());
+	for (const auto& e : m_color_palette)
+		entries.push_back({ hb::net::color_palette_table::regular, e.color_id, e.r, e.g, e.b });
+	for (const auto& e : m_weapon_color_palette)
+		entries.push_back({ hb::net::color_palette_table::weapon, e.color_id, e.r, e.g, e.b });
+	if (entries.empty()) return packets;
+
 	constexpr size_t headerSize = sizeof(hb::net::PacketColorPaletteConfigHeader);
 	constexpr size_t entrySize = sizeof(hb::net::PacketColorPaletteConfigEntry);
-	size_t totalColors = m_color_palette.size();
-
-	std::vector<uint8_t> allData;
-	size_t colorsSent = 0;
-	uint16_t packetIndex = 0;
 	constexpr size_t maxEntriesPerPacket = (7000 - headerSize) / entrySize;
 
-	while (colorsSent < totalColors)
+	size_t total = entries.size();
+	size_t built = 0;
+	uint16_t packetIndex = 0;
+
+	while (built < total)
 	{
-		char buf[7000]{};
-		auto* pktHeader = reinterpret_cast<hb::net::PacketColorPaletteConfigHeader*>(buf);
+		size_t entriesInPacket = std::min(maxEntriesPerPacket, total - built);
+		std::vector<char> buf(headerSize + entriesInPacket * entrySize, 0);
+
+		auto* pktHeader = reinterpret_cast<hb::net::PacketColorPaletteConfigHeader*>(buf.data());
 		pktHeader->header.msg_id = MsgId::ColorPaletteConfigContents;
 		pktHeader->header.msg_type = MsgType::Confirm;
-		pktHeader->totalColors = static_cast<uint16_t>(totalColors);
+		pktHeader->totalColors = static_cast<uint16_t>(total);
 		pktHeader->packetIndex = packetIndex;
+		pktHeader->colorCount = static_cast<uint16_t>(entriesInPacket);
+		std::memcpy(buf.data() + headerSize, entries.data() + built, entriesInPacket * entrySize);
 
-		auto* entries = reinterpret_cast<hb::net::PacketColorPaletteConfigEntry*>(buf + headerSize);
-		uint16_t entriesInPacket = 0;
-
-		for (size_t i = colorsSent; i < totalColors && entriesInPacket < maxEntriesPerPacket; i++)
-		{
-			entries[entriesInPacket].colorId = m_color_palette[i].color_id;
-			entries[entriesInPacket].r = m_color_palette[i].r;
-			entries[entriesInPacket].g = m_color_palette[i].g;
-			entries[entriesInPacket].b = m_color_palette[i].b;
-			entriesInPacket++;
-		}
-
-		pktHeader->colorCount = entriesInPacket;
-		size_t packetSize = headerSize + (entriesInPacket * entrySize);
-		allData.insert(allData.end(), buf, buf + packetSize);
-
-		colorsSent += entriesInPacket;
+		packets.push_back(std::move(buf));
+		built += entriesInPacket;
 		packetIndex++;
 	}
+
+	return packets;
+}
+
+void CGame::compute_color_palette_hash()
+{
+	// Hash the exact packet stream the client would receive
+	std::vector<uint8_t> allData;
+	for (const auto& packet : build_color_palette_packets())
+		allData.insert(allData.end(), packet.begin(), packet.end());
 
 	m_config_hash[6] = allData.empty() ? std::string{} : hb::shared::util::sha256(allData.data(), allData.size());
 }
@@ -2861,43 +2869,13 @@ void CGame::compute_color_palette_hash()
 bool CGame::send_client_color_palette(int client_h)
 {
 	if (m_client_list[client_h] == nullptr) return false;
-	if (m_color_palette.empty()) return false;
 
-	constexpr size_t maxPacketSize = 7000;
-	constexpr size_t headerSize = sizeof(hb::net::PacketColorPaletteConfigHeader);
-	constexpr size_t entrySize = sizeof(hb::net::PacketColorPaletteConfigEntry);
-	constexpr size_t maxEntriesPerPacket = (maxPacketSize - headerSize) / entrySize;
+	auto packets = build_color_palette_packets();
+	if (packets.empty()) return false;
 
-	size_t totalColors = m_color_palette.size();
-	size_t colorsSent = 0;
-	uint16_t packetIndex = 0;
-
-	while (colorsSent < totalColors)
+	for (auto& packet : packets)
 	{
-		std::memset(G_cData50000, 0, sizeof(G_cData50000));
-
-		auto* pktHeader = reinterpret_cast<hb::net::PacketColorPaletteConfigHeader*>(G_cData50000);
-		pktHeader->header.msg_id = MsgId::ColorPaletteConfigContents;
-		pktHeader->header.msg_type = MsgType::Confirm;
-		pktHeader->totalColors = static_cast<uint16_t>(totalColors);
-		pktHeader->packetIndex = packetIndex;
-
-		auto* entries = reinterpret_cast<hb::net::PacketColorPaletteConfigEntry*>(G_cData50000 + headerSize);
-		uint16_t entriesInPacket = 0;
-
-		for (size_t i = colorsSent; i < totalColors && entriesInPacket < maxEntriesPerPacket; i++)
-		{
-			entries[entriesInPacket].colorId = m_color_palette[i].color_id;
-			entries[entriesInPacket].r = m_color_palette[i].r;
-			entries[entriesInPacket].g = m_color_palette[i].g;
-			entries[entriesInPacket].b = m_color_palette[i].b;
-			entriesInPacket++;
-		}
-
-		pktHeader->colorCount = entriesInPacket;
-		size_t packetSize = headerSize + (entriesInPacket * entrySize);
-
-		int ret = m_client_list[client_h]->m_socket->send_msg(G_cData50000, static_cast<int>(packetSize));
+		int ret = m_client_list[client_h]->m_socket->send_msg(packet.data(), static_cast<int>(packet.size()));
 		switch (ret) {
 		case sock::Event::QueueFull:
 		case sock::Event::SocketError:
@@ -2909,9 +2887,6 @@ bool CGame::send_client_color_palette(int client_h)
 			m_client_list[client_h] = 0;
 			return false;
 		}
-
-		colorsSent += entriesInPacket;
-		packetIndex++;
 	}
 
 	return true;
@@ -12852,6 +12827,8 @@ void CGame::reload_color_palette()
 
 	m_color_palette.clear();
 	LoadColorPalette(configDb, m_color_palette);
+	m_weapon_color_palette.clear();
+	LoadWeaponColorPalette(configDb, m_weapon_color_palette);
 	compute_color_palette_hash();
 	CloseGameConfigDatabase(configDb);
 }
