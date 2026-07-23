@@ -1,3 +1,11 @@
+# Sentry environment override (SENTRY_ENVIRONMENT)
+
+### Shared
+- `SENTRY_ENVIRONMENT` env var overrides the build-type-derived environment tag, so deployments self-describe. The Debian test box now reports `staging` (set in its systemd unit) — `production` stays reserved for the eventual real production host.
+
+### Versioning
+- **Server → 0.4.4**, **Client → 0.4.5**.
+
 # Sentry crash reporting + error monitoring (client & server)
 
 ### Shared

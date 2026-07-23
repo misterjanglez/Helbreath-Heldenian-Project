@@ -190,7 +190,12 @@
       "Bash(git commit -m 'Sentry crash reporting + error monitoring \\(client & server\\) *)",
       "Bash(git check-ignore *)",
       "Bash(echo \"handler-exe ignore check exit: $?\")",
-      "Bash(git commit *)"
+      "Bash(git commit *)",
+      "Bash(scp -q misterjanglez@192.168.1.191:~/helbreath/Binaries/Server/HelbreathServer \"C:/Users/miste/AppData/Local/Temp/claude/C--Users-miste-source-Helbreath-Heldenian-Project/fa09276d-2d3c-4ee0-895b-e08b17e2c0c4/scratchpad/HelbreathServer\")",
+      "PowerShell(& \"C:\\\\Users\\\\miste\\\\source\\\\Helbreath-Heldenian-Project\\\\Scripts\\\\tools\\\\sentry-cli.exe\" debug-files upload --include-sources \"C:\\\\Users\\\\miste\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\C--Users-miste-source-Helbreath-Heldenian-Project\\\\fa09276d-2d3c-4ee0-895b-e08b17e2c0c4\\\\scratchpad\\\\HelbreathServer\" 2>&1 | Select-String \"UPLOADED|Found|error\" | ForEach-Object { $_.Line.Trim\\(\\) })",
+      "PowerShell(python bak.py guard Sources/Dependencies/Shared/Util/error_monitor.cpp Sources/version.cfg)",
+      "PowerShell(Select-String -Path \"C:\\\\Users\\\\miste\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\C--Users-miste-source-Helbreath-Heldenian-Project\\\\fa09276d-2d3c-4ee0-895b-e08b17e2c0c4\\\\tasks\\\\b9cpcf73h.output\" -Pattern \"BUILD SUCCEEDED|Error\\\\\\(s\\\\\\)\" | ForEach-Object { $_.Line.Trim\\(\\) } | Select-Object -First 3; python bak.py commit --force)",
+      "PowerShell($cli = \"C:\\\\Users\\\\miste\\\\source\\\\Helbreath-Heldenian-Project\\\\Scripts\\\\tools\\\\sentry-cli.exe\"; & $cli debug-files upload --include-sources \"C:\\\\Users\\\\miste\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\C--Users-miste-source-Helbreath-Heldenian-Project\\\\fa09276d-2d3c-4ee0-895b-e08b17e2c0c4\\\\scratchpad\\\\HelbreathServer\" 2>&1 | Select-String \"UPLOADED|error\" | ForEach-Object { $_.Line.Trim\\(\\) }; powershell -ExecutionPolicy Bypass -File \"C:\\\\Users\\\\miste\\\\source\\\\Helbreath-Heldenian-Project\\\\Scripts\\\\upload_symbols.ps1\" 2>&1 | Select-String \"UPLOADED|complete|error\" | ForEach-Object { $_.Line.Trim\\(\\) })"
     ]
   }
 }

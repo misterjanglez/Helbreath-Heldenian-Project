@@ -76,6 +76,10 @@ session start(const char* app_name, const char* app_version)
 #else
 	const char* environment = "development";
 #endif
+	// SENTRY_ENVIRONMENT overrides the build-type default (e.g. "staging"
+	// on the test box) so deployments self-describe
+	if (const char* env_environment = std::getenv("SENTRY_ENVIRONMENT"))
+		environment = env_environment;
 
 	sentry_options_t* options = sentry_options_new();
 	sentry_options_set_dsn(options, dsn.c_str());
