@@ -800,8 +800,8 @@ bool CGame::init()
 	for(int i = 0; i < MaxClients; i++)
 		if (m_client_list[i] != 0) delete m_client_list[i];
 
-	for(int i = 0; i < MaxNpcs; i++)
-		if (m_npc_list[i] != 0) delete m_npc_list[i];
+	// NPC entries are owned by CEntityManager (m_npc_list is an alias into
+	// its array) — never deleted here; see quit() for the same rule.
 
 	for(int i = 0; i < MaxMaps; i++)
 		if (m_map_list[i] != 0) delete m_map_list[i];
@@ -6634,7 +6634,7 @@ void CGame::client_common_handler(int client_h, char* data)
 		m_client_list[client_h]->m_socket->send_msg(
 			reinterpret_cast<char*>(&result), sizeof(result));
 		hb::logger::log<log_channel::commands>("[TesterMenu] '{}' searched NPCs '{}' ({} results)",
-			m_client_list[client_h]->m_char_name, has_filter ? string : "(all)", result.count);
+			m_client_list[client_h]->m_char_name, has_filter ? string : "(all)", static_cast<int>(result.count));
 		break;
 	}
 
@@ -9226,8 +9226,9 @@ void CGame::quit()
 	for(int i = 0; i < MaxClients; i++)
 		if (m_client_list[i] != 0) delete m_client_list[i];
 
-	for(int i = 0; i < MaxNpcs; i++)
-		if (m_npc_list[i] != 0) delete m_npc_list[i];
+	// NPCs are NOT deleted here: m_npc_list aliases CEntityManager's array
+	// and ~CEntityManager owns and deletes the entries. Deleting them here
+	// left the slots dangling and double-freed every NPC at shutdown (SIGSEGV).
 
 	for(int i = 0; i < MaxMaps; i++)
 		if (m_map_list[i] != 0) delete m_map_list[i];
