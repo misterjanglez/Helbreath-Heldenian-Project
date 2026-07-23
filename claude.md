@@ -187,3 +187,13 @@ When teams are enabled, follow the structured coordinator/wing model. See `CLAUD
 No automated tests. Manual: run server, then client with configs in `Binaries/`.
 For network changes, rebuild both client and server.
 Both targets can be tested on Linux — server with `build_server_linux.sh`, client with `build_client_linux.sh`.
+
+## Agent skills
+
+### Issue tracker
+
+Issues are tracked as GitHub Issues on this repo via the `gh` CLI. See `docs/agents/issue-tracker.md`.
+
+### Domain docs
+
+Single-context: `CONTEXT.md` at the repo root plus `docs/adr/`. See `docs/agents/domain.md`.
