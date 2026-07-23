@@ -73,6 +73,7 @@ set(SHARED_SOURCES
     ../Dependencies/Shared/Render/ResolutionConfig.cpp
     ../Dependencies/Shared/Render/TextLib.cpp
     ../Dependencies/Shared/Util/SHA256.cpp
+    ../Dependencies/Shared/Util/error_monitor.cpp
     ../Dependencies/Shared/Game/FormulaEngine.cpp
 )
 
@@ -167,3 +168,9 @@ target_link_libraries(HelbreathClient PRIVATE
     X11::X11
     ${CMAKE_DL_LIBS}
 )
+
+# ---------------------------------------------------------------------------
+# Sentry crash reporting
+# ---------------------------------------------------------------------------
+include(${CMAKE_CURRENT_SOURCE_DIR}/../cmake/sentry.cmake)
+hb_enable_sentry(HelbreathClient)

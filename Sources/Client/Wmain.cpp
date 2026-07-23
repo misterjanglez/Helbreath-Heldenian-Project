@@ -8,11 +8,16 @@
 #include <cstdlib>
 #include <ctime>
 #include "Benchmark.h"
+#include "error_monitor.h"
+#include "version_info.h"
 
 // --------------------------------------------------------------
 // Platform-independent core
 int GameMain(hb::shared::types::NativeInstance native_instance, int icon_resource_id, const char* cmdLine)
 {
+	// Crash reporting first, so even startup failures are captured
+	auto monitoring = hb::shared::error_monitor::start("helbreath-client", hb::version::client::full_version);
+
 #ifdef _DEBUG
 	DebugConsole::allocate();
 #endif

@@ -18,6 +18,8 @@
 #include "ConcurrentMsgQueue.h"
 #include "Log.h"
 #include "ServerLogChannels.h"
+#include "error_monitor.h"
+#include "version_info.h"
 
 using namespace hb::server::config;
 using hb::log_channel;
@@ -121,6 +123,9 @@ void PollAllSockets()
 
 int main()
 {
+	// Crash reporting first, so even startup failures are captured
+	auto monitoring = hb::shared::error_monitor::start("helbreath-server", hb::version::server::full_version);
+
 	// Register signal handlers for graceful shutdown
 	std::signal(SIGINT, signal_handler);
 	std::signal(SIGTERM, signal_handler);

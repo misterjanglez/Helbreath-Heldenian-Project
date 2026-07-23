@@ -1,3 +1,79 @@
+# Sentry crash reporting + error monitoring (client & server)
+
+### Shared
+- New `hb::shared::error_monitor` (`Dependencies/Shared/Util/error_monitor.{h,cpp}`) wrapping the Sentry Native SDK 0.15.4 (crashpad backend). One call at the top of each `main()` — `auto monitoring = error_monitor::start("helbreath-server", hb::version::server::full_version);` — returns an RAII session that flushes and closes on any exit path. Release string, environment (`development` for debug builds, `production` otherwise), DSN, and crashpad handler location are all owned by the wrapper; `SENTRY_DSN` env var overrides the DSN (empty disables). Manual `capture_message`/`capture_error`/`add_breadcrumb` available for non-fatal reports. Targets without the SDK compile the same API as no-op stubs (`HB_SENTRY` gate).
+
+### Build
+- Windows: prebuilt SDK bundled at `Sources/Dependencies/sentry-native/` (import lib + `sentry.dll` + `crashpad_handler.exe`, mirroring the SFML layout); rebuild via `Scripts/build_sentry.ps1`. Runtime DLLs copied to `Binaries/Game/`, `Binaries/Server/`, `Sources/Debug/`.
+- Linux: `Sources/cmake/sentry.cmake` (`hb_enable_sentry(<target>)`) fetches and statically links the SDK in both CMake builds and copies `crashpad_handler` next to the binary post-build. Opt out with `-DHB_ENABLE_SENTRY=OFF`. New build-host prerequisites: `libcurl4-openssl-dev zlib1g-dev`. **Not yet built on Linux — verify on the Debian box before next deploy, and ship `crashpad_handler` alongside the server binary there.**
+
+### Server
+- New console command `testcrash confirm` — deliberate null-dereference to verify the crash pipeline end-to-end (warns and requires the literal `confirm`; does not save players). Verified 2026-07-23: minidump written and uploaded by crashpad at crash time (crashpad metadata shows `uploaded=1`, attempts=1); uploaded `.dmp` files linger in `.sentry-native/reports/` until crashpad's own pruning — that is not a stuck queue.
+- `SENTRY_DEBUG` env var (any value) turns on Sentry SDK internal diagnostics to stderr.
+
+### Tooling
+- `Scripts/upload_symbols.ps1` — uploads PDBs + binaries (with source context) to Sentry via sentry-cli (auto-downloaded to gitignored `Scripts/tools/`) so crash stacks symbolicate. Auth via `SENTRY_AUTH_TOKEN` env var or `sentry-cli login`; org/project via params, env, or `.sentryclirc` defaults.
+- `Sources/build.ps1` gained an opt-in `-UploadSymbols` switch (runs the upload after a successful build; intended for release/deploy builds).
+
+### Versioning
+- **Server → 0.4.3**, **Client → 0.4.4** (no protocol change).
+
+# Fix: shutdown double-free of every NPC (SIGSEGV)
+
+### Server
+- `CGame::m_npc_list` is an alias into `CEntityManager`'s entity array, yet `CGame::quit()` (and the re-init sweep in `CGame::init()`) deleted the NPCs through it without nulling the slots — `~CEntityManager`, the real owner, then deleted them all a second time. Every shutdown segfaulted in libc `free` (confirmed via core dump + backtrace on the deployed server). Removed both non-owner delete loops; `~CEntityManager` remains the single authoritative owner.
+
+### Versioning
+- **Server → 0.4.2**.
+
+# Headless server console (pipe mode)
+
+### Server
+- `ServerConsole` now detects a non-TTY stdin (POSIX) and runs in pipe mode: no raw-terminal setup (previously `tcgetattr` failed and the console went permanently dead under systemd), no prompt/ANSI redraws — commands are read as plain newline-terminated lines. Windows console behavior unchanged.
+- Deployed pattern (Debian box): systemd socket unit `helbreath-server.socket` with `ListenFIFO=/run/helbreath.console` feeds the service's stdin — `echo '<command>' > /run/helbreath.console` from any SSH session, output in `journalctl -u helbreath-server -f`.
+
+### Versioning
+- **Server → 0.4.1**.
+
+# Local server override for LAN play
+
+### Client
+- Optional `server_override.txt` next to the exe (one line, an IP) overrides the compiled-in login server address. Lets LAN players connect directly to the server instead of through router NAT loopback (which proved unreliable for the game handshake on consumer routers). The file is not in the update manifest, so self-updates leave it alone.
+
+### Versioning
+- **Client → 0.4.3**.
+
+### Ops (Debian box, not in repo)
+- Server logs now line-buffered under systemd (live `journalctl -f`); core dumps enabled (`systemd-coredump` + `LimitCORE=infinity`); server binary rebuilt as RelWithDebInfo — a repeat of the 19:19 segfault will produce a symbolized backtrace via `coredumpctl gdb`.
+
+# Auto-updater hardening + fast parallel downloads
+
+### AutoUpdater (client lib)
+- Per-file downloads now retry transient failures (3 attempts with backoff) instead of aborting the whole update on the first dropped connection — the cause of half-installed clients crashing at the sprite-loading screen.
+- If a file still fails after retries, the user gets a retry/skip dialog (`show_retry_dialog`, replaces the manifest-only `show_server_unreachable_dialog` with cause-specific messages) instead of silently launching a partially-updated client.
+- Downloads run on 4 parallel workers, each reusing one keep-alive HTTP connection (`http_client` class, pimpl over httplib) — collapses the per-file connection-setup cost that made 648-file installs crawl.
+- Responses stream straight to disk in chunks instead of buffering whole files in memory.
+
+### Update server (tools/UpdaterServer)
+- `update_server.py` speaks HTTP/1.1 so clients can keep connections alive.
+- Deployed config: per-IP request cap removed (300/min silently dropped fast LAN installs mid-download), bandwidth cap removed.
+
+### Versioning
+- **Client → 0.4.2** (updater is client-side; two bumps: 0.4.1 retry hardening, 0.4.2 parallel/streaming).
+
+# Self-hosted deployment: dedicated Linux server + internet distribution
+
+### Endpoints (client + updater)
+- `DEF_SERVER_IP` (release builds) and the auto-updater host now point at the self-hosted dedicated server's public IP (was the old 199.187.160.239 test server). Updater port moved 8080 → 8090 (8080 is occupied by Docker on the host).
+
+### Cross-platform fixes (Linux/GCC server build)
+- `GameConfigSqliteStore.h`: added missing `<cstdint>` include (uint8_t members compiled only via MSVC's transitive includes).
+- `Server/Game.cpp`: packed struct field passed to the variadic logger now goes through `static_cast<int>` (GCC cannot bind packed fields to references).
+
+### Deployment notes (Debian box, not in repo)
+- Server runs as systemd `helbreath-server` (login 2500 / game 9907), update file server as `helbreath-updates` (HTTP 8090) serving the manifest + game data; `mapdata/` filenames and `mapinfo.db` lowercased to match the server's case-sensitive lookups.
+- No version bump — rides the 0.4.0 client/server, 0.5.0 compatibility from the entry below.
+
 # Faithful item coloring: dual palette + additive-offset rendering — issue #2
 
 ### Rendering (engine + client)

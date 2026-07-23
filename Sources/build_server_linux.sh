@@ -68,5 +68,11 @@ OUTPUT_DIR="$SCRIPT_DIR/$BUILD_TYPE"
 mkdir -p "$OUTPUT_DIR"
 cp "$BUILD_DIR/HelbreathServer" "$OUTPUT_DIR/HelbreathServer"
 
+# Sentry crashpad handler must ship next to the server binary
+# (a POST_BUILD step in cmake/sentry.cmake copies it beside the built exe)
+if [ -f "$BUILD_DIR/crashpad_handler" ]; then
+    cp "$BUILD_DIR/crashpad_handler" "$OUTPUT_DIR/crashpad_handler"
+fi
+
 echo ""
 echo "Build complete: $OUTPUT_DIR/HelbreathServer"

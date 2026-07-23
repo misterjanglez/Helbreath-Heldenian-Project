@@ -1,17 +1,22 @@
 # Unified Build Script for Helbreath 3.82
-# Usage: build.ps1 [-Target <Game|Server|All>] [-Config <Debug|Release>]
+# Usage: build.ps1 [-Target <Game|Server|All>] [-Config <Debug|Release>] [-UploadSymbols]
 #
 # Examples:
 #   build.ps1                           # Build Game with Debug-SFML x64 (default)
 #   build.ps1 -Target Server            # Build Server
 #   build.ps1 -Target Game -Config Release
 #   build.ps1 -Target All               # Build all projects
+#   build.ps1 -Target All -Config Release -UploadSymbols   # Release + Sentry symbol upload
 param(
     [ValidateSet("Game", "Server", "All")]
     [string]$Target = "Game",
 
     [ValidateSet("Debug", "Release")]
-    [string]$Config = "Debug"
+    [string]$Config = "Debug",
+
+    # Upload PDBs to Sentry after a successful build (Scripts\upload_symbols.ps1).
+    # Use when building binaries that will actually ship/deploy.
+    [switch]$UploadSymbols
 )
 
 $Renderer = "SFML"
@@ -78,6 +83,11 @@ $exitCode = $LASTEXITCODE
 Write-Host ""
 if ($exitCode -eq 0) {
     Write-Host "BUILD SUCCEEDED" -ForegroundColor Green
+    if ($UploadSymbols) {
+        Write-Host ""
+        & powershell -ExecutionPolicy Bypass -File (Join-Path (Split-Path $scriptDir -Parent) "Scripts\upload_symbols.ps1")
+        if ($LASTEXITCODE -ne 0) { Write-Host "Symbol upload FAILED (build itself succeeded)" -ForegroundColor Yellow }
+    }
 } else {
     Write-Host "BUILD FAILED" -ForegroundColor Red
     Write-Host "Check log: $logFile"

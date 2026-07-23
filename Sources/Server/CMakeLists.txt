@@ -29,6 +29,7 @@ set(SERVER_SOURCES
     CmdSaveAll.cpp
     CmdSetCmdLevel.cpp
     CmdShutdown.cpp
+    CmdTestCrash.cpp
     CmdShowChat.cpp
     CombatManager.cpp
     CommonTypes.cpp
@@ -93,6 +94,7 @@ set(SHARED_SOURCES
     ../Dependencies/Shared/Net/IOServicePool.cpp
     ../Dependencies/Shared/Log/LogBackend.cpp
     ../Dependencies/Shared/Util/SHA256.cpp
+    ../Dependencies/Shared/Util/error_monitor.cpp
     ../Dependencies/Shared/Game/FormulaEngine.cpp
 )
 
@@ -143,3 +145,9 @@ target_link_libraries(HelbreathServer PRIVATE
     Threads::Threads
     ${CMAKE_DL_LIBS}
 )
+
+# ---------------------------------------------------------------------------
+# Sentry crash reporting
+# ---------------------------------------------------------------------------
+include(${CMAKE_CURRENT_SOURCE_DIR}/../cmake/sentry.cmake)
+hb_enable_sentry(HelbreathServer)

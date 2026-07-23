@@ -56,8 +56,8 @@
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <LinkIncremental>true</LinkIncremental>
-    <IncludePath>$(SolutionDir)CControls;$(SolutionDir)Sources\SFMLEngine;$(SolutionDir)Dependencies\Shared;$(SolutionDir)Dependencies\Shared\Entity;$(SolutionDir)Dependencies\Shared\Game;$(SolutionDir)Dependencies\Shared\Net;$(SolutionDir)Dependencies\Shared\Render;$(SolutionDir)Dependencies\Shared\Util;$(SolutionDir)AutoUpdater;$(SolutionDir)Dependencies\Shared\Log;$(SolutionDir)Dependencies\Client\Includes;$(SolutionDir)Dependencies\SFML\include;$(VC_IncludePath);$(WindowsSDK_IncludePath);</IncludePath>
-    <LibraryPath>$(SolutionDir)Dependencies\Client\Libs\x64;$(SolutionDir)Dependencies\SFML\lib_x64;$(VC_LibraryPath_x64);$(WindowsSDK_LibraryPath_x64)</LibraryPath>
+    <IncludePath>$(SolutionDir)CControls;$(SolutionDir)Sources\SFMLEngine;$(SolutionDir)Dependencies\Shared;$(SolutionDir)Dependencies\Shared\Entity;$(SolutionDir)Dependencies\Shared\Game;$(SolutionDir)Dependencies\Shared\Net;$(SolutionDir)Dependencies\Shared\Render;$(SolutionDir)Dependencies\Shared\Util;$(SolutionDir)AutoUpdater;$(SolutionDir)Dependencies\Shared\Log;$(SolutionDir)Dependencies\Client\Includes;$(SolutionDir)Dependencies\SFML\include;$(SolutionDir)Dependencies\sentry-native\include;$(VC_IncludePath);$(WindowsSDK_IncludePath);</IncludePath>
+    <LibraryPath>$(SolutionDir)Dependencies\Client\Libs\x64;$(SolutionDir)Dependencies\SFML\lib_x64;$(SolutionDir)Dependencies\sentry-native\lib_x64;$(VC_LibraryPath_x64);$(WindowsSDK_LibraryPath_x64)</LibraryPath>
     <OutDir>$(SolutionDir)Debug\</OutDir>
     <IntDir>$(Configuration)_x64\</IntDir>
     <TargetName>Game_x64_win</TargetName>
@@ -66,8 +66,8 @@
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LinkIncremental>false</LinkIncremental>
-    <IncludePath>$(SolutionDir)CControls;$(SolutionDir)Sources\SFMLEngine;$(SolutionDir)Dependencies\Shared;$(SolutionDir)Dependencies\Shared\Entity;$(SolutionDir)Dependencies\Shared\Game;$(SolutionDir)Dependencies\Shared\Net;$(SolutionDir)Dependencies\Shared\Render;$(SolutionDir)Dependencies\Shared\Util;$(SolutionDir)AutoUpdater;$(SolutionDir)Dependencies\Shared\Log;$(SolutionDir)Dependencies\Client\Includes;$(SolutionDir)Dependencies\SFML\include;$(VC_IncludePath);$(WindowsSDK_IncludePath);</IncludePath>
-    <LibraryPath>$(SolutionDir)Dependencies\Client\Libs\x64;$(SolutionDir)Dependencies\SFML\lib_x64;$(VC_LibraryPath_x64);$(WindowsSDK_LibraryPath_x64)</LibraryPath>
+    <IncludePath>$(SolutionDir)CControls;$(SolutionDir)Sources\SFMLEngine;$(SolutionDir)Dependencies\Shared;$(SolutionDir)Dependencies\Shared\Entity;$(SolutionDir)Dependencies\Shared\Game;$(SolutionDir)Dependencies\Shared\Net;$(SolutionDir)Dependencies\Shared\Render;$(SolutionDir)Dependencies\Shared\Util;$(SolutionDir)AutoUpdater;$(SolutionDir)Dependencies\Shared\Log;$(SolutionDir)Dependencies\Client\Includes;$(SolutionDir)Dependencies\SFML\include;$(SolutionDir)Dependencies\sentry-native\include;$(VC_IncludePath);$(WindowsSDK_IncludePath);</IncludePath>
+    <LibraryPath>$(SolutionDir)Dependencies\Client\Libs\x64;$(SolutionDir)Dependencies\SFML\lib_x64;$(SolutionDir)Dependencies\sentry-native\lib_x64;$(VC_LibraryPath_x64);$(WindowsSDK_LibraryPath_x64)</LibraryPath>
     <OutDir>$(SolutionDir)Release\</OutDir>
     <IntDir>$(Configuration)_x64\</IntDir>
     <TargetName>Game_x64_win</TargetName>
@@ -76,8 +76,8 @@
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='ReleaseWithDebugInfo|x64'">
     <LinkIncremental>false</LinkIncremental>
-    <IncludePath>$(SolutionDir)CControls;$(SolutionDir)Sources\SFMLEngine;$(SolutionDir)Dependencies\Shared;$(SolutionDir)Dependencies\Shared\Entity;$(SolutionDir)Dependencies\Shared\Game;$(SolutionDir)Dependencies\Shared\Net;$(SolutionDir)Dependencies\Shared\Render;$(SolutionDir)Dependencies\Shared\Util;$(SolutionDir)AutoUpdater;$(SolutionDir)Dependencies\Shared\Log;$(SolutionDir)Dependencies\Client\Includes;$(SolutionDir)Dependencies\SFML\include;$(VC_IncludePath);$(WindowsSDK_IncludePath);</IncludePath>
-    <LibraryPath>$(SolutionDir)Dependencies\Client\Libs\x64;$(SolutionDir)Dependencies\SFML\lib_x64;$(VC_LibraryPath_x64);$(WindowsSDK_LibraryPath_x64)</LibraryPath>
+    <IncludePath>$(SolutionDir)CControls;$(SolutionDir)Sources\SFMLEngine;$(SolutionDir)Dependencies\Shared;$(SolutionDir)Dependencies\Shared\Entity;$(SolutionDir)Dependencies\Shared\Game;$(SolutionDir)Dependencies\Shared\Net;$(SolutionDir)Dependencies\Shared\Render;$(SolutionDir)Dependencies\Shared\Util;$(SolutionDir)AutoUpdater;$(SolutionDir)Dependencies\Shared\Log;$(SolutionDir)Dependencies\Client\Includes;$(SolutionDir)Dependencies\SFML\include;$(SolutionDir)Dependencies\sentry-native\include;$(VC_IncludePath);$(WindowsSDK_IncludePath);</IncludePath>
+    <LibraryPath>$(SolutionDir)Dependencies\Client\Libs\x64;$(SolutionDir)Dependencies\SFML\lib_x64;$(SolutionDir)Dependencies\sentry-native\lib_x64;$(VC_LibraryPath_x64);$(WindowsSDK_LibraryPath_x64)</LibraryPath>
     <OutDir>$(SolutionDir)ReleaseDbg\</OutDir>
     <IntDir>$(Configuration)_x64\</IntDir>
     <TargetName>Game_x64_win</TargetName>
@@ -92,7 +92,7 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <Optimization>Disabled</Optimization>
       <SuppressStartupBanner>true</SuppressStartupBanner>
-      <PreprocessorDefinitions>WIN32;_DEBUG;_WINDOWS;_VC80_UPGRADE=0x0600;SFML_STATIC;SFML_ENGINE;TESTER_ONLY;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>WIN32;_DEBUG;_WINDOWS;_VC80_UPGRADE=0x0600;SFML_STATIC;SFML_ENGINE;TESTER_ONLY;HB_SENTRY;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <AssemblerListingLocation>$(IntDir)</AssemblerListingLocation>
       <ObjectFileName>$(IntDir)</ObjectFileName>
       <ProgramDataBaseFileName>$(IntDir)</ProgramDataBaseFileName>
@@ -108,7 +108,7 @@
       <SuppressStartupBanner>true</SuppressStartupBanner>
       <SubSystem>Windows</SubSystem>
       <SetChecksum>false</SetChecksum>
-      <AdditionalDependencies>CControls.lib;AutoUpdater.lib;SFMLEngine.lib;sfml-graphics-s-d.lib;sfml-window-s-d.lib;sfml-system-s-d.lib;freetyped.lib;opengl32.lib;Ws2_32.lib;dxgi.lib;winmm.lib;gdi32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>CControls.lib;AutoUpdater.lib;SFMLEngine.lib;sfml-graphics-s-d.lib;sfml-window-s-d.lib;sfml-system-s-d.lib;freetyped.lib;opengl32.lib;Ws2_32.lib;dxgi.lib;winmm.lib;gdi32.lib;sentry.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <GenerateDebugInformation>DebugFull</GenerateDebugInformation>
       <OutputFile>$(OutDir)$(TargetName)$(TargetExt)</OutputFile>
     </Link>
@@ -131,7 +131,7 @@
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
       <SuppressStartupBanner>true</SuppressStartupBanner>
-      <PreprocessorDefinitions>WIN32;NDEBUG;_WINDOWS;_VC80_UPGRADE=0x0600;SFML_STATIC;SFML_ENGINE;TESTER_ONLY;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>WIN32;NDEBUG;_WINDOWS;_VC80_UPGRADE=0x0600;SFML_STATIC;SFML_ENGINE;TESTER_ONLY;HB_SENTRY;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <AssemblerListingLocation>$(IntDir)</AssemblerListingLocation>
       <ObjectFileName>$(IntDir)</ObjectFileName>
       <ProgramDataBaseFileName>$(IntDir)</ProgramDataBaseFileName>
@@ -145,7 +145,7 @@
       <SuppressStartupBanner>true</SuppressStartupBanner>
       <SubSystem>Windows</SubSystem>
       <SetChecksum>true</SetChecksum>
-      <AdditionalDependencies>CControls.lib;AutoUpdater.lib;SFMLEngine.lib;sfml-graphics-s.lib;sfml-window-s.lib;sfml-system-s.lib;freetype.lib;opengl32.lib;Ws2_32.lib;dxgi.lib;winmm.lib;gdi32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>CControls.lib;AutoUpdater.lib;SFMLEngine.lib;sfml-graphics-s.lib;sfml-window-s.lib;sfml-system-s.lib;freetype.lib;opengl32.lib;Ws2_32.lib;dxgi.lib;winmm.lib;gdi32.lib;sentry.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <GenerateDebugInformation>false</GenerateDebugInformation>
       <AdditionalOptions> /FORCE:UNRESOLVED</AdditionalOptions>
       <LinkTimeCodeGeneration>UseLinkTimeCodeGeneration</LinkTimeCodeGeneration>
@@ -172,7 +172,7 @@
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
       <SuppressStartupBanner>true</SuppressStartupBanner>
-      <PreprocessorDefinitions>WIN32;NDEBUG;_WINDOWS;_VC80_UPGRADE=0x0600;SFML_STATIC;SFML_ENGINE;TESTER_ONLY;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>WIN32;NDEBUG;_WINDOWS;_VC80_UPGRADE=0x0600;SFML_STATIC;SFML_ENGINE;TESTER_ONLY;HB_SENTRY;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <AssemblerListingLocation>$(IntDir)</AssemblerListingLocation>
       <ObjectFileName>$(IntDir)</ObjectFileName>
       <ProgramDataBaseFileName>$(IntDir)</ProgramDataBaseFileName>
@@ -187,7 +187,7 @@
       <SuppressStartupBanner>true</SuppressStartupBanner>
       <SubSystem>Windows</SubSystem>
       <SetChecksum>true</SetChecksum>
-      <AdditionalDependencies>CControls.lib;AutoUpdater.lib;SFMLEngine.lib;sfml-graphics-s.lib;sfml-window-s.lib;sfml-system-s.lib;freetype.lib;opengl32.lib;Ws2_32.lib;dxgi.lib;winmm.lib;gdi32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>CControls.lib;AutoUpdater.lib;SFMLEngine.lib;sfml-graphics-s.lib;sfml-window-s.lib;sfml-system-s.lib;freetype.lib;opengl32.lib;Ws2_32.lib;dxgi.lib;winmm.lib;gdi32.lib;sentry.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalOptions> /FORCE:UNRESOLVED</AdditionalOptions>
       <LinkTimeCodeGeneration>UseLinkTimeCodeGeneration</LinkTimeCodeGeneration>
@@ -354,6 +354,7 @@
     <ClInclude Include="..\Dependencies\Shared\Entity\Appearance.h" />
     <ClInclude Include="..\Dependencies\Shared\Render\BitmapFontFactory.h" />
     <ClInclude Include="..\Dependencies\Shared\Util\SHA256.h" />
+    <ClInclude Include="..\Dependencies\Shared\Util\error_monitor.h" />
     <ClInclude Include="..\Dependencies\Shared\vendor\picosha2.h" />
     <ClInclude Include="..\Dependencies\Shared\Render\ColorUtils.h" />
     <ClInclude Include="..\Dependencies\Shared\Net\ConcurrentMsgQueue.h" />
@@ -567,6 +568,7 @@
     <ClCompile Include="..\Dependencies\Shared\Render\ResolutionConfig.cpp" />
     <ClCompile Include="..\Dependencies\Shared\Log\LogBackend.cpp" />
     <ClCompile Include="..\Dependencies\Shared\Util\SHA256.cpp" />
+    <ClCompile Include="..\Dependencies\Shared\Util\error_monitor.cpp" />
     <ClCompile Include="..\Dependencies\Shared\Game\FormulaEngine.cpp" />
     <ClCompile Include="ClientLog.cpp" />
   </ItemGroup>

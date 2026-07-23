@@ -14,7 +14,7 @@
 #
 # Prerequisites (Ubuntu/Debian):
 #   sudo apt install cmake g++ libx11-dev libxrandr-dev libxcursor-dev \
-#       libgl1-mesa-dev libudev-dev libfreetype-dev
+#       libgl1-mesa-dev libudev-dev libfreetype-dev libcurl4-openssl-dev zlib1g-dev
 #
 # SFML 3 is fetched and built automatically via CMake FetchContent.
 # If you have SFML 3 installed system-wide, it will be used instead.
@@ -81,6 +81,12 @@ if [ -z "$EXE_NAME" ]; then
 fi
 EXE_BASENAME=$(basename "$EXE_NAME")
 cp "$EXE_NAME" "$OUTPUT_DIR/$EXE_BASENAME"
+
+# Sentry crashpad handler must ship next to the client binary
+# (a POST_BUILD step in cmake/sentry.cmake copies it beside the built exe)
+if [ -f "$BUILD_DIR/crashpad_handler" ]; then
+    cp "$BUILD_DIR/crashpad_handler" "$OUTPUT_DIR/crashpad_handler"
+fi
 
 echo ""
 echo "Build complete: $OUTPUT_DIR/$EXE_BASENAME"

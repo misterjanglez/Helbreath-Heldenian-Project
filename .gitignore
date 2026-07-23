@@ -381,3 +381,20 @@ tools/InstallerCreator/Helbreath/
 
 # Backup checkpoints (bak.py)
 **/*.bak_*
+
+# Sentry crash-report database (created at runtime next to the exe)
+.sentry-native/
+**/.sentry-native/
+
+# Auto-downloaded CLI tools (Scripts/upload_symbols.ps1 fetches sentry-cli)
+Scripts/tools/
+
+# Per-machine LAN override (deliberately not distributed)
+Binaries/Game/server_override.txt
+
+# Account DB migration backups
+Binaries/Server/accounts/*.bak
+Binaries/Server/accounts/*.guild_migration_bak
+
+# Personal teaching workspace
+teaching/

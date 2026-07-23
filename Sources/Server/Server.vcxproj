@@ -45,8 +45,8 @@
     <OutDir>$(SolutionDir)$(Configuration)\</OutDir>
     <IntDir>$(Configuration)_x64\</IntDir>
     <LinkIncremental>false</LinkIncremental>
-    <IncludePath>$(SolutionDir)Dependencies\Shared;$(SolutionDir)Dependencies\Shared\Entity;$(SolutionDir)Dependencies\Shared\Game;$(SolutionDir)Dependencies\Shared\Net;$(SolutionDir)Dependencies\Shared\Render;$(SolutionDir)Dependencies\Shared\Util;$(SolutionDir)Dependencies\Shared\Log;$(SolutionDir)Dependencies\Server\Includes;$(VC_IncludePath);$(WindowsSDK_IncludePath);</IncludePath>
-    <LibraryPath>$(SolutionDir)Dependencies\Server\Libs;$(VC_LibraryPath_x64);$(WindowsSDK_LibraryPath_x64)</LibraryPath>
+    <IncludePath>$(SolutionDir)Dependencies\Shared;$(SolutionDir)Dependencies\Shared\Entity;$(SolutionDir)Dependencies\Shared\Game;$(SolutionDir)Dependencies\Shared\Net;$(SolutionDir)Dependencies\Shared\Render;$(SolutionDir)Dependencies\Shared\Util;$(SolutionDir)Dependencies\Shared\Log;$(SolutionDir)Dependencies\Server\Includes;$(SolutionDir)Dependencies\sentry-native\include;$(VC_IncludePath);$(WindowsSDK_IncludePath);</IncludePath>
+    <LibraryPath>$(SolutionDir)Dependencies\Server\Libs;$(SolutionDir)Dependencies\sentry-native\lib_x64;$(VC_LibraryPath_x64);$(WindowsSDK_LibraryPath_x64)</LibraryPath>
     <LocalDebuggerWorkingDirectory>$(SolutionDir)..\Binaries\Server</LocalDebuggerWorkingDirectory>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
   </PropertyGroup>
@@ -54,8 +54,8 @@
     <OutDir>$(SolutionDir)$(Configuration)\</OutDir>
     <IntDir>$(Configuration)_x64\</IntDir>
     <LinkIncremental>true</LinkIncremental>
-    <IncludePath>$(SolutionDir)Dependencies\Shared;$(SolutionDir)Dependencies\Shared\Entity;$(SolutionDir)Dependencies\Shared\Game;$(SolutionDir)Dependencies\Shared\Net;$(SolutionDir)Dependencies\Shared\Render;$(SolutionDir)Dependencies\Shared\Util;$(SolutionDir)Dependencies\Shared\Log;$(SolutionDir)Dependencies\Server\Includes;$(VC_IncludePath);$(WindowsSDK_IncludePath);</IncludePath>
-    <LibraryPath>$(SolutionDir)Dependencies\Server\Libs;$(VC_LibraryPath_x64);$(WindowsSDK_LibraryPath_x64)</LibraryPath>
+    <IncludePath>$(SolutionDir)Dependencies\Shared;$(SolutionDir)Dependencies\Shared\Entity;$(SolutionDir)Dependencies\Shared\Game;$(SolutionDir)Dependencies\Shared\Net;$(SolutionDir)Dependencies\Shared\Render;$(SolutionDir)Dependencies\Shared\Util;$(SolutionDir)Dependencies\Shared\Log;$(SolutionDir)Dependencies\Server\Includes;$(SolutionDir)Dependencies\sentry-native\include;$(VC_IncludePath);$(WindowsSDK_IncludePath);</IncludePath>
+    <LibraryPath>$(SolutionDir)Dependencies\Server\Libs;$(SolutionDir)Dependencies\sentry-native\lib_x64;$(VC_LibraryPath_x64);$(WindowsSDK_LibraryPath_x64)</LibraryPath>
     <LocalDebuggerWorkingDirectory>$(SolutionDir)..\Binaries\Server</LocalDebuggerWorkingDirectory>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
   </PropertyGroup>
@@ -63,7 +63,7 @@
     <ClCompile>
       <Optimization>MaxSpeed</Optimization>
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
-      <PreprocessorDefinitions>WIN32;WIN32_LEAN_AND_MEAN;_CRT_SECURE_NO_WARNINGS;NDEBUG;_WINDOWS;TESTER_ONLY;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>WIN32;WIN32_LEAN_AND_MEAN;_CRT_SECURE_NO_WARNINGS;NDEBUG;_WINDOWS;TESTER_ONLY;HB_SENTRY;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <StringPooling>true</StringPooling>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
@@ -85,7 +85,7 @@
     </ClCompile>
     <Link>
       <AdditionalOptions>/MACHINE:X64 %(AdditionalOptions)</AdditionalOptions>
-      <AdditionalDependencies>winmm.lib;ws2_32.lib;sqlite3_x64.lib;bcrypt.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>winmm.lib;ws2_32.lib;sqlite3_x64.lib;bcrypt.lib;sentry.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <OutputFile>$(OutDir)$(TargetName)$(TargetExt)</OutputFile>
       <SuppressStartupBanner>true</SuppressStartupBanner>
       <ProgramDatabaseFile>$(OutDir)$(TargetName).pdb</ProgramDatabaseFile>
@@ -114,7 +114,7 @@
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
       <Optimization>Disabled</Optimization>
-      <PreprocessorDefinitions>WIN32;WIN32_LEAN_AND_MEAN;_CRT_SECURE_NO_WARNINGS;_DEBUG;_WINDOWS;TESTER_ONLY;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>WIN32;WIN32_LEAN_AND_MEAN;_CRT_SECURE_NO_WARNINGS;_DEBUG;_WINDOWS;TESTER_ONLY;HB_SENTRY;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <PrecompiledHeaderOutputFile>
@@ -132,7 +132,7 @@
     </ClCompile>
     <Link>
       <AdditionalOptions>/MACHINE:X64 %(AdditionalOptions)</AdditionalOptions>
-      <AdditionalDependencies>winmm.lib;ws2_32.lib;sqlite3_x64.lib;bcrypt.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>winmm.lib;ws2_32.lib;sqlite3_x64.lib;bcrypt.lib;sentry.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <OutputFile>$(OutDir)$(TargetName)$(TargetExt)</OutputFile>
       <SuppressStartupBanner>true</SuppressStartupBanner>
       <GenerateDebugInformation>DebugFull</GenerateDebugInformation>
@@ -237,6 +237,7 @@
     <ClInclude Include="CmdSetAdmin.h" />
     <ClInclude Include="CmdSetCmdLevel.h" />
     <ClInclude Include="CmdSaveAll.h" />
+    <ClInclude Include="CmdTestCrash.h" />
     <ClInclude Include="CmdShutdown.h" />
     <ClInclude Include="PasswordHash.h" />
     <ClInclude Include="StringCompat.h" />
@@ -247,6 +248,7 @@
     <ClInclude Include="..\Dependencies\Shared\Entity\Appearance.h" />
     <ClInclude Include="..\Dependencies\Shared\Render\BitmapFontFactory.h" />
     <ClInclude Include="..\Dependencies\Shared\Util\SHA256.h" />
+    <ClInclude Include="..\Dependencies\Shared\Util\error_monitor.h" />
     <ClInclude Include="..\Dependencies\Shared\vendor\picosha2.h" />
     <ClInclude Include="..\Dependencies\Shared\Render\ColorUtils.h" />
     <ClInclude Include="..\Dependencies\Shared\Net\ConcurrentMsgQueue.h" />
@@ -366,11 +368,13 @@
     <ClCompile Include="CmdSetAdmin.cpp" />
     <ClCompile Include="CmdSetCmdLevel.cpp" />
     <ClCompile Include="CmdSaveAll.cpp" />
+    <ClCompile Include="CmdTestCrash.cpp" />
     <ClCompile Include="CmdShutdown.cpp" />
     <ClCompile Include="..\Dependencies\Shared\Net\ASIOSocket.cpp" />
     <ClCompile Include="..\Dependencies\Shared\Net\IOServicePool.cpp" />
     <ClCompile Include="..\Dependencies\Shared\Log\LogBackend.cpp" />
     <ClCompile Include="..\Dependencies\Shared\Util\SHA256.cpp" />
+    <ClCompile Include="..\Dependencies\Shared\Util\error_monitor.cpp" />
     <ClCompile Include="..\Dependencies\Shared\Game\FormulaEngine.cpp" />
     <ClCompile Include="ServerLog.cpp" />
   </ItemGroup>
