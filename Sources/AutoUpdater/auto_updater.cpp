@@ -5,10 +5,14 @@
 #include "updater_sha256.h"
 #include "updater_file_ops.h"
 #include "updater_gui.h"
+#include <algorithm>
+#include <atomic>
+#include <chrono>
+#include <cstdio>
 #include <filesystem>
 #include <string>
+#include <thread>
 #include <vector>
-#include <cstdio>
 
 namespace fs = std::filesystem;
 
@@ -33,7 +37,7 @@ namespace hb::updater
 		std::string manifest_json;
 		while (!http_get_text(update_server_host, update_server_port, manifest_path, manifest_json))
 		{
-			if (!show_server_unreachable_dialog())
+			if (!show_retry_dialog("Could not reach the update server."))
 				return update_result::server_unreachable;
 		}
 
@@ -79,37 +83,92 @@ namespace hb::updater
 		std::string staging_base = (fs::path(base_dir) / staging_dir).string();
 		int total = static_cast<int>(changed_files.size());
 
-		for (int i = 0; i < total; ++i)
+		// Parallel download: workers pull the next file index from a shared
+		// counter, each over its own keep-alive connection. The main thread
+		// only pumps the GUI. On persistent failure the user chooses retry or
+		// skip; already-staged files are skipped on retry (hash check below),
+		// so no progress is lost.
+		for (;;)
 		{
-			const auto& entry = *changed_files[i].entry;
-			std::string staged_path = (fs::path(staging_base) / entry.path).string();
+			std::atomic<int> next_index{0};
+			std::atomic<int> completed{0};
+			std::atomic<bool> failed{false};
+			std::atomic<bool> cancelled{false};
 
-			// Resume: skip files already staged with correct hash
-			std::string staged_hash = sha256_file(staged_path.c_str());
-			if (staged_hash == entry.sha256)
+			auto worker = [&]()
 			{
-				gui.set_progress(static_cast<float>(i + 1) / static_cast<float>(total));
+				http_client client(update_server_host, update_server_port);
+				for (;;)
+				{
+					if (failed.load() || cancelled.load())
+						return;
+
+					int i = next_index.fetch_add(1);
+					if (i >= total)
+						return;
+
+					const auto& entry = *changed_files[i].entry;
+					std::string staged_path = (fs::path(staging_base) / entry.path).string();
+
+					// Resume: skip files already staged with correct hash
+					if (sha256_file(staged_path.c_str()) == entry.sha256)
+					{
+						completed.fetch_add(1);
+						continue;
+					}
+
+					std::string url = "/" + entry.path;
+					if (!client.download_file(url.c_str(), staged_path))
+					{
+						failed.store(true);
+						return;
+					}
+
+					completed.fetch_add(1);
+				}
+			};
+
+			int worker_count = std::min(total, parallel_downloads);
+			std::vector<std::thread> workers;
+			for (int t = 0; t < worker_count; ++t)
+				workers.emplace_back(worker);
+
+			int last_done = -1;
+			while (completed.load() < total && !failed.load())
+			{
+				if (gui.is_cancelled())
+				{
+					cancelled.store(true);
+					break;
+				}
+
+				int done = completed.load();
+				if (done != last_done)
+				{
+					last_done = done;
+					char status_buf[256];
+					std::snprintf(status_buf, sizeof(status_buf),
+						"Downloading files (%d of %d)...", done, total);
+					gui.set_status(status_buf);
+					gui.set_progress(static_cast<float>(done) / static_cast<float>(total));
+				}
 				gui.pump_messages();
-				continue;
+				std::this_thread::sleep_for(std::chrono::milliseconds(30));
 			}
 
-			char status_buf[256];
-			std::snprintf(status_buf, sizeof(status_buf),
-				"Downloading %s (%d of %d)...", entry.path.c_str(), i + 1, total);
-			gui.set_status(status_buf);
-			gui.set_progress(static_cast<float>(i) / static_cast<float>(total));
-			gui.pump_messages();
+			for (auto& w : workers)
+				w.join();
 
-			if (gui.is_cancelled())
+			if (cancelled.load())
 			{
 				gui.destroy();
 				return update_result::error;
 			}
 
-			std::string url = "/" + entry.path;
+			if (!failed.load())
+				break;
 
-			if (!http_download_file(update_server_host, update_server_port,
-				url.c_str(), staged_path))
+			if (!show_retry_dialog("The update download failed."))
 			{
 				gui.destroy();
 				return update_result::error;

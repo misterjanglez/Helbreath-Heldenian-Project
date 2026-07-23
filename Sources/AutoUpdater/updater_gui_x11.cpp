@@ -172,9 +172,9 @@ namespace hb::updater
 		return m_impl && m_impl->cancelled;
 	}
 
-	bool show_server_unreachable_dialog()
+	bool show_retry_dialog(const char* message)
 	{
-		std::fprintf(stderr, "[AutoUpdater] Update server unreachable, continuing with current version.\n");
+		std::fprintf(stderr, "[AutoUpdater] %s Continuing with current version.\n", message);
 		return false;
 	}
 }

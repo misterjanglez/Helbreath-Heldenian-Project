@@ -3,13 +3,19 @@
 namespace hb::updater
 {
 	// Server configuration
-	constexpr const char* update_server_host = "199.187.160.239";
-	constexpr int update_server_port = 8080;
+	constexpr const char* update_server_host = "108.95.173.161";
+	constexpr int update_server_port = 8090;
 	constexpr const char* manifest_path = "/update.manifest.json";
 
 	// Timeouts (seconds)
 	constexpr int connect_timeout = 10;
 	constexpr int read_timeout = 30;
+
+	// Per-file download attempts before asking the user to retry or skip
+	constexpr int max_download_attempts = 3;
+
+	// Concurrent download workers (each with its own keep-alive connection)
+	constexpr int parallel_downloads = 4;
 
 	// Paths (relative to exe directory)
 	constexpr const char* staging_dir = "updates";

@@ -20,7 +20,8 @@ namespace hb::updater
 		impl* m_impl = nullptr;
 	};
 
-	// Standalone dialog (no window needed).
+	// Standalone retry/skip dialog (no window needed). message states what
+	// failed; the dialog offers retry or continue-without-updating.
 	// Returns true if the user wants to retry, false to skip updates.
-	bool show_server_unreachable_dialog();
+	bool show_retry_dialog(const char* message);
 }

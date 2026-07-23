@@ -83,6 +83,10 @@ class ThreadingHTTPServer(ThreadingMixIn, TCPServer):
 class UpdateRequestHandler(SimpleHTTPRequestHandler):
     """HTTP handler with CORS support, rate limiting, and cleaner logging."""
 
+    # HTTP/1.1 enables keep-alive so updater clients can reuse one
+    # connection across the whole multi-file download.
+    protocol_version = "HTTP/1.1"
+
     rate_limit_bps = 0
     connection_timeout = 30
 

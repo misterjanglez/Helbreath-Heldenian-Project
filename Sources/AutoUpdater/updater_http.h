@@ -1,7 +1,6 @@
 #pragma once
+#include <memory>
 #include <string>
-#include <vector>
-#include <cstdint>
 
 namespace hb::updater
 {
@@ -9,8 +8,22 @@ namespace hb::updater
 	// response_body receives the full body on success.
 	bool http_get_text(const char* host, int port, const char* path, std::string& response_body);
 
-	// HTTP GET a binary file and write it to disk. Returns true on success.
-	// Creates parent directories as needed.
-	bool http_download_file(const char* host, int port, const char* url_path,
-		const std::string& local_path);
+	// Reusable HTTP connection (keep-alive across requests). One instance per
+	// thread — instances are not thread-safe, but independent instances may be
+	// used concurrently.
+	class http_client
+	{
+	public:
+		http_client(const char* host, int port);
+		~http_client();
+
+		// HTTP GET a binary file and write it to disk. Creates parent
+		// directories as needed. Retries transient failures internally
+		// (reconnecting as needed). Returns true on success.
+		bool download_file(const char* url_path, const std::string& local_path);
+
+	private:
+		struct impl;
+		std::unique_ptr<impl> m_impl;
+	};
 }

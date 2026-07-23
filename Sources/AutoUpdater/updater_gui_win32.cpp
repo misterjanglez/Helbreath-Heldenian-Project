@@ -3,6 +3,7 @@
 #include "updater_gui.h"
 #include "UpdaterConstants.h"
 #include "updater_platform.h"
+#include <cstdio>
 
 namespace hb::updater
 {
@@ -153,12 +154,14 @@ namespace hb::updater
 		return m_impl && m_impl->cancelled;
 	}
 
-	bool show_server_unreachable_dialog()
+	bool show_retry_dialog(const char* message)
 	{
+		char text[512];
+		std::snprintf(text, sizeof(text),
+			"%s\n\nYou can retry or continue with the current version.", message);
 		int result = MessageBoxA(
 			nullptr,
-			"Could not reach the update server.\n\n"
-			"You can retry or continue with the current version.",
+			text,
 			window_title,
 			MB_RETRYCANCEL | MB_ICONWARNING | MB_SETFOREGROUND);
 		return result == IDRETRY;
