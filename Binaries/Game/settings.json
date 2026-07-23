@@ -15,7 +15,7 @@
         "backgroundFpsThrottle": false,
         "borderless": false,
         "captureMouse": true,
-        "detailLevel": 2,
+        "detailLevel": 0,
         "dialogTransparency": false,
         "fpsLimit": 240,
         "fullscreen": false,
@@ -31,7 +31,7 @@
         "zoomMap": false
     },
     "shortcuts": {
-        "magic": 12,
+        "magic": 2,
         "slots": [
             -1,
             -1,
