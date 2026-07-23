@@ -206,7 +206,8 @@
       "PowerShell(powershell -ExecutionPolicy Bypass -File \"C:\\\\Users\\\\miste\\\\source\\\\Helbreath-Heldenian-Project\\\\Scripts\\\\upload_symbols.ps1\" 2>&1 | Select-String \"UPLOADED|complete|error\" | ForEach-Object { $_.Line.Trim\\(\\) })",
       "PowerShell(python bak.py guard Sources/Client/Wmain.cpp Sources/version.cfg)",
       "PowerShell(Copy-Item *)",
-      "PowerShell(powershell -ExecutionPolicy Bypass -File \"C:\\\\Users\\\\miste\\\\source\\\\Helbreath-Heldenian-Project\\\\Scripts\\\\upload_symbols.ps1\" 2>&1 | Select-String \"UPLOADED|complete\" | ForEach-Object { $_.Line.Trim\\(\\) }; python bak.py commit --force)"
+      "PowerShell(powershell -ExecutionPolicy Bypass -File \"C:\\\\Users\\\\miste\\\\source\\\\Helbreath-Heldenian-Project\\\\Scripts\\\\upload_symbols.ps1\" 2>&1 | Select-String \"UPLOADED|complete\" | ForEach-Object { $_.Line.Trim\\(\\) }; python bak.py commit --force)",
+      "WebFetch(domain:docs.sentry.io)"
     ]
   }
 }

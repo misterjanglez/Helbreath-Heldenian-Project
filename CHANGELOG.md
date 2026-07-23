@@ -1,3 +1,9 @@
+# Sentry dashboard config (not in repo)
+
+### Ops
+- Stack Trace Rules added to the Sentry project (Settings → Issue Grouping): `stack.package` globs for our three binaries and `stack.abs_path` globs for both source roots mark our frames `+app`; CRT/runtime scaffolding (`**/vcstartup/**`, `invoke_main`, `__scrt_common_main_seh`, `_start`, `_fini`) demoted `-app`. Verified on both platforms — only project code highlights in-app.
+- Symbols current for: client 0.4.6 (Windows PDB), server 0.4.4 (Linux DWARF + Windows PDB), bundled sentry.dll.
+
 # Client --testcrash flag (crash-pipeline verification)
 
 ### Client
