@@ -287,6 +287,19 @@ bool CGame::on_initialize()
 	m_log_server_port = DEF_SERVER_PORT;
 	m_game_server_port = DEF_GSERVER_PORT;
 
+	// Optional local override: server_override.txt next to the exe holds a
+	// server IP (LAN play / testing). Not part of the update manifest, so it
+	// survives self-updates.
+	if (std::ifstream override_file{"server_override.txt"}; override_file)
+	{
+		std::string override_ip;
+		std::getline(override_file, override_ip);
+		while (!override_ip.empty() && (override_ip.back() == '\r' || override_ip.back() == ' ' || override_ip.back() == '\t'))
+			override_ip.pop_back();
+		if (!override_ip.empty())
+			m_log_server_addr = override_ip;
+	}
+
 	m_map_data = std::make_unique<CMapData>(this);
 
 	m_menu_dir = direction::southeast;

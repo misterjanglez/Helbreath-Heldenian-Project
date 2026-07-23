@@ -27,7 +27,7 @@ constexpr const char* NAME_WORLDNAME1 = "WS1";
 #endif
 
 #ifdef DEF_TEST_SERVER
-constexpr const char* DEF_SERVER_IP = "199.187.160.239";
+constexpr const char* DEF_SERVER_IP = "108.95.173.161";
 #else
 constexpr const char* DEF_SERVER_IP = "127.0.0.1";
 #endif
