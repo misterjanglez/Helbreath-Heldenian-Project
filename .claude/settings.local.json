@@ -203,7 +203,10 @@
       "PowerShell(powershell -ExecutionPolicy Bypass -File Sources\\\\build.ps1 -Target Game -Config Release)",
       "PowerShell(Select-String -Path \"C:\\\\Users\\\\miste\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\C--Users-miste-source-Helbreath-Heldenian-Project\\\\fa09276d-2d3c-4ee0-895b-e08b17e2c0c4\\\\tasks\\\\bn76482e5.output\" -Pattern \"BUILD SUCCEEDED|Error\\\\\\(s\\\\\\)\" | ForEach-Object { $_.Line.Trim\\(\\) } | Select-Object -First 3; Get-ChildItem \"C:\\\\Users\\\\miste\\\\source\\\\Helbreath-Heldenian-Project\\\\Sources\\\\Release\\\\Game_x64_win.exe\", \"C:\\\\Users\\\\miste\\\\source\\\\Helbreath-Heldenian-Project\\\\Sources\\\\Release\\\\Game_x64_win.pdb\" -ErrorAction SilentlyContinue | Select-Object Name, LastWriteTime, @{n='MB';e={[math]::Round\\($_.Length/1MB,1\\)}})",
       "Bash(scp -q Sources/Release/Game_x64_win.exe misterjanglez@192.168.1.191:~/helbreath/updates/game/)",
-      "PowerShell(powershell -ExecutionPolicy Bypass -File \"C:\\\\Users\\\\miste\\\\source\\\\Helbreath-Heldenian-Project\\\\Scripts\\\\upload_symbols.ps1\" 2>&1 | Select-String \"UPLOADED|complete|error\" | ForEach-Object { $_.Line.Trim\\(\\) })"
+      "PowerShell(powershell -ExecutionPolicy Bypass -File \"C:\\\\Users\\\\miste\\\\source\\\\Helbreath-Heldenian-Project\\\\Scripts\\\\upload_symbols.ps1\" 2>&1 | Select-String \"UPLOADED|complete|error\" | ForEach-Object { $_.Line.Trim\\(\\) })",
+      "PowerShell(python bak.py guard Sources/Client/Wmain.cpp Sources/version.cfg)",
+      "PowerShell(Copy-Item *)",
+      "PowerShell(powershell -ExecutionPolicy Bypass -File \"C:\\\\Users\\\\miste\\\\source\\\\Helbreath-Heldenian-Project\\\\Scripts\\\\upload_symbols.ps1\" 2>&1 | Select-String \"UPLOADED|complete\" | ForEach-Object { $_.Line.Trim\\(\\) }; python bak.py commit --force)"
     ]
   }
 }

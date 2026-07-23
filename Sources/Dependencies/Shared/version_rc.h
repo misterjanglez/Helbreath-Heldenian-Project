@@ -4,11 +4,11 @@
 // Client version
 #define VER_CLIENT_MAJOR         0
 #define VER_CLIENT_MINOR         4
-#define VER_CLIENT_PATCH         5
+#define VER_CLIENT_PATCH         6
 #define VER_CLIENT_BUILD         361
-#define VER_CLIENT_FILEVERSION   0,4,5,361
-#define VER_CLIENT_DISPLAY       "0.4.5-alpha"
-#define VER_CLIENT_FULL          "0.4.5-alpha+build.361"
+#define VER_CLIENT_FILEVERSION   0,4,6,361
+#define VER_CLIENT_DISPLAY       "0.4.6-alpha"
+#define VER_CLIENT_FULL          "0.4.6-alpha+build.361"
 
 // Server version
 #define VER_SERVER_MAJOR         0

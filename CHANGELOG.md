@@ -1,3 +1,8 @@
+# Client --testcrash flag (crash-pipeline verification)
+
+### Client
+- `--testcrash` command-line flag crashes immediately after Sentry init — client counterpart of the server's `testcrash confirm`. Verified: Release client crash uploads at crash time, tagged `production`. **Client → 0.4.6**, deployed to the update server.
+
 # Release builds now produce PDBs (Sentry symbolication)
 
 ### Build

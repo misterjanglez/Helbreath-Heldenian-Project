@@ -6,6 +6,7 @@
 #include "auto_updater.h"
 #include <memory>
 #include <cstdlib>
+#include <cstring>
 #include <ctime>
 #include "Benchmark.h"
 #include "error_monitor.h"
@@ -17,6 +18,14 @@ int GameMain(hb::shared::types::NativeInstance native_instance, int icon_resourc
 {
 	// Crash reporting first, so even startup failures are captured
 	auto monitoring = hb::shared::error_monitor::start("helbreath-client", hb::version::client::full_version);
+
+	// --testcrash: deliberate crash to verify the reporting pipeline
+	// (client counterpart of the server's 'testcrash confirm' console command)
+	if (cmdLine && std::strstr(cmdLine, "--testcrash"))
+	{
+		volatile int* null_pointer = nullptr;
+		*null_pointer = 42;
+	}
 
 #ifdef _DEBUG
 	DebugConsole::allocate();
