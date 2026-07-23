@@ -53,7 +53,8 @@ ServerConsole::~ServerConsole()
 #ifdef _WIN32
 	SetConsoleMode(m_in, m_orig_mode);
 #else
-	tcsetattr(STDIN_FILENO, TCSANOW, &m_orig_termios);
+	if (m_is_tty)
+		tcsetattr(STDIN_FILENO, TCSANOW, &m_orig_termios);
 #endif
 }
 
@@ -78,6 +79,16 @@ bool ServerConsole::init()
 	if (GetConsoleMode(m_out, &outMode))
 		SetConsoleMode(m_out, outMode | ENABLE_VIRTUAL_TERMINAL_PROCESSING);
 #else
+	// Pipe mode: stdin is not a terminal (e.g. a systemd FIFO on a headless
+	// box). Raw mode and prompt drawing don't apply — commands are read as
+	// plain newline-terminated lines in poll_input.
+	m_is_tty = isatty(STDIN_FILENO) != 0;
+	if (!m_is_tty)
+	{
+		m_init = true;
+		return true;
+	}
+
 	// Set terminal to raw mode (no echo, no canonical buffering)
 	if (tcgetattr(STDIN_FILENO, &m_orig_termios) < 0)
 		return false;
@@ -97,14 +108,14 @@ bool ServerConsole::init()
 
 void ServerConsole::clear_input_line()
 {
-	if (!m_init) return;
+	if (!m_init || !m_is_tty) return;
 	std::fputs("\r\033[K", stdout);
 	std::fflush(stdout);
 }
 
 void ServerConsole::draw_input_line()
 {
-	if (!m_init) return;
+	if (!m_init || !m_is_tty) return;
 	// Clear line, draw green "> " prompt, input text in bright white, reset
 	std::fputs("\r\033[K\033[1;32m> \033[1;37m", stdout);
 	if (m_input_len > 0)

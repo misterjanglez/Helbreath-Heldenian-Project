@@ -40,6 +40,7 @@ private:
 	int m_input_len;
 	int m_cursor_pos;
 	bool m_init;
+	bool m_is_tty = true;  // false = stdin is a pipe/FIFO (headless): no raw mode, no prompt drawing
 
 	// Command history
 	static constexpr int max_history = 64;
