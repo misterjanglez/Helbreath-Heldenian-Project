@@ -1,3 +1,9 @@
+# Release builds now produce PDBs (Sentry symbolication)
+
+### Build
+- Client and Server Release configs link with `GenerateDebugInformation=true` — PDBs are local-only (never in the update manifest) but required for symbolicated crash reports from shipped builds.
+- Client 0.4.5 deployed to the update server (651 files incl. `sentry.dll`, `crashpad_handler.exe`, `crashpad_wer.dll`); players self-update on next launch.
+
 # Sentry environment override (SENTRY_ENVIRONMENT)
 
 ### Shared
