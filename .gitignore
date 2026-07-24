@@ -389,8 +389,13 @@ tools/InstallerCreator/Helbreath/
 # Auto-downloaded CLI tools (Scripts/upload_symbols.ps1 fetches sentry-cli)
 Scripts/tools/
 
-# Per-machine LAN override (deliberately not distributed)
+# Per-machine LAN override + local toggle (deliberately not distributed)
 Binaries/Game/server_override.txt
+Binaries/Game/server_override.txt.disabled
+
+# Local runtime junk (client screenshots, settings backups)
+Binaries/Game/save/helshot*.png
+Binaries/Game/*.bak
 
 # Account DB migration backups
 Binaries/Server/accounts/*.bak
