@@ -1,3 +1,183 @@
+# Faithful frozen recolor + weapon afterimage (completes issue #3 code work)
+
+Replicates the original DDraw client's two **scaled-base** special-case draws — the last code items on the #2/#3 faithful-coloring workstream. Both now use the additive-offset blends (`offset_tinted`/`additive_tinted`) that #21 established for worn gear, instead of the multiplicative stand-ins, so sprite highlights survive.
+
+**Naming correction:** the `−base/2` body recolor is the **Frozen** status (original `sStatus & 0x40`, drawn opaque via `PutSpriteRGB`), not "berserk" as #3's notes loosely labeled it. Berserk in the original (`& 0x20`) is only a subtle `(0,−5,−5)` overlay, and the `−base/2`/`−base/3` draws are gated on Frozen / the swing frame, not berserk. The ticket body's "replicate where they exist" settles it: `−base/2` lands on Frozen, `−base/3` on the swing afterimage.
+
+### Client
+- New `CGame::frozen_tint_params()` — the original Frozen body recolor: opaque additive offset `clamp(src + (regular[10] − regular[0]/2))` (icy blue, highlight-preserving). Replaces the multiplicative `tint(94,160,208)` in `RenderHelpers::draw_body`, the single body-draw chokepoint every render state routes through (the original repeated this recolor in ~20 places).
+- New `CGame::afterimage_tint_params()` — the original weapon/body swing afterimage: transparent additive offset `clamp(src + (regular[10] − regular[0]/3))` (DDraw `PutTransSpriteRGB`). Replaces the fixed `tinted_alpha(126,192,242,0.7)` swing trail at all six original-afterimage sites: the attack swing trail (`PlayerRenderer` OnAttack + OnAttackMove) and the magic-dash body+weapon+shield ghost (`PlayerRenderer` + `NpcRenderer`).
+- Both helpers read the runtime palette (regular indices 10/0), so they track server palette hot-reloads like the rest of the dye system. Default additive alpha matches the sibling weapon-glare overlay.
+- The Haste trail (5 stacked body ghosts) keeps its own fixed light-blue tint — a modern-only effect with no `−base/N` analogue in the original; now commented as intentional.
+
+### Not changed
+- Berserk `(0,−5,−5)` and protection-from-magic `(−5,0,+5)` body overlays are fixed offsets, not scaled-base draws — outside this ticket's scope.
+- Manual side-by-side of the five reference items on the character doll vs the original client remains the open QA item on #3.
+
+### Versioning
+- Client → 0.6.1 (client-only render change; compatibility and server unchanged).
+
+# Worn equipment coloring: original additive-offset dye (fixes DK/DM flat-black armor)
+
+Resolves issue #21 — the worn-equipment slice of the #2/#3 faithful-coloring workstream. Gear on in-world characters and the character select/create preview was tinted **multiplicatively** (`DrawParams::tint`), which scales each texel by `palette[color]/255` — crushing a 255 specular highlight to 40 for the Dark Knight/Mage armor (palette entry 6 = 40,40,40) and rendering it flat black. The original DDraw client (and the already-fixed inventory icons, `draw_item_sprite`) instead **add a signed offset** `clamp(src + palette[color] - palette[0])` (base = regular index 0, gray 100,100,100), which preserves highlights for the glossy dark look.
+
+### Client
+- New `CGame::worn_tint_params(color, weapon)` — the original PutSpriteRGB additive-offset dye, mirroring `draw_item_sprite`'s math so worn gear matches its icon. Weapon colors 1-9 read the weapon sub-palette (dual-palette rule); armor/shield/mantle/pants/boots/arm/helm read the regular table. Worn colors are 4-bit (0-15); color 0 = plain draw (unchanged).
+- `RenderHelpers.cpp` (`draw_equip_layer`, `draw_weapon`, `draw_shield`) and the menu-preview path (`draw_object_on_move_for_menu`) now route through it. Hair keeps its extended-palette (32-47) absolute tint per #3.
+
+### Engine (SFMLEngine)
+- The additive-offset fragment shader now multiplies its result by `gl_Color` (was applying only `gl_Color.a`), and the offset draw path no longer force-overwrites the sprite color to white. Together these let night-mode darkening (and alpha) reach offset-tinted draws, so worn gear keeps dimming at night in step with the body it sits on. Backward-compatible: existing offset callers pass white RGB (a no-op multiply), and item icons (no alpha-effect) are unaffected.
+
+### Not changed (remaining #3 follow-ups)
+- Weapon/shield glare overlays and berserk glow are untouched; the original's scaled-base special-case draws (−base/2 berserk, −base/3 afterimage) are not yet replicated.
+
+# Dark items: evolution trees corrected per official-server behavior
+
+### Evolution chains (player clarification of official HB USA behavior)
+- **Dark Knight**: Flameberge → Giant Sword at **+4**, Giant Sword → Dark Knight Templar at **+8** (not glowing), Templar starts glowing when maxed at **+15**. The Great Sword (battle-mage weapon) stays claimable and never evolves — the prior Great Sword→Giant Sword wiring is removed.
+- **Dark Mage**: Magic Staff → Magic Wand at **+4**, Magic Wand → **Dark Mage Dragon Wand** at **+8** (not glowing), Dragon Wand starts glowing at **+15**. Item 746 renamed "Dark Mage Templar" → "Dark Mage Dragon Wand" (its real name on official servers; BlackMageTemple in the CENTUU cfg); `ItemId::DarkMageStaff` constant renamed `DarkMageDragonWand`.
+- The +15 glow is now its own final stage on both lines: reaching max sets instance color 9 in place (no model change), lighting the client's pulsating `dk_glare`.
+- Thresholds fire on the +2 upgrades that reach +4/+8/+15 (conditions ≥2/≥6/≥14), so odd-valued legacy items still evolve on their next upgrade.
+
+### Versioning
+- Server → 0.8.0 (server-only; claim menu and protocol unchanged).
+
+# Dark items: official HB USA progression confirmed and implemented
+
+### Primary source found
+- The official Helbreath USA Dark Knight guide (helbreathusa.com/darkknightinfo.php, archived 2008-03-08) settles the design: at 180 a GM email placed the armor plus "a weapon or wand depending on your character stats"; upgrades step **+2** (+0→+2→…→+14→+15) with costs 2, 4, 7, 11, 16, 22, 29, 37 — exactly the CENTUU `x(x+6)/8+2` formula at even levels, 128 points total, no fail chance. Our implementation now reproduces that table digit-for-digit.
+
+### Progression tree (documented in CONTEXT.md)
+- Symmetric evolution chains, base forms claimable at City Hall, evolutions earned: **Great Sword → Giant Sword (+12) → Dark Knight Templar (+15)** and **Magic Staff → Magic Wand (+12) → Dark Mage Templar (+15)**. Flameberge and Rapier are standalone.
+- Claim menu trimmed to base forms: Giant Sword and Magic Wand removed (earned via the chains); male-only Scale Mail / Leather Armor removed outright, which also retires the client's sex-greying machinery.
+- Both Templar transforms stamp instance color 9 — the client's existing `dk_glare` renders the legacy pulsating glow (blue DK / green DM).
+
+### Server (ItemManager.cpp)
+- Majestic weapon/wand upgrades step +2 (thresholds re-anchored to >=10 / >=14 so stages fire on the upgrades reaching +12 / +15).
+- New `transform_majestic_item()` helper replaces six copy-pasted delete/re-init/re-bind blocks; dead shark-item ids (703/709/736) dropped from the weapon route; ids now use named `ItemId` constants.
+
+### Data (gamedata.db)
+- Dark Knight Full-Helm (707/725) had the Hauberk's `display_id` (21) — claiming a Full-Helm visually produced a hauberk. Corrected to the full-helm visual (0).
+
+### Tracked
+- Armor "flat black vs original glossy" tint difference filed as issue #21 (multiply-tint vs DDraw palette swap — rendering-model work, separate pass).
+
+### Versioning
+- Server → 0.7.0, Client → 0.6.0 (compatibility unchanged at 0.6.0 — no protocol change).
+
+# Fix: Dark item majestic evolution stages now actually fire
+
+### Research findings (vs HB382_CENTUU)
+- The majestic upgrade **cost formula was already faithful** on both sides: `x(x+6)/8 + 2` points at level x (2, 2, 4, 5, 7, 8, 11, 13, 16, 18, 22, 25, 29, 32, 37) — server routes and the client upgrade dialog agree. Not n+1.
+- The **stat gates were already faithful**: `equip_item_handler` enforces the original per-stat armor requirements (`item_effect_value4/5`; the Dark Mage Robe requires MAG 100, same as wizard robes) plus the weight rule (`weight > STR x 1000` — Dark Knight Plate Mail needs STR 100). The original gates at equip time, not at claim time; most DK/DM pieces carry no stat requirement in any legacy data.
+- The **evolution stages were dead code in CENTUU itself** (inherited by our port): the handler rejects items already at +15 before the `== 15` transform branches can run, so only staff→wand at +11→12 was ever reachable. The 746→892 stage references an item defined in no known config or DB — had it ever fired it would have destroyed the wand.
+
+### Server (ItemManager.cpp)
+- Wand line now completes: Dark Mage Magic Staff → Magic Wand at +12 (unchanged), Magic Wand → **Dark Mage Templar** on the upgrade that reaches +15 (re-anchored from the unreachable `== 15` to `== 14`). The 892 branch is removed; the Templar is the final stage.
+- Sword line now has its stage: Dark Knight Giant Sword → **Dark Knight Templar** on the upgrade that reaches +15, mirroring the wand line. Designed deviation: legacy data ships 737/745 with identical stats (the stage is the prestige appearance) but no legacy source ever wired the transform.
+- Legacy bug fix: the female Dark Mage Magic Staff (732) was excluded from the staff→wand transform (only 714 was checked) and could never evolve.
+- Great Sword, Flameberge, and Rapier have no evolution in any legacy source — left as plain majestic-upgradeable, matching CENTUU.
+
+### Versioning
+- Server → 0.6.0 (server-only behavior; transforms ride the existing GizonItemChange notify, no protocol change).
+
+# Feature: Dark Knight / Dark Mage items claimable at City Hall at max level
+
+### Design note
+- No legacy source implements a City Hall handout of the DK/DM sets (CENTUU only reaches them via majestic upgrades; Snoopy 3.82 has an evil-side event-666 set). This is a deliberate designed addition modeled on the hero-item flow: at max level (180), citizens claim the Dark items from the City Hall Officer — free, re-claimable, and unique-owner bound (never tradeable).
+
+### Server
+- New `ItemManager::get_dark_item_handler` (separate from the hero mantle handler): validates level >= max_level and citizenship, resolves the sex variant server-side from a named-constant table (`female == 0` marks male-only pieces like the mage scale mail / leather armor), grants with `UniqueOwner` binding, logs to the events channel.
+- New `CommonType::ReqGetDarkItem` (0x0A7B, placed clear of the tester-only id block).
+
+### Client
+- Three new City Hall dialog pages (separate from the hero pages): class select (Dark Knight / Dark Mage), 8-piece item list per class, confirm. Entry row "Take the DARK's items" on the main City Hall menu, enabled at max level. Male-only pieces grey out for female characters. Draw and click share the same `ui_rect` hit-rects, and the hero/dark confirm pages now share one draw/click implementation.
+- The client sends only the base item id; the server owns variant resolution (unlike the hero flow, where the client picks the final id).
+
+### Shared / data
+- `ItemId`: named constants added for the full DK/DM sets (706-738). Fixed stale constants `SwordofMedusa`/`SwordofIceElemental` (724/725 → 613/614, matching gamedata.db) — they had collided with the female DK hauberk/full-helm ids in `is_special_item()`.
+- gamedata.db: item 706 renamed "Dark Knight Full-Helm (M)" → "Dark Knight Hauberk (M)" (its stats were always the hauberk's; 707 is the helm). The Flameberge stays consolidated as unisex 727; 709 intentionally not re-added.
+
+### Versioning
+- Compatibility → 0.6.0 (new packet), Client → 0.5.0, Server → 0.5.0.
+
+# Fix: Illusion-Movement spells dealt damage instead of inverting movement
+
+### Game data (gamedata.db, magic_configs)
+- `Illusion-Movement` (77) and `Mass-Illusion-Movement` (95) were configured as magic type 21 (`damage_area_nospot`, the Meteor-Strike class), so they dealt 7d7+20 area damage. This bug is inherited from the original HGServer/CENTUU `Magic.cfg`; the confuse handler (type 16, value4=4) that inverts the victim's movement was never reachable. Server (`MagicManager` Confuse case 4) and client (`m_illusion_mvt` direction reversal) code paths were already correct — data-only fix, no rebuild.
+- New values per the Snoopy 3.82 reference cfg: type 16, value4=4, damage dice zeroed; durations 30s/60s; Mass radius 3x3 (matching Mass-Illusion). Mana/gold/int-limit untouched.
+
+# Release 0.4.7 DEPLOYED: launcher + Medieval Times loading screen live
+
+### Deployed (2026-07-23, via ssh to the Debian box)
+- `Launcher_x64_win.exe`, `Game_x64_win.exe` (0.4.7), `intermediate_screens.pak`, and the 0.4.7 manifest uploaded to `~/helbreath/updates/game` (manifest last, so no client ever saw a stale-file window). All three payloads SHA-verified back through the running update server; live manifest confirmed 0.4.7 / 652 entries from the public endpoint.
+- Clean-room verification: the shipped Release launcher in an empty folder against production shows "Latest: 0.4.7" with the Install flow.
+- Existing players now pull ~11 MB (new client + loading screen + the launcher itself) on next launch; once on 0.4.7, launcher-spawned sessions skip the embedded update check.
+
+# Release 0.4.7 staged: launcher ships + Medieval Times loading screen
+
+### Versioning
+- **Client → 0.4.7** (launcher env-gate in Wmain; `_CRT_SECURE_NO_WARNINGS` for the `std::getenv` read, matching the error_monitor pattern). Release built, Sentry symbols uploaded (client + launcher + server PDBs).
+- Launcher 0.1.0-alpha Release built.
+
+### Deploy staging (Binaries/Game)
+- `Game_x64_win.exe` (0.4.7), `Launcher_x64_win.exe` (new), rebranded `sprites/interface/intermediate_screens.pak` staged; production manifest regenerated as 0.4.7 (652 entries). Diff vs live 0.4.6: +1 added (launcher), 2 changed (client exe, loading screen), 0 dropped — ~11 MB player download.
+
+# Launcher E2E verified + update-endpoint override + skip-list fixes
+
+### Launcher / AutoUpdater
+- New `update_override.txt` (beside launcher or game exe): "host port" redirects the update server — staging/testing analogue of `server_override.txt`. Read by both the launcher and the client's embedded updater.
+- Full E2E pass against a local `update_server.py` instance: fresh 654-file install (SHA-verified, launcher excluded from install, staging cleaned), instant up-to-date relaunch, settings read-modify-write (foreign JSON keys preserved), 1-file update flow, launcher self-update round-trip (binary swapped, no residue, no relaunch loop), Play spawning the game with correct working directory.
+
+### Tooling
+- `server_override.txt` and `update_override.txt` added to `gen_update_manifest.py` and `make_installer.py` skip lists — machine-local overrides are never shipped or clobbered by updates (restores the documented `server_override.txt` guarantee, which had regressed).
+
+# Launcher: 3x window, branded logo overlay, artwork as embedded binary
+
+### Launcher
+- Window scaled to 1440x1080 via a single `layout::ui_scale` knob (rects, fonts, border widths all derive from it; art regenerated to match).
+- The silver "Helbreath: Medieval Times" logo is now composited onto the launcher backdrop (top-center, matching the game loading screen). Logo asset lives at `tools/hbmt_logo.png`; `gen_launcher_art.py` composites it during baking.
+- Logo cleanup: the left subtitle ornament carried emblem fragments from the original luminance-key — both ornaments now use the clean right-side winged cross (mirrored). The in-game loading screen PAK was rebuilt with the corrected logo too.
+- Artwork embedding switched from a C array header (6M elements blew MSVC's compiler heap at 3x) to `launcher_art.bin` + RCDATA resource on Windows; Linux will use `.incbin`. `launcher_art.h` now carries dimensions only.
+
+# Launcher: full state machine — Install / Update / Play (Windows)
+
+### Launcher
+- The launcher now checks first and acts second: fetches the manifest, then presents exactly one primary action — **Play Game** (up to date), **Update** (N files, size shown), **Install** (game not on disk: folder picker with default path, writability probe, non-empty-folder double-confirm), or **Retry** (server unreachable with nothing installed). Installed + unreachable = playable offline with an indicator.
+- Launch options in the launcher: Windowed/Borderless/Fullscreen and resolution cycle selectors, persisted straight into the game's `settings.json` (read-modify-write preserving all client-owned keys, `.bak` before write).
+- Self-update: if the manifest carries a newer launcher, it stages its own `.update`, swaps and relaunches — with a loop guard against bad uploads. Launcher entries are always excluded from game plans.
+- `version.txt` written to the install dir after every successful install/update; "Installed: X | Latest: Y" shown in the window.
+- Game processes spawned with `HB_LAUNCHED_BY_LAUNCHER=1` and CWD = install dir.
+- Cancel/close mid-download keeps staging — next Install/Update resumes where it left off.
+
+### Client
+- Embedded update check now skipped when spawned by the launcher (env flag); still runs on direct exe launches as a safety net. **Client → 0.4.7** on next release build.
+
+### Tooling
+- `gen_update_manifest.py` + `make_installer.py` skip `launcher.json`/`version.txt` (installer also skips `settings.json` + manifest); installer shortcut/run target is now `Launcher_x64_win.exe`, display name "Helbreath: Medieval Times".
+
+# Launcher skeleton: branded window with custom widgets (Windows)
+
+### Launcher
+- New `Sources/Launcher/` project (`Launcher_x64_win.exe`, in the solution + `build.ps1 -Target Launcher`): 480x360 branded window — splash artwork backdrop, status line, progress bar, primary CTA button, launch-mode + resolution cycle selectors, install-path field with native folder browser (IFileDialog). All widgets custom-drawn from shared layout rects (`launcher_layout.h`) so the upcoming X11 backend renders identically; double-buffered GDI, event-queue interface (`launcher_gui.h`).
+- Pending self-update swap (`.update`/`.old` + re-exec) wired at entry.
+- State machine, install/update/play flows land next — current build is the UI shell.
+
+# Launcher version track + embedded artwork generator
+
+### Build
+- `[Launcher Version]` (0.1.0-alpha) added to `version.cfg`; `version_gen.py` now emits `hb::version::launcher`, `VER_LAUNCHER_*` RC defines, `HB_LAUNCHER_*` CMake vars, and manages `build_counter_launcher.txt` (`--target launcher`).
+- New `tools/gen_launcher_art.py`: bakes the splash artwork into `Sources/Launcher/launcher_art.h` (480x360 raw BGRX, bottom strip pre-darkened for launcher chrome). Run manually on art changes; header is committed — no build-time Pillow dependency.
+
+# AutoUpdater core refactor: scan/apply split (launcher groundwork)
+
+### AutoUpdater
+- New GUI-free engine `updater_core.h/.cpp`: `scan(target_dir)` (manifest fetch + SHA compare → `update_plan`, manifest version now surfaced for display) and `apply(plan, target_dir, exe_strategy, progress_callback)` (parallel download with staged-hash resume, verify, disperse). Callers own UI, retry policy, and target directory — groundwork for the standalone launcher.
+- `check_for_updates()` reduced to a thin wrapper over the core; in-client behavior unchanged (same dialogs, same progress window, same `.update`/`.old` exe-swap).
+- New `exe_strategy`: `stage_for_swap` (in-process self-update, unchanged) vs `write_direct` (launcher updating a not-running game).
+- Data-file disperse now renames from staging (same volume) with copy fallback — cheaper, and atomically replaces busy binaries on Linux.
+- New constant `launcher_exe_name` (`Launcher_x64_win.exe` / `Launcher_x64_linux`).
+
 # Sentry dashboard config (not in repo)
 
 ### Ops
