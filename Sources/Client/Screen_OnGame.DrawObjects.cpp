@@ -1135,7 +1135,7 @@ void Screen_OnGame::dk_glare(int weapon_color, int16_t weapon_item_id, int* weap
 	{
 		*weapon_glare = 3;
 	}
-	else if (weapon_item_id == 746) // Dark Mage Templar
+	else if (weapon_item_id == 746) // Dark Mage Dragon Wand
 	{
 		*weapon_glare = 2;
 	}

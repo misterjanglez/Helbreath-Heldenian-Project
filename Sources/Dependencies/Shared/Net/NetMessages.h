@@ -153,6 +153,7 @@ namespace CommonType
 		EnchantItem                             = 0x0A73,
 		UpgradeEnchant                          = 0x0A74,
 		DisenchantItem                          = 0x0A75,
+		ReqGetDarkItem                          = 0x0A7B,	// 0x0A76-0x0A7A reserved by the tester block below
 #ifdef TESTER_ONLY
 		// TESTER MENU — tester-only commands
 		TesterAction                            = 0x0A76,

@@ -1799,6 +1799,25 @@
 
 #define DRAW_DIALOGBOX_CITYHALL_MENU77  "Map Name:{} Cost : {}"
 
+#define DRAW_DIALOGBOX_CITYHALL_DARKITEM1	"Take the DARK's items."
+#define DRAW_DIALOGBOX_CITYHALL_DARKITEM2	"Which items do you seek?"
+#define DRAW_DIALOGBOX_CITYHALL_DARKITEM3	"Dark Knight's items"
+#define DRAW_DIALOGBOX_CITYHALL_DARKITEM4	"Dark Mage's items"
+#define DRAW_DIALOGBOX_CITYHALL_DARKITEM5	"Here are the available Dark items :"
+
+#define DRAW_DIALOGBOX_CITYHALL_DARKITEM_DK1	"Dark Knight Hauberk"
+#define DRAW_DIALOGBOX_CITYHALL_DARKITEM_DK2	"Dark Knight Full-Helm"
+#define DRAW_DIALOGBOX_CITYHALL_DARKITEM_DK3	"Dark Knight Leggings"
+#define DRAW_DIALOGBOX_CITYHALL_DARKITEM_DK4	"Dark Knight Plate Mail"
+#define DRAW_DIALOGBOX_CITYHALL_DARKITEM_DK5	"Dark Knight Flameberge"
+#define DRAW_DIALOGBOX_CITYHALL_DARKITEM_DK6	"Dark Knight Great Sword"
+#define DRAW_DIALOGBOX_CITYHALL_DARKITEM_DK7	"Dark Knight Rapier"
+#define DRAW_DIALOGBOX_CITYHALL_DARKITEM_DM1	"Dark Mage Hauberk"
+#define DRAW_DIALOGBOX_CITYHALL_DARKITEM_DM2	"Dark Mage Chain Mail"
+#define DRAW_DIALOGBOX_CITYHALL_DARKITEM_DM5	"Dark Mage Leggings"
+#define DRAW_DIALOGBOX_CITYHALL_DARKITEM_DM6	"Dark Mage Robe"
+#define DRAW_DIALOGBOX_CITYHALL_DARKITEM_DM7	"Dark Mage Magic Staff"
+
 
 #define DEF_MSG_NOTIFY_AGRICULTURENOAREA	"This is not an area to farm."
 #define DEF_MSG_NOTIFY_AGRICULTURESKILLLIMIT	"Farming is not possible with your current farming skill."

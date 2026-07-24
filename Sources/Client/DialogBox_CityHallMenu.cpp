@@ -5,6 +5,7 @@
 #include "GameFonts.h"
 #include "TextLibExt.h"
 #include <format>
+#include <iterator>
 #include <string>
 #include "IInput.h"
 #include "Packet/SharedPackets.h"
@@ -44,7 +45,56 @@ void DialogBox_CityHallMenu::on_draw()
 	case mode::change_play_mode:       DrawMode9_ChangePlayMode(sX, sY, size_x); break;
 	case mode::teleport_menu:          DrawMode10_TeleportMenu(sX, sY, size_x); break;
 	case mode::hero_item_confirm:      DrawMode11_HeroItemConfirm(sX, sY, size_x); break;
+	case mode::dark_item_class:        DrawMode12_DarkItemClass(sX, sY, size_x); break;
+	case mode::dark_items:             DrawMode13_DarkItems(sX, sY, size_x); break;
+	case mode::dark_item_confirm:      DrawMode14_DarkItemConfirm(sX, sY, size_x); break;
 	}
+}
+
+// One selectable piece on the dark-items list page. The base (male) id is sent;
+// the server resolves the sex variant. Only base forms are listed — the Giant
+// Sword and Magic Wand are earned through the majestic evolution chains.
+struct dark_item_entry
+{
+	const char* label;
+	int item_id;
+};
+
+struct dark_item_page
+{
+	const dark_item_entry* items;
+	int count;
+};
+
+static constexpr dark_item_entry dark_knight_items[] =
+{
+	{ DRAW_DIALOGBOX_CITYHALL_DARKITEM_DK1, 706 },
+	{ DRAW_DIALOGBOX_CITYHALL_DARKITEM_DK2, 707 },
+	{ DRAW_DIALOGBOX_CITYHALL_DARKITEM_DK3, 708 },
+	{ DRAW_DIALOGBOX_CITYHALL_DARKITEM_DK4, 710 },
+	{ DRAW_DIALOGBOX_CITYHALL_DARKITEM_DK5, 727 },
+	{ DRAW_DIALOGBOX_CITYHALL_DARKITEM_DK6, 718 },
+	{ DRAW_DIALOGBOX_CITYHALL_DARKITEM_DK7, 717 },
+};
+
+static constexpr dark_item_entry dark_mage_items[] =
+{
+	{ DRAW_DIALOGBOX_CITYHALL_DARKITEM_DM1, 711 },
+	{ DRAW_DIALOGBOX_CITYHALL_DARKITEM_DM2, 712 },
+	{ DRAW_DIALOGBOX_CITYHALL_DARKITEM_DM5, 713 },
+	{ DRAW_DIALOGBOX_CITYHALL_DARKITEM_DM6, 715 },
+	{ DRAW_DIALOGBOX_CITYHALL_DARKITEM_DM7, 714 },
+};
+
+static constexpr dark_item_page dark_pages[2] =
+{
+	{ dark_knight_items, static_cast<int>(std::size(dark_knight_items)) },
+	{ dark_mage_items,   static_cast<int>(std::size(dark_mage_items)) },
+};
+
+static const dark_item_page& dark_page(bool mage_page)
+{
+	return dark_pages[mage_page ? 1 : 0];
 }
 
 void DialogBox_CityHallMenu::DrawMode0_MainMenu(short sX, short sY, short size_x)
@@ -137,6 +187,17 @@ void DialogBox_CityHallMenu::DrawMode0_MainMenu(short sX, short sY, short size_x
 	}
 	else
 		hb::shared::text::draw_text_aligned(GameFont::Default, sX, sY + 220, (sX + size_x) - (sX), 15, DRAW_DIALOGBOX_CITYHALL_MENU14, hb::shared::text::TextStyle::from_color(GameColors::UIDisabled), hb::shared::text::Align::TopCenter);
+
+	// Dark items (max level only)
+	if (player().m_level >= m_game->m_max_level)
+	{
+		if (mouse_in(link_dark_items))
+			hb::shared::text::draw_text_aligned(GameFont::Default, sX, sY + 245, (sX + size_x) - (sX), 15, DRAW_DIALOGBOX_CITYHALL_DARKITEM1, hb::shared::text::TextStyle::from_color(GameColors::UIWhite), hb::shared::text::Align::TopCenter);
+		else
+			hb::shared::text::draw_text_aligned(GameFont::Default, sX, sY + 245, (sX + size_x) - (sX), 15, DRAW_DIALOGBOX_CITYHALL_DARKITEM1, hb::shared::text::TextStyle::from_color(GameColors::UIMagicBlue), hb::shared::text::Align::TopCenter);
+	}
+	else
+		hb::shared::text::draw_text_aligned(GameFont::Default, sX, sY + 245, (sX + size_x) - (sX), 15, DRAW_DIALOGBOX_CITYHALL_DARKITEM1, hb::shared::text::TextStyle::from_color(GameColors::UIDisabled), hb::shared::text::Align::TopCenter);
 
 	hb::shared::text::draw_text_aligned(GameFont::Default, sX, sY + 270, (sX + size_x) - (sX), 15, DRAW_DIALOGBOX_CITYHALL_MENU17, hb::shared::text::TextStyle::from_color(GameColors::UIBlack), hb::shared::text::Align::TopCenter);
 }
@@ -394,10 +455,15 @@ void DialogBox_CityHallMenu::DrawMode10_TeleportMenu(short sX, short sY, short s
 
 void DialogBox_CityHallMenu::DrawMode11_HeroItemConfirm(short sX, short sY, short size_x)
 {
+	draw_item_confirm(sX, sY, size_x, m_cTakeHeroItemName.c_str());
+}
+
+void DialogBox_CityHallMenu::draw_item_confirm(short sX, short sY, short size_x, const char* item_name)
+{
 	short mouse_x = static_cast<short>(hb::shared::input::get_mouse_x());
 	short mouse_y = static_cast<short>(hb::shared::input::get_mouse_y());
-	hb::shared::text::draw_text_aligned(GameFont::Default, sX, sY + 125, (sX + size_x - 1) - (sX), 15, m_cTakeHeroItemName.c_str(), hb::shared::text::TextStyle::from_color(GameColors::UILabel), hb::shared::text::Align::TopCenter);
-	hb::shared::text::draw_text_aligned(GameFont::Default, sX + 1, sY + 125, (sX + size_x) - (sX + 1), 15, m_cTakeHeroItemName.c_str(), hb::shared::text::TextStyle::from_color(GameColors::UILabel), hb::shared::text::Align::TopCenter);
+	hb::shared::text::draw_text_aligned(GameFont::Default, sX, sY + 125, (sX + size_x - 1) - (sX), 15, item_name, hb::shared::text::TextStyle::from_color(GameColors::UILabel), hb::shared::text::Align::TopCenter);
+	hb::shared::text::draw_text_aligned(GameFont::Default, sX + 1, sY + 125, (sX + size_x) - (sX + 1), 15, item_name, hb::shared::text::TextStyle::from_color(GameColors::UILabel), hb::shared::text::Align::TopCenter);
 	hb::shared::text::draw_text_aligned(GameFont::Default, sX, sY + 260, (sX + size_x) - (sX), 15, DRAW_DIALOGBOX_CITYHALL_MENU46A, hb::shared::text::TextStyle::from_color(GameColors::UILabel), hb::shared::text::Align::TopCenter);
 
 	if ((mouse_x >= sX + ui_layout::left_btn_x) && (mouse_x <= sX + ui_layout::left_btn_x + ui_layout::btn_size_x) && (mouse_y >= sY + ui_layout::btn_y) && (mouse_y <= sY + ui_layout::btn_y + ui_layout::btn_size_y))
@@ -409,6 +475,42 @@ void DialogBox_CityHallMenu::DrawMode11_HeroItemConfirm(short sX, short sY, shor
 		m_game->draw_new_dialog_box(InterfaceNdButton, sX + ui_layout::right_btn_x, sY + ui_layout::btn_y, 3);
 	else
 		m_game->draw_new_dialog_box(InterfaceNdButton, sX + ui_layout::right_btn_x, sY + ui_layout::btn_y, 2);
+}
+
+void DialogBox_CityHallMenu::DrawMode12_DarkItemClass(short sX, short sY, short size_x)
+{
+	hb::shared::text::draw_text_aligned(GameFont::Default, sX, sY + 60, (sX + size_x) - (sX), 15, DRAW_DIALOGBOX_CITYHALL_DARKITEM2, hb::shared::text::TextStyle::from_color(GameColors::UIWhite), hb::shared::text::Align::TopCenter);
+
+	if (mouse_in(dark_class_knight_row))
+		hb::shared::text::draw_text_aligned(GameFont::Default, sX, sY + 125, (sX + size_x) - (sX), 15, DRAW_DIALOGBOX_CITYHALL_DARKITEM3, hb::shared::text::TextStyle::from_color(GameColors::UIWhite), hb::shared::text::Align::TopCenter);
+	else
+		hb::shared::text::draw_text_aligned(GameFont::Default, sX, sY + 125, (sX + size_x) - (sX), 15, DRAW_DIALOGBOX_CITYHALL_DARKITEM3, hb::shared::text::TextStyle::from_color(GameColors::UIMagicBlue), hb::shared::text::Align::TopCenter);
+
+	if (mouse_in(dark_class_mage_row))
+		hb::shared::text::draw_text_aligned(GameFont::Default, sX, sY + 155, (sX + size_x) - (sX), 15, DRAW_DIALOGBOX_CITYHALL_DARKITEM4, hb::shared::text::TextStyle::from_color(GameColors::UIWhite), hb::shared::text::Align::TopCenter);
+	else
+		hb::shared::text::draw_text_aligned(GameFont::Default, sX, sY + 155, (sX + size_x) - (sX), 15, DRAW_DIALOGBOX_CITYHALL_DARKITEM4, hb::shared::text::TextStyle::from_color(GameColors::UIMagicBlue), hb::shared::text::Align::TopCenter);
+}
+
+void DialogBox_CityHallMenu::DrawMode13_DarkItems(short sX, short sY, short size_x)
+{
+	const dark_item_page& page = dark_page(m_dark_mage_page);
+
+	hb::shared::text::draw_text_aligned(GameFont::Default, sX, sY + 60, (sX + size_x) - (sX), 15, DRAW_DIALOGBOX_CITYHALL_DARKITEM5, hb::shared::text::TextStyle::from_color(GameColors::UIWhite), hb::shared::text::Align::TopCenter);
+
+	for (int i = 0; i < page.count; i++)
+	{
+		short row_y = static_cast<short>(sY + dark_item_row(i).y);
+		if (mouse_in(dark_item_row(i)))
+			hb::shared::text::draw_text_aligned(GameFont::Default, sX, row_y, (sX + size_x) - (sX), 15, page.items[i].label, hb::shared::text::TextStyle::from_color(GameColors::UIWhite), hb::shared::text::Align::TopCenter);
+		else
+			hb::shared::text::draw_text_aligned(GameFont::Default, sX, row_y, (sX + size_x) - (sX), 15, page.items[i].label, hb::shared::text::TextStyle::from_color(GameColors::UIMagicBlue), hb::shared::text::Align::TopCenter);
+	}
+}
+
+void DialogBox_CityHallMenu::DrawMode14_DarkItemConfirm(short sX, short sY, short size_x)
+{
+	draw_item_confirm(sX, sY, size_x, m_take_dark_item_name);
 }
 
 bool DialogBox_CityHallMenu::on_click()
@@ -428,6 +530,9 @@ bool DialogBox_CityHallMenu::on_click()
 	case mode::change_play_mode:     return on_click_mode9(sX, sY);
 	case mode::teleport_menu:        return on_click_mode10(sX, sY);
 	case mode::hero_item_confirm:    return on_click_mode11(sX, sY);
+	case mode::dark_item_class:      return on_click_mode12(sX, sY);
+	case mode::dark_items:           return on_click_mode13(sX, sY);
+	case mode::dark_item_confirm:    return on_click_mode14(sX, sY);
 	}
 	return false;
 }
@@ -503,6 +608,15 @@ bool DialogBox_CityHallMenu::on_click_mode0(short sX, short sY)
 	{
 		if (m_game->on_game()->m_is_crusade_mode == false) return false;
 		m_game->get_dialog_box_manager().enable_dialog_box(DialogBoxId::CrusadeJob, 1, 0, 0);
+		audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
+		return true;
+	}
+
+	// Dark items
+	if (mouse_in(link_dark_items))
+	{
+		if (player().m_level < m_game->m_max_level) return false;
+		m_mode = mode::dark_item_class;
 		audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 		return true;
 	}
@@ -760,14 +874,19 @@ bool DialogBox_CityHallMenu::on_click_mode10(short sX, short sY)
 
 bool DialogBox_CityHallMenu::on_click_mode11(short sX, short sY)
 {
+	return click_item_confirm(sX, sY, CommonType::ReqGetHeroMantle, m_hero_item_id, mode::hero_items);
+}
+
+bool DialogBox_CityHallMenu::click_item_confirm(short sX, short sY, uint16_t common_type, int item_id, mode cancel_mode)
+{
 	short mouse_x = static_cast<short>(hb::shared::input::get_mouse_x());
 	short mouse_y = static_cast<short>(hb::shared::input::get_mouse_y());
 	// Yes button
 	if ((mouse_x >= sX + ui_layout::left_btn_x) && (mouse_x <= sX + ui_layout::left_btn_x + ui_layout::btn_size_x) && (mouse_y >= sY + ui_layout::btn_y) && (mouse_y <= sY + ui_layout::btn_y + ui_layout::btn_size_y))
 	{
 		{
-			auto pkt = hb::net::make_common_command(CommonType::ReqGetHeroMantle, m_game->m_player->m_player_x, m_game->m_player->m_player_y);
-			pkt.v1 = m_hero_item_id;
+			auto pkt = hb::net::make_common_command(common_type, m_game->m_player->m_player_x, m_game->m_player->m_player_y);
+			pkt.v1 = item_id;
 			m_game->send_game_packet(pkt);
 		}
 		m_mode = mode::main_menu;
@@ -778,10 +897,57 @@ bool DialogBox_CityHallMenu::on_click_mode11(short sX, short sY)
 	// No button
 	if ((mouse_x >= sX + ui_layout::right_btn_x) && (mouse_x <= sX + ui_layout::right_btn_x + ui_layout::btn_size_x) && (mouse_y >= sY + ui_layout::btn_y) && (mouse_y <= sY + ui_layout::btn_y + ui_layout::btn_size_y))
 	{
-		m_mode = mode::hero_items;
+		m_mode = cancel_mode;
 		audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 		return true;
 	}
 
 	return false;
+}
+
+bool DialogBox_CityHallMenu::on_click_mode12(short sX, short sY)
+{
+	// Dark Knight's items
+	if (mouse_in(dark_class_knight_row))
+	{
+		m_dark_mage_page = false;
+		m_mode = mode::dark_items;
+		audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
+		return true;
+	}
+
+	// Dark Mage's items
+	if (mouse_in(dark_class_mage_row))
+	{
+		m_dark_mage_page = true;
+		m_mode = mode::dark_items;
+		audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
+		return true;
+	}
+
+	return false;
+}
+
+bool DialogBox_CityHallMenu::on_click_mode13(short sX, short sY)
+{
+	const dark_item_page& page = dark_page(m_dark_mage_page);
+
+	for (int i = 0; i < page.count; i++)
+	{
+		if (mouse_in(dark_item_row(i)))
+		{
+			m_dark_item_id = page.items[i].item_id;
+			m_take_dark_item_name = page.items[i].label;
+			m_mode = mode::dark_item_confirm;
+			audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
+			return true;
+		}
+	}
+
+	return false;
+}
+
+bool DialogBox_CityHallMenu::on_click_mode14(short sX, short sY)
+{
+	return click_item_confirm(sX, sY, CommonType::ReqGetDarkItem, m_dark_item_id, mode::dark_items);
 }

@@ -6150,6 +6150,10 @@ void CGame::client_common_handler(int client_h, char* data)
 		m_item_manager->get_hero_mantle_handler(client_h, v1, string);
 		break;
 
+	case CommonType::ReqGetDarkItem:
+		m_item_manager->get_dark_item_handler(client_h, v1);
+		break;
+
 	case CommonType::ReqGetOccupyFlag:
 		//DbgWnd->AddEventMsg("RECV -> Source::Client -> MsgId::CommandCommon -> CommonType::ReqGetOccupyFlag");
 		m_war_manager->get_occupy_flag_handler(client_h);

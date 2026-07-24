@@ -3910,6 +3910,118 @@ void ItemManager::get_hero_mantle_handler(int client_h, int item_id, const char*
 	}
 }
 
+void ItemManager::get_dark_item_handler(int client_h, int item_id)
+{
+	// Max-level City Hall handout. No cost, re-claimable; granted items are
+	// unique-owner bound so they can never be traded or used by anyone else.
+	// The client requests the base (male) id; the sex variant is resolved here.
+	// Only base forms are claimable — the Giant Sword and Magic Wand are earned
+	// through the majestic evolution chains, and the Templars end them.
+	static constexpr struct { short base; short female; } dark_item_variants[] =
+	{
+		{ ItemId::DarkKnightHauberkM,    ItemId::DarkKnightHauberkW },
+		{ ItemId::DarkKnightFullHelmM,   ItemId::DarkKnightFullHelmW },
+		{ ItemId::DarkKnightLeggingsM,   ItemId::DarkKnightLeggingsW },
+		{ ItemId::DarkKnightPlateMailM,  ItemId::DarkKnightPlateMailW },
+		{ ItemId::DarkKnightFlameberge,  ItemId::DarkKnightFlameberge },
+		{ ItemId::DarkKnightGreatSword,  ItemId::DarkKnightGreatSword },
+		{ ItemId::DarkKnightRapier,      ItemId::DarkKnightRapier },
+		{ ItemId::DarkMageHauberkM,      ItemId::DarkMageHauberkW },
+		{ ItemId::DarkMageChainMailM,    ItemId::DarkMageChainMailW },
+		{ ItemId::DarkMageLeggingsM,     ItemId::DarkMageLeggingsW },
+		{ ItemId::DarkMageRobeM,         ItemId::DarkMageRobeW },
+		{ ItemId::DarkMageMagicStaff,    ItemId::DarkMageMagicStaffW },
+	};
+
+	int erase_req, ret;
+	CItem* item;
+
+	if (m_game->m_client_list[client_h] == 0) return;
+	if (m_game->m_client_list[client_h]->m_level < m_game->m_max_level) return;
+	if (m_game->m_client_list[client_h]->m_side == 0) return;
+
+	int resolved_id = 0;
+	for (const auto& variant : dark_item_variants)
+	{
+		if (variant.base == item_id)
+		{
+			resolved_id = (m_game->m_client_list[client_h]->m_sex == 2) ? variant.female : variant.base;
+			break;
+		}
+	}
+	if (resolved_id == 0) return;
+	if (m_game->m_item_config_list[resolved_id] == 0) return;
+
+	item = new CItem;
+	if (init_item_attr(item, resolved_id) == false)
+	{
+		delete item;
+		return;
+	}
+
+	if (add_client_item_list(client_h, item, &erase_req))
+	{
+		if (m_game->m_client_list[client_h]->m_cur_weight_load < 0) m_game->m_client_list[client_h]->m_cur_weight_load = 0;
+
+		hb::logger::log<log_channel::events>("get DarkItem : Char({}) Level({}) Obtained({})", m_game->m_client_list[client_h]->m_char_name, m_game->m_client_list[client_h]->m_level, item->m_name);
+
+		item->set_touch_effect_type(TouchEffectType::UniqueOwner);
+		item->m_instance.touch_effect_value1 = m_game->m_client_list[client_h]->m_char_id_num1;
+		item->m_instance.touch_effect_value2 = m_game->m_client_list[client_h]->m_char_id_num2;
+		item->m_instance.touch_effect_value3 = m_game->m_client_list[client_h]->m_char_id_num3;
+
+		ret = send_item_notify_msg(client_h, Notify::ItemObtained, item, 0);
+
+		m_game->calc_total_weight(client_h);
+	}
+	else
+	{
+		delete item;
+		ret = send_item_notify_msg(client_h, Notify::CannotCarryMoreItem, 0, 0);
+	}
+
+	switch (ret) {
+	case sock::Event::QueueFull:
+	case sock::Event::SocketError:
+	case sock::Event::CriticalError:
+	case sock::Event::SocketClosed:
+		m_game->delete_client(client_h, true, true);
+		return;
+	}
+}
+
+// Replaces the item in-place with the next stage of a majestic evolution chain,
+// keeping its bag position and re-binding it to the owner. glow_color != 0 also
+// sets the instance color (9 drives the client's Templar glare).
+bool ItemManager::transform_majestic_item(int client_h, int item_index, int new_item_id, int new_value, int glow_color)
+{
+	int item_x = m_game->m_client_list[client_h]->m_item_pos_list[item_index].x;
+	int item_y = m_game->m_client_list[client_h]->m_item_pos_list[item_index].y;
+
+	delete m_game->m_client_list[client_h]->m_item_list[item_index];
+	m_game->m_client_list[client_h]->m_item_list[item_index] = new CItem;
+	m_game->m_client_list[client_h]->m_item_pos_list[item_index].x = item_x;
+	m_game->m_client_list[client_h]->m_item_pos_list[item_index].y = item_y;
+
+	CItem* item = m_game->m_client_list[client_h]->m_item_list[item_index];
+	if (init_item_attr(item, new_item_id) == false)
+	{
+		m_game->send_item_attribute_change(client_h, item_index, item);
+		return false;
+	}
+
+	item->set_touch_effect_type(TouchEffectType::UniqueOwner);
+	item->m_instance.touch_effect_value1 = m_game->m_client_list[client_h]->m_char_id_num1;
+	item->m_instance.touch_effect_value2 = m_game->m_client_list[client_h]->m_char_id_num2;
+	item->m_instance.touch_effect_value3 = m_game->m_client_list[client_h]->m_char_id_num3;
+	item->m_instance.enchant_bonus = new_value;
+	if (glow_color != 0) item->m_instance.item_color = glow_color;
+
+	m_game->send_gizon_item_change(client_h, item_index, item);
+	item_log(ItemLogAction::UpgradeSuccess, client_h, (int)-1, item);
+	return true;
+}
+
 void ItemManager::set_item_pos(int client_h, char* data)
 {
 	char item_index;
@@ -5505,6 +5617,9 @@ void ItemManager::reload_item_configs()
 	hb::logger::log("Item configs reloaded successfully");
 }
 
+// Instance color the client's dk_glare renders as the pulsating Templar glow
+constexpr int dark_templar_glow_color = 9;
+
 void ItemManager::request_item_upgrade_handler(int client_h, int item_index)
 {
 	int item_x, item_y, so_m, so_x, som_h, sox_h, value; // v2.172
@@ -5635,13 +5750,15 @@ void ItemManager::request_item_upgrade_handler(int client_h, int item_index)
 
 	case 1: // weapons upgrade
 		switch (m_game->m_client_list[client_h]->m_item_list[item_index]->m_id_num) {
-		case 703:
-		case 709: // DarkKnightFlameberge 
-		case 718: // DarkKnightGreatSword
-		case 727: // DarkKnightFlamebergW
-		case 736:
-		case 737: // DarkKnightAxe
-		case 745: // DarkKnightHammer
+		// Dark Knight majestic line: Flameberge -> Giant Sword at +4,
+		// Giant Sword -> Dark Knight Templar at +8, Templar starts glowing at
+		// +15 — mirroring the mage line Staff -> Wand -> Dragon Wand. The
+		// Great Sword (battle-mage weapon) never evolves. Steps are +2 per
+		// upgrade; cost stays the official x(x+6)/8+2 curve.
+		case ItemId::DarkKnightGreatSword:
+		case ItemId::DarkKnightFlameberge:
+		case ItemId::DarkKnightGiantSword:
+		case ItemId::DarkKnightSword: // Dark Knight Templar
 			if (m_game->m_client_list[client_h]->m_gizon_item_upgrade_left <= 0)
 			{
 				m_game->send_notify_msg(0, client_h, Notify::ItemUpgradeFail, 3, 0, 0, 0);
@@ -5670,140 +5787,37 @@ void ItemManager::request_item_upgrade_handler(int client_h, int item_index)
 
 			m_game->send_notify_msg(0, client_h, Notify::GizonItemUpgradeLeft, m_game->m_client_list[client_h]->m_gizon_item_upgrade_left, 0, 0, 0);
 
-			if ((value == 0) && m_game->m_client_list[client_h]->m_item_list[item_index]->m_id_num == 703)
+			// First upgrade binds the item to its owner (claimed items already are)
+			if (value == 0)
 			{
-				item_x = m_game->m_client_list[client_h]->m_item_pos_list[item_index].x;
-				item_y = m_game->m_client_list[client_h]->m_item_pos_list[item_index].y;
-
-				delete m_game->m_client_list[client_h]->m_item_list[item_index];
-				m_game->m_client_list[client_h]->m_item_list[item_index] = 0;
-
-				m_game->m_client_list[client_h]->m_item_list[item_index] = new CItem;
-				m_game->m_client_list[client_h]->m_item_pos_list[item_index].x = item_x;
-				m_game->m_client_list[client_h]->m_item_pos_list[item_index].y = item_y;
-
-				if (init_item_attr(m_game->m_client_list[client_h]->m_item_list[item_index], 709) == false) {
-					m_game->send_item_attribute_change(client_h, item_index, m_game->m_client_list[client_h]->m_item_list[item_index]);
-					return;
-				}
-
 				m_game->m_client_list[client_h]->m_item_list[item_index]->set_touch_effect_type(TouchEffectType::UniqueOwner);
 				m_game->m_client_list[client_h]->m_item_list[item_index]->m_instance.touch_effect_value1 = m_game->m_client_list[client_h]->m_char_id_num1;
 				m_game->m_client_list[client_h]->m_item_list[item_index]->m_instance.touch_effect_value2 = m_game->m_client_list[client_h]->m_char_id_num2;
 				m_game->m_client_list[client_h]->m_item_list[item_index]->m_instance.touch_effect_value3 = m_game->m_client_list[client_h]->m_char_id_num3;
-
-				value += 1;
-				if (value > 15) value = 15;
-				m_game->m_client_list[client_h]->m_item_list[item_index]->m_instance.enchant_bonus = value;
-
-
-				m_game->send_gizon_item_change(client_h, item_index, m_game->m_client_list[client_h]->m_item_list[item_index]);
-				item_log(ItemLogAction::UpgradeSuccess, client_h, (int)-1, m_game->m_client_list[client_h]->m_item_list[item_index]);
-				break;
-
 			}
-			else if ((value == 0) && (m_game->m_client_list[client_h]->m_item_list[item_index]->m_id_num == 709))
+
+			if ((value >= 2) && (m_game->m_client_list[client_h]->m_item_list[item_index]->m_id_num == ItemId::DarkKnightFlameberge))
 			{
-
-				item_x = m_game->m_client_list[client_h]->m_item_pos_list[item_index].x;
-				item_y = m_game->m_client_list[client_h]->m_item_pos_list[item_index].y;
-
-				delete m_game->m_client_list[client_h]->m_item_list[item_index];
-				m_game->m_client_list[client_h]->m_item_list[item_index] = 0;
-
-				m_game->m_client_list[client_h]->m_item_list[item_index] = new CItem;
-				m_game->m_client_list[client_h]->m_item_pos_list[item_index].x = item_x;
-				m_game->m_client_list[client_h]->m_item_pos_list[item_index].y = item_y;
-
-				if (init_item_attr(m_game->m_client_list[client_h]->m_item_list[item_index], 709) == false) {
-					m_game->send_item_attribute_change(client_h, item_index, m_game->m_client_list[client_h]->m_item_list[item_index]);
-					return;
-				}
-
-				m_game->m_client_list[client_h]->m_item_list[item_index]->set_touch_effect_type(TouchEffectType::UniqueOwner);
-				m_game->m_client_list[client_h]->m_item_list[item_index]->m_instance.touch_effect_value1 = m_game->m_client_list[client_h]->m_char_id_num1;
-				m_game->m_client_list[client_h]->m_item_list[item_index]->m_instance.touch_effect_value2 = m_game->m_client_list[client_h]->m_char_id_num2;
-				m_game->m_client_list[client_h]->m_item_list[item_index]->m_instance.touch_effect_value3 = m_game->m_client_list[client_h]->m_char_id_num3;
-
-				value += 1;
-				if (value > 15) value = 15;
-				m_game->m_client_list[client_h]->m_item_list[item_index]->m_instance.enchant_bonus = value;
-
-
-				m_game->send_gizon_item_change(client_h, item_index, m_game->m_client_list[client_h]->m_item_list[item_index]);
-
-				item_log(ItemLogAction::UpgradeSuccess, client_h, (int)-1, m_game->m_client_list[client_h]->m_item_list[item_index]);
-				break;
+				int next_value = (value + 2 > 15) ? 15 : value + 2;
+				transform_majestic_item(client_h, item_index, ItemId::DarkKnightGiantSword, next_value, 0);
 			}
-			else if ((value == 0) && (m_game->m_client_list[client_h]->m_item_list[item_index]->m_id_num == 745))
+			else if ((value >= 6) && (m_game->m_client_list[client_h]->m_item_list[item_index]->m_id_num == ItemId::DarkKnightGiantSword))
 			{
-
-				item_x = m_game->m_client_list[client_h]->m_item_pos_list[item_index].x;
-				item_y = m_game->m_client_list[client_h]->m_item_pos_list[item_index].y;
-
-				delete m_game->m_client_list[client_h]->m_item_list[item_index];
-				m_game->m_client_list[client_h]->m_item_list[item_index] = 0;
-
-				m_game->m_client_list[client_h]->m_item_list[item_index] = new CItem;
-				m_game->m_client_list[client_h]->m_item_pos_list[item_index].x = item_x;
-				m_game->m_client_list[client_h]->m_item_pos_list[item_index].y = item_y;
-
-				if (init_item_attr(m_game->m_client_list[client_h]->m_item_list[item_index], 745) == false) {
-					m_game->send_item_attribute_change(client_h, item_index, m_game->m_client_list[client_h]->m_item_list[item_index]);
-					return;
-				}
-
-				m_game->m_client_list[client_h]->m_item_list[item_index]->set_touch_effect_type(TouchEffectType::UniqueOwner);
-				m_game->m_client_list[client_h]->m_item_list[item_index]->m_instance.touch_effect_value1 = m_game->m_client_list[client_h]->m_char_id_num1;
-				m_game->m_client_list[client_h]->m_item_list[item_index]->m_instance.touch_effect_value2 = m_game->m_client_list[client_h]->m_char_id_num2;
-				m_game->m_client_list[client_h]->m_item_list[item_index]->m_instance.touch_effect_value3 = m_game->m_client_list[client_h]->m_char_id_num3;
-
-				value += 1;
-				if (value > 15) value = 15;
-				m_game->m_client_list[client_h]->m_item_list[item_index]->m_instance.enchant_bonus = value;
-
-
-				m_game->send_gizon_item_change(client_h, item_index, m_game->m_client_list[client_h]->m_item_list[item_index]);
-
-				item_log(ItemLogAction::UpgradeSuccess, client_h, (int)-1, m_game->m_client_list[client_h]->m_item_list[item_index]);
-				break;
+				int next_value = (value + 2 > 15) ? 15 : value + 2;
+				transform_majestic_item(client_h, item_index, ItemId::DarkKnightSword, next_value, 0);
 			}
-			else if ((value == 0) && (m_game->m_client_list[client_h]->m_item_list[item_index]->m_id_num == 737))
+			else if ((value >= 14) && (m_game->m_client_list[client_h]->m_item_list[item_index]->m_id_num == ItemId::DarkKnightSword))
 			{
-
-				item_x = m_game->m_client_list[client_h]->m_item_pos_list[item_index].x;
-				item_y = m_game->m_client_list[client_h]->m_item_pos_list[item_index].y;
-
-				delete m_game->m_client_list[client_h]->m_item_list[item_index];
-				m_game->m_client_list[client_h]->m_item_list[item_index] = 0;
-
-				m_game->m_client_list[client_h]->m_item_list[item_index] = new CItem;
-				m_game->m_client_list[client_h]->m_item_pos_list[item_index].x = item_x;
-				m_game->m_client_list[client_h]->m_item_pos_list[item_index].y = item_y;
-
-				if (init_item_attr(m_game->m_client_list[client_h]->m_item_list[item_index], 737) == false) {
-					m_game->send_item_attribute_change(client_h, item_index, m_game->m_client_list[client_h]->m_item_list[item_index]);
-					return;
-				}
-
-				m_game->m_client_list[client_h]->m_item_list[item_index]->set_touch_effect_type(TouchEffectType::UniqueOwner);
-				m_game->m_client_list[client_h]->m_item_list[item_index]->m_instance.touch_effect_value1 = m_game->m_client_list[client_h]->m_char_id_num1;
-				m_game->m_client_list[client_h]->m_item_list[item_index]->m_instance.touch_effect_value2 = m_game->m_client_list[client_h]->m_char_id_num2;
-				m_game->m_client_list[client_h]->m_item_list[item_index]->m_instance.touch_effect_value3 = m_game->m_client_list[client_h]->m_char_id_num3;
-
-				value += 1;
-				if (value > 15) value = 15;
-				m_game->m_client_list[client_h]->m_item_list[item_index]->m_instance.enchant_bonus = value;
-
+				// Maxed out — the Templar starts glowing
+				m_game->m_client_list[client_h]->m_item_list[item_index]->m_instance.enchant_bonus = 15;
+				m_game->m_client_list[client_h]->m_item_list[item_index]->m_instance.item_color = dark_templar_glow_color;
 
 				m_game->send_gizon_item_change(client_h, item_index, m_game->m_client_list[client_h]->m_item_list[item_index]);
-
 				item_log(ItemLogAction::UpgradeSuccess, client_h, (int)-1, m_game->m_client_list[client_h]->m_item_list[item_index]);
-				break;
 			}
 			else
 			{
-				value += 1;
+				value += 2;
 				if (value > 15) value = 15;
 				m_game->m_client_list[client_h]->m_item_list[item_index]->m_instance.enchant_bonus = value;
 
@@ -6045,108 +6059,35 @@ void ItemManager::request_item_upgrade_handler(int client_h, int item_index)
 				m_game->m_client_list[client_h]->m_item_list[item_index]->m_instance.touch_effect_value3 = m_game->m_client_list[client_h]->m_char_id_num3;
 			}
 
-			if ((value == 11) && ((m_game->m_client_list[client_h]->m_item_list[item_index]->m_id_num == 714) || (m_game->m_client_list[client_h]->m_item_list[item_index]->m_id_num == 738)))
+			// Dark Mage majestic line: Staff (M/W) -> Magic Wand at +4,
+			// Magic Wand -> Dragon Wand at +8, Dragon Wand starts glowing at
+			// +15. Steps are +2 per upgrade. (The Dragon Wand is legacy item
+			// 746 — BlackMageTemple in the CENTUU cfg.)
+			if ((value >= 2) && ((m_game->m_client_list[client_h]->m_item_list[item_index]->m_id_num == ItemId::DarkMageMagicStaff) || (m_game->m_client_list[client_h]->m_item_list[item_index]->m_id_num == ItemId::DarkMageMagicStaffW)))
 			{
-				item_x = m_game->m_client_list[client_h]->m_item_pos_list[item_index].x;
-				item_y = m_game->m_client_list[client_h]->m_item_pos_list[item_index].y;
-
-				delete m_game->m_client_list[client_h]->m_item_list[item_index];
-				m_game->m_client_list[client_h]->m_item_list[item_index] = 0;
-
-				m_game->m_client_list[client_h]->m_item_list[item_index] = new CItem;
-
-				m_game->m_client_list[client_h]->m_item_pos_list[item_index].x = item_x;
-				m_game->m_client_list[client_h]->m_item_pos_list[item_index].y = item_y;
-
-				if (init_item_attr(m_game->m_client_list[client_h]->m_item_list[item_index], 738) == false) {
-					m_game->send_item_attribute_change(client_h, item_index, m_game->m_client_list[client_h]->m_item_list[item_index]);
-					return;
-				}
-
-				m_game->m_client_list[client_h]->m_item_list[item_index]->set_touch_effect_type(TouchEffectType::UniqueOwner);
-				m_game->m_client_list[client_h]->m_item_list[item_index]->m_instance.touch_effect_value1 = m_game->m_client_list[client_h]->m_char_id_num1;
-				m_game->m_client_list[client_h]->m_item_list[item_index]->m_instance.touch_effect_value2 = m_game->m_client_list[client_h]->m_char_id_num2;
-				m_game->m_client_list[client_h]->m_item_list[item_index]->m_instance.touch_effect_value3 = m_game->m_client_list[client_h]->m_char_id_num3;
-
-				value += 1;
-				if (value > 15) value = 15;
-				m_game->m_client_list[client_h]->m_item_list[item_index]->m_instance.enchant_bonus = value;
-
-
-				m_game->send_gizon_item_change(client_h, item_index, m_game->m_client_list[client_h]->m_item_list[item_index]);
-				item_log(ItemLogAction::UpgradeSuccess, client_h, (int)-1, m_game->m_client_list[client_h]->m_item_list[item_index]);
+				int next_value = (value + 2 > 15) ? 15 : value + 2;
+				transform_majestic_item(client_h, item_index, ItemId::DarkMageMagicWand, next_value, 0);
 				break;
-
 			}
-			else if ((value == 15) && (m_game->m_client_list[client_h]->m_item_list[item_index]->m_id_num == 738))
+			else if ((value >= 6) && (m_game->m_client_list[client_h]->m_item_list[item_index]->m_id_num == ItemId::DarkMageMagicWand))
 			{
-				item_x = m_game->m_client_list[client_h]->m_item_pos_list[item_index].x;
-				item_y = m_game->m_client_list[client_h]->m_item_pos_list[item_index].y;
-
-				delete m_game->m_client_list[client_h]->m_item_list[item_index];
-				m_game->m_client_list[client_h]->m_item_list[item_index] = 0;
-
-				m_game->m_client_list[client_h]->m_item_list[item_index] = new CItem;
-
-				m_game->m_client_list[client_h]->m_item_pos_list[item_index].x = item_x;
-				m_game->m_client_list[client_h]->m_item_pos_list[item_index].y = item_y;
-
-				if (init_item_attr(m_game->m_client_list[client_h]->m_item_list[item_index], 746) == false) {
-					m_game->send_item_attribute_change(client_h, item_index, m_game->m_client_list[client_h]->m_item_list[item_index]);
-					return;
-				}
-
-				m_game->m_client_list[client_h]->m_item_list[item_index]->set_touch_effect_type(TouchEffectType::UniqueOwner);
-				m_game->m_client_list[client_h]->m_item_list[item_index]->m_instance.touch_effect_value1 = m_game->m_client_list[client_h]->m_char_id_num1;
-				m_game->m_client_list[client_h]->m_item_list[item_index]->m_instance.touch_effect_value2 = m_game->m_client_list[client_h]->m_char_id_num2;
-				m_game->m_client_list[client_h]->m_item_list[item_index]->m_instance.touch_effect_value3 = m_game->m_client_list[client_h]->m_char_id_num3;
-
-				value += 1;
-				if (value > 15) value = 15;
-				m_game->m_client_list[client_h]->m_item_list[item_index]->m_instance.enchant_bonus = value;
-
-
-				m_game->send_gizon_item_change(client_h, item_index, m_game->m_client_list[client_h]->m_item_list[item_index]);
-				item_log(ItemLogAction::UpgradeSuccess, client_h, (int)-1, m_game->m_client_list[client_h]->m_item_list[item_index]);
+				int next_value = (value + 2 > 15) ? 15 : value + 2;
+				transform_majestic_item(client_h, item_index, ItemId::DarkMageDragonWand, next_value, 0);
 				break;
-
 			}
-			else if ((value == 15) && (m_game->m_client_list[client_h]->m_item_list[item_index]->m_id_num == 746))
+			else if ((value >= 14) && (m_game->m_client_list[client_h]->m_item_list[item_index]->m_id_num == ItemId::DarkMageDragonWand))
 			{
-				item_x = m_game->m_client_list[client_h]->m_item_pos_list[item_index].x;
-				item_y = m_game->m_client_list[client_h]->m_item_pos_list[item_index].y;
-
-				delete m_game->m_client_list[client_h]->m_item_list[item_index];
-				m_game->m_client_list[client_h]->m_item_list[item_index] = 0;
-
-				m_game->m_client_list[client_h]->m_item_list[item_index] = new CItem;
-
-				m_game->m_client_list[client_h]->m_item_pos_list[item_index].x = item_x;
-				m_game->m_client_list[client_h]->m_item_pos_list[item_index].y = item_y;
-
-				if (init_item_attr(m_game->m_client_list[client_h]->m_item_list[item_index], 892) == false) {
-					m_game->send_item_attribute_change(client_h, item_index, m_game->m_client_list[client_h]->m_item_list[item_index]);
-					return;
-				}
-
-				m_game->m_client_list[client_h]->m_item_list[item_index]->set_touch_effect_type(TouchEffectType::UniqueOwner);
-				m_game->m_client_list[client_h]->m_item_list[item_index]->m_instance.touch_effect_value1 = m_game->m_client_list[client_h]->m_char_id_num1;
-				m_game->m_client_list[client_h]->m_item_list[item_index]->m_instance.touch_effect_value2 = m_game->m_client_list[client_h]->m_char_id_num2;
-				m_game->m_client_list[client_h]->m_item_list[item_index]->m_instance.touch_effect_value3 = m_game->m_client_list[client_h]->m_char_id_num3;
-
-				value += 1;
-				if (value > 15) value = 15;
-				m_game->m_client_list[client_h]->m_item_list[item_index]->m_instance.enchant_bonus = value;
-
+				// Maxed out — the Dragon Wand starts glowing
+				m_game->m_client_list[client_h]->m_item_list[item_index]->m_instance.enchant_bonus = 15;
+				m_game->m_client_list[client_h]->m_item_list[item_index]->m_instance.item_color = dark_templar_glow_color;
 
 				m_game->send_gizon_item_change(client_h, item_index, m_game->m_client_list[client_h]->m_item_list[item_index]);
 				item_log(ItemLogAction::UpgradeSuccess, client_h, (int)-1, m_game->m_client_list[client_h]->m_item_list[item_index]);
 				break;
-
 			}
 			else
 			{
-				value += 1;
+				value += 2;
 				if (value > 15) value = 15;
 				m_game->m_client_list[client_h]->m_item_list[item_index]->m_instance.enchant_bonus = value;
 

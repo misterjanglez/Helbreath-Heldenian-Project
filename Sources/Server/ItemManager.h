@@ -103,6 +103,8 @@ public:
 
 	// Hero / special
 	void get_hero_mantle_handler(int client_h, int item_id, const char* string);
+	void get_dark_item_handler(int client_h, int item_id);
+	bool transform_majestic_item(int client_h, int item_index, int new_item_id, int new_value, int glow_color);
 
 	// Slate
 	void req_create_slate_handler(int client_h, char* data);

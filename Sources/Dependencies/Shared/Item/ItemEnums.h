@@ -333,8 +333,8 @@ namespace ItemId
     constexpr short NecklaceOfLiche = 648;
     constexpr short StoneOfXelima = 656;
     constexpr short StoneOfMerien = 657;
-    constexpr short SwordofMedusa = 724;
-    constexpr short SwordofIceElemental = 725;
+    constexpr short SwordofMedusa = 613;
+    constexpr short SwordofIceElemental = 614;
     constexpr short RingofArcmage = 734;
     constexpr short RingofDragonpower = 735;
     constexpr short ZemstoneofSacrifice = 753;
@@ -367,8 +367,34 @@ namespace ItemId
     constexpr short AngelicPendantMAG = 1111;
 
     // DK Weapon IDs — used for glare visual effect
+    // Dark Knight / Dark Mage max-level sets (claimed at the City Hall Officer)
+    constexpr short DarkKnightHauberkM = 706;
+    constexpr short DarkKnightFullHelmM = 707;
+    constexpr short DarkKnightLeggingsM = 708;
+    constexpr short DarkKnightPlateMailM = 710;
+    constexpr short DarkMageHauberkM = 711;
+    constexpr short DarkMageChainMailM = 712;
+    constexpr short DarkMageLeggingsM = 713;
+    constexpr short DarkMageMagicStaff = 714;
+    constexpr short DarkMageRobeM = 715;
+    constexpr short DarkMageLeatherArmorM = 716;   // male-only, no (W) variant
+    constexpr short DarkKnightRapier = 717;
+    constexpr short DarkKnightGreatSword = 718;
+    constexpr short DarkMageScaleMailM = 719;      // male-only, no (W) variant
+    constexpr short DarkKnightHauberkW = 724;
+    constexpr short DarkKnightFullHelmW = 725;
+    constexpr short DarkKnightLeggingsW = 726;
+    constexpr short DarkKnightFlameberge = 727;
+    constexpr short DarkKnightPlateMailW = 728;
+    constexpr short DarkMageHauberkW = 729;
+    constexpr short DarkMageChainMailW = 730;
+    constexpr short DarkMageLeggingsW = 731;
+    constexpr short DarkMageMagicStaffW = 732;
+    constexpr short DarkMageRobeW = 733;
+    constexpr short DarkKnightGiantSword = 737;
+    constexpr short DarkMageMagicWand = 738;
     constexpr short DarkKnightSword = 745;   // Dark Knight Templar (appr_val was 14, glare 3)
-    constexpr short DarkMageStaff = 746;     // Dark Mage Templar (appr_val was 37, glare 2)
+    constexpr short DarkMageDragonWand = 746; // Dark Mage Dragon Wand (legacy names: BlackMageTemple / "Templar"; appr_val was 37, glare 2)
 }
 
 inline bool is_special_item(short i_dnum)
