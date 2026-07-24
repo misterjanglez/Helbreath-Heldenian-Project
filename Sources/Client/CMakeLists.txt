@@ -43,6 +43,7 @@ add_library(SFMLEngine STATIC ${SFMLENGINE_SOURCES})
 set(AUTOUPDATER_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../AutoUpdater)
 set(AUTOUPDATER_SOURCES
     ${AUTOUPDATER_DIR}/auto_updater.cpp
+    ${AUTOUPDATER_DIR}/updater_core.cpp
     ${AUTOUPDATER_DIR}/updater_manifest.cpp
     ${AUTOUPDATER_DIR}/updater_http.cpp
     ${AUTOUPDATER_DIR}/updater_sha256.cpp

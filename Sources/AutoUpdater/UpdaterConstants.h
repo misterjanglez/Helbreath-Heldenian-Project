@@ -22,6 +22,14 @@ namespace hb::updater
 	constexpr const char* exe_update_suffix = ".update";
 	constexpr const char* exe_old_suffix = ".old";
 
+	// Launcher executable basename in the manifest (per platform). The
+	// launcher self-updates via this entry and excludes it from game plans.
+#ifdef _WIN32
+	constexpr const char* launcher_exe_name = "Launcher_x64_win.exe";
+#else
+	constexpr const char* launcher_exe_name = "Launcher_x64_linux";
+#endif
+
 	// GUI
 	constexpr int window_width = 420;
 	constexpr int window_height = 140;

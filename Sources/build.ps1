@@ -8,7 +8,7 @@
 #   build.ps1 -Target All               # Build all projects
 #   build.ps1 -Target All -Config Release -UploadSymbols   # Release + Sentry symbol upload
 param(
-    [ValidateSet("Game", "Server", "All")]
+    [ValidateSet("Game", "Server", "Launcher", "All")]
     [string]$Target = "Game",
 
     [ValidateSet("Debug", "Release")]
@@ -41,9 +41,10 @@ $solutionPath = Join-Path $scriptDir "Helbreath.sln"
 # Configuration string matches the solution configs (Debug|x64, Release|x64)
 $configString = $Config
 switch ($Target) {
-    "Server" { $logFile = Join-Path $scriptDir "build_server.log" }
-    "All"    { $logFile = Join-Path $scriptDir "build_all.log" }
-    default  { $logFile = Join-Path $scriptDir "build_game.log" }
+    "Server"   { $logFile = Join-Path $scriptDir "build_server.log" }
+    "Launcher" { $logFile = Join-Path $scriptDir "build_launcher.log" }
+    "All"      { $logFile = Join-Path $scriptDir "build_all.log" }
+    default    { $logFile = Join-Path $scriptDir "build_game.log" }
 }
 
 # Delete old log

@@ -98,6 +98,7 @@
     <ClInclude Include="updater_manifest.h" />
     <ClInclude Include="updater_http.h" />
     <ClInclude Include="updater_sha256.h" />
+    <ClInclude Include="updater_core.h" />
     <ClInclude Include="updater_file_ops.h" />
     <ClInclude Include="updater_gui.h" />
     <ClInclude Include="updater_platform.h" />
@@ -105,6 +106,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="auto_updater.cpp" />
+    <ClCompile Include="updater_core.cpp" />
     <ClCompile Include="updater_manifest.cpp" />
     <ClCompile Include="updater_http.cpp" />
     <ClCompile Include="updater_sha256.cpp" />

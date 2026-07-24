@@ -22,13 +22,17 @@ CONFIG_PATH = os.path.join(SCRIPT_DIR, "installer.json")
 
 SKIP_DIRS = {"cache", "logs", "save", "updates", ".git", "__pycache__", "build"}
 SKIP_EXTENSIONS = {".old", ".update", ".log", ".bak", ".pdb", ".ilk", ".exp"}
+# Machine-local state the installer must never ship
+SKIP_FILES = {"launcher.json", "version.txt", "update_override.txt", "server_override.txt", "update.manifest.json", "settings.json"}
 
 DEFAULTS = {
     "source_dir": ".",
-    "game_title": "Helbreath",
+    "game_title": "Helbreath: Medieval Times",
     "output_dir": SCRIPT_DIR,
     "platforms": "3",
-    "exe_name": "Game_x64_win.exe",
+    # Shortcuts and post-install run target point at the launcher, which owns
+    # installing/updating/launching the game from here on.
+    "exe_name": "Launcher_x64_win.exe",
 }
 
 
@@ -82,6 +86,8 @@ def collect_files(root_dir: str) -> list[str]:
         for filename in sorted(filenames):
             _, ext = os.path.splitext(filename)
             if ext.lower() in SKIP_EXTENSIONS:
+                continue
+            if filename in SKIP_FILES:
                 continue
             if ".bak_" in filename:
                 continue

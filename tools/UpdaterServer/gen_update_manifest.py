@@ -17,7 +17,8 @@ import sys
 
 
 SKIP_DIRS = {"cache", "logs", "save", "updates", ".git", "__pycache__"}
-SKIP_FILES = {"settings.json", "update.manifest.json", "gen_update_manifest.py"}
+SKIP_FILES = {"settings.json", "update.manifest.json", "gen_update_manifest.py",
+              "launcher.json", "version.txt", "update_override.txt", "server_override.txt"}
 SKIP_EXTENSIONS = {".old", ".update", ".log", ".bak"}
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))

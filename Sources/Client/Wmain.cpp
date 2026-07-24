@@ -1,3 +1,8 @@
+// std::getenv is fine here (read-once at startup); silence MSVC's C4996
+#ifndef _CRT_SECURE_NO_WARNINGS
+#define _CRT_SECURE_NO_WARNINGS
+#endif
+
 #include "NativeTypes.h"
 #include "Game.h"
 #include "Application.h"
@@ -32,10 +37,15 @@ int GameMain(hb::shared::types::NativeInstance native_instance, int icon_resourc
 #endif
 
 #ifndef _DEBUG
-	// Check for updates before any SFML initialization
-	auto update_status = hb::updater::check_for_updates();
-	if (update_status == hb::updater::update_result::restart_required)
-		hb::updater::relaunch(); // Re-exec; next launch swaps .update → exe
+	// Check for updates before any SFML initialization. Skipped when the
+	// launcher spawned us — it has already updated the install; this embedded
+	// check remains as a safety net for players who run the game exe directly.
+	if (std::getenv("HB_LAUNCHED_BY_LAUNCHER") == nullptr)
+	{
+		auto update_status = hb::updater::check_for_updates();
+		if (update_status == hb::updater::update_result::restart_required)
+			hb::updater::relaunch(); // Re-exec; next launch swaps .update → exe
+	}
 #endif
 
 	using namespace hb::shared::render;

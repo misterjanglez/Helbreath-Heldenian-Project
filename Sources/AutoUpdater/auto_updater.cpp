@@ -1,20 +1,13 @@
 #include "auto_updater.h"
 #include "UpdaterConstants.h"
-#include "updater_manifest.h"
-#include "updater_http.h"
-#include "updater_sha256.h"
+#include "updater_core.h"
 #include "updater_file_ops.h"
 #include "updater_gui.h"
-#include <algorithm>
-#include <atomic>
-#include <chrono>
 #include <cstdio>
-#include <filesystem>
-#include <string>
-#include <thread>
-#include <vector>
 
-namespace fs = std::filesystem;
+// Thin in-client wrapper over the scan/apply core (updater_core.h): silent
+// pre-launch check with the classic progress window. The standalone launcher
+// drives the same core with its own UI and target directory.
 
 namespace hb::updater
 {
@@ -23,7 +16,7 @@ namespace hb::updater
 		std::string exe_path = get_exe_path();
 		std::string base_dir = get_exe_directory();
 
-		// Phase 0 — pending exe swap from last run
+		// Pending exe swap from last run
 		if (apply_pending_exe_swap(exe_path))
 		{
 			cleanup_old_exe(exe_path);
@@ -33,198 +26,89 @@ namespace hb::updater
 		// Clean up .old if left over
 		cleanup_old_exe(exe_path);
 
-		// Phase 1 — fetch manifest
-		std::string manifest_json;
-		while (!http_get_text(update_server_host, update_server_port, manifest_path, manifest_json))
+		// Staging/testing endpoint override (update_override.txt beside exe)
+		load_endpoint_override(base_dir);
+
+		// Scan, with the classic retry dialog on connectivity failure
+		update_plan plan;
+		for (;;)
 		{
+			scan_status status = scan(base_dir, plan);
+			if (status == scan_status::up_to_date)
+				return update_result::no_update;
+			if (status == scan_status::error)
+				return update_result::error;
+			if (status == scan_status::update_available)
+				break;
+
+			// server_unreachable
 			if (!show_retry_dialog("Could not reach the update server."))
 				return update_result::server_unreachable;
 		}
 
-		update_manifest manifest;
-		if (!parse_manifest(manifest_json, manifest))
-			return update_result::error;
-
-		// Phase 2 — compare local files vs manifest
-		struct changed_file
-		{
-			const manifest_entry* entry;
-		};
-		std::vector<changed_file> changed_files;
-
-		for (const auto& entry : manifest.files)
-		{
-#ifdef _WIN32
-			if (entry.platform == "linux") continue;
-#else
-			if (entry.platform == "windows") continue;
-#endif
-
-			std::string local_path = (fs::path(base_dir) / entry.path).string();
-			std::string local_hash = sha256_file(local_path.c_str());
-
-			if (local_hash != entry.sha256)
-				changed_files.push_back({&entry});
-		}
-
-		if (changed_files.empty())
-			return update_result::no_update;
-
-		// Phase 3 — download changed files to staging
+		// Apply with the classic progress window; the in-process client uses
+		// stage-for-swap so its own exe is swapped on the next launch.
 		updater_gui gui;
 		gui.create();
 
-		if (!ensure_staging_dir(base_dir))
+		auto on_progress = [&](const apply_progress& p) -> bool
 		{
-			gui.destroy();
-			return update_result::error;
-		}
+			switch (p.phase)
+			{
+			case apply_phase::downloading:
+			{
+				char status_buf[256];
+				std::snprintf(status_buf, sizeof(status_buf),
+					"Downloading files (%d of %d)...", p.files_done, p.files_total);
+				gui.set_status(status_buf);
+				gui.set_progress(p.files_total > 0
+					? static_cast<float>(p.files_done) / static_cast<float>(p.files_total)
+					: 0.0f);
+				break;
+			}
+			case apply_phase::verifying:
+				gui.set_status("Verifying files...");
+				gui.set_progress(1.0f);
+				break;
+			case apply_phase::dispersing:
+				gui.set_status("Applying update...");
+				break;
+			}
+			gui.pump_messages();
+			return !gui.is_cancelled();
+		};
 
-		std::string staging_base = (fs::path(base_dir) / staging_dir).string();
-		int total = static_cast<int>(changed_files.size());
-
-		// Parallel download: workers pull the next file index from a shared
-		// counter, each over its own keep-alive connection. The main thread
-		// only pumps the GUI. On persistent failure the user chooses retry or
-		// skip; already-staged files are skipped on retry (hash check below),
-		// so no progress is lost.
 		for (;;)
 		{
-			std::atomic<int> next_index{0};
-			std::atomic<int> completed{0};
-			std::atomic<bool> failed{false};
-			std::atomic<bool> cancelled{false};
+			apply_status status = apply(plan, base_dir, exe_strategy::stage_for_swap, on_progress);
 
-			auto worker = [&]()
+			switch (status)
 			{
-				http_client client(update_server_host, update_server_port);
-				for (;;)
-				{
-					if (failed.load() || cancelled.load())
-						return;
+			case apply_status::success:
+				gui.destroy();
+				return update_result::updated;
 
-					int i = next_index.fetch_add(1);
-					if (i >= total)
-						return;
+			case apply_status::success_exe_staged:
+				gui.destroy();
+				return update_result::restart_required;
 
-					const auto& entry = *changed_files[i].entry;
-					std::string staged_path = (fs::path(staging_base) / entry.path).string();
-
-					// Resume: skip files already staged with correct hash
-					if (sha256_file(staged_path.c_str()) == entry.sha256)
-					{
-						completed.fetch_add(1);
-						continue;
-					}
-
-					std::string url = "/" + entry.path;
-					if (!client.download_file(url.c_str(), staged_path))
-					{
-						failed.store(true);
-						return;
-					}
-
-					completed.fetch_add(1);
-				}
-			};
-
-			int worker_count = std::min(total, parallel_downloads);
-			std::vector<std::thread> workers;
-			for (int t = 0; t < worker_count; ++t)
-				workers.emplace_back(worker);
-
-			int last_done = -1;
-			while (completed.load() < total && !failed.load())
-			{
-				if (gui.is_cancelled())
-				{
-					cancelled.store(true);
-					break;
-				}
-
-				int done = completed.load();
-				if (done != last_done)
-				{
-					last_done = done;
-					char status_buf[256];
-					std::snprintf(status_buf, sizeof(status_buf),
-						"Downloading files (%d of %d)...", done, total);
-					gui.set_status(status_buf);
-					gui.set_progress(static_cast<float>(done) / static_cast<float>(total));
-				}
-				gui.pump_messages();
-				std::this_thread::sleep_for(std::chrono::milliseconds(30));
-			}
-
-			for (auto& w : workers)
-				w.join();
-
-			if (cancelled.load())
-			{
+			case apply_status::download_failed:
+				// Staged files are kept — retry resumes where it left off
+				if (show_retry_dialog("The update download failed."))
+					continue;
 				gui.destroy();
 				return update_result::error;
-			}
 
-			if (!failed.load())
-				break;
-
-			if (!show_retry_dialog("The update download failed."))
-			{
-				gui.destroy();
-				return update_result::error;
-			}
-		}
-
-		// Phase 4 — verify staged files
-		gui.set_status("Verifying files...");
-		gui.set_progress(1.0f);
-		gui.pump_messages();
-
-		for (const auto& cf : changed_files)
-		{
-			const auto& entry = *cf.entry;
-			std::string staged_path = (fs::path(staging_base) / entry.path).string();
-			std::string hash = sha256_file(staged_path.c_str());
-
-			if (hash != entry.sha256)
-			{
-				// Remove corrupt file so next run re-downloads it
-				std::error_code ec;
-				fs::remove(staged_path, ec);
-				gui.destroy();
-				return update_result::error;
-			}
-		}
-
-		// Phase 5 — disperse files
-		bool has_exe_update = false;
-		gui.set_status("Applying update...");
-		gui.pump_messages();
-
-		for (const auto& cf : changed_files)
-		{
-			const auto& entry = *cf.entry;
-			std::string staged_path = (fs::path(staging_base) / entry.path).string();
-			std::string final_path = (fs::path(base_dir) / entry.path).string();
-
-			if (!disperse_file(staged_path, final_path, entry.is_executable))
-			{
+			case apply_status::disperse_failed:
 				cleanup_staging(base_dir);
 				gui.destroy();
 				return update_result::error;
+
+			case apply_status::cancelled:
+			case apply_status::verify_failed:
+				gui.destroy();
+				return update_result::error;
 			}
-
-			if (entry.is_executable)
-				has_exe_update = true;
 		}
-
-		cleanup_staging(base_dir);
-		gui.destroy();
-
-		// Phase 6
-		if (has_exe_update)
-			return update_result::restart_required;
-
-		return update_result::updated;
 	}
 }

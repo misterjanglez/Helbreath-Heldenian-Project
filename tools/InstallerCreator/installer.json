@@ -1,7 +1,7 @@
 {
     "source_dir": "Helbreath",
-    "game_title": "Helbreath",
+    "game_title": "Helbreath: Medieval Times",
     "output_dir": ".",
     "platforms": "1",
-    "exe_name": "Game_x64_win.exe"
+    "exe_name": "Launcher_x64_win.exe"
 }

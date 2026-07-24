@@ -1,0 +1,4573 @@
+{
+    "version": {
+        "major": 0,
+        "minor": 4,
+        "patch": 7
+    },
+    "files": [
+        {
+            "path": "Game_x64_win.exe",
+            "sha256": "5d6dfba9ddf94799534c6a21d8b6a99fffa3e9775b3ed96a2515cb05dfe83e6f",
+            "size": 3645440,
+            "executable": true,
+            "platform": "windows"
+        },
+        {
+            "path": "Launcher_x64_win.exe",
+            "sha256": "23338b8043d4d69dafc8cb77c74fcb53d46ed8778251a07046348e508fc48beb",
+            "size": 6625280,
+            "executable": true,
+            "platform": "windows"
+        },
+        {
+            "path": "crashpad_handler.exe",
+            "sha256": "c56df4d0d802ddf23349cdb43ff8f6b541f573695e06baf7a27e21346a180c46",
+            "size": 1979904,
+            "executable": true,
+            "platform": "windows"
+        },
+        {
+            "path": "crashpad_wer.dll",
+            "sha256": "5aa193325643c366007e1c43e97d15d8e768ed905d92951e33fb7ceb58a8d7a1",
+            "size": 39424,
+            "executable": true,
+            "platform": "windows"
+        },
+        {
+            "path": "sentry.dll",
+            "sha256": "5119be1f3a09ed444600618772eb97ff6918600e93e8e49e1eaf412ec4e86489",
+            "size": 1264128,
+            "executable": true,
+            "platform": "windows"
+        },
+        {
+            "path": "CONTENTS/BItemcfg.txt",
+            "sha256": "2182947386a33bdc9d4b26c364db19e54b7f8d29ee751e986b297c3df919c1fb",
+            "size": 11011,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "CONTENTS/Contents217.txt",
+            "sha256": "381723f986cba43de80b59d1b1459bbdc93e1e6ea6da1d68d90b4374a262f24a",
+            "size": 262,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "CONTENTS/Contents218.txt",
+            "sha256": "4577533318d36fcdd3b9415d4beb15369d69dd477242afcc1fc59572e0e330e4",
+            "size": 165,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "CONTENTS/Contents219.txt",
+            "sha256": "325080011141c68439445e66709c01973605e6ff5d2d7f172ff0d88158a64530",
+            "size": 200,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "CONTENTS/GameMsgList.txt",
+            "sha256": "ea07eec5a9990a543e9cff0bb6800c5976408b735985307cbb25714d97e66f42",
+            "size": 3152,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "CONTENTS/ItemSpriteMetadata.json",
+            "sha256": "f80f5bb7c47270870a8e4af2ee84653b41ef976d94c88a05102a5896fdc2705a",
+            "size": 70527,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "CONTENTS/contents0.txt",
+            "sha256": "e470b92b33910c5384a715573a91a25100af3a4b55477589d8b90133256b970a",
+            "size": 3419,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "CONTENTS/contents10.txt",
+            "sha256": "8f755416f9e92603769bb5d26a65718edbb22485f6b300ec2c31d4cfb4a330dc",
+            "size": 11150,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "CONTENTS/contents1000.txt",
+            "sha256": "74a329fce8bae5e4f2e7280d9f8b71f65e58b39bc23859a011bd472337c7c40c",
+            "size": 1409,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "CONTENTS/contents121.txt",
+            "sha256": "1682016a1d67552e34af8fab301fd01e37b3c172e35af0b728bcbb4386f18732",
+            "size": 84,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "CONTENTS/contents122.txt",
+            "sha256": "7c061d2c648b72411606ff3df6b550b2b02ebde8eab32c155cf56ab66d780eef",
+            "size": 8,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "CONTENTS/contents123.txt",
+            "sha256": "0d8a4ede16502c5415541de2852b2e18b26b76b581526d834c64191a64591f0d",
+            "size": 26,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "CONTENTS/contents124.txt",
+            "sha256": "b0ed524a23b6434c6288deeef359f49755ea01fa7c6b8de4dd601086bd9a4266",
+            "size": 220,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "CONTENTS/contents134.txt",
+            "sha256": "c65bf80440e2107cd36ad92aeb838c57a7039bb501dab969871fd6f248acf151",
+            "size": 92,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "CONTENTS/contents144.txt",
+            "sha256": "43efd2789f54d258001ae09612f99af902de60f24fe2a76b3b7ec0b5f9fde04c",
+            "size": 180,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "CONTENTS/contents15.txt",
+            "sha256": "d69b69f7b3ff2602bd592bcd1e4be0da9ec3996951fcafce487f52c8eea158c1",
+            "size": 110,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "CONTENTS/contents151.txt",
+            "sha256": "e7b35afae66d4d3519a075eb958c93714b9fcd4b16b0b2c758d438244885b92f",
+            "size": 177,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "CONTENTS/contents152.txt",
+            "sha256": "6a4f006706b9d4fc0491d200c6eeafe07b5040a789847f8c7a3496320194147d",
+            "size": 105,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "CONTENTS/contents153.txt",
+            "sha256": "ea3ae7c6728d0ac41e5930b203216a89874d40db5f2f6bc50401122c7a9cbaaa",
+            "size": 252,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "CONTENTS/contents154.txt",
+            "sha256": "6463a60ef23de3cee30f1cce9014987f3293eec215f70cb8c0ac855fe70d5283",
+            "size": 135,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "CONTENTS/contents155.txt",
+            "sha256": "fa8b18b6783a96708b75cd8922e18f3dd7595b152f2a797f445ea81f486e0dfb",
+            "size": 203,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "CONTENTS/contents156.txt",
+            "sha256": "15f61048070a48f0199705547dd3879332f06d302d17da12274929da133e39ed",
+            "size": 338,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "CONTENTS/contents171.txt",
+            "sha256": "439ed7a1da315cb071049b81c5b217cbc24c8073799dfe75c13f5ad7f96594f6",
+            "size": 9,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "CONTENTS/contents182.txt",
+            "sha256": "df4d4b02de4c4fc19047c9c3a5a3764b522093a88aaaa737b270940626e62e64",
+            "size": 5,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "CONTENTS/contents20.txt",
+            "sha256": "5289e48d107b80fedd9009c3881381302304452096254071ae896238a3754b7f",
+            "size": 17,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "CONTENTS/contents21.txt",
+            "sha256": "30427b73688fbfa203c58a330e64643373b6f03fb7584be93143438cd2e5aca1",
+            "size": 180,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "CONTENTS/contents220.txt",
+            "sha256": "913246953590611ecaeae081c55be6e91a4500d27f788824d298b6ca89104775",
+            "size": 152,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "CONTENTS/contents221.txt",
+            "sha256": "0eaa101cfce1ef16b8faf7b9af4e881a4e1f8bbd6c7e4cf6aa70fb569000401e",
+            "size": 36,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "CONTENTS/contents222.txt",
+            "sha256": "e35430f0e2cd2472741575828ef37326ee98e4a4ee2ae45d0602f3064cc10bd9",
+            "size": 35,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "CONTENTS/contents223.txt",
+            "sha256": "e7832d73ae5294e63832bf4e0d75dd151651725eff77635306ff35cdb6356253",
+            "size": 234,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "CONTENTS/contents224.txt",
+            "sha256": "6e4f28f291ec30df9e67241f11721939b4d6ce75c82c545be1eb791ce2668f97",
+            "size": 168,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "CONTENTS/contents225.txt",
+            "sha256": "e1046ca0b56f1fc70a5aa61bc749ba4f3e0339e2622b7751f70ee061451cb0ef",
+            "size": 169,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "CONTENTS/contents226.txt",
+            "sha256": "b7b1592363338a12a5d313f3019efc3806a24eeb7da2ceeeb311911a81bc1d16",
+            "size": 677,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "CONTENTS/contents27.txt",
+            "sha256": "ab605174b2eda8b4d3466b6925715d74930a24c44e262b4d1d6ced74af1b48d7",
+            "size": 126,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "CONTENTS/contents500.txt",
+            "sha256": "09233a635d16015d1dce7103a9fc2c1fdaa9cd504abf07b749b274bfaf6859a7",
+            "size": 478,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "CONTENTS/contents800.txt",
+            "sha256": "cb7039f9e498b855c2189208a5cc46f91b8d9367d745f08158f41e07761674ef",
+            "size": 366,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "CONTENTS/contents801.txt",
+            "sha256": "aa819879b285e7fdafea681dff6dcb3ca7e81fb9fd7f69383ccf66eeeb34db87",
+            "size": 4050,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "CONTENTS/contents802.txt",
+            "sha256": "d55564ff0cc5f1798e5db70d830a2dfffee24ea5820800dfd2f9ac999f15c1a8",
+            "size": 4051,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "CONTENTS/contents803.txt",
+            "sha256": "3e1965e3044669a36eb225363d1e86a7c1de3e8c30b6fa0e5c7fd7c6b2d21fd5",
+            "size": 473,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "CONTENTS/contents804.txt",
+            "sha256": "55d01095eefccb45177f8cff2b225b2f1b3ac00255a0084d1ace9633f3a8b3ca",
+            "size": 603,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "CONTENTS/contents805.txt",
+            "sha256": "89ace15b07f2f12b1241f380ae1d84cdfd9cf717a5d59065c93d91ae60c9992a",
+            "size": 1444,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "CONTENTS/contents806.txt",
+            "sha256": "0226b1ad6b10cf861f1fccb2f397baab3dff97c6c3a8082d9972d221aef3543c",
+            "size": 1336,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "CONTENTS/contents807.txt",
+            "sha256": "e7594658fe864e35e50de287b39e501d87f6e0dac7094d4ed011c7a3012b30bb",
+            "size": 583,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "CONTENTS/contents808.txt",
+            "sha256": "35ff3c9a75a028d2e221786aa7009d836a0d17b30dbc05090d9d9e1a88178479",
+            "size": 734,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "CONTENTS/contents809.txt",
+            "sha256": "c63499e2766b6a516f8938a0eeec428368a11692172ff23f05b96a074db93ba8",
+            "size": 323,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "CONTENTS/contents810.txt",
+            "sha256": "e0964b553cc52fbe6bdfa0c2912a117a7efa31c41aae7500227140c98ffd4021",
+            "size": 333,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "CONTENTS/contents811.txt",
+            "sha256": "f751629fd5516e6c014a21fc1621dc7dc540d510260bfb69a9103edb49569425",
+            "size": 689,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "CONTENTS/contents812.txt",
+            "sha256": "58de87e256034b2d449da2f22dadf7de9b255cb92a6ec888f1b2d6b96e43da25",
+            "size": 546,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "CONTENTS/contents813.txt",
+            "sha256": "793d0766c9083277fd32ce948a5c5ab36007b794209c5d88d8fe7dcc18de4d92",
+            "size": 1821,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "CONTENTS/contents900.txt",
+            "sha256": "6bf26ce547df119c76a3b448e51b9df6754aa7c6250a14a55d24f99d78021e25",
+            "size": 2353,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "CONTENTS/contents901.txt",
+            "sha256": "9f399459e7c6d873e3c5d38cbfc76e323233714670165d6b93290e83dce9fbf9",
+            "size": 942,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "CONTENTS/contents902.txt",
+            "sha256": "32ddae57d7a82c846cfdb88ffbef883705531a8b1ef0e24947bfd5853f0fa8ce",
+            "size": 2685,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "CONTENTS/contents903.txt",
+            "sha256": "2a0cd27e98418a337fe7e25b0a50c7b2e5cef021992208bf8a4d305aa60df876",
+            "size": 1367,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "CONTENTS/contents904.txt",
+            "sha256": "7c50f0b097eb2292a05c5befd827b1e78bfb4c2f8077662e564e2799ad3f1277",
+            "size": 832,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "CONTENTS/contents905.txt",
+            "sha256": "a62f74bf6d1fa7c25918cddb79edf278ee40919176f167a08a4d741523231d7a",
+            "size": 3134,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "CONTENTS/contents906.txt",
+            "sha256": "f4610c95d6e0857f800bb8337b71672df461eb5b7016575662d0b0b83d16f723",
+            "size": 953,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "CONTENTS/contents907.txt",
+            "sha256": "1a73337e52dd8371ab80298d95a25d25f00874c38e5b5459013e9aeac6ea11f8",
+            "size": 1277,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "CONTENTS/contents908.txt",
+            "sha256": "de30d1bc28175977620919383cf3765ef6aa49b930bb699e1c4de25c32532737",
+            "size": 1023,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "CONTENTS/contents909.txt",
+            "sha256": "912516c8e7b84001d9ae1fb72ab971a0f9ad31314bf08ee9404d6c1684a129f1",
+            "size": 3651,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "CONTENTS/contents910.txt",
+            "sha256": "ebb9132cebfc643390cf73bd217536532c5c2744d9b7ee9518c43c97827fe3e3",
+            "size": 705,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "CONTENTS/contents911.txt",
+            "sha256": "c100b3e70f6497d09b148352e31b14ca35923f8a274f00df738e343226196359",
+            "size": 3022,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "CONTENTS/contents912.txt",
+            "sha256": "2d992f2701978d501736edbcce4a2347f02efbe217ba0799a41fffb932bf1090",
+            "size": 2153,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "FONTS/arial.ttf",
+            "sha256": "74d696e666f696e93db685a85c94bfbfcc0796dfcf8a2e2e2e2c908a54e82949",
+            "size": 1047208,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "FONTS/default.ttf",
+            "sha256": "dbccddcd68ffa5f9e4d2b9f8ca2507145e0c1f02f8f03298cb1f6281fe3ad12e",
+            "size": 948860,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "FONTS/segoeui.ttf",
+            "sha256": "cb5821a4012c8bbb3365ffbcd722f87e32567889597758e1419307a67f345bb9",
+            "size": 975268,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "FONTS/tahoma.ttf",
+            "sha256": "dbccddcd68ffa5f9e4d2b9f8ca2507145e0c1f02f8f03298cb1f6281fe3ad12e",
+            "size": 948860,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "MAPDATA/2ndmiddle.amd",
+            "sha256": "6c9df2ab7a3bfa4d7aa157329417c95bd73dd6141e518bfcab958e13c43ede76",
+            "size": 625256,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "MAPDATA/ARESDEN.AMD",
+            "sha256": "56bfa67f443e266d236a1bd58771972db76545a5e0d596fe223eae9c33331e9a",
+            "size": 900256,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "MAPDATA/Abaddon.amd",
+            "sha256": "1ac9dc8d4b88cce8116b3cc715a1daa90cc5206ba74bc5ff9c73f996ec374022",
+            "size": 400256,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "MAPDATA/BTField.amd",
+            "sha256": "0bbc83154d079423470706fcccccd66ec0cfe9aa7f53cf61e35d4d5fd484b1e4",
+            "size": 900256,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "MAPDATA/Cmdhall_1.amd",
+            "sha256": "732622f1850d192d1b156ceaf0c624cac1243caeec8648e134f1b9fba121f7f5",
+            "size": 100256,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "MAPDATA/Cmdhall_2.amd",
+            "sha256": "732622f1850d192d1b156ceaf0c624cac1243caeec8648e134f1b9fba121f7f5",
+            "size": 100256,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "MAPDATA/DruncnCity.amd",
+            "sha256": "df0f52b12f7200043cd4b132be82a1addf9202957d39d6c8c6357f2a5d99b383",
+            "size": 400256,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "MAPDATA/ELVINE.AMD",
+            "sha256": "8fb5f62ac0a2b8a1f4b867866efa56515a77ab67fbd5e33d50a8d8b642238996",
+            "size": 900256,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "MAPDATA/GodH.amd",
+            "sha256": "5bc6196a7fbed4af7dcaf501397249f3b9d830dab6eadcd16a6389219a50bba4",
+            "size": 625256,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "MAPDATA/HRampart.amd",
+            "sha256": "7bc80719bb47bebf511cbdd9b8d4aeaadfe3b6482e30428668e3c2fd8e9508f8",
+            "size": 400256,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "MAPDATA/Resurr1.amd",
+            "sha256": "f5e11a32b71fb936cab4bb7d0827c2cf63e41dbeb8fa9e5c85baa73a32b36464",
+            "size": 400256,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "MAPDATA/Resurr2.amd",
+            "sha256": "f5e11a32b71fb936cab4bb7d0827c2cf63e41dbeb8fa9e5c85baa73a32b36464",
+            "size": 400256,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "MAPDATA/Toh1.amd",
+            "sha256": "aef0e52f31dee4ec6021a2badc9693e98ed33370464a00b2c36b2eeba514b26a",
+            "size": 625256,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "MAPDATA/Toh2.amd",
+            "sha256": "f268d03fbb504f551fa92129682f2554633493cb73d2a2ec839f026688915e69",
+            "size": 900256,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "MAPDATA/Toh3.amd",
+            "sha256": "ebb43cc4ef605043deedd70ee4144c4f2a1abf7dac9a57e21a6ab70ff5235456",
+            "size": 900256,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "MAPDATA/arebrk11.amd",
+            "sha256": "76a2d14d3d636f42f7ddd331fd8e7b948367f5d0c5f37c1c04b47c173374ff6e",
+            "size": 225256,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "MAPDATA/arebrk12.amd",
+            "sha256": "d8becac589873f19426f3ac81bd10caf54aeed6aae8b426366725df46056e6d4",
+            "size": 225256,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "MAPDATA/arebrk21.amd",
+            "sha256": "49a9fe8cf81841086a0e9a303ae3a5a88aac13e16820000185567ef78b07a4cd",
+            "size": 225256,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "MAPDATA/arebrk22.amd",
+            "sha256": "847eaebd077f75bbb6bdad4cd6ba4c66fd4e261ae6de42b6448b37bb5a600662",
+            "size": 225256,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "MAPDATA/arefarm.amd",
+            "sha256": "b6611dfd77621466488b7b0abb3dadb42bc889066d935d43f45f81f72fa9be96",
+            "size": 625256,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "MAPDATA/arejail.amd",
+            "sha256": "5f7216f5c2559f8494175e2c90b28c6d0a904c20d123d41f3dedc0d7aa9dc22a",
+            "size": 240256,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "MAPDATA/aresdend1.amd",
+            "sha256": "631867ff8ff772d676ac5639093ecdaf177bb09f06bc5e593a83e104658140b2",
+            "size": 400256,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "MAPDATA/areuni.amd",
+            "sha256": "943b361ef3c69387bf84403f69a007afe72eb972ef07ce6a836fc054d7872842",
+            "size": 400256,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "MAPDATA/arewrhus.amd",
+            "sha256": "c21ff35254d6801f98c5bbb7630590c7414c731670c8788b1a1bc4c0b6660a34",
+            "size": 100256,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "MAPDATA/bisle.amd",
+            "sha256": "34293bea2da545a36ea3a0372d1b374c1492bf45840e69365538d90cd483b544",
+            "size": 685256,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "MAPDATA/bsmith_1.amd",
+            "sha256": "f17f393db7f1875bd1f9470f8dbd9364835889f4c867829394c382a4d03828ec",
+            "size": 100256,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "MAPDATA/bsmith_1f.amd",
+            "sha256": "f17f393db7f1875bd1f9470f8dbd9364835889f4c867829394c382a4d03828ec",
+            "size": 100256,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "MAPDATA/bsmith_2.amd",
+            "sha256": "f17f393db7f1875bd1f9470f8dbd9364835889f4c867829394c382a4d03828ec",
+            "size": 100256,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "MAPDATA/bsmith_2f.amd",
+            "sha256": "f17f393db7f1875bd1f9470f8dbd9364835889f4c867829394c382a4d03828ec",
+            "size": 100256,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "MAPDATA/cath_1.amd",
+            "sha256": "2f4d7b326b9b3e2d08a04565f251e59c9e62ecb10067700ed2b3e7cdba70cc6a",
+            "size": 100256,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "MAPDATA/cath_2.amd",
+            "sha256": "2f4d7b326b9b3e2d08a04565f251e59c9e62ecb10067700ed2b3e7cdba70cc6a",
+            "size": 100256,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "MAPDATA/cityhall_1.amd",
+            "sha256": "75d43a427f022e7a7f9b005958446cd8e87f782ce476ef86e97215e226ee4e52",
+            "size": 100256,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "MAPDATA/cityhall_2.amd",
+            "sha256": "6f7f60a42188ba6eddefea0030062ca1a9a27a63047bceb3377e7b1e0621a77f",
+            "size": 100256,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "MAPDATA/default.amd",
+            "sha256": "d50084a0bbd10d3e85e8762323d7518d278ba201840954506cb86f0a381cd7e7",
+            "size": 289256,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "MAPDATA/dglv2.amd",
+            "sha256": "f3413250390d67de04d2590a020e75ea616255455d3481d33afccaf1e674782e",
+            "size": 2500256,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "MAPDATA/dglv3.amd",
+            "sha256": "dbdba2c153251177cfce1672ab7077e8e3f716d1e2dce492e1597a1e1d099be6",
+            "size": 1600256,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "MAPDATA/dglv4.amd",
+            "sha256": "d12b99f03d6954577ea28df2319f29c75c4c62c74a5f0566b15abfd42cdc0c38",
+            "size": 1600256,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "MAPDATA/elvbrk11.amd",
+            "sha256": "76a2d14d3d636f42f7ddd331fd8e7b948367f5d0c5f37c1c04b47c173374ff6e",
+            "size": 225256,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "MAPDATA/elvbrk12.amd",
+            "sha256": "d8becac589873f19426f3ac81bd10caf54aeed6aae8b426366725df46056e6d4",
+            "size": 225256,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "MAPDATA/elvbrk21.amd",
+            "sha256": "49a9fe8cf81841086a0e9a303ae3a5a88aac13e16820000185567ef78b07a4cd",
+            "size": 225256,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "MAPDATA/elvbrk22.amd",
+            "sha256": "847eaebd077f75bbb6bdad4cd6ba4c66fd4e261ae6de42b6448b37bb5a600662",
+            "size": 225256,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "MAPDATA/elvfarm.amd",
+            "sha256": "9321eb40d87e2fefd52a3d5e733127e12a5b0928eabed1b9a2de0ac6fabf4c4c",
+            "size": 625256,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "MAPDATA/elvined1.amd",
+            "sha256": "1e322df54da9fbfd4807f25057a76ceecd204e65f6370508834319e5f15688d0",
+            "size": 400256,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "MAPDATA/elvjail.amd",
+            "sha256": "5f7216f5c2559f8494175e2c90b28c6d0a904c20d123d41f3dedc0d7aa9dc22a",
+            "size": 240256,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "MAPDATA/elvuni.amd",
+            "sha256": "177ffc38be615e9817bc83607639b05da8f70ed5949ad3db2497f52484c45509",
+            "size": 400256,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "MAPDATA/elvwrhus.amd",
+            "sha256": "c21ff35254d6801f98c5bbb7630590c7414c731670c8788b1a1bc4c0b6660a34",
+            "size": 100256,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "MAPDATA/fightzone1.amd",
+            "sha256": "8df950113e7e6aef8bff2c0adac4931e83e69a484d7f5f9cd9eb0756dfc377e1",
+            "size": 100256,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "MAPDATA/fightzone2.amd",
+            "sha256": "8df950113e7e6aef8bff2c0adac4931e83e69a484d7f5f9cd9eb0756dfc377e1",
+            "size": 100256,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "MAPDATA/fightzone3.amd",
+            "sha256": "8df950113e7e6aef8bff2c0adac4931e83e69a484d7f5f9cd9eb0756dfc377e1",
+            "size": 100256,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "MAPDATA/fightzone4.amd",
+            "sha256": "ccad1027c17deb45fc9b4116d90189a156f9dce8cb0325410c5f2056cffc4ea8",
+            "size": 64256,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "MAPDATA/fightzone5.amd",
+            "sha256": "18875eff28cef621f94e33e1da8fce845b8c4030dcf066bda77b7ca778d6b143",
+            "size": 144256,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "MAPDATA/fightzone6.amd",
+            "sha256": "93a40d994e15cacf76480e79e49d9e7e0db4386cecd587e21315daa5e4c21df3",
+            "size": 144256,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "MAPDATA/fightzone7.amd",
+            "sha256": "28eb7b7f0f100cbc6b170301f676c99b4632e0791cd57c68322a3fa94e577429",
+            "size": 144256,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "MAPDATA/fightzone8.amd",
+            "sha256": "cc6f2980e6dd2fb1e0ca9f12182249e3f24d9e2d548368fef8a6b9fb030a00de",
+            "size": 144256,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "MAPDATA/fightzone9.amd",
+            "sha256": "8df950113e7e6aef8bff2c0adac4931e83e69a484d7f5f9cd9eb0756dfc377e1",
+            "size": 100256,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "MAPDATA/gldhall_1.amd",
+            "sha256": "a669d80a58c5262dc020902669fbc5a31292afba52c0629e5f1c69c32edb2fe0",
+            "size": 100256,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "MAPDATA/gldhall_2.amd",
+            "sha256": "a669d80a58c5262dc020902669fbc5a31292afba52c0629e5f1c69c32edb2fe0",
+            "size": 100256,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "MAPDATA/gshop_1.amd",
+            "sha256": "6bf5ca867d93f7ae880bc5d59610dd19a18a6e64607560f1f70920b9e96e607e",
+            "size": 100256,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "MAPDATA/gshop_1f.amd",
+            "sha256": "6bf5ca867d93f7ae880bc5d59610dd19a18a6e64607560f1f70920b9e96e607e",
+            "size": 100256,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "MAPDATA/gshop_2.amd",
+            "sha256": "6bf5ca867d93f7ae880bc5d59610dd19a18a6e64607560f1f70920b9e96e607e",
+            "size": 100256,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "MAPDATA/gshop_2f.amd",
+            "sha256": "6bf5ca867d93f7ae880bc5d59610dd19a18a6e64607560f1f70920b9e96e607e",
+            "size": 100256,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "MAPDATA/huntzone1.amd",
+            "sha256": "e7523a5ed689b9172131ee95a50444d4349c7cc192204332ab8e65187e629924",
+            "size": 400256,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "MAPDATA/huntzone2.amd",
+            "sha256": "6ac001fffc3ef40f26306ae479ed00ae96867de3971f12b58230adb98636e3ab",
+            "size": 400256,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "MAPDATA/huntzone3.amd",
+            "sha256": "679a76abb16beb58dfedfd7f71596942f5dbe283f0d4382a0c917976feded5c0",
+            "size": 400256,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "MAPDATA/huntzone4.amd",
+            "sha256": "3e592b1f366f666012038425c10041e82ea91a160ba3d6df6d23b421df8bb844",
+            "size": 400256,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "MAPDATA/icebound.amd",
+            "sha256": "ef4ecf08fa3d175858f8a2228f6009040b43afd9bda241fa4668f04423da6d49",
+            "size": 900256,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "MAPDATA/inferniaA.amd",
+            "sha256": "35bf5d273f27c9936a115c6bdf08cad4b2a7d5b5a7cd0050a8dce83368030e4e",
+            "size": 225256,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "MAPDATA/inferniaB.amd",
+            "sha256": "e88945db9c19b5500800337113100d7453bfcbf50e65ecd67b2426d44990491b",
+            "size": 225256,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "MAPDATA/maze.AMD",
+            "sha256": "af0504da7340b7b66cb29804194e79caac4c74ad3196299c4dc0613f41eac5cb",
+            "size": 400256,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "MAPDATA/middled1n.amd",
+            "sha256": "6f22f4ebb42e7fab646fcc1b532c4f68749ff7fe5ba6f558924e4135a6b91f4b",
+            "size": 484256,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "MAPDATA/middled1x.amd",
+            "sha256": "1bf7a3003e0da17dd01636cc6a0cebc47f6002b146010dcc53824610f6d0a0fd",
+            "size": 400256,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "MAPDATA/middleland.amd",
+            "sha256": "1321e2c93e84e94949cc627b265bd54e11b92d6e0c2d4ce508f04317bc0b07c7",
+            "size": 2746016,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "MAPDATA/procella.amd",
+            "sha256": "1ae813c1589c71268ecaa94e64390f0872fdde52b86f3416c5bd07f1d9abce36",
+            "size": 625256,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "MAPDATA/wrhus_1.amd",
+            "sha256": "c21ff35254d6801f98c5bbb7630590c7414c731670c8788b1a1bc4c0b6660a34",
+            "size": 100256,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "MAPDATA/wrhus_1f.amd",
+            "sha256": "c21ff35254d6801f98c5bbb7630590c7414c731670c8788b1a1bc4c0b6660a34",
+            "size": 100256,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "MAPDATA/wrhus_2.amd",
+            "sha256": "c21ff35254d6801f98c5bbb7630590c7414c731670c8788b1a1bc4c0b6660a34",
+            "size": 100256,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "MAPDATA/wrhus_2f.amd",
+            "sha256": "c21ff35254d6801f98c5bbb7630590c7414c731670c8788b1a1bc4c0b6660a34",
+            "size": 100256,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "MAPDATA/wzdtwr_1.amd",
+            "sha256": "68ea3a4f46eeb5604b30247fec0094ca98f46b8fee8084595d109be9d010c187",
+            "size": 100256,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "MAPDATA/wzdtwr_2.amd",
+            "sha256": "494b930b2bf8e75f61c3d7d038f471a1f3b8dc839300f3a9f79bbf25b0ce6851",
+            "size": 100256,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "MUSIC/Carol.wav",
+            "sha256": "950131e83bdaca0c42815f0262ac7f4dbc64276a8ec0d00a118c019dd605f527",
+            "size": 2736480,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "MUSIC/Carol0.wav",
+            "sha256": "7901c499f65b74c3b5962b517ba4d82e2297ee8bf29d028bce21d4fde7f6fe95",
+            "size": 3008044,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "MUSIC/Carol1.wav",
+            "sha256": "abeefb30c7d618184047c260c549add22749b9c0a8e89acec486452ddf58614e",
+            "size": 2349878,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "MUSIC/Carol2.wav",
+            "sha256": "c77b5e990740d1a64bbab75d3260b55d3a75658a9fc64e60eba08b5984a957bb",
+            "size": 2803236,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "MUSIC/MainTm.wav",
+            "sha256": "731263ea97057c4d33f5dbf8f421df8c12bd0b11ee812e43da3646b1debf4c5b",
+            "size": 3159590,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "MUSIC/abaddon.wav",
+            "sha256": "594e9a8952f785f5bc3b8a0e2715b9f2f413c833788a39f44f302aeb5a7e574e",
+            "size": 2949372,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "MUSIC/aresden.wav",
+            "sha256": "e99e18c2aa3f53ed7589f2bc3c81c1b19efde13e48066fde4af4bb983aef94bf",
+            "size": 3228446,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "MUSIC/druncncity.wav",
+            "sha256": "87cc306a8592474e41acaeaac4f99459fbbdd2de3b2af9adde5312f5cb385909",
+            "size": 1204052,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "MUSIC/dungeon.wav",
+            "sha256": "ab2abb45fbb3009768f9a2a4c5ff106576dfd2ede2bde49495de1dcafd8bbcaa",
+            "size": 3669372,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "MUSIC/elvine.wav",
+            "sha256": "66612f9257a95957ad3262695d2a6e023678ad0820807715b8c5c3123103ad0f",
+            "size": 3695250,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "MUSIC/middleland.wav",
+            "sha256": "3e23f114f828d035e69f8e509d781fb4966c0cffa3bf89182a0bd1d543066862",
+            "size": 2620348,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/character/c1.wav",
+            "sha256": "defa92ff292e37def48e318cd3af9b2a4a0c0e6f7ec78f1cef8fc17963a65149",
+            "size": 14674,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/character/c10.wav",
+            "sha256": "aaf38dee1e07400d03cc8da08b0d674a95b0ff6129d58411d331cd2b526b96a6",
+            "size": 14946,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/character/c11.wav",
+            "sha256": "ddee527a68628bb45b20a2b17c6e1bf158bf3a6bb363b812e7d808e569d0a85d",
+            "size": 14476,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/character/c12.wav",
+            "sha256": "1c56e6c055eab45d4c604bd0be249e7aede5284d678b402571282cd730c07260",
+            "size": 16322,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/character/c13.wav",
+            "sha256": "1f7650696adf4bdc7fdcfc4c53816715033d31b6dcee9160f570d07dcce5d2fe",
+            "size": 13046,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/character/c14.wav",
+            "sha256": "5eed2e1dd99cdc79820e5308a9c679cb2bc2702f0324d0d675c1ef27cec749a1",
+            "size": 67680,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/character/c15.wav",
+            "sha256": "bf851ec651ba4fa4a6c2d3e0bb45d91dc430c49925a5a2b45d95ddc78357e66d",
+            "size": 74358,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/character/c16.wav",
+            "sha256": "7e03e51f4a60ecafc0582f5ed9b253db891ee67699d6605b581668c66e1044b7",
+            "size": 90646,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/character/c17.wav",
+            "sha256": "b0660f053f2408323b7d19d545c357673365704f330a3513479c935d9506bf34",
+            "size": 44220,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/character/c18.wav",
+            "sha256": "cde04c726d016cff1f81d092b3d9d02f1187ae2369e3e31578876b36a937d350",
+            "size": 41100,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/character/c19.wav",
+            "sha256": "f23b6362d32119cc5b9357faee294377b1274e4027d6e3a22b2fa381ea09b718",
+            "size": 50934,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/character/c2.wav",
+            "sha256": "27815f17874e0a65e11eec3e05f132f0e43168a63e883dd8e48f841a482a46d7",
+            "size": 32124,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/character/c20.wav",
+            "sha256": "8970cff4c03c0abaf901dad614966fd2b9c6bd8c7ab3169e4977524a095c4131",
+            "size": 55796,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/character/c21.wav",
+            "sha256": "634a8045ab17c1debf517c888a4da1bac24627bd3149e0c8bce1fd0cde120f9b",
+            "size": 82294,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/character/c22.wav",
+            "sha256": "56265226901ea9de8a80921efb3f5e07d2f47d7329e85aa94c2ac0750ed5b190",
+            "size": 26422,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/character/c23.wav",
+            "sha256": "b3f67207b91253408afcb75bd261da536ed1d526d2e98ea7c818594653669792",
+            "size": 46582,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/character/c24.wav",
+            "sha256": "14312eb9eda63100f82b48ab015cf6b433bc886f6e065332fcc4448b8b042ea1",
+            "size": 46710,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/character/c3.wav",
+            "sha256": "72bf612c7dcb9bf3c23304b35b49e32a03ae84cf21390d7ecaa04810bc263358",
+            "size": 55050,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/character/c4.wav",
+            "sha256": "922a7122be2068cad21eace27cf8a0e87a996cf59eacf17d8dba7bc8153c7150",
+            "size": 7636,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/character/c5.wav",
+            "sha256": "12e6da0257b1785a1ced56ce8c2818eae2ac85a01ab1aed9484a77be26d14993",
+            "size": 10838,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/character/c6.wav",
+            "sha256": "6a681c469a225a512a55fe26eb3f90064276763ad0a03d0607134dff6a596c0a",
+            "size": 28726,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/character/c7.wav",
+            "sha256": "2e66b8e8133cae064bfdee12f2037e3ae27c5aba6dcb1a2b03203626634e2dc0",
+            "size": 15062,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/character/c8.wav",
+            "sha256": "0f470bbd5b6beeb90b9ef1996bfed9cc693b839660993aa6869cd5c57ecf88d9",
+            "size": 11174,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/character/c9.wav",
+            "sha256": "4bca0517a792ce8e38d8a68a5287696abbe65470594283692e4104938ffc0184",
+            "size": 15760,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/effects/e1.wav",
+            "sha256": "48697f0ccb8e07a886cf9f885b46fbf0395fefb88eda380322ef012c8fcd0012",
+            "size": 45548,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/effects/e10.wav",
+            "sha256": "3750a78b5e238c21819de8061354d060b4bd42c3efea1ef2620089d25c6bfe8a",
+            "size": 32340,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/effects/e11.wav",
+            "sha256": "e8c7cd9e8569b8a9cdad1aed89288182c279f7d387f1da3137ae4e23c6195802",
+            "size": 20116,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/effects/e12.wav",
+            "sha256": "d7996f94047e4247ddf17e261d0b55f1124e0b4ef44f7348ac3e16770ec9ee85",
+            "size": 27814,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/effects/e13.wav",
+            "sha256": "d7341f0bb761b2af41cefa4d5bbeb0b77790fc6a57012a6b61acafca4485e328",
+            "size": 7352,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/effects/e14.wav",
+            "sha256": "f07b2a3262f63041e998af664c87367e4ebbf400d89934e76392d77b79eb52e4",
+            "size": 16098,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/effects/e15.wav",
+            "sha256": "19138229ab9b4f2f5461276c2998edd516b305a570979b0a8d8284004ea373b9",
+            "size": 132024,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/effects/e16.wav",
+            "sha256": "c54445bb67371d8cb480b3e780d9b6a740f0866030a03f3e2daedf5f7576c137",
+            "size": 148478,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/effects/e17.wav",
+            "sha256": "37f9364fbf074fc0f2ef7b8b085edcdbe5e0a660a637e58b777fb2a7bb081dad",
+            "size": 48794,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/effects/e18.wav",
+            "sha256": "ab0e7ec9ead53aa3420c489d851bd223bf1fdc8bd30a436571379be893dea9cd",
+            "size": 66586,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/effects/e19.wav",
+            "sha256": "80e0e0be4e6e579d67cd829bff1ee767c464bd3d033cec739b757a47ad870150",
+            "size": 18292,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/effects/e2.wav",
+            "sha256": "95ec88431dd679e179daaad97f25cefdc35a514a89208685cad4f0018883aa72",
+            "size": 87056,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/effects/e20.wav",
+            "sha256": "81229491ca3f838d7b649deb5597c529288708afe2745db2edc21ae69d34e98d",
+            "size": 22364,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/effects/e21.wav",
+            "sha256": "3847f47c2150c676963a110e7c4f2153f52281aca26a5fb00586b3d1fc8d0330",
+            "size": 24684,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/effects/e22.wav",
+            "sha256": "a548c74f845e342798b1bd698d945320703de989a0ac9ddb656167fc9bc51f78",
+            "size": 58868,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/effects/e23.wav",
+            "sha256": "636d76c8bf58bac4e17e0f70747bd31ad367aea9b999e5525ec046feb111b568",
+            "size": 173820,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/effects/e24.wav",
+            "sha256": "fbb8252080fd017904d1974366bcf917f221b8d979610b92a21cddb47ee23295",
+            "size": 132182,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/effects/e25.wav",
+            "sha256": "127fec49114c390b797c4a2ae64800079b8503ab54f3001e377e32841f19ff0c",
+            "size": 39014,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/effects/e26.wav",
+            "sha256": "943bedb2db49b6ba8e3ee57f9f946263f4a1d496c691cb941482415f298e7859",
+            "size": 136270,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/effects/e27.wav",
+            "sha256": "06710421afd2cd5c5707f659d3c203a7411c35d5edde255b0127e7485851bfd6",
+            "size": 216038,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/effects/e28.wav",
+            "sha256": "aa5b6f7eadb9e8078aa6ba16533bdc1058be26e69e6dd78721b428182ecea913",
+            "size": 50220,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/effects/e29.wav",
+            "sha256": "ea87a325736d76a2a2b72939b6b2b01a28f3538a72e4bd0a19443217134bb79a",
+            "size": 44140,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/effects/e3.wav",
+            "sha256": "40be808738513bd2e5b90f510e9d34f5789ff963a62d01cc5f2bb4eeb4c63cbf",
+            "size": 88318,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/effects/e30.wav",
+            "sha256": "9fd970e00abce88e5b282e2584afe89e59df6e181688b2639803974186a18970",
+            "size": 53148,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/effects/e31.wav",
+            "sha256": "da0a463fa846aeb0c2739989b1ab4aa1608c14ef0b2e1c0059d339c613dd02a3",
+            "size": 832206,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/effects/e32.wav",
+            "sha256": "d741e0ef0f0e3a763d50f7ad9db07a09e87892119151f08bcff2643769304f0b",
+            "size": 745680,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/effects/e33.wav",
+            "sha256": "529c242f123fa8b75a3a94dcf2eede62c79a1b6de2241111ee7663d66ad1e75e",
+            "size": 752568,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/effects/e34.wav",
+            "sha256": "f3b9718ed4d0f7fc0512c382da493b54b98a232f84c7e95928f584c0e80e2bb3",
+            "size": 169182,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/effects/e35.wav",
+            "sha256": "f7cc64d6585519aec56c5465ac58a266624028141485bb815b67f8a555ddf476",
+            "size": 156892,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/effects/e36.wav",
+            "sha256": "205820718fdf6399f3297edc4ff1859bde99ad5c860548236dc86bc729d71b6a",
+            "size": 23092,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/effects/e37.wav",
+            "sha256": "fa4fac34424624dc53e6e544ce300b299b64450cf30a0d3b55aa2d86af563d35",
+            "size": 21748,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/effects/e38.wav",
+            "sha256": "5c8e2e1fa7c3d7fd45b4b555a7ee7b71ef90b3f67f39818a657adca17a4e41d3",
+            "size": 754942,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/effects/e39.wav",
+            "sha256": "19145331b23e039c12076a605808653f2d38948e2fb4f3b1a191e67caf221755",
+            "size": 503852,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/effects/e4.wav",
+            "sha256": "4213ff7fa1a4786fddb64d719fe2956d71a0be1a96444c35a1b429242c6ddcc3",
+            "size": 166200,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/effects/e40.wav",
+            "sha256": "7faaaed664790dfb6183010eca80c52cb9f4ef58859100cea5b35c39060ab3f6",
+            "size": 207740,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/effects/e41.wav",
+            "sha256": "6c24a27f0b57744d1fc52fa0a18f8e1add5169571bbddabad1f63631e8859d8e",
+            "size": 160770,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/effects/e42.wav",
+            "sha256": "5ba6fcd502b97ad17e5d02dc4edda39cad613043650eda243d69b91036225197",
+            "size": 40382,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/effects/e43.wav",
+            "sha256": "6ea57d1e5477f6b69bacac7194ae8fad20e8ef85c39dfb3a6c0d78db12df961b",
+            "size": 111948,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/effects/e44.wav",
+            "sha256": "53085c8e03ecf4235cda3072d842c7f3ea3ff81d32a4321dfdb4e7f2a1a4d9f0",
+            "size": 213290,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/effects/e45.wav",
+            "sha256": "e036695e4ef5b1aa100deb2373e54ee569ba10693ec1f82f13e629a550640910",
+            "size": 51106,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/effects/e46.wav",
+            "sha256": "0a167f797baac1acc438fcadc56c7822ce518d0f8e4a8cee23986688b8b6f154",
+            "size": 20502,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/effects/e47.wav",
+            "sha256": "ff5d0452df2f91502cc6682cae14e563cf018043fb79018a63f0f06ebd7b41c6",
+            "size": 55108,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/effects/e49.wav",
+            "sha256": "d7a8f4e7556d844d99022ceab5b8105ee3a569106212e0d54855af689cf77564",
+            "size": 75812,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/effects/e5.wav",
+            "sha256": "5060c79024c2592c80380410265cd887eaef2aea1c6e474dae37464df455ff21",
+            "size": 131862,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/effects/e50.wav",
+            "sha256": "3701bcc740fd24a1cb940b41eac8096f1909b4f92283dfc356b3384374c1863d",
+            "size": 54238,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/effects/e51.wav",
+            "sha256": "7048b2752ab5d5627b0db8d3804ddf8352b89d3860ab3d05e168ba01845edc0f",
+            "size": 648784,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/effects/e52.wav",
+            "sha256": "08f2ee0d31f51dfdd6f8e79418272097863642dc08a12d64eadaa393bd4726d2",
+            "size": 417836,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/effects/e53.wav",
+            "sha256": "c9f41baf56e37377306852e6f391b44f71ce23c5fb7236bf61d365af6f43b812",
+            "size": 565292,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/effects/e6.wav",
+            "sha256": "ef08b3b8bf0527d730d8625b95b770304bee2269ce4536a314126715fbaa1f6c",
+            "size": 131116,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/effects/e7.wav",
+            "sha256": "b45ca13767b8c381b3812556c1d3a9f313e9438aded36647841a75ceb7ee6bf1",
+            "size": 87924,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/effects/e8.wav",
+            "sha256": "4bba5344d5477f39aa200576d45bf1e572d608ad31e878ef09e5efdc335519b1",
+            "size": 91860,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/effects/e9.wav",
+            "sha256": "d3de90b0ed5cb3685c45871795b610cdb313c3b7bc32231062a67f78b227b096",
+            "size": 130196,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/monster/m1.wav",
+            "sha256": "925b7676998a17c1204e1db69c3295d2c8c12653175c765d2390fabcc83b3c50",
+            "size": 44242,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/monster/m10.wav",
+            "sha256": "c8e16bcdf22d0970c4255546f0bee1d280c5d19ca78cf36b9b3d551241f399d4",
+            "size": 33376,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/monster/m100.wav",
+            "sha256": "7195a95e309f8dda6f3af116d4230b2a37610dd014949d19fcabc770f1b1f6ca",
+            "size": 27088,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/monster/m101.wav",
+            "sha256": "a9bf1e97db28fd47ceb70365e1ce5119c44206456f698d93dfc0d6508552d6c0",
+            "size": 24104,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/monster/m102.wav",
+            "sha256": "b32a69e70d9a78303b48ad0292673c700ab04b408cd19e455a5664effa298db2",
+            "size": 60460,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/monster/m103.wav",
+            "sha256": "e195b8111e9a84080a7a549ed5e58843d753811e4ee71c654ad0c1e70fac1505",
+            "size": 106540,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/monster/m105.wav",
+            "sha256": "a8af3a62a004130dfeabeccd11c134151f3e9c7db4d725bc454b269042bd7140",
+            "size": 229494,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/monster/m106.wav",
+            "sha256": "c02024d84ab59684b0675940b5c55b9919d33bccb414da229745556c837e48cd",
+            "size": 498806,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/monster/m107.wav",
+            "sha256": "9124223d5b48bf9570201fcf0341674d5ddafc907964148abc5988c0c06ab124",
+            "size": 325676,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/monster/m108.wav",
+            "sha256": "748706c44ff2f7f00a60d681d41c60da66248235c8d36f690fb3e2e55e7d7b3d",
+            "size": 139382,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/monster/m109.wav",
+            "sha256": "69b755632c89031fcf94b38b25c978fe85332d96e16addc8c63eca5216040440",
+            "size": 108406,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/monster/m11.wav",
+            "sha256": "3273df91ae51daca93354729a63f070016bd923b79daa9befdb090888d1ecdf7",
+            "size": 42678,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/monster/m110.wav",
+            "sha256": "82f676f03a2e205a57f02963cd2e6a8cd9f3fdc069a910e792489a745385e964",
+            "size": 76534,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/monster/m111.wav",
+            "sha256": "4348b9321b04bd0ff3f7dce7c6326fc2a007731923f13126945dd2786f43c056",
+            "size": 156278,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/monster/m112.wav",
+            "sha256": "7fd0deaf5c1aacdac485a2b1d9e700382745396509ae3b6e528fc907e95e0476",
+            "size": 85622,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/monster/m113.wav",
+            "sha256": "0ee1ea89f51b477068ecd922179e7a87481cffc689953763ee09e22b63e5a8f3",
+            "size": 169338,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/monster/m114.wav",
+            "sha256": "3bc227d80863333ef64d6d8e42c9a79de716e6b0fc7283afa623916ed93c804d",
+            "size": 440438,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/monster/m115.wav",
+            "sha256": "a08e10cf10e22688e2865806dff7553cef8b88b1722395d7a3c62358a71d2cbd",
+            "size": 180854,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/monster/m116.wav",
+            "sha256": "c910e36cc1bb7da53199eb26e7fc04e5c4fae1e800bff43b62114ca2337995a0",
+            "size": 162934,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/monster/m117.wav",
+            "sha256": "f83b20af6d8061915465dbd529a841473065de89be2f7778c1b00f09981cb158",
+            "size": 101750,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/monster/m118.wav",
+            "sha256": "58cf2d9b3cac35b8d47ef381f8e2d506007c044359e4fa3405a71d0fe2aee960",
+            "size": 150134,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/monster/m119.wav",
+            "sha256": "5fd784911a6aec2392aee449ea330b3962bcdafa17d0eea154327fb19b8f729f",
+            "size": 122960,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/monster/m12.wav",
+            "sha256": "850b6a6c2e945c6b8fc32ae76d5ba70bd5a737ed5bd0bc1de81cdda03df3ee48",
+            "size": 39092,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/monster/m120.wav",
+            "sha256": "d418c3d3b7ac5aa8fee4e042a2a3c8d96eb2c3cd112fbb571474f4e7091cbc6a",
+            "size": 133750,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/monster/m121.wav",
+            "sha256": "b12e0e627dd1101ceec7c30e0e1c62a2ae4ca95c0db62289bca089b5ac010c1a",
+            "size": 187510,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/monster/m122.wav",
+            "sha256": "12c76f6b1adbe9d79918da159295f9c921997a2cec1062a0ba49ca13a5627314",
+            "size": 215158,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/monster/m123.wav",
+            "sha256": "354f775e5c700eddf75a875d23f056f7f791b50ebb5e14d5b1c5cb69b38fa7ae",
+            "size": 188534,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/monster/m124.wav",
+            "sha256": "d94f185b66279bc0599d18ff83eeb329122e8885d7d2f39e050c694db80dbf63",
+            "size": 59002,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/monster/m125.wav",
+            "sha256": "c8a9f104c3825f4794e2b7c50bf100602fd67cf1e7c5da4d315ac45af7fda235",
+            "size": 189258,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/monster/m126.wav",
+            "sha256": "fb55122c3bff0ca858514a3961db5380f3c83b9d79fcb0cb564ce0e76cd51e40",
+            "size": 192630,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/monster/m127.wav",
+            "sha256": "d66aac65dbe0f1c524355943a474619f1404a69709ac7f4841e3092ef215f790",
+            "size": 71798,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/monster/m128.wav",
+            "sha256": "730186a50b242547662e4c53950ce2af311a353a49cc655b7f3ea032a23fbe87",
+            "size": 162426,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/monster/m129.wav",
+            "sha256": "f04fa37c73b062dd9faf6cb190f616848a6fd3bf74733a375a66a6a9e6d66e94",
+            "size": 199914,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/monster/m13.wav",
+            "sha256": "6f7afd2aa91aed592124db24e7ffbf1532ee70cd00d8e8148405d40aa1a1a59b",
+            "size": 48630,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/monster/m130.wav",
+            "sha256": "1ad8e16511817b64619f76073a397f821ae165aafe208f65e4fd0aa1563a6ad1",
+            "size": 348278,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/monster/m131.wav",
+            "sha256": "1b0955092f1dddf820564bab26f158a3aabd706fcaf5f50fcb50a1227a26d1d1",
+            "size": 162002,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/monster/m132.wav",
+            "sha256": "8a4f13805e637c7630270ed3995b737e794a76110a71ed3eb5c5bdcdbae663a4",
+            "size": 46618,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/monster/m133.wav",
+            "sha256": "46dec8aa51723ed61affbfa03a8e7a68c2fbd5c6a227712c4a664b3c19af7ccc",
+            "size": 126106,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/monster/m134.wav",
+            "sha256": "2a6224d3a334fe3f5137c39746c6d280884c9c6a173c758c305a27c2f2e134ab",
+            "size": 196066,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/monster/m135.wav",
+            "sha256": "7957abda91d5047d7d0443f7f03226a7ab4c2d206770268816f8e8714356b7e8",
+            "size": 82342,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/monster/m14.wav",
+            "sha256": "ca270b1752243c7037110760016863c1c0020e796abe7bc425e1b37efc6173b5",
+            "size": 11554,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/monster/m140.wav",
+            "sha256": "3404d74b47559a3f03ddf09eacf15f74b428822e760425bc65d5e05be958213e",
+            "size": 65476,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/monster/m141.wav",
+            "sha256": "f1855c02562f1be15dea9960f130449e9a89a84688cfadd9eaf682181460d649",
+            "size": 117206,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/monster/m142.wav",
+            "sha256": "c017035e8fa0d478e1912fab901d2fb5c8078fa1f4c45f122024b84c3588945c",
+            "size": 18126,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/monster/m143.wav",
+            "sha256": "8d9ff93454a2561abc2e32c324bf211108f13c4c4a9bf3ca30859c064a148d18",
+            "size": 54550,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/monster/m144.wav",
+            "sha256": "d418c3d3b7ac5aa8fee4e042a2a3c8d96eb2c3cd112fbb571474f4e7091cbc6a",
+            "size": 133750,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/monster/m145.wav",
+            "sha256": "73504151ff29cffd40f11ea47d0c5098e477a862a5c47ab2e00c998b4ab6ef98",
+            "size": 137198,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/monster/m146.wav",
+            "sha256": "43f4bc1e73e4d486b6fb005bca25bdf94993ad94136884fa1fda4d3e4d9f1f90",
+            "size": 77376,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/monster/m147.wav",
+            "sha256": "7202281f33ba8b19ce15668b041ec6901a527f49978ab43c880543d8a37d8d57",
+            "size": 45234,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/monster/m148.wav",
+            "sha256": "e11a51addfae02cb8c82be9e2de9a877ad879388bbc021cd57388608762c3a38",
+            "size": 50506,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/monster/m149.wav",
+            "sha256": "84a817d65ab3ab25cb0d34c48994c8db7f99c60ff87e1e98b021c679e0b81ec3",
+            "size": 194210,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/monster/m15.wav",
+            "sha256": "394f05f4fea5ecb1ccbf564c8fd767b62299fb289fd8bc600eebc43ffcc89930",
+            "size": 23478,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/monster/m150.wav",
+            "sha256": "967dbb7fadeb055b7ad007c94dbe7c0dc89e3ed03b4676eff7da04086ccf6fb9",
+            "size": 65498,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/monster/m151.wav",
+            "sha256": "932335e30dc681c56bdd5224c43173bb87c4bd6841c253ad212e31829f83f97b",
+            "size": 73224,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/monster/m152.wav",
+            "sha256": "00911a36cff848959332a70fb153b9b36beab7030ebdfdf6620e65e65e6bd900",
+            "size": 86960,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/monster/m153.wav",
+            "sha256": "254b50c47b21c1bc7bf68f7ee9ea47d8298ef9240a19deacea192ba64c5f7177",
+            "size": 86392,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/monster/m154.wav",
+            "sha256": "d0149ca4543602a9af8cb1da5e911f363e95eedad747e28e212aba1ee0b05989",
+            "size": 87160,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/monster/m155.wav",
+            "sha256": "784d1ae3924c24ee02ec3225603256716c03e7af9295795f6e96bed9b022504b",
+            "size": 73224,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/monster/m156.wav",
+            "sha256": "a79b169c73e41f14135d324c2d6b7606a4a6a678e70824c608516011f64ce0be",
+            "size": 86960,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/monster/m16.wav",
+            "sha256": "3eeab99ccfdc5295f7bfa35e0f132c7ac56fc4949b8b6818bcc623119570a619",
+            "size": 66340,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/monster/m17.wav",
+            "sha256": "43b03a4ac34731ef9d96b86187167251454ab83e71fa174588e9d6db2be6ebc3",
+            "size": 65472,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/monster/m18.wav",
+            "sha256": "64d4a79d0ac1910717a675ee2b44cb6458e800b4d8ac90cd549fb3ec3e682aa8",
+            "size": 47276,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/monster/m19.wav",
+            "sha256": "fc6ec3f88a8ce30e23462ce88ec7d720cece969b9632a5d2ca8f3822a58d9179",
+            "size": 71212,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/monster/m2.wav",
+            "sha256": "035e21370ad9954eef0d5b7b63b8886601a543f27827fc01fe775c932bc118f9",
+            "size": 27628,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/monster/m20.wav",
+            "sha256": "a512336c73b86d031f7c41a65590972e1459ada761425f129c38c14b80b4447e",
+            "size": 87340,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/monster/m21.wav",
+            "sha256": "d57f632731b2cd4a5311caf75eb45b98e6956382dd4f1f529755dd6a988d274d",
+            "size": 36332,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/monster/m22.wav",
+            "sha256": "3e81f65ed3e035d145cae2a983fe4e1fda3d53a1c8159a6a3f0967dbc18a3de3",
+            "size": 34804,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/monster/m23.wav",
+            "sha256": "b851b3dfea331402921fde7b2a2f27c59cf6f7f58ec0ee043a9fd00e97e6434c",
+            "size": 34180,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/monster/m24.wav",
+            "sha256": "86ad75301305051c8c212cb337adcb5ea860e22ae94e955e225368c4c767cf7e",
+            "size": 44452,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/monster/m25.wav",
+            "sha256": "50c722787d079a4c88c19477a51eedc1f521cf3a6961bce0c10d7cf058f082b7",
+            "size": 36722,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/monster/m26.wav",
+            "sha256": "a2cd82fd1cfab14214e62a1b91b4e0fb81ffd16093190b625aa973e0b8cb1c7e",
+            "size": 21634,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/monster/m27.wav",
+            "sha256": "d16f5db52824666a63a3f6b26ad9d4f660b089340ae09b51e004aa44cc44219f",
+            "size": 26520,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/monster/m28.wav",
+            "sha256": "6ab93293e02793eb488c795666b84cc9aabaaf0437d8d28ef8c5966796cafd74",
+            "size": 35360,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/monster/m29.wav",
+            "sha256": "b2ac2a3b87915b99e1d2fd9d4780527bd2a277d1f3d621fc0266d86c0bb9ac72",
+            "size": 37956,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/monster/m3.wav",
+            "sha256": "59a26bf64a0e96fc90d3a3162b2afe4ec0c8fcf5535b978c2666ad575dc66cd2",
+            "size": 43776,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/monster/m30.wav",
+            "sha256": "91b105abec9b2542e833ea443d1267719eb1741996bff7ef9963787cda4c7f7a",
+            "size": 44934,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/monster/m31.wav",
+            "sha256": "d77430a81b65ff207095659b4bf540330811b11e3c3e79ea1fa657290e117ffa",
+            "size": 31620,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/monster/m32.wav",
+            "sha256": "73b402cff5318dd441dd81c3e7dd48203c8aee00cb38dccecca56ecf588ec18b",
+            "size": 35980,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/monster/m33.wav",
+            "sha256": "73338e9b7e277ad5ab160d797eeafa76cf84d2bcee660a8987bfa595bc977b37",
+            "size": 67468,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/monster/m34.wav",
+            "sha256": "1613c5b2842f79ad2cbb24ca0db7058d039e48ac06804d46dcb85da821d32529",
+            "size": 55540,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/monster/m35.wav",
+            "sha256": "5af915b97291ab1e7bdaade04364125b311aa030c6996aff772561414266ab2c",
+            "size": 39348,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/monster/m36.wav",
+            "sha256": "42c667339fbe4fcb9b8517dd104fd15492b6c8b4bdede01c3fd7474d5f8d0ad4",
+            "size": 50620,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/monster/m37.wav",
+            "sha256": "83fded15aa5710128b1d8b9ef9bf4ddebec2cef4b32f00d31bb959285d4a1aab",
+            "size": 64666,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/monster/m38.wav",
+            "sha256": "5ec80fc4411214e124cce50d20a13220f845a329a47123ddbf798162a37b8919",
+            "size": 32260,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/monster/m39.wav",
+            "sha256": "fe403907238d4727065436c5cb9501eec70c4181eac7b465dfe17c49a30ed1a7",
+            "size": 42442,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/monster/m4.wav",
+            "sha256": "e672ac9a8fe2a1ee9bbdaf00433eca270bc8947804631eb8c0670239c8e35be7",
+            "size": 66302,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/monster/m40.wav",
+            "sha256": "687b6595ad06fa2b78b834a64d53c74fe87b15c5800ffd0e8f790441bfa1958e",
+            "size": 67978,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/monster/m41.wav",
+            "sha256": "4a4bbe8fa80116d5afc49c8574195982b576416e67590a6ecf2198600dd50eba",
+            "size": 66548,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/monster/m42.wav",
+            "sha256": "066dc4ed16eaed6173cbfd5d7936e1d83617a3849174a3477c82b011b23797fb",
+            "size": 44104,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/monster/m43.wav",
+            "sha256": "1c18486364f657dd867cdced225cf8357c72ddb4ab0e55542fe7acdb60cea623",
+            "size": 37866,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/monster/m44.wav",
+            "sha256": "920da864ca92cae2f422d5ced0534c5a676285726e039f20055abd888abcdc6a",
+            "size": 82440,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/monster/m45.wav",
+            "sha256": "3748898b8814c6e1bedec9d19a210a3fb234094c2cecad80dc0cde49a2d99cc1",
+            "size": 86470,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/monster/m46.wav",
+            "sha256": "63f02f4fc9554b772790f95407d80d40ca1f6da572c542834936804c3961362f",
+            "size": 61044,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/monster/m47.wav",
+            "sha256": "93e4abf14a2daea70927a2440754649c604b618dae4e49e89281b3806f27d9d7",
+            "size": 44498,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/monster/m48.wav",
+            "sha256": "d9656d09230ab6ce9c700c34b231ef4024c4e1f05ade96100f7d5d97c15a38eb",
+            "size": 18382,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/monster/m49.wav",
+            "sha256": "2a76907310dc3f9c2c8886ee8119857f23faaeb8c88e7f90f4ff64b1e90461b0",
+            "size": 40054,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/monster/m5.wav",
+            "sha256": "76d0fab9ca6766bd442e0f451697a932961652db611c608fff6a5c6b043f7272",
+            "size": 68220,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/monster/m50.wav",
+            "sha256": "c6385a94e411a388c8ddb3538a1c172befd2f3708baaeb8ad1983efe7ec745f3",
+            "size": 77262,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/monster/m51.wav",
+            "sha256": "4d758a8a79c6c2711e17ba072fd54d6edc85e8caa9609810fca9a65f5b1a7dff",
+            "size": 62670,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/monster/m52.wav",
+            "sha256": "52f6a27ffff371adba86eec9728c4d143e17d1827423aee5ec4b65eb9e535219",
+            "size": 34974,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/monster/m53.wav",
+            "sha256": "1236427edcd37d8f89510b0cf7c7b6e84874b9aed4afade3afcdaaed2bdd959e",
+            "size": 21582,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/monster/m54.wav",
+            "sha256": "fa4c6cfa7e4436f473e0d90113dd18c18fc319a725ffed627c55cbe1eafd8120",
+            "size": 81762,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/monster/m55.wav",
+            "sha256": "ce655b11d0d65096de93cecbb58e1a913ffc9493ba3ae2a4adf110d39288a939",
+            "size": 101300,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/monster/m56.wav",
+            "sha256": "9ab6d6d1334139c64ddb0df459325a88efd42dc7e46e65e54ecaadfa820c9b87",
+            "size": 180868,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/monster/m57.wav",
+            "sha256": "baf55d65cf38ded1d5aafee83e1b49f3b3c49720298d318e6045073ee428d419",
+            "size": 28388,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/monster/m58.wav",
+            "sha256": "526ba269a5d4740d1c866d734f0f073d35d87d15f9eab7de99bc66405bdce247",
+            "size": 53804,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/monster/m59.wav",
+            "sha256": "91e3d63e88e6dbc8864e4e06646ea761e784c5f1587962de303297362174ceaa",
+            "size": 73588,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/monster/m6.wav",
+            "sha256": "520f213deae438b42cc009eb364dfd90f77d2753d30b18015f80a7cfd99def24",
+            "size": 44220,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/monster/m60.wav",
+            "sha256": "978722c2805c94df89f7775a48bfec1969a2366710a41787a7a7196526e78437",
+            "size": 64116,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/monster/m61.wav",
+            "sha256": "fd0c24218e27dc891927889c27acecd2771f791fc77ad716cbb34a1721e296d9",
+            "size": 72638,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/monster/m62.wav",
+            "sha256": "df23d49424114aeb7c2c73d53c73b62e6f2b5f00aca580ef94e144abda73462e",
+            "size": 65654,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/monster/m63.wav",
+            "sha256": "c32bb94a1f676bd362e5d8d2ea7e62682ab57d3689733e46448ae69aa6ac13fb",
+            "size": 53366,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/monster/m64.wav",
+            "sha256": "c002e144be01c4e7e34f009c191248dfecc4be2e4c151e4086cb1659d771ee80",
+            "size": 59050,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/monster/m65.wav",
+            "sha256": "7873f179d09313b4a0a14f96356a1340d5777c2cbc99e50708c295ecae9ea1d0",
+            "size": 41514,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/monster/m66.wav",
+            "sha256": "fb2d5494284a838b08698c09e25df17de811bd78a8f0a6e3106f194c221e55cc",
+            "size": 82548,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/monster/m67.wav",
+            "sha256": "d39eecdea5535132d5b45b16abdb96726163b464766c351abe63730e6aefddf3",
+            "size": 29626,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/monster/m68.wav",
+            "sha256": "bbf3396627b0684ade2f7506cdb67b48dc03b53e9d6ede902b987e27baa4ad36",
+            "size": 43580,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/monster/m69.wav",
+            "sha256": "f91ccf76e1ac6589791ac83dcacf06acde317096f8832b9cc179830b229a25b6",
+            "size": 30848,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/monster/m7.wav",
+            "sha256": "1d4b5cf3458ef89ce7ee7db3be9a6571e299125d567d34efd83b1ec4f44ec4dc",
+            "size": 30520,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/monster/m70.wav",
+            "sha256": "b60cc5c6a90e00687747fc17f9964e293006e792f57ac2e2859630ec6ace552f",
+            "size": 103694,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/monster/m71.wav",
+            "sha256": "6960f2bd2d4e9790691d5a0ca292911da811c2ebafe677008e324bae411f6569",
+            "size": 29864,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/monster/m72.wav",
+            "sha256": "66d14a1d6e7a3565f07a207cc1723734bc74b7c493578816834bb8e844063ea9",
+            "size": 12712,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/monster/m73.wav",
+            "sha256": "4351506a1856404d6398110f040072f3bf8ab6ebf5e5fbaf611516999fb0c215",
+            "size": 44026,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/monster/m74.wav",
+            "sha256": "d0cb783004dc231e52c1ba3243d243b20ae83cc845ab566b5ded9dc991e038a8",
+            "size": 39558,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/monster/m75.wav",
+            "sha256": "132ad46b79907e1f1aa9b1aca5267fb587b87f57c13b1baa2e0c0f63512c357c",
+            "size": 61394,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/monster/m76.wav",
+            "sha256": "4a0ebf26da1c2c784f489b9f154cf92aa6f21f9b44e5ef240f14b25169cfd238",
+            "size": 51944,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/monster/m77.wav",
+            "sha256": "919c9542596f8739d14c421b52cc7fce0cf8209b583aeb38c639727ccaa42c10",
+            "size": 20074,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/monster/m78.wav",
+            "sha256": "044b688e4f3fbce25425da7ee8c33763eb0bfd66f2d94e203fb3f16939b4d4a3",
+            "size": 30066,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/monster/m79.wav",
+            "sha256": "464a28d3e45b1f8a267348eba4488d0c49140723597488331a5536ca220095c0",
+            "size": 22824,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/monster/m8.wav",
+            "sha256": "efdfb290e9516b2d209ae6f221d01fa08b81fd5ff038f1dd5a24d96740bba87b",
+            "size": 66188,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/monster/m80.wav",
+            "sha256": "46765befb6f31b2ac875b56a4595845937f2468138bc35260860807f995b45ac",
+            "size": 32344,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/monster/m81.wav",
+            "sha256": "0144fedae420858e414381deee4664d32228ddf7055098d237ad60d97cc0cfc0",
+            "size": 31810,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/monster/m82.wav",
+            "sha256": "a1bdd2183e692c1e73e7b4e26774992b1b2a17da29379cff210bcf08dfcdda1b",
+            "size": 60176,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/monster/m83.wav",
+            "sha256": "a6411601c9d6dc8d9d5dde4e1689d05a9a38eb86617d4fbbcee2f981b7caaf1c",
+            "size": 85826,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/monster/m84.wav",
+            "sha256": "ed3e1b931bd64ab0c0a935bff9594d5ea01ae908d6bd5ef1ec55287a552e8b80",
+            "size": 60504,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/monster/m85.wav",
+            "sha256": "809a0a770b72c7810344c4fadf1c5910134c4b4937c03b659fea8e491b790650",
+            "size": 56530,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/monster/m86.wav",
+            "sha256": "6f823c3bb1d7eb2dcfbd55262b4c5d875b5fea2e783a8b6a82dd0d1f4e1dcdb4",
+            "size": 80470,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/monster/m87.wav",
+            "sha256": "9cb133b5bf93a270f6931cce819993537c653ce9a16416cb9fb322e40b4290c8",
+            "size": 43832,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/monster/m88.wav",
+            "sha256": "ee9b1351493b8a8e5c19fcfc7fd4fa66dcac4f6591815f81b9e8de2ec18b4cb9",
+            "size": 63494,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/monster/m89.wav",
+            "sha256": "287cc2dce38b7fc1dbabc4e149a64213f98a9b78ed6a9a007e364c05b7658bcb",
+            "size": 22984,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/monster/m9.wav",
+            "sha256": "74d225d69c73e0dc34051dcc631d0ae8254a289409f378ca9b75a91e2aac2918",
+            "size": 48012,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/monster/m90.wav",
+            "sha256": "453d2b26c27b035384a63ebfbf931563e96ef71be41e4b3e7e7f8a29abfa0b7b",
+            "size": 75978,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/monster/m91.wav",
+            "sha256": "3c8f70809ddcc4548731cfefb26bd1bc3c930cb5057947b14c0947ef83dea383",
+            "size": 44152,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/monster/m92.wav",
+            "sha256": "c1de0ab51658a0be8f6dd4a3bb55f55d094e5b557be53411d7c6c78b2bfb89d1",
+            "size": 46124,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/monster/m93.wav",
+            "sha256": "b921e6b9c54840c46c36330be55adcf236769ae040db2e89789fadaa79e74c83",
+            "size": 48570,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/monster/m94.wav",
+            "sha256": "649ec6db4ef817d51d8a1a7cba5d20496384b3768664762c7e1705a3bcf6cecc",
+            "size": 68568,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/monster/m95.wav",
+            "sha256": "b1039a3a5d6ad8692094dc55a75d82585585770cd7e8d19b14185023fd21ff85",
+            "size": 40186,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/monster/m96.wav",
+            "sha256": "4ab584f504e893f43de05d73a63055b12fa531a3233664d2c8faa733f90c2b51",
+            "size": 46202,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/monster/m97.wav",
+            "sha256": "dc76949dbb3ecc96773980e4b253cb47f8a486d5205e990c6309e470eb6304e4",
+            "size": 47850,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/monster/m98.wav",
+            "sha256": "775a978fb2d6f262ca8e9eda47639ee72da109ed1430d6de02e1d2a9c8c8f2f5",
+            "size": 42146,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sounds/monster/m99.wav",
+            "sha256": "24bd697582b10c7e5e9c5408eeddb2dbd4aa4b7cd05724563a07b2359e5a410a",
+            "size": 214760,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/effects/abaddon-effect2.pak",
+            "sha256": "2c49f869f0ca7d08f8c25a1d239075b5bdacd4028db09e615caf8b41977962ce",
+            "size": 6953876,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/effects/abaddon-effect3.pak",
+            "sha256": "57b73bcce834c3e42a3af02784aca5602d8329b4ce4c3834ba038cace0723759",
+            "size": 6649602,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/effects/abaddon-effect4.pak",
+            "sha256": "34dfad6c2c6a4c7252818fa143243ddb266d5c35cacc6611e532cf5581521ae8",
+            "size": 685342,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/effects/crusade-effect.pak",
+            "sha256": "c53fa83068fae8146a8f437c13d70a64b4fcfab204d2f3b88b2235f5d89e40a6",
+            "size": 1546915,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/effects/effect.pak",
+            "sha256": "acaf0cb1edd10d339fb9d4f37921b3d7228c2eeaf54c74761a82641137ec3d9e",
+            "size": 634081,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/effects/effect10.pak",
+            "sha256": "4964f06821326db20f3c6f4de146fa659f2d09bfc300378986e1ad99d56170c9",
+            "size": 221825,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/effects/effect11-shadow.pak",
+            "sha256": "dd466c679392fab990a9fe6b7bac5fcd16a9f9128da48847e37001cbf0b2fb64",
+            "size": 388658,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/effects/effect11.pak",
+            "sha256": "0ba5df5b9c3b2ae8fc6acde2ae5f1eed4798ebe308801bc3822c65e1ba4a54bf",
+            "size": 2960300,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/effects/effect12.pak",
+            "sha256": "b877fe905810ebefcc954c112169829e626eff1e5e9230c01607468b4ee7c8dd",
+            "size": 271730,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/effects/effect13.pak",
+            "sha256": "3b1ea3aa9ef1ee76d293b564230a7917a34ebd4b82eb3f07c91c1c6cd286b75e",
+            "size": 524790,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/effects/effect2.pak",
+            "sha256": "d20321554957d14c7e05672fec390c243fa68226af7b0e0ea126d45d21be8ade",
+            "size": 101649,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/effects/effect3.pak",
+            "sha256": "8e3f4852e435de5b0593a12641c8063b6d5a8f3a72706aa0f59f94196c17a6ce",
+            "size": 1003932,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/effects/effect4.pak",
+            "sha256": "ce100bbef1f68c983a2b99c5903765b0e79cb216bde6467672d5a66c6e52761b",
+            "size": 437742,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/effects/effect5.pak",
+            "sha256": "30bae7f1a4a157f2bbd077fefe97129fcaf2c82a25a58ecd46ee3b81fcb7164e",
+            "size": 888752,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/effects/effect6.pak",
+            "sha256": "42fa556297c14f9ad2349ba08080a85e1db0ac02eab7ab9d4cb57abcf737be1e",
+            "size": 560056,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/effects/effect7.pak",
+            "sha256": "1a8c4521136d027cdfcaac7c4d2b170885c023fe0c5ceb4f5076c78718fca911",
+            "size": 820441,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/effects/effect8.pak",
+            "sha256": "fe8b86c81c9186b6ad3444b64d2e661bd5c0cfc428598277aa234e3047d20bb9",
+            "size": 956853,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/effects/effect9.pak",
+            "sha256": "3c095739f5e81b8c75ff12e2155002cfc17e0bea4f86c046aac8436a98610887",
+            "size": 755663,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/interface/equip_models.pak",
+            "sha256": "641a9ef386b3a3311c7176b806ac44fd1697f29d33c6ab5f4b3ea41f45c28da3",
+            "size": 48504,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/interface/game_dialogs.pak",
+            "sha256": "47f07ee3661504caf0bbe3fecc871ae738c3691e095bfb5deb6921dca0fb6ba5",
+            "size": 2271027,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/interface/intermediate_screens.pak",
+            "sha256": "b17a870fad63b3c89e16e0343863a726f998ce78bddc121aa81f657da19ec6a8",
+            "size": 4322779,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/interface/monster.pak",
+            "sha256": "63c415a9cc5b5ac68404282c3252c5a299242bcba8f012e2b52c645e753a948d",
+            "size": 23295,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/interface/newmaps.pak",
+            "sha256": "81e14f99dc2b1a07fec2cf3f5a741c27ffbc5eafe003efe3ff8e2cd032dffb26",
+            "size": 890303,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/interface/sprite_fonts.pak",
+            "sha256": "87bd2239cef0c3322ac34a1e3e8cbeb75c179d74b4aa0f5108874beb9f8fea1c",
+            "size": 32844,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/interface/telescope.pak",
+            "sha256": "4ea99ca995814e50ba894dcc0d40c97b6a250de4e12d6166b35603736aa358fe",
+            "size": 2842393,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/interface/telescope2.pak",
+            "sha256": "50f739c4b771535307fe4c98fe41fbbe98839b2d7ee7ddcf2326d5741efcc3a9",
+            "size": 257745,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/items/aresden_hero_armor.pak",
+            "sha256": "c609b48ee6ebf77faa5fa43b56c26a3e375dceca0a32c0f31b0e2aedfa509330",
+            "size": 1515238,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/items/aresden_hero_cap.pak",
+            "sha256": "16bb3280a3261dc9fa504f99e3f756e17c73b118de2b2794f4e295591e09120e",
+            "size": 235081,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/items/aresden_hero_hauberk.pak",
+            "sha256": "5e63f8b5371f176e1093fc7580ee268dea099aba8f6a235f924929082b58db67",
+            "size": 1274898,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/items/aresden_hero_helm.pak",
+            "sha256": "1cb65cac79dd5e51a725d4afa3dd15309a8287cda4513d88feca4f3c218b1f50",
+            "size": 333121,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/items/aresden_hero_leggings.pak",
+            "sha256": "9592848c7187258736d806e2a51c4aa3c13dddc243aca1d81f8ac659c075db80",
+            "size": 1646870,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/items/aresden_hero_robe.pak",
+            "sha256": "c53f96e1fde95fa6301bb1c05b85d4e0d922b0bc769bf7cf4f9be0d47a72832c",
+            "size": 4398216,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/items/aresden_heros_cape.pak",
+            "sha256": "66ea4136cc2bf608c80315ded8444b1384a400b89eaafbf5b8ef61072bdf1e4f",
+            "size": 1331948,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/items/aresden_heros_cape_+1.pak",
+            "sha256": "10bc8c86550682c546e99efaa0e58007a1dd2ef01964542c9433645537708c70",
+            "size": 2868752,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/items/barbarian_hammer.pak",
+            "sha256": "4873e5cf40a74e78a4e50b1266af36ae3463053053ebc589fb5322d7b71b3fdd",
+            "size": 728851,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/items/bastad_sword.pak",
+            "sha256": "c9d088be1d7ea34aea4ad88f436a535d00ba70993bf6a52ff6a77a04c4f67332",
+            "size": 308058,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/items/battle_axe.pak",
+            "sha256": "fd4211b79255df0312394ba523beeb63dbf89bc7a007fb0d8a76ce7001262183",
+            "size": 534938,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/items/battle_hammer.pak",
+            "sha256": "625337862868e732730a2e9b8a1f36be6d7f91c979233eb7dfb88d0f040f82a0",
+            "size": 521507,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/items/berserk_magic_wand_ms.20.pak",
+            "sha256": "a115814cba9678ae53b139ac2bbdb8f61827ee54103097b82924ec4db2d08044",
+            "size": 322782,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/items/black_shadow_sword.pak",
+            "sha256": "40c69fd8245e597027820ad0d476304609337df78dcb680b3b25a040da7d926b",
+            "size": 530202,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/items/blonde_shield.pak",
+            "sha256": "f3ca3e120cdeb8294fd5f85193c0f6aa22ed53829c2e0e2c1b0dc8eb3685e0ec",
+            "size": 250506,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/items/bodice1.pak",
+            "sha256": "1d0d19029fd0c8a9488eaaef46b56c193c7f6c64aa7443119f96971e313decfd",
+            "size": 132760,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/items/bodice2.pak",
+            "sha256": "b12d42e051015428b466ba7ca3dd149ed0cb5d7fe6481088610e3975db4e00ca",
+            "size": 180628,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/items/broad_sword.pak",
+            "sha256": "128d19b28a3f114d33d0a3f77f7e69a8f779c489f7124464bcb0e8f7b13c2a1f",
+            "size": 367276,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/items/cape.pak",
+            "sha256": "0e6d99442a377ae0408cef4e28138d11e11f32c671abc533f12228bb884dbe79",
+            "size": 1367845,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/items/chain_hose.pak",
+            "sha256": "0b896fb825d4c70dbe3c9a65c8cb9f29867ae4fb6342b8c8a260d46976ae0b33",
+            "size": 783871,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/items/chain_mail.pak",
+            "sha256": "c00c9ce04f2ac7fad2c586ab6bc2e7358e70284f36ef731510154673f27907c1",
+            "size": 1098771,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/items/claymore.pak",
+            "sha256": "e8218631bace3cdbdf85aecb082a853af22618d1eac12100fcd5a8d18218a1b1",
+            "size": 315026,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/items/combatant_cape.pak",
+            "sha256": "d8cfbddd5c490570fee7e04550d1e173ade140ed4452e1acbdf3b50fb2559e68",
+            "size": 2393250,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/items/dagger.pak",
+            "sha256": "74bb9c27826370dddcf471adfcc7949482f53e14eb27792b211587cbb42686d8",
+            "size": 118972,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/items/dark_executor.pak",
+            "sha256": "a5c54221aad9cbb7b03220f62e2f77b49ead6f94835e5580be3e37004d641ec5",
+            "size": 417263,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/items/dark_knight_templar.pak",
+            "sha256": "6d6bc42a98106b32432e8cfdb9ca6cde5307831309b57aaf020ff8a918a8cabe",
+            "size": 593578,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/items/dark_mage_templar.pak",
+            "sha256": "dbc61ff01961527900f90f234918effd3d83499885178fcd3014fe246d9f1b56",
+            "size": 571297,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/items/direction_bow.pak",
+            "sha256": "fe0a257c195fb8dccf459e6dbd6e5ebb4048cb009f967d8f5904a50d03882fe8",
+            "size": 382570,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/items/double_axe.pak",
+            "sha256": "d7882f70973f84a245ef2a3de8d767aee89909caa772634385539c065cc8fbc8",
+            "size": 279690,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/items/dress.pak",
+            "sha256": "f306eb1b29716c7bf20956341a6351f681260d0934535948a7d13f2480c5fad2",
+            "size": 422450,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/items/elvine_hero_armor.pak",
+            "sha256": "2a23a1ee6463d7ec472c53b47a9d9f1a328ab594e854fa63d5c3f14d94dfe7c4",
+            "size": 1566800,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/items/elvine_hero_cap.pak",
+            "sha256": "bb05b50591cc1082313f5d4fbca9079d9340a6a8d742c780f2911b29a9b4f921",
+            "size": 253080,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/items/elvine_hero_hauberk.pak",
+            "sha256": "016879e28cf02a13f38b08a1a212646e1ec9f609cc3a11c3998f1d3b8b017346",
+            "size": 1254350,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/items/elvine_hero_helm.pak",
+            "sha256": "2f2205fd9982da1c64aa68b3e8a08b09edc8832c68ffc2a05de1a86a04da35e0",
+            "size": 340003,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/items/elvine_hero_leggings.pak",
+            "sha256": "d52d74986a19e6b10d0045f8641b2ea941c04c561598a9d10afb9b9117279bdd",
+            "size": 1667029,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/items/elvine_hero_robe.pak",
+            "sha256": "5315eb82690235204f82ff50c792284943c93b75e5bd81e7d40c12d7a600ec0e",
+            "size": 4370944,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/items/elvine_heros_cape.pak",
+            "sha256": "c09b0f6590baae8866e26e808bb2899726a1aed8122350db13d012e8826fd22c",
+            "size": 1331115,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/items/elvine_heros_cape_+1.pak",
+            "sha256": "ea60d0a23dd4ee0925c5057fe79283afc7d0a70f7420d0cc41ffa151536df8bc",
+            "size": 2677040,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/items/esterk.pak",
+            "sha256": "17d552cc4d99a05ce24749dacd0e2fa3f6b4ae0ce52e515e99d8fe18622f8b08",
+            "size": 293687,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/items/excalibur.pak",
+            "sha256": "9f4e0e586e9b398dfa96c23f922d532d5596856fe469817aee33da353538c2be",
+            "size": 279208,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/items/falchion.pak",
+            "sha256": "1a99c022a669a0e8f3cdb3fea7e4e1d894ce4e612937760eaa787c76faece548",
+            "size": 294865,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/items/fire_bow.pak",
+            "sha256": "ec038bb258f176801bd91f1793868ac1c313a43cc28d3e1ae48ebaf322ddd61b",
+            "size": 458246,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/items/flameberge.pak",
+            "sha256": "04bb60f2703a90cbd54518692a81a8d3a15e016c0c595eec7397af0b4355768c",
+            "size": 535762,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/items/full_helm.pak",
+            "sha256": "acc16037018e770f5541f170c740d55133343c5b0bd9c9d65a14bcbb2c476c87",
+            "size": 187587,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/items/giant_sword.pak",
+            "sha256": "3f16dffa20b3060dade6c1a7e2eb3f293a7f2d5528b3274457c5ae6039436091",
+            "size": 503891,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/items/golden_axe.pak",
+            "sha256": "d6794977b666e5f5051d9bb36be953ef9294affe9a8c3060b18c14c00f75bde9",
+            "size": 459539,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/items/great_sword.pak",
+            "sha256": "b114a8207d86e28d758df2615789187e5b9d53b6c6ccda6f3c4637c728989326",
+            "size": 388479,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/items/hammer.pak",
+            "sha256": "71ccb2e1ad2cf00cf528e8aa508d8402cb9ebce2fe0ff9be85133d7eb1fcb657",
+            "size": 405789,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/items/hauberk.pak",
+            "sha256": "873c11baee2157182cfd6d0ffe44aae2e821048b84b8ab38a049699bcaabd828",
+            "size": 988758,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/items/helm.pak",
+            "sha256": "e4659cc6210959494555f49b3178d905f09753ad100cafdc1ce9d3262d2bed1b",
+            "size": 136171,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/items/hoe.pak",
+            "sha256": "49d0dd548daab30eba380c3ebaa64037c0e194a68e0fe04424e200f4f811ab68",
+            "size": 95027,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/items/horned_helm.pak",
+            "sha256": "d9002fdaa288bc93a05dbf845362e48d028790a6177fd2e2326e6a4ac0c83916",
+            "size": 203572,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/items/iron_shield.pak",
+            "sha256": "c3fe99e0fe4e52d6d161e7624186b512e1a0aaaaa2e384318431be9b1e28494c",
+            "size": 286236,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/items/item_atlas.pak",
+            "sha256": "ed6d71469db7aaea0fa3f3059bdfc8fb550f8913b622e3cce5effc61156f7318",
+            "size": 1385697,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/items/kite_shield.pak",
+            "sha256": "54a5a84e9aa5467e2d96e8ecd2220e73ec3f4db2a2d202287d28396b76fb8700",
+            "size": 291634,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/items/kloness_axe.pak",
+            "sha256": "3cb1eab216967893426c7f927519e4f502d4c8b25cac0ea88d5282fc51527ec2",
+            "size": 599458,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/items/kloness_blade.pak",
+            "sha256": "94ff5d111cee2e880acc77f841aaf6ed8cc5db16626e3ee4d7fedc042dc51638",
+            "size": 464567,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/items/kloness_esterk.pak",
+            "sha256": "f379897e3b5fad1807e18e58e4e811352ac5f5678520176e45f0c4b010aa926e",
+            "size": 404787,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/items/kloness_magic_wand_ms.20.pak",
+            "sha256": "1ed6d28f00ce9a78d550fc0f69271eddd8051b789838e3a0b7cef7c32818e640",
+            "size": 366791,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/items/knee_trousers.pak",
+            "sha256": "e696bc7c7474a3d636d6635424d1327c89ce27531fdd6388eb4ee0b6e1745ff0",
+            "size": 391802,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/items/lagi_shield.pak",
+            "sha256": "992e64a01f4c6748f11cbff9adc14ed6d0670425efdc3d62261b6a9d300c159e",
+            "size": 329567,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/items/leather.pak",
+            "sha256": "867c1068e8aa3584d543a8bfee55368af3ccd024e80b8d5f45bd7d9ed2ff3e4d",
+            "size": 591878,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/items/leather_shield.pak",
+            "sha256": "af61676fff7f110f135cd7756a6333776df6fd28e982113ba17a9c0a5fc1b09c",
+            "size": 223993,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/items/light_axe.pak",
+            "sha256": "15408345a1771a870cdb6cd7aeba24dc7c3a49e931e00cb545a7aa9d4711195d",
+            "size": 197842,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/items/lighting_blade.pak",
+            "sha256": "c76a5fb7596f213ef2b167ba54810eab3383fa24bce0279a8f75877754ed065e",
+            "size": 454235,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/items/long_boots.pak",
+            "sha256": "e8ae57f716b1a5526509bf841a70f68ebcdead00a30e8a712f4e85cf0dfb4da9",
+            "size": 762984,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/items/long_bow.pak",
+            "sha256": "67e2d30ee4c0f2e57e71ce1306d8f7a6246d2dd939e0107e072d359d548683fc",
+            "size": 427816,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/items/long_sword.pak",
+            "sha256": "3f4d5c9a5e73ad90e9980c8e6fdbd62917007cba3212b856edbc1d1c877b7393",
+            "size": 295083,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/items/magic_wand_ms20.pak",
+            "sha256": "b10759ffe3295c5cf27bf706af042aa5a096d710b674683ffc2f05f9c9225df5",
+            "size": 269315,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/items/magic_wand_ms30_llf.pak",
+            "sha256": "04b0c39bb8c239b69813a2cf90cbc9e6123d9de0e003a77bc12b18829051ea42",
+            "size": 405957,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/items/pick_axe.pak",
+            "sha256": "fb1c4bedc96e2bc6a81396bbe5113ff7c3111da1652e9e935416cbd1069d5617",
+            "size": 306728,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/items/plate_leggings.pak",
+            "sha256": "d143ca76bc0a6879ad9910551a38435d2a1c99b7957590da6a0432a15c1c3222",
+            "size": 842822,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/items/plate_mail.pak",
+            "sha256": "07f1abadfdd9a128a00c56da2335a8870d1f9996dc37e6d746cbae507ed6bb65",
+            "size": 800240,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/items/resurrection_magic_wand_ms.20.pak",
+            "sha256": "81ddb75d95ff324bdabb8596ef83afde794673c083a174b22cbbb76234674e4d",
+            "size": 339606,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/items/robe.pak",
+            "sha256": "35a893ec3e15081c26d60b4b3729c4dcc29a3514ad3ee5720309d13cb44d00e6",
+            "size": 1930952,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/items/sabre.pak",
+            "sha256": "2c5ce63d0db83f084fa2ab5bad971222c0495fd0b29c8c28fb4fcaa806375009",
+            "size": 265967,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/items/santa_costume.pak",
+            "sha256": "3fd04d0092ed7300024d721b987b6c815c5b8ed7f10280b4a0c2467349381ef5",
+            "size": 1131307,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/items/saxon_axe.pak",
+            "sha256": "5f8ed57c2d892e25742868c876daa72bc307b4310fc7b955b0716ac0948720fe",
+            "size": 199635,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/items/scale_mail.pak",
+            "sha256": "aff2aa283a9cc46e1b60ad975d21ae13bd821cd8bfb1e9ea33d86dab68636b27",
+            "size": 751484,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/items/scimitar.pak",
+            "sha256": "ee81124ee0c547ee5814525b4a3bf57e1896447efd91a829aca3b9cb89c44a7c",
+            "size": 360126,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/items/scrutum_shield.pak",
+            "sha256": "bd6e3ab1e6b5dd81aa1419eaea76ec2e22c101964dd3e7dbddefee49a4ef32c2",
+            "size": 246934,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/items/shirt.pak",
+            "sha256": "89aac02ea179aa600d9fa451727bf3892ae9843ee9457da8bca0be91e7cd7949",
+            "size": 701331,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/items/shoes.pak",
+            "sha256": "a3cd5fa4a6fd16127abf8fb5bf5f94c764476995db0fd065cedf1c9d5111e703",
+            "size": 307152,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/items/short_bow.pak",
+            "sha256": "b761d239c0f195fca024c1c9e7ad13eb51f6735efc8c940536ba5ed71ae0dd63",
+            "size": 353393,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/items/short_sword.pak",
+            "sha256": "fb5a596497b334cdf4d45938878b00591ac3cabc8569e86196a7d2406698d98b",
+            "size": 233357,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/items/skirt.pak",
+            "sha256": "e4698108c295827a43f539487adc62cd0eb7d9100788a0fdab9674c3d5581dbe",
+            "size": 549014,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/items/storm_bringer.pak",
+            "sha256": "00b7ad5828836071063fbef9fc54d1a59fd2021b71ad063d28ea35f6e5a5b1b0",
+            "size": 356045,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/items/targe_shield.pak",
+            "sha256": "54b6759fdcd60fb43138db9b511b720b1fe9e50a8b72b007d5a39e0f66cef322",
+            "size": 231605,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/items/the_devastator.pak",
+            "sha256": "9c40fb4b48d80917c67dea772760815ba3c671eb02651cce9c7131bcd85211f6",
+            "size": 552658,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/items/tower_shield.pak",
+            "sha256": "890e819f2c13f2cb963f8012617749230092189d7c27d3bd66404298228af570",
+            "size": 417939,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/items/trousers.pak",
+            "sha256": "b939c68de02bfb12d30366302d6fdeb342665f4d04105732572e602faf161905",
+            "size": 714828,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/items/tunic.pak",
+            "sha256": "d8b160a6b6ce51029a70388402d59c0e07a5f2a3c0b97257f37d6c9e98bd176d",
+            "size": 443997,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/items/war_axe.pak",
+            "sha256": "be2953fd0e1a149e048de4d98d648a3d75e5a3f92faa5642281c1991d01d79c3",
+            "size": 401380,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/items/wings_helm.pak",
+            "sha256": "7820f5d7ce189bd4ad91f336c21e737c99729b39f933e92b09605d0b48abee6d",
+            "size": 282284,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/items/wizard_cap.pak",
+            "sha256": "5667025e0695abcf70ffae573bd598febc6a9773f9a1d1af834d58197a14ba11",
+            "size": 177937,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/items/wizard_hat.pak",
+            "sha256": "b46e8e5e3c85531ef90d565c3e61aeda3a0dc296a3d438bf9683299653315f3f",
+            "size": 355306,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/items/wood_shield.pak",
+            "sha256": "e5cca667f6fdedd56a0f554c9701e4835812b0200a7e73ea0fec5f5f4dbcf391",
+            "size": 182336,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/npcs/abaddon.pak",
+            "sha256": "bc9aab1ae600317dc94feddee9038720a67d97e3d45ee9dcec7dd38592ea43bd",
+            "size": 22986140,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/npcs/abs.pak",
+            "sha256": "43d83edfd864632cc5956e9f079d029bda7a80754db6166c6b26da23fb152757",
+            "size": 1066236,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/npcs/amphis.pak",
+            "sha256": "1cef27493b6de9f7176be2ad1ddb84249334d5325202bcd6c862d4e16cd30caf",
+            "size": 130846,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/npcs/apocalypse-cannon.pak",
+            "sha256": "8171f8f3926c214461a72f10925067c27113a588d90369be46de5f00b8872f66",
+            "size": 2063028,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/npcs/arrow-guard-tower.pak",
+            "sha256": "21c6fcf31de598fb93be942bc24ede90590b19df9d8bf10397e72ccb6cb8914e",
+            "size": 455871,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/npcs/barbarian.pak",
+            "sha256": "c1f36a8df8a7074adcaa51ba3d010fcbcba06c18cf682d1d13dbafa8a7c9a324",
+            "size": 1662518,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/npcs/barlog.pak",
+            "sha256": "6f7f29f0cae82f62c25faacf3dae6ed229895c76c5e7aa6d8e65994bd56f9e9e",
+            "size": 2653261,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/npcs/battle-golem.pak",
+            "sha256": "75e9801898e13995c6018fc9e0a792933129aeca7da15f571133eb61849a9572",
+            "size": 1922239,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/npcs/beholder.pak",
+            "sha256": "de68ce23a28878eeee19599fef844bb044383c0efc546ee9690c7095f9f96223",
+            "size": 913191,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/npcs/bunny.pak",
+            "sha256": "27dc8689bb290a57666805ac6241ef60145ed710ea8f23be8fa48767f473da98",
+            "size": 110305,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/npcs/cannibal-plant.pak",
+            "sha256": "1d0a13a5697f54a1e873f48f2184477181dc4b222f6698c3e85b90421f4dee7d",
+            "size": 615746,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/npcs/cannon-guard-tower.pak",
+            "sha256": "d8a2e2b4ede4149a6f065c201568ba8b1c5c0dabc4980791c12f84978ba22dff",
+            "size": 408387,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/npcs/cat.pak",
+            "sha256": "108ad410a674430dc6bc991acee776110eb39ec337981026bb83d697fb4bcbca",
+            "size": 177215,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/npcs/catapult.pak",
+            "sha256": "456ce682c491fe4c0378402dd78f624f7de4e3e2156f886d5fc0048b6ecb1c5e",
+            "size": 747820,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/npcs/centaur.pak",
+            "sha256": "acf4dc8987249dbb6322d2d26f0b49e28a97585bed32f0b94ade366c03f4023f",
+            "size": 1108641,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/npcs/claw-turtle.pak",
+            "sha256": "4d3cd6e81f57531a7f7791e86d2720058ebf0c122653570ad3879325a3186508",
+            "size": 1509635,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/npcs/clay-golem.pak",
+            "sha256": "2092be6aec2a5973ca4891fca9b5ec69a2a83bdd1e7b18cace00fb734af33b5f",
+            "size": 351519,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/npcs/crops.pak",
+            "sha256": "0492c912c136a46078e12696548a4f5439b5123361ce152dc5f535559f0500f7",
+            "size": 297224,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/npcs/crusade-barricade-turret.pak",
+            "sha256": "89d9fb20f2f09e4b7d008709f4c4a699bfb4e09d236ed96ab8e145ab6b6179e7",
+            "size": 2274854,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/npcs/cyclops.pak",
+            "sha256": "056bda6b29f7ebd55a0de8b78e55771a163fb1059f6a5817663f77ac6f5048c6",
+            "size": 738926,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/npcs/dark-elf.pak",
+            "sha256": "408a1d913547fec1a9dbf274249a25ff61d1c62eb4d3255aee1f3d50a2d696be",
+            "size": 595760,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/npcs/dark-knight.pak",
+            "sha256": "df46aa71d0609f0c9f8161dd7d405aca4eed985a3f282c79f43eab4abe683c44",
+            "size": 1262358,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/npcs/demon.pak",
+            "sha256": "5c4fbbf6937734ce999d5c0921790fedbf45d9321f5a60da43a479b29782212c",
+            "size": 2059802,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/npcs/detector.pak",
+            "sha256": "2e7df9e26319c40116164baebdf1976c74cb3e86e421bab178de8c85f9ecfc36",
+            "size": 348616,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/npcs/devlin.pak",
+            "sha256": "28c0ba162046763fcd40e24f8fdcdf88b96766efabe1f9e197c0c87770bc7350",
+            "size": 82593,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/npcs/dire-boar.pak",
+            "sha256": "bb0a6edad74728ab64603cacb1019e2dacfb75a0501e31fcf9b8eb021c3fbcde",
+            "size": 1026528,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/npcs/dummy.pak",
+            "sha256": "6ad9b8733917cac70bfb03cd16b55ba5f0f44d26e5b8dcc4140513c72afe9ec2",
+            "size": 93184,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/npcs/energy-shield.pak",
+            "sha256": "2456185f53ed9f525196ee02f692f1293939753d5b0818f84ecf76e15330af82",
+            "size": 238104,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/npcs/ettin.pak",
+            "sha256": "6031133af6db630c055e094df0e5101a02d806a57e91883116ea19c7dd481f0e",
+            "size": 1952768,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/npcs/fire-wyvern.pak",
+            "sha256": "510c3b9334b10037b7c0b8af71bd76d579dce1c334039501002edb5699cd9fbc",
+            "size": 6090418,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/npcs/frost.pak",
+            "sha256": "5c5e6b68f12000cff435bc0c3b2e125f6b9748c448dce6656e30a14dcacc9f1c",
+            "size": 668268,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/npcs/gail.pak",
+            "sha256": "0f947979c3c20096a9985e4869dddea471a1f2e799adb3d567ff5c41b54bd3db",
+            "size": 59657,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/npcs/gandalf.pak",
+            "sha256": "bffe25fe54e5f284804390715cb0b4a2f810308a8b99d1d980f1cff9ae225eca",
+            "size": 89447,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/npcs/gargoyle.pak",
+            "sha256": "2de99088f46675be7a7c865cbd10486e70eabed97de68709b2d2b265aa7ed2bb",
+            "size": 2347222,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/npcs/gate.pak",
+            "sha256": "1a3b4279fbfca179047cfdfabfbeb67affa8b2951ed6c8fb3f7fa6b3e13329e2",
+            "size": 1549235,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/npcs/giant-ant.pak",
+            "sha256": "9c19c46e251fdf8fbff91eb0f123cde6b4b7c26b6d9c57741d6ae7ed115ce713",
+            "size": 70333,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/npcs/giant-crayfish.pak",
+            "sha256": "8df514bb7df88325eef15021721d015540d9582dc8f266fc1bab063b11aae589",
+            "size": 1406263,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/npcs/giant-frog.pak",
+            "sha256": "2551093531be007a4a4d5c418510f088e6202a4331277e4e9c5b3f95ae02a69e",
+            "size": 466367,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/npcs/giant-lizard.pak",
+            "sha256": "96c523d07224756f77a327a634e9b248db21fe42a19aced0d3b624ba00d93699",
+            "size": 1760647,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/npcs/giant-plant.pak",
+            "sha256": "7a7b0b0a5d3e8301d56a2eebbda2e58c0c3c3a8948f8f8d5fea117396ca7be01",
+            "size": 1541449,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/npcs/gods-hand-knight-ck.pak",
+            "sha256": "4f98fe423184076761dbd6a964a2bb5ec424c3104934625fae21b1c1bf832b0e",
+            "size": 1247675,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/npcs/gods-hand-knight.pak",
+            "sha256": "ec8a0305348b80ddd3c310b00e33aa321487e01bcb085c87b286465e866ba198",
+            "size": 585566,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/npcs/grand-magic-generator.pak",
+            "sha256": "cda4a9dc92e1ef84a4b731b6aad17c913e24c4489a077f0edc690877d522b82c",
+            "size": 328384,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/npcs/guard.pak",
+            "sha256": "ac531c776af1628deccd4210eda640ca89ef914512dd61b564cf994878ac77d9",
+            "size": 261530,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/npcs/helbreath-tank.pak",
+            "sha256": "8cb3023f58af1f81aaf57d767708323a4e37fc6fe571eef1b52e8d0dc640f33d",
+            "size": 2848483,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/npcs/hell-claw.pak",
+            "sha256": "03835f39b18f7f533e7ff4f378c0cd9cbe413ebd212893c41f6d821eda1c8d21",
+            "size": 1760142,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/npcs/hellhound.pak",
+            "sha256": "38245d80a02b4b34fdd4be71820db6de51f5203c65c9bb3b631bc19962fc087f",
+            "size": 306677,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/npcs/howard.pak",
+            "sha256": "beccc0933349a23ba22a5ecdbeac87981cb5d8865afd4e5ae599eb157336e084",
+            "size": 86338,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/npcs/ice-golem.pak",
+            "sha256": "0f3a7468db21e4cf9da800295b9de9b46578b870672770e855c624d4643f53ea",
+            "size": 1465341,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/npcs/kennedy.pak",
+            "sha256": "0f947979c3c20096a9985e4869dddea471a1f2e799adb3d567ff5c41b54bd3db",
+            "size": 59657,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/npcs/liche.pak",
+            "sha256": "64760f8ba33e0ce51f017c14491864eb16b9b258fc9dfe4597c62ec291456ed1",
+            "size": 1097725,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/npcs/light-war-beetle.pak",
+            "sha256": "eb9111897f8184ae08f3e54d76f6aab6af9f99e7f6103605ab68e075c1105ce2",
+            "size": 1396499,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/npcs/mana-collector.pak",
+            "sha256": "e1929c4fe30b17f56a0c465add60eca16b35a8e38b11c54b5430631d22070a4e",
+            "size": 276120,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/npcs/mana-stone.pak",
+            "sha256": "51589f47542896ff32acc334cdded72278ff13397036f2a1681df52748001123",
+            "size": 286749,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/npcs/master-elf.pak",
+            "sha256": "5126ce0a32f2fd65ab38e1a692d8dc2d086beb6dd1c91e56425e945e1de6d1e7",
+            "size": 885034,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/npcs/master-mage-orc.pak",
+            "sha256": "b9bcab3b7e441383022dada282151c9dcc614221006bd01bddca92054688c1a1",
+            "size": 1379232,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/npcs/mcgaffin.pak",
+            "sha256": "cd33519e98d9e3e6479032f08ff60345f7d3e5a7b0196157dec385918d7b06ee",
+            "size": 76218,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/npcs/minotaur.pak",
+            "sha256": "0681160b398e41dea7abf311ae941ff499a116c882605ab591721af70273b0e1",
+            "size": 1075247,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/npcs/mountain-giant.pak",
+            "sha256": "7f0437341eba6db58b3fbc32b91ec5afe42e1b84f8e2456cbbe630d687dafef8",
+            "size": 1181447,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/npcs/nizie.pak",
+            "sha256": "197c9d6e33c2dbe039bc8d5c01d5c638d208e82d2128899b46cb2057e41e8757",
+            "size": 1333006,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/npcs/ogre.pak",
+            "sha256": "cd7b9c4c01cdc5963f3dfe21b09cef7bbb56d4a0595cc7cef8b8d17c1f8fdc4f",
+            "size": 2152294,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/npcs/orc-mage.pak",
+            "sha256": "7517a0bd073f5f51c4311958f956b0d1b885e1aa312a315dbd696a0d57b28b98",
+            "size": 303728,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/npcs/perry.pak",
+            "sha256": "57083a86c9ae901ef2bcb303f9c9b9fdb756af4766bc1a4260c025ce51be6d23",
+            "size": 79990,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/npcs/rudolph.pak",
+            "sha256": "f69eed4310f4619f44b71759aa33c64430ec8f26e76ebd70c0b120d85eec8d58",
+            "size": 482411,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/npcs/scarecrow.pak",
+            "sha256": "ffab4f23e12edb311b5528aa254d85c5607754902645064aee0bc8128d7bf8f1",
+            "size": 85081,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/npcs/scorpion.pak",
+            "sha256": "41b660491f023a5d1c4b74f4f2eb1e3fd3defb06aa32c0d077fc3d03711b07a8",
+            "size": 279663,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/npcs/shopkeeper.pak",
+            "sha256": "d0fbc8125e17e217046d44d2caebd0d8c9e4c6c8c5caf3e7fe5c55141c66020a",
+            "size": 71920,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/npcs/skeleton.pak",
+            "sha256": "fe442a714e31f8b6a891e7401222686eeb6c71cdbe813d3f2b38ea3cc7abafc3",
+            "size": 253686,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/npcs/slime.pak",
+            "sha256": "841d5dc7c6d73c61af3e72c36bca28582cb09e0eb99b773d8d834742c3de7bb0",
+            "size": 150685,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/npcs/sorceress.pak",
+            "sha256": "acdc8129edfd6aa6ec04cb48a127ca004de084bf62cc4437e4af2b10943c6ce5",
+            "size": 850798,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/npcs/stalker.pak",
+            "sha256": "17165af1f211738fbb6fb593438b5a0feb3645b54b61a8921c6afac549a8ebe4",
+            "size": 1105632,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/npcs/stone-golem.pak",
+            "sha256": "c679d56410cc3b528da67126da7d651de57297dd66df3e45aa9b6d43aa726327",
+            "size": 450799,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/npcs/temple-knight-atk.pak",
+            "sha256": "6ab99ba7b2c2a2f7e5f0070d6d0e44a67c2abec8352cb3f0a1c2947069e0c156",
+            "size": 1290300,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/npcs/temple-knight.pak",
+            "sha256": "cc93ab97e2b0e79498faa1c079b7dc5429bb05ca28ad4cb3c6838cfe60f92b6e",
+            "size": 548599,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/npcs/tentacle.pak",
+            "sha256": "dc0c80db463a49df581b52a4f9437dfbf91564b9e3d285f87d4ad8c1bed2e14a",
+            "size": 299822,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/npcs/tiger-worm.pak",
+            "sha256": "d5a56d8b66fe6f116e4c1e255d5238f04f7f3178f0eba39d775ccbf2d4ce0b3d",
+            "size": 1989952,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/npcs/tom.pak",
+            "sha256": "1d7ac21b74fc7aaac741b673793cfbf4b7e73de4ec939628efe4a35155b6a88b",
+            "size": 100374,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/npcs/troll.pak",
+            "sha256": "25c9086b6f38a8c2da0d86fd7ad6f31412fedfa9819844943fe2583d11bdbd72",
+            "size": 821957,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/npcs/unicorn.pak",
+            "sha256": "b6947a55d07b1b14f0734fcbfceb6fa24010396da437379bf198083783047f76",
+            "size": 614861,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/npcs/werewolf.pak",
+            "sha256": "c19bc846f0412b4b11c13c7a9c720a50b961b2e3fbf6e21d60c7b991bea218ae",
+            "size": 762084,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/npcs/william.pak",
+            "sha256": "caaf63e864b9a2666ef5b76a75e021ff0d62c0c135a96791d660a4d3ebad64c9",
+            "size": 69556,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/npcs/wyvern.pak",
+            "sha256": "ba858a34a6a30a0e85d8071ef0ce1116c43e73ca2ec3da564ba0505a26f9ac8e",
+            "size": 6314841,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/npcs/zombie.pak",
+            "sha256": "ea9b90d6ffefc5db56d77b3b8a1247db5e86a2b490b414890474742610022e94",
+            "size": 219467,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/objects/cruobj1.pak",
+            "sha256": "e8e5e9ec061cdd66b272817a4fc0d58d1b5dcd7bea5a22a1a8b1492da45640e2",
+            "size": 293987,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/objects/item-dynamic.pak",
+            "sha256": "9fe1f78cfb9f7af91f87d426f1956a33497cfe113708ebb2b7ab48b7f0bab74b",
+            "size": 20254,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/objects/objects1.pak",
+            "sha256": "dc5ef535734e53e8c4dda61b6f2e8ce6633e3fcdb8ca71141d409d5790e2949f",
+            "size": 1166455,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/objects/objects2.pak",
+            "sha256": "9870b6223f42ac98b7b6608654b943010a9e4df5af616253396efc17d15d14fd",
+            "size": 374008,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/objects/objects3.pak",
+            "sha256": "1a0eb38ad6fcf6166eae0f0cf99078e0b918f06061756cad95c7636880cd5d99",
+            "size": 358397,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/objects/objects4.pak",
+            "sha256": "23baf9ee02e9fd96fb3d81ce11d80009c7aac55009808e0c0982e342a90eafa1",
+            "size": 239028,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/objects/objects5.pak",
+            "sha256": "638d9178f78dd852c41991898e10550548ab367c53fffdcf5ab8aa341b82ece2",
+            "size": 1008314,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/objects/objects6.pak",
+            "sha256": "aa80f146a1c2066b47a6562d841f39801746d95825f18b3d7823a65b17dc0e25",
+            "size": 344249,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/objects/objects7.pak",
+            "sha256": "6792bba6d579cc2a4d3c715544da748e29e56ebd92212df76a646aa773a1ef01",
+            "size": 1111194,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/objects/structures1.pak",
+            "sha256": "0ad5ff043852b815cc827518ff4dd4c921d13402388ceaf6f4f62d6dee982695",
+            "size": 5125574,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/objects/trees1.pak",
+            "sha256": "1f4281b96f01c601281a39e80a64bec80766b2d35e97634a48e847b36209826d",
+            "size": 1686689,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/objects/treeshadows.pak",
+            "sha256": "c2e6a8c692fcb907bcf08256f99978d9c720c60f31c61644d2d49f0fa09ba84d",
+            "size": 119344,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/pets/tutelary-angel1.pak",
+            "sha256": "faea3be4dc8642f7710b6cdb36fb147e78f1f28c28273027a08e0ea3a542bac1",
+            "size": 270998,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/pets/tutelary-angel2.pak",
+            "sha256": "edc6d058afbd8242acd0c5e3b62523c24614c480b3af5ba3c1e9972965a876d8",
+            "size": 277737,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/pets/tutelary-angel3.pak",
+            "sha256": "ee9b50d9d82de0ca2a63240549e6406039d481fb098a2fe7c1e1473969869134",
+            "size": 281095,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/pets/tutelary-angel4.pak",
+            "sha256": "af00382038068026b41fbed765c44911072aa242e284ae1a26c021cb3ca9e5bf",
+            "size": 273037,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/players/black-man.pak",
+            "sha256": "25c06d557e94bb2923e70a63c0531b3a4883d5b29dabaa7cdcb2967c85688e71",
+            "size": 913406,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/players/black-woman.pak",
+            "sha256": "79485ccd697f881fdbe37927538e0de86ac984e119382a65c73be0cad2512ade",
+            "size": 689272,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/players/female-hair.pak",
+            "sha256": "6b44ef9e851cb028e1ae842618abb5f1b75348d5e0a604812d47316cc12de736",
+            "size": 477089,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/players/female-underwear.pak",
+            "sha256": "995c9af8683ed8679cc81745fc682f5a94e9b85c8ecd682940089a42d6699eac",
+            "size": 570861,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/players/male-hair.pak",
+            "sha256": "3d05af1919d14f74e247df17ed83c0e6bd9e6efe05b118e89a04a9a8579d505f",
+            "size": 469928,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/players/male-underwear.pak",
+            "sha256": "7fc345c130eafbcacdbc0ccca3932670bd254ded21d09d54ca2c07bcb8cc3d37",
+            "size": 579400,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/players/white-man.pak",
+            "sha256": "8d3e4812b271b9ad3990a501df51e385ed4f20f850cfcc4ac934199c2aec747e",
+            "size": 937114,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/players/white-woman.pak",
+            "sha256": "e21c8c10e2050fb397cc272d9c00ce3e4f05c5aacf62cc53b91b10e37c84cdd5",
+            "size": 720744,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/players/yellow-man.pak",
+            "sha256": "f75e22ce0085ee0486a1c30267bfffd5a2fbe8b06aef3ebfd1b43272cf2790b1",
+            "size": 932598,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/players/yellow-woman.pak",
+            "sha256": "fa1666f9b0d90a91834407c2248fb163e7e3c2cc6abe2fcb06910d7d04275f36",
+            "size": 711531,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/tiles/htile406-421.pak",
+            "sha256": "064854751fe0f7c128e1c298fd2acafd9c44dcf80851803abbb5ddce54d5a0f3",
+            "size": 1720029,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/tiles/maptiles1.pak",
+            "sha256": "9fba825c8823e26c8eecfc4e5caa529d975f54292af9e408a3f0860db9265941",
+            "size": 7366034,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/tiles/maptiles2.pak",
+            "sha256": "521fa9fb1bd506617990d0392c62aef176d994026351c2391c770fb73619edd5",
+            "size": 4147135,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/tiles/maptiles353-361.pak",
+            "sha256": "24832ffa169018376c11573275b970986988dbeab950d6abd98985c3e9c25696",
+            "size": 2468413,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/tiles/maptiles4.pak",
+            "sha256": "8bc3945fb371f99253c9922199d0b2a2f29f2fb8859430983e68e2b357d6c177",
+            "size": 2420824,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/tiles/maptiles5.pak",
+            "sha256": "0d53a6f4f8952bcd13d98e3ccf4214593731d446ec6ea73b5a389acb775e8320",
+            "size": 4125189,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/tiles/maptiles6.pak",
+            "sha256": "c19fe6ec6a8a60660fd26e29955ddd595baca2d1d3a8698995ca56207a79c333",
+            "size": 966440,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/tiles/sinside1.pak",
+            "sha256": "aefb831b529cfc1d8f793efd19036f71757d4f0a028a982307cff2e5387217fa",
+            "size": 3139855,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/tiles/tile223-225.pak",
+            "sha256": "56929b7003e4307e5bca0f17048abe8e655073fd2ec8900dcb6815e554514856",
+            "size": 229514,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/tiles/tile226-229.pak",
+            "sha256": "fa033da62b5a1275d021f0cc8c25306bba7ab7e20394c4a644b5d42f4659cb7f",
+            "size": 295970,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/tiles/tile363-366.pak",
+            "sha256": "5b0c9576b560560661b1373e460141f509e39d015754054f29506988cf655a23",
+            "size": 868485,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/tiles/tile367-367.pak",
+            "sha256": "6e0edce8b397433c366dbf4d234b6035fa38fe007f34e0cbc5a75a4f0d4765b7",
+            "size": 81219,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/tiles/tile370-381.pak",
+            "sha256": "55ff65acf23d33891e3bd84b67a575ebd41d4c1c5ab6abbcb0484783506d587b",
+            "size": 1246976,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/tiles/tile382-387.pak",
+            "sha256": "e6438a5523db54e6c2f4f14f14731a7ef13ced2c3b391fa531616b4f64e4bc27",
+            "size": 775512,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/tiles/tile388-402.pak",
+            "sha256": "6a671c4b486b3e8f9d66e4bd33e8a4f21e944ae6c705dcd44e1523d88edaba69",
+            "size": 3710798,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/tiles/tile403-405.pak",
+            "sha256": "c7c36e522ce75ad17ffb3a61cafcafc773dd62c15964a46ad18f0709e55f7847",
+            "size": 669070,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/tiles/tile406-421.pak",
+            "sha256": "77b58392de9ff829a658166022fdebc2be580963d65281ede2206a047baf28b1",
+            "size": 1418352,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/tiles/tile422-429.pak",
+            "sha256": "618cc7da83029651551a079c55ebc5eaf7a1a0ca62febe6443f9ee3e5f0860c1",
+            "size": 890975,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/tiles/tile430-443.pak",
+            "sha256": "1d58ffae24c7a9b6124cf1a918e92ad5b75fc0d8a7b5793888f365f325211bfc",
+            "size": 3166135,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/tiles/tile444-444.pak",
+            "sha256": "090f23eb123155f76d7a48160bb368a44cc3c4be49b60790848b17bc8b80607e",
+            "size": 184134,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/tiles/tile445-461.pak",
+            "sha256": "d73fe62573cbe8c887cd1ada194161588bee36774829dffaa8775aefabb51924",
+            "size": 3583998,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/tiles/tile462-464.pak",
+            "sha256": "921e14839c4390231fe9ae403036a9ec322a487eaf3de69122ce34e88a4b153a",
+            "size": 1431277,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/tiles/tile462-473.pak",
+            "sha256": "f6431ef439ed867a1a7183e95bbef940e0c65259a38f68a0df29ccc8d55c1f21",
+            "size": 3206737,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/tiles/tile462-475.pak",
+            "sha256": "9055cd16152567f35262b94f60acbea4f55a5be4905aea7ad436d9035a992797",
+            "size": 3105289,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/tiles/tile474-478.pak",
+            "sha256": "2ff9a6f5e687378b990d683c6216f467cb9c77fea88a87c9e5eaef33c227d51a",
+            "size": 1478591,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/tiles/tile474-488.pak",
+            "sha256": "be0ffc8fcb877c63741e6ffc0a8d3a4348a6b4c2412a50bfeb60e9b22d5fb096",
+            "size": 1537501,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/tiles/tile479-488.pak",
+            "sha256": "633ea9ba195e5e7fbb695aa8958a317f9cca35d84b33f9e9509bef9f6553421b",
+            "size": 2073405,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/tiles/tile489-522.pak",
+            "sha256": "bc2aac628f783685c18cd574baf24f44e61e434e259ffcf1da3af016cdf4667f",
+            "size": 8450314,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/tiles/tile523-530.pak",
+            "sha256": "2f51ca3c0e3f8328421a43728ee416c1ce53884c63cd492e2e2dd6d867e9172d",
+            "size": 2357868,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/tiles/tile523-532.pak",
+            "sha256": "04e17f275f5b530f6a86b8a4554c2e83d68617790e4caeb0f9c38a9cc5081bb1",
+            "size": 58934,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/tiles/tile531-540.pak",
+            "sha256": "a6026978e48a57b2710c6e6e21ebb72d7900baf4fb4fe177a69729dc2b62e288",
+            "size": 2607549,
+            "executable": false,
+            "platform": "any"
+        },
+        {
+            "path": "sprites/tiles/tile541-545.pak",
+            "sha256": "c5229757ef1c2f67373facaa674db60599f34189b6ebf1579495e80f141c1a50",
+            "size": 1098412,
+            "executable": false,
+            "platform": "any"
+        }
+    ]
+}

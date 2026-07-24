@@ -1,0 +1,34 @@
+#include <winver.h>
+#include "version_rc.h"
+#include "launcher_resource.h"
+
+// Launcher backdrop artwork (raw BGRX pixels, dimensions in launcher_art.h)
+IDR_LAUNCHER_ART RCDATA "launcher_art.bin"
+
+VS_VERSION_INFO VERSIONINFO
+ FILEVERSION VER_LAUNCHER_FILEVERSION
+ PRODUCTVERSION VER_LAUNCHER_FILEVERSION
+ FILEFLAGSMASK 0x3fL
+ FILEFLAGS 0x0L
+ FILEOS VOS_NT_WINDOWS32
+ FILETYPE VFT_APP
+ FILESUBTYPE 0x0L
+BEGIN
+    BLOCK "StringFileInfo"
+    BEGIN
+        BLOCK "040904b0"
+        BEGIN
+            VALUE "CompanyName", "Helbreath: Medieval Times"
+            VALUE "FileDescription", "Helbreath: Medieval Times Launcher"
+            VALUE "FileVersion", VER_LAUNCHER_FULL
+            VALUE "InternalName", "Launcher"
+            VALUE "OriginalFilename", "Launcher_x64_win.exe"
+            VALUE "ProductName", "Helbreath: Medieval Times"
+            VALUE "ProductVersion", VER_LAUNCHER_DISPLAY
+        END
+    END
+    BLOCK "VarFileInfo"
+    BEGIN
+        VALUE "Translation", 0x409, 1200
+    END
+END

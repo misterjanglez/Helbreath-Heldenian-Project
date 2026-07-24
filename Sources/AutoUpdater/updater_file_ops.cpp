@@ -55,12 +55,21 @@ namespace hb::updater
 		}
 		else
 		{
-			// For data files, overwrite directly
+			// Overwrite in place. Rename first: staging lives inside the target
+			// directory (same volume), so this is cheap and — on Linux — replaces
+			// even a busy binary atomically. Fall back to copy if rename fails
+			// (e.g. cross-volume staging).
 			auto parent = fs::path(final_path).parent_path();
 			if (!parent.empty())
 				fs::create_directories(parent, ec);
 
-			fs::copy_file(staged_path, final_path, fs::copy_options::overwrite_existing, ec);
+			ec.clear();
+			fs::rename(staged_path, final_path, ec);
+			if (ec)
+			{
+				ec.clear();
+				fs::copy_file(staged_path, final_path, fs::copy_options::overwrite_existing, ec);
+			}
 		}
 
 		return !ec;

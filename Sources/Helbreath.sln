@@ -17,6 +17,11 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "AutoUpdater", "AutoUpdater\
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "CControls", "CControls\CControls.vcxproj", "{B1C2D3E4-F5A6-7890-1234-567890ABCDEF}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Launcher", "Launcher\Launcher.vcxproj", "{D7E8F9A0-B1C2-4D3E-8F90-1A2B3C4D5E6F}"
+	ProjectSection(ProjectDependencies) = postProject
+		{A1B2C3D4-E5F6-7890-ABCD-EF1234567890} = {A1B2C3D4-E5F6-7890-ABCD-EF1234567890}
+	EndProjectSection
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -53,6 +58,12 @@ Global
 		{B1C2D3E4-F5A6-7890-1234-567890ABCDEF}.Release|x64.Build.0 = Release|x64
 		{B1C2D3E4-F5A6-7890-1234-567890ABCDEF}.ReleaseWithDebugInfo|x64.ActiveCfg = Release|x64
 		{B1C2D3E4-F5A6-7890-1234-567890ABCDEF}.ReleaseWithDebugInfo|x64.Build.0 = Release|x64
+		{D7E8F9A0-B1C2-4D3E-8F90-1A2B3C4D5E6F}.Debug|x64.ActiveCfg = Debug|x64
+		{D7E8F9A0-B1C2-4D3E-8F90-1A2B3C4D5E6F}.Debug|x64.Build.0 = Debug|x64
+		{D7E8F9A0-B1C2-4D3E-8F90-1A2B3C4D5E6F}.Release|x64.ActiveCfg = Release|x64
+		{D7E8F9A0-B1C2-4D3E-8F90-1A2B3C4D5E6F}.Release|x64.Build.0 = Release|x64
+		{D7E8F9A0-B1C2-4D3E-8F90-1A2B3C4D5E6F}.ReleaseWithDebugInfo|x64.ActiveCfg = Release|x64
+		{D7E8F9A0-B1C2-4D3E-8F90-1A2B3C4D5E6F}.ReleaseWithDebugInfo|x64.Build.0 = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
