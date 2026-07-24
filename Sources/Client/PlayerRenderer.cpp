@@ -200,7 +200,9 @@ hb::shared::sprite::BoundRect CPlayerRenderer::draw_run(int indexX, int indexY, 
 		m_screen->draw_angel(40 + (state.m_dir - 1), fix_x + 20, fix_y - 20, state.m_frame % 4, time);
 		m_game.check_active_aura2(fix_x, fix_y, time, state.m_owner_type);
 
-		// Haste trail effect
+		// Haste trail effect — an intentional modern effect (5 stacked body ghosts).
+		// The original has no base/N afterimage for haste, so this keeps its own fixed
+		// light-blue tint rather than routing through afterimage_tint_params().
 		if (state.m_status.haste)
 		{
 			int bodyDirIndex = eq.m_body_index + (state.m_dir - 1);
@@ -302,8 +304,10 @@ hb::shared::sprite::BoundRect CPlayerRenderer::draw_attack(int indexX, int index
 			if (!is_bow)
 			{
 				int trailFrame = (state.m_dir - 1) * 8 + (state.m_frame - 1);
+				// Original swing afterimage: transparent additive-offset echo (base/3),
+				// not a fixed-color tinted copy.
 				m_game.m_equip_sprites[eq.m_weapon_index]->draw(sX, sY, trailFrame,
-					hb::shared::sprite::DrawParams::tinted_alpha(126, 192, 242, 0.7f));
+					m_game.afterimage_tint_params());
 			}
 		}
 
@@ -447,8 +451,9 @@ hb::shared::sprite::BoundRect CPlayerRenderer::draw_attack_move(int indexX, int 
 		if (eq.m_weapon_index != -1 && state.m_frame == 3)
 		{
 			int trailFrame = (state.m_dir - 1) * 8 + (state.m_frame - 1);
+			// Original swing afterimage: transparent additive-offset echo (base/3).
 			m_game.m_equip_sprites[eq.m_weapon_index]->draw(sX + dx, sY + dy, trailFrame,
-				hb::shared::sprite::DrawParams::tinted_alpha(126, 192, 242, 0.7f));
+				m_game.afterimage_tint_params());
 		}
 
 		// Berserk glow
@@ -458,18 +463,17 @@ hb::shared::sprite::BoundRect CPlayerRenderer::draw_attack_move(int indexX, int 
 		m_screen->draw_angel(8 + (state.m_dir - 1), sX + dx + 20, sY + dy - 20, state.m_frame % 8, time);
 		m_game.check_active_aura2(sX + dx, sY + dy, time, state.m_owner_type);
 
-		// Dash ghost effect
+		// Dash ghost effect — original magic-dash afterimage of body + weapon + shield
+		// (client/Game.cpp:9857-9859), transparent additive-offset echo (base/3).
 		if (dash_draw)
 		{
+			const auto ghost = m_game.afterimage_tint_params();
 			int ghostDirFrame = (state.m_dir - 1) * 8 + state.m_frame;
-			m_game.m_sprite[eq.m_body_index + (state.m_dir - 1)]->draw(sX + dsx, sY + dsy, state.m_frame,
-				hb::shared::sprite::DrawParams::tinted_alpha(126, 192, 242, 0.7f));
+			m_game.m_sprite[eq.m_body_index + (state.m_dir - 1)]->draw(sX + dsx, sY + dsy, state.m_frame, ghost);
 			if (eq.m_weapon_index != -1)
-				m_game.m_equip_sprites[eq.m_weapon_index]->draw(sX + dsx, sY + dsy, ghostDirFrame,
-					hb::shared::sprite::DrawParams::tinted_alpha(126, 192, 242, 0.7f));
+				m_game.m_equip_sprites[eq.m_weapon_index]->draw(sX + dsx, sY + dsy, ghostDirFrame, ghost);
 			if (eq.m_shield_index != -1)
-				m_game.m_equip_sprites[eq.m_shield_index]->draw(sX + dsx, sY + dsy, ghostDirFrame,
-					hb::shared::sprite::DrawParams::tinted_alpha(126, 192, 242, 0.7f));
+				m_game.m_equip_sprites[eq.m_shield_index]->draw(sX + dsx, sY + dsy, ghostDirFrame, ghost);
 		}
 	}
 	else if (state.m_name[0] != '\0')

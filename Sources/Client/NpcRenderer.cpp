@@ -550,11 +550,12 @@ hb::shared::sprite::BoundRect CNpcRenderer::draw_attack_move(int indexX, int ind
 		m_screen->draw_angel(8 + (state.m_dir - 1), sX + dx + 20, sY + dy - 20, state.m_frame % 8, time);
 		m_game.check_active_aura2(sX + dx, sY + dy, time, state.m_owner_type);
 
-		// Dash ghost effect
+		// Dash ghost effect — original body afterimage (base/3), transparent
+		// additive-offset echo, not a fixed-color tinted copy.
 		if (dash_draw)
 		{
 			m_game.m_sprite[eq.m_body_index + (state.m_dir - 1)]->draw(sX + dsx, sY + dsy, state.m_frame,
-				hb::shared::sprite::DrawParams::tinted_alpha(126, 192, 242, 0.7f));
+				m_game.afterimage_tint_params());
 		}
 	}
 	else if (state.m_name[0] != '\0')

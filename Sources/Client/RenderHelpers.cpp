@@ -42,19 +42,11 @@ void draw_equip_layer(CGame& game, hb::shared::sprite::SpriteCollection& sprites
 	if (spriteIndex == -1) return;
 
 	if (inv)
-	{
 		sprites[spriteIndex]->draw(sX, sY, frame, hb::shared::sprite::DrawParams::alpha_blend(0.25f));
-	}
-	else if (colorIndex == 0)
-	{
-		sprites[spriteIndex]->draw(sX, sY, frame);
-	}
 	else
-	{
-		auto c = game.m_color_palette[colorIndex];
-		sprites[spriteIndex]->draw(sX, sY, frame,
-			hb::shared::sprite::DrawParams::tint(c.r, c.g, c.b));
-	}
+		// Original additive-offset dye (highlight-preserving), regular color table.
+		// worn_tint_params(0) yields a plain opaque draw, covering the no-dye case.
+		sprites[spriteIndex]->draw(sX, sY, frame, game.worn_tint_params(static_cast<uint8_t>(colorIndex), false));
 }
 
 // -----------------------------------------------------------------------
@@ -65,19 +57,11 @@ void draw_weapon(CGame& game, hb::shared::sprite::SpriteCollection& sprites,
 	if (eq.m_weapon_index == -1) return;
 
 	if (inv)
-	{
 		sprites[eq.m_weapon_index]->draw(sX, sY, weaponFrame, hb::shared::sprite::DrawParams::alpha_blend(0.25f));
-	}
-	else if (eq.m_weapon_color == 0)
-	{
-		sprites[eq.m_weapon_index]->draw(sX, sY, weaponFrame);
-	}
 	else
-	{
-		auto c = game.m_color_palette[eq.m_weapon_color];
-		sprites[eq.m_weapon_index]->draw(sX, sY, weaponFrame,
-			hb::shared::sprite::DrawParams::tint(c.r, c.g, c.b));
-	}
+		// Original additive-offset dye, weapon color table (matches the icon).
+		// worn_tint_params(0) yields a plain opaque draw, covering the no-dye case.
+		sprites[eq.m_weapon_index]->draw(sX, sY, weaponFrame, game.worn_tint_params(static_cast<uint8_t>(eq.m_weapon_color), true));
 
 	// DK set glare — single-pass shader rendering matching DDraw PutTransSpriteRGB.
 	// Shader adds a flat color offset to every pixel before additive blending:
@@ -104,19 +88,11 @@ void draw_shield(CGame& game, hb::shared::sprite::SpriteCollection& sprites,
 	if (eq.m_shield_index == -1) return;
 
 	if (inv)
-	{
 		sprites[eq.m_shield_index]->draw(sX, sY, frame, hb::shared::sprite::DrawParams::alpha_blend(0.25f));
-	}
-	else if (eq.m_shield_color == 0)
-	{
-		sprites[eq.m_shield_index]->draw(sX, sY, frame);
-	}
 	else
-	{
-		auto c = game.m_color_palette[eq.m_shield_color];
-		sprites[eq.m_shield_index]->draw(sX, sY, frame,
-			hb::shared::sprite::DrawParams::tint(c.r, c.g, c.b));
-	}
+		// Original additive-offset dye, regular color table (original worn shields
+		// read the regular table). worn_tint_params(0) covers the no-dye case.
+		sprites[eq.m_shield_index]->draw(sX, sY, frame, game.worn_tint_params(static_cast<uint8_t>(eq.m_shield_color), false));
 
 	// Shield glare — single-pass shader matching DDraw PutTransSpriteRGB
 	if (eq.m_shield_glare != 0 && game.on_game())
@@ -162,8 +138,10 @@ void draw_body(CGame& game, int body_dir_index, int sX, int sY, int frame,
 	}
 	else if (frozen)
 	{
-		game.m_sprite[body_dir_index]->draw(sX, sY, frame,
-			hb::shared::sprite::DrawParams::tint(94, 160, 208));
+		// Original Frozen (status 0x40) body recolor: additive-offset icy tint that
+		// preserves highlights (DDraw PutSpriteRGB, regular[10] - regular[0]/2),
+		// replacing the multiplicative tint that flattened them.
+		game.m_sprite[body_dir_index]->draw(sX, sY, frame, game.frozen_tint_params());
 	}
 	else
 	{

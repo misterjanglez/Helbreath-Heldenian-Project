@@ -27,8 +27,11 @@ void main()
     vec4 pixel = texture2D(texture, gl_TexCoord[0].xy);
     if (pixel.a < 0.01) discard;
     pixel.rgb = clamp(pixel.rgb + colorOffset, 0.0, 1.0);
-    pixel.a *= gl_Color.a;
-    gl_FragColor = pixel;
+    // Multiply by gl_Color so a caller-supplied sprite color survives the
+    // offset pass: alpha, plus RGB dimming (night-mode darkening on worn
+    // equipment). The color OFFSET arrives via the colorOffset uniform, not
+    // gl_Color, so callers that pass white RGB are unaffected (white = no-op).
+    gl_FragColor = pixel * gl_Color;
 }
 )glsl";
 

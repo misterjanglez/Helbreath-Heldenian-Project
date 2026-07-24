@@ -2480,18 +2480,12 @@ hb::shared::sprite::BoundRect CGame::draw_object_on_move_for_menu(int indexX, in
 
 	auto drawEquipLayer = [&](int idx, int color) {
 		if (idx == -1) return;
-		if (color == 0)
-			m_equip_sprites[idx]->draw(sX, sY, dirFrame);
-		else
-			m_equip_sprites[idx]->draw(sX, sY, dirFrame, hb::shared::sprite::DrawParams::tint(m_color_palette[color].r, m_color_palette[color].g, m_color_palette[color].b));
+		m_equip_sprites[idx]->draw(sX, sY, dirFrame, worn_tint_params(static_cast<uint8_t>(color), false));
 	};
 
 	auto drawWeapon = [&]() {
 		if (eq.weapon == -1) return;
-		if (eq.weaponColor == 0)
-			m_equip_sprites[eq.weapon]->draw(sX, sY, dirFrame);
-		else
-			m_equip_sprites[eq.weapon]->draw(sX, sY, dirFrame, hb::shared::sprite::DrawParams::tint(m_color_palette[eq.weaponColor].r, m_color_palette[eq.weaponColor].g, m_color_palette[eq.weaponColor].b));
+		m_equip_sprites[eq.weapon]->draw(sX, sY, dirFrame, worn_tint_params(static_cast<uint8_t>(eq.weaponColor), true));
 	};
 
 	auto drawMantle = [&](int order) {
@@ -3404,6 +3398,60 @@ const hb::shared::render::Color& CGame::item_palette_color(uint8_t color, const 
 
 	bool weapon = color <= 9 && item_config != nullptr && uses_weapon_color_table(*item_config, on_ground);
 	return weapon ? m_weapon_color_palette[color] : m_color_palette[color];
+}
+
+hb::shared::sprite::DrawParams CGame::worn_tint_params(uint8_t color, bool weapon) const
+{
+	using hb::shared::sprite::DrawParams;
+	// Color 0 = no dye: the art is shown as authored (base gray), matching the
+	// original's PutSpriteFast path for uncolored gear.
+	if (color == 0)
+		return DrawParams::opaque();
+
+	// Original coloring (DDraw PutSpriteRGB): add the signed offset
+	// palette[color] - base to the base-gray art (base = regular index 0, gray
+	// 100,100,100). Preserves specular highlights instead of the multiplicative
+	// crush. Weapon colors 1-9 read the weapon sub-palette (dual-palette rule);
+	// everything else (and weapon 10-15) reads the regular table.
+	const auto& target = (weapon && color <= 9) ? m_weapon_color_palette[color]
+	                                            : m_color_palette[color];
+	const auto& base = m_color_palette[0];
+	return DrawParams::offset_tinted(
+		static_cast<int16_t>(target.r - base.r),
+		static_cast<int16_t>(target.g - base.g),
+		static_cast<int16_t>(target.b - base.b));
+}
+
+hb::shared::sprite::DrawParams CGame::frozen_tint_params() const
+{
+	using hb::shared::sprite::DrawParams;
+	// Original Frozen (status 0x40) body recolor (DDraw PutSpriteRGB): opaque
+	// additive offset clamp(src + (regular[10] - regular[0]/2)). The halved base is
+	// the original's icy special case (client/Game.cpp:8991), applied on the body in
+	// every draw state. Additive-offset preserves highlights, unlike a multiplicative
+	// tint that crushes them (same rationale as the worn-gear dye).
+	const auto& icy = m_color_palette[10];   // regular table blue (0,35,60)
+	const auto& base = m_color_palette[0];    // base gray (100,100,100)
+	return DrawParams::offset_tinted(
+		static_cast<int16_t>(icy.r - base.r / 2),
+		static_cast<int16_t>(icy.g - base.g / 2),
+		static_cast<int16_t>(icy.b - base.b / 2));
+}
+
+hb::shared::sprite::DrawParams CGame::afterimage_tint_params() const
+{
+	using hb::shared::sprite::DrawParams;
+	// Original weapon/body swing afterimage (DDraw PutTransSpriteRGB): a transparent
+	// additive echo of the prior frame, offset clamp(src + (regular[10] - regular[0]/3)).
+	// The thirded base is the original's special case (client/Game.cpp:8961 weapon,
+	// 9857-9859 dash body/weapon/shield). Default alpha matches the sibling weapon
+	// glare, the codebase's other PutTransSpriteRGB worn-equipment overlay.
+	const auto& echo = m_color_palette[10];
+	const auto& base = m_color_palette[0];
+	return DrawParams::additive_tinted(
+		static_cast<int16_t>(echo.r - base.r / 3),
+		static_cast<int16_t>(echo.g - base.g / 3),
+		static_cast<int16_t>(echo.b - base.b / 3));
 }
 
 void CGame::draw_item_sprite(const item_draw_ref& draw, int x, int y, char item_color,

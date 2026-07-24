@@ -380,17 +380,11 @@ void SFMLSprite::DrawInternal(sf::RenderTexture* target, int x, int y, int frame
             states.shader = shader;
         }
 
-        // Shader handles the color offset — only set alpha via sprite color if needed
-        if (params.m_alpha < 1.0f)
-        {
-            sf::Color c = sf::Color::White;
-            c.a = static_cast<uint8_t>(params.m_alpha * 255.0f);
-            sprite.setColor(c);
-        }
-        else
-        {
-            sprite.setColor(sf::Color::White);
-        }
+        // The shader supplies the color offset via the colorOffset uniform. The
+        // sprite color carries only the non-offset multipliers — alpha and
+        // night-mode darkening — which the color block above already applied (or
+        // left as the default white). Don't overwrite it here, or worn equipment
+        // would stop dimming at night while the body it sits on still darkens.
     } else if (params.m_blend_mode == hb::shared::sprite::BlendMode::Additive) {
         states.blendMode = sf::BlendAdd;
         // Enable smooth filtering for additive blending (light effects)

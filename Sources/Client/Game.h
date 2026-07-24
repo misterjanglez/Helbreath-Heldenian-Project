@@ -171,6 +171,22 @@ public:
 		bool on_ground = false);
 	const hb::shared::render::Color& item_palette_color(uint8_t color, const CItem* item_config,
 		bool on_ground) const;
+	// Tint params for a worn equipment layer, using the original's additive-offset
+	// coloring (dest = clamp(src + palette[color] - palette[0])) — the same
+	// highlight-preserving math as draw_item_sprite, so worn gear matches its icon.
+	// Worn colors are 4-bit (0-15); color 0 = no tint. `weapon` selects the weapon
+	// sub-palette for colors 1-9 (the dual-palette rule), everything else uses the
+	// regular table.
+	hb::shared::sprite::DrawParams worn_tint_params(uint8_t color, bool weapon) const;
+	// Original Frozen (status 0x40) body recolor: opaque additive-offset icy tint
+	// clamp(src + (regular[10] - regular[0]/2)) — DDraw PutSpriteRGB. The halved
+	// base is the original's special case (Game.cpp:8991); highlight-preserving,
+	// unlike the multiplicative tint it replaces.
+	hb::shared::sprite::DrawParams frozen_tint_params() const;
+	// Original weapon/body swing afterimage (attack frame 3, dash ghost): transparent
+	// additive-offset echo clamp(src + (regular[10] - regular[0]/3)) — DDraw
+	// PutTransSpriteRGB (Game.cpp:8961). Thirded base is the original's special case.
+	hb::shared::sprite::DrawParams afterimage_tint_params() const;
 	short find_item_id_by_name(const char* item_name);
 	void load_game_msg_text_contents();
 	const char* get_npc_config_name_by_id(short npcConfigId) const;
