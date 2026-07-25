@@ -10,6 +10,7 @@
 #include "CombatManager.h"
 #include "QuestManager.h"
 #include "DelayEventManager.h"
+#include "OwnerType.h"
 #include <cstdio>
 #include "Log.h"
 #include "StringCompat.h"
@@ -250,6 +251,14 @@ int CEntityManager::create_entity(
                 case 25: // William
                 case 26: // Kennedy
                     m_npc_list[i]->m_dir = static_cast<direction>(4 + m_game->dice(1, 3) - 1);
+                    break;
+
+                case hb::shared::owner::auctioneer: // Vince
+                    // Behavior::stop never writes m_dir again, so this facing is
+                    // permanent. Vince mans one fixed post at the Trading Post, so
+                    // he is pinned square to the camera rather than given the
+                    // merchants' random SE/S/SW spread.
+                    m_npc_list[i]->m_dir = direction::south;
                     break;
 
                 default:
@@ -674,7 +683,9 @@ bool CEntityManager::try_magic_attack(int npc_h, int target_h, char target_type,
 				magic_type = 74; // Lightning-Strike
 			break;
 
-		case 10: // Frost, Nizie
+		case 10: // Frost, Nizie — and Griffin, parked here deliberately spell-less:
+			// it keeps the >= 6 debuff resists while its ranged attack comes from
+			// try_ranged_attack (gust of wind) instead of a spell.
 			break;
 
 		case 11: // Ice-Golem
@@ -795,6 +806,13 @@ bool CEntityManager::try_ranged_attack(int npc_h, int target_h, char target_type
 
 		case 54: // Dark Elf
 			m_game->send_event_to_near_client_type_a(npc_h, hb::shared::owner_class::Npc, MsgId::EventMotion, Type::Attack, dX, dY, 2);
+			m_game->m_combat_manager->calculate_attack_effect(target_h, target_type, npc_h, hb::shared::owner_class::Npc, dX, dY, 2);
+			break;
+
+		case hb::shared::owner::Griffin: // gust of wind — v3 81 is the client's
+			// EffectType::STORM_BLADE (drawn by the NPC attack path in MapData.cpp);
+			// damage mode 2 = ranged physical, as Dark Elf.
+			m_game->send_event_to_near_client_type_a(npc_h, hb::shared::owner_class::Npc, MsgId::EventMotion, Type::Attack, dX, dY, 81);
 			m_game->m_combat_manager->calculate_attack_effect(target_h, target_type, npc_h, hb::shared::owner_class::Npc, dX, dY, 2);
 			break;
 
@@ -973,7 +991,10 @@ void CEntityManager::on_entity_killed(int entity_handle, short attacker_h, char 
     short type = entity->m_type;
     int map_index = entity->m_map_index;
 
-    // Decrement alive object counter
+    // Decrement alive object counter. Apocalypse clear-gating watches this
+    // counter from a once-per-second poll (WarManager::apocalypse_progress_tick)
+    // rather than a kill hook — deletion paths (e.g. summon cleanup on logout)
+    // also zero it, and a hook here could spawn the boss mid /clearnpc sweep.
     m_map_list[map_index]->m_total_alive_object--;
 
     // ========================================================================
@@ -1074,6 +1095,31 @@ void CEntityManager::on_entity_killed(int entity_handle, short attacker_h, char 
         }
     }
 
+}
+
+int CEntityManager::kill_entities_on_map(int map_index, bool include_static, int attacker_h)
+{
+	char attacker_type = (attacker_h != 0) ? hb::shared::owner_class::Player : 0;
+	int killed = 0;
+
+	for (int i = 1; i < MaxNpcs; i++)
+	{
+		CNpc* npc = m_npc_list[i];
+		if (npc == nullptr || npc->m_map_index != map_index || npc->m_is_killed)
+			continue;
+
+		// Static town/faction NPCs (shopkeepers, guards, gates) spawn once at
+		// boot and never respawn — unless include_static, only kill what
+		// regenerates or was summoned: monsters (side 10), summons, and
+		// spot-generator mobs.
+		if (!include_static && npc->m_side != 10 && !npc->m_is_summoned && npc->m_spot_mob_index == 0)
+			continue;
+
+		on_entity_killed(i, static_cast<short>(attacker_h), attacker_type, 0);
+		killed++;
+	}
+
+	return killed;
 }
 
 // ========================================================================
@@ -2961,6 +3007,15 @@ void CEntityManager::remove_from_active_list(int entity_handle)
 // Spawn Point Management - STUBS
 // ========================================================================
 
+bool CEntityManager::apocalypse_suppresses_spawns(int map_index) const
+{
+	const CMap* map = m_map_list[map_index];
+	return map != nullptr
+		&& m_game->m_is_apocalypse_mode
+		&& map->m_is_apocalypse_map
+		&& map->m_apocalypse_mob_gen_type != 0;
+}
+
 void CEntityManager::process_random_spawns(int map_index)
 {
 	int naming_value, result;
@@ -2971,6 +3026,8 @@ void CEntityManager::process_random_spawns(int map_index)
 
 	for(int i = 0; i < m_max_maps; i++) {
 		// Random Mob Generator
+		if (apocalypse_suppresses_spawns(i))
+			continue;
 
 		int result_num = 0;
 		if (m_map_list[i] != nullptr) {
@@ -3780,6 +3837,9 @@ void CEntityManager::process_spot_spawns(int map_index)
         return;
 
     if (m_map_list[map_index] == nullptr)
+        return;
+
+    if (apocalypse_suppresses_spawns(map_index))
         return;
 
     // Check if map has room for more objects

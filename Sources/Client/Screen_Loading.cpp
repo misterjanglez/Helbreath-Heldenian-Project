@@ -420,6 +420,17 @@ void Screen_Loading::LoadStage_CosmeticsMale()
     make_sprite("npcs/gail", Mob + 7 * 8 * 80, 8, true);
     make_sprite("npcs/gate", Mob + 7 * 8 * 81, 24, true);
 
+    // Griffin — owner::Griffin is 92, and the client derives the body sprite as
+    // Mob + (owner_type - 10) * 8 * 7, so this must be slot 82. Full monster
+    // layout: 40 sprites = 5 actions x 8 facings, action-major.
+    make_sprite("npcs/griffin", Mob + 7 * 8 * 82, 40, true);
+
+    // Vince the Auctioneer. The slot is fixed by his owner type, not by the next
+    // free index: the client derives the body sprite as Mob + (owner_type - 10) * 8 * 7,
+    // and owner::auctioneer is 111, so this must be slot 101. Town-NPC layout —
+    // 8 sprites, one per facing, each holding the 8 idle frames.
+    make_sprite("npcs/vince", Mob + 7 * 8 * 101, 8, true);
+
     // Male underwear
     hb::shared::sprite::SpriteLoader::open_pak("players/male-underwear", [&](hb::shared::sprite::SpriteLoader& loader) {
         for (int g = 0; g < 8; g++) {

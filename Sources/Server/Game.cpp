@@ -4342,23 +4342,6 @@ void CGame::check_client_response_time()
 					request_teleport_handler(i, "1   ");
 				}
 
-				if (m_is_apocalypse_mode) {
-					if (memcmp(m_map_list[m_client_list[i]->m_map_index]->m_name, "abaddon", 7) == 0)
-						send_notify_msg(0, i, Notify::ApocGateOpen, 167, 169, 0, m_client_list[i]->m_map_name);
-					else if (memcmp(m_map_list[m_client_list[i]->m_map_index]->m_name, "icebound", 8) == 0)
-						send_notify_msg(0, i, Notify::ApocGateOpen, 89, 31, 0, m_client_list[i]->m_map_name);
-				}
-
-				if (m_client_list[i] == 0) break;
-				if ((m_is_apocalypse_mode) &&
-					(memcmp(m_map_list[m_client_list[i]->m_map_index]->m_name, "icebound", 8) == 0) &&
-					((m_client_list[i]->m_x == 89 && m_client_list[i]->m_y == 31) ||
-						(m_client_list[i]->m_x == 89 && m_client_list[i]->m_y == 32) ||
-						(m_client_list[i]->m_x == 90 && m_client_list[i]->m_y == 31) ||
-						(m_client_list[i]->m_x == 90 && m_client_list[i]->m_y == 32))) {
-					request_teleport_handler(i, "2   ", "druncncity", -1, -1);
-				}
-
 				if (m_client_list[i] == 0) break;
 				if ((memcmp(m_client_list[i]->m_location, "are", 3) == 0) &&
 					(strcmp(m_map_list[m_client_list[i]->m_map_index]->m_name, "elvfarm") == 0)) {
@@ -7101,6 +7084,7 @@ void CGame::send_notify_msg(int from_h, int to_h, uint16_t msg_type, uint32_t v1
 	case Notify::ApocForceRecallPlayers:
 	case Notify::ApocGateStartMsg:
 	case Notify::ApocGateEndMsg:
+	case Notify::AbaddonThunder:
 	case Notify::NoRecall:
 	case Notify::TeleportApproved:
 	{
@@ -8688,8 +8672,13 @@ void CGame::request_teleport_handler(int client_h, const char* data, const char*
 	if (m_client_list[client_h]->m_is_init_complete == false) return;
 	if (m_client_list[client_h]->m_is_killed) return;
 	if (m_client_list[client_h]->m_is_on_waiting_process) return;
+	// Recall-impossible maps block recall-outs during apocalypse ('0'/'1'/'3'),
+	// not progression: tile teleports (maze exit) and server-directed '2'
+	// teleports (clear-gates) must still work. Admins bypass, as the original did.
 	if ((m_map_list[m_client_list[client_h]->m_map_index]->m_is_recall_impossible) &&
-		(m_client_list[client_h]->m_is_killed == false) && (m_is_apocalypse_mode) && (m_client_list[client_h]->m_hp > 0)) {
+		(m_client_list[client_h]->m_admin_level == 0) &&
+		(m_client_list[client_h]->m_is_killed == false) && (m_is_apocalypse_mode) && (m_client_list[client_h]->m_hp > 0) &&
+		((data[0] == '0') || (data[0] == '1') || (data[0] == '3'))) {
 		send_notify_msg(0, client_h, Notify::NoRecall, 0, 0, 0, 0);
 		return;
 	}
@@ -9444,12 +9433,10 @@ void CGame::request_teleport_auth_handler(int client_h, const char* data)
 		return;
 	}
 
-	// Apocalypse recall-impossible map check
-	if ((m_map_list[m_client_list[client_h]->m_map_index]->m_is_recall_impossible) &&
-		(m_client_list[client_h]->m_is_killed == false) && (m_is_apocalypse_mode) && (m_client_list[client_h]->m_hp > 0)) {
-		send_notify_msg(0, client_h, Notify::NoRecall, 0, 0, 0, 0);
-		return;
-	}
+	// No apocalypse recall-impossible guard here: this handler's only sender is
+	// the client's walk-on-teleport-tile path, and tile teleports ARE the
+	// apocalypse progression routes (maze exit). Recall-outs are blocked by
+	// mode ('0'/'1'/'3') in request_teleport_handler instead.
 
 	// Crusade force-recall restrictions (enemy city) — GMs bypass
 	if (!m_client_list[client_h]->m_is_gm_mode) {
@@ -12192,6 +12179,7 @@ void CGame::on_timer(char type)
 	if ((time - m_game_time_2) > 1000) {
 		check_client_response_time();
 		check_day_or_night_mode();
+		m_war_manager->apocalypse_progress_tick();
 		m_game_time_2 += 1000;
 		if (time - m_game_time_2 > 1000) m_game_time_2 = time;
 		// v1.41
@@ -12337,6 +12325,7 @@ void CGame::on_timer(char type)
 
 	if ((time - m_weather_time) > 1000 * 20) {
 		weather_processor();
+		m_war_manager->abaddon_thunder_tick();
 		m_weather_time += 1000 * 20;
 		if (time - m_weather_time > 1000 * 20) m_weather_time = time;
 	}
@@ -12683,20 +12672,6 @@ at the start of client move handler check if the switch is true
 if it is not true add 1 warning, if the warning reaches 3
 delete client and log him, if the true switch
 */
-//and when a client walks into a map with dynamic portal
-//[KLKS] - [Pretty Good Coders] says:
-//u gotta inform it
-//[KLKS] - [Pretty Good Coders] says:
-//or else they wont see it
-
-/*void CGame::OpenApocalypseGate(int client_h)
-{
-	if (m_client_list[client_h] == 0) return;
-
-	//m_map_list[m_client_list[client_h]->m_map_index]->m_total_alive_object;
-	send_notify_msg(0, client_h, Notify::ApocGateOpen, 95, 31, 0, m_client_list[client_h]->m_map_name);
-}*/
-
 void CGame::global_update_configs(char config_type)
 {
 	local_update_configs(config_type);

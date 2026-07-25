@@ -45,6 +45,7 @@ set(SERVER_SOURCES
     GameCmdBeginCrusade.cpp
     GameCmdBeginHeldenian.cpp
     GameCmdBlock.cpp
+    GameCmdClearNpc.cpp
     GameCmdCome.cpp
     GameCmdCreateItem.cpp
     GameCmdEndApocalypse.cpp
@@ -57,6 +58,7 @@ set(SERVER_SOURCES
     GameCmdRegen.cpp
     GameCmdSaveAll.cpp
     GameCmdSpawn.cpp
+    GameCmdThunder.cpp
     GameCmdUnblock.cpp
     GameCmdWhisper.cpp
     GameConfigSqliteStore.cpp

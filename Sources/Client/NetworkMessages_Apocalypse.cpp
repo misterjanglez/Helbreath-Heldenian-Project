@@ -40,6 +40,12 @@ void HandleApocForceRecall(CGame* game, char* data)
 	game->add_event_list("You are recalled by force, because the Apocalypse is started.", 10);
 }
 
+void HandleAbaddonThunder(CGame* game, char* data)
+{
+	// Payload-less latch (retail notify 0x0BE5): flash the full-screen storm.
+	game->on_game()->m_abaddon_storm_until = game->m_cur_time + Screen_OnGame::abaddon_storm_duration_ms;
+}
+
 void HandleAbaddonKilled(CGame* game, char* data)
 {
 	std::string txt;

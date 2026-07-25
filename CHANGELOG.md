@@ -1,3 +1,231 @@
+# Griffin polish — correct diagonals, family-length E, gust-of-wind ranged attack
+
+Follow-up round driven by in-game testing of the re-shoot.
+
+### Client data (`griffin.pak` rebuilds, art only)
+- **NE/NW walks were crab-walking** ("sliding sideways"): the away-diagonal flip book is NE-native (heads upper-right) but was first built as NW-native, putting mirrored art in both diagonal slots so the body walked opposite its travel. Caught by extracting the *built pak* sprites at zoom — source-sheet thumbnails had been misread twice; that check is now the rule. The gait itself was never wrong, and a planned third re-roll of the book was cancelled.
+- Three re-rolls integrated (hardened prompts: FORESHORTENING CHECK in every camera block, corner-axis + narrower-than-side-view rules on diagonals, bottom-right corner kept green): **stop E** at the family camera (aspect 1.39 vs the drifted 1.65 — standing E/W body 129 → 109 px, dire-boar-class overhang when fought from the side, and no more length pop against the 104–116 px walk frames; attack/die inherit it via their stand frames); **SE/SW walk book** properly 45° (came back SW-native, SE is the mirror); **NE/NW walk book** tightened. Bbox aspect lies when the tail streams horizontally — heading is judged by eye at full res.
+- Per-facing verification vs the shipped quadrupeds now covers width×height and area ratios per direction, not just heights.
+
+### Server — gust-of-wind ranged attack
+- `EntityManager.cpp` `try_ranged_attack`: new `case hb::shared::owner::Griffin` mirroring the Dark Elf shape — attack event with **v3 = 81 (client `EffectType::STORM_BLADE`, the StormBringer strike visual)**, damage via `calculate_attack_effect` mode 2 (ranged physical). Range comes from the existing `attack_range 3`.
+- `gamedata.db` `npc_configs` griffin `magic_level` 8 → **10** — the deliberately empty Frost/Nizie tier: spellcasting (Unicorn/Centaurus tier-8 kit) stops, the `magic_level >= 6` debuff resists stay, and the gust becomes the mob's only distant attack. Tier-10 roster comment updated so the parking is discoverable.
+
+### Client
+- `MapData.cpp` NPC attack path (`default:` owner branch) previously drew only `v3 == 2` arrows — any other effect id from an NPC was silently invisible (found by the /simplify altitude reviewer before it shipped broken). It now also draws `STORM_BLADE`, same call shape as the player StormBringer path.
+
+### Versioning
+- Server → 0.9.2, Client → 0.7.4. No compatibility bump — v3 rides the existing attack event; an older client simply ignores 81.
+
+# Griffin re-shoot — sculpted golden art set, real 8-frame walks (client)
+
+The griffin's art is fully re-shot against a single golden reference sheet, replacing the first-pass set. 18 sources: 13 singles plus 5 walk flip books (2×4 grids), classified by what they actually show — damaged came back SW where SE was asked, the corpse faces W, and two Stage-1 holdovers cover stop E and the W walk book (it faces left, so W is native and E the mirror, the same trick as the first set's filmstrip).
+
+### Client data
+- `sprites/npcs/griffin.pak` rebuilt — 40 sprites, action-major, layout unchanged:
+  - **Move is a real 8-frame flip-book gait on all 8 directions** (native N/NW/SE/S/W books, mirrors for NE/E/SW), replacing the 2-pose stride/gather cut. Frames play straight through with per-frame torso-stabilised pivots.
+  - **Per-facing target heights.** Normalising every facing to one height made the mob visibly shrink on N and grow on S as it turned: on the shipped quadrupeds the away-facing views are ~25% *taller* on screen than the side views — the body's depth foreshortens into the vertical axis (dire-boar/unicorn/giant-lizard/hellhound/werewolf N ratio 1.19–1.31, S 0.88–1.04 vs E; centaur hides the effect behind its upright torso, which is why comparing E facings never caught it). Griffin now: N 98, NE/NW 97, E/W 78, SE/SW 73, S 74 — ratios 1.26 / 0.94, mid-family.
+  - **Sharpen is solved per source** (target: ettin's 19.1 local contrast at final size) instead of a constant — renders arrive at different softness, the same reason the brightness lift has always been solved rather than hard-coded. Solved values ran 60–220 and the whole set lands at 18.6–19.6, where a fixed constant left it spanning 16–27.
+  - Verified against the reshoot pass bars with a metric calibrated to reproduce the originals' published figures exactly (dire-boar 17.2, ettin 19.1, centaur 25.5): camera holds across all 40 walk frames (aspects 1.28–1.48 vs the sheet's 1.39 — multi-figure grids keep the camera where standalones drifted to 1.65); palette is coherent across the whole set including both holdovers (hue 29–35°, sat 0.46–0.52 — saturation now sits at family level, where the first-pass set measured 0.75 and read pasted-on); walk phase-opposition passes on N/S and is weak-but-animating on NE/SE.
+  - Gemini's engine was benchmarked for the walk books and lost: best gait of any render (the far-side legs finally animate) but its surface never reached the contrast bar (caps ~17.5 at sharpen 340, visibly softer at final size) and its watermark sparkle fused onto a frame's front talon. The regenerated reshoot doc carries the countermeasures for any future pass: a sharp-focus STYLE rule (smooth shading ≠ soft focus), keep the canvas's bottom-right corner flat green (isolates the watermark for the keyer), and a concrete phase rule (each bottom-row frame shows the opposite legs vs the frame directly above) — the last correlates with the passing phase scores in this batch.
+- Builder `build_griffin_pak_v2.py` (handoff folder, promotion to `tools/` still pending): filename-stamp classification instead of mtime order (dropping a file can no longer silently remap the pak), self-contained helpers (importing the vince builder executes its build — learned the hard way), `__main__`-guarded, flip-book segmentation by connected components with largest-blob cleanup that also strips watermark sparkles.
+
+### Client
+- `MapData.cpp`: griffin Move now takes the init loop's 8-frame default (centaur-standard); the explicit `m_sMaxFrame = 7` written first was redundant with the loop and is gone (simplify finding — the file's convention is omit-when-default). Comment corrected while there: the other actions get no init-loop values at all (that loop covers player bodies only), so their explicit 4-frame caps are load-bearing, not overrides of a 7 default.
+
+### Versioning
+- Client → 0.7.3 (client-only: frame table; pak is data). No compatibility bump.
+
+# Griffin — first AI-assisted monster (test spawn)
+
+New PvE creature wired end to end so it can be seen in game. Stats, drops and spawn are deliberately provisional — cloned from the Centaur and dropped next to the Middleland arrival point for a look, not balanced.
+
+### Client data
+- `sprites/npcs/griffin.pak`: 40 sprites = 5 actions × 8 facings, **action-major** (`sprite = base + pose*8 + (dir-1)`, poses stop/move/attack/damaged/dying = 0-4). Built from 18 renders classified by content: stop and attack have all five source facings, move and damaged came back SW where SE was asked for (free — one of each SE/SW pair is a mirror either way), damaged has only S and SW, die only E. E facing measures stop 112×65, move 122×65, against centaur 115×107 and dire-boar 121×73.
+- Pak notes: pivots are bbox-centre with a 5 px overhang, matching every shipped quadruped (centaur 53%, dire-boar 51%, unicorn 51%) — a foot-centroid anchor lands at 59% on a profile view, because the front talons reach lower than the hind paws, and would sit the griffin off its tile. Each render is a separate generation and their framing is not identical (standing height varied 514-580 px), so standing poses are normalised to a common height and the rearing/collapsed poses take the mean of those factors; height-normalising a rear-up attack would wrongly shrink it. No de-ink pass and no edge darkening: the source is a 3D render whose dark feather barring is real shading, and de-inking visibly flattens it even though the thin-line metric prefers it.
+
+### Client
+- `OwnerType.h`: `owner::Griffin = 92`. `Screen_Loading.cpp`: registered at slot 82 (`owner_type - 10`), 40 sprites.
+- `MapData.cpp`: frame timings follow the Centaur but **every action is capped at 4 frames**, matching the 4 rects per sprite. `Type::Move` in particular has to be set explicitly — it defaults to 7 for every character in the constructor's init loop, which would index three rects past the end of the sprite.
+
+### Server data
+- `gamedata.db` `npc_configs` row 117 "Griffin", npc_type 92 — every combat field cloned from the Centaur (1751-2100 HP, 12-132 damage, magic level 8, attack range 3) including its drop table 20085.
+- `MapInfo.db` `map_spot_mob_generators` middleland index 33: 5 griffins in a 20×20 rect at (184,220), around the map's arrival point (192,228).
+
+### Animation from the art already in hand
+First in-game test read as "paper sliding across the screen" — correctly, because every frame of a sprite was identical while its screen position interpolated, so only the position moved. Fixed without new renders: each facing already has **two** genuine poses, its own action render and the standing render, so every action now cuts between them.
+- Idle now breathes. Every shipped mob does — measured silhouette change across their idle frames is dire-boar 0/2/11/18/18/11/3/0%, centaur peaking at 53%, hellhound 45%, while the griffin sat at a flat 0%. A single render cannot move limbs, so the body is stretched a few px upward from a planted baseline on a rise-and-fall arc, which reads as breathing and costs nothing. Scaling rather than shifting a region avoids a seam across the shoulders; the rect height and pivot are constant across the frames so the feet never leave the ground. Peak is ~10% — deliberately under dire-boar's 18%, whose figure comes from real limb movement, so matching it with a whole-body stretch would look rubbery.
+- move `[stride, gather, stride, gather]` — a real 2-beat gait, legs visibly extending and closing.
+- attack `[stand, strike, strike, stand]` — a lunge and recovery rather than a frozen talon-swipe.
+- damaged `[flinch, flinch, stand, stand]`, die `[stand, collapsed, collapsed, collapsed]` — a fall instead of the corpse popping in.
+- **Every frame carries its own box and its own pivot**, which is how the shipped mobs are built — ettin's move frames run 40 to 87 px wide with pivots from -27 to -50, the artists moving the pivot per frame so the body stays planted while the limbs swing. Padding all frames to a shared canvas and centring them does the opposite: when a foreleg reaches forward the box grows forward and centring shoves the torso backward, so the body slides against the motion. Placement and stability need different references — frame 0 anchors at its bbox centre (the quadruped convention: centaur 53%, dire-boar 51%, unicorn 51%), and later frames offset by how far the *torso* centroid moved, since anchoring on the torso alone would sit a profile view at ~67% and stand the griffin off its tile. Measured result: anchors land at 47-53% of width and the torso holds within 1 px across a cycle.
+- Ruled out while diagnosing, all verified rather than assumed: shadows do render (`draw_npc_layers` → `draw_shadow`, and Griffin is not in `ShouldSkipShadow`); alpha is correctly binary (every shipped pak has exactly zero partial-alpha pixels); camera pitch is in family (griffin aspect 1.72 vs dire-boar 1.66).
+
+### Provisional, not yet balanced
+- Centaur-strength monsters sitting on the Middleland arrival tile will kill anything that walks in. This is a look-at-it spawn, not a placement.
+- 4 frames per action against the originals' 8 (and 11 for centaur's death). Smoother motion needs filmstrip renders, not more compositing.
+- Damaged reuses the SW recoil across 7 of 8 facings and die is one corpse mirrored; closing those needs 3 more damaged renders (N, NE, E) and 4 more die (N, NE, SE, S).
+- Saturation measures 0.75 against centaur 0.56 and dire-boar 0.22 — the griffin is the most saturated thing on screen, which is part of why it reads as pasted on rather than lit by the scene.
+
+### Versioning
+- Client → 0.7.2 (client-only: sprite registration + frame table). No compatibility bump — no protocol change; NPC configs stream to the client at login.
+
+# Vince the Auctioneer gets his own sprite (first AI-assisted NPC)
+
+Vince has been shipping since the Trading Post landed, but with no art of his own — the client drew him with a stand-in built from the *player* compositor (a female body in full plate with green boots and a green cape). He now has a real pak, and the whole stand-in is gone.
+
+### Client data
+- `sprites/npcs/vince.pak`: new town-NPC pak — 8 sprites (one per facing) × 8 idle frames, 64 px tall, feet-centre pivots with william's 5 px overhang (foot anchor taken from the bottom 8% of rows, not the bbox centre, or he slides sideways as he turns). Built from a three-view pre-rendered 3D sheet (front, right profile, rear) plus mirrors for W/SW/NW; NE and SE substitute the N and E art for now. Idle animation is a synthesised 1 px head settle over the 2 s cycle.
+- Pipeline notes, all learned by measuring against the shipped town NPCs:
+  - **Palette** — the originals carry ~220-240 unique colours per frame (pre-rendered, not pixel art), so the 24-colour item-icon quantize flattens the face to a single tone. One shared 160-colour palette across all facings, built from opaque pixels only (feeding median-cut the background block lets it hog palette boxes).
+  - **No outlines, ever.** The originals have none. The first attempt used cel-shaded illustration renders and added silhouette edge-darkening on top; the useful metric is the fraction of body pixels that are *thin dark lines* (much darker than their local neighbourhood) — originals sit at 2.9-10%, the illustration source hit 12.8%. Counting near-black pixels outright does not work: it cannot tell dark art from outlined art. Edge-darkening is off, and the source is now a 3D render that scores 5.9%.
+  - **Brightness is solved, not hard-coded.** Renders arrive dark, but how dark varies per generation — two sheets of the same character came in at mean luma 42 and 56 — so a gamma tuned on one blows out the next. The lift gamma is now searched across all facings at once to land the set on 84 (tom and gandalf are 82.5, howard 85.7; william is an outlier at 143.9). The search has to include the contrast step, since PIL blends toward a grey averaged over the whole image including the transparent region, which is near-black here and pushes the body ~7 luma brighter.
+  - **Lift luminance, not RGB.** The gamma runs on luma and is applied back as a per-pixel scale factor across all three channels, which leaves saturation exactly as rendered. Running it on RGB directly drags every colour toward white: an earlier pass lost saturation 0.526 → 0.463 and read as if white paint had been brushed over him. Fixed, it sits at 0.62 against the originals' 0.36-0.52.
+  - **Match the originals' surface smoothness, measured as local contrast** — the mean luma step between adjacent body pixels. This is what separates a sprite that reads as a solid volume from one that reads as a flat patterned shape, and it is not the same thing as overall contrast. The shipped mobs sit at dire-boar 17.2, ogre 17.5, troll 18.8, ettin 19.1, centaur 25.5: ettin's skin is one continuous tonal sweep per muscle, so the eye integrates it into form. At the 140% unsharp inherited from Vince the griffin measured 31.6 — 65% noisier than ettin — because every feather edge survives the downscale as a hard pixel step and reads as texture rather than shape. Detail at 78 px does not stay detail; it becomes noise that flattens. Dropped to 40% unsharp, landing at 20.8.
+  - **Sharpen the body, not the face.** Photorealism does not survive to a 19 px head, but sharpening it does — the unsharp mask manufactures eyes, cheekbones and beard edges the originals do not have, and the face reads as a portrait beside their suggestions of one. The mask is held off the top 28% and feathered in across the shoulders. With that in place the head measures 258 px in 60 tones (spread 44.7) against william 240/96/45.8, tom 257/99/49.0, gandalf 269/113/52.6 and howard 305/126/65.2 — i.e. less facial detail than any original, which is the bar that matters. A photoreal source still *looks* photoreal at full size; that impression does not reach the sprite.
+
+### Client
+- `Screen_Loading.cpp`: registers `npcs/vince` at slot 101. The slot is fixed by the owner type, not the next free index — the body sprite is derived as `Mob + (owner_type - 10) * 8 * 7` and `owner::auctioneer` is 111.
+- `NpcRenderer.cpp`: `build_auctioneer_equipment()` and the `is_auctioneer` branches in `draw_stop` deleted. Vince now takes the ordinary NPC path (`CalcNpc` + `draw_npc_layers`), so he picks up frame animation and colour handling like every other NPC instead of being pinned to a single player idle frame.
+- `MapData.cpp`: the frame table no longer copies William's row wholesale; the auctioneer gets the town-merchant idle directly (250 ms × 8 frames, matching William and Kennedy). Only the stop action is ever played.
+- `OwnerType.h`: `sprite_render_type()` removed — it existed solely to redirect the auctioneer to William's sheet. Its three call sites (`EquipmentIndices.cpp`, `Game.cpp`, `NpcRenderer.cpp`) now index by owner type directly.
+
+### Server
+- `EntityManager.cpp`: Vince's spawn facing is pinned to south. `action_limit 2` routes to `Behavior::stop`, which never writes `m_dir` again, so the spawn value is permanent — and as `npc_type 111` he was falling into the `dice(1,8)` default and could spawn facing any direction. He mans one fixed post, so square to the camera beats the merchants' random SE/S/SW spread.
+
+### Verified, no change
+- Stationary town NPCs genuinely never turn: `npc_behavior_stop` does work only for `action_limit 5` (towers, generators, crops) and falls straight through for the merchant class. The only remaining writer of an idle NPC's direction is combat knockback (`CombatManager` `damage_move_dir`, 4 sites) — which is why all 8 direction slots are filled rather than just south.
+
+### Versioning
+- Server → 0.9.1, Client → 0.7.1. No compatibility bump: no protocol change, and owner type 111 was already on the wire.
+
+# Crossbow — first AI-assisted content item (data-only, no code)
+
+New bow-class weapon wired entirely through data — proof of the content pipeline end to end (Gemini art → chroma-key/downscale scripts → atlas/JSON/DB).
+
+### Client data
+- `sprites/items/item_atlas.pak`: three new frames appended — equip preview 63×100 (atlas 0, frame 221), ground 34×20 (atlas 1, frame 362), pack 45×71 (atlas 2, frame 362). Pivots derived from the long bow's by preserving visual center.
+- `CONTENTS/ItemSpriteMetadata.json`: entry `id: 313` → `cross_bow.pak`, both genders share the equip frame (synced to the DisplayIDManager and Release copies).
+- `sprites/items/cross_bow.pak`: generated paperdoll overlay — long bow's frame layout (rect counts, pivots, visual centers) kept 1:1, pixels replaced per pose: carry poses (stand/walk/run/damage) show a two-handed port-arms diagonal carry (rest view rotated 40°, mirrored per facing side); attack pose aims per direction from five dedicated Gemini renders (N/NE/SE/S + side for E/W, mirrors for SW/NW). Engine indexing `(dir-1)*8+frame` and per-direction draw order (`weapon_draw_order`: behind body for N/W/NW) verified. Icons rebuilt with a sharpen → 24-color quantize → edge-darken pass plus hand-redrawn 1px strings.
+- Verified, no change: bows overlapping the body while running NE (and E/SE) is faithful retail behavior — original `_cDrawingOrder` (Game.cpp:19) and run-pose weapon art are identical to ours; retail never gave weapons the run-specific order table mantles have.
+
+### Server data
+- `gamedata.db` items row 604 "Crossbow": bow class (type 2/sub 3, weapon_class 8, archery skill 6 — inherits bow attack pose, arrow consumption), 2d5 dmg, speed 7, durability 900, level 30, dyeable, display_id 313, attribute pool 1.
+
+### Versioning
+- None — pure content; item configs stream to the client at login.
+
+# Abaddon lightning storm — the missing retail apocalypse hazard (all targets)
+
+Retail Helbreath periodically dropped a full-screen lightning storm on the abaddon map that damaged everyone not magically protected. Surveyed all 11 reference lineages: only Snoopy's helbreath-v3.82 has a server implementation (`DoAbaddonThunderDamageHandler`); HBCursed carries the retail full-screen bolt renderer as a client-side orphan (its `m_bThunder` latch is never set by anything); the retail client's handler for notify 0x0BE5 survives only as a disassembly comment. Reconstructed from those three pieces.
+
+### Shared (protocol)
+- New payload-less `Notify::AbaddonThunder = 0x0BE5` — the retail notify id, slotted into the existing empty-notify packet group.
+
+### Server
+- `WarManager::abaddon_thunder_tick()` on the 20s weather tick: while Apocalypse runs, a 1-in-15 roll (~one storm per 5 minutes on average — Snoopy's cadence) calls `unleash_abaddon_thunder()`: every player on an apocalypse boss map (new `CMap::is_apocalypse_boss_map()` = `apocalypse_map` AND `gen_type 2`) gets the storm notify; damage `dice(1,20)+100` spares admins, executors, and the dead. Protection-From-Magic halves (`/2 - 2`), Absolute-Magic-Protect nulls — meteor-strike semantics, per retail behavior (Snoopy's thunder handler wrongly halved for both; his meteor handler carries the correct retail split). Kills route through `client_killed_handler`; survivors get the HP notify, damage motion, tile-owner refresh (unless hiding), and hold/paralyze break — identical to meteor strike.
+- New `/thunder` admin command (Developer): fires one wave immediately, bypassing mode and dice — the test hook; audit-logged to the commands channel.
+
+### Client
+- `HandleAbaddonThunder` latches a 700 ms full-screen storm; `Screen_OnGame::draw_abaddon_storm()` sweeps sky-to-ground bolt clusters across the whole viewport every frame via `weather_manager::draw_thunder_effect`, re-randomized per frame — the HBCursed `ThunderEffectAbaddonMap` visual, thinned to ~10 clusters × 3 bolts because each bolt costs ~56 unbatched `draw_line` calls in the SFML renderer (the original 32×6 sweep would be ~21× the heaviest rain frame).
+
+### Noted for later (from the /simplify panel)
+- The environmental-damage tail (protect mitigation, owner refresh, hold break) now has two WarManager copies and ~4 relatives across CombatManager/DynamicObjectManager — a shared `apply_environmental_damage()` in CombatManager is the candidate extraction.
+- The renderer has no batched-line path; a `draw_lines()` API would collapse storm/corpse/spell-thunder from thousands of GPU calls to one.
+
+### Versioning
+- Compatibility → 0.7.0 (new notify: client and server must update together). Server → 0.9.0, Client → 0.7.0.
+
+# Infernia minimaps restored + maze navigates blind (client)
+
+- `get_hardcoded_map_index` still compared the CENTUU-era `"inferniaA"`/`"inferniaB"` capitalizations against our lowercase server map names — the strcmp miss left `m_map_index` at -1, killing both the guide map and the infernia ambience path in Screen_OnGame. Now lowercase, matching the server. Same case fix in the music picker.
+- `maze` now deliberately returns -1: retail gave the maze no guide map (navigated blind); the display name stays.
+
+### Versioning
+- Client → shipped in 0.7.0 (staged as 0.6.3, superseded by the storm release's protocol bump before it ever built — Visual Studio held the client PDB hostage all evening).
+
+# Apocalypse gates: the real reason portals didn't teleport (GM-bypass scope) + tile-teleport auth unblock
+
+The 0.8.5 retest still failed: portals lit up but nobody travelled. Two root causes, both now fixed.
+
+### Server
+- Gate travel (the 1s re-notify + stand-on-portal teleport) sat inside `check_client_response_time`'s `if (!m_is_gm_mode)` forced-recall wrapper. Every admin chat command requires GM mode (`requires_gm_mode()` defaults true for any privileged command), so the admin who ran `/beginapocalypse` + `/clearnpc` could never trigger a gate — the exact test scenario. The block now lives in `WarManager::apocalypse_gate_travel_tick()`, called from the existing `apocalypse_progress_tick()` 1s poll: same cadence, applies to everyone including GM-mode admins, and the whole gate lifecycle (open → notify/travel → reset) is now in one file. Also swaps the asymmetric `.x`/`Right()` bounds test for the `Left()/Top()/Right()/Bottom()` idiom used elsewhere.
+- `request_teleport_auth_handler` no longer applies the apocalypse recall-impossible block. Walk-on tile teleports are a two-step client flow (stand on flagged tile → `RequestTeleportAuth` → approved → `RequestTeleport`), and that first step was still rejecting non-admin players wholesale — killing the maze→procella exit. The auth handler's only sender is the tile path, and tile teleports ARE the progression routes; recall-outs stay blocked by mode ('0'/'1'/'3') in `request_teleport_handler`.
+- Dead code removed: the leak's commented-out `OpenApocalypseGate` stub (hardcoded gate at 95,31) and `CMap`'s write-only `m_dynamic_gate_coords[10]` parallel gate model (the live model is the singular `m_dynamic_gate_coord` loaded from `map_dynamic_gate`).
+
+### Verified, no change needed
+- Map data is byte-faithful to the originals: maze's second client-flagged teleport tile (167,171) has no server row in any original tree (retail no-op), and procella's (119,29)→inferniaB server row has no client-side flag in any original `.amd` either (retail-dead back-exit). Both left alone.
+
+### Versioning
+- Server → 0.8.6 (server-only).
+
+# Apocalypse gates: travel fixes (stand-on-portal margin + recall-guard scope)
+
+First live test of the clear-gates found players couldn't actually travel: standing on the portal did nothing on Infernia A/B, and the maze exit and Procella gate were rejected outright.
+
+### Server
+- Gate entry now accepts standing within 2 tiles of the gate rect. The gate data is a single tile (original: `115 105 115 105`) but the portal graphic spans ~7x5 tiles around the anchor, so the exact-tile check was nearly impossible to satisfy by standing "on" the visible portal.
+- The apocalypse recall-impossible guard in `request_teleport_handler` now blocks only recall-type teleports ('0'/'1'/'3') and restores the original's admin bypass (`m_admin_level == 0` condition, dropped during modernization). It previously rejected *every* teleport from a recall-impossible map during apocalypse — which broke the maze→procella tile exit and the procella→abaddon clear-gate (maze/procella/abaddon are all `recall_impossible`). Tile teleports and server-directed '2' teleports (the gates) now pass; recalls out of the event remain blocked for players. The Teleport-spell auth handler keeps its full block, with the admin bypass restored.
+
+### Versioning
+- Server → 0.8.5 (server-only).
+
+# Apocalypse progression: clear-gated portals + Abaddon boss spawn
+
+Completes the retail progression on top of the no-respawn groundwork: Infernia A/B and Procella now open their portal when the map is cleared, and clearing the Abaddon map summons the boss. All driven by data that already existed unused (`map_dynamic_gate`, `map_apocalypse_boss`) and the client's existing `ApocGateOpen`/`ApocGateClose` handlers — no protocol change.
+
+### Server
+- New `WarManager::apocalypse_progress_tick()` (1s poll while Apocalypse runs): when a clear-gated map's `m_total_alive_object` hits 0 — gen type 1 (inferniaa/inferniab/procella) marks the map's dynamic gate open, notifies on-map players (`ApocGateOpen` + notice); gen type 2 (abaddon) spawns the boss from `map_apocalypse_boss` at a random point in its rect, once per event. Polling rather than a kill hook was deliberate: deletion paths (summon cleanup on logout) also zero the counter, and a kill hook could spawn the boss mid `/clearnpc` sweep and have the same sweep kill it.
+- `check_client_response_time` gate block is now data-driven: while a gate is open it re-notifies on-map players (covers late arrivals) and teleports anyone standing on the gate tile to the dynamic gate's destination. Replaces the leak's degenerate hardcoded abaddon/icebound `ApocGateOpen` spam and the icebound→druncncity tile teleport.
+- Gate/boss state lives on `CMap` (`m_apocalypse_gate_open`, `m_apocalypse_boss_spawned`), reset at apocalypse start and end; event end also broadcasts `ApocGateClose`.
+
+### Client
+- Apocalypse gate sprite now renders only on the map the server opened it for (`m_gate_map_name` check) — previously a received gate position would draw on any map the player teleported to.
+
+### Data (MapInfo.db)
+- `map_apocalypse_boss.npc_id` corrected 71 → 48 (Abaddon). 71 was the leak's raw type id, which maps to Centaurus in the original and to Mana Collector in our npc table.
+
+### Investigated, not changed
+- The periodic "mass lightning storm" on the Abaddon map is the map's mob roster working as the original data intends: 140 magic-level 7-8 casters (60 Gargoyles, 20 Centaurs, 20 Dragons, 40 Fire Wyverns) whose spell tables are the lightning family; volleys recur as their mana regenerates. Verified against the original abaddon.txt (same spots/counts). One conversion artifact noted: spots 4-6 hold Orcs where the original had its type-51 mob — if anything our map is tamer than the original.
+
+### Versioning
+- Server → 0.8.4, Client → 0.6.2 (existing packets only — compatibility unchanged).
+
+# Apocalypse maps: no mob respawn during the event (retail clear-gating groundwork)
+
+Infernia A/B, Procella, and Abaddon are clear-gated on the official servers — players must kill every mob to advance (portal opens / boss spawns), so mobs must not respawn during the event. Verified against both original source trees (HelbreathServer and HB382_CENTUU): the leak never had this — its spot generators refill all maps unconditionally and the entire progression chain (`OpenApocalypseGate`, the `ApocalypseMobGenType == 2` boss trigger) is commented-out stubs. Implemented per official behavior as described by Nick.
+
+### Server
+- New `CEntityManager::apocalypse_suppresses_spawns(map_index)`: while Apocalypse mode is active, both spawn paths (spot generators and the random mob generator) skip maps with `apocalypse_map` set and `apocalypse_mob_gen_type != 0` — exactly inferniaa, inferniab, procella, abaddon. Maze and Druncnian City (`gen_type = 0`) keep regenerating, matching their traverse-only role.
+- Between events the generators run normally, so each apocalypse starts with fully populated maps. Kill-time/decay counters are untouched — the suppression is a pure computed predicate, so no state can desync when the event ends mid-corpse-decay.
+
+### Versioning
+- Server → 0.8.3 (server-only).
+
+# /clearnpc: optional "rewards" flag (exp/drops), gated by its own admin level
+
+### Server
+- `/clearnpc rewards` (combinable with `all`, any order) attributes every kill to the admin as attacker, so the normal death rewards fire: exp share, loot rolls, quest credit — and the type-81 `AbaddonKilled` broadcast, which makes boss-death paths testable via the command. Without the flag, kills stay attacker-less (no exp/drops), as before.
+- The flag is gated by a new **sub-permission** `clearnpc.rewards` in the existing `admin_command_permissions` table, seeded at default level 1000 (Administrator) while base `/clearnpc` stays 500 (Developer). Tunable like any command via the DB or `setcmdlevel clearnpc.rewards <level>`; dotted keys can never collide with real command dispatch. An under-leveled admin using the flag gets a notice with the required level.
+- `CEntityManager::kill_entities_on_map` gained an `attacker_h` parameter (0 = system kill) — no new reward logic; the flag just selects the attacker identity the existing death path already branches on.
+- `setcmdlevel` listing now prints sub-permission keys without the `/` prefix so they don't read as typeable commands.
+
+### Versioning
+- Server → 0.8.2 (server-only).
+
+# Admin command: /clearnpc — kill all NPCs on the current map
+
+New admin chat command, built for event testing — e.g. simulating players clearing Apocalypse maps (Infernia → Maze → Procella → Abaddon progression) without hand-killing hundreds of mobs.
+
+### Server
+- `/clearnpc` kills every monster (side 10), summon, and spot-generator mob on the admin's current map. `/clearnpc all` additionally kills static town/faction NPCs (shopkeepers, guards, gates) — those spawn once at boot, so the reply warns they only return on server restart.
+- Kills route through the shared death path (`on_entity_killed` with no attacker — the summon-expiry / war-teardown idiom): death animation, corpse and decay, natural respawn cycle, and the same `m_total_alive_object` bookkeeping player kills drive. No exp and no drops (both are attacker-gated), so the command can't be farmed. Explosive mobs still detonate on death, as they would for a player kill.
+- New `CEntityManager::kill_entities_on_map(map_index, include_static)` owns the map-scoped kill loop and the static-vs-regenerating classification; the command class is a thin arg-parse + notify shell like `/spawn`.
+- Default permission: Developer (500), GM mode required; seeded into `admin_command_permissions` on first boot like every command, adjustable in the DB.
+
+### Versioning
+- Server → 0.8.1 (server-only; chat commands ride the existing protocol — no compatibility bump).
+
 # Faithful frozen recolor + weapon afterimage (completes issue #3 code work)
 
 Replicates the original DDraw client's two **scaled-base** special-case draws — the last code items on the #2/#3 faithful-coloring workstream. Both now use the additive-offset blends (`offset_tinted`/`additive_tinted`) that #21 established for worn gear, instead of the multiplicative stand-ins, so sprite highlights survive.

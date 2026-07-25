@@ -82,6 +82,22 @@ public:
      */
     void on_entity_killed(int entity_handle, short attacker_h, char attacker_type, short damage);
 
+    /**
+     * Kill every living entity on a map.
+     *
+     * With attacker_h 0 the kills are attacker-less system kills (death
+     * animation, corpse, respawn cycle — no exp or drops). A nonzero
+     * attacker_h attributes each kill to that player, so the full death
+     * rewards fire: exp, drops, and quest credit.
+     *
+     * Unless include_static, only kills entities that regenerate or were
+     * summoned (monsters, summons, spot-generator mobs) — static town and
+     * faction NPCs spawn once at boot and never respawn.
+     *
+     * @return Number of entities killed.
+     */
+    int kill_entities_on_map(int map_index, bool include_static, int attacker_h = 0);
+
     // ========================================================================
     // Update & Behavior System
     // ========================================================================
@@ -301,6 +317,14 @@ private:
      * Check if spawn point can spawn (limits, timers).
      */
     bool can_spawn_at_spot(int map_index, int spot_index) const;
+
+    /**
+     * During apocalypse, clear-gated event maps (apocalypse_mob_gen_type != 0:
+     * Infernia A/B, Procella, Abaddon) must stay cleared once players kill
+     * everything, so their generators pause until the event ends. Between
+     * events the generators run normally to repopulate the maps.
+     */
+    bool apocalypse_suppresses_spawns(int map_index) const;
 
     /**
      * Generate next unique GUID for new entity.

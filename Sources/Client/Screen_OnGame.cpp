@@ -764,6 +764,7 @@ void Screen_OnGame::on_render()
 
     FrameTiming::begin_profile(ProfileStage::DrawWeather);
     weather_manager::get().draw();
+    draw_abaddon_storm();
     FrameTiming::end_profile(ProfileStage::DrawWeather);
 
     FrameTiming::begin_profile(ProfileStage::DrawChat);
@@ -785,8 +786,10 @@ void Screen_OnGame::on_render()
         m_game->m_effect_sprites[89]->draw(1648 - m_game->m_Camera.get_x(), 3913 - m_game->m_Camera.get_y(), m_game->m_entity_state.m_effect_frame % 12, hb::shared::sprite::DrawParams::alpha_blend(0.5f));
     }
 
-    // Apocalypse gate
-    if ((m_gate_posit_x >= m_game->m_Camera.get_x() / 32) && (m_gate_posit_x <= m_game->m_Camera.get_x() / 32 + VIEW_TILE_WIDTH())
+    // Apocalypse gate (only on the map the server opened it for — the gate
+    // position persists across teleports and must not draw elsewhere)
+    if ((m_gate_posit_x >= 0) && (m_game->m_gate_map_name == m_game->m_map_name)
+        && (m_gate_posit_x >= m_game->m_Camera.get_x() / 32) && (m_gate_posit_x <= m_game->m_Camera.get_x() / 32 + VIEW_TILE_WIDTH())
         && (m_gate_posit_y >= m_game->m_Camera.get_y() / 32) && (m_gate_posit_y <= m_game->m_Camera.get_y() / 32 + VIEW_TILE_HEIGHT())) {
         m_game->m_effect_sprites[101]->draw(m_gate_posit_x * 32 - m_game->m_Camera.get_x() - 96, m_gate_posit_y * 32 - m_game->m_Camera.get_y() - 69, m_game->m_entity_state.m_effect_frame % 30, hb::shared::sprite::DrawParams::alpha_blend(0.5f));
     }

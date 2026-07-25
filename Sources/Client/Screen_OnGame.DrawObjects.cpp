@@ -1178,3 +1178,23 @@ void Screen_OnGame::abaddon_corpse(int sX, int sY)
 	}
 }
 
+// Full-screen lightning storm on the abaddon map (Notify::AbaddonThunder,
+// retail notify 0x0BE5): bolt clusters sweep the whole viewport from the
+// sky to jittered ground points, re-randomized every frame while the
+// latch runs. Thinner than the original ThunderEffectAbaddonMap's 32x6
+// sweep — each bolt costs ~56 unbatched draw_line calls here, so ~10
+// clusters of 3 keeps a storm frame under the abaddon_corpse effect.
+void Screen_OnGame::draw_abaddon_storm()
+{
+	if (m_game->m_cur_time >= m_abaddon_storm_until) return;
+
+	for (int x = 20; x < LOGICAL_WIDTH(); x += 60 + (rand() % 40))
+	{
+		int ir = (rand() % 10) - 5;
+		int ground_y = LOGICAL_HEIGHT() - 35 - (rand() % 15);
+		weather_manager::get().draw_thunder_effect(x, 0, x, ground_y, ir, ir, 2);
+		weather_manager::get().draw_thunder_effect(x, 0, x, ground_y, ir + 2, ir + 3, 2);
+		weather_manager::get().draw_thunder_effect(x, 0, x, ground_y, ir - 1, ir - 4, 2);
+	}
+}
+

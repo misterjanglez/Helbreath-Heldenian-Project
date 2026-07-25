@@ -225,6 +225,8 @@
     <ClInclude Include="GameCmdCreateItem.h" />
     <ClInclude Include="GameCmdGiveItem.h" />
     <ClInclude Include="GameCmdSpawn.h" />
+    <ClInclude Include="GameCmdClearNpc.h" />
+    <ClInclude Include="GameCmdThunder.h" />
     <ClInclude Include="GameCmdGoto.h" />
     <ClInclude Include="GameCmdCome.h" />
     <ClInclude Include="GameCmdInvis.h" />
@@ -356,6 +358,8 @@
     <ClCompile Include="GameCmdCreateItem.cpp" />
     <ClCompile Include="GameCmdGiveItem.cpp" />
     <ClCompile Include="GameCmdSpawn.cpp" />
+    <ClCompile Include="GameCmdClearNpc.cpp" />
+    <ClCompile Include="GameCmdThunder.cpp" />
     <ClCompile Include="GameCmdGoto.cpp" />
     <ClCompile Include="GameCmdCome.cpp" />
     <ClCompile Include="GameCmdInvis.cpp" />

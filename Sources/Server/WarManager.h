@@ -80,6 +80,14 @@ public:
 	void global_end_apocalypse_mode();
 	void local_end_apocalypse();
 	void local_start_apocalypse(uint32_t apocalypse_guid);
+	// Clear-gate progression poll, called once per second while the server
+	// runs. When a clear-gated apocalypse map has no alive mobs left, opens
+	// its dynamic gate (gen type 1) or spawns the boss (gen type 2). Polling
+	// (instead of a kill hook) also catches deletion paths that zero the
+	// alive counter, and never spawns the boss mid bulk-kill sweep.
+	void apocalypse_progress_tick();
+	void abaddon_thunder_tick();
+	void unleash_abaddon_thunder();
 	bool read_apocalypse_guid_file(const char* fn);
 	bool read_heldenian_guid_file(const char* fn);
 	void create_apocalypse_guid(uint32_t apocalypse_guid);
@@ -102,5 +110,11 @@ public:
 	void get_fightzone_ticket_handler(int client_h);
 
 private:
+	void check_apocalypse_map_cleared(int map_index);
+	void apocalypse_gate_travel_tick();
+	void open_apocalypse_gate(int map_index);
+	void spawn_apocalypse_boss(int map_index);
+	void reset_apocalypse_map_state();
+
 	CGame* m_game = nullptr;
 };

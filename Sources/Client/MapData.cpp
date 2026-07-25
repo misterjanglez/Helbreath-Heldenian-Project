@@ -645,6 +645,20 @@ CMapData::CMapData(class CGame* game)
 	m_stFrame[hb::shared::owner::Centaur][Type::Damage].m_sMaxFrame = 7;
 	m_stFrame[hb::shared::owner::Centaur][Type::Dying].m_sFrameTime = 150;
 	m_stFrame[hb::shared::owner::Centaur][Type::Dying].m_sMaxFrame = 10;
+
+	// Griffin — timings follow the Centaur. Move takes the init loop's 8-frame
+	// default, matching the 8-rect flip-book gait in griffin.pak; the other
+	// actions carry 4 rects each and get no init-loop values at all (that loop
+	// covers player bodies only), so their caps are set explicitly.
+	m_stFrame[hb::shared::owner::Griffin][Type::stop].m_sFrameTime = 250;
+	m_stFrame[hb::shared::owner::Griffin][Type::stop].m_sMaxFrame = 3;
+	m_stFrame[hb::shared::owner::Griffin][Type::Move].m_sFrameTime = 70;
+	m_stFrame[hb::shared::owner::Griffin][Type::Attack].m_sFrameTime = 100;
+	m_stFrame[hb::shared::owner::Griffin][Type::Attack].m_sMaxFrame = 3;
+	m_stFrame[hb::shared::owner::Griffin][Type::Damage].m_sFrameTime = 100;
+	m_stFrame[hb::shared::owner::Griffin][Type::Damage].m_sMaxFrame = 3;
+	m_stFrame[hb::shared::owner::Griffin][Type::Dying].m_sFrameTime = 150;
+	m_stFrame[hb::shared::owner::Griffin][Type::Dying].m_sMaxFrame = 3;
 	m_stFrame[hb::shared::owner::ClawTurtle][Type::stop].m_sFrameTime = 100;
 	m_stFrame[hb::shared::owner::ClawTurtle][Type::stop].m_sMaxFrame = 7;
 	m_stFrame[hb::shared::owner::ClawTurtle][Type::Move].m_sFrameTime = 70;
@@ -836,11 +850,10 @@ CMapData::CMapData(class CGame* game)
 	m_stFrame[hb::shared::owner::AirElemental][Type::Dying].m_sFrameTime = 180;
 	m_stFrame[hb::shared::owner::AirElemental][Type::Dying].m_sMaxFrame = 7;
 
-	// Auctioneer (Vince) has no sprite sheet of its own; it borrows the CityHall Officer
-	// (William) body via owner::sprite_render_type. Mirror William's animation frames here
-	// so the reused sprite steps through the same idle/move cycle.
-	for (int a = 0; a < TotalAction; a++)
-		m_stFrame[hb::shared::owner::auctioneer][a] = m_stFrame[hb::shared::owner::William][a];
+	// Auctioneer (Vince) — town-merchant idle, same cadence as William and Kennedy.
+	// He is stationary (action_limit 2), so only the stop action is ever played.
+	m_stFrame[hb::shared::owner::auctioneer][Type::stop].m_sFrameTime = 250;
+	m_stFrame[hb::shared::owner::auctioneer][Type::stop].m_sMaxFrame = 7;
 
 }
 
@@ -2652,6 +2665,15 @@ int CMapData::object_frame_counter(const std::string& player_name, short view_po
 										, m_pivot_x + dX + m_data[dX][dY].m_v1
 										, m_pivot_y + dY + m_data[dX][dY].m_v2
 										, 0, m_data[dX][dY].m_owner_type * 1000);
+								}
+								else if (static_cast<EffectType>(m_data[dX][dY].m_v3) == EffectType::STORM_BLADE)
+								{
+									// NPC gust attack (griffin): same visual the StormBringer
+									// weapon fires on the player path above.
+									m_game->m_effect_manager->add_effect(EffectType::STORM_BLADE, m_pivot_x + dX, m_pivot_y + dY
+										, m_pivot_x + dX + m_data[dX][dY].m_v1
+										, m_pivot_y + dY + m_data[dX][dY].m_v2
+										, 0, m_data[dX][dY].m_owner_type);
 								}
 							}
 							break;

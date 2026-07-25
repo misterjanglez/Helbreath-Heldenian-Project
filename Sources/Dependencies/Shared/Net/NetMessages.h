@@ -319,6 +319,7 @@ namespace Notify
 		SlateStatus                             = 0x0BE1,
 		QuestCounter                            = 0x0BE2,
 		MonsterCount                            = 0x0BE3,
+		AbaddonThunder                          = 0x0BE5,
 		HeldenianTeleport                       = 0x0BE6,
 		HeldenianEnd                            = 0x0BE7,
 		Unknown0BE8                             = 0x0BE8,

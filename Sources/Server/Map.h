@@ -27,7 +27,6 @@ constexpr int MaxHeldenianDoor      = 200;
 constexpr int MaxOccupyFlag         = 20001;
 constexpr int MaxInitialPoint       = 20;
 constexpr int MaxAgriculture        = 200;
-constexpr int MaxDynamicGates       = 10;
 constexpr int MaxHeldenianTower     = 200;
 } // namespace hb::server::map
 
@@ -82,6 +81,9 @@ public:
 	void set_dynamic_object(uint16_t id, short type, short sX, short sY, uint32_t register_time);
 	bool get_is_teleport(short dX, short dY);
 	bool search_teleport_dest(int sX, int sY, char * map_name, int * dx, int * dy, direction * dir);
+	// A boss map needs BOTH flags: gen_type 2 marks the boss trigger, but
+	// only apocalypse_map rows are part of the event at all.
+	bool is_apocalypse_boss_map() const { return m_is_apocalypse_map && (m_apocalypse_mob_gen_type == 2); }
 	bool init(char * name);
 	bool is_valid_loc(short sX, short sY);
 	CItem* get_item(short sX, short sY, CItem** remain = nullptr);
@@ -150,6 +152,9 @@ public:
 	hb::shared::geometry::GameRectangle m_dynamic_gate_coord;
 	char  m_dynamic_gate_coord_dest_map[11];
 	short m_dynamic_gate_coord_tgt_x, m_dynamic_gate_coord_tgt_y;
+	// Apocalypse clear-gate runtime state (reset at event start/end)
+	bool  m_apocalypse_gate_open;
+	bool  m_apocalypse_boss_spawned;
 	bool  m_is_citizen_limit;
 	short m_heldenian_tower_type, m_heldenian_tower_x_pos, m_heldenian_tower_y_pos;
 	char  m_heldenian_tower_side;
@@ -191,13 +196,6 @@ public:
 
 	bool m_is_energy_sphere_goal_enabled;
 	int m_cur_energy_sphere_goal_point_index; 
-
-	struct {
-		bool is_gate_map;
-		char dynamic_gate_map[11];
-		int dynamic_gate_x;
-		int dynamic_gate_y;
-	} m_dynamic_gate_coords[hb::server::map::MaxDynamicGates];
 
 	struct {
 		int player_activity;

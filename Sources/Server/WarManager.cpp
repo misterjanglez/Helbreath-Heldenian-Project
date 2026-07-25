@@ -1827,13 +1827,15 @@ void WarManager::global_end_apocalypse_mode()
 
 void WarManager::local_end_apocalypse()
 {
-	
+
 
 	m_game->m_is_apocalypse_mode = false;
+	reset_apocalypse_map_state();
 
 	for(int i = 1; i < MaxClients; i++) {
 		if (m_game->m_client_list[i] != 0) {
 			m_game->send_notify_msg(0, i, Notify::ApocGateEndMsg, 0, 0, 0, 0);
+			m_game->send_notify_msg(0, i, Notify::ApocGateClose, 0, 0, 0, 0);
 		}
 	}
 	hb::logger::log("Apocalypse mode disabled");
@@ -1841,10 +1843,11 @@ void WarManager::local_end_apocalypse()
 
 void WarManager::local_start_apocalypse(uint32_t apocalypse_guid)
 {
-	
+
 	//uint32_t dwApocalypse;
 
 	m_game->m_is_apocalypse_mode = true;
+	reset_apocalypse_map_state();
 
 	if (apocalypse_guid != 0) {
 		create_apocalypse_guid(apocalypse_guid);
@@ -1859,6 +1862,194 @@ void WarManager::local_start_apocalypse(uint32_t apocalypse_guid)
 		}
 	}
 	hb::logger::log("Apocalypse mode enabled");
+}
+
+void WarManager::reset_apocalypse_map_state()
+{
+	for(int i = 0; i < MaxMaps; i++) {
+		if (m_game->m_map_list[i] != 0) {
+			m_game->m_map_list[i]->m_apocalypse_gate_open = false;
+			m_game->m_map_list[i]->m_apocalypse_boss_spawned = false;
+		}
+	}
+}
+
+void WarManager::apocalypse_progress_tick()
+{
+	if (m_game->m_is_apocalypse_mode == false) return;
+
+	for(int i = 0; i < MaxMaps; i++)
+		check_apocalypse_map_cleared(i);
+
+	apocalypse_gate_travel_tick();
+}
+
+// Re-sends each open gate's position to everyone on that map (players who
+// arrive after the gate opened need it) and teleports anyone standing on
+// the portal. Lives here, not in check_client_response_time, so gate
+// travel is never subject to that loop's GM-bypass/anticheat gating.
+void WarManager::apocalypse_gate_travel_tick()
+{
+	for(int m = 0; m < MaxMaps; m++) {
+		CMap* map = m_game->m_map_list[m];
+		if (map == nullptr || map->m_apocalypse_gate_open == false) continue;
+
+		for(int i = 1; i < MaxClients; i++) {
+			if (m_game->m_client_list[i] == 0) continue;
+			if (m_game->m_client_list[i]->m_map_index != m) continue;
+
+			m_game->send_notify_msg(0, i, Notify::ApocGateOpen,
+				map->m_dynamic_gate_coord.x, map->m_dynamic_gate_coord.y, 0, m_game->m_client_list[i]->m_map_name);
+
+			// The gate data is a single tile but the portal graphic spans
+			// several tiles around it — accept standing anywhere on it.
+			constexpr int gate_enter_margin = 2;
+			if ((m_game->m_client_list[i]->m_x >= map->m_dynamic_gate_coord.Left() - gate_enter_margin) &&
+				(m_game->m_client_list[i]->m_x <= map->m_dynamic_gate_coord.Right() + gate_enter_margin) &&
+				(m_game->m_client_list[i]->m_y >= map->m_dynamic_gate_coord.Top() - gate_enter_margin) &&
+				(m_game->m_client_list[i]->m_y <= map->m_dynamic_gate_coord.Bottom() + gate_enter_margin)) {
+				m_game->request_teleport_handler(i, "2   ", map->m_dynamic_gate_coord_dest_map,
+					map->m_dynamic_gate_coord_tgt_x, map->m_dynamic_gate_coord_tgt_y);
+			}
+		}
+	}
+}
+
+// Abaddon environmental lightning storm — the retail apocalypse hazard,
+// reconstructed from the only known implementation (Snoopy v3.82
+// DoAbaddonThunderDamageHandler): rolled on the 20s weather tick with a
+// 1-in-15 chance, ~one storm every 5 minutes on average.
+void WarManager::abaddon_thunder_tick()
+{
+	if (m_game->m_is_apocalypse_mode == false) return;
+	if (m_game->dice(1, 15) != 13) return;
+
+	unleash_abaddon_thunder();
+}
+
+// One storm wave over every apocalypse boss map, regardless of mode or
+// dice (also the /thunder admin test hook). Damage mitigation matches
+// the meteor strike, per retail behavior: Protection-From-Magic halves,
+// Absolute-Magic-Protect nulls.
+void WarManager::unleash_abaddon_thunder()
+{
+	for(int m = 0; m < MaxMaps; m++) {
+		CMap* map = m_game->m_map_list[m];
+		if (map == nullptr || map->is_apocalypse_boss_map() == false) continue;
+
+		for(int i = 1; i < MaxClients; i++) {
+			if (m_game->m_client_list[i] == 0) continue;
+			if (m_game->m_client_list[i]->m_map_index != m) continue;
+			if (m_game->m_client_list[i]->m_is_init_complete == false) continue;
+
+			// Everyone on the map sees the storm; admins, executors, and
+			// the dead are spared the damage.
+			m_game->send_notify_msg(0, i, Notify::AbaddonThunder, 0, 0, 0, 0);
+
+			if (m_game->m_client_list[i]->m_admin_level > 0) continue;
+			if (m_game->m_client_list[i]->m_side == 4) continue;
+			if (m_game->m_client_list[i]->m_is_killed) continue;
+
+			int damage = m_game->dice(1, 20) + 100;
+			if (m_game->m_client_list[i]->m_magic_effect_status[hb::shared::magic::Protect] == 2)
+				damage = (damage / 2) - 2;	// Protection-From-Magic
+			if (m_game->m_client_list[i]->m_magic_effect_status[hb::shared::magic::Protect] == 5)
+				damage = 0;					// Absolute-Magic-Protect
+			if (damage <= 0) continue;
+
+			m_game->m_client_list[i]->m_hp -= damage;
+			if (m_game->m_client_list[i]->m_hp <= 0) {
+				m_game->m_combat_manager->client_killed_handler(i, 0, 0, damage);
+				continue;
+			}
+
+			m_game->send_notify_msg(0, i, Notify::Hp, 0, 0, 0, 0);
+			m_game->send_event_to_near_client_type_a(i, hb::shared::owner_class::Player, MsgId::EventMotion, Type::Damage, damage, 0, 0);
+
+			if (m_game->m_client_list[i]->m_skill_using_status[19] != true) {
+				map->clear_owner(0, i, hb::shared::owner_class::Player, m_game->m_client_list[i]->m_x, m_game->m_client_list[i]->m_y);
+				map->set_owner(i, hb::shared::owner_class::Player, m_game->m_client_list[i]->m_x, m_game->m_client_list[i]->m_y);
+			}
+
+			if (m_game->m_client_list[i]->m_magic_effect_status[hb::shared::magic::HoldObject] != 0) {
+				m_game->send_notify_msg(0, i, Notify::MagicEffectOff, hb::shared::magic::HoldObject, m_game->m_client_list[i]->m_magic_effect_status[hb::shared::magic::HoldObject], 0, 0);
+				m_game->m_client_list[i]->m_magic_effect_status[hb::shared::magic::HoldObject] = 0;
+				m_game->m_delay_event_manager->remove_from_delay_event_list(i, hb::shared::owner_class::Player, hb::shared::magic::HoldObject);
+			}
+		}
+	}
+}
+
+void WarManager::check_apocalypse_map_cleared(int map_index)
+{
+	CMap* map = m_game->m_map_list[map_index];
+	if (map == nullptr || map->m_is_apocalypse_map == false) return;
+	if (map->m_apocalypse_mob_gen_type == 0) return;
+	if (map->m_total_alive_object > 0) return;
+
+	if (map->m_apocalypse_mob_gen_type == 1)
+		open_apocalypse_gate(map_index);
+	else if (map->m_apocalypse_mob_gen_type == 2)
+		spawn_apocalypse_boss(map_index);
+}
+
+void WarManager::open_apocalypse_gate(int map_index)
+{
+	CMap* map = m_game->m_map_list[map_index];
+	if (map->m_apocalypse_gate_open) return;
+	if (map->m_dynamic_gate_type == 0 || map->m_dynamic_gate_coord_dest_map[0] == '\0') return;
+
+	map->m_apocalypse_gate_open = true;
+	hb::logger::log("Apocalypse map '{}' cleared - gate to '{}' opened", map->m_name, map->m_dynamic_gate_coord_dest_map);
+
+	for(int i = 1; i < MaxClients; i++) {
+		if (m_game->m_client_list[i] == 0) continue;
+		if (m_game->m_client_list[i]->m_map_index != map_index) continue;
+
+		m_game->send_notify_msg(0, i, Notify::ApocGateOpen,
+			map->m_dynamic_gate_coord.x, map->m_dynamic_gate_coord.y, 0, m_game->m_client_list[i]->m_map_name);
+		m_game->send_notify_msg(0, i, Notify::NoticeMsg, 0, 0, 0, "The land is cleansed - a gate has opened!");
+	}
+}
+
+void WarManager::spawn_apocalypse_boss(int map_index)
+{
+	CMap* map = m_game->m_map_list[map_index];
+	if (map->m_apocalypse_boss_spawned) return;
+
+	int npc_id = map->m_apocalypse_boss_mob_npc_id;
+	if (npc_id <= 0 || npc_id >= MaxNpcTypes || m_game->m_npc_config_list[npc_id] == nullptr) return;
+
+	int naming_value = map->get_empty_naming_value();
+	if (naming_value == -1) return;
+
+	char name[8];
+	std::snprintf(name, sizeof(name), "XX%d", naming_value);
+	name[0] = '_';
+	name[1] = static_cast<char>(map_index + 65);
+
+	const auto& rc = map->m_apocalypse_boss_mob;
+	int tX = rc.x + (rc.width > 0 ? m_game->dice(1, rc.width) - 1 : 0);
+	int tY = rc.y + (rc.height > 0 ? m_game->dice(1, rc.height) - 1 : 0);
+
+	if (m_game->create_new_npc(npc_id, name, map->m_name, 0, 0, MoveType::Random,
+		&tX, &tY, 0, 0, 0, -1, false, false, false, false, true) == false) {
+		map->set_naming_value_empty(naming_value);
+		hb::logger::warn("Apocalypse boss spawn failed (npc {}) on map '{}'", npc_id, map->m_name);
+		return;
+	}
+
+	map->m_apocalypse_boss_spawned = true;
+	hb::logger::log("Apocalypse map '{}' cleared - boss '{}' has risen", map->m_name, m_game->m_npc_config_list[npc_id]->m_npc_name);
+
+	char txt[80];
+	std::snprintf(txt, sizeof(txt), "%s has risen!", m_game->m_npc_config_list[npc_id]->m_npc_name);
+	for(int i = 1; i < MaxClients; i++) {
+		if (m_game->m_client_list[i] == 0) continue;
+		if (m_game->m_client_list[i]->m_map_index != map_index) continue;
+
+		m_game->send_notify_msg(0, i, Notify::NoticeMsg, 0, 0, 0, txt);
+	}
 }
 
 bool WarManager::read_apocalypse_guid_file(const char* fn)

@@ -162,13 +162,8 @@ CMap::CMap(class CGame* game)
 	m_is_energy_sphere_auto_creation = false;
 	m_is_recall_impossible = false;
 	m_is_apocalypse_map = false;
-
-	for(int i = 0; i < MaxDynamicGates; i++) {
-		m_dynamic_gate_coords[i].is_gate_map = false;
-		m_dynamic_gate_coords[i].dynamic_gate_x = 0;
-		m_dynamic_gate_coords[i].dynamic_gate_y = 0;
-		std::memset(m_dynamic_gate_coords[i].dynamic_gate_map, 0, sizeof(m_dynamic_gate_coords[i].dynamic_gate_map));
-	}
+	m_apocalypse_gate_open = false;
+	m_apocalypse_boss_spawned = false;
 }
 
 CMap::~CMap()

@@ -73,6 +73,7 @@ public:
     void draw_angel(int sprite, short sX, short sY, char frame, uint32_t time);
     void dk_glare(int weapon_color, int16_t weapon_item_id, int* weapon_glare);
     void abaddon_corpse(int sX, int sY);
+    void draw_abaddon_storm();
     hb::shared::sprite::BoundRect draw_object_on_stop(int indexX, int indexY, int sX, int sY, bool trans, uint32_t time);
     hb::shared::sprite::BoundRect draw_object_on_move(int indexX, int indexY, int sX, int sY, bool trans, uint32_t time);
     hb::shared::sprite::BoundRect draw_object_on_run(int indexX, int indexY, int sX, int sY, bool trans, uint32_t time);
@@ -146,6 +147,10 @@ public:
     std::string m_top_msg;
     int m_gate_posit_x = -1;
     int m_gate_posit_y = -1;
+    // Abaddon storm latch (Notify::AbaddonThunder): render the full-screen
+    // storm until this timestamp.
+    static constexpr uint32_t abaddon_storm_duration_ms = 700;
+    uint32_t m_abaddon_storm_until = 0;
     int m_heldenian_aresden_left_tower = -1;
     int m_heldenian_elvine_left_tower = -1;
     int m_heldenian_aresden_flags = -1;

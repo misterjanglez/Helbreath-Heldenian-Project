@@ -17,10 +17,12 @@ void CmdSetCmdLevel::execute(CGame* game, const char* args)
 			hb::console::info("Current command permissions:");
 			for (const auto& pair : game->m_command_permissions)
 			{
+				// Dotted keys are flag sub-permissions (e.g. clearnpc.rewards), not typeable commands
+				const char* prefix = (pair.first.find('.') != std::string::npos) ? "" : "/";
 				if (pair.second.description.empty())
-					hb::console::write("  /{} -> level {}", pair.first, pair.second.admin_level);
+					hb::console::write("  {}{} -> level {}", prefix, pair.first, pair.second.admin_level);
 				else
-					hb::console::write("  /{} -> level {} ({})", pair.first, pair.second.admin_level, pair.second.description);
+					hb::console::write("  {}{} -> level {} ({})", prefix, pair.first, pair.second.admin_level, pair.second.description);
 			}
 		}
 		return;

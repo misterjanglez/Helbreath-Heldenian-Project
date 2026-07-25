@@ -2459,7 +2459,7 @@ hb::shared::sprite::BoundRect CGame::draw_object_on_move_for_menu(int indexX, in
 		break;
 	default:  // Mob/NPC
 		if (m_entity_state.m_owner_type < 10) return {};
-		eq.body = Mob + (hb::shared::owner::sprite_render_type(m_entity_state.m_owner_type) - 10) * 8 * 7 + (1 * 8);
+		eq.body = Mob + (m_entity_state.m_owner_type - 10) * 8 * 7 + (1 * 8);
 		eq.undies = eq.hair = eq.bodyArmor = eq.armArmor = -1;
 		eq.boots = eq.pants = eq.weapon = eq.shield = eq.helm = eq.mantle = -1;
 		mob = true;
@@ -4010,20 +4010,21 @@ char CGame::get_hardcoded_map_index(const char* map_name, char* name)
 		std::snprintf(name, 21, "%s", GET_OFFICIAL_MAP_NAME70);
 		return 25;
 	}
-	else if (strcmp(map_name, "inferniaA") == 0)
+	else if (strcmp(map_name, "inferniaa") == 0)
 	{
 		std::snprintf(name, 21, "%s", GET_OFFICIAL_MAP_NAME71);
 		return 26;
 	}
-	else if (strcmp(map_name, "inferniaB") == 0)
+	else if (strcmp(map_name, "inferniab") == 0)
 	{
 		std::snprintf(name, 21, "%s", GET_OFFICIAL_MAP_NAME72);
 		return 27;
 	}
 	else if (strcmp(map_name, "maze") == 0)
 	{
+		// The Maze must be navigated blind - no guide map (official behavior)
 		std::snprintf(name, 21, "%s", GET_OFFICIAL_MAP_NAME73);
-		return 28;
+		return -1;
 	}
 	else if (strcmp(map_name, "procella") == 0)
 	{
@@ -4534,11 +4535,11 @@ void CGame::start_bgm()
 	{
 		trackName = "druncncity";
 	}
-	else if (m_cur_location.starts_with("inferniaA"))
+	else if (m_cur_location.starts_with("inferniaa"))
 	{
 		trackName = "middleland";
 	}
-	else if (m_cur_location.starts_with("inferniaB"))
+	else if (m_cur_location.starts_with("inferniab"))
 	{
 		trackName = "middleland";
 	}

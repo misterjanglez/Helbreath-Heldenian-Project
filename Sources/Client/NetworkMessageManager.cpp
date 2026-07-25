@@ -113,6 +113,7 @@ namespace NetworkMessageHandlers {
 	void HandleApocGateOpen(CGame* game, char* data);
 	void HandleApocGateClose(CGame* game, char* data);
 	void HandleApocForceRecall(CGame* game, char* data);
+	void HandleAbaddonThunder(CGame* game, char* data);
 	void HandleAbaddonKilled(CGame* game, char* data);
 
 	// Heldenian
@@ -357,6 +358,7 @@ bool NetworkMessageManager::process_message(uint32_t msg_id, char* data, uint32_
 		case Notify::ApocGateOpen: NetworkMessageHandlers::HandleApocGateOpen(m_game, data); return true;
 		case Notify::ApocGateClose: NetworkMessageHandlers::HandleApocGateClose(m_game, data); return true;
 		case Notify::ApocForceRecallPlayers: NetworkMessageHandlers::HandleApocForceRecall(m_game, data); return true;
+		case Notify::AbaddonThunder: NetworkMessageHandlers::HandleAbaddonThunder(m_game, data); return true;
 		case Notify::AbaddonKilled: NetworkMessageHandlers::HandleAbaddonKilled(m_game, data); return true;
 
 		// Heldenian

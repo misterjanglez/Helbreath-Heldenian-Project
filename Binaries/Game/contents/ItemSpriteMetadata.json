@@ -3226,5 +3226,24 @@
     "pak_file": null,
     "inventory_frame_index": 249,
     "ground_frame_index": 249
+  },
+  {
+    "pak_file": "cross_bow.pak",
+    "id": 313,
+    "male": {
+      "pak_index_start": 0,
+      "pak_index_end": 11,
+      "equip_frame_index": 221,
+      "ground_frame_index": 362,
+      "pack_frame_index": 362
+    },
+    "female": {
+      "pak_index_start": 12,
+      "pak_index_end": 23,
+      "equip_frame_index": 221,
+      "ground_frame_index": 362,
+      "pack_frame_index": 362
+    },
+    "equip_type": "weapon"
   }
 ]

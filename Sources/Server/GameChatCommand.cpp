@@ -7,6 +7,8 @@
 #include "GameCmdCreateItem.h"
 #include "GameCmdGiveItem.h"
 #include "GameCmdSpawn.h"
+#include "GameCmdClearNpc.h"
+#include "GameCmdThunder.h"
 #include "GameCmdGoto.h"
 #include "GameCmdCome.h"
 #include "GameCmdInvis.h"
@@ -131,6 +133,8 @@ void GameChatCommandManager::register_built_in_commands()
 	register_command(std::make_unique<GameCmdCreateItem>());
 	register_command(std::make_unique<GameCmdGiveItem>());
 	register_command(std::make_unique<GameCmdSpawn>());
+	register_command(std::make_unique<GameCmdClearNpc>());
+	register_command(std::make_unique<GameCmdThunder>());
 	register_command(std::make_unique<GameCmdGoto>());
 	register_command(std::make_unique<GameCmdCome>());
 	register_command(std::make_unique<GameCmdInvis>());
@@ -160,6 +164,26 @@ void GameChatCommandManager::seed_command_permissions()
 			changed = true;
 
 			hb::logger::log("Command '/{}' registered (default level: {})", name, cmd->get_default_level());
+		}
+	}
+
+	// Sub-permissions: not commands themselves, but extra level checks
+	// commands perform on specific flags (looked up via
+	// get_command_required_level). Seeded here so they're tunable in the
+	// admin_command_permissions table like regular commands.
+	static constexpr struct { const char* name; int level; } sub_permissions[] = {
+		{ "clearnpc.rewards", hb::shared::admin::Administrator },
+	};
+	for (const auto& sub : sub_permissions)
+	{
+		if (m_game->m_command_permissions.find(sub.name) == m_game->m_command_permissions.end())
+		{
+			CommandPermission perm;
+			perm.admin_level = sub.level;
+			m_game->m_command_permissions[sub.name] = perm;
+			changed = true;
+
+			hb::logger::log("Permission '{}' registered (default level: {})", sub.name, sub.level);
 		}
 	}
 
