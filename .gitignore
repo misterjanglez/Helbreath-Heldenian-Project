@@ -359,14 +359,19 @@ DocProject/Help/html
 # Project-specific     #
 ########################
 
-# Project docs/plans (tracked separately)
-PLANS/
+# Markdown: ignore scratch notes by default, but track project docs
+# (design contracts in PLANS/, ADRs and agent docs in docs/, the domain
+# glossary CONTEXT.md, and the root standards files).
 *.md
 !**/README.md
 !/CLAUDE*.md
 !/CHANGELOG.md
 !/CODING_STANDARDS.md
 !/VERSION_STANDARDS.md
+!/CONTEXT.md
+!/docs/**/*.md
+PLANS/*
+!/PLANS/*.md
 
 # Game logs and runtime data
 **/GameLogs/
