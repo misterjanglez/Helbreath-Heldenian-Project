@@ -328,24 +328,16 @@ public:
         return m_instance.has_attributes();
     }
 
-    // Copy attribute fields to a packet or DB struct that has matching field names
-    template <typename T>
-    void copy_attributes_to(T& target) const
+    // The whole attribute POD — packets embed the same struct, so
+    // encode/decode is plain assignment through these.
+    const hb::shared::item::item_attribute_data& get_attributes() const
     {
-        m_instance.copy_attributes_to(target);
+        return m_instance.attributes;
     }
 
-    // Load attribute fields from a packet or DB struct that has matching field names
-    template <typename T>
-    void load_attributes_from(const T& source)
+    void set_attributes(const hb::shared::item::item_attribute_data& attributes)
     {
-        m_instance.load_attributes_from(source);
-    }
-
-    // Copy all attribute fields from another CItem
-    void copy_attributes_from(const CItem* other)
-    {
-        m_instance.load_attributes_from(other->m_instance);
+        m_instance.attributes = attributes;
     }
 
     // Return a const reference to the instance data

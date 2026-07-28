@@ -4,6 +4,8 @@
 #include <string>
 #include <vector>
 
+#include "Item/ItemAttributeData.h"
+
 struct sqlite3;
 class CGame;
 class CItem;
@@ -18,6 +20,9 @@ namespace hb::server
 	// tradingpost.db, and an account DB. This is the currency of every escrow
 	// transition: pulled out of inventory on escrow-in, stored as a
 	// listing/offer item, and handed back to deliver_to_bank on escrow-out.
+	// The attribute portion is the shared POD; the store's sqlite bind/read
+	// sites bridge it to the legacy prefix/secondary columns until the 1-E
+	// DDL swap.
 	struct escrow_item
 	{
 		int16_t  item_id             = 0;
@@ -31,17 +36,12 @@ namespace hb::server
 		int16_t  spec_effect_value2  = 0;
 		int16_t  spec_effect_value3  = 0;
 		uint16_t cur_durability      = 0;
-		uint8_t  custom_made         = 0;
-		uint8_t  prefix_type         = 0;
-		uint8_t  prefix_value        = 0;
-		uint8_t  secondary_type      = 0;
-		uint8_t  secondary_value     = 0;
-		uint8_t  enchant_bonus       = 0;
+		hb::shared::item::item_attribute_data attributes;
 	};
 
 	// One Listing summarized for a board browse row: identity + a compact preview
 	// of the escrowed bundle. The handler renders names from the item's
-	// name-affecting instance fields (prefix/secondary/enchant/custom/dye).
+	// name-affecting instance fields (modifiers/enchant/custom/dye).
 	struct listing_brief
 	{
 		int64_t                  listing_id    = 0;

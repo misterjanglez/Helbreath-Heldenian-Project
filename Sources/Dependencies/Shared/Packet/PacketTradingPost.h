@@ -1,6 +1,7 @@
 #pragma once
 
 #include "PacketHeaders.h"
+#include "Item/ItemAttributeData.h"
 #include "NetConstants.h"
 
 #include <cstdint>
@@ -87,18 +88,13 @@ namespace net {
 	};
 
 	// Compact item for browse rows: id/count plus the name-affecting instance
-	// fields, so the client renders display names (prefix/secondary/enchant/
-	// custom/dye) via item_name_formatter without the full payload.
+	// fields, so the client renders display names (modifiers/enchant/custom/
+	// dye) via item_name_formatter without the full payload.
 	struct HB_PACKED TpItemBrief {
 		int16_t item_id;
 		uint64_t count;
 		uint8_t item_color;
-		uint8_t custom_made;
-		uint8_t prefix_type;
-		uint8_t prefix_value;
-		uint8_t secondary_type;
-		uint8_t secondary_value;
-		uint8_t enchant_bonus;
+		hb::shared::item::item_attribute_data attributes;
 	};
 
 	// Full item instance columns (mirror character_bank_items /
@@ -116,12 +112,7 @@ namespace net {
 		int16_t spec_effect_value2;
 		int16_t spec_effect_value3;
 		uint16_t cur_durability;
-		uint8_t custom_made;
-		uint8_t prefix_type;
-		uint8_t prefix_value;
-		uint8_t secondary_type;
-		uint8_t secondary_value;
-		uint8_t enchant_bonus;
+		hb::shared::item::item_attribute_data attributes;
 	};
 
 	//------------------------------------------------------------------------

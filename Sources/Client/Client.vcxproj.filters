@@ -557,6 +557,9 @@
     <ClInclude Include="..\Dependencies\Shared\Item\ItemEnums.h">
       <Filter>Shared\Item</Filter>
     </ClInclude>
+    <ClInclude Include="..\Dependencies\Shared\Item\ItemAttributeData.h">
+      <Filter>Shared\Item</Filter>
+    </ClInclude>
     <ClInclude Include="..\Dependencies\Shared\Item\ItemInstanceData.h">
       <Filter>Shared\Item</Filter>
     </ClInclude>

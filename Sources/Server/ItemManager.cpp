@@ -623,7 +623,7 @@ int ItemManager::add_client_bulk_item_list(int client_h, const char* item_name, 
 		pkt.weight = first_item->m_weight;
 		pkt.item_color = first_item->m_instance.item_color;
 		pkt.spec_value2 = static_cast<uint8_t>(first_item->m_instance.special_effect_value2);
-		first_item->copy_attributes_to(pkt);
+		pkt.attributes = first_item->get_attributes();
 		pkt.item_id = first_item->m_id_num;
 		pkt.max_durability = first_item->m_durability;
 		m_game->m_client_list[client_h]->m_socket->send_msg(reinterpret_cast<char*>(&pkt), sizeof(pkt));
@@ -1697,7 +1697,7 @@ bool ItemManager::set_item_to_bank_item(int client_h, short item_index)
 				pkt.weight = item->m_weight;
 				pkt.item_color = item->m_instance.item_color;
 				pkt.item_effect_value2 = item->m_item_effect_value2;
-				item->copy_attributes_to(pkt);
+				pkt.attributes = item->get_attributes();
 				pkt.spec_effect_value2 = static_cast<uint8_t>(item->m_instance.special_effect_value2);
 				pkt.item_id = item->m_id_num;
 				pkt.max_durability = item->m_durability;
@@ -2312,7 +2312,7 @@ void ItemManager::use_item_handler(int client_h, short item_index, short dX, sho
 						pkt.weight = item->m_weight;
 						pkt.item_color = item->m_instance.item_color;
 						pkt.item_effect_value2 = item->m_item_effect_value2;
-						item->copy_attributes_to(pkt);
+						pkt.attributes = item->get_attributes();
 						pkt.spec_effect_value2 = static_cast<uint8_t>(item->m_instance.special_effect_value2);
 						pkt.item_id = item->m_id_num;
 						pkt.max_durability = item->m_durability;
@@ -2476,7 +2476,7 @@ bool ItemManager::set_item_to_bank_item(int client_h, CItem* item)
 				pkt.weight = item->m_weight;
 				pkt.item_color = item->m_instance.item_color;
 				pkt.item_effect_value2 = item->m_item_effect_value2;
-				item->copy_attributes_to(pkt);
+				pkt.attributes = item->get_attributes();
 				pkt.spec_effect_value2 = static_cast<uint8_t>(item->m_instance.special_effect_value2);
 				pkt.item_id = item->m_id_num;
 				pkt.max_durability = item->m_durability;
@@ -4439,7 +4439,7 @@ int ItemManager::send_item_notify_msg(int client_h, uint16_t msg_type, CItem* it
 		pkt.weight = item->m_weight;
 		pkt.item_color = item->m_instance.item_color;
 		pkt.spec_value2 = static_cast<uint8_t>(item->m_instance.special_effect_value2);
-		item->copy_attributes_to(pkt);
+		pkt.attributes = item->get_attributes();
 		pkt.item_id = item->m_id_num;
 		pkt.max_durability = item->m_durability;
 		ret = m_game->m_client_list[client_h]->m_socket->send_msg(reinterpret_cast<char*>(&pkt), sizeof(pkt));

@@ -1,6 +1,7 @@
 ﻿#pragma once
 
 #include "PacketHeaders.h"
+#include "Item/ItemAttributeData.h"
 #include "NetConstants.h"
 
 #include <cstddef>
@@ -116,12 +117,7 @@ namespace net {
 	struct HB_PACKED PacketNotifyItemAttributeChange {
 		PacketHeader header;
 		int16_t item_index;
-		uint8_t custom_made;
-		uint8_t prefix_type;
-		uint8_t prefix_value;
-		uint8_t secondary_type;
-		uint8_t secondary_value;
-		uint8_t enchant_bonus;
+		hb::shared::item::item_attribute_data attributes;
 		uint32_t spec_value1;
 		uint32_t spec_value2;
 	};
@@ -133,12 +129,7 @@ namespace net {
 		int16_t cur_durability;
 		uint8_t item_color;
 		uint8_t spec_value2;
-		uint8_t custom_made;
-		uint8_t prefix_type;
-		uint8_t prefix_value;
-		uint8_t secondary_type;
-		uint8_t secondary_value;
-		uint8_t enchant_bonus;
+		hb::shared::item::item_attribute_data attributes;
 		char item_name[hb::shared::limits::ItemNameLen];
 		int16_t item_id;
 	};
@@ -351,12 +342,7 @@ namespace net {
 		uint16_t weight;
 		uint8_t item_color;
 		uint8_t spec_value2;
-		uint8_t custom_made;
-		uint8_t prefix_type;
-		uint8_t prefix_value;
-		uint8_t secondary_type;
-		uint8_t secondary_value;
-		uint8_t enchant_bonus;
+		hb::shared::item::item_attribute_data attributes;
 		int16_t item_id;           // Item ID for config lookup
 		uint16_t max_durability;
 
@@ -395,12 +381,7 @@ namespace net {
 		uint16_t weight;
 		uint8_t item_color;
 		int16_t item_effect_value2;
-		uint8_t custom_made;
-		uint8_t prefix_type;
-		uint8_t prefix_value;
-		uint8_t secondary_type;
-		uint8_t secondary_value;
-		uint8_t enchant_bonus;
+		hb::shared::item::item_attribute_data attributes;
 		uint8_t spec_effect_value2;
 		uint8_t padding;
 		int16_t item_id;           // Item ID for config lookup
@@ -671,12 +652,7 @@ namespace net {
 		int16_t performance;
 		char item_name[hb::shared::limits::ItemNameLen];
 		char char_name[hb::shared::limits::CharNameLen];
-		uint8_t custom_made;
-		uint8_t prefix_type;
-		uint8_t prefix_value;
-		uint8_t secondary_type;
-		uint8_t secondary_value;
-		uint8_t enchant_bonus;
+		hb::shared::item::item_attribute_data attributes;
 		int16_t item_id;
 	};
 

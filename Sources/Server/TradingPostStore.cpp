@@ -210,7 +210,7 @@ namespace hb::server
 		item->m_instance.special_effect_value2 = e.spec_effect_value2;
 		item->m_instance.special_effect_value3 = e.spec_effect_value3;
 		item->m_instance.cur_durability = e.cur_durability;
-		item->load_attributes_from(e);
+		item->set_attributes(e.attributes);
 		if (item->is_custom_made()) {
 			item->m_durability = item->m_instance.special_effect_value1;
 		}
@@ -233,9 +233,9 @@ namespace hb::server
 		char buf[160];
 		std::snprintf(buf, sizeof(buf), "%s x%llu (id=%d pfx=%d/%d sec=%d/%d ench=%d%s)",
 			name, static_cast<unsigned long long>(e.count),
-			static_cast<int>(e.item_id), e.prefix_type, e.prefix_value,
-			e.secondary_type, e.secondary_value, e.enchant_bonus,
-			e.custom_made ? " custom" : "");
+			static_cast<int>(e.item_id), e.attributes.modifiers[0].type, e.attributes.modifiers[0].value,
+			e.attributes.modifiers[1].type, e.attributes.modifiers[1].value, e.attributes.enchant_bonus,
+			e.attributes.custom_made ? " custom" : "");
 		return buf;
 	}
 
@@ -307,7 +307,7 @@ namespace hb::server
 			e.spec_effect_value2 = it->m_instance.special_effect_value2;
 			e.spec_effect_value3 = it->m_instance.special_effect_value3;
 			e.cur_durability = it->m_instance.cur_durability;
-			it->copy_attributes_to(e);
+			e.attributes = it->get_attributes();
 			snap.push_back(e);
 			pend.push_back({ slot, static_cast<uint64_t>(amount) });
 		}
@@ -391,12 +391,14 @@ namespace hb::server
 			ok &= (sqlite3_bind_int(stmt, c++, e.spec_effect_value2) == SQLITE_OK);
 			ok &= (sqlite3_bind_int(stmt, c++, e.spec_effect_value3) == SQLITE_OK);
 			ok &= (sqlite3_bind_int(stmt, c++, e.cur_durability) == SQLITE_OK);
-			ok &= (sqlite3_bind_int(stmt, c++, e.custom_made) == SQLITE_OK);
-			ok &= (sqlite3_bind_int(stmt, c++, e.prefix_type) == SQLITE_OK);
-			ok &= (sqlite3_bind_int(stmt, c++, e.prefix_value) == SQLITE_OK);
-			ok &= (sqlite3_bind_int(stmt, c++, e.secondary_type) == SQLITE_OK);
-			ok &= (sqlite3_bind_int(stmt, c++, e.secondary_value) == SQLITE_OK);
-			ok &= (sqlite3_bind_int(stmt, c++, e.enchant_bonus) == SQLITE_OK);
+			// Legacy prefix/secondary columns until the 1-E DDL swap; tier and
+			// modifier slots [2]/[3] have no columns yet and are 0 pre-Phase-3.
+			ok &= (sqlite3_bind_int(stmt, c++, e.attributes.custom_made) == SQLITE_OK);
+			ok &= (sqlite3_bind_int(stmt, c++, e.attributes.modifiers[0].type) == SQLITE_OK);
+			ok &= (sqlite3_bind_int(stmt, c++, e.attributes.modifiers[0].value) == SQLITE_OK);
+			ok &= (sqlite3_bind_int(stmt, c++, e.attributes.modifiers[1].type) == SQLITE_OK);
+			ok &= (sqlite3_bind_int(stmt, c++, e.attributes.modifiers[1].value) == SQLITE_OK);
+			ok &= (sqlite3_bind_int(stmt, c++, e.attributes.enchant_bonus) == SQLITE_OK);
 			if (ok && sqlite3_step(stmt) != SQLITE_DONE) {
 				ok = false;
 			}
@@ -642,12 +644,17 @@ namespace hb::server
 			e.spec_effect_value2 = static_cast<int16_t>(sqlite3_column_int(stmt, c++));
 			e.spec_effect_value3 = static_cast<int16_t>(sqlite3_column_int(stmt, c++));
 			e.cur_durability = static_cast<uint16_t>(sqlite3_column_int(stmt, c++));
-			e.custom_made = static_cast<uint8_t>(sqlite3_column_int(stmt, c++));
-			e.prefix_type = static_cast<uint8_t>(sqlite3_column_int(stmt, c++));
-			e.prefix_value = static_cast<uint8_t>(sqlite3_column_int(stmt, c++));
-			e.secondary_type = static_cast<uint8_t>(sqlite3_column_int(stmt, c++));
-			e.secondary_value = static_cast<uint8_t>(sqlite3_column_int(stmt, c++));
-			e.enchant_bonus = static_cast<uint8_t>(sqlite3_column_int(stmt, c++));
+			// Legacy prefix/secondary columns until the 1-E DDL swap.
+			{
+				int custom_made = sqlite3_column_int(stmt, c++);
+				int prefix_type = sqlite3_column_int(stmt, c++);
+				int prefix_value = sqlite3_column_int(stmt, c++);
+				int secondary_type = sqlite3_column_int(stmt, c++);
+				int secondary_value = sqlite3_column_int(stmt, c++);
+				int enchant_bonus = sqlite3_column_int(stmt, c++);
+				e.attributes = hb::shared::item::item_attribute_data::from_legacy_fields(
+					custom_made, prefix_type, prefix_value, secondary_type, secondary_value, enchant_bonus);
+			}
 			out_items.push_back(e);
 		}
 		sqlite3_finalize(stmt);
@@ -760,12 +767,13 @@ namespace hb::server
 			r.spec_effect_value2 = e.spec_effect_value2;
 			r.spec_effect_value3 = e.spec_effect_value3;
 			r.cur_durability = e.cur_durability;
-			r.custom_made = e.custom_made;
-			r.prefix_type = e.prefix_type;
-			r.prefix_value = e.prefix_value;
-			r.secondary_type = e.secondary_type;
-			r.secondary_value = e.secondary_value;
-			r.enchant_bonus = e.enchant_bonus;
+			// The bank row's legacy int columns feed the INSERT binds until 1-E.
+			r.custom_made = e.attributes.custom_made;
+			r.prefix_type = e.attributes.modifiers[0].type;
+			r.prefix_value = e.attributes.modifiers[0].value;
+			r.secondary_type = e.attributes.modifiers[1].type;
+			r.secondary_value = e.attributes.modifiers[1].value;
+			r.enchant_bonus = e.attributes.enchant_bonus;
 			rows.push_back(r);
 		}
 
@@ -994,12 +1002,17 @@ namespace hb::server
 			e.spec_effect_value2 = static_cast<int16_t>(sqlite3_column_int(stmt, c++));
 			e.spec_effect_value3 = static_cast<int16_t>(sqlite3_column_int(stmt, c++));
 			e.cur_durability = static_cast<uint16_t>(sqlite3_column_int(stmt, c++));
-			e.custom_made = static_cast<uint8_t>(sqlite3_column_int(stmt, c++));
-			e.prefix_type = static_cast<uint8_t>(sqlite3_column_int(stmt, c++));
-			e.prefix_value = static_cast<uint8_t>(sqlite3_column_int(stmt, c++));
-			e.secondary_type = static_cast<uint8_t>(sqlite3_column_int(stmt, c++));
-			e.secondary_value = static_cast<uint8_t>(sqlite3_column_int(stmt, c++));
-			e.enchant_bonus = static_cast<uint8_t>(sqlite3_column_int(stmt, c++));
+			// Legacy prefix/secondary columns until the 1-E DDL swap.
+			{
+				int custom_made = sqlite3_column_int(stmt, c++);
+				int prefix_type = sqlite3_column_int(stmt, c++);
+				int prefix_value = sqlite3_column_int(stmt, c++);
+				int secondary_type = sqlite3_column_int(stmt, c++);
+				int secondary_value = sqlite3_column_int(stmt, c++);
+				int enchant_bonus = sqlite3_column_int(stmt, c++);
+				e.attributes = hb::shared::item::item_attribute_data::from_legacy_fields(
+					custom_made, prefix_type, prefix_value, secondary_type, secondary_value, enchant_bonus);
+			}
 			out.push_back(e);
 		}
 		sqlite3_finalize(stmt);

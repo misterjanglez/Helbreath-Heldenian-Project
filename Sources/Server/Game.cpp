@@ -1987,7 +1987,7 @@ void CGame::request_init_data_handler(int client_h, char* data, char key, size_t
 		entry->weight = m_client_list[client_h]->m_item_list[i]->m_weight;
 		entry->item_color = m_client_list[client_h]->m_item_list[i]->m_instance.item_color;
 		entry->spec_value2 = static_cast<std::uint8_t>(m_client_list[client_h]->m_item_list[i]->m_instance.special_effect_value2);
-		m_client_list[client_h]->m_item_list[i]->copy_attributes_to(*entry);
+		entry->attributes = m_client_list[client_h]->m_item_list[i]->get_attributes();
 		entry->item_id = m_client_list[client_h]->m_item_list[i]->m_id_num;
 		entry->max_durability = m_client_list[client_h]->m_item_list[i]->m_durability;
 	}
@@ -2019,7 +2019,7 @@ void CGame::request_init_data_handler(int client_h, char* data, char key, size_t
 		entry->weight = m_client_list[client_h]->m_item_in_bank_list[i]->m_weight;
 		entry->item_color = m_client_list[client_h]->m_item_in_bank_list[i]->m_instance.item_color;
 		entry->spec_value2 = static_cast<std::uint8_t>(m_client_list[client_h]->m_item_in_bank_list[i]->m_instance.special_effect_value2);
-		m_client_list[client_h]->m_item_in_bank_list[i]->copy_attributes_to(*entry);
+		entry->attributes = m_client_list[client_h]->m_item_in_bank_list[i]->get_attributes();
 		entry->item_id = m_client_list[client_h]->m_item_in_bank_list[i]->m_id_num;
 		entry->max_durability = m_client_list[client_h]->m_item_in_bank_list[i]->m_durability;
 	}
@@ -3252,7 +3252,7 @@ int CGame::compose_init_map_data(short sX, short sY, int client_h, char* data)
 					hb::net::PacketMapDataItem itemObj{};
 					itemObj.item_id = tile->m_item[0]->m_id_num;
 					itemObj.color = tile->m_item[0]->m_instance.item_color;
-					tile->m_item[0]->copy_attributes_to(itemObj);
+					itemObj.attributes = tile->m_item[0]->get_attributes();
 					itemObj.count = CItem::count_to_v2(tile->m_item[0]->m_instance.count);
 					std::memcpy(cp, &itemObj, sizeof(itemObj));
 					cp += sizeof(itemObj);
@@ -4054,7 +4054,7 @@ int CGame::compose_move_map_data(short sX, short sY, int client_h, direction dir
 				hb::net::PacketMapDataItem itemObj{};
 				itemObj.item_id = tile->m_item[0]->m_id_num;
 				itemObj.color = tile->m_item[0]->m_instance.item_color;
-				tile->m_item[0]->copy_attributes_to(itemObj);
+				itemObj.attributes = tile->m_item[0]->get_attributes();
 				itemObj.count = CItem::count_to_v2(tile->m_item[0]->m_instance.count);
 				std::memcpy(cp, &itemObj, sizeof(itemObj));
 				cp += sizeof(itemObj);
@@ -4572,7 +4572,7 @@ bool CGame::load_player_data_from_db(int client_h)
 		m_client_list[client_h]->m_item_list[item.slot]->m_instance.special_effect_value2 = item.spec_effect_value2;
 		m_client_list[client_h]->m_item_list[item.slot]->m_instance.special_effect_value3 = item.spec_effect_value3;
 		m_client_list[client_h]->m_item_list[item.slot]->m_instance.cur_durability = (short)item.cur_durability;
-		m_client_list[client_h]->m_item_list[item.slot]->load_attributes_from(item);
+		m_client_list[client_h]->m_item_list[item.slot]->set_attributes(item.attributes);
 
 		if (m_client_list[client_h]->m_item_list[item.slot]->is_custom_made()) {
 			m_client_list[client_h]->m_item_list[item.slot]->m_durability = m_client_list[client_h]->m_item_list[item.slot]->m_instance.special_effect_value1;
@@ -4609,7 +4609,7 @@ bool CGame::load_player_data_from_db(int client_h)
 		m_client_list[client_h]->m_item_in_bank_list[item.slot]->m_instance.special_effect_value2 = item.spec_effect_value2;
 		m_client_list[client_h]->m_item_in_bank_list[item.slot]->m_instance.special_effect_value3 = item.spec_effect_value3;
 		m_client_list[client_h]->m_item_in_bank_list[item.slot]->m_instance.cur_durability = (short)item.cur_durability;
-		m_client_list[client_h]->m_item_in_bank_list[item.slot]->load_attributes_from(item);
+		m_client_list[client_h]->m_item_in_bank_list[item.slot]->set_attributes(item.attributes);
 		if (m_client_list[client_h]->m_item_in_bank_list[item.slot]->is_custom_made()) {
 			m_client_list[client_h]->m_item_in_bank_list[item.slot]->m_durability = m_client_list[client_h]->m_item_in_bank_list[item.slot]->m_instance.special_effect_value1;
 		}
@@ -6830,7 +6830,7 @@ void CGame::send_ground_item_event(uint16_t msg_type, char map_index, short sX, 
 		pkt.special_effect_value2 = item->m_instance.special_effect_value2;
 		pkt.special_effect_value3 = item->m_instance.special_effect_value3;
 		pkt.cur_durability = item->m_instance.cur_durability;
-		item->copy_attributes_to(pkt);
+		pkt.attributes = item->get_attributes();
 	}
 
 	flag = true;
@@ -6927,7 +6927,7 @@ void CGame::send_item_attribute_change(int client_h, int item_index, CItem* item
 	pkt.header.msg_id = MsgId::Notify;
 	pkt.header.msg_type = Notify::ItemAttributeChange;
 	pkt.item_index = static_cast<int16_t>(item_index);
-	item->copy_attributes_to(pkt);
+	pkt.attributes = item->get_attributes();
 	pkt.spec_value1 = spec_value1;
 	pkt.spec_value2 = spec_value2;
 	m_client_list[client_h]->m_socket->send_msg(reinterpret_cast<char*>(&pkt), sizeof(pkt));
@@ -6947,7 +6947,7 @@ void CGame::send_gizon_item_change(int client_h, int item_index, CItem* item)
 	std::memcpy(pkt.item_name, item->m_name, sizeof(pkt.item_name));
 	pkt.item_color = item->m_instance.item_color;
 	pkt.spec_value2 = static_cast<uint8_t>(item->m_instance.special_effect_value2);
-	item->copy_attributes_to(pkt);
+	pkt.attributes = item->get_attributes();
 	pkt.item_id = item->m_id_num;
 	m_client_list[client_h]->m_socket->send_msg(reinterpret_cast<char*>(&pkt), sizeof(pkt));
 }
@@ -6968,7 +6968,7 @@ void CGame::send_exchange_item_notify(int from_h, int to_h, uint16_t msg_type, i
 	pkt.performance = static_cast<int16_t>(item->m_instance.special_effect_value2 + 100);
 	std::memcpy(pkt.item_name, item->m_name, sizeof(pkt.item_name));
 	std::memcpy(pkt.char_name, m_client_list[from_h]->m_char_name, sizeof(pkt.char_name));
-	item->copy_attributes_to(pkt);
+	pkt.attributes = item->get_attributes();
 	pkt.item_id = item->m_id_num;
 	m_client_list[to_h]->m_socket->send_msg(reinterpret_cast<char*>(&pkt), sizeof(pkt));
 }

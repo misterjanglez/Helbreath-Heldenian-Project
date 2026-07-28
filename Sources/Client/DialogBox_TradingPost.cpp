@@ -117,15 +117,15 @@ namespace
 	}
 
 	// Build a display item_instance_data from a Tp wire item. TpItemBrief and
-	// TpItemFull both carry the name-affecting fields under the same names, so
-	// this duck-types over either (like CItem::load_attributes_from).
+	// TpItemFull both carry count, item_color, and the attribute POD under the
+	// same names, so this duck-types over either.
 	template <typename TWire>
 	hb::shared::item::item_instance_data tp_wire_instance(const TWire& w)
 	{
 		hb::shared::item::item_instance_data d;
 		d.count = w.count;
 		d.item_color = static_cast<int8_t>(w.item_color);
-		d.load_attributes_from(w);
+		d.attributes = w.attributes;
 		return d;
 	}
 

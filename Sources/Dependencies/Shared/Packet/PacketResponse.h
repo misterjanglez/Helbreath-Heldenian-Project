@@ -1,6 +1,7 @@
 ﻿#pragma once
 
 #include "PacketHeaders.h"
+#include "Item/ItemAttributeData.h"
 #include "NetConstants.h"
 #include "Appearance.h"
 #include "PlayerStatusData.h"
@@ -80,12 +81,7 @@ namespace net {
 		uint16_t weight;
 		uint8_t item_color;
 		uint8_t spec_value2;
-		uint8_t custom_made;
-		uint8_t prefix_type;
-		uint8_t prefix_value;
-		uint8_t secondary_type;
-		uint8_t secondary_value;
-		uint8_t enchant_bonus;
+		hb::shared::item::item_attribute_data attributes;
 		int16_t item_id;           // Item ID for config lookup
 		uint16_t max_durability;     // Maximum durability
 	};
@@ -105,12 +101,7 @@ namespace net {
 		uint16_t weight;
 		uint8_t item_color;
 		uint8_t spec_value2;
-		uint8_t custom_made;
-		uint8_t prefix_type;
-		uint8_t prefix_value;
-		uint8_t secondary_type;
-		uint8_t secondary_value;
-		uint8_t enchant_bonus;
+		hb::shared::item::item_attribute_data attributes;
 		int16_t item_id;           // Item ID for config lookup
 		uint16_t max_durability;     // Maximum durability
 	};

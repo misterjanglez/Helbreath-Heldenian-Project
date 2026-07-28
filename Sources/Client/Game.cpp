@@ -1771,7 +1771,18 @@ void CGame::common_event_handler(char* data)
 		const auto* pkt = hb::net::PacketCast<hb::net::PacketEventGroundItem>(
 			data, sizeof(hb::net::PacketEventGroundItem));
 		if (!pkt) return;
-		auto idata = hb::shared::item::item_instance_data::from_ground_item_packet(*pkt);
+		hb::shared::item::item_instance_data idata;
+		idata.count = static_cast<uint64_t>(std::max<std::int16_t>(pkt->count, 0));
+		idata.item_color = static_cast<int8_t>(pkt->item_color);
+		idata.touch_effect_type = pkt->touch_effect_type;
+		idata.touch_effect_value1 = pkt->touch_effect_value1;
+		idata.touch_effect_value2 = pkt->touch_effect_value2;
+		idata.touch_effect_value3 = pkt->touch_effect_value3;
+		idata.special_effect_value1 = pkt->special_effect_value1;
+		idata.special_effect_value2 = pkt->special_effect_value2;
+		idata.special_effect_value3 = pkt->special_effect_value3;
+		idata.cur_durability = pkt->cur_durability;
+		idata.attributes = pkt->attributes;
 		short item_id = pkt->item_id;
 		bool is_drop = (event_type == CommonType::ItemDrop);
 		if (is_drop && item_id == hb::shared::item::ItemId::Gold)
@@ -1936,7 +1947,7 @@ void CGame::read_map_data(short pivot_x, short pivot_y, const char* packet_data)
 			short map_item_id = item->item_id;
 			idata.count = static_cast<uint64_t>(std::max<std::int16_t>(item->count, 0));
 			idata.item_color = static_cast<int8_t>(item->color);
-			idata.load_attributes_from(*item);
+			idata.attributes = item->attributes;
 			cursor += sizeof(hb::net::PacketMapDataItem);
 			m_map_data->set_item(pivot_x + map_x, pivot_y + map_y, map_item_id, idata, false);
 		}
@@ -2619,7 +2630,7 @@ void CGame::init_item_list(char* packet_data)
 		m_player->m_item_list[i]->m_instance.cur_durability = entry.cur_durability;
 		m_player->m_item_list[i]->m_instance.item_color = entry.item_color;
 		m_player->m_item_list[i]->m_instance.special_effect_value2 = static_cast<short>(entry.spec_value2); // v1.41
-		m_player->m_item_list[i]->load_attributes_from(entry);
+		m_player->m_item_list[i]->set_attributes(entry.attributes);
 		m_item_order[i] = i;
 		// Snoopy: Add Angelic Stats
 		if (cfg && (cfg->get_item_type() == hb::shared::item::item_type::equipment)
@@ -2659,7 +2670,7 @@ void CGame::init_item_list(char* packet_data)
 		m_player->m_bank_list[i]->m_instance.cur_durability = entry.cur_durability;
 		m_player->m_bank_list[i]->m_instance.item_color = entry.item_color;
 		m_player->m_bank_list[i]->m_instance.special_effect_value2 = static_cast<short>(entry.spec_value2); // v1.41
-		m_player->m_bank_list[i]->load_attributes_from(entry);
+		m_player->m_bank_list[i]->set_attributes(entry.attributes);
 	}
 
 	const auto* mastery = reinterpret_cast<const hb::net::PacketResponseMasteryData*>(bankEntries + total_items);

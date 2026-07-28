@@ -4,6 +4,7 @@
 #include <string>
 #include <vector>
 #include "Appearance.h"
+#include "Item/ItemAttributeData.h"
 
 struct sqlite3;
 
@@ -143,6 +144,10 @@ struct AccountDbItemRow
     int pos_x;
     int pos_y;
     int is_equipped;
+    // Attribute POD assembled from the legacy columns above by the load
+    // functions (not itself a DB column until the 1-E DDL swap). Insert
+    // paths bind the legacy int columns directly.
+    hb::shared::item::item_attribute_data attributes;
 };
 
 struct AccountDbBankItemRow
@@ -165,6 +170,10 @@ struct AccountDbBankItemRow
     int secondary_type;
     int secondary_value;
     int enchant_bonus;
+    // Attribute POD assembled from the legacy columns above by the load
+    // functions (not itself a DB column until the 1-E DDL swap). Insert
+    // paths bind the legacy int columns directly.
+    hb::shared::item::item_attribute_data attributes;
 };
 
 struct AccountDbIndexedValue

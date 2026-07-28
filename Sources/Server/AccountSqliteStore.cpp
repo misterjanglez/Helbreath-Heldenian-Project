@@ -826,6 +826,9 @@ bool LoadCharacterItems(sqlite3* db, const char* character_name, std::vector<Acc
         row.pos_x = sqlite3_column_int(stmt, col++);
         row.pos_y = sqlite3_column_int(stmt, col++);
         row.is_equipped = sqlite3_column_int(stmt, col++);
+        row.attributes = hb::shared::item::item_attribute_data::from_legacy_fields(
+            row.custom_made, row.prefix_type, row.prefix_value,
+            row.secondary_type, row.secondary_value, row.enchant_bonus);
         outItems.push_back(row);
     }
 
@@ -874,6 +877,9 @@ bool LoadCharacterBankItems(sqlite3* db, const char* character_name, std::vector
         row.secondary_type = sqlite3_column_int(stmt, col++);
         row.secondary_value = sqlite3_column_int(stmt, col++);
         row.enchant_bonus = sqlite3_column_int(stmt, col++);
+        row.attributes = hb::shared::item::item_attribute_data::from_legacy_fields(
+            row.custom_made, row.prefix_type, row.prefix_value,
+            row.secondary_type, row.secondary_value, row.enchant_bonus);
         outItems.push_back(row);
     }
 

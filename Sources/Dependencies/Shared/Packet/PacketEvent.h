@@ -1,6 +1,7 @@
 ﻿#pragma once
 
 #include "PacketHeaders.h"
+#include "Item/ItemAttributeData.h"
 #include "NetConstants.h"
 #include "Appearance.h"
 #include "PlayerStatusData.h"
@@ -162,12 +163,7 @@ namespace net {
 		std::int16_t special_effect_value2;
 		std::int16_t special_effect_value3;
 		std::uint16_t cur_durability;
-		std::uint8_t custom_made;
-		std::uint8_t prefix_type;
-		std::uint8_t prefix_value;
-		std::uint8_t secondary_type;
-		std::uint8_t secondary_value;
-		std::uint8_t enchant_bonus;
+		hb::shared::item::item_attribute_data attributes;
 	};
 	HB_PACK_END
 }

@@ -54,7 +54,7 @@ namespace NetworkMessageHandlers {
 			game->m_player->m_bank_list[index]->m_instance.count = count;
 			game->m_player->m_bank_list[index]->m_instance.cur_durability = cur_durability;
 			game->m_player->m_bank_list[index]->m_instance.item_color = item_color;
-			game->m_player->m_bank_list[index]->load_attributes_from(*pkt);
+			game->m_player->m_bank_list[index]->set_attributes(pkt->attributes);
 			game->m_player->m_bank_list[index]->m_instance.special_effect_value2 = item_spec_effect_value2;
 
 			if (count == 1) txt = std::format(NOTIFYMSG_ITEMTOBANK3, str1.c_str());
@@ -74,7 +74,7 @@ namespace NetworkMessageHandlers {
 			game->m_player->m_bank_list[index]->m_instance.count = count;
 			game->m_player->m_bank_list[index]->m_instance.cur_durability = cur_durability;
 			game->m_player->m_bank_list[index]->m_instance.item_color = item_color;
-			game->m_player->m_bank_list[index]->load_attributes_from(*pkt);
+			game->m_player->m_bank_list[index]->set_attributes(pkt->attributes);
 			game->m_player->m_bank_list[index]->m_instance.special_effect_value2 = item_spec_effect_value2;
 		}
 	}

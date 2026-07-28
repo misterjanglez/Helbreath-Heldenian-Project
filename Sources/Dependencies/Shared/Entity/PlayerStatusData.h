@@ -84,6 +84,12 @@ struct HB_PACKED PlayerStatus
 	// AFK state (server-controlled)
 	bool afk;
 
+	// Item Tiers marquee speed fields (spec §5) — server-computed totals from
+	// equipped gear, always 0 until the Phase 3 mechanics land. The client
+	// scales cast/walk/run animation timing from these (Cycle 4-C).
+	uint8_t cast_reduction_pct;   // total cast-time reduction %
+	uint8_t move_speed_pct;       // total move-speed %
+
 	bool HasAngelType() const
 	{
 		return angel_str || angel_dex || angel_int || angel_mag;

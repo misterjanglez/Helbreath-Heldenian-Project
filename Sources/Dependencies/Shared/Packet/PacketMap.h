@@ -1,6 +1,7 @@
 ﻿#pragma once
 
 #include "PacketCommon.h"
+#include "Item/ItemAttributeData.h"
 #include "NetConstants.h"
 #include "Appearance.h"
 #include "PlayerStatusData.h"
@@ -45,12 +46,7 @@ namespace net {
 	struct HB_PACKED PacketMapDataItem {
 		std::int16_t item_id;
 		std::uint8_t color;
-		std::uint8_t custom_made;
-		std::uint8_t prefix_type;
-		std::uint8_t prefix_value;
-		std::uint8_t secondary_type;
-		std::uint8_t secondary_value;
-		std::uint8_t enchant_bonus;
+		hb::shared::item::item_attribute_data attributes;
 		std::int16_t count;
 	};
 
