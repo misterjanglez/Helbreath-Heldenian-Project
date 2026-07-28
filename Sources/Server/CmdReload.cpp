@@ -12,7 +12,7 @@ void CmdReload::execute(CGame* game, const char* args)
 {
 	if (args == nullptr || args[0] == '\0')
 	{
-		hb::console::error("Usage: reload <items|magic|skills|npcs|shops|config|formulas|colors|catalog|all>");
+		hb::console::error("Usage: reload <items|magic|skills|npcs|shops|config|formulas|colors|tiers|all>");
 		return;
 	}
 
@@ -24,7 +24,7 @@ void CmdReload::execute(CGame* game, const char* args)
 	bool config = false;
 	bool formulas = false;
 	bool colors = false;
-	bool modifier_catalog = false;
+	bool tiers = false;
 
 	if (hb_stricmp(args, "items") == 0)
 		items = true;
@@ -42,8 +42,9 @@ void CmdReload::execute(CGame* game, const char* args)
 		formulas = true;
 	else if (hb_stricmp(args, "colors") == 0)
 		colors = true;
-	else if (hb_stricmp(args, "catalog") == 0 || hb_stricmp(args, "attributes") == 0)  // "attributes" = legacy alias
-		modifier_catalog = true;
+	else if (hb_stricmp(args, "tiers") == 0 ||
+		hb_stricmp(args, "catalog") == 0 || hb_stricmp(args, "attributes") == 0)  // legacy aliases
+		tiers = true;
 	else if (hb_stricmp(args, "all") == 0)
 	{
 		items = true;
@@ -54,11 +55,11 @@ void CmdReload::execute(CGame* game, const char* args)
 		config = true;
 		formulas = true;
 		colors = true;
-		modifier_catalog = true;
+		tiers = true;
 	}
 	else
 	{
-		hb::console::error("Unknown reload target: '{}'. Use items, magic, skills, npcs, shops, config, formulas, colors, catalog, or all.", args);
+		hb::console::error("Unknown reload target: '{}'. Use items, magic, skills, npcs, shops, config, formulas, colors, tiers, or all.", args);
 		return;
 	}
 
@@ -80,23 +81,39 @@ void CmdReload::execute(CGame* game, const char* args)
 			hb::console::error("Formula reload failed");
 	}
 
-	// Send reload notification to clients first (shows top bar message)
-	if (items || magic || skills || npcs || shops || formulas || colors || modifier_catalog)
-		game->send_config_reload_notification(items, magic, skills, npcs, formulas, colors, modifier_catalog);
-
-	// Reload configs from database
+	// Transactional tier reload runs before any client traffic: a rejected
+	// candidate leaves the running config untouched and must not be pushed.
+	// Runs after `items`/`npcs` so cross-checks see the data just reloaded.
 	if (items)           game->m_item_manager->reload_item_configs();
+	if (npcs)            game->reload_npc_configs();
+
+	// A rejected candidate leaves the running config untouched and must not
+	// reach clients, so tiers_ok gates the notification and push below.
+	bool tiers_ok = false;
+	if (tiers)
+	{
+		tiers_ok = game->reload_tier_tables();
+		if (tiers_ok)
+			hb::console::success("Tier + legacy-pool tables reloaded");
+	}
+
+	// Send reload notification to clients first (shows top bar message)
+	if (items || magic || skills || npcs || shops || formulas || colors || tiers_ok)
+		game->send_config_reload_notification(items, magic, skills, npcs, formulas, colors, tiers_ok);
+
+	// Reload remaining configs from database
 	if (magic)           game->m_magic_manager->reload_magic_configs();
 	if (skills)          game->m_skill_manager->reload_skill_configs();
-	if (npcs)            game->reload_npc_configs();
 	if (shops)           game->reload_shop_configs();
 	if (colors)          game->reload_color_palette();
-	if (modifier_catalog) game->reload_modifier_catalog();
 
 	// Stream updated config data to clients
-	if (items || magic || skills || npcs || formulas || colors || modifier_catalog)
-		game->push_config_reload_to_clients(items, magic, skills, npcs, formulas, colors, modifier_catalog);
+	if (items || magic || skills || npcs || formulas || colors || tiers_ok)
+		game->push_config_reload_to_clients(items, magic, skills, npcs, formulas, colors, tiers_ok);
 
-	hb::console::success("Reload complete: {}", args);
+	if (tiers && !tiers_ok)
+		hb::console::error("Reload complete with errors: {} (tiers rejected - running config untouched, details in server log)", args);
+	else
+		hb::console::success("Reload complete: {}", args);
 	hb::logger::log<hb::log_channel::commands>("reload {}", args);
 }

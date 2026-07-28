@@ -19,6 +19,7 @@
 #include <chrono>
 #include <cstring>
 #include <cstdio>
+#include <format>
 
 using namespace hb::shared::net;   // Notify::*
 using namespace hb::server::net;   // ItemLogAction::*
@@ -644,6 +645,12 @@ namespace hb::server
 			e.spec_effect_value3 = static_cast<int16_t>(sqlite3_column_int(stmt, c++));
 			e.cur_durability = static_cast<uint16_t>(sqlite3_column_int(stmt, c++));
 			e.attributes = ReadItemAttributeColumns(stmt, c);
+
+			if (!ItemAttributesLoadOk(e.attributes,
+				std::format("offer_items offer {} item {}", offer_id, e.item_id))) {
+				sqlite3_finalize(stmt);
+				return false;
+			}
 			out_items.push_back(e);
 		}
 		sqlite3_finalize(stmt);
@@ -986,6 +993,13 @@ namespace hb::server
 			e.spec_effect_value3 = static_cast<int16_t>(sqlite3_column_int(stmt, c++));
 			e.cur_durability = static_cast<uint16_t>(sqlite3_column_int(stmt, c++));
 			e.attributes = ReadItemAttributeColumns(stmt, c);
+
+			if (!ItemAttributesLoadOk(e.attributes,
+				std::format("listing_items listing {} item {}", listing_id, e.item_id))) {
+				sqlite3_finalize(stmt);
+				out.clear();
+				return false;
+			}
 			out.push_back(e);
 		}
 		sqlite3_finalize(stmt);

@@ -112,6 +112,9 @@ public:
 	uint32_t  m_gold_dice_min;
 	uint32_t  m_gold_dice_max;
 	int   m_drop_table_id;
+	// Loot grade 1..5 vermin/standard/veteran/elite/boss (loot_grades table,
+	// spec §8) — the tiered drop-economics dial. Default 2 = standard.
+	int   m_loot_grade = 2;
 
 	char m_side;
 	char m_action_limit;            // 1 Move   .    2    . 3 Dummy.  ,

@@ -254,6 +254,16 @@ constexpr bool is_attack_effect_type(ItemEffectType type)
            type == ItemEffectType::AttackSpecAbility;
 }
 
+// The legacy roll gate: only these effect types ever roll attributes.
+// Shared by ItemManager::generate_item_attributes and the Tiers 2-D
+// validator so the roll and its pool-coverage rule cannot diverge.
+constexpr bool is_legacy_rollable_effect_type(ItemEffectType type)
+{
+    return type == ItemEffectType::Attack ||
+           type == ItemEffectType::AttackManaSave ||
+           type == ItemEffectType::Defense;
+}
+
 // Check if item effect type is consumable (potion-like)
 constexpr bool is_consumable_effect_type(ItemEffectType type)
 {

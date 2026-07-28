@@ -13,6 +13,7 @@
 #include "MiningManager.h"
 #include "AccountSqliteStore.h"
 #include "GameConfigSqliteStore.h"
+#include "TierConfigValidator.h"
 #include "TradingPostStore.h"
 #include "TradingPostManager.h"
 #include "MapInfoSqliteStore.h"
@@ -1169,6 +1170,21 @@ bool CGame::init()
 		}
 		if (missingDrops > 0) {
 			hb::logger::warn("NPCs missing drop tables: {}", missingDrops);
+		}
+	}
+
+	// Tiers 2-D fail-fast sweep over both Roll strategies' datasets. Runs
+	// here — after items, NPCs and drop tables — because the cross-checks
+	// join against them. Any error blocks boot (spec §2: no clamping, no
+	// skip-and-warn); empty tiered tables failing in tiered mode is the
+	// intended unconfigured-world guard.
+	{
+		auto errors = hb::server::validate_tier_config(m_tier_config, running_validation_context());
+		if (!errors.empty()) {
+			hb::server::log_tier_validation_errors(errors);
+			hb::logger::error("Cannot start server: tier dataset failed validation ({} error(s))", errors.size());
+			CloseGameConfigDatabase(configDb);
+			return false;
 		}
 	}
 
@@ -2938,39 +2954,42 @@ void CGame::build_multiplier_lookup()
 		(int)m_attribute_prefix_types.size(), (int)m_attribute_secondary_types.size());
 }
 
-// The catalog's replicated multiplier scales tooltip display; the legacy
-// tables' multiplier scales the actual roll. The 1-D shim made divergence
-// impossible by construction — with both in data it is possible, so warn
-// loudly. Cross-table validation proper is the Tiers 2-D validator.
-void CGame::check_catalog_multiplier_consistency() const
+// The one statement of which tables make up the legacy attribute dataset —
+// boot loads into the members, `reload tiers` into staged candidates.
+static void load_attribute_type_tables(sqlite3* configDb,
+	std::vector<attribute_prefix_type_entry>& prefix_types,
+	std::vector<attribute_secondary_type_entry>& secondary_types)
 {
-	auto check = [this](uint8_t id, uint8_t legacy_multiplier)
-	{
-		const auto* row = m_tier_config.find_modifier(id);
-		if (row != nullptr && row->multiplier != legacy_multiplier)
-			hb::logger::warn("modifier {} ({}): catalog multiplier {} != legacy table multiplier {} - tooltips will scale differently than rolls",
-				(int)id, row->name, (int)row->multiplier, (int)legacy_multiplier);
-	};
-	for (const auto& e : m_attribute_prefix_types) check(e.prefix_id, e.multiplier);
-	for (const auto& e : m_attribute_secondary_types) check(e.secondary_id, e.multiplier);
+	prefix_types.clear();
+	secondary_types.clear();
+	if (HasGameConfigRows(configDb, "attribute_prefix_types"))
+		LoadAttributePrefixTypes(configDb, prefix_types);
+	if (HasGameConfigRows(configDb, "attribute_secondary_types"))
+		LoadAttributeSecondaryTypes(configDb, secondary_types);
 }
 
 bool CGame::load_modifier_datasets(sqlite3* configDb)
 {
-	m_attribute_prefix_types.clear();
-	m_attribute_secondary_types.clear();
-	if (HasGameConfigRows(configDb, "attribute_prefix_types"))
-		LoadAttributePrefixTypes(configDb, m_attribute_prefix_types);
-	if (HasGameConfigRows(configDb, "attribute_secondary_types"))
-		LoadAttributeSecondaryTypes(configDb, m_attribute_secondary_types);
+	load_attribute_type_tables(configDb, m_attribute_prefix_types, m_attribute_secondary_types);
 	build_multiplier_lookup();
 
 	// On failure m_tier_config keeps the previous dataset (the loader only
-	// replaces it wholesale on success).
-	if (!hb::server::load_tier_config(configDb, m_tier_config))
-		return false;
-	check_catalog_multiplier_consistency();
-	return true;
+	// replaces it wholesale on success). Deep validation is the 2-D sweep,
+	// run by the boot sequence once item/npc/drop data is also loaded.
+	return hb::server::load_tier_config(configDb, m_tier_config);
+}
+
+hb::server::tier_validation_context CGame::running_validation_context() const
+{
+	hb::server::tier_validation_context context;
+	context.item_configs = m_item_config_list;
+	context.item_config_count = hb::server::config::MaxItemTypes;
+	context.npc_configs = m_npc_config_list;
+	context.npc_config_count = hb::server::config::MaxNpcTypes;
+	context.drop_tables = &m_drop_tables;
+	context.attribute_prefix_types = &m_attribute_prefix_types;
+	context.attribute_secondary_types = &m_attribute_secondary_types;
+	return context;
 }
 
 std::vector<std::vector<char>> CGame::build_modifier_catalog_packets() const
@@ -3040,28 +3059,58 @@ bool CGame::send_client_modifier_catalog(int client_h)
 	return send_packet_stream(client_h, m_modifier_catalog_packets, "modifier catalog");
 }
 
-void CGame::reload_modifier_catalog()
+bool CGame::reload_tier_tables()
 {
 	sqlite3* configDb = nullptr;
 	std::string dbPath;
 	bool created = false;
-	if (!EnsureGameConfigDatabase(&configDb, dbPath, &created)) return;
+	if (!EnsureGameConfigDatabase(&configDb, dbPath, &created)) return false;
 
-	// The item-system mode is restart-only by design (spec §2): whatever
-	// the reloaded row says, the aggregate keeps the running mode.
-	uint8_t running_mode = m_tier_config.item_system;
-	if (!load_modifier_datasets(configDb))
+	// Stage the full candidate dataset — tier config plus the legacy
+	// attribute tables that ride the same reload target. Nothing running
+	// is touched until the candidate passes the 2-D validator (spec §2).
+	std::vector<attribute_prefix_type_entry> prefix_types;
+	std::vector<attribute_secondary_type_entry> secondary_types;
+	load_attribute_type_tables(configDb, prefix_types, secondary_types);
+
+	bool ok = false;
+	hb::server::tier_config candidate;
+	if (!hb::server::load_tier_config(configDb, candidate))
 	{
-		hb::logger::error("reload catalog: tier config failed to load - keeping the running dataset");
+		hb::logger::error("reload tiers: candidate dataset failed to load - running config untouched");
 	}
-	else if (m_tier_config.item_system != running_mode)
+	else
 	{
-		hb::logger::warn("meta.item_system changed on disk - the mode is restart-only, still running '{}'",
-			running_mode == hb::shared::item::item_system_mode::tiered ? "tiered" : "legacy");
-		m_tier_config.item_system = running_mode;
+		// The item-system mode is restart-only by design (spec §2): whatever
+		// the candidate row says, the running mode stays.
+		if (candidate.item_system != m_tier_config.item_system)
+		{
+			hb::logger::warn("meta.item_system changed on disk - the mode is restart-only, still running '{}'",
+				m_tier_config.item_system == hb::shared::item::item_system_mode::tiered ? "tiered" : "legacy");
+			candidate.item_system = m_tier_config.item_system;
+		}
+
+		auto context = running_validation_context();
+		context.attribute_prefix_types = &prefix_types;
+		context.attribute_secondary_types = &secondary_types;
+		auto errors = hb::server::validate_tier_config(candidate, context);
+		if (!errors.empty())
+		{
+			hb::server::log_tier_validation_errors(errors);
+			hb::logger::error("reload tiers rejected: {} validation error(s) - running config untouched", errors.size());
+		}
+		else
+		{
+			m_tier_config = std::move(candidate);
+			m_attribute_prefix_types = std::move(prefix_types);
+			m_attribute_secondary_types = std::move(secondary_types);
+			build_multiplier_lookup();
+			compute_modifier_catalog_hash();
+			ok = true;
+		}
 	}
-	compute_modifier_catalog_hash();
 	CloseGameConfigDatabase(configDb);
+	return ok;
 }
 
 void CGame::fill_player_map_object(hb::net::PacketMapDataObjectPlayer& obj, short owner_h, int viewer_h)
@@ -4521,7 +4570,11 @@ bool CGame::load_player_data_from_db(int client_h)
 	}
 
 	std::vector<AccountDbItemRow> items;
-	LoadCharacterItems(db, m_client_list[client_h]->m_char_name, items);
+	if (!LoadCharacterItems(db, m_client_list[client_h]->m_char_name, items)) {
+		hb::logger::error("Player '{}': character item load failed - login rejected", m_client_list[client_h]->m_char_name);
+		CloseAccountDatabase(db);
+		return false;
+	}
 	for (const auto& item : items) {
 		if (item.slot < 0 || item.slot >= hb::shared::limits::MaxItems) {
 			continue;
@@ -4558,7 +4611,11 @@ bool CGame::load_player_data_from_db(int client_h)
 	}
 
 	std::vector<AccountDbBankItemRow> bankItems;
-	LoadCharacterBankItems(db, m_client_list[client_h]->m_char_name, bankItems);
+	if (!LoadCharacterBankItems(db, m_client_list[client_h]->m_char_name, bankItems)) {
+		hb::logger::error("Player '{}': bank item load failed - login rejected", m_client_list[client_h]->m_char_name);
+		CloseAccountDatabase(db);
+		return false;
+	}
 	for (const auto& item : bankItems) {
 		if (item.slot < 0 || item.slot >= hb::shared::limits::MaxBankItems) {
 			continue;

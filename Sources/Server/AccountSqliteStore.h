@@ -207,6 +207,13 @@ class CClient;
 bool BindItemAttributeColumns(sqlite3_stmt* stmt, int& col, const hb::shared::item::item_attribute_data& attributes);
 hb::shared::item::item_attribute_data ReadItemAttributeColumns(sqlite3_stmt* stmt, int& col);
 
+// The one load-path gate for the Tiers spec §3 invariant (tiered =>
+// modifier count == tier): false logs "<row_context>: tier X != modifier
+// count Y - load rejected" and the caller fails its load, leaving the row
+// intact on disk rather than loading — and later re-saving — corrupt
+// attribute data. Every ReadItemAttributeColumns caller must apply it.
+bool ItemAttributesLoadOk(const hb::shared::item::item_attribute_data& attributes, const std::string& row_context);
+
 // Loud stale-schema gate: a dev DB whose meta.schema_version differs from
 // expected_version refuses to load (fresh start — no migrations). A database
 // with tables but no readable version row is pre-versioning and also refused.

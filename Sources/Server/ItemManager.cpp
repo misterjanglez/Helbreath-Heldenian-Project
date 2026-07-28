@@ -4754,14 +4754,13 @@ bool ItemManager::generate_item_attributes(CItem* item)
 {
 	if (item == nullptr) return false;
 
-	// Rollability gate unchanged from the hardcoded-table era: only these
-	// three effect types roll. Some pool-assigned gear (bows, Xelima-class
-	// weapons) carries other effect types and stays attribute-less until a
-	// curation pass (Tiers 2-E) decides otherwise.
+	// Rollability gate unchanged from the hardcoded-table era: only three
+	// effect types roll (is_legacy_rollable_effect_type). Some pool-assigned
+	// gear (bows, Xelima-class weapons) carries other effect types and stays
+	// attribute-less until a curation pass (Tiers 2-E) decides otherwise.
 	const auto effect_type = item->get_item_effect_type();
-	const bool weapon_family = (effect_type == ItemEffectType::Attack ||
-		effect_type == ItemEffectType::AttackManaSave);
-	if (!weapon_family && effect_type != ItemEffectType::Defense) return false;
+	if (!is_legacy_rollable_effect_type(effect_type)) return false;
+	const bool weapon_family = (effect_type != ItemEffectType::Defense);
 
 	if (item->m_attribute_pool_id <= 0) return false;   // no pool: the item never rolls (spec §2)
 	const auto* pool = m_game->get_tier_config().find_attribute_pool(item->m_attribute_pool_id);

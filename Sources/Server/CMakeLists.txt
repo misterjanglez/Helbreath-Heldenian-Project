@@ -83,6 +83,7 @@ set(SERVER_SOURCES
     SkillManager.cpp
     StatusEffectManager.cpp
     TierConfigStore.cpp
+    TierConfigValidator.cpp
     Tile.cpp
     TradingPostManager.cpp
     TradingPostStore.cpp

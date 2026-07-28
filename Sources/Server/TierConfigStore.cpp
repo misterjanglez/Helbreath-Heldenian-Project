@@ -5,6 +5,7 @@
 #include "TierConfigStore.h"
 
 #include <algorithm>
+#include <format>
 #include <utility>
 
 #include "sqlite3.h"
@@ -255,8 +256,8 @@ bool load_presentation(sqlite3* db, tier_config& config)
 		int tier = sqlite3_column_int(stmt, 0);
 		if (tier < 1 || tier > hb::shared::item::tier_count)
 		{
-			hb::logger::warn("tier config: tier_presentation row {} outside 1..{} - skipped",
-				tier, (int)hb::shared::item::tier_count);
+			config.load_anomalies.push_back(std::format(
+				"tier_presentation tier {}: outside 1..{}", tier, (int)hb::shared::item::tier_count));
 			return;
 		}
 		auto& row = config.presentation[tier - 1];
@@ -313,7 +314,9 @@ bool load_attribute_pool_entries(sqlite3* db, tier_config& config)
 			[pool_id](const attribute_pool_config& p) { return p.pool_id == pool_id; });
 		if (pool == config.attribute_pools.end())
 		{
-			hb::logger::warn("tier config: attribute_pool_entries references unknown pool {} - skipped", pool_id);
+			config.load_anomalies.push_back(std::format(
+				"attribute_pool_entries pool {} {} type {}: pool not in attribute_pools",
+				pool_id, is_secondary ? "secondary" : "prefix", (int)type_id));
 			return;
 		}
 
@@ -324,8 +327,9 @@ bool load_attribute_pool_entries(sqlite3* db, tier_config& config)
 			: hb::shared::item::legacy_prefix_to_modifier_id(type_id);
 		if (modifier == hb::shared::item::modifier_id::empty)
 		{
-			hb::logger::warn("tier config: attribute_pool_entries pool {} {} type {} maps to no modifier - skipped",
-				pool_id, is_secondary ? "secondary" : "prefix", (int)type_id);
+			config.load_anomalies.push_back(std::format(
+				"attribute_pool_entries pool {} {} type {}: maps to no unified modifier",
+				pool_id, is_secondary ? "secondary" : "prefix", (int)type_id));
 			return;
 		}
 
@@ -350,6 +354,20 @@ const attribute_pool_config* tier_config::find_attribute_pool(int pool_id) const
 	auto it = std::find_if(attribute_pools.begin(), attribute_pools.end(),
 		[pool_id](const attribute_pool_config& row) { return row.pool_id == pool_id; });
 	return it != attribute_pools.end() ? &*it : nullptr;
+}
+
+const tier_bucket_config* tier_config::find_bucket(uint8_t bucket_id) const
+{
+	auto it = std::find_if(buckets.begin(), buckets.end(),
+		[bucket_id](const tier_bucket_config& row) { return row.bucket_id == bucket_id; });
+	return it != buckets.end() ? &*it : nullptr;
+}
+
+const loot_grade_config* tier_config::find_loot_grade(uint8_t grade) const
+{
+	auto it = std::find_if(loot_grades.begin(), loot_grades.end(),
+		[grade](const loot_grade_config& row) { return row.grade == grade; });
+	return it != loot_grades.end() ? &*it : nullptr;
 }
 
 bool load_tier_config(sqlite3* db, tier_config& out)

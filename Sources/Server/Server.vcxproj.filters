@@ -206,6 +206,9 @@
     <ClInclude Include="TierConfigStore.h">
       <Filter>Database</Filter>
     </ClInclude>
+    <ClInclude Include="TierConfigValidator.h">
+      <Filter>Database</Filter>
+    </ClInclude>
     <ClInclude Include="TradingPostStore.h">
       <Filter>Database</Filter>
     </ClInclude>
@@ -620,6 +623,9 @@
     </ClCompile>
     <ClCompile Include="TradingPostManager.cpp" />
     <ClCompile Include="TierConfigStore.cpp">
+      <Filter>Database</Filter>
+    </ClCompile>
+    <ClCompile Include="TierConfigValidator.cpp">
       <Filter>Database</Filter>
     </ClCompile>
     <ClCompile Include="TradingPostStore.cpp">

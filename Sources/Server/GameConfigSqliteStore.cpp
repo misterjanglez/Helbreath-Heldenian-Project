@@ -1349,8 +1349,8 @@ bool SaveNpcConfigs(sqlite3* db, const CGame* game)
         " exp_min, exp_max, gold_min, gold_max, min_damage, max_damage,"
         " npc_size, side, action_limit, action_time, resist_magic, magic_level,"
         " day_of_week_limit, chat_msg_presence, target_search_range, regen_time,"
-        " attribute, abs_damage, max_mana, magic_hit_ratio, attack_range, drop_table_id"
-        ") VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?);";
+        " attribute, abs_damage, max_mana, magic_hit_ratio, attack_range, drop_table_id, loot_grade"
+        ") VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?);";
 
     sqlite3_stmt* stmt = nullptr;
     if (sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) != SQLITE_OK) {
@@ -1399,6 +1399,7 @@ bool SaveNpcConfigs(sqlite3* db, const CGame* game)
         ok &= (sqlite3_bind_int(stmt, col++, npc->m_magic_hit_ratio) == SQLITE_OK);
         ok &= (sqlite3_bind_int(stmt, col++, npc->m_attack_range) == SQLITE_OK);
         ok &= (sqlite3_bind_int(stmt, col++, npc->m_drop_table_id) == SQLITE_OK);
+        ok &= (sqlite3_bind_int(stmt, col++, npc->m_loot_grade) == SQLITE_OK);
 
         if (!ok || sqlite3_step(stmt) != SQLITE_DONE) {
             sqlite3_finalize(stmt);
@@ -1431,7 +1432,7 @@ bool LoadNpcConfigs(sqlite3* db, CGame* game)
         " exp_min, exp_max, gold_min, gold_max, min_damage, max_damage,"
         " npc_size, side, action_limit, action_time, resist_magic, magic_level,"
         " day_of_week_limit, chat_msg_presence, target_search_range, regen_time,"
-        " attribute, abs_damage, max_mana, magic_hit_ratio, attack_range, drop_table_id"
+        " attribute, abs_damage, max_mana, magic_hit_ratio, attack_range, drop_table_id, loot_grade"
         " FROM npc_configs ORDER BY npc_id;";
 
     sqlite3_stmt* stmt = nullptr;
@@ -1478,6 +1479,7 @@ bool LoadNpcConfigs(sqlite3* db, CGame* game)
         npc->m_magic_hit_ratio = sqlite3_column_int(stmt, col++);
         npc->m_attack_range = sqlite3_column_int(stmt, col++);
         npc->m_drop_table_id = sqlite3_column_int(stmt, col++);
+        npc->m_loot_grade = sqlite3_column_int(stmt, col++);
 
         game->m_npc_config_list[npcId] = npc;
     }

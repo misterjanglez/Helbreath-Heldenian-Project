@@ -236,6 +236,16 @@ enum item_system_mode : uint8_t
 // presentation table and every client/server tier array.
 inline constexpr uint8_t tier_count = 4;
 
+// The loot-grade ladder vermin/standard/veteran/elite/boss, 1..5 — the
+// whole tiered drop-economics dial (spec §8). Grade 2 (standard) is the
+// npc_configs default.
+inline constexpr uint8_t loot_grade_count = 5;
+
+// The tier_curves rows the tiered value roll consumes, bound by name —
+// one curve per tier in tier order (spec §7). The 2-D validator requires
+// them; the 3-B roll selects by them.
+inline constexpr const char* tier_curve_names[tier_count] = { "common", "rare", "epic", "legendary" };
+
 //------------------------------------------------------------------------
 // Buckets — the thematic groups of the modifier catalog (spec §4). An item
 // carries at most one modifier per bucket; the wire catalog's bucket_id

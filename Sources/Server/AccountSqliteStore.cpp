@@ -4,6 +4,7 @@
 #include <cstdio>
 #include <cctype>
 #include <cstring>
+#include <format>
 #include <string>
 
 #include "Client.h"
@@ -87,6 +88,16 @@ hb::shared::item::item_attribute_data ReadItemAttributeColumns(sqlite3_stmt* stm
     }
     attributes.enchant_bonus = static_cast<uint8_t>(sqlite3_column_int(stmt, col++));
     return attributes;
+}
+
+bool ItemAttributesLoadOk(const hb::shared::item::item_attribute_data& attributes, const std::string& row_context)
+{
+    if (attributes.tier_invariant_ok()) {
+        return true;
+    }
+    hb::logger::error("{}: tier {} != modifier count {} - load rejected",
+        row_context, (int)attributes.tier, (int)attributes.modifier_count());
+    return false;
 }
 
 sqlite_schema_state VerifySqliteSchemaVersion(sqlite3* db, const char* db_label, const char* expected_version)
@@ -580,6 +591,12 @@ bool LoadCharacterItems(sqlite3* db, const char* character_name, std::vector<Acc
         row.pos_x = sqlite3_column_int(stmt, col++);
         row.pos_y = sqlite3_column_int(stmt, col++);
         row.is_equipped = sqlite3_column_int(stmt, col++);
+
+        if (!ItemAttributesLoadOk(row.attributes,
+            std::format("character_items '{}' slot {} item {}", character_name, row.slot, row.item_id))) {
+            sqlite3_finalize(stmt);
+            return false;
+        }
         outItems.push_back(row);
     }
 
@@ -622,6 +639,12 @@ bool LoadCharacterBankItems(sqlite3* db, const char* character_name, std::vector
         row.spec_effect_value3 = sqlite3_column_int(stmt, col++);
         row.cur_durability = sqlite3_column_int(stmt, col++);
         row.attributes = ReadItemAttributeColumns(stmt, col);
+
+        if (!ItemAttributesLoadOk(row.attributes,
+            std::format("character_bank_items '{}' slot {} item {}", character_name, row.slot, row.item_id))) {
+            sqlite3_finalize(stmt);
+            return false;
+        }
         outItems.push_back(row);
     }
 

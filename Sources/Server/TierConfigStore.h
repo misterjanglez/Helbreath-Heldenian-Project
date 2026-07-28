@@ -171,8 +171,16 @@ struct tier_config
 	// LoadItemConfigs) so `reload items` keeps item data and pool ids in step.
 	std::vector<attribute_pool_config> attribute_pools;
 
+	// Rows the loader had to skip because they resolve to nothing (unknown
+	// pool, unmappable legacy type id, out-of-range presentation tier). The
+	// 2-D validator reports these as errors — the DB holds rows the model
+	// cannot represent, which fail-fast forbids papering over.
+	std::vector<std::string> load_anomalies;
+
 	const modifier_catalog_config* find_modifier(uint8_t modifier_id) const;
 	const attribute_pool_config* find_attribute_pool(int pool_id) const;
+	const tier_bucket_config* find_bucket(uint8_t bucket_id) const;
+	const loot_grade_config* find_loot_grade(uint8_t grade) const;
 };
 
 // Loads the full dataset and replaces `out` wholesale on success; on

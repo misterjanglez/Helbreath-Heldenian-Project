@@ -186,6 +186,7 @@
     <ClInclude Include="GameConfigSqliteStore.h" />
     <ClInclude Include="TradingPostManager.h" />
     <ClInclude Include="TierConfigStore.h" />
+    <ClInclude Include="TierConfigValidator.h" />
     <ClInclude Include="TradingPostStore.h" />
     <ClInclude Include="ServerConfig.h" />
     <ClInclude Include="GlobalDef.h" />
@@ -337,6 +338,7 @@
     <ClCompile Include="GameConfigSqliteStore.cpp" />
     <ClCompile Include="TradingPostManager.cpp" />
     <ClCompile Include="TierConfigStore.cpp" />
+    <ClCompile Include="TierConfigValidator.cpp" />
     <ClCompile Include="TradingPostStore.cpp" />
     <ClCompile Include="ServerConfig.cpp" />
     <ClCompile Include="MapInfoSqliteStore.cpp" />

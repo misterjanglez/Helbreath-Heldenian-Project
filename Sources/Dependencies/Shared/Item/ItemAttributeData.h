@@ -32,8 +32,24 @@ struct HB_PACKED item_attribute_data
 
 	bool has_any() const
 	{
-		return custom_made || tier || enchant_bonus
-			|| modifiers[0].type || modifiers[1].type || modifiers[2].type || modifiers[3].type;
+		return custom_made || tier || enchant_bonus || modifier_count() != 0;
+	}
+
+	uint8_t modifier_count() const
+	{
+		uint8_t count = 0;
+		for (const auto& mod : modifiers)
+			if (mod.type != 0) count++;
+		return count;
+	}
+
+	// The spec §3 invariant *tiered => modifier count == tier* — enforced at
+	// roll time and on persistence load paths, never by the storage format.
+	// Tier 0 (untiered/legacy) is unconstrained; a tier above the 4 slots can
+	// never match a count and correctly fails.
+	bool tier_invariant_ok() const
+	{
+		return tier == 0 || modifier_count() == tier;
 	}
 };
 HB_PACK_END

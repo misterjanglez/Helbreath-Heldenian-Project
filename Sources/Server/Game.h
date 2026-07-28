@@ -54,6 +54,7 @@ extern bool G_bRunning;
 #include "FormulaEngine.h"
 #include "GameConfigSqliteStore.h"
 #include "TierConfigStore.h"
+#include "TierConfigValidator.h"
 
 namespace hb::server::config
 {
@@ -302,7 +303,10 @@ public:
 	void send_config_reload_notification(bool items, bool magic, bool skills, bool npcs, bool balance = false, bool colors = false, bool modifier_catalog = false);
 	void push_config_reload_to_clients(bool items, bool magic, bool skills, bool npcs, bool balance = false, bool colors = false, bool modifier_catalog = false);
 	void reload_color_palette();
-	void reload_modifier_catalog();
+	// Transactional `reload tiers` (Tiers 2-D): stages a candidate of every
+	// tier + legacy-pool table, validates it, and either swaps it in (true)
+	// or rejects it leaving the running config untouched (false).
+	bool reload_tier_tables();
 	void apply_server_config(const server_config& cfg);
 	bool reload_server_config();
 	void send_server_config_update();
@@ -573,10 +577,15 @@ public:
 	bool send_client_color_palette(int client_h);
 	bool send_client_modifier_catalog(int client_h);
 
-	// Legacy attribute tables + tier config model, shared by boot and
-	// `reload catalog`. False = tier config load failed (boot treats that
-	// as fatal; reload keeps the previous dataset).
+	// Legacy attribute tables + tier config model, loaded at boot. False =
+	// tier config load failed (fatal). Deep validation is the 2-D sweep
+	// (validate_tier_config), run once npc/drop data is also loaded.
 	bool load_modifier_datasets(sqlite3* configDb);
+
+	// The running datasets as a validator context. Callers staging
+	// candidate tables (reload tiers) overwrite just those fields before
+	// calling hb::server::validate_tier_config.
+	hb::server::tier_validation_context running_validation_context() const;
 
 	// Exact color-palette packet stream sent to clients (both tables, chunked).
 	// Shared by the hash computation and both send paths so they stay identical.
@@ -606,7 +615,6 @@ public:
 	uint8_t m_modifier_max_value[256]{};
 	uint8_t m_modifier_weapon_color[256]{};  // dye color a weapon-family roll applies (0 = none)
 	void build_multiplier_lookup();
-	void check_catalog_multiplier_consistency() const;
 
 	class hb::shared::net::ASIOSocket* _lsock;
 
