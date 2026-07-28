@@ -1313,7 +1313,7 @@ bool LoadDropTables(sqlite3* db, CGame* game)
 
     while (sqlite3_step(stmt) == SQLITE_ROW) {
         int tableId = sqlite3_column_int(stmt, 0);
-        int tier = sqlite3_column_int(stmt, 1);
+        int stage = sqlite3_column_int(stmt, 1);
         int item_id = sqlite3_column_int(stmt, 2);
         int weight = sqlite3_column_int(stmt, 3);
         int min_count = sqlite3_column_int(stmt, 4);
@@ -1323,7 +1323,7 @@ bool LoadDropTables(sqlite3* db, CGame* game)
         if (it == game->m_drop_tables.end()) {
             continue;
         }
-        if (tier < 1 || tier > 2) {
+        if (stage < 1 || stage > 2) {
             continue;
         }
         if (weight <= 0) {
@@ -1335,8 +1335,8 @@ bool LoadDropTables(sqlite3* db, CGame* game)
         entry.weight = weight;
         entry.min_count = min_count;
         entry.max_count = max_count;
-        it->second.tierEntries[tier].push_back(entry);
-        it->second.total_weight[tier] += weight;
+        it->second.stage_entries[stage].push_back(entry);
+        it->second.total_weight[stage] += weight;
     }
     sqlite3_finalize(stmt);
 

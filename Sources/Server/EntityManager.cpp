@@ -1816,7 +1816,7 @@ void CEntityManager::npc_behavior_stop(int npc_h)
 	}
 }
 
-// The delayed second (tier-2) drop appears at the corpse's decay time, but no
+// The delayed second (stage-2) drop appears at the corpse's decay time, but no
 // later than this cap. Slow-decaying bosses have a 60s regen_time, which is too
 // long to wait for loot, so their drop is placed at ~20s while the corpse still
 // lingers and respawn timing (driven by corpse removal) is unaffected. Ordinary
@@ -1837,7 +1837,7 @@ void CEntityManager::npc_behavior_dead(int npc_h)
 
 	uint32_t time_since_death = time - m_npc_list[npc_h]->m_dead_time;
 
-	// Place the delayed second-stage loot (tier-2, scattered for bosses) once
+	// Place the delayed second-stage loot (stage-2, scattered for bosses) once
 	// its capped delay elapses. This can be before the corpse is removed, so a
 	// boss's loot lands promptly instead of a full minute later.
 	uint32_t drop_delay = m_npc_list[npc_h]->m_regen_time;
@@ -2655,7 +2655,7 @@ void CEntityManager::npc_dead_item_generator(int npc_h, short attacker_h, char a
 		}
 	}
 
-	// Primary item drop (from drop table tier 1) - uses same primary chance
+	// Primary item drop (from drop table stage 1) - uses same primary chance
 	if (!droppedGold && table != nullptr) {
 		if (m_game->dice(1, 10000) <= primaryChance) {
 			int min_count = 1;
@@ -2671,7 +2671,7 @@ void CEntityManager::npc_dead_item_generator(int npc_h, short attacker_h, char a
 		}
 	}
 
-	// Secondary/bonus drop (from drop table tier 2).
+	// Secondary/bonus drop (from drop table stage 2).
 	//
 	// This is the "second drop": in the original game it appears a little later
 	// than the death drop, when the corpse decays. So instead of placing it now
@@ -2680,13 +2680,13 @@ void CEntityManager::npc_dead_item_generator(int npc_h, short attacker_h, char a
 	// the corpse's regen timer elapses.
 	if (table != nullptr) {
 		// Guaranteed-drop bosses (e.g. Helclaw, Tiger Worm, Wyverns, Abaddon)
-		// always roll their tier-2 table and skip the "nothing" slot, so a real
+		// always roll their stage-2 table and skip the "nothing" slot, so a real
 		// second item drops on every kill. All other NPCs use the normal
 		// rating-modified secondary chance and may roll nothing.
 		bool guaranteed = table->guaranteed_secondary;
 
 		if (table->scatter_count > 0) {
-			// Scatter bosses (Wyvern / Fire-Wyvern / Abaddon): roll the tier-2
+			// Scatter bosses (Wyvern / Fire-Wyvern / Abaddon): roll the stage-2
 			// table scatter_count times and spread the real hits over the 5x5
 			// spiral. The first roll skips the "nothing" slot when the table is
 			// guaranteed (preserving one guaranteed item); the remaining rolls
@@ -2747,26 +2747,26 @@ void CEntityManager::npc_dead_item_generator(int npc_h, short attacker_h, char a
 	}
 }
 
-int CEntityManager::roll_drop_table_item(const DropTable* table, int tier, int& outMinCount, int& outMaxCount, bool exclude_empty) const
+int CEntityManager::roll_drop_table_item(const DropTable* table, int stage, int& outMinCount, int& outMaxCount, bool exclude_empty) const
 {
 	if (table == nullptr) return 0;
-	if (tier < 1 || tier > 2) return 0;
+	if (stage < 1 || stage > 2) return 0;
 
 	// When exclude_empty is set, the item_id=0 "nothing" slot is ignored so a
 	// real item is always chosen (guaranteed-drop bosses). The roll then runs
 	// against the summed weight of the real entries only, preserving their
 	// relative rarity.
-	int total = table->total_weight[tier];
+	int total = table->total_weight[stage];
 	if (exclude_empty) {
 		total = 0;
-		for (const auto& entry : table->tierEntries[tier]) {
+		for (const auto& entry : table->stage_entries[stage]) {
 			if (entry.item_id != 0) total += entry.weight;
 		}
 	}
 	if (total <= 0) return 0;
 	int roll = m_game->dice(1, total);
 	int cumulative = 0;
-	for (const auto& entry : table->tierEntries[tier]) {
+	for (const auto& entry : table->stage_entries[stage]) {
 		if (exclude_empty && entry.item_id == 0) continue;
 		cumulative += entry.weight;
 		if (roll <= cumulative) {
@@ -2836,7 +2836,7 @@ bool CEntityManager::spawn_npc_drop_item(int npc_h, int item_id, int min_count, 
 	return true;
 }
 
-// Queue a tier-2 drop rolled at death for placement when the corpse decays.
+// Queue a stage-2 drop rolled at death for placement when the corpse decays.
 void CEntityManager::queue_pending_drop(int npc_h, int item_id, int min_count, int max_count, short dx, short dy)
 {
 	if (m_npc_list[npc_h] == 0) return;

@@ -44,7 +44,7 @@ namespace Behavior
 
 } // namespace hb::server::npc
 
-// A tier-2 drop rolled at death but placed later, when the corpse decays.
+// A stage-2 drop rolled at death but placed later, when the corpse decays.
 // (dx, dy) is the tile offset from the corpse for scattered boss loot; (0, 0)
 // for the ordinary single delayed drop.
 struct PendingDrop
@@ -91,7 +91,7 @@ public:
 	uint32_t m_hp_up_time, m_mp_up_time;
 	uint32_t m_dead_time, m_regen_time;
 
-	// Second-stage (tier-2) loot rolled at death and placed when the corpse
+	// Second-stage (stage-2) loot rolled at death and placed when the corpse
 	// decays. Sized to the 5x5 scatter spiral. See CEntityManager drop logic.
 	static constexpr int MaxPendingDrops = 25;
 	PendingDrop m_pending_drops[MaxPendingDrops];
