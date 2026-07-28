@@ -53,6 +53,7 @@ extern bool G_bRunning;
 #include "ServerConfig.h"
 #include "FormulaEngine.h"
 #include "GameConfigSqliteStore.h"
+#include "TierConfigStore.h"
 
 namespace hb::server::config
 {
@@ -572,33 +573,39 @@ public:
 	bool send_client_color_palette(int client_h);
 	bool send_client_modifier_catalog(int client_h);
 
+	// Legacy attribute tables + tier config model, shared by boot and
+	// `reload catalog`. False = tier config load failed (boot treats that
+	// as fatal; reload keeps the previous dataset).
+	bool load_modifier_datasets(sqlite3* configDb);
+
 	// Exact color-palette packet stream sent to clients (both tables, chunked).
 	// Shared by the hash computation and both send paths so they stay identical.
 	std::vector<std::vector<char>> build_color_palette_packets() const;
 
 	// Exact modifier-catalog packet stream (catalog entries + tier
-	// presentation + item-system mode), shared by hash and send paths.
+	// presentation + item-system mode). A pure function of m_tier_config,
+	// so it is built once per (re)load — compute_modifier_catalog_hash
+	// refreshes the cache — and served from m_modifier_catalog_packets by
+	// the per-client send paths.
 	std::vector<std::vector<char>> build_modifier_catalog_packets() const;
+	std::vector<std::vector<char>> m_modifier_catalog_packets;
 
 	// Send a prebuilt config packet stream; on socket failure the client
 	// is dropped and false returned. `what` names the stream in the log.
 	bool send_packet_stream(int client_h, const std::vector<std::vector<char>>& packets, const char* what);
-
-	// Which roll strategy the world runs; replicated to clients in the
-	// catalog header. Hardcoded legacy until meta.item_system lands (2-B).
-	uint8_t m_item_system_mode = hb::shared::item::item_system_mode::legacy;
 
 	std::vector<color_palette_entry> m_color_palette;
 	std::vector<color_palette_entry> m_weapon_color_palette;
 	std::vector<attribute_prefix_type_entry> m_attribute_prefix_types;
 	std::vector<attribute_secondary_type_entry> m_attribute_secondary_types;
 	// Keyed by unified modifier ID (ModifierIds.h) — one flat space for the
-	// former prefix/secondary tables. Interim until the tiered config tables
-	// replace the legacy attribute rows entirely (Tiers 2-B).
+	// former prefix/secondary tables. Legacy-roll gameplay values; retires
+	// when the legacy Roll strategy goes pool-driven (Tiers 2-C/3-A).
 	uint8_t m_modifier_multiplier[256]{};
 	uint8_t m_modifier_min_value[256]{};
 	uint8_t m_modifier_max_value[256]{};
 	void build_multiplier_lookup();
+	void check_catalog_multiplier_consistency() const;
 
 	class hb::shared::net::ASIOSocket* _lsock;
 
@@ -858,6 +865,14 @@ public:
 	bool m_heldenian_running;
 
 private:
+
+	// The Item Tiers config model (Tiers 2-B): every tiered table plus the
+	// legacy attribute pools and the item-system mode (meta.item_system,
+	// restart-only — reload pins the running mode back). Loaded at boot and
+	// on `reload catalog` via load_modifier_datasets, immutable in between;
+	// private so the replace-wholesale contract is compiled, not commented.
+	// Sources the replicated modifier catalog stream.
+	hb::server::tier_config m_tier_config;
 
 public:
 

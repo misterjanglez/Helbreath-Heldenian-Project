@@ -218,7 +218,9 @@ bool EnsureGameConfigDatabase(sqlite3** outDb, std::string& outPath, bool* outCr
         " armor_class INTEGER NOT NULL DEFAULT 0,"
         " set_id INTEGER NOT NULL DEFAULT 0,"
         " item_color INTEGER NOT NULL DEFAULT 0,"
-        " display_id INTEGER NOT NULL DEFAULT -1"
+        " display_id INTEGER NOT NULL DEFAULT -1,"
+        // NULL = no pool: the item never rolls legacy attributes (spec §2).
+        " attribute_pool_id INTEGER"
         ");"
         "CREATE TABLE IF NOT EXISTS active_maps ("
         " map_index INTEGER PRIMARY KEY,"
@@ -490,6 +492,22 @@ bool EnsureGameConfigDatabase(sqlite3** outDb, std::string& outPath, bool* outCr
         " max_value INTEGER NOT NULL DEFAULT 0,"
         " multiplier INTEGER NOT NULL DEFAULT 1"
         ");"
+        // Legacy Roll strategy pool tables (spec §2) — the curated
+        // per-item attribute pools the legacy roll reads from Tiers 2-C
+        // (rows keyed by the legacy prefix/secondary type ids; translated
+        // to unified modifier IDs at load, TierConfigStore.cpp).
+        "CREATE TABLE IF NOT EXISTS attribute_pools ("
+        " pool_id INTEGER PRIMARY KEY,"
+        " name TEXT NOT NULL,"
+        " secondary_chance INTEGER NOT NULL DEFAULT 40"
+        ");"
+        "CREATE TABLE IF NOT EXISTS attribute_pool_entries ("
+        " pool_id INTEGER NOT NULL REFERENCES attribute_pools(pool_id),"
+        " is_secondary INTEGER NOT NULL,"
+        " type_id INTEGER NOT NULL,"
+        " weight INTEGER NOT NULL,"
+        " PRIMARY KEY (pool_id, is_secondary, type_id)"
+        ");"
         // ---- Item Tiers (tiered strategy) schema, per PLANS/ItemTiers_Implementation_Plan.md
         // DDL draft. Server-owned, seeded empty: empty tables in tiered mode are the
         // intended unconfigured-world guard (the 2-D validator blocks boot); seeding is
@@ -738,6 +756,89 @@ bool EnsureGameConfigDatabase(sqlite3** outDb, std::string& outPath, bool* outCr
     if (!HasColumn(db, "npc_configs", "loot_grade")) {
         // Default 2 = standard grade (loot_grades table, spec §8).
         ExecSql(db, "ALTER TABLE npc_configs ADD COLUMN loot_grade INTEGER NOT NULL DEFAULT 2;");
+    }
+
+    if (!HasColumn(db, "items", "attribute_pool_id")) {
+        // NULL = no pool: the item never rolls legacy attributes (spec §2).
+        ExecSql(db, "ALTER TABLE items ADD COLUMN attribute_pool_id INTEGER;");
+    }
+
+    // Tiers 2-B fold: the modifier catalog display data lives in the DB from
+    // here on (the 1-D hardcoded shim died with this migration). One-shot,
+    // gated on a meta marker so an operator who later empties a table is
+    // respected rather than re-seeded; OR IGNORE lets DBs folded before the
+    // marker existed converge. Buckets/bands/min-tiers here are placeholders
+    // in legacy terms (band = legacy min/max x multiplier, display units;
+    // aggregate_cap = band_max formality) — Tiers 2-E reseeds every tiered
+    // table wholesale from the spec §4/§7 annex.
+    //
+    // The SQL bakes in ModifierIds.h values as literals; pin the block ends
+    // so renumbering the enums cannot silently seed wrong rows.
+    static_assert(hb::shared::item::modifier_id::sharp == 1 &&
+                  hb::shared::item::modifier_id::crit_chance == 23,
+        "modifier_id assignments changed - update the Tiers 2-B fold seed");
+    static_assert(hb::shared::item::effect_id::critical == 1 &&
+                  hb::shared::item::effect_id::gold_bonus == 23,
+        "effect_id assignments changed - update the Tiers 2-B fold seed");
+    static_assert(hb::shared::item::tier_bucket::damage == 1 &&
+                  hb::shared::item::tier_bucket::marquee == 9,
+        "tier_bucket assignments changed - update the Tiers 2-B fold seed");
+    bool tierFoldApplied = false;
+    {
+        sqlite3_stmt* stmt = nullptr;
+        if (sqlite3_prepare_v2(db, "SELECT 1 FROM meta WHERE key = 'tier_fold_applied';",
+                -1, &stmt, nullptr) == SQLITE_OK) {
+            tierFoldApplied = (sqlite3_step(stmt) == SQLITE_ROW);
+        }
+        sqlite3_finalize(stmt);
+    }
+    if (!tierFoldApplied) {
+        // Catalog rows keyed by unified modifier ID; display strings verbatim
+        // from the retired shim (trailing spaces in three labels are
+        // load-bearing for tooltip layout). effect_id per ModifierIds.h.
+        // Presentation rows: the locked §11 palette + name template.
+        if (!ExecSql(db,
+            "BEGIN;"
+            "INSERT OR IGNORE INTO tier_buckets(bucket_id, name, sort_order) VALUES"
+            " (1,'DAMAGE',1),(2,'PRECISION',2),(3,'HANDLING',3),(4,'ECONOMY',4),"
+            " (5,'CASTING',5),(6,'SET_AXIS',6),(7,'COMBAT_UTILITY',7),"
+            " (8,'ATTRIBUTES',8),(9,'MARQUEE',9);"
+            "INSERT OR IGNORE INTO modifier_catalog(modifier_id, name, display_name,"
+            " effect_label, effect_format, effect_id, effect_param1, effect_param2,"
+            " bucket_id, multiplier, min_tier, marquee, band_min, band_max, aggregate_cap) VALUES"
+            " (1,'sharp','Sharp','','+{}',6,0,0,1,1,1,0,1,13,13),"
+            " (2,'critical','Critical','Critical Hit Damage','+{}',1,0,0,1,1,1,0,1,13,13),"
+            " (3,'poisoning','Poisoning','Poison Damage','+{}',2,0,0,1,5,1,0,20,65,65),"
+            " (4,'righteous','Righteous','','',3,0,0,1,0,1,0,0,0,0),"
+            " (5,'ancient','Ancient','','+{}',8,0,0,1,1,1,0,1,13,13),"
+            " (6,'hitting_probability','','Hitting Probability','+{}',13,0,0,2,7,1,0,21,91,91),"
+            " (7,'consecutive_attack','','Consecutive Attack Damage','+{}',21,0,0,2,1,1,0,1,7,7),"
+            " (8,'agile','Agile','Attack Speed -1','',4,0,0,3,0,1,0,0,0,0),"
+            " (9,'light','Light','','-{}%',5,0,0,3,4,1,0,4,52,52),"
+            " (10,'strong','Strong','Durability','+{}%',7,0,0,3,7,1,0,14,91,91),"
+            " (11,'experience','','Experience','+{}%',22,0,0,4,10,1,0,10,20,20),"
+            " (12,'gold','','Gold','+{}%',23,0,0,4,10,1,0,50,50,50),"
+            " (13,'spell_success','Special','Magic Casting Probability ','+{}%',9,0,0,5,3,1,0,3,39,39),"
+            " (14,'defense_ratio','','Defense Ratio','+{}',14,0,0,6,7,1,0,21,91,91),"
+            " (15,'physical_absorb','','Physical Absorption','+{}%',19,0,0,6,3,1,0,9,39,39),"
+            " (16,'magic_resist','','Magic Resistance','+{}%',18,0,0,6,7,1,0,21,91,91),"
+            " (17,'magic_absorb','','Magic Absorption','+{}%',20,0,0,6,3,1,0,9,39,39),"
+            " (18,'hp_recovery','','HP recovery ','{}%',15,0,0,6,7,1,0,7,91,91),"
+            " (19,'sp_recovery','','SP recovery ','{}%',16,0,0,6,7,1,0,7,91,91),"
+            " (20,'mp_recovery','','MP recovery ','{}%',17,0,0,6,7,1,0,7,91,91),"
+            " (21,'poison_resist','','Poison Resistance','+{}%',12,0,0,6,7,1,0,21,91,91),"
+            " (22,'mana_converting','Mana Converting','Replace {}% damage to mana','',10,0,0,7,1,1,0,1,6,6),"
+            " (23,'crit_chance','Critical','Crit Increase Chance ','{}%',11,0,0,7,1,1,0,1,6,6);"
+            "INSERT OR IGNORE INTO tier_presentation(tier, name, color_r, color_g, color_b, name_template) VALUES"
+            " (1,'Common',255,255,255,'{tier} {name}'),"
+            " (2,'Rare',128,192,128,'{tier} {name}'),"
+            " (3,'Epic',150,160,225,'{tier} {name}'),"
+            " (4,'Legendary',255,176,16,'{tier} {name}');"
+            "INSERT OR IGNORE INTO meta(key, value) VALUES('tier_fold_applied','1');"
+            "COMMIT;"))
+        {
+            RollbackTransaction(db);
+        }
     }
 
     if (!HasColumn(db, "admins", "admin_level")) {

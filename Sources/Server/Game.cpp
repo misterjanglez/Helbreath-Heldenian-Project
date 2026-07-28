@@ -1113,14 +1113,14 @@ bool CGame::init()
 		hb::logger::warn("No weapon color palette entries found in gamedata.db");
 	}
 
-	// Load attribute type multipliers (optional — migration script seeds the tables)
-	if (HasGameConfigRows(configDb, "attribute_prefix_types")) {
-		LoadAttributePrefixTypes(configDb, m_attribute_prefix_types);
+	// Legacy attribute tables + the Item Tiers config model (Tiers 2-B):
+	// all tiered tables + legacy pools + meta.item_system. The replicated
+	// modifier catalog is sourced from the model.
+	if (!load_modifier_datasets(configDb)) {
+		hb::logger::error("Cannot start server: tier config failed to load from gamedata.db");
+		CloseGameConfigDatabase(configDb);
+		return false;
 	}
-	if (HasGameConfigRows(configDb, "attribute_secondary_types")) {
-		LoadAttributeSecondaryTypes(configDb, m_attribute_secondary_types);
-	}
-	build_multiplier_lookup();
 
 	m_is_build_item_available = false;
 	if (HasGameConfigRows(configDb, "builditem_configs")) {
@@ -2935,65 +2935,40 @@ void CGame::build_multiplier_lookup()
 		(int)m_attribute_prefix_types.size(), (int)m_attribute_secondary_types.size());
 }
 
-namespace {
-
-// Tiers 1-D interim shim — the unified modifier catalog rows, equal to
-// today's legacy attribute entries. Multipliers are not here: they come
-// from the DB-fed lookup (build_multiplier_lookup) so replicated display
-// scale can never diverge from gameplay. Dies in Tiers 2-B when the
-// catalog reads the tiered config tables.
-struct modifier_catalog_shim_row
+// The catalog's replicated multiplier scales tooltip display; the legacy
+// tables' multiplier scales the actual roll. The 1-D shim made divergence
+// impossible by construction — with both in data it is possible, so warn
+// loudly. Cross-table validation proper is the Tiers 2-D validator.
+void CGame::check_catalog_multiplier_consistency() const
 {
-	uint8_t modifier_id;
-	const char* display_name;   // item-name prefix word ("" = none)
-	const char* effect_label;   // "{}" inside = whole-line format
-	const char* effect_format;  // value format ("" = label-only line)
-	uint8_t bucket_id;
-};
+	auto check = [this](uint8_t id, uint8_t legacy_multiplier)
+	{
+		const auto* row = m_tier_config.find_modifier(id);
+		if (row != nullptr && row->multiplier != legacy_multiplier)
+			hb::logger::warn("modifier {} ({}): catalog multiplier {} != legacy table multiplier {} - tooltips will scale differently than rolls",
+				(int)id, row->name, (int)row->multiplier, (int)legacy_multiplier);
+	};
+	for (const auto& e : m_attribute_prefix_types) check(e.prefix_id, e.multiplier);
+	for (const auto& e : m_attribute_secondary_types) check(e.secondary_id, e.multiplier);
+}
 
-constexpr modifier_catalog_shim_row k_modifier_catalog_shim[] = {
-	{ modifier_id::sharp,               "Sharp",           "",                           "+{}",  tier_bucket::damage },
-	{ modifier_id::critical,            "Critical",        "Critical Hit Damage",        "+{}",  tier_bucket::damage },
-	{ modifier_id::poisoning,           "Poisoning",       "Poison Damage",              "+{}",  tier_bucket::damage },
-	{ modifier_id::righteous,           "Righteous",       "",                           "",     tier_bucket::damage },
-	{ modifier_id::ancient,             "Ancient",         "",                           "+{}",  tier_bucket::damage },
-	{ modifier_id::hitting_probability, "",                "Hitting Probability",        "+{}",  tier_bucket::precision },
-	{ modifier_id::consecutive_attack,  "",                "Consecutive Attack Damage",  "+{}",  tier_bucket::precision },
-	{ modifier_id::agile,               "Agile",           "Attack Speed -1",            "",     tier_bucket::handling },
-	{ modifier_id::light,               "Light",           "",                           "-{}%", tier_bucket::handling },
-	{ modifier_id::strong,              "Strong",          "Durability",                 "+{}%", tier_bucket::handling },
-	{ modifier_id::experience,          "",                "Experience",                 "+{}%", tier_bucket::economy },
-	{ modifier_id::gold,                "",                "Gold",                       "+{}%", tier_bucket::economy },
-	{ modifier_id::spell_success,       "Special",         "Magic Casting Probability ", "+{}%", tier_bucket::casting },
-	{ modifier_id::defense_ratio,       "",                "Defense Ratio",              "+{}",  tier_bucket::set_axis },
-	{ modifier_id::physical_absorb,     "",                "Physical Absorption",        "+{}%", tier_bucket::set_axis },
-	{ modifier_id::magic_resist,        "",                "Magic Resistance",           "+{}%", tier_bucket::set_axis },
-	{ modifier_id::magic_absorb,        "",                "Magic Absorption",           "+{}%", tier_bucket::set_axis },
-	{ modifier_id::hp_recovery,         "",                "HP recovery ",               "{}%",  tier_bucket::set_axis },
-	{ modifier_id::sp_recovery,         "",                "SP recovery ",               "{}%",  tier_bucket::set_axis },
-	{ modifier_id::mp_recovery,         "",                "MP recovery ",               "{}%",  tier_bucket::set_axis },
-	{ modifier_id::poison_resist,       "",                "Poison Resistance",          "+{}%", tier_bucket::set_axis },
-	{ modifier_id::mana_converting,     "Mana Converting", "Replace {}% damage to mana", "",     tier_bucket::combat_utility },
-	{ modifier_id::crit_chance,         "Critical",        "Crit Increase Chance ",      "{}%",  tier_bucket::combat_utility },
-};
-
-// Tier presentation (spec §11): names, name colors, name template.
-struct tier_presentation_shim_row
+bool CGame::load_modifier_datasets(sqlite3* configDb)
 {
-	const char* name;
-	uint8_t r, g, b;
-};
+	m_attribute_prefix_types.clear();
+	m_attribute_secondary_types.clear();
+	if (HasGameConfigRows(configDb, "attribute_prefix_types"))
+		LoadAttributePrefixTypes(configDb, m_attribute_prefix_types);
+	if (HasGameConfigRows(configDb, "attribute_secondary_types"))
+		LoadAttributeSecondaryTypes(configDb, m_attribute_secondary_types);
+	build_multiplier_lookup();
 
-constexpr tier_presentation_shim_row k_tier_presentation[hb::shared::item::tier_count] = {
-	{ "Common",    255, 255, 255 },
-	{ "Rare",      128, 192, 128 },
-	{ "Epic",      150, 160, 225 },
-	{ "Legendary", 255, 176,  16 },
-};
-
-constexpr char k_tier_name_template[] = "{tier} {name}";
-
-} // namespace
+	// On failure m_tier_config keeps the previous dataset (the loader only
+	// replaces it wholesale on success).
+	if (!hb::server::load_tier_config(configDb, m_tier_config))
+		return false;
+	check_catalog_multiplier_consistency();
+	return true;
+}
 
 std::vector<std::vector<char>> CGame::build_modifier_catalog_packets() const
 {
@@ -3002,7 +2977,7 @@ std::vector<std::vector<char>> CGame::build_modifier_catalog_packets() const
 	constexpr size_t maxEntriesPerPacket = (7000 - headerSize) / entrySize;
 
 	std::vector<std::vector<char>> packets;
-	size_t total = std::size(k_modifier_catalog_shim);
+	size_t total = m_tier_config.catalog.size();
 	size_t built = 0;
 	uint16_t packetIndex = 0;
 
@@ -3017,28 +2992,30 @@ std::vector<std::vector<char>> CGame::build_modifier_catalog_packets() const
 		pktHeader->totalEntries = static_cast<uint16_t>(total);
 		pktHeader->packetIndex = packetIndex;
 		pktHeader->entryCount = static_cast<uint16_t>(entriesInPacket);
-		pktHeader->item_system_mode = m_item_system_mode;
-		std::snprintf(pktHeader->tier_name_template, sizeof(pktHeader->tier_name_template), "%s", k_tier_name_template);
+		pktHeader->item_system_mode = m_tier_config.item_system;
+		std::snprintf(pktHeader->tier_name_template, sizeof(pktHeader->tier_name_template), "%s",
+			m_tier_config.tier_name_template.c_str());
 		for (size_t t = 0; t < hb::shared::item::tier_count; t++)
 		{
-			std::snprintf(pktHeader->tiers[t].name, sizeof(pktHeader->tiers[t].name), "%s", k_tier_presentation[t].name);
-			pktHeader->tiers[t].r = k_tier_presentation[t].r;
-			pktHeader->tiers[t].g = k_tier_presentation[t].g;
-			pktHeader->tiers[t].b = k_tier_presentation[t].b;
+			const auto& tier = m_tier_config.presentation[t];
+			std::snprintf(pktHeader->tiers[t].name, sizeof(pktHeader->tiers[t].name), "%s", tier.name.c_str());
+			pktHeader->tiers[t].r = tier.r;
+			pktHeader->tiers[t].g = tier.g;
+			pktHeader->tiers[t].b = tier.b;
 		}
 
 		auto* entries = reinterpret_cast<hb::net::PacketModifierCatalogEntry*>(buf.data() + headerSize);
 		for (size_t i = 0; i < entriesInPacket; i++)
 		{
-			const auto& row = k_modifier_catalog_shim[built + i];
+			const auto& row = m_tier_config.catalog[built + i];
 			entries[i].modifier_id = row.modifier_id;
-			std::snprintf(entries[i].display_name, sizeof(entries[i].display_name), "%s", row.display_name);
-			std::snprintf(entries[i].effect_label, sizeof(entries[i].effect_label), "%s", row.effect_label);
-			std::snprintf(entries[i].effect_format, sizeof(entries[i].effect_format), "%s", row.effect_format);
-			entries[i].multiplier = m_modifier_multiplier[row.modifier_id];
+			std::snprintf(entries[i].display_name, sizeof(entries[i].display_name), "%s", row.display_name.c_str());
+			std::snprintf(entries[i].effect_label, sizeof(entries[i].effect_label), "%s", row.effect_label.c_str());
+			std::snprintf(entries[i].effect_format, sizeof(entries[i].effect_format), "%s", row.effect_format.c_str());
+			entries[i].multiplier = row.multiplier;
 			entries[i].bucket_id = row.bucket_id;
-			entries[i].min_tier = 0;
-			entries[i].marquee = 0;
+			entries[i].min_tier = row.min_tier;
+			entries[i].marquee = row.marquee ? 1 : 0;
 		}
 
 		packets.push_back(std::move(buf));
@@ -3051,12 +3028,13 @@ std::vector<std::vector<char>> CGame::build_modifier_catalog_packets() const
 
 void CGame::compute_modifier_catalog_hash()
 {
-	m_config_hash[7] = hash_packet_stream(build_modifier_catalog_packets());
+	m_modifier_catalog_packets = build_modifier_catalog_packets();
+	m_config_hash[7] = hash_packet_stream(m_modifier_catalog_packets);
 }
 
 bool CGame::send_client_modifier_catalog(int client_h)
 {
-	return send_packet_stream(client_h, build_modifier_catalog_packets(), "modifier catalog");
+	return send_packet_stream(client_h, m_modifier_catalog_packets, "modifier catalog");
 }
 
 void CGame::reload_modifier_catalog()
@@ -3066,11 +3044,19 @@ void CGame::reload_modifier_catalog()
 	bool created = false;
 	if (!EnsureGameConfigDatabase(&configDb, dbPath, &created)) return;
 
-	m_attribute_prefix_types.clear();
-	m_attribute_secondary_types.clear();
-	LoadAttributePrefixTypes(configDb, m_attribute_prefix_types);
-	LoadAttributeSecondaryTypes(configDb, m_attribute_secondary_types);
-	build_multiplier_lookup();
+	// The item-system mode is restart-only by design (spec §2): whatever
+	// the reloaded row says, the aggregate keeps the running mode.
+	uint8_t running_mode = m_tier_config.item_system;
+	if (!load_modifier_datasets(configDb))
+	{
+		hb::logger::error("reload catalog: tier config failed to load - keeping the running dataset");
+	}
+	else if (m_tier_config.item_system != running_mode)
+	{
+		hb::logger::warn("meta.item_system changed on disk - the mode is restart-only, still running '{}'",
+			running_mode == hb::shared::item::item_system_mode::tiered ? "tiered" : "legacy");
+		m_tier_config.item_system = running_mode;
+	}
 	compute_modifier_catalog_hash();
 	CloseGameConfigDatabase(configDb);
 }
@@ -12747,10 +12733,6 @@ void CGame::send_config_reload_notification(bool items, bool magic, bool skills,
 
 void CGame::push_config_reload_to_clients(bool items, bool magic, bool skills, bool npcs, bool balance, bool colors, bool modifier_catalog)
 {
-	// The catalog stream is identical for every client — build it once
-	std::vector<std::vector<char>> catalog_packets;
-	if (modifier_catalog) catalog_packets = build_modifier_catalog_packets();
-
 	int count = 0;
 	for(int i = 1; i < MaxClients; i++)
 	{
@@ -12762,7 +12744,7 @@ void CGame::push_config_reload_to_clients(bool items, bool magic, bool skills, b
 			if (npcs)    send_client_npc_configs(i);
 			if (balance) send_client_balance_config(i);
 			if (colors)  send_client_color_palette(i);
-			if (modifier_catalog) send_packet_stream(i, catalog_packets, "modifier catalog");
+			if (modifier_catalog) send_client_modifier_catalog(i);
 			count++;
 		}
 	}

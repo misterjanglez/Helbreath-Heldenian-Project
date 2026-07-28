@@ -1,0 +1,181 @@
+// TierConfigStore.h: the Item Tiers config model (Tiers 2-B)
+//
+// Loads every tiered table plus the legacy attribute-pool tables from
+// gamedata.db into one immutable in-memory aggregate at boot (and on
+// `reload catalog`). The replicated modifier catalog / tier presentation
+// stream is sourced from this model; both Roll strategies read their
+// datasets from it (legacy pools consumed from Tiers 2-C, tiered rolls
+// from Tiers 3-B). Deep validation is the Tiers 2-D boot validator —
+// this store only fails on SQL errors and an unreadable item_system.
+//
+// Design contract: PLANS/ItemTiers_Plan.md §2; plan cycle 2-B.
+//
+//////////////////////////////////////////////////////////////////////
+
+#pragma once
+
+#include <cstdint>
+#include <map>
+#include <optional>
+#include <string>
+#include <unordered_map>
+#include <vector>
+
+#include "Item/ModifierIds.h"
+
+struct sqlite3;
+
+namespace hb::server
+{
+
+struct tier_bucket_config
+{
+	uint8_t bucket_id;
+	std::string name;
+	int sort_order;
+};
+
+// Per-tier value window (display units); absent = full band.
+struct modifier_window
+{
+	int min;
+	int max;
+};
+
+struct modifier_catalog_config
+{
+	uint8_t modifier_id;              // unified modifier ID (ModifierIds.h)
+	std::string name;                 // internal slug
+	std::string display_name;         // replicated: item-name prefix word
+	std::string effect_label;         // replicated: tooltip line
+	std::string effect_format;        // replicated: value format
+	uint8_t effect_id;                // behavior key (effect_id enum)
+	int effect_param1;
+	int effect_param2;
+	uint8_t bucket_id;
+	uint8_t multiplier;               // display = stored byte x multiplier
+	uint8_t min_tier;
+	bool marquee;
+	int band_min;                     // display units
+	int band_max;
+	int aggregate_cap;                // display units
+	std::optional<modifier_window> windows[hb::shared::item::tier_count];
+};
+
+struct modifier_eligibility_config
+{
+	uint8_t modifier_id;
+	uint8_t item_class;               // tier_item_class enum
+	int weight;
+};
+
+struct bucket_class_rule_config
+{
+	uint8_t bucket_id;
+	uint8_t item_class;
+	bool mandatory;
+};
+
+struct tier_curve_config
+{
+	int curve_id;
+	std::string name;
+	double p50;                       // normalized band position anchors
+	double p90;
+	double p99;
+	int cap_chance_den;               // P(cap) = 1 / cap_chance_den
+};
+
+struct tier_curve_override_config
+{
+	uint8_t modifier_id;
+	uint8_t tier;
+	int cap_chance_den;
+};
+
+struct loot_grade_config
+{
+	uint8_t grade;                    // 1..5 vermin/standard/veteran/elite/boss
+	std::string name;
+	int weight_common;                // out of 10000; zero = staircase hard gate
+	int weight_rare;
+	int weight_epic;
+	int weight_legendary;
+	int first_drop_chance;            // out of 10000
+};
+
+struct enchant_category_config
+{
+	uint8_t category;
+	std::string name;
+	int cap;
+	int endurance_growth_pct;
+};
+
+struct enchant_step_config
+{
+	uint8_t category;
+	int step;                         // attempting +step
+	int success_pct;                  // basis points
+	bool destroy_on_fail;
+};
+
+struct tier_presentation_config
+{
+	std::string name;                 // player-facing tier word
+	uint8_t r;
+	uint8_t g;
+	uint8_t b;
+};
+
+// Legacy Roll strategy tables (spec §2: each strategy owns its tables).
+struct attribute_pool_config
+{
+	int pool_id;
+	std::string name;
+	int secondary_chance;             // percent gate for the secondary roll
+};
+
+struct attribute_pool_entry_config
+{
+	int pool_id;
+	bool is_secondary;                // legacy slot: prefix (0) or secondary (1)
+	uint8_t modifier_id;              // unified (translated at the load boundary)
+	int weight;
+};
+
+// The whole Item Tiers dataset, loaded once and treated as immutable —
+// replaced wholesale by load_tier_config, never edited in place.
+struct tier_config
+{
+	uint8_t item_system = hb::shared::item::item_system_mode::legacy;
+
+	std::vector<tier_bucket_config> buckets;
+	std::vector<modifier_catalog_config> catalog;            // ordered by modifier_id
+	std::vector<modifier_eligibility_config> eligibility;
+	std::vector<bucket_class_rule_config> bucket_rules;
+	std::vector<tier_curve_config> curves;
+	std::vector<tier_curve_override_config> curve_overrides;
+	std::vector<loot_grade_config> loot_grades;
+	std::vector<enchant_category_config> enchant_categories;
+	std::vector<enchant_step_config> enchant_steps;
+	tier_presentation_config presentation[hb::shared::item::tier_count];
+	std::string tier_name_template;
+	std::map<std::string, std::string> settings;             // tier_settings rows
+
+	// Legacy pools (consumed by the legacy Roll strategy, Tiers 2-C).
+	std::vector<attribute_pool_config> attribute_pools;
+	std::vector<attribute_pool_entry_config> attribute_pool_entries;
+	std::unordered_map<int, int> item_pool_assignments;      // item_id -> pool_id
+
+	const modifier_catalog_config* find_modifier(uint8_t modifier_id) const;
+};
+
+// Loads the full dataset and replaces `out` wholesale on success; on
+// failure `out` is left untouched (reload keeps the running config).
+// False on SQL errors or an unrecognized meta.item_system value — callers
+// treat that as a boot/reload failure; empty tables load fine (the 2-D
+// validator decides whether an empty dataset may boot).
+bool load_tier_config(sqlite3* db, tier_config& out);
+
+} // namespace hb::server

@@ -16,7 +16,7 @@ if(NOT CMAKE_BUILD_TYPE)
 endif()
 
 # ---------------------------------------------------------------------------
-# Server sources (63 .cpp files)
+# Server sources (64 .cpp files)
 # ---------------------------------------------------------------------------
 set(SERVER_SOURCES
     AccountSqliteStore.cpp
@@ -81,6 +81,7 @@ set(SERVER_SOURCES
     ServerLog.cpp
     SkillManager.cpp
     StatusEffectManager.cpp
+    TierConfigStore.cpp
     Tile.cpp
     TradingPostManager.cpp
     TradingPostStore.cpp
