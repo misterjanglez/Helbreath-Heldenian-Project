@@ -304,36 +304,35 @@ bool load_attribute_pool_entries(sqlite3* db, tier_config& config)
 		"attribute_pool_entries",
 		[&](sqlite3_stmt* stmt)
 	{
-		attribute_pool_entry_config row{};
-		row.pool_id      = sqlite3_column_int(stmt, 0);
-		row.is_secondary = sqlite3_column_int(stmt, 1) != 0;
-		row.weight       = sqlite3_column_int(stmt, 3);
+		int pool_id       = sqlite3_column_int(stmt, 0);
+		bool is_secondary = sqlite3_column_int(stmt, 1) != 0;
+		uint8_t type_id   = static_cast<uint8_t>(sqlite3_column_int(stmt, 2));
+		int weight        = sqlite3_column_int(stmt, 3);
+
+		auto pool = std::find_if(config.attribute_pools.begin(), config.attribute_pools.end(),
+			[pool_id](const attribute_pool_config& p) { return p.pool_id == pool_id; });
+		if (pool == config.attribute_pools.end())
+		{
+			hb::logger::warn("tier config: attribute_pool_entries references unknown pool {} - skipped", pool_id);
+			return;
+		}
 
 		// Rows are keyed by the legacy prefix/secondary type ids; translate
 		// to unified modifier IDs here at the load boundary (ModifierIds.h).
-		uint8_t type_id = static_cast<uint8_t>(sqlite3_column_int(stmt, 2));
-		row.modifier_id = row.is_secondary
+		uint8_t modifier = is_secondary
 			? hb::shared::item::legacy_secondary_to_modifier_id(type_id)
 			: hb::shared::item::legacy_prefix_to_modifier_id(type_id);
-		if (row.modifier_id == hb::shared::item::modifier_id::empty)
+		if (modifier == hb::shared::item::modifier_id::empty)
 		{
 			hb::logger::warn("tier config: attribute_pool_entries pool {} {} type {} maps to no modifier - skipped",
-				row.pool_id, row.is_secondary ? "secondary" : "prefix", (int)type_id);
+				pool_id, is_secondary ? "secondary" : "prefix", (int)type_id);
 			return;
 		}
-		config.attribute_pool_entries.push_back(row);
-	});
-}
 
-bool load_item_pool_assignments(sqlite3* db, tier_config& config)
-{
-	return for_each_row(db,
-		"SELECT item_id, attribute_pool_id FROM items"
-		" WHERE attribute_pool_id IS NOT NULL;",
-		"items.attribute_pool_id",
-		[&](sqlite3_stmt* stmt)
-	{
-		config.item_pool_assignments[sqlite3_column_int(stmt, 0)] = sqlite3_column_int(stmt, 1);
+		auto& slot  = is_secondary ? pool->secondary_entries : pool->prefix_entries;
+		auto& total = is_secondary ? pool->secondary_total_weight : pool->prefix_total_weight;
+		slot.push_back({ modifier, weight });
+		total += weight;
 	});
 }
 
@@ -344,6 +343,13 @@ const modifier_catalog_config* tier_config::find_modifier(uint8_t modifier_id) c
 	auto it = std::find_if(catalog.begin(), catalog.end(),
 		[modifier_id](const modifier_catalog_config& row) { return row.modifier_id == modifier_id; });
 	return it != catalog.end() ? &*it : nullptr;
+}
+
+const attribute_pool_config* tier_config::find_attribute_pool(int pool_id) const
+{
+	auto it = std::find_if(attribute_pools.begin(), attribute_pools.end(),
+		[pool_id](const attribute_pool_config& row) { return row.pool_id == pool_id; });
+	return it != attribute_pools.end() ? &*it : nullptr;
 }
 
 bool load_tier_config(sqlite3* db, tier_config& out)
@@ -364,20 +370,22 @@ bool load_tier_config(sqlite3* db, tier_config& out)
 		&& load_presentation(db, fresh)
 		&& load_settings(db, fresh)
 		&& load_attribute_pools(db, fresh)
-		&& load_attribute_pool_entries(db, fresh)
-		&& load_item_pool_assignments(db, fresh);
+		&& load_attribute_pool_entries(db, fresh);
 	if (!ok) return false;
 
 	if (fresh.catalog.empty())
 		hb::logger::warn("tier config: modifier_catalog is empty - item tooltips will have no labels");
 
+	int pool_entries = 0;
+	for (const auto& pool : fresh.attribute_pools)
+		pool_entries += (int)(pool.prefix_entries.size() + pool.secondary_entries.size());
+
 	hb::logger::log("Tier config loaded ({} mode): {} catalog rows, {} buckets, {} eligibility rows, "
-		"{} curves, {} grades, {} enchant steps, {} settings; legacy pools: {} pools, {} entries, {} item assignments",
+		"{} curves, {} grades, {} enchant steps, {} settings; legacy pools: {} pools, {} entries",
 		fresh.item_system == hb::shared::item::item_system_mode::tiered ? "tiered" : "legacy",
 		(int)fresh.catalog.size(), (int)fresh.buckets.size(), (int)fresh.eligibility.size(),
 		(int)fresh.curves.size(), (int)fresh.loot_grades.size(), (int)fresh.enchant_steps.size(),
-		(int)fresh.settings.size(), (int)fresh.attribute_pools.size(),
-		(int)fresh.attribute_pool_entries.size(), (int)fresh.item_pool_assignments.size());
+		(int)fresh.settings.size(), (int)fresh.attribute_pools.size(), pool_entries);
 
 	out = std::move(fresh);
 	return true;

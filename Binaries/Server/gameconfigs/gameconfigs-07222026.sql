@@ -169,7 +169,7 @@ INSERT INTO "attribute_secondary_types" VALUES(7,'MagicResistance','Magic Resist
 INSERT INTO "attribute_secondary_types" VALUES(8,'PhysicalAbsorb','Physical Absorption','+{value}%',3,13,3);
 INSERT INTO "attribute_secondary_types" VALUES(9,'MagicAbsorb','Magic Absorption','+{value}%',3,13,3);
 INSERT INTO "attribute_secondary_types" VALUES(10,'ConsecutiveAttack','Consecutive Attack Damage','+{value}',1,7,1);
-INSERT INTO "attribute_secondary_types" VALUES(11,'ExperienceBonus','Experience','+{value}%',1,2,10);
+INSERT INTO "attribute_secondary_types" VALUES(11,'ExperienceBonus','Experience','+{value}%',2,2,10);
 INSERT INTO "attribute_secondary_types" VALUES(12,'GoldBonus','Gold','+{value}%',5,5,10);
 CREATE TABLE "banned_list" (
   "ip_address" TEXT,

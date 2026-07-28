@@ -18,7 +18,6 @@
 #include <map>
 #include <optional>
 #include <string>
-#include <unordered_map>
 #include <vector>
 
 #include "Item/ModifierIds.h"
@@ -129,19 +128,23 @@ struct tier_presentation_config
 };
 
 // Legacy Roll strategy tables (spec §2: each strategy owns its tables).
+struct attribute_pool_entry_config
+{
+	uint8_t modifier_id;              // unified (translated at the load boundary)
+	int weight;
+};
+
 struct attribute_pool_config
 {
 	int pool_id;
 	std::string name;
 	int secondary_chance;             // percent gate for the secondary roll
-};
-
-struct attribute_pool_entry_config
-{
-	int pool_id;
-	bool is_secondary;                // legacy slot: prefix (0) or secondary (1)
-	uint8_t modifier_id;              // unified (translated at the load boundary)
-	int weight;
+	// Entries grouped per legacy slot, kept in load order (the cumulative
+	// walk order); totals precomputed for the rand() % total selection.
+	std::vector<attribute_pool_entry_config> prefix_entries;
+	std::vector<attribute_pool_entry_config> secondary_entries;
+	int prefix_total_weight = 0;
+	int secondary_total_weight = 0;
 };
 
 // The whole Item Tiers dataset, loaded once and treated as immutable —
@@ -163,12 +166,13 @@ struct tier_config
 	std::string tier_name_template;
 	std::map<std::string, std::string> settings;             // tier_settings rows
 
-	// Legacy pools (consumed by the legacy Roll strategy, Tiers 2-C).
+	// Legacy pools (consumed by the legacy Roll strategy, Tiers 2-C). The
+	// per-item pool assignment lives on CItem (items.attribute_pool_id via
+	// LoadItemConfigs) so `reload items` keeps item data and pool ids in step.
 	std::vector<attribute_pool_config> attribute_pools;
-	std::vector<attribute_pool_entry_config> attribute_pool_entries;
-	std::unordered_map<int, int> item_pool_assignments;      // item_id -> pool_id
 
 	const modifier_catalog_config* find_modifier(uint8_t modifier_id) const;
+	const attribute_pool_config* find_attribute_pool(int pool_id) const;
 };
 
 // Loads the full dataset and replaces `out` wholesale on success; on

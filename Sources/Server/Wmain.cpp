@@ -1,6 +1,7 @@
 #include "CommonTypes.h"
 #include <cstdio>
 #include <cstring>
+#include <string>
 #include <thread>
 #include <chrono>
 #include <ctime>
@@ -121,7 +122,17 @@ void PollAllSockets()
 
 // --- Entry point ---
 
-int main()
+// Free everything a partially-started server owns; used by the early-exit
+// paths that never reach the socket/main-loop stage.
+static int early_exit(int rc)
+{
+	hb::logger::shutdown();
+	delete G_pGame;
+	delete G_pIOPool;
+	return rc;
+}
+
+int main(int argc, char* argv[])
 {
 	// Crash reporting first, so even startup failures are captured
 	auto monitoring = hb::shared::error_monitor::start("helbreath-server", hb::version::server::full_version);
@@ -191,14 +202,26 @@ int main()
 	G_pGame = new CGame();
 	if (!G_pGame->init()) {
 		hb::logger::error("Server initialization failed");
-		hb::logger::shutdown();
-		delete G_pGame;
-		delete G_pIOPool;
-		return 1;
+		return early_exit(1);
 	}
 
 	ServerCommandManager::get().initialize(G_pGame);
 	GameChatCommandManager::get().initialize(G_pGame);
+
+	// Headless one-shot: `Server --<console command> [args...]` runs any
+	// registered console command against the booted world and exits before
+	// any socket comes up (e.g. `Server --rollsmoke 1 200000`, the roll
+	// parity harness). Failures surface in the command output, not the
+	// exit code — ServerCommand::execute has no status to report.
+	if (argc >= 2 && std::strncmp(argv[1], "--", 2) == 0) {
+		std::string cmd = argv[1] + 2;
+		for (int i = 2; i < argc; i++) {
+			cmd += ' ';
+			cmd += argv[i];
+		}
+		ServerCommandManager::get().process_command(cmd.c_str());
+		return early_exit(0);
+	}
 
 	// start listen sockets
 	G_pListenSock = new hb::shared::net::ASIOSocket(G_pIOPool->get_context(), ServerSocketBlockLimit);

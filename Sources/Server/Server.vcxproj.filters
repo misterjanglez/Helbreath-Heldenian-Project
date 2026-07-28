@@ -81,6 +81,9 @@
     <ClInclude Include="CmdReload.h">
       <Filter>Console\Commands</Filter>
     </ClInclude>
+    <ClInclude Include="CmdRollSmoke.h">
+      <Filter>Console\Commands</Filter>
+    </ClInclude>
     <ClInclude Include="CmdSetAdmin.h">
       <Filter>Console\Commands</Filter>
     </ClInclude>
@@ -501,6 +504,9 @@
       <Filter>Console\Commands</Filter>
     </ClCompile>
     <ClCompile Include="CmdReload.cpp">
+      <Filter>Console\Commands</Filter>
+    </ClCompile>
+    <ClCompile Include="CmdRollSmoke.cpp">
       <Filter>Console\Commands</Filter>
     </ClCompile>
     <ClCompile Include="CmdSetAdmin.cpp">

@@ -160,6 +160,7 @@ public:
     char  m_is_dyeable;            // Item can be a dye target
     char  m_armor_class;           // Armor class (0=none, 1=clothing, 2=armor)
     int16_t m_set_id;              // Equipment set ID (0 = no set)
+    int   m_attribute_pool_id = 0; // Legacy attribute pool (items.attribute_pool_id; 0 = never rolls)
 
     //------------------------------------------------------------------------
     // Client-side lock (prevents interaction while item is in a pending operation)

@@ -34,6 +34,7 @@ struct attribute_prefix_type_entry
 	uint8_t multiplier;
 	uint8_t min_value;
 	uint8_t max_value;
+	uint8_t weapon_color;
 };
 
 struct attribute_secondary_type_entry

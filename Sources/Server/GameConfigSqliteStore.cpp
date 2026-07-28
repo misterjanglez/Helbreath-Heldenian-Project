@@ -919,8 +919,8 @@ bool SaveItemConfigs(sqlite3* db, CItem* const* itemList, int maxItems)
         " level_requirement, gender_requirement,"
         " special_effect_value1, special_effect_value2, related_skill,"
         " hide_armor, is_skirt, stackable, is_dyeable, armor_class, set_id,"
-        " item_color, display_id"
-        ") VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?);";
+        " item_color, display_id, attribute_pool_id"
+        ") VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?);";
 
     sqlite3_stmt* stmt = nullptr;
     if (sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) != SQLITE_OK) {
@@ -968,6 +968,11 @@ bool SaveItemConfigs(sqlite3* db, CItem* const* itemList, int maxItems)
         ok &= (sqlite3_bind_int(stmt, col++, itemList[i]->m_set_id) == SQLITE_OK);
         ok &= (sqlite3_bind_int(stmt, col++, itemList[i]->m_instance.item_color) == SQLITE_OK);
         ok &= (sqlite3_bind_int(stmt, col++, itemList[i]->m_display_id) == SQLITE_OK);
+        // 0 = no pool, stored as NULL to match the schema's "NULL = never rolls"
+        if (itemList[i]->m_attribute_pool_id > 0)
+            ok &= (sqlite3_bind_int(stmt, col++, itemList[i]->m_attribute_pool_id) == SQLITE_OK);
+        else
+            ok &= (sqlite3_bind_null(stmt, col++) == SQLITE_OK);
 
         if (!ok || sqlite3_step(stmt) != SQLITE_DONE) {
             sqlite3_finalize(stmt);
@@ -998,7 +1003,7 @@ bool LoadItemConfigs(sqlite3* db, CItem** itemList, int maxItems)
         " level_requirement, gender_requirement,"
         " special_effect_value1, special_effect_value2, related_skill,"
         " hide_armor, is_skirt, stackable, is_dyeable, armor_class, set_id,"
-        " item_color, display_id"
+        " item_color, display_id, attribute_pool_id"
         " FROM items ORDER BY item_id;";
 
     sqlite3_stmt* stmt = nullptr;
@@ -1050,6 +1055,8 @@ bool LoadItemConfigs(sqlite3* db, CItem** itemList, int maxItems)
         item->m_set_id = (int16_t)sqlite3_column_int(stmt, col++);
         item->m_instance.item_color = (char)sqlite3_column_int(stmt, col++);
         item->m_display_id = (short)sqlite3_column_int(stmt, col++);
+        // NULL (no pool) reads as 0 = never rolls legacy attributes
+        item->m_attribute_pool_id = sqlite3_column_int(stmt, col++);
 
         itemList[item_id] = item;
     }
@@ -1732,7 +1739,7 @@ bool LoadAttributePrefixTypes(sqlite3* db, std::vector<attribute_prefix_type_ent
 
     out.clear();
 
-    const char* sql = "SELECT prefix_id, multiplier, min_value, max_value FROM attribute_prefix_types ORDER BY prefix_id;";
+    const char* sql = "SELECT prefix_id, multiplier, min_value, max_value, weapon_color FROM attribute_prefix_types ORDER BY prefix_id;";
 
     sqlite3_stmt* stmt = nullptr;
     if (sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) != SQLITE_OK)
@@ -1749,9 +1756,10 @@ bool LoadAttributePrefixTypes(sqlite3* db, std::vector<attribute_prefix_type_ent
         // modifier IDs here at the load boundary.
         entry.prefix_id  = hb::shared::item::legacy_prefix_to_modifier_id(
             static_cast<uint8_t>(sqlite3_column_int(stmt, 0)));
-        entry.multiplier = static_cast<uint8_t>(sqlite3_column_int(stmt, 1));
-        entry.min_value  = static_cast<uint8_t>(sqlite3_column_int(stmt, 2));
-        entry.max_value  = static_cast<uint8_t>(sqlite3_column_int(stmt, 3));
+        entry.multiplier   = static_cast<uint8_t>(sqlite3_column_int(stmt, 1));
+        entry.min_value    = static_cast<uint8_t>(sqlite3_column_int(stmt, 2));
+        entry.max_value    = static_cast<uint8_t>(sqlite3_column_int(stmt, 3));
+        entry.weapon_color = static_cast<uint8_t>(sqlite3_column_int(stmt, 4));
         if (entry.prefix_id == hb::shared::item::modifier_id::empty) continue;
         out.push_back(entry);
     }

@@ -236,47 +236,8 @@ bool ItemManager::init_item_attr(CItem* item, const char* item_name)
 		if (m_game->m_item_config_list[i] != 0) {
 			// Normalize the config name for comparison
 			NormalizeItemName(m_game->m_item_config_list[i]->m_name, normalized_config, sizeof(normalized_config));
-			if (hb_stricmp(normalized_input, normalized_config) == 0) {
-				std::memset(item->m_name, 0, sizeof(item->m_name));
-				strcpy(item->m_name, m_game->m_item_config_list[i]->m_name);
-				item->m_item_type = m_game->m_item_config_list[i]->m_item_type;
-				item->m_equip_pos = m_game->m_item_config_list[i]->m_equip_pos;
-				item->m_item_effect_type = m_game->m_item_config_list[i]->m_item_effect_type;
-				item->m_item_effect_value1 = m_game->m_item_config_list[i]->m_item_effect_value1;
-				item->m_item_effect_value2 = m_game->m_item_config_list[i]->m_item_effect_value2;
-				item->m_item_effect_value3 = m_game->m_item_config_list[i]->m_item_effect_value3;
-				item->m_item_effect_value4 = m_game->m_item_config_list[i]->m_item_effect_value4;
-				item->m_item_effect_value5 = m_game->m_item_config_list[i]->m_item_effect_value5;
-				item->m_item_effect_value6 = m_game->m_item_config_list[i]->m_item_effect_value6;
-				item->m_durability = m_game->m_item_config_list[i]->m_durability;
-				item->m_instance.cur_durability = item->m_durability;
-				item->m_special_effect = m_game->m_item_config_list[i]->m_special_effect;
-
-				item->m_sell_price = m_game->m_item_config_list[i]->m_sell_price;
-				item->m_weight = m_game->m_item_config_list[i]->m_weight;
-				item->m_weapon_class = m_game->m_item_config_list[i]->m_weapon_class;
-				item->m_swing_speed = m_game->m_item_config_list[i]->m_swing_speed;
-				item->m_level_requirement = m_game->m_item_config_list[i]->m_level_requirement;
-				item->m_gender_requirement = m_game->m_item_config_list[i]->m_gender_requirement;
-
-				item->m_special_effect_value1 = m_game->m_item_config_list[i]->m_special_effect_value1;
-				item->m_special_effect_value2 = m_game->m_item_config_list[i]->m_special_effect_value2;
-
-				item->m_related_skill = m_game->m_item_config_list[i]->m_related_skill;
-				item->m_item_sub_type = m_game->m_item_config_list[i]->m_item_sub_type;
-				item->m_id_num = m_game->m_item_config_list[i]->m_id_num;
-
-				item->m_hide_armor = m_game->m_item_config_list[i]->m_hide_armor;
-				item->m_is_skirt = m_game->m_item_config_list[i]->m_is_skirt;
-				item->m_stackable = m_game->m_item_config_list[i]->m_stackable;
-				item->m_is_dyeable = m_game->m_item_config_list[i]->m_is_dyeable;
-				item->m_armor_class = m_game->m_item_config_list[i]->m_armor_class;
-				item->m_set_id = m_game->m_item_config_list[i]->m_set_id;
-				item->m_instance.item_color = m_game->m_item_config_list[i]->m_instance.item_color;
-				item->m_display_id = m_game->m_item_config_list[i]->m_display_id;
-
-				return true;
-			}
+			if (hb_stricmp(normalized_input, normalized_config) == 0)
+				return init_item_attr(item, i);
 		}
 
 	return false;
@@ -320,6 +281,7 @@ bool ItemManager::init_item_attr(CItem* item, int item_id)
 	item->m_is_dyeable = config->m_is_dyeable;
 	item->m_armor_class = config->m_armor_class;
 	item->m_set_id = config->m_set_id;
+	item->m_attribute_pool_id = config->m_attribute_pool_id;
 	item->m_instance.item_color = config->m_instance.item_color;
 	item->m_display_id = config->m_display_id;
 
@@ -4773,156 +4735,61 @@ int ItemManager::roll_attribute_value(int min_val, int max_val)
 	return min_val;
 }
 
+// Weighted pick over one pool slot's entries. Legacy roll semantics:
+// rand() % total-weight, cumulative walk in load order.
+static uint8_t pick_pool_modifier(const std::vector<hb::server::attribute_pool_entry_config>& entries,
+	int total_weight)
+{
+	if (total_weight <= 0) return modifier_id::empty;
+	int roll = rand() % total_weight;
+	for (const auto& entry : entries)
+	{
+		roll -= entry.weight;
+		if (roll < 0) return entry.modifier_id;
+	}
+	return modifier_id::empty;
+}
+
 bool ItemManager::generate_item_attributes(CItem* item)
 {
 	if (item == nullptr) return false;
 
-	uint8_t primaryType = modifier_id::empty;
-	int primaryValue = 0;
+	// Rollability gate unchanged from the hardcoded-table era: only these
+	// three effect types roll. Some pool-assigned gear (bows, Xelima-class
+	// weapons) carries other effect types and stays attribute-less until a
+	// curation pass (Tiers 2-E) decides otherwise.
+	const auto effect_type = item->get_item_effect_type();
+	const bool weapon_family = (effect_type == ItemEffectType::Attack ||
+		effect_type == ItemEffectType::AttackManaSave);
+	if (!weapon_family && effect_type != ItemEffectType::Defense) return false;
+
+	if (item->m_attribute_pool_id <= 0) return false;   // no pool: the item never rolls (spec §2)
+	const auto* pool = m_game->get_tier_config().find_attribute_pool(item->m_attribute_pool_id);
+	if (pool == nullptr) return false;
+
+	uint8_t primaryType = pick_pool_modifier(pool->prefix_entries, pool->prefix_total_weight);
+	if (primaryType == modifier_id::empty) return false;
+
+	int primaryValue = roll_attribute_value(m_game->m_modifier_min_value[primaryType],
+		m_game->m_modifier_max_value[primaryType]);
+	// Legacy halving for the two charge-style armor prefixes (dead zero kept
+	// until drift fix 3-F).
+	if (primaryType == modifier_id::mana_converting || primaryType == modifier_id::crit_chance)
+		primaryValue = primaryValue / 2;
+
 	uint8_t secondaryType = modifier_id::empty;
 	int secondaryValue = 0;
-	int item_color = 0;
-
-	if (item->get_item_effect_type() == ItemEffectType::Attack) {
-		// Attack weapons - roll primary prefix
-		int roll = rand() % 10000;
-		int cumul = 0;
-
-		struct { int weight; uint8_t type; int color; } attackPrimary[] = {
-			{ 299,  modifier_id::light,      16 },
-			{ 700,  modifier_id::strong,     16 },
-			{ 1500, modifier_id::critical,   18 },
-			{ 2000, modifier_id::agile,      16 },
-			{ 2000, modifier_id::righteous,  20 },
-			{ 1600, modifier_id::poisoning,  17 },
-			{ 1600, modifier_id::sharp,      19 },
-			{ 301,  modifier_id::ancient,    21 },
-		};
-
-		for (auto& entry : attackPrimary) {
-			cumul += entry.weight;
-			if (roll < cumul) {
-				primaryType = entry.type;
-				item_color = entry.color;
-				primaryValue = roll_attribute_value(m_game->m_modifier_min_value[entry.type], m_game->m_modifier_max_value[entry.type]);
-				break;
-			}
-		}
-
-		// Secondary effect - 40% chance (original rate)
-		if (rand() % 100 < 40) {
-		int secRoll = rand() % 10000;
-		int secCumul = 0;
-
-		struct { int weight; uint8_t type; int minVal; int maxVal; int fixedVal; } attackSecondary[] = {
-			{ 4999, modifier_id::hitting_probability, 3, 13, 0 },
-			{ 3500, modifier_id::consecutive_attack,  1, 7,  0 },
-			{ 1000, modifier_id::gold,                0, 0,  5 },
-			{ 501,  modifier_id::experience,          0, 0,  2 },
-		};
-
-		for (auto& entry : attackSecondary) {
-			secCumul += entry.weight;
-			if (secRoll < secCumul) {
-				secondaryType = entry.type;
-				if (entry.fixedVal > 0) {
-					secondaryValue = entry.fixedVal;
-				} else {
-					secondaryValue = roll_attribute_value(entry.minVal, entry.maxVal);
-				}
-				break;
-			}
-		}
-		} // end 40% secondary chance
-	}
-	else if (item->get_item_effect_type() == ItemEffectType::Defense) {
-		// Defense armor - roll primary prefix
-		int roll = rand() % 10000;
-		int cumul = 0;
-
-		struct { int weight; uint8_t type; bool halved; } defensePrimary[] = {
-			{ 5999, modifier_id::strong,          false },
-			{ 3000, modifier_id::light,           false },
-			{ 555,  modifier_id::mana_converting,  true },
-			{ 446,  modifier_id::crit_chance,      true },
-		};
-
-		for (auto& entry : defensePrimary) {
-			cumul += entry.weight;
-			if (roll < cumul) {
-				primaryType = entry.type;
-				item_color = 0;
-				primaryValue = roll_attribute_value(m_game->m_modifier_min_value[entry.type], m_game->m_modifier_max_value[entry.type]);
-				if (entry.halved) primaryValue = primaryValue / 2;
-				break;
-			}
-		}
-
-		// Secondary effect - 40% chance (original rate)
-		if (rand() % 100 < 40) {
-		int secRoll = rand() % 10001;
-		int secCumul = 0;
-
-		struct { int weight; uint8_t type; int minVal; int maxVal; } defenseSecondary[] = {
-			{ 1000, modifier_id::defense_ratio,   3, 13 },
-			{ 3000, modifier_id::poison_resist,   3, 13 },
-			{ 1500, modifier_id::sp_recovery,     1, 13 },
-			{ 1000, modifier_id::hp_recovery,     1, 13 },
-			{ 1000, modifier_id::mp_recovery,     1, 13 },
-			{ 1900, modifier_id::magic_resist,    3, 13 },
-			{ 400,  modifier_id::physical_absorb, 3, 13 },
-			{ 201,  modifier_id::magic_absorb,    3, 13 },
-		};
-
-		for (auto& entry : defenseSecondary) {
-			secCumul += entry.weight;
-			if (secRoll < secCumul) {
-				secondaryType = entry.type;
-				secondaryValue = roll_attribute_value(entry.minVal, entry.maxVal);
-				break;
-			}
-		}
-		} // end 40% secondary chance
-	}
-	else if (item->get_item_effect_type() == ItemEffectType::AttackManaSave) {
-		// AttackManaSave - always spell success (legacy "Special")
-		primaryType = modifier_id::spell_success;
-		item_color = 5;
-		primaryValue = roll_attribute_value(m_game->m_modifier_min_value[modifier_id::spell_success], m_game->m_modifier_max_value[modifier_id::spell_success]);
-
-		// Secondary effect - 40% chance (original rate)
-		// Same secondary pool as attack weapons
-		if (rand() % 100 < 40) {
-		int secRoll = rand() % 10000;
-		int secCumul = 0;
-
-		struct { int weight; uint8_t type; int minVal; int maxVal; int fixedVal; } manaSaveSecondary[] = {
-			{ 4999, modifier_id::hitting_probability, 3, 13, 0 },
-			{ 3500, modifier_id::consecutive_attack,  1, 7,  0 },
-			{ 1000, modifier_id::gold,                0, 0,  5 },
-			{ 501,  modifier_id::experience,          0, 0,  2 },
-		};
-
-		for (auto& entry : manaSaveSecondary) {
-			secCumul += entry.weight;
-			if (secRoll < secCumul) {
-				secondaryType = entry.type;
-				if (entry.fixedVal > 0) {
-					secondaryValue = entry.fixedVal;
-				} else {
-					secondaryValue = roll_attribute_value(entry.minVal, entry.maxVal);
-				}
-				break;
-			}
-		}
-		} // end 40% secondary chance
-	}
-	else {
-		// Item has no applicable effect type
-		return false;
+	if (rand() % 100 < pool->secondary_chance)
+	{
+		secondaryType = pick_pool_modifier(pool->secondary_entries, pool->secondary_total_weight);
+		if (secondaryType != modifier_id::empty)
+			secondaryValue = roll_attribute_value(m_game->m_modifier_min_value[secondaryType],
+				m_game->m_modifier_max_value[secondaryType]);
 	}
 
-	item->m_instance.item_color = (char)item_color;
+	// Armor never dyes from its roll; weapon-family colors ride the prefix row.
+	item->m_instance.item_color = weapon_family
+		? (char)m_game->m_modifier_weapon_color[primaryType] : 0;
 	item->set_custom_made(false);
 	item->set_prefix(primaryType, static_cast<uint8_t>(primaryValue));
 	item->set_secondary(secondaryType, static_cast<uint8_t>(secondaryValue));

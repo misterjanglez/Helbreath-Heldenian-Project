@@ -217,6 +217,7 @@
     <ClInclude Include="CmdShowChat.h" />
     <ClInclude Include="CmdGiveItem.h" />
     <ClInclude Include="CmdReload.h" />
+    <ClInclude Include="CmdRollSmoke.h" />
     <ClInclude Include="GameChatCommand.h" />
     <ClInclude Include="GameCmdWhisper.h" />
     <ClInclude Include="GameCmdBlock.h" />
@@ -354,6 +355,7 @@
     <ClCompile Include="CmdShowChat.cpp" />
     <ClCompile Include="CmdGiveItem.cpp" />
     <ClCompile Include="CmdReload.cpp" />
+    <ClCompile Include="CmdRollSmoke.cpp" />
     <ClCompile Include="GameChatCommand.cpp" />
     <ClCompile Include="GameCmdWhisper.cpp" />
     <ClCompile Include="GameCmdBlock.cpp" />

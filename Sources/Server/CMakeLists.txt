@@ -25,6 +25,7 @@ set(SERVER_SOURCES
     CmdGiveItem.cpp
     CmdHelp.cpp
     CmdReload.cpp
+    CmdRollSmoke.cpp
     CmdSetAdmin.cpp
     CmdSaveAll.cpp
     CmdSetCmdLevel.cpp

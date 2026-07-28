@@ -604,6 +604,7 @@ public:
 	uint8_t m_modifier_multiplier[256]{};
 	uint8_t m_modifier_min_value[256]{};
 	uint8_t m_modifier_max_value[256]{};
+	uint8_t m_modifier_weapon_color[256]{};  // dye color a weapon-family roll applies (0 = none)
 	void build_multiplier_lookup();
 	void check_catalog_multiplier_consistency() const;
 
@@ -875,6 +876,8 @@ private:
 	hb::server::tier_config m_tier_config;
 
 public:
+
+	const hb::server::tier_config& get_tier_config() const { return m_tier_config; }
 
 	void check_force_recall_time(int client_h);
 	void set_playing_status(int client_h);

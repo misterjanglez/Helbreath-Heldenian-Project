@@ -2911,10 +2911,12 @@ void CGame::build_multiplier_lookup()
 		m_modifier_multiplier[i] = 1;
 		m_modifier_min_value[i] = 1;
 		m_modifier_max_value[i] = 13;
+		m_modifier_weapon_color[i] = 0;
 	}
 	m_modifier_multiplier[0] = 0;
 	m_modifier_min_value[0] = 0;
 	m_modifier_max_value[0] = 0;
+	m_modifier_weapon_color[0] = 0;
 
 	// Entry ids are unified modifier IDs (translated from the legacy-keyed
 	// DB rows at load); the two tables cover disjoint parts of the space.
@@ -2923,6 +2925,7 @@ void CGame::build_multiplier_lookup()
 		m_modifier_multiplier[e.prefix_id] = e.multiplier;
 		m_modifier_min_value[e.prefix_id] = e.min_value;
 		m_modifier_max_value[e.prefix_id] = e.max_value;
+		m_modifier_weapon_color[e.prefix_id] = e.weapon_color;
 	}
 	for (const auto& e : m_attribute_secondary_types)
 	{
