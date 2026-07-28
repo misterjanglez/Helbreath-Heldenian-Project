@@ -51,9 +51,12 @@ public:
     void draw_pixel(int x, int y, const hb::shared::render::Color& color) override;
     void draw_line(int x0, int y0, int x1, int y1, const hb::shared::render::Color& color,
                   hb::shared::render::BlendMode blend = hb::shared::render::BlendMode::Alpha) override;
-    void draw_rect_filled(int x, int y, int w, int h, const hb::shared::render::Color& color) override;
+    void draw_rect_filled(int x, int y, int w, int h, const hb::shared::render::Color& color,
+                         hb::shared::render::BlendMode blend = hb::shared::render::BlendMode::Alpha) override;
     void draw_rect_outline(int x, int y, int w, int h, const hb::shared::render::Color& color,
                          int thickness = 1) override;
+    void draw_gradient_quad(const hb::shared::render::GradientCorner (&corners)[4],
+                          hb::shared::render::BlendMode blend = hb::shared::render::BlendMode::Alpha) override;
     void draw_rounded_rect_filled(int x, int y, int w, int h, int radius,
                                const hb::shared::render::Color& color) override;
     void draw_rounded_rect_outline(int x, int y, int w, int h, int radius,

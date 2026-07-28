@@ -54,9 +54,16 @@ public:
     virtual void draw_pixel(int x, int y, const Color& color) = 0;
     virtual void draw_line(int x0, int y0, int x1, int y1, const Color& color,
                           BlendMode blend = BlendMode::Alpha) = 0;
-    virtual void draw_rect_filled(int x, int y, int w, int h, const Color& color) = 0;
+    virtual void draw_rect_filled(int x, int y, int w, int h, const Color& color,
+                                 BlendMode blend = BlendMode::Alpha) = 0;
     virtual void draw_rect_outline(int x, int y, int w, int h, const Color& color,
                                  int thickness = 1) = 0;
+    // Arbitrary quad with a per-corner color, interpolated across the surface in
+    // one draw. Corners run clockwise from the top-left; they need not form a
+    // rectangle, so a trapezoid gives a tapered shape. Fading a corner's alpha to
+    // zero yields a soft edge — the reason to reach for this over draw_rect_filled.
+    virtual void draw_gradient_quad(const GradientCorner (&corners)[4],
+                                  BlendMode blend = BlendMode::Alpha) = 0;
     virtual void draw_rounded_rect_filled(int x, int y, int w, int h, int radius,
                                        const Color& color) = 0;
     virtual void draw_rounded_rect_outline(int x, int y, int w, int h, int radius,

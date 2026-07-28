@@ -23,6 +23,9 @@
 #include "PacketSendHelpers.h"
 #include "NetMessages.h"
 
+#include <algorithm>
+#include <cmath>
+
 
 
 namespace dynamic_object = hb::shared::dynamic_object;
@@ -34,6 +37,137 @@ using namespace hb::shared::net;
 using namespace hb::shared::item;
 using namespace hb::client::config;
 using namespace hb::client::sprite_id;
+
+// Ground light-pillar for a tiered drop (Item Tiers spec §11).
+//
+// Venue pick: a procedural primitive column drawn from tile data on every frame,
+// not a new EffectType. A ground item persists until someone takes it, while the
+// effect list is built for transient animations — an effect would need lifetime
+// tracking against tile state plus new art, and would drift out of sync whenever
+// a tile changed off-screen. Drawn before the item sprite, so the item sits in
+// front of its own light. Additive, so the column reads as light over whatever
+// the tile already drew rather than as a painted rectangle.
+//
+// The pillar runs to the top of the screen. Drawing it here, inside the tile
+// pass, is what makes that legible: a pillar painted at this row covers the rows
+// already drawn above it (the ones behind it) and is painted over by the rows
+// drawn after (the ones in front), so a shaft occludes and is occluded correctly
+// with no separate pass or sort. Nothing clips it — the client sets no clip area
+// — and the HUD draws after the world, so it passes under the UI.
+//
+// Built from gradient quads rather than stacked rectangles: the GPU interpolates
+// each quad's corner colors, which buys a per-pixel falloff both along the pillar
+// and across it. The alpha-zero outer edges are what stop it reading as a pixel
+// bar — a filled rect has a hard 1px side at logical resolution, and the back
+// buffer blits 1:1 in windowed mode, so that edge reaches the screen as authored.
+namespace {
+
+// Additive light desaturates toward white — `dst + src` raises every channel, so
+// a color whose channels are all high adds brightness rather than hue. That is
+// exactly why Legendary's gold (blue = 16) keeps its color while Epic's
+// 150/160/225 blue reads as a washed-out white. Drop most of the shared white
+// component and renormalize to full brightness, so the pillar adds *color*
+// wherever the tier has any to add. An achromatic tier — Common's pure white —
+// has no chroma to extract and passes through unchanged, which is what §11 asks
+// of it anyway. The tier's own color is untouched: this is the light the beam
+// emits, not the color the name renders in.
+hb::shared::render::Color beam_light_color(const hb::shared::render::Color& tier)
+{
+	constexpr float white_strip = 0.8f;
+	const float low = static_cast<float>(std::min({ tier.r, tier.g, tier.b }));
+	const float high = static_cast<float>(std::max({ tier.r, tier.g, tier.b }));
+	const float white = low * white_strip;
+	const float peak = high - white;
+	if (peak <= 1.0f) return tier;
+
+	const float gain = 255.0f / peak;
+	const auto lift = [white, gain](uint8_t channel)
+	{
+		return static_cast<uint8_t>(std::clamp((channel - white) * gain, 0.0f, 255.0f));
+	};
+	return { lift(tier.r), lift(tier.g), lift(tier.b) };
+}
+
+} // namespace
+
+void Screen_OnGame::draw_tier_beam(int center_x, int base_y, uint8_t tier, uint32_t time) const
+{
+	using hb::shared::render::BlendMode;
+	using hb::shared::render::Color;
+	using hb::shared::render::GradientCorner;
+
+	const tier_presentation_entry* row = item_name_formatter::get().tier_row(tier);
+	// An unreplicated tier row demotes to no beam, exactly as it demotes to a
+	// plain item name — one rule for missing presentation data everywhere.
+	if (row == nullptr || row->name.empty()) return;
+
+	// Column strength per tier: Common is a faint neutral marker (its color is
+	// white), each tier above it brighter. Indexed tier-1.
+	static constexpr uint8_t tier_alpha[hb::shared::item::tier_count] = { 55, 110, 150, 195 };
+	constexpr float root_height = 48.0f;
+	constexpr uint32_t pulse_period_ms = 2400;
+	constexpr float pool_half_width = 17.0f;
+	constexpr float pool_half_height = 3.0f;
+
+	// Slow breathing pulse — keeps the column alive without animating art.
+	const float phase = static_cast<float>(time % pulse_period_ms) / pulse_period_ms;
+	const float pulse = 1.0f + 0.15f * std::sin(phase * 2.0f * 3.14159265f);
+	const float alpha_base = tier_alpha[tier - 1] * pulse;
+	const Color light = beam_light_color(row->color);
+
+	// The color on the pillar's center line at a given fraction of full strength,
+	// and the transparent color its outer edges fade to.
+	const auto core = [&light, alpha_base](float strength)
+	{
+		return Color{ light.r, light.g, light.b,
+			static_cast<uint8_t>(std::clamp(alpha_base * strength, 0.0f, 255.0f)) };
+	};
+	const Color edge{ light.r, light.g, light.b, 0 };
+
+	// One quad pair per section, centre line at full strength fading to nothing at
+	// both outer edges. `half_width` is the reach of the glow, not a hard border.
+	const auto draw_section = [this, center_x, &core, &edge]
+		(float top_y, float top_half_width, float top_strength,
+		 float bottom_y, float bottom_half_width, float bottom_strength)
+	{
+		if (top_y >= bottom_y) return;   // nothing left of this section on screen
+
+		const float cx = static_cast<float>(center_x);
+		const Color top = core(top_strength);
+		const Color bottom = core(bottom_strength);
+
+		const GradientCorner left[4] = {
+			{ cx - top_half_width,    top_y,    edge   },
+			{ cx,                     top_y,    top    },
+			{ cx,                     bottom_y, bottom },
+			{ cx - bottom_half_width, bottom_y, edge   },
+		};
+		const GradientCorner right[4] = {
+			{ cx,                     top_y,    top    },
+			{ cx + top_half_width,    top_y,    edge   },
+			{ cx + bottom_half_width, bottom_y, edge   },
+			{ cx,                     bottom_y, bottom },
+		};
+		m_game->m_Renderer->draw_gradient_quad(left, BlendMode::Additive);
+		m_game->m_Renderer->draw_gradient_quad(right, BlendMode::Additive);
+	};
+
+	const float base = static_cast<float>(base_y);
+
+	// Ground pool: a soft wide glow that roots the pillar to the tile. Its flat
+	// top and bottom sit under the item sprite, so only the faded sides show.
+	draw_section(base - pool_half_height, pool_half_width, 0.55f,
+	             base + pool_half_height, pool_half_width, 0.55f);
+
+	// Root — bright and wide at the tile, tapering as it rises. Split in two so
+	// the falloff curves instead of running straight to the shaft's strength.
+	draw_section(base - root_height * 0.5f, 6.0f, 0.80f, base,                    9.0f, 1.00f);
+	draw_section(base - root_height,        4.0f, 0.55f, base - root_height * 0.5f, 6.0f, 0.80f);
+
+	// Shaft — the rest of the way to the top of the screen, dissipating as it
+	// goes. One quad pair covers it: the gradient does what seven bands did.
+	draw_section(0.0f, 3.0f, 0.16f, base - root_height, 4.0f, 0.55f);
+}
 
 // --- DrawObject dispatcher functions ---
 
@@ -247,6 +381,10 @@ void Screen_OnGame::draw_objects(short pivot_x, short pivot_y, short div_x, shor
 					auto rect = ground_draw.sprite->GetFrameRect(ground_draw.frame);
 					int cx = ix + (TILE_SIZE - rect.width) / 2 - (TILE_SIZE / 2);
 					int cy = iy + (TILE_SIZE - rect.height) / 2 - (TILE_SIZE / 2);
+
+					// Tier beam under the item — the sprites are centered on (ix, iy),
+					// so that point is the tile center the column rises from.
+					draw_tier_beam(ix, iy, m_game->m_map_data->m_data[dX][dY].m_item.get_tier(), time);
 
 					m_game->draw_item_sprite(ground_draw, cx, cy, item_color, ground_cfg,
 						item_draw_state::normal, /*on_ground=*/true);

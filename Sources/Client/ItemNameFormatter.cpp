@@ -33,6 +33,14 @@ void item_name_formatter::set_tier_presentation(const tier_presentation_entry* t
 	m_tier_name_template = name_template;
 }
 
+// The one tier-table lookup — apply_tier_presentation and the world beam share
+// it, so an unreplicated table answers nullptr in both.
+const tier_presentation_entry* item_name_formatter::tier_row(uint8_t tier) const
+{
+	if (tier == 0 || tier > hb::shared::item::tier_count || m_tier_presentation == nullptr) return nullptr;
+	return &m_tier_presentation[tier - 1];
+}
+
 namespace {
 
 // Format a catalog format string with the scaled value(s). An attribute-pair
@@ -135,9 +143,10 @@ void item_name_formatter::append_modifier_effect(std::vector<tooltip_effect>& ef
 // name in the caller's own color.
 void item_name_formatter::apply_tier_presentation(ItemNameInfo& info, uint8_t tier) const
 {
-	if (tier == 0 || tier > hb::shared::item::tier_count || m_tier_presentation == nullptr) return;
+	const tier_presentation_entry* entry = tier_row(tier);
+	if (entry == nullptr) return;
 
-	const auto& row = m_tier_presentation[tier - 1];
+	const auto& row = *entry;
 	if (row.name.empty()) return;
 
 	static const std::string no_template;

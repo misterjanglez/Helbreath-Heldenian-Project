@@ -17,47 +17,85 @@ void event_list_manager::set_game(CGame* game)
 	m_game = game;
 }
 
-void event_list_manager::add_event(const char* txt, char color, bool dup_allow)
+namespace {
+
+// Scroll a six-slot list up one and write the newest entry into the last slot.
+void push_event(EventEntry (&list)[6], const char* txt, char color, const event_highlight& highlight)
 {
-	int i;
+	for (int i = 1; i < 6; i++)
+		list[i - 1] = list[i];
+
+	list[5].txt = txt;
+	list[5].color = color;
+	list[5].time = GameClock::get_time_ms();
+	list[5].highlight = highlight;
+}
+
+// The event-list palette. Both lists share it; an unlisted color index draws
+// nothing at all, which is what the original per-list switches did by omission.
+const hb::shared::render::Color* event_color(char color)
+{
+	switch (color) {
+	case 0:                       return &GameColors::UINearWhite;
+	case 1:                       return &GameColors::ChatEventGreen;
+	case 2:                       return &GameColors::UIWorldChat;
+	case 3:                       return &GameColors::UIFactionChat;
+	case 4:                       return &GameColors::UIPartyChat;
+	case hb::shared::owner::Slime:  return &GameColors::UIGameMasterChat;
+	case hb::shared::owner::Howard: return &GameColors::UINormalChat;
+	default:                      return nullptr;
+	}
+}
+
+// One event line. A highlight span (the Tier-colored item name of a pickup line)
+// splits the draw into prefix / name / suffix, each advancing by its own measured
+// width; without one this is the single draw_text it has always been.
+void draw_event_line(const EventEntry& entry, int x, int y)
+{
+	const hb::shared::render::Color* base = event_color(entry.color);
+	if (base == nullptr) return;
+
+	const auto& span = entry.highlight;
+	if (span.len == 0 || span.start + span.len > entry.txt.size())
+	{
+		hb::shared::text::draw_text(GameFont::Default, x, y, entry.txt.c_str(),
+			hb::shared::text::TextStyle::with_shadow(*base));
+		return;
+	}
+
+	const std::string prefix = entry.txt.substr(0, span.start);
+	const std::string name = entry.txt.substr(span.start, span.len);
+	const std::string suffix = entry.txt.substr(span.start + span.len);
+
+	if (!prefix.empty())
+	{
+		hb::shared::text::draw_text(GameFont::Default, x, y, prefix.c_str(),
+			hb::shared::text::TextStyle::with_shadow(*base));
+		x += hb::shared::text::measure_text(GameFont::Default, prefix.c_str()).width;
+	}
+
+	hb::shared::text::draw_text(GameFont::Default, x, y, name.c_str(),
+		hb::shared::text::TextStyle::with_shadow(span.color));
+
+	if (!suffix.empty())
+	{
+		x += hb::shared::text::measure_text(GameFont::Default, name.c_str()).width;
+		hb::shared::text::draw_text(GameFont::Default, x, y, suffix.c_str(),
+			hb::shared::text::TextStyle::with_shadow(*base));
+	}
+}
+
+}
+
+void event_list_manager::add_event(const char* txt, char color, bool dup_allow, const event_highlight& highlight)
+{
 	if ((dup_allow == false) && (m_events[5].txt == txt)) return;
-	if (color == 10)
-	{
-		for (i = 1; i < 6; i++)
-		{
-			m_events2[i - 1].txt = m_events2[i].txt;
-			m_events2[i - 1].color = m_events2[i].color;
-			m_events2[i - 1].time = m_events2[i].time;
-		}
-		m_events2[5].txt = txt;
-		m_events2[5].color = color;
-		m_events2[5].time = GameClock::get_time_ms();
-	}
-	else
-	{
-		for (i = 1; i < 6; i++)
-		{
-			m_events[i - 1].txt = m_events[i].txt;
-			m_events[i - 1].color = m_events[i].color;
-			m_events[i - 1].time = m_events[i].time;
-		}
-		m_events[5].txt = txt;
-		m_events[5].color = color;
-		m_events[5].time = GameClock::get_time_ms();
-	}
+	push_event(color == 10 ? m_events2 : m_events, txt, color, highlight);
 }
 
 void event_list_manager::add_event_top(const char* txt, char color)
 {
-	for (int i = 1; i < 6; i++)
-	{
-		m_events[i - 1].txt = m_events[i].txt;
-		m_events[i - 1].color = m_events[i].color;
-		m_events[i - 1].time = m_events[i].time;
-	}
-	m_events[5].txt = txt;
-	m_events[5].color = color;
-	m_events[5].time = GameClock::get_time_ms();
+	push_event(m_events, txt, color, {});
 }
 
 void event_list_manager::show_events(uint32_t time)
@@ -69,59 +107,11 @@ void event_list_manager::show_events(uint32_t time)
 	// large differences that exceed 5000, so the comparison remains correct across wrap
 	for (i = 0; i < 6; i++)
 		if ((time - m_events[i].time) < 5000)
-		{
-			switch (m_events[i].color) {
-			case 0:
-				hb::shared::text::draw_text(GameFont::Default, 10, 10 + i * 15, m_events[i].txt.c_str(), hb::shared::text::TextStyle::with_shadow(GameColors::UINearWhite));
-				break;
-			case 1:
-				hb::shared::text::draw_text(GameFont::Default, 10, 10 + i * 15, m_events[i].txt.c_str(), hb::shared::text::TextStyle::with_shadow(GameColors::ChatEventGreen));
-				break;
-			case 2:
-				hb::shared::text::draw_text(GameFont::Default, 10, 10 + i * 15, m_events[i].txt.c_str(), hb::shared::text::TextStyle::with_shadow(GameColors::UIWorldChat));
-				break;
-			case 3:
-				hb::shared::text::draw_text(GameFont::Default, 10, 10 + i * 15, m_events[i].txt.c_str(), hb::shared::text::TextStyle::with_shadow(GameColors::UIFactionChat));
-				break;
-			case 4:
-				hb::shared::text::draw_text(GameFont::Default, 10, 10 + i * 15, m_events[i].txt.c_str(), hb::shared::text::TextStyle::with_shadow(GameColors::UIPartyChat));
-				break;
-			case hb::shared::owner::Slime:
-				hb::shared::text::draw_text(GameFont::Default, 10, 10 + i * 15, m_events[i].txt.c_str(), hb::shared::text::TextStyle::with_shadow(GameColors::UIGameMasterChat));
-				break;
-			case hb::shared::owner::Howard:
-				hb::shared::text::draw_text(GameFont::Default, 10, 10 + i * 15, m_events[i].txt.c_str(), hb::shared::text::TextStyle::with_shadow(GameColors::UINormalChat));
-				break;
-			}
-		}
+			draw_event_line(m_events[i], 10, 10 + i * 15);
 
 	for (i = 0; i < 6; i++)
 		if ((time - m_events2[i].time) < 5000)
-		{
-			switch (m_events2[i].color) {
-			case 0:
-				hb::shared::text::draw_text(GameFont::Default, 10, baseY + i * 15, m_events2[i].txt.c_str(), hb::shared::text::TextStyle::with_shadow(GameColors::UINearWhite));
-				break;
-			case 1:
-				hb::shared::text::draw_text(GameFont::Default, 10, baseY + i * 15, m_events2[i].txt.c_str(), hb::shared::text::TextStyle::with_shadow(GameColors::ChatEventGreen));
-				break;
-			case 2:
-				hb::shared::text::draw_text(GameFont::Default, 10, baseY + i * 15, m_events2[i].txt.c_str(), hb::shared::text::TextStyle::with_shadow(GameColors::UIWorldChat));
-				break;
-			case 3:
-				hb::shared::text::draw_text(GameFont::Default, 10, baseY + i * 15, m_events2[i].txt.c_str(), hb::shared::text::TextStyle::with_shadow(GameColors::UIFactionChat));
-				break;
-			case 4:
-				hb::shared::text::draw_text(GameFont::Default, 10, baseY + i * 15, m_events2[i].txt.c_str(), hb::shared::text::TextStyle::with_shadow(GameColors::UIPartyChat));
-				break;
-			case hb::shared::owner::Slime:
-				hb::shared::text::draw_text(GameFont::Default, 10, baseY + i * 15, m_events2[i].txt.c_str(), hb::shared::text::TextStyle::with_shadow(GameColors::UIGameMasterChat));
-				break;
-			case hb::shared::owner::Howard:
-				hb::shared::text::draw_text(GameFont::Default, 10, baseY + i * 15, m_events2[i].txt.c_str(), hb::shared::text::TextStyle::with_shadow(GameColors::UINormalChat));
-				break;
-			}
-		}
+			draw_event_line(m_events2[i], 10, baseY + i * 15);
 	if (m_game->on_game()->m_skill_using_status == true)
 	{
 		int text_w = hb::shared::text::GetTextRenderer()->measure_text(SHOW_EVENT_LIST1).width;

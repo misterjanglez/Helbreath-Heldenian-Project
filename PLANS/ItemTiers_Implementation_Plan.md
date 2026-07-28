@@ -128,6 +128,51 @@ All client; no wire changes (fields and catalog data all exist since Phase 1).
 
 **Cycle 4-B — World presentation.** Ground light-beam in Tier color on every tiered drop (Common faint neutral) keyed off the tier byte in ground-item/map packets; pickup line "You got a {name}." with name in tier color; **sprites never tinted in tiered mode** (legacy keeps prefix dye-tints — gate the tint channel on the replicated Item system mode). No broadcasts, no banners. Touch: `Screen_OnGame.DrawObjects.cpp` / effect render files (beam venue is a Pick), pickup notify handler.
 
+> **Beam venue — Pick recorded (4-B, as built):** a **procedural primitive column** drawn from tile
+> data inside the ground-item pass of `Screen_OnGame.DrawObjects.cpp`, **not** a new `EffectType`.
+> A ground item persists until someone takes it, while the effect list is built for transient
+> animations: an effect would need lifetime tracking against tile state plus new art, and would
+> drift out of sync whenever a tile changed off-screen. `Screen_OnGame::draw_tier_beam` renders a
+> full-height, additively-blended **pillar** in the replicated Tier color — a soft ground pool, a
+> bright tapering root, and a narrow shaft dissipating to the top of the screen, plus a slow pulse.
+> Drawn before the item sprite so the item sits in front of its own light. Drawing it inside the
+> tile pass is also what makes a full-height shaft legible: it covers the rows already drawn above
+> it (behind it) and is covered by the rows drawn after (in front of it), so occlusion is correct
+> with no separate pass or sort, and nothing clips it — the client sets no clip area, and the HUD
+> draws after the world. All four tiers raise one; the per-tier alpha ramp keeps Common subtle
+> (owner call, 2026-07-28 — full pillars for Epic and Legendary only was considered and rejected,
+> because it reads as two kinds of thing rather than four degrees).
+>
+> **Rendering — revised after the first visual pass (owner feedback: faint, pixelated, Epic's blue
+> indistinguishable from Common's white).** Two causes, both fixed at the drawing level:
+> 1. *Additive light desaturates toward white.* `dst + src` raises every channel, so a color with
+>    all channels high adds brightness, not hue — which is why Legendary's gold (blue = 16) always
+>    read correctly while Epic's 150/160/225 washed out. `beam_light_color` strips 80% of the
+>    shared white component and renormalizes to full brightness, so Epic emits 72/97/254 and Rare
+>    72/255/72 while Common (achromatic, no chroma to extract) passes through unchanged. **The
+>    replicated tier color is not touched** — this is the light the pillar emits, not the color the
+>    name renders in. Alpha ramp raised `{30,55,80,110}` → `{55,110,150,195}`.
+> 2. *Hard rectangle edges.* The pillar was a stack of filled rects; at logical resolution with a
+>    1:1 windowed blit those 1px sides reach the screen as authored, which is the "pixelated" read.
+>    It is now **gradient quads** — new primitive `IRenderer::draw_gradient_quad` (arbitrary quad,
+>    per-corner color, one GPU-interpolated draw). Each section is a quad pair whose centre line
+>    carries the color and whose outer corners are alpha 0, giving a per-pixel falloff across the
+>    pillar as well as along it. Also cheaper: 8 quads per pillar against ~15 rects, and against
+>    the ~45 that soft edges would have cost as rects.
+>
+> `IRenderer::draw_rect_filled` gained an optional `BlendMode` in the first pass, mirroring
+> `draw_line`; `draw_gradient_quad` is the second addition. Both are general primitives, not
+> beam-specific.
+> Per-tier beam intensity is a code table (`{30, 55, 80, 110}`) — the tier *color* is data, the
+> intensity ramp is not; promoting it to the tier-presentation table needs a wire field, so it is
+> a Phase-5 candidate, not a 4-B one.
+>
+> **Tint gate — as built:** palette band 16-21 (`hb::net::first_prefix_color..last_prefix_color`)
+> is exclusively prefix tint (the legacy strategy's `weapon_color` rows and the GM mint switch), so
+> tiered mode zeroes exactly that band in `CGame::draw_item_sprite` — player and config dyes (1-15)
+> are untouched, and a legacy item minted before a mode flip stops tinting too. `worn_tint_params`
+> needs no gate: worn colors are 4-bit on the wire, so the band can never reach it.
+
 **Cycle 4-C — Status-broadcast animation scaling.** Cast animation frame time × (1 − r) from the broadcast cast-reduction field (`Player.h` `Magic` 16×88 ms); Walk/Run frame time × (1 − speed_total) (`Move` 8×70, `Run` 8×39); AttackMove/DamageMove untouched; applies to self and remote entities. Touch: `Player.h/.cpp` animation timing, entity anim update sites.
 
 **Cycle 4-D — GM creator dialog.** `DialogBox_ItemCreator.cpp` mode-aware: tiered mode drives tier + modifier pickers from replicated catalog data (no rarity constraints within legality — server enforces structure). Touch: `DialogBox_ItemCreator.cpp`.

@@ -77,6 +77,11 @@ public:
 	// must remain stable). Item Tiers spec §11.
 	void set_tier_presentation(const tier_presentation_entry* tiers, const std::string* name_template);
 
+	// Replicated presentation row for a tier, or nullptr when the tier is out of
+	// range or the table never arrived. Lets the world renderer read a Tier color
+	// per frame without formatting a name it will not draw.
+	const tier_presentation_entry* tier_row(uint8_t tier) const;
+
 	// format item name, returning name + attribute strings + special flag
 	ItemNameInfo format(CItem* item);
 	ItemNameInfo format(short item_id);

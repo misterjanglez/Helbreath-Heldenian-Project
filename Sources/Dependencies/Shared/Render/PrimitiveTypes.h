@@ -27,4 +27,16 @@ enum class BlendMode : uint8_t
 	Additive    // Additive blending (glow effects)
 };
 
+// One corner of a gradient quad: a position plus the color the surface takes
+// there. The renderer interpolates between the four corners per pixel, which is
+// how a soft-edged glow is drawn without a texture and without stacking
+// hard-edged rectangles. Positions are floats — a gradient shape need not land
+// on pixel boundaries, and need not be a rectangle.
+struct GradientCorner
+{
+	float x = 0.0f;
+	float y = 0.0f;
+	Color color;
+};
+
 } // namespace hb::shared::render

@@ -108,6 +108,11 @@ private:
     // dye color, or nullopt. Feeds item_name_color at both tooltip sites.
     std::optional<hb::shared::render::Color> name_dye_tint(const hb::shared::item::item_instance_data& instance) const;
 
+    // Ground light-beam for a tiered drop (Item Tiers spec §11): a Tier-colored
+    // column rising from the tile, faint neutral for Common. Draws nothing for an
+    // untiered item or an unreplicated tier row.
+    void draw_tier_beam(int center_x, int base_y, uint8_t tier, uint32_t time) const;
+
     void render_item_tooltip();
     void draw_tile_grid();           // Simple dark grid lines
     void draw_patching_grid();       // Debug grid with zone colors

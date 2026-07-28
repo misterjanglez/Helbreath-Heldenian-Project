@@ -491,14 +491,32 @@ void SFMLRenderer::draw_line(int x0, int y0, int x1, int y1, const hb::shared::r
     m_backBuffer.draw(line, (blend == hb::shared::render::BlendMode::Additive) ? sf::BlendAdd : sf::BlendAlpha);
 }
 
-void SFMLRenderer::draw_rect_filled(int x, int y, int w, int h, const hb::shared::render::Color& color)
+void SFMLRenderer::draw_rect_filled(int x, int y, int w, int h, const hb::shared::render::Color& color,
+    hb::shared::render::BlendMode blend)
 {
     if (color.a == 0 || w <= 0 || h <= 0) return;
 
     sf::RectangleShape rect({static_cast<float>(w), static_cast<float>(h)});
     rect.setPosition({static_cast<float>(x), static_cast<float>(y)});
     rect.setFillColor(sf::Color(color.r, color.g, color.b, color.a));
-    m_backBuffer.draw(rect);
+    m_backBuffer.draw(rect, (blend == hb::shared::render::BlendMode::Additive) ? sf::BlendAdd : sf::BlendAlpha);
+}
+
+void SFMLRenderer::draw_gradient_quad(const hb::shared::render::GradientCorner (&corners)[4],
+    hb::shared::render::BlendMode blend)
+{
+    // A four-vertex fan is one quad; the GPU interpolates the per-vertex colors
+    // across it, so a soft-edged glow costs a single draw instead of a stack of
+    // rectangles approximating the falloff.
+    sf::VertexArray quad(sf::PrimitiveType::TriangleFan, 4);
+    for (std::size_t i = 0; i < 4; i++)
+    {
+        quad[i].position = sf::Vector2f(corners[i].x, corners[i].y);
+        quad[i].color = sf::Color(corners[i].color.r, corners[i].color.g,
+            corners[i].color.b, corners[i].color.a);
+    }
+
+    m_backBuffer.draw(quad, (blend == hb::shared::render::BlendMode::Additive) ? sf::BlendAdd : sf::BlendAlpha);
 }
 
 void SFMLRenderer::draw_rect_outline(int x, int y, int w, int h, const hb::shared::render::Color& color, int thickness)

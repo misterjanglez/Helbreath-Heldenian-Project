@@ -22,6 +22,24 @@
 using namespace hb::shared::net;
 using namespace hb::shared::item;
 
+namespace {
+
+// The Tier-colored span of a pickup line (Item Tiers spec §11): the item name
+// inside "You got a {name}.". An untiered item yields an empty span and the line
+// draws in one color, exactly as before. rfind, not find — the name is the last
+// thing the template substitutes, so a name that also occurs in the surrounding
+// words still anchors on the substituted copy.
+event_highlight tier_name_span(const std::string& line, const ItemNameInfo& info)
+{
+	if (info.tier == 0 || info.name.empty()) return {};
+
+	const size_t at = line.rfind(info.name);
+	if (at == std::string::npos) return {};
+	return { at, info.name.size(), info.tier_color };
+}
+
+}
+
 namespace NetworkMessageHandlers {
 	void HandleItemPurchased(CGame* game, char* data)
 	{
@@ -142,6 +160,7 @@ namespace NetworkMessageHandlers {
 		item_color = static_cast<char>(pkt->item_color);
 		special_ev2 = static_cast<short>(pkt->spec_value2);
 
+		event_highlight name_span;
 		{
 			hb::shared::item::item_instance_data idata;
 			idata.count = static_cast<uint64_t>(count);
@@ -149,9 +168,10 @@ namespace NetworkMessageHandlers {
 			idata.special_effect_value2 = static_cast<int16_t>(pkt->spec_value2);
 			auto info = item_name_formatter::get().format(pkt->item_id, idata);
 			txt = std::format(NOTIFYMSG_ITEMOBTAINED2, info.name);
+			name_span = tier_name_span(txt, info);
 		}
 
-		game->add_event_list(txt.c_str(), 10);
+		game->add_event_list(txt.c_str(), 10, true, name_span);
 		audio_manager::get().play_game_sound(sound_type::effect, 20, 0);
 
 		game->m_map_data->set_item(game->m_player->m_player_x, game->m_player->m_player_y, 0, {}, false);
@@ -240,6 +260,7 @@ namespace NetworkMessageHandlers {
 
 		// One chat message for the entire batch
 		std::string txt;
+		event_highlight name_span;
 		{
 			hb::shared::item::item_instance_data idata;
 			idata.count = static_cast<uint64_t>(total_count);
@@ -247,8 +268,9 @@ namespace NetworkMessageHandlers {
 			idata.special_effect_value2 = special_ev2;
 			auto info = item_name_formatter::get().format(item_id, idata);
 			txt = std::format(NOTIFYMSG_ITEMOBTAINED2, info.name);
+			name_span = tier_name_span(txt, info);
 		}
-		game->add_event_list(txt.c_str(), 10);
+		game->add_event_list(txt.c_str(), 10, true, name_span);
 		audio_manager::get().play_game_sound(sound_type::effect, 20, 0);
 
 		// Create individual items in separate slots (no Consume/Arrow merge)

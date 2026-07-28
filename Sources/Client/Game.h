@@ -61,6 +61,7 @@
 #include "GameConstants.h"
 #include "Application.h"
 #include "GameEvents.h"
+#include "EventListManager.h"   // event_highlight — add_event_list's optional colored span
 #include "FormulaEngine.h"
 
 // Overlay types for popup screens that render over base screens
@@ -219,7 +220,10 @@ public:
 	void civil_right_admission_handler(char * data);
 	void request_teleport_and_wait_data();
 	void point_command_handler(int indexX, int indexY, char item_id = -1);
-	void add_event_list(const char* txt, char color = 0, bool dup_allow = true);
+	// `highlight` colors one span of the line on its own — the Tier-colored item
+	// name of a pickup line (Item Tiers spec §11). Default = a single-color line.
+	void add_event_list(const char* txt, char color = 0, bool dup_allow = true,
+		const event_highlight& highlight = {});
 	// shift_guild_operation_list / put_guild_operation_list REMOVED — use DialogBox_GuildOperation
 	// init_player_characteristics MOVED to NetworkMessages_Player.cpp
 	void common_event_handler(char * data);
@@ -469,6 +473,13 @@ std::array<bool, hb::shared::limits::MaxItems> m_is_item_equipped{};
 	std::string m_tier_name_template;
 	uint8_t m_item_system_mode = hb::shared::item::item_system_mode::legacy;
 	bool m_modifier_catalog_loaded = false;
+
+	// The item system the server replicated at login. Tiered mode closes the
+	// sprite tint channel and opens the ground beam (Item Tiers spec §11).
+	bool is_tiered_mode() const
+	{
+		return m_item_system_mode == hb::shared::item::item_system_mode::tiered;
+	}
 
 	struct NpcConfig { short npcType = 0; std::string name; bool valid = false; };
 	std::array<NpcConfig, hb::shared::limits::MaxNpcConfigs> m_npc_config_list{};   // indexed by npc_id

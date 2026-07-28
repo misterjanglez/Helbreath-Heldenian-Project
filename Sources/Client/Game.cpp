@@ -1807,9 +1807,9 @@ Screen_OnGame* CGame::on_game()
 
 // enable_dialog_box / disable_dialog_box wrappers REMOVED — callers use get_dialog_box_manager() directly
 
-void CGame::add_event_list(const char* txt, char color, bool dup_allow)
+void CGame::add_event_list(const char* txt, char color, bool dup_allow, const event_highlight& highlight)
 {
-	event_list_manager::get().add_event(txt, color, dup_allow);
+	event_list_manager::get().add_event(txt, color, dup_allow, highlight);
 }
 
 void CGame::request_full_object_data(uint16_t object_id)
@@ -3472,6 +3472,16 @@ void CGame::draw_item_sprite(const item_draw_ref& draw, int x, int y, char item_
 	using hb::shared::sprite::DrawParams;
 	DrawParams params;
 	uint8_t color = static_cast<uint8_t>(item_color);
+
+	// Sprites are never dye-tinted in tiered mode (spec §11). Palette band 16-21
+	// exists only as the legacy strategy's prefix tint, so closing that band closes
+	// the whole prefix tint channel — player and config dyes (1-15) are untouched,
+	// and an item minted before a mode flip stops tinting as well. This is the one
+	// gate needed: worn-gear colors are 4-bit, so the band never reaches
+	// worn_tint_params in the first place.
+	if (color >= hb::net::first_prefix_color && color <= hb::net::last_prefix_color && is_tiered_mode())
+		color = 0;
+
 	if (color == 0)
 	{
 		if (state == item_draw_state::disabled)
