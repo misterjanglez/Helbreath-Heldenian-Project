@@ -6,6 +6,13 @@
 // tiered strategy): capture a baseline before the change, re-run after,
 // compare the ROLLSMOKE lines.
 //
+// Legacy mode: rollsmoke <item_id> [count] — P/S/C histograms, unchanged
+// format since 2-C.
+// Tiered mode: rollsmoke <item_id> [count] [grade] — tier histogram (T),
+// per-tier modifier value histograms (M, and N for pair second halves),
+// plus a per-item legality audit (count == tier, Bucket law, min-tier
+// ladder, band/window bounds) so a smoke run is also structural evidence.
+//
 //////////////////////////////////////////////////////////////////////
 
 #include "CmdRollSmoke.h"
@@ -13,16 +20,102 @@
 #include "Game.h"
 #include "ItemManager.h"
 #include "Item.h"
+#include "TierConfigStore.h"
+#include "TierConfigValidator.h"
 #include <cstdio>
+#include <string>
 #include <vector>
+
+using namespace hb::shared::item;
+
+namespace
+{
+
+void rollsmoke_tiered(CGame* game, int item_id, int count, int grade)
+{
+	const hb::server::tier_config& config = game->get_tier_config();
+	if (config.find_loot_grade(static_cast<uint8_t>(grade)) == nullptr)
+	{
+		hb::console::error("Unknown loot grade: {}.", grade);
+		return;
+	}
+
+	// [tier][modifier id][stored value] counters; tier index 1..tier_count.
+	std::vector<int> values((tier_count + 1) * 256 * 256);
+	std::vector<int> values2((tier_count + 1) * 256 * 256);
+	int tier_counts[tier_count + 1] = {};
+	int no_roll = 0;
+	int violations = 0;
+
+	for (int i = 0; i < count; i++)
+	{
+		CItem item;
+		if (game->m_item_manager->init_item_attr(&item, item_id) == false)
+		{
+			hb::console::error("init_item_attr failed for item ID {}.", item_id);
+			return;
+		}
+		hb::server::roll_context context;
+		context.loot_grade = static_cast<uint8_t>(grade);
+		context.first_drop = true;
+		if (game->get_roll_strategy().roll(item, context) == false)
+		{
+			no_roll++;
+			continue;
+		}
+
+		const item_attribute_data& attributes = item.get_attributes();
+		// The shared structural gate (also the 3-G GM-mint gate): count ==
+		// tier, Bucket law, min-tier ladder, band/window bounds.
+		std::string violation = hb::server::validate_tiered_instance(config, attributes);
+		if (!violation.empty())
+		{
+			if (violations < 10)
+				hb::console::error("rollsmoke VIOLATION: {}", violation);
+			violations++;
+		}
+
+		const int tier = attributes.tier <= tier_count ? attributes.tier : 0;
+		tier_counts[tier]++;
+		if (tier == 0) continue;
+		for (const auto& mod : attributes.modifiers)
+		{
+			if (mod.type == 0) continue;
+			values[(tier * 256 + mod.type) * 256 + mod.value]++;
+			if (mod.value2 != 0)
+				values2[(tier * 256 + mod.type) * 256 + mod.value2]++;
+		}
+	}
+
+	hb::console::write("rollsmoke: item {} ({}) x{} rolls, grade {}, {} produced no attributes, {} legality violations",
+		item_id, game->m_item_config_list[item_id]->m_name, count, grade, no_roll, violations);
+
+	for (int tier = 1; tier <= tier_count; tier++)
+		if (tier_counts[tier] > 0)
+			hb::console::write("ROLLSMOKE T {} {}", tier, tier_counts[tier]);
+
+	auto dump = [](const char* slot, const std::vector<int>& hist)
+	{
+		for (int tier = 1; tier <= tier_count; tier++)
+			for (int id = 0; id < 256; id++)
+				for (int value = 0; value < 256; value++)
+					if (int n = hist[(tier * 256 + id) * 256 + value]; n > 0)
+						hb::console::write("ROLLSMOKE {} {} {} {} {}", slot, tier, id, value, n);
+	};
+	dump("M", values);
+	dump("N", values2);
+}
+
+} // namespace
 
 void CmdRollSmoke::execute(CGame* game, const char* args)
 {
 	int item_id = 0;
 	int count = 100000;
-	if (args == nullptr || std::sscanf(args, "%d %d", &item_id, &count) < 1)
+	int grade = loot_grade::boss;   // tiered default: every tier reachable
+	if (args == nullptr || std::sscanf(args, "%d %d %d", &item_id, &count, &grade) < 1)
 	{
-		hb::console::error("Usage: rollsmoke <item_id> [count]");
+		hb::console::error("Usage: rollsmoke <item_id> [count] [grade]");
 		return;
 	}
 	if (count < 1) count = 1;
@@ -32,6 +125,12 @@ void CmdRollSmoke::execute(CGame* game, const char* args)
 		game->m_item_config_list[item_id] == nullptr)
 	{
 		hb::console::error("Invalid item ID: {}.", item_id);
+		return;
+	}
+
+	if (game->get_tier_config().item_system == item_system_mode::tiered)
+	{
+		rollsmoke_tiered(game, item_id, count, grade);
 		return;
 	}
 
@@ -48,7 +147,7 @@ void CmdRollSmoke::execute(CGame* game, const char* args)
 			hb::console::error("init_item_attr failed for item ID {}.", item_id);
 			return;
 		}
-		if (game->get_roll_strategy().roll(item) == false)
+		if (game->get_roll_strategy().roll(item, hb::server::roll_context{}) == false)
 		{
 			no_roll++;
 			continue;

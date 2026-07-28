@@ -293,7 +293,7 @@ private:
 
     void npc_dead_item_generator(int npc_h, short attacker_h, char attacker_type);
     int roll_drop_table_item(const DropTable* table, int stage, int& outMinCount, int& outMaxCount, bool exclude_empty = false) const;
-    bool spawn_npc_drop_item(int npc_h, int item_id, int min_count, int max_count, short dx = 0, short dy = 0);
+    bool spawn_npc_drop_item(int npc_h, int item_id, int min_count, int max_count, short dx = 0, short dy = 0, bool first_drop = false);
     // Queue a stage-2 drop rolled at death to be placed when the corpse decays.
     void queue_pending_drop(int npc_h, int item_id, int min_count, int max_count, short dx, short dy);
     // Place all pending (delayed) stage-2 drops for a decaying corpse.

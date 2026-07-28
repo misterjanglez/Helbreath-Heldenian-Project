@@ -59,6 +59,15 @@ struct modifier_catalog_config
 	int band_max;
 	int aggregate_cap;                // display units
 	std::optional<modifier_window> windows[hb::shared::item::tier_count];
+
+	// The display-unit range a roll at `tier` draws from: the per-tier
+	// window when data sets one, else the full band ("absent = full band"
+	// is owned here — every consumer resolves through this).
+	modifier_window display_range(uint8_t tier) const
+	{
+		const auto& window = windows[tier - 1];
+		return window.has_value() ? *window : modifier_window{ band_min, band_max };
+	}
 };
 
 struct modifier_eligibility_config
@@ -177,10 +186,15 @@ struct tier_config
 	// cannot represent, which fail-fast forbids papering over.
 	std::vector<std::string> load_anomalies;
 
+	// Tier -> curves row, bound by name (tier_curve_names) once at load;
+	// -1 = that curve is absent (a validator error in tiered mode).
+	int curve_index_by_tier[hb::shared::item::tier_count] = { -1, -1, -1, -1 };
+
 	const modifier_catalog_config* find_modifier(uint8_t modifier_id) const;
 	const attribute_pool_config* find_attribute_pool(int pool_id) const;
 	const tier_bucket_config* find_bucket(uint8_t bucket_id) const;
 	const loot_grade_config* find_loot_grade(uint8_t grade) const;
+	const tier_curve_config* find_tier_curve(uint8_t tier) const;
 };
 
 // Loads the full dataset and replaces `out` wholesale on success; on

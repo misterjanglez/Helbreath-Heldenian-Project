@@ -15,6 +15,7 @@
 #include <map>
 #include <vector>
 
+#include "Item/ItemAttributeData.h"
 #include "TierConfigStore.h"
 
 class CItem;
@@ -52,5 +53,14 @@ std::vector<std::string> validate_tier_config(const tier_config& config,
 // One "tier validator: <error>" log line per error — the shared reporting
 // half every caller (boot, reload) pairs with its own outcome summary.
 void log_tier_validation_errors(const std::vector<std::string>& errors);
+
+// Structural-legality audit of one rolled/minted tiered instance against
+// the catalog: tier 1..4, count == tier, one modifier per Bucket, min-tier
+// ladder, values inside band/window. Empty string = legal; else the first
+// violation found. The rules mirror the spec, not the roll code, so a roll
+// bug cannot self-certify — used by the rollsmoke harness now and the 3-G
+// GM-mint gate later (one authoritative implementation).
+std::string validate_tiered_instance(const tier_config& config,
+	const hb::shared::item::item_attribute_data& attributes);
 
 } // namespace hb::server

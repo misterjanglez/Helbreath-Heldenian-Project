@@ -14,7 +14,6 @@
 #include "Item.h"
 #include "Npc.h"
 #include "Log.h"
-#include "StringCompat.h"
 
 namespace hb::server
 {
@@ -381,14 +380,12 @@ void check_tiered_required_data(const tier_config& config, validation_state& v)
 	if (config.enchant_steps.empty()) v.add("enchant_steps: empty - tiered mode requires seeded data");
 	if (config.settings.empty()) v.add("tier_settings: empty - tiered mode requires seeded data");
 
+	// Checked through the load-time tier -> curve binding (find_tier_curve)
+	// so name matching has exactly one implementation.
 	if (!config.curves.empty())
-		for (const char* name : tier_curve_names)
-		{
-			bool found = std::any_of(config.curves.begin(), config.curves.end(),
-				[name](const tier_curve_config& curve) { return hb_stricmp(curve.name.c_str(), name) == 0; });
-			if (!found)
-				v.add("tier_curves: no '{}' curve (the four tier curves are required)", name);
-		}
+		for (uint8_t tier = 1; tier <= tier_count; tier++)
+			if (config.find_tier_curve(tier) == nullptr)
+				v.add("tier_curves: no '{}' curve (the four tier curves are required)", tier_curve_names[tier - 1]);
 
 	if (!config.loot_grades.empty())
 		for (uint8_t grade = 1; grade <= loot_grade_count; grade++)
@@ -414,6 +411,40 @@ void check_npc_loot_grades(const tier_config& config,
 		if (npc == nullptr) continue;
 		if (config.find_loot_grade(static_cast<uint8_t>(npc->m_loot_grade)) == nullptr)
 			v.add("npc_configs id {} '{}': loot_grade {} not in loot_grades", id, npc->m_npc_name, npc->m_loot_grade);
+	}
+}
+
+// Tiered-only: every gear class must be able to fill count == tier at
+// every tier — t distinct Buckets with an eligible modifier rollable at
+// tier t (min-tier ladder applied). Venue-independent by design: the §3
+// invariant is a property of the eligibility/catalog dataset alone, and
+// GM minting (3-G) reaches classes no drop table currently holds. This is
+// what lets the 3-B roll never degrade a rolled tier.
+void check_class_fillability(const tier_config& config, validation_state& v)
+{
+	for (uint8_t item_class = tier_item_class::melee_weapon;
+		item_class <= tier_item_class::cape; item_class++)
+	{
+		// One eligibility pass per class: each Bucket's lowest rollable tier.
+		std::map<uint8_t, uint8_t> bucket_min_tier;
+		for (const auto& e : config.eligibility)
+		{
+			if (e.item_class != item_class) continue;
+			const auto* modifier = config.find_modifier(e.modifier_id);
+			if (modifier == nullptr) continue;
+			auto [it, inserted] = bucket_min_tier.try_emplace(modifier->bucket_id, modifier->min_tier);
+			if (!inserted && modifier->min_tier < it->second) it->second = modifier->min_tier;
+		}
+
+		for (int tier = 1; tier <= tier_count; tier++)
+		{
+			int buckets = 0;
+			for (const auto& [bucket_id, min_tier] : bucket_min_tier)
+				if (min_tier <= tier) buckets++;
+			if (buckets < tier)
+				v.add("modifier_eligibility class {}: only {} bucket(s) rollable at tier {} - gear of this class cannot satisfy count == tier",
+					(int)item_class, buckets, tier);
+		}
 	}
 }
 
@@ -443,6 +474,56 @@ void log_tier_validation_errors(const std::vector<std::string>& errors)
 		hb::logger::error("tier validator: {}", error);
 }
 
+std::string validate_tiered_instance(const tier_config& config,
+	const hb::shared::item::item_attribute_data& attributes)
+{
+	using namespace hb::shared::item;
+
+	const int tier = attributes.tier;
+	if (tier < 1 || tier > tier_count)
+		return std::format("tier {} outside 1..{}", tier, (int)tier_count);
+	if (!attributes.tier_invariant_ok())
+		return std::format("modifier count {} != tier {}", (int)attributes.modifier_count(), tier);
+
+	bool bucket_seen[256] = {};
+	for (const auto& mod : attributes.modifiers)
+	{
+		if (mod.type == 0) continue;
+		const auto* row = config.find_modifier(mod.type);
+		if (row == nullptr)
+			return std::format("modifier {} not in catalog", (int)mod.type);
+		if (row->min_tier > tier)
+			return std::format("modifier {} min_tier {} above tier {}", (int)mod.type, (int)row->min_tier, tier);
+		if (bucket_seen[row->bucket_id])
+			return std::format("two modifiers from bucket {}", (int)row->bucket_id);
+		bucket_seen[row->bucket_id] = true;
+
+		const bool pair = row->effect_id == effect_id::add_attribute_pair;
+		if (!pair && mod.value2 != 0)
+			return std::format("modifier {} has value2 {} but is not a pair", (int)mod.type, (int)mod.value2);
+		if (row->multiplier == 0)
+		{
+			if (mod.value != 0)
+				return std::format("value-less modifier {} rolled value {}", (int)mod.type, (int)mod.value);
+			continue;
+		}
+
+		const modifier_window range = row->display_range(static_cast<uint8_t>(tier));
+		const int display = mod.value * row->multiplier;
+		if (display < range.min || display > range.max)
+			return std::format("modifier {} value {} (display {}) outside {}..{}",
+				(int)mod.type, (int)mod.value, display, range.min, range.max);
+		if (pair)
+		{
+			const int display2 = mod.value2 * row->multiplier;
+			if (display2 < range.min || display2 > range.max)
+				return std::format("modifier {} value2 {} (display {}) outside {}..{}",
+					(int)mod.type, (int)mod.value2, display2, range.min, range.max);
+		}
+	}
+	return {};
+}
+
 std::vector<std::string> validate_tier_config(const tier_config& config,
 	const tier_validation_context& context)
 {
@@ -465,6 +546,7 @@ std::vector<std::string> validate_tier_config(const tier_config& config,
 	{
 		check_tiered_required_data(config, v);
 		check_npc_loot_grades(config, context, v);
+		check_class_fillability(config, v);
 		check_stage2_gear(context, v);
 	}
 

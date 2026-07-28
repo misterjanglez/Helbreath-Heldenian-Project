@@ -370,6 +370,13 @@ const loot_grade_config* tier_config::find_loot_grade(uint8_t grade) const
 	return it != loot_grades.end() ? &*it : nullptr;
 }
 
+const tier_curve_config* tier_config::find_tier_curve(uint8_t tier) const
+{
+	if (tier < 1 || tier > hb::shared::item::tier_count) return nullptr;
+	int index = curve_index_by_tier[tier - 1];
+	return index >= 0 ? &curves[index] : nullptr;
+}
+
 bool load_tier_config(sqlite3* db, tier_config& out)
 {
 	if (db == nullptr) return false;
@@ -393,6 +400,16 @@ bool load_tier_config(sqlite3* db, tier_config& out)
 
 	if (fresh.catalog.empty())
 		hb::logger::warn("tier config: modifier_catalog is empty - item tooltips will have no labels");
+
+	// Bind tier -> curve once (the name convention lives here alone); an
+	// unresolved tier stays -1 and the validator reports it in tiered mode.
+	for (int tier = 0; tier < hb::shared::item::tier_count; tier++)
+		for (int i = 0; i < (int)fresh.curves.size(); i++)
+			if (hb_stricmp(fresh.curves[i].name.c_str(), hb::shared::item::tier_curve_names[tier]) == 0)
+			{
+				fresh.curve_index_by_tier[tier] = i;
+				break;
+			}
 
 	int pool_entries = 0;
 	for (const auto& pool : fresh.attribute_pools)

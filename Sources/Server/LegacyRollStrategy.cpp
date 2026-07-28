@@ -57,7 +57,7 @@ static uint8_t pick_pool_modifier(const std::vector<attribute_pool_entry_config>
 	return modifier_id::empty;
 }
 
-bool legacy_roll_strategy::roll(CItem& item)
+bool legacy_roll_strategy::roll(CItem& item, const roll_context&)
 {
 	// Rollability gate unchanged from the hardcoded-table era: only three
 	// effect types roll (is_legacy_rollable_effect_type). Some pool-assigned

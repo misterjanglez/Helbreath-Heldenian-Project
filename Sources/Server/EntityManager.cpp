@@ -2595,8 +2595,9 @@ static uint32_t ApplyDropMultiplier(uint32_t baseChance, float multiplier)
 	return static_cast<uint32_t>(result);
 }
 
-// Base drop chances (out of 10000 = 100%)
-static constexpr uint32_t BASE_PRIMARY_DROP_CHANCE = 1000;   // 10% base primary item drop chance
+// Base drop chances (out of 10000 = 100%). The stage-1 primary base moved
+// to the Roll strategy seam (base_primary_drop_chance, RollStrategy.h) —
+// it is strategy policy since Tiers 3-B.
 static constexpr uint32_t BASE_GOLD_DROP_CHANCE = 3000;      // 30% base gold drop chance
 static constexpr uint32_t BASE_SECONDARY_DROP_CHANCE = 500;  // 5% base secondary/bonus drop chance
 
@@ -2628,7 +2629,12 @@ void CEntityManager::npc_dead_item_generator(int npc_h, short attacker_h, char a
 
 	// Apply drop rate multipliers to base chances
 	// At 1.0: normal, at 1.5: 150% more likely, at 2.0: 200%, etc.
-	uint32_t primaryChance = ApplyDropMultiplier(BASE_PRIMARY_DROP_CHANCE, m_game->m_primary_drop_rate);
+	// The base first-drop chance is strategy policy (spec §8): legacy keeps
+	// the flat base, tiered reads the monster's loot-grade row.
+	uint32_t primaryChance = ApplyDropMultiplier(
+		m_game->get_roll_strategy().first_drop_chance(
+			static_cast<uint8_t>(m_npc_list[npc_h]->m_loot_grade)),
+		m_game->m_primary_drop_rate);
 	uint32_t goldChance = ApplyDropMultiplier(BASE_GOLD_DROP_CHANCE, m_game->m_gold_drop_rate);
 
 	bool droppedGold = false;
@@ -2666,7 +2672,7 @@ void CEntityManager::npc_dead_item_generator(int npc_h, short attacker_h, char a
 					min_count = static_cast<int>(m_npc_list[npc_h]->m_gold_dice_min);
 					max_count = static_cast<int>(m_npc_list[npc_h]->m_gold_dice_max);
 				}
-				spawn_npc_drop_item(npc_h, item_id, min_count, max_count);
+				spawn_npc_drop_item(npc_h, item_id, min_count, max_count, 0, 0, /*first_drop=*/true);
 			}
 		}
 	}
@@ -2778,7 +2784,7 @@ int CEntityManager::roll_drop_table_item(const DropTable* table, int stage, int&
 	return 0;
 }
 
-bool CEntityManager::spawn_npc_drop_item(int npc_h, int item_id, int min_count, int max_count, short dx, short dy)
+bool CEntityManager::spawn_npc_drop_item(int npc_h, int item_id, int min_count, int max_count, short dx, short dy, bool first_drop)
 {
 	if (item_id <= 0) return false;
 	if (m_npc_list[npc_h] == nullptr) return false;
@@ -2824,7 +2830,10 @@ bool CEntityManager::spawn_npc_drop_item(int npc_h, int item_id, int min_count, 
 		return false;
 	}
 	item->m_instance.count = count;
-	m_game->get_roll_strategy().roll(*item);
+	hb::server::roll_context roll_context;
+	roll_context.loot_grade = static_cast<uint8_t>(m_npc_list[npc_h]->m_loot_grade);
+	roll_context.first_drop = first_drop;
+	m_game->get_roll_strategy().roll(*item, roll_context);
 	item->set_touch_effect_type(TouchEffectType::ID);
 	item->m_instance.touch_effect_value1 = static_cast<short>(m_game->dice(1, 100000));
 	item->m_instance.touch_effect_value2 = static_cast<short>(m_game->dice(1, 100000));

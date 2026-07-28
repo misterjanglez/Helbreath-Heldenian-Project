@@ -243,9 +243,19 @@ inline constexpr const char* item_system_mode_name(uint8_t mode)
 // presentation table and every client/server tier array.
 inline constexpr uint8_t tier_count = 4;
 
-// The loot-grade ladder vermin/standard/veteran/elite/boss, 1..5 — the
-// whole tiered drop-economics dial (spec §8). Grade 2 (standard) is the
-// npc_configs default.
+// The loot-grade ladder — the whole tiered drop-economics dial (spec §8),
+// each grade mapping to one live-reloadable loot_grades row. Grade 2
+// (standard) is the npc_configs default.
+namespace loot_grade {
+enum loot_grade : uint8_t
+{
+	vermin   = 1,
+	standard = 2,
+	veteran  = 3,
+	elite    = 4,
+	boss     = 5
+};
+}
 inline constexpr uint8_t loot_grade_count = 5;
 
 // The tier_curves rows the tiered value roll consumes, bound by name —

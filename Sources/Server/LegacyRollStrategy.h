@@ -22,7 +22,10 @@ class legacy_roll_strategy : public roll_strategy
 public:
 	explicit legacy_roll_strategy(CGame& game) : m_game(game) {}
 
-	bool roll(CItem& item) override;
+	// The context is deliberately unused: legacy rolls every spawn venue
+	// (stage-1 and stage-2 drops alike), exactly as before the seam.
+	// first_drop_chance keeps the seam's flat-base default.
+	bool roll(CItem& item, const roll_context& context) override;
 
 private:
 	CGame& m_game;

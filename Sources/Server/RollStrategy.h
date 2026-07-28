@@ -1,4 +1,4 @@
-// RollStrategy.h: the Roll strategy seam (Tiers 3-A)
+// RollStrategy.h: the Roll strategy seam (Tiers 3-A/3-B)
 //
 // One interface, two pluggable implementations of item attribute
 // generation: legacy (the retail-faithful prefix + secondary roll) and
@@ -9,16 +9,36 @@
 // never in what they store: both emit unified modifier IDs onto the
 // item instance.
 //
-// Design contract: PLANS/ItemTiers_Plan.md §2; plan cycle 3-A.
+// Design contract: PLANS/ItemTiers_Plan.md §2, §8; plan cycles 3-A/3-B.
 //
 //////////////////////////////////////////////////////////////////////
 
 #pragma once
 
+#include <cstdint>
+
 class CItem;
 
 namespace hb::server
 {
+
+// Where a drop came from — the tiered strategy's spec-§8 gates. The
+// legacy strategy ignores it (legacy rolls every spawn venue, unchanged).
+struct roll_context
+{
+	// Loot grade (1..5) of the monster whose death produced the drop;
+	// 0 = no grade (non-drop venues — GM minting until 3-G).
+	uint8_t loot_grade = 0;
+
+	// True only for the stage-1 drop rolled at the moment of death — the
+	// only venue that tier-rolls (spec §8: second drops never tiered).
+	bool first_drop = false;
+};
+
+// The legacy flat base chance for the stage-1 first drop, out of 10000
+// (10%). Strategy policy since spec §8 made the tiered replacement a
+// per-grade data column — the drop pipeline no longer owns this number.
+inline constexpr uint32_t base_primary_drop_chance = 1000;
 
 class roll_strategy
 {
@@ -28,7 +48,16 @@ public:
 	// Rolls attributes onto a freshly initialized drop (spawn_npc_drop_item;
 	// GM minting routes here in 3-G). False = no attributes rolled; the
 	// item keeps its init_item_attr state and spawns plain.
-	virtual bool roll(CItem& item) = 0;
+	virtual bool roll(CItem& item, const roll_context& context) = 0;
+
+	// The stage-1 base drop chance (out of 10000) this strategy's drop
+	// economy uses. Default = the legacy flat base; tiered overrides with
+	// the grade's first_drop_chance row (spec §8) so drop odds stay
+	// live-reloadable.
+	virtual uint32_t first_drop_chance(uint8_t) const
+	{
+		return base_primary_drop_chance;
+	}
 };
 
 } // namespace hb::server
