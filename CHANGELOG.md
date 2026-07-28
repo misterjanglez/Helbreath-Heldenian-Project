@@ -1,3 +1,15 @@
+# Item Tiers Cycle 1-A — Unified modifier ID space (Shared header)
+
+Issue #39 (epic #36). First cycle of the Phase-1 wire batch, compile-only: new Shared header `Dependencies/Shared/Item/ModifierIds.h` establishes the flat Unified modifier ID namespace the whole tier system stores/ships (`uint8_t`, 0 = empty, renumbered from scratch). No runtime behavior change; legacy enums stay until 1-B.
+
+- `modifier_id` — the authoritative ID assignment (recorded implementation-time pick), catalog order: 1–5 DAMAGE, 6–7 PRECISION, 8–10 HANDLING, 11–12 ECONOMY, 13 CASTING, 14–21 SET-AXIS, 22–23 COMBAT UTILITY, 24–34 ATTRIBUTES (singles/pairs/all-stats), 35–40 MARQUEE. Light/Strong are one ID each; per-class eligibility is data.
+- `effect_id` — code-side behavior keys catalog rows carry (`add_attribute`/`add_attribute_pair`/`add_all_attributes` take `tier_attribute` params; six marquee behaviors). Values are arbitrary stable keys — the 1-B translation table is the authority, and must reconcile all THREE legacy enums (prefix, secondary, `AddEffectType`).
+- `tier_attribute` param keys match the existing `hb::shared::net::StatId` wire ids (Str/Dex/Int/Vit/Mag/Chr) so the two attribute keyspaces can never silently diverge (caught by the /simplify reuse reviewer).
+- `tier_item_class` + constexpr `derive_tier_item_class(sub_type, weapon_class, equip_pos)` — the eight §1 gear classes, derivation verified against live `items` rows: capes are `sub_type` armor at `equip_pos` Back (NOT accessory — stale `ItemEnums.h` comment fixed), hauberks/shirts are Arms, robes Body, costumes FullBody → all body_armor; shields are `sub_type` weapon at LeftHand. Plan 3-F updated: the enchant handler's hand-rolled route switch dies in favor of this single classifier.
+- Compile coverage rides `ItemInstanceData.h` (the struct whose modifier slots rekey onto these IDs in 1-B) — deliberately NOT the wide legacy headers. Both new headers registered as `ClInclude` in Client/Server `.vcxproj` + `.filters`.
+- Verified: Windows `-Target All` green; header is include-complete and platform-neutral (Linux gate at phase exit per plan).
+- No version bump: compile-only addition; the single Compatibility bump 0.7.0 → 0.8.0 lands in 1-B.
+
 # Item Tiers Cycle 0-B — item attribute field access funneled through accessors (shared/server/client)
 
 Issue #38 (epic #36). Prefactor per `PLANS/ItemTiers_Implementation_Plan.md` Cycle 0-B: every direct read/write of the item-instance attribute fields (`custom_made`, `prefix_type/value`, `secondary_type/value`, `enchant_bonus`) now routes through accessors, so the Phase-1 struct reshape only touches the accessor bodies. Zero behavior change (verified by `git diff` review + acceptance grep: no `m_instance.<attr>` access remains outside the two shared headers).

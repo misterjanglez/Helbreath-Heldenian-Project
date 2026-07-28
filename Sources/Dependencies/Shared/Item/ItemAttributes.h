@@ -9,6 +9,8 @@
 
 #include <cstdint>
 
+// Successor: ModifierIds.h (Item Tiers unified modifier ID space).
+
 namespace hb::shared::item {
 
 //------------------------------------------------------------------------

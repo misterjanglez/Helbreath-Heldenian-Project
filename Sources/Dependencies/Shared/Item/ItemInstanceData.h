@@ -2,6 +2,8 @@
 #include <algorithm>
 #include <cstdint>
 
+#include "ModifierIds.h"  // unified modifier IDs — the attribute portion rekeys onto these in Tiers 1-B
+
 namespace hb::shared::item {
 
 // All dynamic/mutable item fields — the per-instance data layered on top of base config.

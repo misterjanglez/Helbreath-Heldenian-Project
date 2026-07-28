@@ -66,7 +66,7 @@ enum item_sub_type : int8_t
 	target       = 2,   // Requires pointing at a target (dyes, flags, seeds)
 	weapon       = 3,   // Weapons
 	armor        = 4,   // Armor, shields, helms, boots, gloves
-	accessory    = 5,   // Rings, necklaces, capes
+	accessory    = 5,   // Rings, necklaces, pendants (capes are sub_type armor in item data)
 	component    = 6,   // Crafting inputs — ores, gems, stones
 	monster_drop = 7,   // Monster body parts
 	crafted      = 8,   // Smelted bars, wares (output of crafting)

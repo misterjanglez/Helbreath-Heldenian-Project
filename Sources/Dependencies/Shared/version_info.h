@@ -48,6 +48,6 @@ constexpr const char* display_version = "0.1-alpha";
 constexpr const char* full_version = "0.1.0-alpha+build.12";
 } // namespace launcher
 
-constexpr const char* build_timestamp = "2026-07-27T20:48:50";
+constexpr const char* build_timestamp = "2026-07-27T21:16:37";
 
 } // namespace hb::version

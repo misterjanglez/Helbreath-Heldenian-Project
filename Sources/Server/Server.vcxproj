@@ -270,6 +270,8 @@
     <ClInclude Include="..\Dependencies\Shared\Item\Item.h" />
     <ClInclude Include="..\Dependencies\Shared\Item\ItemAttributes.h" />
     <ClInclude Include="..\Dependencies\Shared\Item\ItemEnums.h" />
+    <ClInclude Include="..\Dependencies\Shared\Item\ItemInstanceData.h" />
+    <ClInclude Include="..\Dependencies\Shared\Item\ModifierIds.h" />
     <ClInclude Include="..\Dependencies\Shared\Item\SharedItem.h" />
     <ClInclude Include="..\Dependencies\Shared\Game\MagicTypes.h" />
     <ClInclude Include="..\Dependencies\Shared\Net\NetConstants.h" />
