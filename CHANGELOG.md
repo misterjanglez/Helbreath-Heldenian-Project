@@ -1,3 +1,13 @@
+# Item Tiers Phase-1 exit gate — legacy-mode smoke through the new wire envelope
+
+Issue #44 (epic #36). No code changes — verification that Phase 1 (cycles 1-A through 1-E) only moved the encoding, not the semantics. Closes Phase 1; Compatibility stays exactly 0.8.0 with no further wire changes queued.
+
+- Builds: Windows `-Target All` Debug green (0 errors); Linux server + Linux client both green via `build_server_linux.sh` / `build_client_linux.sh` on the test box's `~/hb38-ci/` scratch.
+- 1-E stale-schema gate verified live: booting against pre-1-E dev DBs → loud refusal and exit (`schema version '1' does not match required '2' - stale dev database refused`); after clearing, clean boot (79/79 maps, ports listening) with fresh DBs stamped at the new versions.
+- Legacy smoke loop passed: login → prefixed drop (Strong Cape) → pickup → tooltip correct (catalog-fed, Strong inline as durability) → bank round-trip → exchange → Trading Post list/withdraw → enchant attempt — behavior identical to pre-phase.
+- Storage evidence read directly off disk: the cape persisted as `tier 0`, `mod1_type 10` (strong, unified ID), `mod1_value 5` through both paths — account-DB inventory (schema v7) and trading-post escrow (schema v2) — with the modifier POD byte-identical across drop → TP listing → withdraw → logout save, including across a hard server kill mid-loop.
+- Repo dev DBs reset to post-1-E schemas: stale v6 account DBs (`janglez2`, `janglez3`, `shadowevil`, `shadowtest`) removed; `janglez.db` and `tradingpost.db` recommitted as fresh v7/v2 files so a clean checkout boots. Pre-wipe copies parked untracked in `Binaries/Server/pre1E_stale_backup/`.
+
 # Item Tiers Cycle 1-E — persistence DDL swap to the flat tier/modifier columns
 
 Issue #43 (epic #36). All three item-carrying table pairs — `character_items` + `character_bank_items` (per-account DBs) and trading-post `listing_items` + `offer_items` — replace the four legacy `prefix_type`/`prefix_value`/`secondary_type`/`secondary_value` columns with `tier` plus the twelve `mod1..mod4 type/value/value2` columns, so the 15 attribute columns now mirror the 15-byte `item_attribute_data` POD field-for-field and the whole POD round-trips as one unit. **Fresh start per spec §12: straight DDL swap, no data migration.** Server-only (0.9.2 → 0.9.3); no Compatibility change.
