@@ -1147,6 +1147,18 @@ void CEntityManager::process_entities()
             PollAllSockets();
         }
 
+        // Bleed (Item Tiers spec §5) is time-driven, so it ticks outside the
+        // action_time gate below — an NPC's action cadence must not stretch or
+        // compress a debuff's clock. Gated here rather than inside so the
+        // overwhelmingly common no-bleed NPC costs one load and a branch off a
+        // pointer already in hand. A lethal tick can retire the entity.
+        if (m_npc_list[i]->m_marquee_debuffs.bleed_expire_time != 0) {
+            m_game->m_status_effect_manager->tick_bleed(static_cast<short>(i),
+                hb::shared::owner_class::Npc, time);
+            if (m_npc_list[i] == nullptr)
+                continue;
+        }
+
         if (m_npc_list[i]->m_behavior == Behavior::Attack) {
             switch (m_game->dice(1, 7)) {
             case 1: action_time = m_npc_list[i]->m_action_time; break;

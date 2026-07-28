@@ -12,12 +12,12 @@
 
 // Server version
 #define VER_SERVER_MAJOR         0
-#define VER_SERVER_MINOR         9
-#define VER_SERVER_PATCH         9
+#define VER_SERVER_MINOR         10
+#define VER_SERVER_PATCH         0
 #define VER_SERVER_BUILD         267
-#define VER_SERVER_FILEVERSION   0,9,9,267
-#define VER_SERVER_DISPLAY       "0.9.9-alpha"
-#define VER_SERVER_FULL          "0.9.9-alpha+build.267"
+#define VER_SERVER_FILEVERSION   0,10,0,267
+#define VER_SERVER_DISPLAY       "0.10-alpha"
+#define VER_SERVER_FULL          "0.10.0-alpha+build.267"
 
 // Launcher version
 #define VER_LAUNCHER_MAJOR         0

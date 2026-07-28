@@ -12,7 +12,8 @@ public:
 	void set_game(CGame* game) { m_game = game; }
 
 	// Called once per client per game tick from the main loop.
-	// Handles hunger consumption, regen slowdown, HP/MP/SP regen, and poison.
+	// Handles hunger consumption, regen slowdown, HP/MP/SP regen, poison and
+	// the Item Tiers bleed debuff.
 	void process_client_tick(int client_h, uint32_t time);
 
 private:

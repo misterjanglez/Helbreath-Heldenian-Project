@@ -1,9 +1,11 @@
-// RegenManager.cpp: Player HP/MP/SP regen, hunger consumption, and poison ticks.
+// RegenManager.cpp: Player HP/MP/SP regen, hunger consumption, poison and
+// bleed ticks.
 
 #include "RegenManager.h"
 #include "Game.h"
 #include "Client.h"
 #include "CombatManager.h"
+#include "StatusEffectManager.h"
 #include "SharedCalculations.h"
 #include "Log.h"
 #include <algorithm>
@@ -22,6 +24,12 @@ void RegenManager::process_client_tick(int client_h, uint32_t time)
 	tick_mp(client_h, time, hunger_delay);
 	tick_sp(client_h, time, hunger_delay);
 	tick_poison(client_h, time);
+
+	// Bleed (Item Tiers spec §5) rides here beside poison because it is the same
+	// shape of effect, but it shares no state with it: no resist, no cure, its
+	// own clock. StatusEffectManager owns the state machine.
+	m_game->m_status_effect_manager->tick_bleed(static_cast<short>(client_h),
+		hb::shared::owner_class::Player, time);
 }
 
 bool RegenManager::is_regen_suppressed(int client_h) const

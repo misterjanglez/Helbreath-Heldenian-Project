@@ -19,6 +19,7 @@
 #include "GameGeometry.h"
 #include "Appearance.h"
 #include "PlayerStatusData.h"
+#include "MarqueeEffects.h"
 #include "StringCompat.h"
 #include "DirectionHelpers.h"
 using hb::shared::direction::direction;
@@ -199,7 +200,13 @@ public:
 	bool  m_is_poisoned;
 	int   m_poison_level;
 	uint32_t m_poison_time;
-	
+
+	// Item Tiers Marquee (spec §5): what this player is suffering, and what
+	// their equipped weapon grants. Cast-time reduction and total move speed
+	// are not here — they ride m_status (Cycle 4-C).
+	hb::server::marquee_debuffs m_marquee_debuffs;
+	hb::server::marquee_weapon_lines m_marquee_weapon;
+
 	int   m_penalty_block_year, m_penalty_block_month, m_penalty_block_day; // v1.4
 
 	class hb::shared::net::ASIOSocket * m_socket;

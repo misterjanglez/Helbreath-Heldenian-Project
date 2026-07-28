@@ -145,6 +145,10 @@ CClient::CClient(asio::io_context& ctx)
 
 	m_is_poisoned    = false;
 	m_poison_level   = 0;
+	m_poison_time    = 0;
+
+	m_marquee_debuffs.clear();
+	m_marquee_weapon.clear();
 
 	m_rating          = 0;
 	m_time_left_rating = 0;

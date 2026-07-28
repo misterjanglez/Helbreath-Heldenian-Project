@@ -1,14 +1,21 @@
 #include "StatusEffectManager.h"
 #include "Game.h"
+#include "Client.h"
+#include "Npc.h"
 #include "Item.h"
 #include "ItemManager.h"
+#include "CombatManager.h"
 #include "Packet/SharedPackets.h"
 #include "ObjectIDRange.h"
+
+#include <cstdio>
+#include <cstring>
 
 using namespace hb::shared::net;
 using namespace hb::shared::action;
 using namespace hb::server::net;
 using namespace hb::server::config;
+using namespace hb::server::npc;
 namespace sock = hb::shared::net::socket;
 
 extern char G_cTxt[512];
@@ -329,4 +336,115 @@ void StatusEffectManager::check_farming_action(short attacker_h, short target_h,
 			m_game->m_npc_list[target_h]->m_x, m_game->m_npc_list[target_h]->m_y, item);
 	}
 
+}
+
+//////////////////////////////////////////////////////////////////////
+// Item Tiers Marquee debuffs — state machine only (PLANS/ItemTiers_Plan.md §5).
+// The bleed tick's damage and death consequences live in CombatManager, the
+// way poison_effect already does for poison.
+//////////////////////////////////////////////////////////////////////
+
+hb::server::marquee_debuffs* StatusEffectManager::marquee_state(short owner_h, char owner_type)
+{
+	switch (owner_type) {
+	case hb::shared::owner_class::Player:
+		if (m_game->m_client_list[owner_h] == nullptr) return nullptr;
+		return &m_game->m_client_list[owner_h]->m_marquee_debuffs;
+
+	case hb::shared::owner_class::Npc:
+		if (m_game->m_npc_list[owner_h] == nullptr) return nullptr;
+		return &m_game->m_npc_list[owner_h]->m_marquee_debuffs;
+
+	default:
+		return nullptr;
+	}
+}
+
+void StatusEffectManager::clear_marquee(short owner_h, char owner_type)
+{
+	if (auto* state = marquee_state(owner_h, owner_type)) state->clear();
+}
+
+void StatusEffectManager::apply_sunder(short target_h, char target_type, uint32_t now)
+{
+	auto* state = marquee_state(target_h, target_type);
+	if (state == nullptr) return;
+
+	const auto& marquee = m_game->get_tier_config().marquee;
+	if (marquee.sunder_duration_ms <= 0) return;
+
+	// Refresh is a plain overwrite: the debuff is a single fixed step, so a
+	// re-proc restarts its clock rather than deepening it.
+	state->sunder_delta = marquee.sunder_defense_delta;
+	state->sunder_expire_time = now + static_cast<uint32_t>(marquee.sunder_duration_ms);
+
+	if (target_type == hb::shared::owner_class::Player)
+		m_game->send_notify_msg(0, target_h, Notify::NoticeMsg, 0, 0, 0, "Your armor is sundered!");
+}
+
+void StatusEffectManager::apply_bleed(short target_h, char target_type, int attacker_h, uint32_t now)
+{
+	auto* state = marquee_state(target_h, target_type);
+	if (state == nullptr) return;
+
+	const auto& marquee = m_game->get_tier_config().marquee;
+	if ((marquee.bleed_tick_damage <= 0) || (marquee.bleed_tick_interval_ms <= 0)
+		|| (marquee.bleed_duration_ms <= 0)) return;
+
+	const bool was_bleeding = state->is_bleeding(now);
+
+	state->bleed_damage = marquee.bleed_tick_damage;
+	state->bleed_interval_ms = static_cast<uint32_t>(marquee.bleed_tick_interval_ms);
+	state->bleed_expire_time = now + static_cast<uint32_t>(marquee.bleed_duration_ms);
+
+	// Refresh extends the bleed but leaves the tick cadence alone. Restarting
+	// the tick clock on every proc would let a fast weapon refresh the bleed
+	// forever without a single tick ever landing.
+	if (!was_bleeding) state->bleed_next_tick_time = now + state->bleed_interval_ms;
+
+	state->bleed_attacker_h = attacker_h;
+	std::memset(state->bleed_attacker_name, 0, sizeof(state->bleed_attacker_name));
+	if (m_game->m_client_list[attacker_h] != nullptr)
+		std::memcpy(state->bleed_attacker_name, m_game->m_client_list[attacker_h]->m_char_name,
+			hb::shared::limits::CharNameLen - 1);
+
+	if ((target_type == hb::shared::owner_class::Player) && !was_bleeding)
+		m_game->send_notify_msg(0, target_h, Notify::NoticeMsg, 0, 0, 0, "You are bleeding!");
+}
+
+int StatusEffectManager::sunder_defense_delta(short target_h, char target_type, uint32_t now)
+{
+	const auto* state = marquee_state(target_h, target_type);
+	return (state != nullptr && state->is_sundered(now)) ? state->sunder_delta : 0;
+}
+
+void StatusEffectManager::tick_bleed(short target_h, char target_type, uint32_t now)
+{
+	auto* state = marquee_state(target_h, target_type);
+	if (state == nullptr) return;
+	if (state->bleed_expire_time == 0) return;
+
+	// A due tick is settled before expiry is considered. The launch constants
+	// put the last tick exactly on the duration boundary (8 s / 2 s = four
+	// ticks, ~20 damage per proc), and expiring first would silently swallow
+	// it every time the tick loop arrived a millisecond late.
+	bool alive = true;
+	if (static_cast<int32_t>(state->bleed_next_tick_time - now) <= 0) {
+		state->bleed_next_tick_time += state->bleed_interval_ms;
+		// A stalled tick loop (long server hitch) catches up to the present
+		// rather than firing the whole backlog at once.
+		if (static_cast<int32_t>(state->bleed_next_tick_time - now) <= 0)
+			state->bleed_next_tick_time = now + state->bleed_interval_ms;
+
+		alive = m_game->m_combat_manager->bleed_effect(target_h, target_type, *state);
+	}
+
+	if (alive && state->is_bleeding(now)) return;
+
+	state->bleed_expire_time = 0;
+	state->bleed_next_tick_time = 0;
+
+	// A victim who stopped bleeding because they died is told by other means.
+	if (alive && (target_type == hb::shared::owner_class::Player))
+		m_game->send_notify_msg(0, target_h, Notify::NoticeMsg, 0, 0, 0, "The bleeding stops.");
 }

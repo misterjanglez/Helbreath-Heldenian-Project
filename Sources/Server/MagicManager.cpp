@@ -2676,8 +2676,17 @@ bool MagicManager::check_client_magic_frequency(int client_h, uint32_t client_ti
 		time_gap = client_time - m_game->m_client_list[client_h]->m_magic_freq_time;
 		m_game->m_client_list[client_h]->m_magic_freq_time = client_time;
 
-		if ((time_gap < 1500) && (m_game->m_client_list[client_h]->m_magic_confirm)) {
-			hb::logger::warn<log_channel::security>("Speed cast: IP={} player={}, irregular casting rate", m_game->m_client_list[client_h]->m_ip_address, m_game->m_client_list[client_h]->m_char_name);
+		// The legal gap is per-player: a Marquee wand shortens the cast
+		// animation, so the floor has to shorten with it or the wand's own
+		// owner trips the check (spec §5, floor = base x (1 - r)). The base is
+		// a tier_settings knob; posture stays log-only until Cycle 3-E.
+		const int cast_floor_ms = m_game->get_tier_config().marquee.cast_check_floor_ms
+			* (100 - m_game->m_client_list[client_h]->m_status.cast_reduction_pct) / 100;
+
+		if ((time_gap < static_cast<uint32_t>(cast_floor_ms)) && (m_game->m_client_list[client_h]->m_magic_confirm)) {
+			hb::logger::warn<log_channel::security>("Speed cast: IP={} player={}, irregular casting rate (gap {} ms, floor {} ms, cast reduction {}%)",
+				m_game->m_client_list[client_h]->m_ip_address, m_game->m_client_list[client_h]->m_char_name,
+				time_gap, cast_floor_ms, (int)m_game->m_client_list[client_h]->m_status.cast_reduction_pct);
 		}
 
 		m_game->m_client_list[client_h]->m_spell_count--;

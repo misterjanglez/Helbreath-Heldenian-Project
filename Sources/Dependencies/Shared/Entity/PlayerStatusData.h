@@ -85,7 +85,7 @@ struct HB_PACKED PlayerStatus
 	bool afk;
 
 	// Item Tiers marquee speed fields (spec §5) — server-computed totals from
-	// equipped gear, always 0 until the Phase 3 mechanics land. The client
+	// equipped gear, filled at the equip recalc since Cycle 3-D. The client
 	// scales cast/walk/run animation timing from these (Cycle 4-C).
 	uint8_t cast_reduction_pct;   // total cast-time reduction %
 	uint8_t move_speed_pct;       // total move-speed %

@@ -8,6 +8,7 @@
 #include "GameGeometry.h"
 #include "Appearance.h"
 #include "PlayerStatusData.h"
+#include "MarqueeEffects.h"
 #include "DirectionHelpers.h"
 using hb::shared::direction::direction;
 
@@ -150,6 +151,10 @@ public:
 	int   m_spot_mob_index;			// spot-mob-generator ?
 	int   m_waypoint_index[hb::server::npc::MaxWaypoints+1];
 	char  m_magic_effect_status[hb::server::config::MaxMagicEffects];
+
+	// Item Tiers Marquee debuffs (spec §5). NPCs are legal victims of every
+	// weapon exotic; the state machine is StatusEffectManager.
+	hb::server::marquee_debuffs m_marquee_debuffs;
 
 	bool  m_is_perm_attack_mode;
    	uint32_t   m_no_die_remain_exp;

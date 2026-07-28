@@ -35,6 +35,7 @@ CNpc::CNpc(const char * name5)
 	m_attribute = 0;
 	m_abs_damage = 0;
 	m_status.clear();
+	m_marquee_debuffs.clear();
 	m_appearance.clear();
 
 	m_attack_range    = 1;

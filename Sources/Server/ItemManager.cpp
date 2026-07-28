@@ -3167,6 +3167,24 @@ void collect_item_modifiers(const hb::server::tier_config& config, const CItem& 
 			}
 			break;
 
+		case effect_id::sunder:
+		case effect_id::bleed:
+		case effect_id::mp_drain:
+		case effect_id::sp_drain:
+		case effect_id::cast_time_reduction:
+			// The weapon and wand Marquee lines act only through the piece they
+			// are rolled on — a swing procs them, an off-hand slot never does.
+			if (is_held_weapon) totals.by_modifier[mod.type] += value;
+			break;
+
+		case effect_id::move_speed:
+			// Spec §5 clamps movement speed twice: 10% per item, 20% across the
+			// set. This is the one modifier whose aggregate_cap exceeds its band,
+			// so the per-item half needs saying — everywhere else the aggregate
+			// clamp already implies it.
+			totals.by_modifier[mod.type] += std::min(value, row->band_max);
+			break;
+
 		default:
 			totals.by_modifier[mod.type] += value;
 			break;
@@ -3180,6 +3198,11 @@ void collect_item_modifiers(const hb::server::tier_config& config, const CItem& 
 void apply_modifier_totals(const hb::server::tier_config& config, CClient* client,
 	const modifier_totals& totals)
 {
+	// The two speed lines land in bytes on the status broadcast, so they are
+	// summed here in full width and clamped once at the end.
+	int cast_reduction_pct = 0;
+	int move_speed_pct = 0;
+
 	for (int id = 1; id < 256; id++)
 	{
 		const int sum = totals.by_modifier[id];
@@ -3215,15 +3238,29 @@ void apply_modifier_totals(const hb::server::tier_config& config, CClient* clien
 		case effect_id::mana_converting:     client->m_add_trans_mana += value; break;
 		case effect_id::crit_chance:         client->m_add_charge_critical += value; break;
 
+		// Marquee (spec §5). The weapon exotics are read per landed hit in
+		// CombatManager; the two speed lines ride the status broadcast so
+		// remote clients can render true cast/walk/run timing (Cycle 4-C).
+		case effect_id::sunder:              client->m_marquee_weapon.sunder_pct += value; break;
+		case effect_id::bleed:               client->m_marquee_weapon.bleed_pct += value; break;
+		case effect_id::mp_drain:            client->m_marquee_weapon.mp_drain += value; break;
+		case effect_id::sp_drain:            client->m_marquee_weapon.sp_drain += value; break;
+		case effect_id::cast_time_reduction: cast_reduction_pct += value; break;
+		case effect_id::move_speed:          move_speed_pct += value; break;
+
 		// Everything else is consumed where it acts rather than summed here:
 		// agile / light / strong / ancient are derived item stats
-		// (CItem::get_effective_*, ItemManager::apply_modifier_derived_stats),
-		// the signature lines ride m_special_weapon_effect_* (collected above),
-		// and the six Marquee behaviors arrive in Cycle 3-D (spec §5) — until
-		// then the status-broadcast speed fields stay 0 and the procs do nothing.
+		// (CItem::get_effective_*, ItemManager::apply_modifier_derived_stats)
+		// and the signature lines ride m_special_weapon_effect_* (collected above).
 		default: break;
 		}
 	}
+
+	// A reduction at or past 100% would invert the cast floor and the client's
+	// animation scale alike; the catalog caps these far below, so this only
+	// guards a hand-edited dataset.
+	client->m_status.cast_reduction_pct = static_cast<uint8_t>(std::clamp(cast_reduction_pct, 0, 99));
+	client->m_status.move_speed_pct = static_cast<uint8_t>(std::clamp(move_speed_pct, 0, 99));
 
 	for (int attr = tier_attribute::strength; attr <= tier_attribute::charisma; attr++)
 		client->m_add_attribute[attr] +=
@@ -3267,6 +3304,14 @@ void ItemManager::calc_total_item_effect(int client_h, int equip_item_id, bool n
 	m_game->m_status_effect_manager->set_angel_flag(client_h, hb::shared::owner_class::Player, 0, 0);
 
 	for (int& gear_attribute : m_game->m_client_list[client_h]->m_add_attribute) gear_attribute = 0;
+
+	// Marquee lines from the equipped set (spec §5). The two speed values also
+	// travel to nearby clients, so their pre-walk values are kept to decide
+	// whether this recalc owes a status rebroadcast; apply_modifier_totals
+	// assigns them outright, so they need no zeroing here.
+	m_game->m_client_list[client_h]->m_marquee_weapon.clear();
+	const uint8_t prev_cast_reduction_pct = m_game->m_client_list[client_h]->m_status.cast_reduction_pct;
+	const uint8_t prev_move_speed_pct = m_game->m_client_list[client_h]->m_status.move_speed_pct;
 
 	// Every rolled modifier line on the equipped set lands here first and is
 	// applied once the walk finishes, so aggregate caps clamp totals rather
@@ -3685,6 +3730,17 @@ void ItemManager::calc_total_item_effect(int client_h, int equip_item_id, bool n
 	// the caps see the whole equipped set, and after the base-item values the
 	// walk assigned, which the damage lines add on top of.
 	apply_modifier_totals(m_game->get_tier_config(), m_game->m_client_list[client_h], totals);
+
+	// Remote clients animate cast and locomotion from these two bytes, so a
+	// change has to reach them the way every other status change does. Pre-init
+	// recalcs are skipped — the login handshake already sends the full status.
+	if (m_game->m_client_list[client_h]->m_is_init_complete &&
+		((m_game->m_client_list[client_h]->m_status.cast_reduction_pct != prev_cast_reduction_pct) ||
+		 (m_game->m_client_list[client_h]->m_status.move_speed_pct != prev_move_speed_pct)))
+	{
+		m_game->send_event_to_near_client_type_a(client_h, hb::shared::owner_class::Player,
+			MsgId::EventMotion, Type::NullAction, 0, 0, 0);
+	}
 
 	// Combined ceiling, preserved from pre-3-C behavior. The catalog's
 	// aggregate_cap already bounds the rolled lines at 80; this bounds rolled

@@ -144,6 +144,7 @@ void CombatManager::client_killed_handler(int client_h, int attacker_h, char att
 	m_game->m_status_effect_manager->set_poison_flag(client_h, hb::shared::owner_class::Player, false);
 	m_game->m_client_list[client_h]->m_is_poisoned = false;
 	m_game->m_client_list[client_h]->m_poison_level = 0;
+	m_game->m_status_effect_manager->clear_marquee(client_h, hb::shared::owner_class::Player);
 	m_game->send_notify_msg(0, client_h, Notify::MagicEffectOff, hb::shared::magic::Poison, 0, 0, 0);
 	m_game->m_status_effect_manager->set_ice_flag(client_h, hb::shared::owner_class::Player, false);
 	m_game->m_status_effect_manager->set_berserk_flag(client_h, hb::shared::owner_class::Player, false);
@@ -1643,6 +1644,168 @@ void CombatManager::poison_effect(int client_h, int v1)
 	}
 }
 
+void CombatManager::apply_marquee_drains(int attacker_h, short target_h, char target_type, uint32_t time)
+{
+	const auto& lines = m_game->m_client_list[attacker_h]->m_marquee_weapon;
+	if ((lines.mp_drain <= 0) && (lines.sp_drain <= 0)) return;
+
+	switch (target_type) {
+	case hb::shared::owner_class::Player: {
+		auto* victim = m_game->m_client_list[target_h];
+		if (victim == nullptr) return;
+
+		// Owner decision (3-D): the victim loses it, the attacker does not gain
+		// it. Spec §5 prices these as denial, not sustain.
+		const int mp_drained = std::min(std::max(victim->m_mp, 0), lines.mp_drain);
+		if (mp_drained > 0) {
+			victim->m_mp -= mp_drained;
+			m_game->send_notify_msg(0, target_h, Notify::Mp, 0, 0, 0, 0);
+		}
+
+		// The stamina half goes through the shared spot effect so a Marquee
+		// weapon respects Firm Stamina and the invincibility slate, exactly as
+		// every other SP-drain source in the game does. dice(0, 1) is 0, so v3
+		// carries the flat amount.
+		const int sp_before = victim->m_sp;
+		if (lines.sp_drain > 0)
+			effect_sp_down_spot(static_cast<short>(attacker_h), hb::shared::owner_class::Player,
+				target_h, target_type, 0, 1, static_cast<short>(lines.sp_drain));
+		const int sp_drained = sp_before - victim->m_sp;
+
+		if ((mp_drained <= 0) && (sp_drained <= 0)) return;
+
+		// Drains land on every hit and are always-on, so an unthrottled notice
+		// line would bury the victim's chat during a melee exchange. The two
+		// procs are discrete events and notify every time.
+		constexpr uint32_t drain_notify_interval_ms = 3000;
+		auto& state = victim->m_marquee_debuffs;
+		if ((state.drain_notify_time != 0) &&
+			(static_cast<int32_t>(time - state.drain_notify_time) < static_cast<int32_t>(drain_notify_interval_ms))) return;
+
+		state.drain_notify_time = time;
+		char buf[64]{};
+		std::snprintf(buf, sizeof(buf), "Your energy is drained. (-%d MP, -%d SP)", mp_drained, sp_drained);
+		m_game->send_notify_msg(0, target_h, Notify::NoticeMsg, 0, 0, 0, buf);
+		break;
+	}
+
+	case hb::shared::owner_class::Npc: {
+		auto* victim = m_game->m_npc_list[target_h];
+		if (victim == nullptr) return;
+
+		// NPCs hold a live mana pool but have no stamina, so SP drain has
+		// nothing to take from them — recorded, not an omission.
+		const int mp_drained = std::min(std::max(victim->m_mana, 0), lines.mp_drain);
+		if (mp_drained > 0) victim->m_mana -= mp_drained;
+		break;
+	}
+
+	default:
+		break;
+	}
+}
+
+void CombatManager::apply_marquee_on_hit(int attacker_h, char attacker_type, short target_h,
+	char target_type, uint32_t time)
+{
+	if (attacker_type != hb::shared::owner_class::Player) return;
+	if (m_game->m_client_list[attacker_h] == nullptr) return;
+
+	const auto& lines = m_game->m_client_list[attacker_h]->m_marquee_weapon;
+
+	if ((lines.sunder_pct > 0) && (m_game->dice(1, 100) <= static_cast<uint32_t>(lines.sunder_pct)))
+		m_game->m_status_effect_manager->apply_sunder(target_h, target_type, time);
+
+	// Bleed is deliberately independent of poison — no resist check, and a
+	// victim already poisoned still bleeds (the two sit in different Buckets,
+	// so one weapon can carry both).
+	if ((lines.bleed_pct > 0) && (m_game->dice(1, 100) <= static_cast<uint32_t>(lines.bleed_pct)))
+		m_game->m_status_effect_manager->apply_bleed(target_h, target_type, attacker_h, time);
+
+	apply_marquee_drains(attacker_h, target_h, target_type, time);
+}
+
+namespace
+{
+// The bleed's source must still be the same player it was when the bleed was
+// applied. Handles are recycled, and eight seconds is long enough for a
+// reconnect to inherit one and be credited with a kill it had no part in.
+bool is_bleed_attacker_valid(CGame* game, const hb::server::marquee_debuffs& state)
+{
+	const int attacker_h = state.bleed_attacker_h;
+	if ((attacker_h <= 0) || (attacker_h >= MaxClients)) return false;
+	if (game->m_client_list[attacker_h] == nullptr) return false;
+	return std::memcmp(game->m_client_list[attacker_h]->m_char_name, state.bleed_attacker_name,
+		hb::shared::limits::CharNameLen - 1) == 0;
+}
+} // namespace
+
+bool CombatManager::bleed_effect(short target_h, char target_type, const hb::server::marquee_debuffs& state)
+{
+	switch (target_type) {
+	case hb::shared::owner_class::Player: {
+		auto* victim = m_game->m_client_list[target_h];
+		if (victim == nullptr) return false;
+		if (victim->m_is_killed) return false;
+		if (victim->m_is_init_complete == false) return false;
+
+		// GMs shrug it off, the way poison_effect already lets them shrug off poison.
+		if (victim->m_is_gm_mode) return false;
+
+		victim->m_hp -= state.bleed_damage;
+
+		if (victim->m_hp > 0) {
+			m_game->send_notify_msg(0, target_h, Notify::Hp, 0, 0, 0, 0);
+			char buf[64]{};
+			std::snprintf(buf, sizeof(buf), "You took -%d bleeding damage.", state.bleed_damage);
+			m_game->send_notify_msg(0, target_h, Notify::NoticeMsg, 0, 0, 0, buf);
+			return true;
+		}
+
+		// Owner decision (3-D): a bleed tick may land the killing blow. It can
+		// only be credited while its source is still identifiable, so an
+		// unverifiable bleed leaves the victim at 1 HP instead of killing them
+		// anonymously — client_killed_handler dereferences a Player attacker
+		// handle unguarded, and a misattributed PK is worse than a survivor.
+		if (!is_bleed_attacker_valid(m_game, state)) {
+			victim->m_hp = 1;
+			m_game->send_notify_msg(0, target_h, Notify::Hp, 0, 0, 0, 0);
+			return false;
+		}
+
+		analyze_criminal_action(state.bleed_attacker_h, victim->m_x, victim->m_y);
+		client_killed_handler(target_h, state.bleed_attacker_h, hb::shared::owner_class::Player,
+			static_cast<short>(state.bleed_damage));
+		return false;
+	}
+
+	case hb::shared::owner_class::Npc: {
+		auto* victim = m_game->m_npc_list[target_h];
+		if (victim == nullptr) return false;
+		if (victim->m_is_killed) return false;
+		if (victim->m_behavior == Behavior::Dead) return false;
+
+		victim->m_hp -= state.bleed_damage;
+		if (victim->m_hp > 0) return true;
+
+		// Same rule as players: no identifiable source, no kill (and no exp or
+		// loot handed to whoever inherited the handle).
+		if (!is_bleed_attacker_valid(m_game, state)) {
+			victim->m_hp = 1;
+			return false;
+		}
+
+		m_game->m_entity_manager->on_entity_killed(target_h,
+			static_cast<short>(state.bleed_attacker_h), hb::shared::owner_class::Player,
+			static_cast<short>(state.bleed_damage));
+		return false;
+	}
+
+	default:
+		return false;
+	}
+}
+
 bool CombatManager::check_resisting_poison_success(short owner_h, char owner_type)
 {
 	int resist, result;
@@ -2755,6 +2918,12 @@ uint32_t CombatManager::calculate_attack_effect(short target_h, char target_type
 	}
 
 	if (attacker_dir == target_dir) target_defense_ratio = target_defense_ratio / 2;
+
+	// Sunder is a flat step (spec §5), so it lands after the back-attack halving
+	// — applying it before would quietly halve the debuff too. The floor below
+	// keeps a sundered target from becoming impossible to miss.
+	target_defense_ratio += m_game->m_status_effect_manager->sunder_defense_delta(target_h, target_type, time);
+
 	if (target_defense_ratio < 1)   target_defense_ratio = 1;
 
 	tmp1 = (double)(attacker_hit_ratio);
@@ -3088,6 +3257,8 @@ uint32_t CombatManager::calculate_attack_effect(short target_h, char target_type
 					}
 				}
 
+				apply_marquee_on_hit(attacker_h, attacker_type, target_h, target_type, time);
+
 				m_game->m_client_list[target_h]->m_hp -= iAP_SM;
 				// Interrupt spell casting on damage
 				if (iAP_SM > 0) {
@@ -3262,6 +3433,8 @@ uint32_t CombatManager::calculate_attack_effect(short target_h, char target_type
 				m_game->m_npc_list[target_h]->m_magic_effect_status[hb::shared::magic::Protect] = 0;
 				m_game->m_delay_event_manager->remove_from_delay_event_list(target_h, hb::shared::owner_class::Npc, hb::shared::magic::Protect);
 			}
+
+			apply_marquee_on_hit(attacker_h, attacker_type, target_h, target_type, time);
 
 			switch (m_game->m_npc_list[target_h]->m_action_limit) {
 			case 0:

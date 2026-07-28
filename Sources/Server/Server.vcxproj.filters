@@ -492,6 +492,7 @@
     <ClInclude Include="SkillManager.h" />
     <ClInclude Include="WarManager.h" />
     <ClInclude Include="StatusEffectManager.h" />
+    <ClInclude Include="MarqueeEffects.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="AccountSqliteStore.cpp">

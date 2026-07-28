@@ -342,6 +342,15 @@ bool load_attribute_pool_entries(sqlite3* db, tier_config& config)
 
 } // namespace
 
+int tier_config::setting_int(const std::string& key, int fallback) const
+{
+	auto it = settings.find(key);
+	if (it == settings.end()) return fallback;
+
+	try { return std::stoi(it->second); }
+	catch (...) { return fallback; }
+}
+
 const modifier_catalog_config* tier_config::find_modifier(uint8_t modifier_id) const
 {
 	auto it = std::find_if(catalog.begin(), catalog.end(),
@@ -410,6 +419,16 @@ bool load_tier_config(sqlite3* db, tier_config& out)
 				fresh.curve_index_by_tier[tier] = i;
 				break;
 			}
+
+	// Resolve the §5 Marquee constants once, so the proc and cast paths read
+	// plain ints. Each keeps its struct default when the row is absent.
+	auto& marquee = fresh.marquee;
+	marquee.sunder_defense_delta = fresh.setting_int("sunder_defense_delta", marquee.sunder_defense_delta);
+	marquee.sunder_duration_ms = fresh.setting_int("sunder_duration_ms", marquee.sunder_duration_ms);
+	marquee.bleed_tick_damage = fresh.setting_int("bleed_tick_damage", marquee.bleed_tick_damage);
+	marquee.bleed_tick_interval_ms = fresh.setting_int("bleed_tick_interval_ms", marquee.bleed_tick_interval_ms);
+	marquee.bleed_duration_ms = fresh.setting_int("bleed_duration_ms", marquee.bleed_duration_ms);
+	marquee.cast_check_floor_ms = fresh.setting_int("cast_check_floor_ms", marquee.cast_check_floor_ms);
 
 	int pool_entries = 0;
 	for (const auto& pool : fresh.attribute_pools)

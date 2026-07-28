@@ -175,6 +175,21 @@ struct tier_config
 	std::string tier_name_template;
 	std::map<std::string, std::string> settings;             // tier_settings rows
 
+	// The spec §5 Marquee constants, resolved out of `settings` once at load.
+	// Their consumers are per-proc and per-cast paths, which have no business
+	// doing a string-keyed lookup and a throwing parse; keeping the launch
+	// defaults in this one place also stops a code fallback from silently
+	// disagreeing with the seeded row.
+	struct marquee_settings_config
+	{
+		int sunder_defense_delta = -50;
+		int sunder_duration_ms = 5000;
+		int bleed_tick_damage = 5;
+		int bleed_tick_interval_ms = 2000;
+		int bleed_duration_ms = 8000;
+		int cast_check_floor_ms = 1500;
+	} marquee;
+
 	// Legacy pools (consumed by the legacy Roll strategy, Tiers 2-C). The
 	// per-item pool assignment lives on CItem (items.attribute_pool_id via
 	// LoadItemConfigs) so `reload items` keeps item data and pool ids in step.
@@ -189,6 +204,11 @@ struct tier_config
 	// Tier -> curves row, bound by name (tier_curve_names) once at load;
 	// -1 = that curve is absent (a validator error in tiered mode).
 	int curve_index_by_tier[hb::shared::item::tier_count] = { -1, -1, -1, -1 };
+
+	// A tier_settings row as an integer, or `fallback` when the key is absent
+	// or unparseable. The 2-D validator refuses an empty tier_settings table in
+	// tiered mode, so the fallback only covers legacy-mode worlds and live edits.
+	int setting_int(const std::string& key, int fallback) const;
 
 	const modifier_catalog_config* find_modifier(uint8_t modifier_id) const;
 	const attribute_pool_config* find_attribute_pool(int pool_id) const;

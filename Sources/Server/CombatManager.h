@@ -1,8 +1,10 @@
 #pragma once
 
-#include <cstdint>
 #include "EntityRelationship.h"
 #include "DirectionHelpers.h"
+#include "MarqueeEffects.h"
+
+#include <cstdint>
 using hb::shared::direction::direction;
 
 class CGame;
@@ -36,6 +38,13 @@ public:
 
 	// Combat status
 	void poison_effect(int client_h, int v1);
+
+	// One Item Tiers bleed tick (spec §5): damages the victim and routes a
+	// lethal tick to their own kill path. Returns false when the bleed should
+	// stop — the victim died, or its source can no longer be credited.
+	// StatusEffectManager owns the clock; this owns the damage, the way
+	// poison_effect does for poison.
+	bool bleed_effect(short target_h, char target_type, const hb::server::marquee_debuffs& state);
 	void check_fire_bluring(char map_index, int sX, int sY);
 	void armor_life_decrement(int attacker_h, int target_h, char owner_type, int value);
 
@@ -62,4 +71,12 @@ public:
 
 private:
 	CGame* m_game = nullptr;
+
+	// Item Tiers Marquee weapon exotics on a landed hit (spec §5): Sunder and
+	// Bleed roll their proc chance, the two drains are deterministic. Players
+	// and NPCs are both legal victims; only a player can be the attacker,
+	// because only equipped gear carries rolled modifier lines.
+	void apply_marquee_on_hit(int attacker_h, char attacker_type, short target_h, char target_type,
+		uint32_t time);
+	void apply_marquee_drains(int attacker_h, short target_h, char target_type, uint32_t time);
 };
