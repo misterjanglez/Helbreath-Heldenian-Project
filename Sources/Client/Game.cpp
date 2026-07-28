@@ -306,6 +306,7 @@ bool CGame::on_initialize()
 	ChatManager::get().initialize();
 	item_name_formatter::get().set_item_configs(m_item_config_list);
 	item_name_formatter::get().set_catalog(m_modifier_catalog);
+	item_name_formatter::get().set_tier_presentation(m_tier_presentation, &m_tier_name_template);
 	LocalCacheManager::get().initialize();
 
 	return true;

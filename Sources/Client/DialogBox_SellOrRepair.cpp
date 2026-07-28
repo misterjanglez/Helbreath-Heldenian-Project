@@ -51,16 +51,9 @@ void DialogBox_SellOrRepair::on_draw()
 		auto itemInfo = item_name_formatter::get().format(player().m_item_list[item_id].get());
 		txt = itemInfo.name;
 
-		if (itemInfo.is_special)
-		{
-			put_aligned_string(sX + 25, sX + 240, sY + 60, txt.c_str(), GameColors::UIItemName_Special);
-			put_aligned_string(sX + 25 + 1, sX + 240 + 1, sY + 60, txt.c_str(), GameColors::UIItemName_Special);
-		}
-		else
-		{
-			put_aligned_string(sX + 25, sX + 240, sY + 60, txt.c_str(), GameColors::UILabel);
-			put_aligned_string(sX + 25 + 1, sX + 240 + 1, sY + 60, txt.c_str(), GameColors::UILabel);
-		}
+		auto name_color = item_name_color(itemInfo, GameColors::UILabel);
+		put_aligned_string(sX + 25, sX + 240, sY + 60, txt.c_str(), name_color);
+		put_aligned_string(sX + 25 + 1, sX + 240 + 1, sY + 60, txt.c_str(), name_color);
 
 		txt = std::format(DRAW_DIALOGBOX_SELLOR_REPAIR_ITEM2, m_sell_price);
 		put_string(sX + 95 + 15, sY + 53 + 60, txt.c_str(), GameColors::UILabel);
@@ -90,16 +83,9 @@ void DialogBox_SellOrRepair::on_draw()
 		}
 		auto itemInfo2 = item_name_formatter::get().format(player().m_item_list[item_id].get());
 		txt = itemInfo2.name.c_str();
-		if (itemInfo2.is_special)
-		{
-			put_aligned_string(sX + 25, sX + 240, sY + 60, txt.c_str(), GameColors::UIItemName_Special);
-			put_aligned_string(sX + 25 + 1, sX + 240 + 1, sY + 60, txt.c_str(), GameColors::UIItemName_Special);
-		}
-		else
-		{
-			put_aligned_string(sX + 25, sX + 240, sY + 60, txt.c_str(), GameColors::UILabel);
-			put_aligned_string(sX + 25 + 1, sX + 240 + 1, sY + 60, txt.c_str(), GameColors::UILabel);
-		}
+		auto name_color2 = item_name_color(itemInfo2, GameColors::UILabel);
+		put_aligned_string(sX + 25, sX + 240, sY + 60, txt.c_str(), name_color2);
+		put_aligned_string(sX + 25 + 1, sX + 240 + 1, sY + 60, txt.c_str(), name_color2);
 		txt = std::format(DRAW_DIALOGBOX_SELLOR_REPAIR_ITEM2, m_sell_price);
 		put_string(sX + 95 + 15, sY + 53 + 60, txt.c_str(), GameColors::UILabel);
 		txt = std::format(DRAW_DIALOGBOX_SELLOR_REPAIR_ITEM6, m_secondary_price);

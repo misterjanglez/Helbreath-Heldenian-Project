@@ -19,6 +19,9 @@
 #include "PlayerStatusData.h"
 #include <cstdint>
 #include <memory>
+#include <optional>
+#include "Item/ItemInstanceData.h"
+#include "Render/PrimitiveTypes.h"
 #include "ChatMsg.h"
 #include "GameConstants.h"
 #include "GlobalDef.h"
@@ -100,6 +103,10 @@ private:
     void hotkey_cycle_detail_level();
     void hotkey_toggle_sound_and_music();
     void hotkey_whisper_target();
+
+    // The legacy dye tint an item's name takes when it carries a prefix and a
+    // dye color, or nullopt. Feeds item_name_color at both tooltip sites.
+    std::optional<hb::shared::render::Color> name_dye_tint(const hb::shared::item::item_instance_data& instance) const;
 
     void render_item_tooltip();
     void draw_tile_grid();           // Simple dark grid lines

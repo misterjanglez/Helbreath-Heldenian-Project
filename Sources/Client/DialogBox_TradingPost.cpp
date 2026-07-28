@@ -753,7 +753,7 @@ void DialogBox_TradingPost::draw_detail(int mx, int my)
 		auto info = item_name_formatter::get().format(it.item_id, tp_wire_instance(it));
 		hb::shared::text::draw_text_aligned(GameFont::Default, lx, m_y + tp::det_info_y, tp::inner_w - 8, 14,
 			info.name.c_str(),
-			hb::shared::text::TextStyle::from_color(info.is_special ? GameColors::UIItemName_Special : tp_col::text_hi),
+			hb::shared::text::TextStyle::from_color(item_name_color(info, tp_col::text_hi)),
 			hb::shared::text::Align::TopLeft);
 		std::string extra = info.effect_text();
 		if (it.count > 1) extra += (extra.empty() ? "" : "   ") + std::string("Count: ") + m_game->format_comma_number(it.count);

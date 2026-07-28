@@ -30,17 +30,10 @@ void DialogBox_ItemDrop::on_draw()
 	if (m_name[0] == '\0')
 		txt = itemInfo.name.c_str();
 
-	// Item name (green if special, blue otherwise)
-	if (itemInfo.is_special)
-	{
-		put_string(sX + 35, sY + 20, txt.c_str(), GameColors::UIItemName_Special);
-		put_string(sX + 36, sY + 20, txt.c_str(), GameColors::UIItemName_Special);
-	}
-	else
-	{
-		put_string(sX + 35, sY + 20, txt.c_str(), GameColors::UIMagicBlue);
-		put_string(sX + 36, sY + 20, txt.c_str(), GameColors::UIMagicBlue);
-	}
+	// Item name (tier color, else green if special, blue otherwise)
+	auto name_color = item_name_color(itemInfo, GameColors::UIMagicBlue);
+	put_string(sX + 35, sY + 20, txt.c_str(), name_color);
+	put_string(sX + 36, sY + 20, txt.c_str(), name_color);
 
 	// "Do you want to drop?" text
 	put_string(sX + 35, sY + 36, DRAW_DIALOGBOX_ITEM_DROP1, GameColors::UIMagicBlue);

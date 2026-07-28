@@ -66,10 +66,9 @@ void DialogBox_SellList::draw_item_list(short sX, short sY, short size_x, short 
 				// Multiple items — itemInfo.name already includes the count prefix
 				if (hover)
 					put_aligned_string(sX, sX + size_x, sY + 55 + row * 15, itemInfo.name.c_str(), GameColors::UIWhite);
-				else if (itemInfo.is_special)
-					put_aligned_string(sX, sX + size_x, sY + 55 + row * 15, itemInfo.name.c_str(), GameColors::UIItemName_Special);
 				else
-					put_aligned_string(sX, sX + size_x, sY + 55 + row * 15, itemInfo.name.c_str(), GameColors::UILabel);
+					put_aligned_string(sX, sX + size_x, sY + 55 + row * 15, itemInfo.name.c_str(),
+						item_name_color(itemInfo, GameColors::UILabel));
 			}
 			else
 			{
@@ -104,12 +103,10 @@ void DialogBox_SellList::draw_item_list(short sX, short sY, short size_x, short 
 				}
 				else
 				{
+					auto name_color = item_name_color(itemInfo, GameColors::UILabel);
 					if (effect.empty() && extra.empty())
 					{
-						if (itemInfo.is_special)
-							put_aligned_string(sX, sX + size_x, sY + 55 + row * 15, itemInfo.name.c_str(), GameColors::UIItemName_Special);
-						else
-							put_aligned_string(sX, sX + size_x, sY + 55 + row * 15, itemInfo.name.c_str(), GameColors::UILabel);
+						put_aligned_string(sX, sX + size_x, sY + 55 + row * 15, itemInfo.name.c_str(), name_color);
 					}
 					else
 					{
@@ -120,17 +117,11 @@ void DialogBox_SellList::draw_item_list(short sX, short sY, short size_x, short 
 							else
 								txt = std::format("{}({}{})", itemInfo.name.c_str(), effect.c_str(), extra.c_str());
 
-							if (itemInfo.is_special)
-								put_aligned_string(sX, sX + size_x, sY + 55 + row * 15, txt.c_str(), GameColors::UIItemName_Special);
-							else
-								put_aligned_string(sX, sX + size_x, sY + 55 + row * 15, txt.c_str(), GameColors::UILabel);
+							put_aligned_string(sX, sX + size_x, sY + 55 + row * 15, txt.c_str(), name_color);
 						}
 						else
 						{
-							if (itemInfo.is_special)
-								put_aligned_string(sX, sX + size_x, sY + 55 + row * 15, itemInfo.name.c_str(), GameColors::UIItemName_Special);
-							else
-								put_aligned_string(sX, sX + size_x, sY + 55 + row * 15, itemInfo.name.c_str(), GameColors::UILabel);
+							put_aligned_string(sX, sX + size_x, sY + 55 + row * 15, itemInfo.name.c_str(), name_color);
 						}
 					}
 				}

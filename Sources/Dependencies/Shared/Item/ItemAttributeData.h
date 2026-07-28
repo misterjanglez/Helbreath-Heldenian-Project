@@ -1,4 +1,5 @@
 #pragma once
+#include <cstddef>
 #include <cstdint>
 
 #include "Packet/PacketCommon.h"
@@ -21,11 +22,15 @@ struct HB_PACKED item_modifier
 	uint8_t value2 = 0;           // second roll for attribute pairs; 0 otherwise
 };
 
+// Rolled modifier slots per item — the spec §3 Legendary ceiling, and so also
+// the tooltip's modifier-line budget. One home for the 4.
+inline constexpr size_t modifier_slot_count = 4;
+
 struct HB_PACKED item_attribute_data
 {
 	uint8_t custom_made = 0;
 	uint8_t tier = 0;             // 0 = untiered, 1-4 = Common..Legendary
-	item_modifier modifiers[4];
+	item_modifier modifiers[modifier_slot_count];
 	uint8_t enchant_bonus = 0;
 
 	void clear() { *this = {}; }

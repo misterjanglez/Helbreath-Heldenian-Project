@@ -667,28 +667,10 @@
 #define	GET_ITEM_NAME2	"Completion: {}%"
 // GET_ITEM_NAME3-13 (attribute prefix words) retired — the replicated
 // modifier catalog supplies display names since Tiers 1-D.
-#define	GET_ITEM_NAME14	"Critical Hit Damage+{}"
-#define	GET_ITEM_NAME15	"Poison Damage+{}"
-#define	GET_ITEM_NAME16	"Attack Speed -1"
-#define	GET_ITEM_NAME17	"{}% light"
-#define	GET_ITEM_NAME18	"Damage added"
-#define	GET_ITEM_NAME19	"Endurance +{}%"
-#define	GET_ITEM_NAME20	"Extra Damage added"
-#define	GET_ITEM_NAME21	"Magic Casting Probability +{}%"
-#define	GET_ITEM_NAME22	"Replace {}% damage to mana"
-#define	GET_ITEM_NAME23	"Crit Increase Chance {}%"
-#define	GET_ITEM_NAME24	"Poison Resistance+{}%"
-#define	GET_ITEM_NAME25	"Hitting Probability+{}"
-#define	GET_ITEM_NAME26	"Defense Ratio+{}"
-#define	GET_ITEM_NAME27	"HP recovery {}%"
-#define	GET_ITEM_NAME28	"SP recovery {}%"
-#define	GET_ITEM_NAME29	"MP recovery {}%"
-#define	GET_ITEM_NAME30	"Magic Resistance+{}%"
-#define	GET_ITEM_NAME31	"Physical Absorption+{}%"
-#define	GET_ITEM_NAME32	"Magic Absorption+{}%"
-#define	GET_ITEM_NAME33	"Consecutive Attack Damage+{}"
-#define	GET_ITEM_NAME34	"Experience+{}%"
-#define	GET_ITEM_NAME35	"Gold+{}%"
+// GET_ITEM_NAME14-35 (modifier effect lines) retired — the same catalog
+// supplies effect_label/effect_format since Tiers 4-A, and a row the server
+// never replicated renders its raw roll rather than falling back to a string
+// the client happens to remember.
 
 //50Cent - Repair all
 #define DRAW_DIALOGBOX_NPCACTION_QUERY49    "Repair All"

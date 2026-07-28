@@ -796,16 +796,8 @@ void Screen_OnGame::draw_objects(short pivot_x, short pivot_y, short div_x, shor
 		auto itemInfo = item_name_formatter::get().format(item_selected_id, item_selected);
 
 		item_tooltip tooltip;
-		bool has_prefix = item_selected.has_prefix();
-		if (has_prefix && item_selected.item_color != 0)
-		{
-			const auto& dye = m_game->m_color_palette[static_cast<uint8_t>(item_selected.item_color)];
-			tooltip.add_line(itemInfo.name, {dye.r, dye.g, dye.b, 255});
-		}
-		else if (itemInfo.is_special)
-			tooltip.add_line(itemInfo.name, GameColors::UIItemName_Special);
-		else
-			tooltip.add_line(itemInfo.name, GameColors::UIWhite);
+		tooltip.add_line(itemInfo.name,
+			item_name_color(itemInfo, GameColors::UIWhite, name_dye_tint(item_selected)));
 		tooltip.draw(mouse_x, mouse_y + 25, m_game->m_Renderer);
 	}
 }

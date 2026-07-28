@@ -844,6 +844,15 @@ void Screen_OnGame::on_render()
     // FPS, latency, and profiling display moved to RenderFrame (global, all screens)
 }
 
+// Legacy dye tint for an item name: only a prefixed, dyed item has one. Tiered
+// items never reach the tint channel — item_name_color puts Tier color first.
+std::optional<hb::shared::render::Color> Screen_OnGame::name_dye_tint(
+    const hb::shared::item::item_instance_data& instance) const
+{
+    if (!instance.has_prefix() || instance.item_color == 0) return std::nullopt;
+    return m_game->m_color_palette[static_cast<uint8_t>(instance.item_color)];
+}
+
 void Screen_OnGame::render_item_tooltip()
 {
 	std::string G_cTxt;
@@ -864,17 +873,9 @@ void Screen_OnGame::render_item_tooltip()
 
     item_tooltip tooltip;
 
-    // 1. Name — dye-colored for prefixed items, special color, or white
-    bool has_prefix = item->has_prefix();
-    if (has_prefix && item_color != 0)
-    {
-        const auto& dye = m_game->m_color_palette[item_color];
-        tooltip.add_line(itemInfo.name, {dye.r, dye.g, dye.b, 255});
-    }
-    else if (itemInfo.is_special)
-        tooltip.add_line(itemInfo.name, GameColors::UIItemName_Special);
-    else
-        tooltip.add_line(itemInfo.name, GameColors::UIWhite);
+    // 1. Name — tier color, else the dye tint of a prefixed item, else special, else white
+    tooltip.add_line(itemInfo.name,
+        item_name_color(itemInfo, GameColors::UIWhite, name_dye_tint(item->m_instance)));
 
     // 2. Classification
     if (cfg->m_armor_class == armor_class::clothing)

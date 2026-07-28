@@ -72,10 +72,8 @@ void DialogBox_Bank::draw_item_list(short sX, short sY, short size_x)
 				draw_item_details(sX, sY, size_x, itemIndex, loc);
 			}
 			else {
-				if (itemInfo.is_special)
-					put_aligned_string(sX, sX + size_x, sY + 110 + i * 15, itemInfo.name.c_str(), GameColors::UIItemName_Special);
-				else
-					put_aligned_string(sX, sX + size_x, sY + 110 + i * 15, itemInfo.name.c_str(), GameColors::UIBlack);
+				put_aligned_string(sX, sX + size_x, sY + 110 + i * 15, itemInfo.name.c_str(),
+					item_name_color(itemInfo, GameColors::UIBlack));
 			}
 		}
 	}
@@ -103,10 +101,8 @@ void DialogBox_Bank::draw_item_details(short sX, short sY, short size_x, int ite
 
 	auto itemInfo2 = item_name_formatter::get().format(item);
 
-	if (itemInfo2.is_special)
-		put_aligned_string(sX + 70, sX + size_x, sY + loc, itemInfo2.name.c_str(), GameColors::UIItemName_Special);
-	else
-		put_aligned_string(sX + 70, sX + size_x, sY + loc, itemInfo2.name.c_str(), GameColors::UIWhite);
+	put_aligned_string(sX + 70, sX + size_x, sY + loc, itemInfo2.name.c_str(),
+		item_name_color(itemInfo2, GameColors::UIWhite));
 
 	auto effect = itemInfo2.effect_text();
 	auto extra = itemInfo2.extra_text();

@@ -128,14 +128,9 @@ void DialogBox_Exchange::draw_item_info(short sX, short sY, short size_x, short 
 
 	if ((mouse_x >= sX + xadd - 6) && (mouse_x <= sX + xadd + 42) && (mouse_y >= sY + 61) && (mouse_y <= sY + 200)) {
 		txt = itemInfo.name.c_str();
-		if (itemInfo.is_special) {
-			put_aligned_string(sX + 15, sX + 155, sY + 215, txt.c_str(), GameColors::UIItemName_Special);
-			put_aligned_string(sX + 16, sX + 156, sY + 215, txt.c_str(), GameColors::UIItemName_Special);
-		}
-		else {
-			put_aligned_string(sX + 15, sX + 155, sY + 215, txt.c_str(), GameColors::UILabel);
-			put_aligned_string(sX + 16, sX + 156, sY + 215, txt.c_str(), GameColors::UILabel);
-		}
+		auto name_color = item_name_color(itemInfo, GameColors::UILabel);
+		put_aligned_string(sX + 15, sX + 155, sY + 215, txt.c_str(), name_color);
+		put_aligned_string(sX + 16, sX + 156, sY + 215, txt.c_str(), name_color);
 
 		loc = 0;
 		auto effect = itemInfo.effect_text();
