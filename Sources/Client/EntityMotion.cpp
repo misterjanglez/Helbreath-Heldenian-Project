@@ -4,6 +4,8 @@
 
 #include "EntityMotion.h"
 #include "ActionID.h"
+#include "BalanceConstants.h"
+#include "SharedCalculations.h"
 #include <cmath>
 #include <algorithm>
 
@@ -236,36 +238,37 @@ void EntityMotion::get_direction_start_offset(direction dir, int16_t& outX, int1
 //=============================================================================
 // get_duration_for_action - get movement duration for an action type
 //=============================================================================
-uint32_t EntityMotion::get_duration_for_action(int action, bool hasHaste, bool frozen)
+uint32_t EntityMotion::get_duration_for_action(int action, bool hasHaste, bool frozen, int move_speed_pct)
 {
+    // Attack and damage displacement are not locomotion, so move speed never
+    // touches them; everything else is paced by the one shared model the
+    // server's anti-cheat move floor is derived from (spec §5), which folds
+    // haste, frozen and the Marquee move-speed total together.
     uint32_t baseDuration;
-
     switch (action) {
-        case Type::Move:
-            baseDuration = MovementTiming::WALK_DURATION_MS;
-            break;
-        case Type::Run:
-            baseDuration = MovementTiming::RUN_DURATION_MS;
-            break;
         case Type::DamageMove:
             baseDuration = MovementTiming::DAMAGE_MOVE_DURATION_MS;
             break;
         case Type::AttackMove:
             baseDuration = MovementTiming::ATTACK_MOVE_DURATION_MS;
             break;
+        case Type::Run:
+            return static_cast<uint32_t>(hb::shared::calc::move_interpolation_time(
+                true, hasHaste, frozen, move_speed_pct));
         default:
-            baseDuration = MovementTiming::WALK_DURATION_MS;
-            break;
+            // Move, and anything unrecognised, paces as a walk
+            return static_cast<uint32_t>(hb::shared::calc::move_interpolation_time(
+                false, hasHaste, frozen, move_speed_pct));
     }
 
     // Apply status modifiers
     if (hasHaste) {
         // Haste speeds up movement by ~30%
-        baseDuration = static_cast<uint32_t>(baseDuration * 0.7f);
+        baseDuration = baseDuration * hb::shared::balance::haste_move_duration_pct / 100;
     }
     if (frozen) {
         // Frozen slows movement by ~25%
-        baseDuration = static_cast<uint32_t>(baseDuration * 1.25f);
+        baseDuration = baseDuration * hb::shared::balance::frozen_move_duration_pct / 100;
     }
 
     return baseDuration;

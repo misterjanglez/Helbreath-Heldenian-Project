@@ -160,6 +160,19 @@ inline int swing_time(int atk_delay_value)
 }
 
 // ============================================================================
+// Marquee speed scaling (Item Tiers spec §5)
+// ============================================================================
+
+// The (1 - r) every Marquee speed line applies: cast-time reduction against the
+// Magic animation, move speed against locomotion frames and tile duration. The
+// percentage is clamped so no data row can stop time, and the result never
+// reaches zero.
+inline int apply_speed_reduction(int base_ms, int reduction_pct)
+{
+	return std::max(base_ms * (100 - std::clamp(reduction_pct, 0, 99)) / 100, 1);
+}
+
+// ============================================================================
 // Movement Pacing (Item Tiers spec §5)
 // ============================================================================
 //
@@ -177,8 +190,7 @@ inline int move_frame_time(bool running, bool haste, bool frozen, int move_speed
 	if (frozen) frame += base >> 2;
 	if (haste)  frame -= balance::haste_frame_bonus;
 
-	frame = frame * (100 - std::clamp(move_speed_pct, 0, 99)) / 100;
-	return std::max(frame, 1);
+	return apply_speed_reduction(frame, move_speed_pct);
 }
 
 // How long the client interpolates the slide across one tile
@@ -190,8 +202,7 @@ inline int move_interpolation_time(bool running, bool haste, bool frozen, int mo
 	if (haste)  duration = duration * balance::haste_move_duration_pct / 100;
 	if (frozen) duration = duration * balance::frozen_move_duration_pct / 100;
 
-	duration = duration * (100 - std::clamp(move_speed_pct, 0, 99)) / 100;
-	return std::max(duration, 1);
+	return apply_speed_reduction(duration, move_speed_pct);
 }
 
 // The fastest a legal client can cross one tile — the expected gap between two
@@ -203,8 +214,14 @@ inline int move_interpolation_time(bool running, bool haste, bool frozen, int mo
 //   - quick-actions chaining — 95% of the interpolated tile duration.
 // The two models agree with no status effects and diverge under haste/frozen
 // (a hasted walk is 432 ms by frames but 372 ms by interpolation), so taking
-// the minimum is what keeps the floor below every legal cadence. Cycle 4-C
-// unifies the client onto one model, at which point the two terms collapse.
+// the minimum is what keeps the floor below every legal cadence.
+//
+// Cycle 4-C folded Marquee move speed into BOTH terms, so the speed axis alone
+// never splits them; the haste/frozen divergence is older than Item Tiers and
+// outlives it. Collapsing the two is a balance decision, not a refactor —
+// additive would slow hasted movement 372 -> 410 ms/tile, multiplicative would
+// speed the hasted walk animation past the original client's 54 ms/frame — so
+// it stays an open question for the design owner rather than a silent pick.
 inline int move_tile_time(bool running, bool haste, bool frozen, int move_speed_pct)
 {
 	const int animation_ms = balance::move_frames * move_frame_time(running, haste, frozen, move_speed_pct);

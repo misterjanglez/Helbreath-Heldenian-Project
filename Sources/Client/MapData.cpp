@@ -9,6 +9,7 @@
 #include "CommonTypes.h"
 #include "Benchmark.h"
 #include "EntityMotion.h"
+#include "SharedCalculations.h"
 #include "WeatherManager.h"
 #include "AudioManager.h"
 
@@ -1655,7 +1656,8 @@ bool CMapData::set_owner(uint16_t object_id, int sX, int sY, int type, direction
 			{
 				bool hasHaste = localStatus.haste;
 				bool frozen = localStatus.frozen;
-				uint32_t duration = EntityMotion::get_duration_for_action(action, hasHaste, frozen);
+				uint32_t duration = EntityMotion::get_duration_for_action(action, hasHaste, frozen,
+					localStatus.move_speed_pct);
 
 				if (m_data[dX][dY].m_motion.is_moving())
 				{
@@ -2015,39 +2017,61 @@ int CMapData::object_frame_counter(const std::string& player_name, short view_po
 				int16_t baseFrameTime;
 				short ownerType = m_data[dX][dY].m_owner_type;
 				int8_t ownerAction = m_data[dX][dY].m_animation.m_action;
-				if (hb::shared::owner::is_player(ownerType)) {
+				const auto& ownerStatus = m_data[dX][dY].m_status;
+				const bool ownerIsPlayer = hb::shared::owner::is_player(ownerType);
+				if (ownerIsPlayer) {
 					baseFrameTime = PlayerAnim::from_action(ownerAction).m_frame_time;
 				} else {
 					baseFrameTime = m_stFrame[ownerType][ownerAction].m_sFrameTime;
 				}
 
-				// Compute effective frame time with status modifiers
-				switch (ownerAction) {
-				case Type::Attack: // 3
-				case Type::AttackMove:	// 8
-					delay = m_data[dX][dY].m_status.attack_delay * 12;
-					break;
-				case Type::Magic: // 4
-					if (m_game->m_player->m_skill_mastery[4] == 100) delay = -17;
-					else delay = 0;
-					break;
-				default:
-					delay = 0;
-					break;
+				if (ownerIsPlayer && (ownerAction == Type::Move || ownerAction == Type::Run))
+				{
+					// Walk/run pacing comes from the one shared model the server's
+					// anti-cheat move floor is derived from (spec §5), Marquee move
+					// speed included — the client and the floor must never drift.
+					// Applies to the local player and remote players alike: both read
+					// the same broadcast status off the tile.
+					frame_time = hb::shared::calc::move_frame_time(ownerAction == Type::Run,
+						ownerStatus.haste, ownerStatus.frozen, ownerStatus.move_speed_pct);
 				}
-				// v1.42 Frozen
-				if (m_data[dX][dY].m_status.frozen)
-					delay += baseFrameTime >> 2;
+				else
+				{
+					// Compute effective frame time with status modifiers
+					switch (ownerAction) {
+					case Type::Attack: // 3
+					case Type::AttackMove:	// 8
+						delay = ownerStatus.attack_delay * 12;
+						break;
+					case Type::Magic: // 4
+						if (m_game->m_player->m_skill_mastery[4] == 100) delay = -17;
+						else delay = 0;
+						break;
+					default:
+						delay = 0;
+						break;
+					}
+					// v1.42 Frozen
+					if (ownerStatus.frozen)
+						delay += baseFrameTime >> 2;
 
-				if (m_data[dX][dY].m_status.haste) { // haste
-					int16_t runFrameTime = hb::shared::owner::is_player(ownerType)
-						? PlayerAnim::Run.m_frame_time
-						: m_stFrame[ownerType][Type::Run].m_sFrameTime;
-					delay -= static_cast<int>(runFrameTime / 2.3);
+					if (ownerStatus.haste) { // haste
+						int16_t runFrameTime = ownerIsPlayer
+							? PlayerAnim::Run.m_frame_time
+							: m_stFrame[ownerType][Type::Run].m_sFrameTime;
+						delay -= static_cast<int>(runFrameTime / 2.3);
+					}
+
+					// Apply computed delay to animation state
+					frame_time = baseFrameTime + delay;
+
+					// A Marquee wand shortens the cast for its owner and for everyone
+					// watching (spec §5); attack and damage animations are untouched
+					// by design. NPCs carry this byte zeroed (SetFromEntityStatus).
+					if (ownerAction == Type::Magic)
+						frame_time = hb::shared::calc::apply_speed_reduction(frame_time, ownerStatus.cast_reduction_pct);
 				}
 
-				// Apply computed delay to animation state
-				frame_time = baseFrameTime + delay;
 				m_data[dX][dY].m_animation.m_frame_time = static_cast<int16_t>(frame_time);
 
 				if (m_data[dX][dY].m_animation.update(time))

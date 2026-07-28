@@ -17,9 +17,11 @@ using hb::shared::direction::direction;
 namespace MovementTiming {
     // Duration to cross one tile (milliseconds)
     // Must match animation frame timing: (maxFrame + 1) * frameTime
-    // Movement duration = (maxFrame + 1) * frameTime
-    constexpr uint32_t WALK_DURATION_MS = 560;         // 8 frames (0-7) * 70ms
-    constexpr uint32_t RUN_DURATION_MS = 312;          // 8 frames (0-7) * 39ms
+    //
+    // Walk and run are deliberately absent: locomotion pacing lives in
+    // hb::shared::calc::move_interpolation_time, which the server's anti-cheat
+    // move floor is also built from (spec §5). A literal here would be a third
+    // copy, free to drift from the two that matter.
     constexpr uint32_t DAMAGE_MOVE_DURATION_MS = 200;  // 4 frames (0-3) * 50ms
     constexpr uint32_t ATTACK_MOVE_DURATION_MS = 1014; // 13 frames (0-12) * 78ms
 
@@ -119,5 +121,8 @@ struct EntityMotion {
     static void get_direction_start_offset(direction dir, int16_t& outX, int16_t& outY);
 
     // get movement duration for an action type
-    static uint32_t get_duration_for_action(int action, bool hasHaste = false, bool frozen = false);
+    // move_speed_pct: the Marquee move-speed total from the status broadcast
+    // (spec §5). Scales walk/run only; AttackMove/DamageMove are untouched.
+    static uint32_t get_duration_for_action(int action, bool hasHaste = false, bool frozen = false,
+                                            int move_speed_pct = 0);
 };
