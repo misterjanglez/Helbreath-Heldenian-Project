@@ -12,9 +12,9 @@ enum class ConfigCacheType : uint8_t
 	Npcs          = 3,
 	Maps          = 4,
 	BalanceConfig  = 5,
-	ColorPalette   = 6,
-	AttributeTypes = 7,
-	COUNT          = 8
+	ColorPalette    = 6,
+	ModifierCatalog = 7,
+	COUNT           = 8
 };
 
 class LocalCacheManager

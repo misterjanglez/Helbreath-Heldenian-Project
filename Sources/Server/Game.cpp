@@ -1853,7 +1853,7 @@ void CGame::request_init_data_handler(int client_h, char* data, char key, size_t
 
 	// Send configs FIRST so the client has item/magic/skill definitions
 	// before receiving player data that references them.
-	std::string clientItemHash, clientMagicHash, clientSkillHash, clientNpcHash, clientMapHash, clientBalanceHash, clientColorPaletteHash, clientAttributeTypeHash;
+	std::string clientItemHash, clientMagicHash, clientSkillHash, clientNpcHash, clientMapHash, clientBalanceHash, clientColorPaletteHash, clientModifierCatalogHash;
 	if (msg_size >= sizeof(hb::net::PacketRequestInitDataEx)) {
 		const auto* exReq = reinterpret_cast<const hb::net::PacketRequestInitDataEx*>(data);
 		clientItemHash = exReq->itemConfigHash;
@@ -1863,7 +1863,7 @@ void CGame::request_init_data_handler(int client_h, char* data, char key, size_t
 		clientMapHash = exReq->mapConfigHash;
 		clientBalanceHash = exReq->balanceConfigHash;
 		clientColorPaletteHash = exReq->colorPaletteConfigHash;
-		clientAttributeTypeHash = exReq->attributeTypeConfigHash;
+		clientModifierCatalogHash = exReq->modifierCatalogHash;
 	}
 
 	bool item_cache_valid    = (!clientItemHash.empty() && clientItemHash == m_config_hash[0]);
@@ -1873,7 +1873,7 @@ void CGame::request_init_data_handler(int client_h, char* data, char key, size_t
 	bool map_cache_valid     = (!clientMapHash.empty() && clientMapHash == m_config_hash[4]);
 	bool balance_cache_valid = (!clientBalanceHash.empty() && clientBalanceHash == m_config_hash[5]);
 	bool color_palette_cache_valid = (!clientColorPaletteHash.empty() && clientColorPaletteHash == m_config_hash[6]);
-	bool attribute_type_cache_valid = (!clientAttributeTypeHash.empty() && clientAttributeTypeHash == m_config_hash[7]);
+	bool modifier_catalog_cache_valid = (!clientModifierCatalogHash.empty() && clientModifierCatalogHash == m_config_hash[7]);
 
 	{
 		hb::net::PacketResponseConfigCacheStatus cacheStatus{};
@@ -1886,7 +1886,7 @@ void CGame::request_init_data_handler(int client_h, char* data, char key, size_t
 		cacheStatus.mapCacheValid = map_cache_valid ? 1 : 0;
 		cacheStatus.balanceCacheValid = balance_cache_valid ? 1 : 0;
 		cacheStatus.colorPaletteCacheValid = color_palette_cache_valid ? 1 : 0;
-		cacheStatus.attributeTypeCacheValid = attribute_type_cache_valid ? 1 : 0;
+		cacheStatus.modifierCatalogCacheValid = modifier_catalog_cache_valid ? 1 : 0;
 		m_client_list[client_h]->m_socket->send_msg(
 			reinterpret_cast<char*>(&cacheStatus), sizeof(cacheStatus));
 	}
@@ -1898,7 +1898,7 @@ void CGame::request_init_data_handler(int client_h, char* data, char key, size_t
 	if (!map_cache_valid)     send_client_map_configs(client_h);
 	if (!balance_cache_valid) send_client_balance_config(client_h);
 	if (!color_palette_cache_valid) send_client_color_palette(client_h);
-	if (!attribute_type_cache_valid) send_client_attribute_types(client_h);
+	if (!modifier_catalog_cache_valid) send_client_modifier_catalog(client_h);
 
 	// Now send player data (configs are guaranteed loaded on client)
 	writer.Reset();
@@ -2770,7 +2770,7 @@ void CGame::compute_config_hashes()
 
 	compute_balance_hash();
 	compute_color_palette_hash();
-	compute_attribute_types_hash();
+	compute_modifier_catalog_hash();
 
 	hb::logger::log("Config hashes computed:");
 	hb::logger::log("- Items: {}", m_config_hash[0]);
@@ -2780,7 +2780,7 @@ void CGame::compute_config_hashes()
 	hb::logger::log("- Maps: {}", m_config_hash[4]);
 	hb::logger::log("- Balance: {}", m_config_hash[5]);
 	hb::logger::log("- ColorPalette: {}", m_config_hash[6]);
-	hb::logger::log("- AttributeTypes: {}", m_config_hash[7]);
+	hb::logger::log("- ModifierCatalog: {}", m_config_hash[7]);
 }
 
 void CGame::compute_balance_hash()
@@ -2811,6 +2811,43 @@ bool CGame::send_client_balance_config(int client_h)
 	std::memcpy(buf.data() + sizeof(hb::net::PacketHeader), serialized.data(), serialized.size());
 
 	m_client_list[client_h]->m_socket->send_msg(buf.data(), static_cast<int>(buf.size()));
+	return true;
+}
+
+namespace {
+
+// Hash the exact packet stream the client would receive
+std::string hash_packet_stream(const std::vector<std::vector<char>>& packets)
+{
+	std::vector<uint8_t> allData;
+	for (const auto& packet : packets)
+		allData.insert(allData.end(), packet.begin(), packet.end());
+	return allData.empty() ? std::string{} : hb::shared::util::sha256(allData.data(), allData.size());
+}
+
+} // namespace
+
+bool CGame::send_packet_stream(int client_h, const std::vector<std::vector<char>>& packets, const char* what)
+{
+	if (m_client_list[client_h] == nullptr) return false;
+	if (packets.empty()) return false;
+
+	for (const auto& packet : packets)
+	{
+		int ret = m_client_list[client_h]->m_socket->send_msg(const_cast<char*>(packet.data()), static_cast<int>(packet.size()));
+		switch (ret) {
+		case sock::Event::QueueFull:
+		case sock::Event::SocketError:
+		case sock::Event::CriticalError:
+		case sock::Event::SocketClosed:
+			hb::logger::log("Failed to send {}: Client({})", what, client_h);
+			delete_client(client_h, true, true);
+			delete m_client_list[client_h];
+			m_client_list[client_h] = 0;
+			return false;
+		}
+	}
+
 	return true;
 }
 
@@ -2858,38 +2895,12 @@ std::vector<std::vector<char>> CGame::build_color_palette_packets() const
 
 void CGame::compute_color_palette_hash()
 {
-	// Hash the exact packet stream the client would receive
-	std::vector<uint8_t> allData;
-	for (const auto& packet : build_color_palette_packets())
-		allData.insert(allData.end(), packet.begin(), packet.end());
-
-	m_config_hash[6] = allData.empty() ? std::string{} : hb::shared::util::sha256(allData.data(), allData.size());
+	m_config_hash[6] = hash_packet_stream(build_color_palette_packets());
 }
 
 bool CGame::send_client_color_palette(int client_h)
 {
-	if (m_client_list[client_h] == nullptr) return false;
-
-	auto packets = build_color_palette_packets();
-	if (packets.empty()) return false;
-
-	for (auto& packet : packets)
-	{
-		int ret = m_client_list[client_h]->m_socket->send_msg(packet.data(), static_cast<int>(packet.size()));
-		switch (ret) {
-		case sock::Event::QueueFull:
-		case sock::Event::SocketError:
-		case sock::Event::CriticalError:
-		case sock::Event::SocketClosed:
-			hb::logger::log("Failed to send color palette: Client({})", client_h);
-			delete_client(client_h, true, true);
-			delete m_client_list[client_h];
-			m_client_list[client_h] = 0;
-			return false;
-		}
-	}
-
-	return true;
+	return send_packet_stream(client_h, build_color_palette_packets(), "color palette");
 }
 
 void CGame::build_multiplier_lookup()
@@ -2924,158 +2935,131 @@ void CGame::build_multiplier_lookup()
 		(int)m_attribute_prefix_types.size(), (int)m_attribute_secondary_types.size());
 }
 
-void CGame::compute_attribute_types_hash()
+namespace {
+
+// Tiers 1-D interim shim — the unified modifier catalog rows, equal to
+// today's legacy attribute entries. Multipliers are not here: they come
+// from the DB-fed lookup (build_multiplier_lookup) so replicated display
+// scale can never diverge from gameplay. Dies in Tiers 2-B when the
+// catalog reads the tiered config tables.
+struct modifier_catalog_shim_row
 {
-	if (m_attribute_prefix_types.empty() && m_attribute_secondary_types.empty())
+	uint8_t modifier_id;
+	const char* display_name;   // item-name prefix word ("" = none)
+	const char* effect_label;   // "{}" inside = whole-line format
+	const char* effect_format;  // value format ("" = label-only line)
+	uint8_t bucket_id;
+};
+
+constexpr modifier_catalog_shim_row k_modifier_catalog_shim[] = {
+	{ modifier_id::sharp,               "Sharp",           "",                           "+{}",  tier_bucket::damage },
+	{ modifier_id::critical,            "Critical",        "Critical Hit Damage",        "+{}",  tier_bucket::damage },
+	{ modifier_id::poisoning,           "Poisoning",       "Poison Damage",              "+{}",  tier_bucket::damage },
+	{ modifier_id::righteous,           "Righteous",       "",                           "",     tier_bucket::damage },
+	{ modifier_id::ancient,             "Ancient",         "",                           "+{}",  tier_bucket::damage },
+	{ modifier_id::hitting_probability, "",                "Hitting Probability",        "+{}",  tier_bucket::precision },
+	{ modifier_id::consecutive_attack,  "",                "Consecutive Attack Damage",  "+{}",  tier_bucket::precision },
+	{ modifier_id::agile,               "Agile",           "Attack Speed -1",            "",     tier_bucket::handling },
+	{ modifier_id::light,               "Light",           "",                           "-{}%", tier_bucket::handling },
+	{ modifier_id::strong,              "Strong",          "Durability",                 "+{}%", tier_bucket::handling },
+	{ modifier_id::experience,          "",                "Experience",                 "+{}%", tier_bucket::economy },
+	{ modifier_id::gold,                "",                "Gold",                       "+{}%", tier_bucket::economy },
+	{ modifier_id::spell_success,       "Special",         "Magic Casting Probability ", "+{}%", tier_bucket::casting },
+	{ modifier_id::defense_ratio,       "",                "Defense Ratio",              "+{}",  tier_bucket::set_axis },
+	{ modifier_id::physical_absorb,     "",                "Physical Absorption",        "+{}%", tier_bucket::set_axis },
+	{ modifier_id::magic_resist,        "",                "Magic Resistance",           "+{}%", tier_bucket::set_axis },
+	{ modifier_id::magic_absorb,        "",                "Magic Absorption",           "+{}%", tier_bucket::set_axis },
+	{ modifier_id::hp_recovery,         "",                "HP recovery ",               "{}%",  tier_bucket::set_axis },
+	{ modifier_id::sp_recovery,         "",                "SP recovery ",               "{}%",  tier_bucket::set_axis },
+	{ modifier_id::mp_recovery,         "",                "MP recovery ",               "{}%",  tier_bucket::set_axis },
+	{ modifier_id::poison_resist,       "",                "Poison Resistance",          "+{}%", tier_bucket::set_axis },
+	{ modifier_id::mana_converting,     "Mana Converting", "Replace {}% damage to mana", "",     tier_bucket::combat_utility },
+	{ modifier_id::crit_chance,         "Critical",        "Crit Increase Chance ",      "{}%",  tier_bucket::combat_utility },
+};
+
+// Tier presentation (spec §11): names, name colors, name template.
+struct tier_presentation_shim_row
+{
+	const char* name;
+	uint8_t r, g, b;
+};
+
+constexpr tier_presentation_shim_row k_tier_presentation[hb::shared::item::tier_count] = {
+	{ "Common",    255, 255, 255 },
+	{ "Rare",      128, 192, 128 },
+	{ "Epic",      150, 160, 225 },
+	{ "Legendary", 255, 176,  16 },
+};
+
+constexpr char k_tier_name_template[] = "{tier} {name}";
+
+} // namespace
+
+std::vector<std::vector<char>> CGame::build_modifier_catalog_packets() const
+{
+	constexpr size_t headerSize = sizeof(hb::net::PacketModifierCatalogHeader);
+	constexpr size_t entrySize = sizeof(hb::net::PacketModifierCatalogEntry);
+	constexpr size_t maxEntriesPerPacket = (7000 - headerSize) / entrySize;
+
+	std::vector<std::vector<char>> packets;
+	size_t total = std::size(k_modifier_catalog_shim);
+	size_t built = 0;
+	uint16_t packetIndex = 0;
+
+	while (built < total)
 	{
-		m_config_hash[7].clear();
-		return;
-	}
+		size_t entriesInPacket = std::min(maxEntriesPerPacket, total - built);
+		std::vector<char> buf(headerSize + entriesInPacket * entrySize, 0);
 
-	constexpr size_t headerSize = sizeof(hb::net::PacketAttributeTypeConfigHeader);
-	constexpr size_t prefixEntrySize = sizeof(hb::net::PacketAttributePrefixTypeEntry);
-	constexpr size_t secondaryEntrySize = sizeof(hb::net::PacketAttributeSecondaryTypeEntry);
-
-	std::vector<uint8_t> allData;
-
-	// Build prefix packet data
-	if (!m_attribute_prefix_types.empty())
-	{
-		char buf[7000]{};
-		auto* pktHeader = reinterpret_cast<hb::net::PacketAttributeTypeConfigHeader*>(buf);
-		pktHeader->header.msg_id = MsgId::AttributeTypeConfigContents;
+		auto* pktHeader = reinterpret_cast<hb::net::PacketModifierCatalogHeader*>(buf.data());
+		pktHeader->header.msg_id = MsgId::ModifierCatalogContents;
 		pktHeader->header.msg_type = MsgType::Confirm;
-		pktHeader->totalEntries = static_cast<uint16_t>(m_attribute_prefix_types.size());
-		pktHeader->packetIndex = 0;
-		pktHeader->entryType = 0;
-
-		auto* entries = reinterpret_cast<hb::net::PacketAttributePrefixTypeEntry*>(buf + headerSize);
-		uint16_t count = 0;
-		for (const auto& e : m_attribute_prefix_types)
+		pktHeader->totalEntries = static_cast<uint16_t>(total);
+		pktHeader->packetIndex = packetIndex;
+		pktHeader->entryCount = static_cast<uint16_t>(entriesInPacket);
+		pktHeader->item_system_mode = m_item_system_mode;
+		std::snprintf(pktHeader->tier_name_template, sizeof(pktHeader->tier_name_template), "%s", k_tier_name_template);
+		for (size_t t = 0; t < hb::shared::item::tier_count; t++)
 		{
-			entries[count].prefix_id = e.prefix_id;
-			entries[count].multiplier = e.multiplier;
-			count++;
+			std::snprintf(pktHeader->tiers[t].name, sizeof(pktHeader->tiers[t].name), "%s", k_tier_presentation[t].name);
+			pktHeader->tiers[t].r = k_tier_presentation[t].r;
+			pktHeader->tiers[t].g = k_tier_presentation[t].g;
+			pktHeader->tiers[t].b = k_tier_presentation[t].b;
 		}
-		pktHeader->entryCount = count;
-		size_t packetSize = headerSize + (count * prefixEntrySize);
-		allData.insert(allData.end(), buf, buf + packetSize);
+
+		auto* entries = reinterpret_cast<hb::net::PacketModifierCatalogEntry*>(buf.data() + headerSize);
+		for (size_t i = 0; i < entriesInPacket; i++)
+		{
+			const auto& row = k_modifier_catalog_shim[built + i];
+			entries[i].modifier_id = row.modifier_id;
+			std::snprintf(entries[i].display_name, sizeof(entries[i].display_name), "%s", row.display_name);
+			std::snprintf(entries[i].effect_label, sizeof(entries[i].effect_label), "%s", row.effect_label);
+			std::snprintf(entries[i].effect_format, sizeof(entries[i].effect_format), "%s", row.effect_format);
+			entries[i].multiplier = m_modifier_multiplier[row.modifier_id];
+			entries[i].bucket_id = row.bucket_id;
+			entries[i].min_tier = 0;
+			entries[i].marquee = 0;
+		}
+
+		packets.push_back(std::move(buf));
+		built += entriesInPacket;
+		packetIndex++;
 	}
 
-	// Build secondary packet data
-	if (!m_attribute_secondary_types.empty())
-	{
-		char buf[7000]{};
-		auto* pktHeader = reinterpret_cast<hb::net::PacketAttributeTypeConfigHeader*>(buf);
-		pktHeader->header.msg_id = MsgId::AttributeTypeConfigContents;
-		pktHeader->header.msg_type = MsgType::Confirm;
-		pktHeader->totalEntries = static_cast<uint16_t>(m_attribute_secondary_types.size());
-		pktHeader->packetIndex = 0;
-		pktHeader->entryType = 1;
-
-		auto* entries = reinterpret_cast<hb::net::PacketAttributeSecondaryTypeEntry*>(buf + headerSize);
-		uint16_t count = 0;
-		for (const auto& e : m_attribute_secondary_types)
-		{
-			entries[count].secondary_id = e.secondary_id;
-			entries[count].multiplier = e.multiplier;
-			count++;
-		}
-		pktHeader->entryCount = count;
-		size_t packetSize = headerSize + (count * secondaryEntrySize);
-		allData.insert(allData.end(), buf, buf + packetSize);
-	}
-
-	m_config_hash[7] = allData.empty() ? std::string{} : hb::shared::util::sha256(allData.data(), allData.size());
+	return packets;
 }
 
-bool CGame::send_client_attribute_types(int client_h)
+void CGame::compute_modifier_catalog_hash()
 {
-	if (m_client_list[client_h] == nullptr) return false;
-	if (m_attribute_prefix_types.empty() && m_attribute_secondary_types.empty()) return false;
-
-	constexpr size_t headerSize = sizeof(hb::net::PacketAttributeTypeConfigHeader);
-	constexpr size_t prefixEntrySize = sizeof(hb::net::PacketAttributePrefixTypeEntry);
-	constexpr size_t secondaryEntrySize = sizeof(hb::net::PacketAttributeSecondaryTypeEntry);
-
-	// Send prefix entries
-	if (!m_attribute_prefix_types.empty())
-	{
-		std::memset(G_cData50000, 0, sizeof(G_cData50000));
-
-		auto* pktHeader = reinterpret_cast<hb::net::PacketAttributeTypeConfigHeader*>(G_cData50000);
-		pktHeader->header.msg_id = MsgId::AttributeTypeConfigContents;
-		pktHeader->header.msg_type = MsgType::Confirm;
-		pktHeader->totalEntries = static_cast<uint16_t>(m_attribute_prefix_types.size());
-		pktHeader->packetIndex = 0;
-		pktHeader->entryType = 0;
-
-		auto* entries = reinterpret_cast<hb::net::PacketAttributePrefixTypeEntry*>(G_cData50000 + headerSize);
-		uint16_t count = 0;
-		for (const auto& e : m_attribute_prefix_types)
-		{
-			entries[count].prefix_id = e.prefix_id;
-			entries[count].multiplier = e.multiplier;
-			count++;
-		}
-		pktHeader->entryCount = count;
-		size_t packetSize = headerSize + (count * prefixEntrySize);
-
-		int ret = m_client_list[client_h]->m_socket->send_msg(G_cData50000, static_cast<int>(packetSize));
-		switch (ret) {
-		case sock::Event::QueueFull:
-		case sock::Event::SocketError:
-		case sock::Event::CriticalError:
-		case sock::Event::SocketClosed:
-			hb::logger::log("Failed to send attribute prefix types: Client({})", client_h);
-			delete_client(client_h, true, true);
-			delete m_client_list[client_h];
-			m_client_list[client_h] = 0;
-			return false;
-		}
-	}
-
-	// Send secondary entries
-	if (!m_attribute_secondary_types.empty())
-	{
-		std::memset(G_cData50000, 0, sizeof(G_cData50000));
-
-		auto* pktHeader = reinterpret_cast<hb::net::PacketAttributeTypeConfigHeader*>(G_cData50000);
-		pktHeader->header.msg_id = MsgId::AttributeTypeConfigContents;
-		pktHeader->header.msg_type = MsgType::Confirm;
-		pktHeader->totalEntries = static_cast<uint16_t>(m_attribute_secondary_types.size());
-		pktHeader->packetIndex = 0;
-		pktHeader->entryType = 1;
-
-		auto* entries = reinterpret_cast<hb::net::PacketAttributeSecondaryTypeEntry*>(G_cData50000 + headerSize);
-		uint16_t count = 0;
-		for (const auto& e : m_attribute_secondary_types)
-		{
-			entries[count].secondary_id = e.secondary_id;
-			entries[count].multiplier = e.multiplier;
-			count++;
-		}
-		pktHeader->entryCount = count;
-		size_t packetSize = headerSize + (count * secondaryEntrySize);
-
-		int ret = m_client_list[client_h]->m_socket->send_msg(G_cData50000, static_cast<int>(packetSize));
-		switch (ret) {
-		case sock::Event::QueueFull:
-		case sock::Event::SocketError:
-		case sock::Event::CriticalError:
-		case sock::Event::SocketClosed:
-			hb::logger::log("Failed to send attribute secondary types: Client({})", client_h);
-			delete_client(client_h, true, true);
-			delete m_client_list[client_h];
-			m_client_list[client_h] = 0;
-			return false;
-		}
-	}
-
-	return true;
+	m_config_hash[7] = hash_packet_stream(build_modifier_catalog_packets());
 }
 
-void CGame::reload_attribute_types()
+bool CGame::send_client_modifier_catalog(int client_h)
+{
+	return send_packet_stream(client_h, build_modifier_catalog_packets(), "modifier catalog");
+}
+
+void CGame::reload_modifier_catalog()
 {
 	sqlite3* configDb = nullptr;
 	std::string dbPath;
@@ -3087,7 +3071,7 @@ void CGame::reload_attribute_types()
 	LoadAttributePrefixTypes(configDb, m_attribute_prefix_types);
 	LoadAttributeSecondaryTypes(configDb, m_attribute_secondary_types);
 	build_multiplier_lookup();
-	compute_attribute_types_hash();
+	compute_modifier_catalog_hash();
 	CloseGameConfigDatabase(configDb);
 }
 
@@ -5925,7 +5909,7 @@ void CGame::msg_process()
 				if (reqPkt->requestMaps)    send_client_map_configs(client_h);
 				if (reqPkt->requestBalance) send_client_balance_config(client_h);
 				if (reqPkt->requestColorPalette) send_client_color_palette(client_h);
-				if (reqPkt->requestAttributeTypes) send_client_attribute_types(client_h);
+				if (reqPkt->requestModifierCatalog) send_client_modifier_catalog(client_h);
 			}
 			break;
 
@@ -12741,7 +12725,7 @@ void CGame::reload_shop_configs()
 		hb::logger::log("Shop configs reloaded (no shop data found)");
 }
 
-void CGame::send_config_reload_notification(bool items, bool magic, bool skills, bool npcs, bool balance, bool colors, bool attribute_types)
+void CGame::send_config_reload_notification(bool items, bool magic, bool skills, bool npcs, bool balance, bool colors, bool modifier_catalog)
 {
 	hb::net::PacketNotifyConfigReload pkt{};
 	pkt.header.msg_id = MsgId::NotifyConfigReload;
@@ -12752,7 +12736,7 @@ void CGame::send_config_reload_notification(bool items, bool magic, bool skills,
 	pkt.reloadNpcs = npcs ? 1 : 0;
 	pkt.reloadBalance = balance ? 1 : 0;
 	pkt.reloadColorPalette = colors ? 1 : 0;
-	pkt.reloadAttributeTypes = attribute_types ? 1 : 0;
+	pkt.reloadModifierCatalog = modifier_catalog ? 1 : 0;
 
 	for(int i = 1; i < MaxClients; i++)
 	{
@@ -12761,8 +12745,12 @@ void CGame::send_config_reload_notification(bool items, bool magic, bool skills,
 	}
 }
 
-void CGame::push_config_reload_to_clients(bool items, bool magic, bool skills, bool npcs, bool balance, bool colors, bool attribute_types)
+void CGame::push_config_reload_to_clients(bool items, bool magic, bool skills, bool npcs, bool balance, bool colors, bool modifier_catalog)
 {
+	// The catalog stream is identical for every client — build it once
+	std::vector<std::vector<char>> catalog_packets;
+	if (modifier_catalog) catalog_packets = build_modifier_catalog_packets();
+
 	int count = 0;
 	for(int i = 1; i < MaxClients; i++)
 	{
@@ -12774,7 +12762,7 @@ void CGame::push_config_reload_to_clients(bool items, bool magic, bool skills, b
 			if (npcs)    send_client_npc_configs(i);
 			if (balance) send_client_balance_config(i);
 			if (colors)  send_client_color_palette(i);
-			if (attribute_types) send_client_attribute_types(i);
+			if (modifier_catalog) send_packet_stream(i, catalog_packets, "modifier catalog");
 			count++;
 		}
 	}

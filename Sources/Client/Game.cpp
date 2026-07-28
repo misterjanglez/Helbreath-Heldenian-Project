@@ -198,28 +198,8 @@ CGame::CGame(hb::shared::types::NativeInstance native_instance, int icon_resourc
 	std::fill(std::begin(m_item_drop_id), std::end(m_item_drop_id), short{ 0 });
 	m_item_drop = false;
 
-	// Initialize attribute multiplier fallbacks (hardcoded defaults matching original values)
-	m_modifier_multiplier[modifier_id::critical] = 1;
-	m_modifier_multiplier[modifier_id::poisoning] = 5;
-	m_modifier_multiplier[modifier_id::light] = 4;
-	m_modifier_multiplier[modifier_id::sharp] = 1;
-	m_modifier_multiplier[modifier_id::strong] = 7;
-	m_modifier_multiplier[modifier_id::ancient] = 1;
-	m_modifier_multiplier[modifier_id::spell_success] = 3;
-	m_modifier_multiplier[modifier_id::mana_converting] = 1;
-	m_modifier_multiplier[modifier_id::crit_chance] = 1;
-	m_modifier_multiplier[modifier_id::poison_resist] = 7;
-	m_modifier_multiplier[modifier_id::hitting_probability] = 7;
-	m_modifier_multiplier[modifier_id::defense_ratio] = 7;
-	m_modifier_multiplier[modifier_id::hp_recovery] = 7;
-	m_modifier_multiplier[modifier_id::sp_recovery] = 7;
-	m_modifier_multiplier[modifier_id::mp_recovery] = 7;
-	m_modifier_multiplier[modifier_id::magic_resist] = 7;
-	m_modifier_multiplier[modifier_id::physical_absorb] = 3;
-	m_modifier_multiplier[modifier_id::magic_absorb] = 3;
-	m_modifier_multiplier[modifier_id::consecutive_attack] = 1;
-	m_modifier_multiplier[modifier_id::experience] = 10;
-	m_modifier_multiplier[modifier_id::gold] = 10;
+	// Modifier catalog arrives from the server (or cache replay) during
+	// login config negotiation — no hardcoded fallback entries.
 
 	combat_system::get().set_game(*this);
 	inventory_manager::get().set_game(this);
@@ -325,7 +305,7 @@ bool CGame::on_initialize()
 	weather_manager::get().initialize();
 	ChatManager::get().initialize();
 	item_name_formatter::get().set_item_configs(m_item_config_list);
-	item_name_formatter::get().set_multipliers(m_modifier_multiplier);
+	item_name_formatter::get().set_catalog(m_modifier_catalog);
 	LocalCacheManager::get().initialize();
 
 	return true;
@@ -1264,53 +1244,66 @@ bool CGame::cache_process_color_palette(char* data, uint32_t msg_size)
 	return true;
 }
 
-bool CGame::cache_process_attribute_types(char* data, uint32_t msg_size)
+bool CGame::cache_process_modifier_catalog(char* data, uint32_t msg_size)
 {
-	LocalCacheManager::get().accumulate_packet(ConfigCacheType::AttributeTypes, data, msg_size);
+	LocalCacheManager::get().accumulate_packet(ConfigCacheType::ModifierCatalog, data, msg_size);
 
-	constexpr size_t headerSize = sizeof(hb::net::PacketAttributeTypeConfigHeader);
+	constexpr size_t headerSize = sizeof(hb::net::PacketModifierCatalogHeader);
+	constexpr size_t entrySize = sizeof(hb::net::PacketModifierCatalogEntry);
 
 	if (msg_size < headerSize) return false;
 
-	const auto* pktHeader = reinterpret_cast<const hb::net::PacketAttributeTypeConfigHeader*>(data);
+	const auto* pktHeader = reinterpret_cast<const hb::net::PacketModifierCatalogHeader*>(data);
 	uint16_t entryCount = pktHeader->entryCount;
-	uint8_t entryType = pktHeader->entryType;
+	if (msg_size < headerSize + entryCount * entrySize) return false;
 
-	// Entry ids are unified modifier IDs (the server translates its
-	// legacy-keyed config rows before sending); both entry types fill the
-	// one flat multiplier table.
-	if (entryType == 0)
+	// Copy a possibly-unterminated fixed char field into a string
+	auto to_string = [](const char* field, size_t cap) {
+		return std::string(field, strnlen(field, cap));
+	};
+
+	// Chunk 0 resets the table (so reload pushes replace, never merge) and
+	// carries the authoritative presentation fields; later chunks repeat
+	// them but only their entries matter.
+	if (pktHeader->packetIndex == 0)
 	{
-		// Prefix entries
-		constexpr size_t entrySize = sizeof(hb::net::PacketAttributePrefixTypeEntry);
-		if (msg_size < headerSize + entryCount * entrySize) return false;
+		for (auto& e : m_modifier_catalog) e = {};
 
-		const auto* entries = reinterpret_cast<const hb::net::PacketAttributePrefixTypeEntry*>(data + headerSize);
-		for (uint16_t i = 0; i < entryCount; i++)
-			m_modifier_multiplier[entries[i].prefix_id] = entries[i].multiplier;
-	}
-	else if (entryType == 1)
-	{
-		// Secondary entries
-		constexpr size_t entrySize = sizeof(hb::net::PacketAttributeSecondaryTypeEntry);
-		if (msg_size < headerSize + entryCount * entrySize) return false;
-
-		const auto* entries = reinterpret_cast<const hb::net::PacketAttributeSecondaryTypeEntry*>(data + headerSize);
-		for (uint16_t i = 0; i < entryCount; i++)
-			m_modifier_multiplier[entries[i].secondary_id] = entries[i].multiplier;
+		m_item_system_mode = pktHeader->item_system_mode;
+		m_tier_name_template = to_string(pktHeader->tier_name_template, sizeof(pktHeader->tier_name_template));
+		for (size_t t = 0; t < hb::shared::item::tier_count; t++)
+		{
+			m_tier_presentation[t].name = to_string(pktHeader->tiers[t].name, sizeof(pktHeader->tiers[t].name));
+			m_tier_presentation[t].color = { pktHeader->tiers[t].r, pktHeader->tiers[t].g, pktHeader->tiers[t].b };
+		}
 	}
 
-	// Finalize cache after receiving data (both prefix and secondary come as separate packets)
-	if (!LocalCacheManager::get().is_replaying())
+	const auto* entries = reinterpret_cast<const hb::net::PacketModifierCatalogEntry*>(data + headerSize);
+	for (uint16_t i = 0; i < entryCount; i++)
 	{
-		// For attribute types we get at most 2 packets (prefix + secondary).
-		// Finalize after the secondary packet (entryType==1) or if only one type was sent.
-		if (entryType == 1)
-			LocalCacheManager::get().finalize_and_save(ConfigCacheType::AttributeTypes);
+		auto& e = m_modifier_catalog[entries[i].modifier_id];
+		e.present = true;
+		e.display_name = to_string(entries[i].display_name, sizeof(entries[i].display_name));
+		e.effect_label = to_string(entries[i].effect_label, sizeof(entries[i].effect_label));
+		e.effect_format = to_string(entries[i].effect_format, sizeof(entries[i].effect_format));
+		e.multiplier = entries[i].multiplier;
+		e.bucket_id = entries[i].bucket_id;
+		e.min_tier = entries[i].min_tier;
+		e.marquee = entries[i].marquee != 0;
 	}
 
-	m_attribute_types_loaded = true;
-	hb::logger::log<hb::log_channel::network>("Attribute types loaded (type={}, {} entries)", entryType, entryCount);
+	// Modifier IDs are unique per stream, so completeness = present count
+	auto received = std::count_if(std::begin(m_modifier_catalog), std::end(m_modifier_catalog),
+		[](const modifier_catalog_entry& e) { return e.present; });
+	if (received >= pktHeader->totalEntries)
+	{
+		if (!LocalCacheManager::get().is_replaying())
+			LocalCacheManager::get().finalize_and_save(ConfigCacheType::ModifierCatalog);
+		m_modifier_catalog_loaded = true;
+	}
+
+	hb::logger::log<hb::log_channel::network>("Modifier catalog loaded ({} entries in packet, {} total, mode={})",
+		entryCount, pktHeader->totalEntries, pktHeader->item_system_mode);
 
 	return true;
 }
@@ -1495,24 +1488,24 @@ void CGame::game_recv_msg_handler(uint32_t msg_size, char* data)
 			need_color_palette = true;
 		}
 
-		bool need_attribute_types = false;
-		if (cachePkt->attributeTypeCacheValid) {
-			bool replay_ok = LocalCacheManager::get().replay_from_cache(ConfigCacheType::AttributeTypes,
+		bool need_modifier_catalog = false;
+		if (cachePkt->modifierCatalogCacheValid) {
+			bool replay_ok = LocalCacheManager::get().replay_from_cache(ConfigCacheType::ModifierCatalog,
 				[](char* p, uint32_t s, void* c) -> bool {
-					return static_cast<ReplayCtx*>(c)->game->cache_process_attribute_types(p, s);
+					return static_cast<ReplayCtx*>(c)->game->cache_process_modifier_catalog(p, s);
 				}, &ctx);
-			if (!replay_ok || !m_attribute_types_loaded) {
-				LocalCacheManager::get().reset_accumulator(ConfigCacheType::AttributeTypes);
-				need_attribute_types = true;
+			if (!replay_ok || !m_modifier_catalog_loaded) {
+				LocalCacheManager::get().reset_accumulator(ConfigCacheType::ModifierCatalog);
+				need_modifier_catalog = true;
 			}
 		}
 		else {
-			LocalCacheManager::get().reset_accumulator(ConfigCacheType::AttributeTypes);
-			need_attribute_types = true;
+			LocalCacheManager::get().reset_accumulator(ConfigCacheType::ModifierCatalog);
+			need_modifier_catalog = true;
 		}
 
-		if (need_items || need_magic || need_skills || need_npcs || need_maps || need_balance || need_color_palette || need_attribute_types) {
-			request_configs_from_server(need_items, need_magic, need_skills, need_npcs, need_maps, need_balance, need_color_palette, need_attribute_types);
+		if (need_items || need_magic || need_skills || need_npcs || need_maps || need_balance || need_color_palette || need_modifier_catalog) {
+			request_configs_from_server(need_items, need_magic, need_skills, need_npcs, need_maps, need_balance, need_color_palette, need_modifier_catalog);
 			m_config_request_time = GameClock::get_time_ms();
 		}
 		else {
@@ -1553,9 +1546,9 @@ void CGame::game_recv_msg_handler(uint32_t msg_size, char* data)
 			LocalCacheManager::get().reset_accumulator(ConfigCacheType::ColorPalette);
 			m_color_palette_loaded = false;
 		}
-		if (reloadPkt->reloadAttributeTypes) {
-			LocalCacheManager::get().reset_accumulator(ConfigCacheType::AttributeTypes);
-			m_attribute_types_loaded = false;
+		if (reloadPkt->reloadModifierCatalog) {
+			LocalCacheManager::get().reset_accumulator(ConfigCacheType::ModifierCatalog);
+			m_modifier_catalog_loaded = false;
 		}
 
 		set_top_msg((char*)"Administration kicked off a config reload, some lag may occur.", 5);
@@ -1594,8 +1587,8 @@ void CGame::game_recv_msg_handler(uint32_t msg_size, char* data)
 		cache_process_color_palette(data, msg_size);
 		check_configs_ready_and_enter_game();
 		break;
-	case MsgId::AttributeTypeConfigContents:
-		cache_process_attribute_types(data, msg_size);
+	case MsgId::ModifierCatalogContents:
+		cache_process_modifier_catalog(data, msg_size);
 		break;
 	case MsgId::ResponseInitPlayer:
 		init_player_response_handler(data);
@@ -1680,8 +1673,8 @@ void CGame::init_player_response_handler(char* data)
 			LocalCacheManager::get().get_hash(ConfigCacheType::BalanceConfig).c_str());
 		std::snprintf(req.colorPaletteConfigHash, sizeof(req.colorPaletteConfigHash), "%s",
 			LocalCacheManager::get().get_hash(ConfigCacheType::ColorPalette).c_str());
-		std::snprintf(req.attributeTypeConfigHash, sizeof(req.attributeTypeConfigHash), "%s",
-			LocalCacheManager::get().get_hash(ConfigCacheType::AttributeTypes).c_str());
+		std::snprintf(req.modifierCatalogHash, sizeof(req.modifierCatalogHash), "%s",
+			LocalCacheManager::get().get_hash(ConfigCacheType::ModifierCatalog).c_str());
 		send_game_packet(req);
 		change_game_mode(GameMode::WaitingInitData);
 	}
@@ -2144,10 +2137,10 @@ void CGame::log_recv_msg_handler(char* data, uint32_t msg_size)
 		return;
 	}
 
-	// Intercept attribute types — sent before login response
-	if (header && header->msg_id == MsgId::AttributeTypeConfigContents)
+	// Intercept the modifier catalog — sent before login response
+	if (header && header->msg_id == MsgId::ModifierCatalogContents)
 	{
-		cache_process_attribute_types(data, msg_size);
+		cache_process_modifier_catalog(data, msg_size);
 		return;
 	}
 
@@ -3608,7 +3601,7 @@ bool CGame::try_replay_cache_for_config(int type)
 	return false;
 }
 
-void CGame::request_configs_from_server(bool items, bool magic, bool skills, bool npcs, bool maps, bool balance, bool color_palette, bool attribute_types)
+void CGame::request_configs_from_server(bool items, bool magic, bool skills, bool npcs, bool maps, bool balance, bool color_palette, bool modifier_catalog)
 {
 	if (!m_g_sock) return;
 	hb::net::PacketRequestConfigData pkt{};
@@ -3621,7 +3614,7 @@ void CGame::request_configs_from_server(bool items, bool magic, bool skills, boo
 	pkt.requestMaps = maps ? 1 : 0;
 	pkt.requestBalance = balance ? 1 : 0;
 	pkt.requestColorPalette = color_palette ? 1 : 0;
-	pkt.requestAttributeTypes = attribute_types ? 1 : 0;
+	pkt.requestModifierCatalog = modifier_catalog ? 1 : 0;
 	m_g_sock->send_msg(reinterpret_cast<char*>(&pkt), sizeof(pkt));
 }
 

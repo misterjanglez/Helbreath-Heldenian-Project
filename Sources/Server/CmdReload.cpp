@@ -12,7 +12,7 @@ void CmdReload::execute(CGame* game, const char* args)
 {
 	if (args == nullptr || args[0] == '\0')
 	{
-		hb::console::error("Usage: reload <items|magic|skills|npcs|shops|config|formulas|colors|attributes|all>");
+		hb::console::error("Usage: reload <items|magic|skills|npcs|shops|config|formulas|colors|catalog|all>");
 		return;
 	}
 
@@ -24,7 +24,7 @@ void CmdReload::execute(CGame* game, const char* args)
 	bool config = false;
 	bool formulas = false;
 	bool colors = false;
-	bool attribute_types = false;
+	bool modifier_catalog = false;
 
 	if (hb_stricmp(args, "items") == 0)
 		items = true;
@@ -42,8 +42,8 @@ void CmdReload::execute(CGame* game, const char* args)
 		formulas = true;
 	else if (hb_stricmp(args, "colors") == 0)
 		colors = true;
-	else if (hb_stricmp(args, "attributes") == 0)
-		attribute_types = true;
+	else if (hb_stricmp(args, "catalog") == 0 || hb_stricmp(args, "attributes") == 0)  // "attributes" = legacy alias
+		modifier_catalog = true;
 	else if (hb_stricmp(args, "all") == 0)
 	{
 		items = true;
@@ -54,11 +54,11 @@ void CmdReload::execute(CGame* game, const char* args)
 		config = true;
 		formulas = true;
 		colors = true;
-		attribute_types = true;
+		modifier_catalog = true;
 	}
 	else
 	{
-		hb::console::error("Unknown reload target: '{}'. Use items, magic, skills, npcs, shops, config, formulas, colors, attributes, or all.", args);
+		hb::console::error("Unknown reload target: '{}'. Use items, magic, skills, npcs, shops, config, formulas, colors, catalog, or all.", args);
 		return;
 	}
 
@@ -81,8 +81,8 @@ void CmdReload::execute(CGame* game, const char* args)
 	}
 
 	// Send reload notification to clients first (shows top bar message)
-	if (items || magic || skills || npcs || shops || formulas || colors || attribute_types)
-		game->send_config_reload_notification(items, magic, skills, npcs, formulas, colors, attribute_types);
+	if (items || magic || skills || npcs || shops || formulas || colors || modifier_catalog)
+		game->send_config_reload_notification(items, magic, skills, npcs, formulas, colors, modifier_catalog);
 
 	// Reload configs from database
 	if (items)           game->m_item_manager->reload_item_configs();
@@ -91,11 +91,11 @@ void CmdReload::execute(CGame* game, const char* args)
 	if (npcs)            game->reload_npc_configs();
 	if (shops)           game->reload_shop_configs();
 	if (colors)          game->reload_color_palette();
-	if (attribute_types) game->reload_attribute_types();
+	if (modifier_catalog) game->reload_modifier_catalog();
 
 	// Stream updated config data to clients
-	if (items || magic || skills || npcs || formulas || colors || attribute_types)
-		game->push_config_reload_to_clients(items, magic, skills, npcs, formulas, colors, attribute_types);
+	if (items || magic || skills || npcs || formulas || colors || modifier_catalog)
+		game->push_config_reload_to_clients(items, magic, skills, npcs, formulas, colors, modifier_catalog);
 
 	hb::console::success("Reload complete: {}", args);
 	hb::logger::log<hb::log_channel::commands>("reload {}", args);

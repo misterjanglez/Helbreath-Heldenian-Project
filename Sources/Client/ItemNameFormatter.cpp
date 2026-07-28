@@ -20,9 +20,66 @@ void item_name_formatter::set_item_configs(const std::array<std::unique_ptr<CIte
 	m_item_configs = &configs;
 }
 
-void item_name_formatter::set_multipliers(const uint8_t* multipliers)
+void item_name_formatter::set_catalog(const modifier_catalog_entry* catalog)
 {
-	m_modifier_multiplier = multipliers;
+	m_modifier_catalog = catalog;
+}
+
+namespace {
+
+// Format a catalog format string with the scaled value. Format strings are
+// replicated data — never trust them to be valid.
+std::string format_catalog_value(const std::string& fmt, uint32_t value)
+{
+	try
+	{
+		return std::vformat(fmt, std::make_format_args(value));
+	}
+	catch (const std::format_error&)
+	{
+		return std::to_string(value);
+	}
+}
+
+// Tooltip line placement is client rendering behavior, not catalog data:
+// these modifiers merge into the base-stat lines instead of standing alone.
+effect_category category_for_modifier(uint8_t modifier)
+{
+	using namespace hb::shared::item;
+	switch (modifier)
+	{
+	case modifier_id::sharp:
+	case modifier_id::ancient: return effect_category::inline_damage;
+	case modifier_id::light:   return effect_category::inline_weight;
+	case modifier_id::strong:  return effect_category::inline_durability;
+	default:                   return effect_category::standalone;
+	}
+}
+
+} // namespace
+
+// Build the tooltip line for one rolled modifier from its catalog entry.
+// A label containing "{}" (or an absent label) renders as one whole
+// formatted line; otherwise the label pairs with the formatted value.
+void item_name_formatter::append_modifier_effect(std::vector<tooltip_effect>& effects, uint8_t modifier, uint32_t rolled_value) const
+{
+	if (!m_modifier_catalog) return;
+	const auto& entry = m_modifier_catalog[modifier];
+	uint32_t value = rolled_value * entry.multiplier;
+	effect_category category = category_for_modifier(modifier);
+
+	bool whole_line = entry.effect_label.empty() || entry.effect_label.find("{}") != std::string::npos;
+	if (whole_line)
+	{
+		const std::string& fmt = entry.effect_label.empty() ? entry.effect_format : entry.effect_label;
+		if (!fmt.empty())
+			effects.push_back({format_catalog_value(fmt, value), "", category});
+	}
+	else
+	{
+		effects.push_back({entry.effect_label,
+			entry.effect_format.empty() ? "" : format_catalog_value(entry.effect_format, value), category});
+	}
 }
 
 CItem* item_name_formatter::get_config(int item_id) const
@@ -78,7 +135,6 @@ ItemNameInfo item_name_formatter::format(short item_id)
 ItemNameInfo item_name_formatter::format(short item_id, const hb::shared::item::item_instance_data& data)
 {
 	ItemNameInfo result;
-	std::string txt;
 	uint32_t type1, type2, value1, value2, value3;
 
 	CItem* cfg = get_config(item_id);
@@ -120,62 +176,18 @@ ItemNameInfo item_name_formatter::format(short item_id, const hb::shared::item::
 
 	if (type1 != 0 || type2 != 0)
 	{
-		using namespace hb::shared::item;
-
 		result.is_special = true;
 		if (type1 != 0)
 		{
-			switch (type1) {
-			case modifier_id::critical:            txt = GET_ITEM_NAME3; break;
-			case modifier_id::poisoning:           txt = GET_ITEM_NAME4; break;
-			case modifier_id::righteous:           txt = GET_ITEM_NAME5; break;
-			case modifier_id::agile:               txt = GET_ITEM_NAME6; break;
-			case modifier_id::light:               txt = GET_ITEM_NAME7; break;
-			case modifier_id::sharp:               txt = GET_ITEM_NAME8; break;
-			case modifier_id::strong:              txt = GET_ITEM_NAME9; break;
-			case modifier_id::ancient:             txt = GET_ITEM_NAME10; break;
-			case modifier_id::spell_success:       txt = GET_ITEM_NAME11; break;
-			case modifier_id::mana_converting:     txt = GET_ITEM_NAME12; break;
-			case modifier_id::crit_chance:         txt = GET_ITEM_NAME13; break;
-			}
-			txt += result.name;
-			result.name = txt;
+			// Name prefix word comes from the replicated catalog
+			if (m_modifier_catalog && !m_modifier_catalog[type1].display_name.empty())
+				result.name = m_modifier_catalog[type1].display_name + " " + result.name;
 
-			int pm = m_modifier_multiplier ? m_modifier_multiplier[type1] : 1;
-
-			switch (type1) {
-			case modifier_id::critical:  result.effects.push_back({"Critical Hit Damage", std::format("+{}", value1 * pm)}); break;
-			case modifier_id::poisoning: result.effects.push_back({"Poison Damage", std::format("+{}", value1 * pm)}); break;
-			case modifier_id::righteous: break;
-			case modifier_id::agile:     result.effects.push_back({"Attack Speed -1", ""}); break;
-			case modifier_id::light:     result.effects.push_back({std::format("-{}%", value1 * pm), "", effect_category::inline_weight}); break;
-			case modifier_id::sharp:     result.effects.push_back({std::format("+{}", value1 * pm), "", effect_category::inline_damage}); break;
-			case modifier_id::strong:    result.effects.push_back({"Durability", std::format("+{}%", value1 * pm), effect_category::inline_durability}); break;
-			case modifier_id::ancient:   result.effects.push_back({std::format("+{}", value1 * pm), "", effect_category::inline_damage}); break;
-			case modifier_id::spell_success:   result.effects.push_back({"Magic Casting Probability ", std::format("+{}%", value1 * pm)}); break;
-			case modifier_id::mana_converting: result.effects.push_back({std::format("Replace {}% damage to mana", value1 * pm), ""}); break;
-			case modifier_id::crit_chance:     result.effects.push_back({"Crit Increase Chance ", std::format("{}%", value1 * pm)}); break;
-			}
+			append_modifier_effect(result.effects, static_cast<uint8_t>(type1), value1);
 		}
 
 		if (type2 != 0)
-		{
-			int s = m_modifier_multiplier ? m_modifier_multiplier[type2] : 1;
-			switch (type2) {
-			case modifier_id::poison_resist:       result.effects.push_back({"Poison Resistance", std::format("+{}%", value2 * s)}); break;
-			case modifier_id::hitting_probability: result.effects.push_back({"Hitting Probability", std::format("+{}", value2 * s)}); break;
-			case modifier_id::defense_ratio:       result.effects.push_back({"Defense Ratio", std::format("+{}", value2 * s)}); break;
-			case modifier_id::hp_recovery:         result.effects.push_back({"HP recovery ", std::format("{}%", value2 * s)}); break;
-			case modifier_id::sp_recovery:         result.effects.push_back({"SP recovery ", std::format("{}%", value2 * s)}); break;
-			case modifier_id::mp_recovery:         result.effects.push_back({"MP recovery ", std::format("{}%", value2 * s)}); break;
-			case modifier_id::magic_resist:        result.effects.push_back({"Magic Resistance", std::format("+{}%", value2 * s)}); break;
-			case modifier_id::physical_absorb:     result.effects.push_back({"Physical Absorption", std::format("+{}%", value2 * s)}); break;
-			case modifier_id::magic_absorb:        result.effects.push_back({"Magic Absorption", std::format("+{}%", value2 * s)}); break;
-			case modifier_id::consecutive_attack:  result.effects.push_back({"Consecutive Attack Damage", std::format("+{}", value2 * s)}); break;
-			case modifier_id::experience:          result.effects.push_back({"Experience", std::format("+{}%", value2 * s)}); break;
-			case modifier_id::gold:                result.effects.push_back({"Gold", std::format("+{}%", value2 * s)}); break;
-			}
-		}
+			append_modifier_effect(result.effects, static_cast<uint8_t>(type2), value2);
 	}
 
 	value3 = data.get_enchant_bonus();

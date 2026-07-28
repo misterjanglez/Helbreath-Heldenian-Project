@@ -382,6 +382,9 @@
     <ClInclude Include="..\Dependencies\Shared\Packet\PacketCommon.h">
       <Filter>Shared\Packet</Filter>
     </ClInclude>
+    <ClInclude Include="..\Dependencies\Shared\Packet\PacketModifierCatalog.h">
+      <Filter>Shared\Packet</Filter>
+    </ClInclude>
     <ClInclude Include="..\Dependencies\Shared\Packet\PacketConfigCache.h">
       <Filter>Shared\Packet</Filter>
     </ClInclude>

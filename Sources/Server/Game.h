@@ -28,6 +28,7 @@ extern bool G_bRunning;
 #include "ActionID_Server.h"
 #include "NetMessages.h"
 #include "Packet/PacketMap.h"
+#include "Packet/PacketModifierCatalog.h"
 #include "ServerMessages.h"
 #include "Misc.h"
 #include "NetworkMsg.h"
@@ -297,10 +298,10 @@ public:
 
 	void reload_npc_configs();
 	void reload_shop_configs();
-	void send_config_reload_notification(bool items, bool magic, bool skills, bool npcs, bool balance = false, bool colors = false, bool attribute_types = false);
-	void push_config_reload_to_clients(bool items, bool magic, bool skills, bool npcs, bool balance = false, bool colors = false, bool attribute_types = false);
+	void send_config_reload_notification(bool items, bool magic, bool skills, bool npcs, bool balance = false, bool colors = false, bool modifier_catalog = false);
+	void push_config_reload_to_clients(bool items, bool magic, bool skills, bool npcs, bool balance = false, bool colors = false, bool modifier_catalog = false);
 	void reload_color_palette();
-	void reload_attribute_types();
+	void reload_modifier_catalog();
 	void apply_server_config(const server_config& cfg);
 	bool reload_server_config();
 	void send_server_config_update();
@@ -566,22 +567,34 @@ public:
 	void compute_config_hashes();
 	void compute_balance_hash();
 	void compute_color_palette_hash();
-	void compute_attribute_types_hash();
+	void compute_modifier_catalog_hash();
 	bool send_client_balance_config(int client_h);
 	bool send_client_color_palette(int client_h);
-	bool send_client_attribute_types(int client_h);
+	bool send_client_modifier_catalog(int client_h);
 
 	// Exact color-palette packet stream sent to clients (both tables, chunked).
 	// Shared by the hash computation and both send paths so they stay identical.
 	std::vector<std::vector<char>> build_color_palette_packets() const;
+
+	// Exact modifier-catalog packet stream (catalog entries + tier
+	// presentation + item-system mode), shared by hash and send paths.
+	std::vector<std::vector<char>> build_modifier_catalog_packets() const;
+
+	// Send a prebuilt config packet stream; on socket failure the client
+	// is dropped and false returned. `what` names the stream in the log.
+	bool send_packet_stream(int client_h, const std::vector<std::vector<char>>& packets, const char* what);
+
+	// Which roll strategy the world runs; replicated to clients in the
+	// catalog header. Hardcoded legacy until meta.item_system lands (2-B).
+	uint8_t m_item_system_mode = hb::shared::item::item_system_mode::legacy;
 
 	std::vector<color_palette_entry> m_color_palette;
 	std::vector<color_palette_entry> m_weapon_color_palette;
 	std::vector<attribute_prefix_type_entry> m_attribute_prefix_types;
 	std::vector<attribute_secondary_type_entry> m_attribute_secondary_types;
 	// Keyed by unified modifier ID (ModifierIds.h) — one flat space for the
-	// former prefix/secondary tables. Interim until the modifier catalog
-	// (Tiers 1-D) replaces the attribute-type config entirely.
+	// former prefix/secondary tables. Interim until the tiered config tables
+	// replace the legacy attribute rows entirely (Tiers 2-B).
 	uint8_t m_modifier_multiplier[256]{};
 	uint8_t m_modifier_min_value[256]{};
 	uint8_t m_modifier_max_value[256]{};

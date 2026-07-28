@@ -279,6 +279,7 @@
     <ClInclude Include="..\Dependencies\Shared\Render\NullSprite.h" />
     <ClInclude Include="..\Dependencies\Shared\Packet\PacketCalcSocket.h" />
     <ClInclude Include="..\Dependencies\Shared\Packet\PacketCommon.h" />
+    <ClInclude Include="..\Dependencies\Shared\Packet\PacketModifierCatalog.h" />
     <ClInclude Include="..\Dependencies\Shared\Packet\PacketConfigCache.h" />
     <ClInclude Include="..\Dependencies\Shared\Packet\PacketEvent.h" />
     <ClInclude Include="..\Dependencies\Shared\Packet\PacketHeaders.h" />

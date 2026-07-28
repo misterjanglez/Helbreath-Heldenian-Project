@@ -41,6 +41,8 @@
 #include "ActionID.h"
 #include "ActionID_Client.h"
 #include "NetMessages.h"
+#include "Packet/PacketModifierCatalog.h"
+#include "ModifierCatalog.h"
 #include "ClientMessages.h"
 #include "CharInfo.h"
 #include "Item/Item.h"
@@ -426,7 +428,7 @@ std::array<bool, hb::shared::limits::MaxItems> m_is_item_equipped{};
 	bool cache_process_map_config(char* data, uint32_t msg_size);
 	bool cache_process_balance_config(char* data, uint32_t msg_size);
 	bool cache_process_color_palette(char* data, uint32_t msg_size);
-	bool cache_process_attribute_types(char* data, uint32_t msg_size);
+	bool cache_process_modifier_catalog(char* data, uint32_t msg_size);
 
 	// Server-driven palette. Entries 0-15 hold the original offset-table values —
 	// sprite tinting is additive-offset via item_palette_color/draw_item_sprite,
@@ -439,11 +441,14 @@ std::array<bool, hb::shared::limits::MaxItems> m_is_item_equipped{};
 	std::array<hb::shared::render::Color, 32> m_weapon_color_palette{};
 	bool m_color_palette_loaded = false;
 
-	// Keyed by unified modifier ID (ModifierIds.h) — one flat space for the
-	// former prefix/secondary multiplier tables. Interim until the modifier
-	// catalog (Tiers 1-D) replaces the attribute-type config.
-	uint8_t m_modifier_multiplier[256]{};
-	bool m_attribute_types_loaded = false;
+	// Replicated modifier catalog, keyed by unified modifier ID
+	// (ModifierIds.h). Tier presentation + item-system mode ride the same
+	// config-cache slot.
+	modifier_catalog_entry m_modifier_catalog[256];
+	tier_presentation_entry m_tier_presentation[hb::shared::item::tier_count];
+	std::string m_tier_name_template;
+	uint8_t m_item_system_mode = hb::shared::item::item_system_mode::legacy;
+	bool m_modifier_catalog_loaded = false;
 
 	struct NpcConfig { short npcType = 0; std::string name; bool valid = false; };
 	std::array<NpcConfig, hb::shared::limits::MaxNpcConfigs> m_npc_config_list{};   // indexed by npc_id
@@ -460,7 +465,7 @@ std::array<bool, hb::shared::limits::MaxItems> m_is_item_equipped{};
 
 	bool ensure_config_loaded(int type);
 	bool try_replay_cache_for_config(int type);
-	void request_configs_from_server(bool items, bool magic, bool skills, bool npcs = false, bool maps = false, bool balance = false, bool color_palette = false, bool attribute_types = false);
+	void request_configs_from_server(bool items, bool magic, bool skills, bool npcs = false, bool maps = false, bool balance = false, bool color_palette = false, bool modifier_catalog = false);
 	void check_configs_ready_and_enter_game();
 
 	bool ensure_item_configs_loaded()  { return ensure_config_loaded(0); }

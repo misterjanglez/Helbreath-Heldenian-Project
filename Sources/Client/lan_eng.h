@@ -665,17 +665,8 @@
 
 #define	GET_ITEM_NAME1	"Purity: {}%"
 #define	GET_ITEM_NAME2	"Completion: {}%"
-#define	GET_ITEM_NAME3	"Critical "
-#define	GET_ITEM_NAME4	"Poisoning "
-#define	GET_ITEM_NAME5	"Righteous "
-#define	GET_ITEM_NAME6	"Agile "
-#define	GET_ITEM_NAME7	"Light "
-#define	GET_ITEM_NAME8	"Sharp "
-#define	GET_ITEM_NAME9	"Strong "
-#define	GET_ITEM_NAME10	"Ancient "
-#define	GET_ITEM_NAME11	"Special "
-#define	GET_ITEM_NAME12	"Mana Converting "
-#define	GET_ITEM_NAME13	"Critical "
+// GET_ITEM_NAME3-13 (attribute prefix words) retired — the replicated
+// modifier catalog supplies display names since Tiers 1-D.
 #define	GET_ITEM_NAME14	"Critical Hit Damage+{}"
 #define	GET_ITEM_NAME15	"Poison Damage+{}"
 #define	GET_ITEM_NAME16	"Attack Speed -1"

@@ -219,6 +219,46 @@ constexpr uint8_t legacy_secondary_to_modifier_id(uint8_t legacy)
 }
 
 //------------------------------------------------------------------------
+// Which roll strategy the world runs (meta.item_system from Phase 2 on;
+// hardcoded legacy until then). Replicated to clients in the modifier
+// catalog header so rendering can be mode-aware (tier names/colors vs
+// legacy prefix tints).
+//------------------------------------------------------------------------
+namespace item_system_mode {
+enum item_system_mode : uint8_t
+{
+	legacy = 0,
+	tiered = 1
+};
+}
+
+// Number of tiers (Common / Rare / Epic / Legendary) — sizes the wire
+// presentation table and every client/server tier array.
+inline constexpr uint8_t tier_count = 4;
+
+//------------------------------------------------------------------------
+// Buckets — the thematic groups of the modifier catalog (spec §4). An item
+// carries at most one modifier per bucket; the wire catalog's bucket_id
+// gives tooltips a stable ordering key. Values follow §4 catalog order
+// (the modifier_id block comment above).
+//------------------------------------------------------------------------
+namespace tier_bucket {
+enum tier_bucket : uint8_t
+{
+	none           = 0,
+	damage         = 1,
+	precision      = 2,
+	handling       = 3,
+	economy        = 4,
+	casting        = 5,
+	set_axis       = 6,
+	combat_utility = 7,
+	attributes     = 8,
+	marquee        = 9
+};
+}
+
+//------------------------------------------------------------------------
 // Attribute keys for the ATTRIBUTES-ladder effect params
 // (modifier_catalog.effect_param1/effect_param2). Values match the
 // hb::shared::net::StatId wire ids (NetMessages.h) so the two attribute

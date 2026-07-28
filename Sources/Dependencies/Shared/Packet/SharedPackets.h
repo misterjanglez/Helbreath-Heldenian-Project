@@ -20,7 +20,7 @@
 #include "PacketTradingPost.h"
 #include "PacketConfigCache.h"
 #include "PacketColorPaletteConfig.h"
-#include "PacketAttributeTypeConfig.h"
+#include "PacketModifierCatalog.h"
 #include "PacketPartyOp.h"
 #include "PacketChat.h"
 #include "PacketCrusade.h"

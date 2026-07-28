@@ -6,6 +6,7 @@
 #include <string>
 #include <vector>
 #include "Item/ItemInstanceData.h"
+#include "ModifierCatalog.h"
 
 class CItem;
 
@@ -57,9 +58,9 @@ public:
 	// Inject item config list (address must remain stable)
 	void set_item_configs(const std::array<std::unique_ptr<CItem>, 5000>& configs);
 
-	// Inject the modifier multiplier lookup array, keyed by unified modifier
-	// ID (pointer must remain stable)
-	void set_multipliers(const uint8_t* multipliers);
+	// Inject the replicated modifier catalog, keyed by unified modifier ID
+	// (pointer must remain stable)
+	void set_catalog(const modifier_catalog_entry* catalog);
 
 	// format item name, returning name + attribute strings + special flag
 	ItemNameInfo format(CItem* item);
@@ -71,6 +72,8 @@ private:
 
 	CItem* get_config(int item_id) const;
 
+	void append_modifier_effect(std::vector<tooltip_effect>& effects, uint8_t modifier, uint32_t rolled_value) const;
+
 	const std::array<std::unique_ptr<CItem>, 5000>* m_item_configs = nullptr;
-	const uint8_t* m_modifier_multiplier = nullptr;
+	const modifier_catalog_entry* m_modifier_catalog = nullptr;
 };

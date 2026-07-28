@@ -137,11 +137,11 @@ void DialogBox_ItemCreator::build_valid_options(int16_t effect_type)
 	// multiplier display lookups route through the one translation table.
 	auto add_prefix = [this](uint8_t legacy_id, const char* name)
 	{
-		m_valid_prefixes.push_back({legacy_id, name, m_game->m_modifier_multiplier[legacy_prefix_to_modifier_id(legacy_id)]});
+		m_valid_prefixes.push_back({legacy_id, name, m_game->m_modifier_catalog[legacy_prefix_to_modifier_id(legacy_id)].multiplier});
 	};
 	auto add_secondary = [this](uint8_t legacy_id, const char* name)
 	{
-		m_valid_secondaries.push_back({legacy_id, name, m_game->m_modifier_multiplier[legacy_secondary_to_modifier_id(legacy_id)]});
+		m_valid_secondaries.push_back({legacy_id, name, m_game->m_modifier_catalog[legacy_secondary_to_modifier_id(legacy_id)].multiplier});
 	};
 
 	switch (m_category)

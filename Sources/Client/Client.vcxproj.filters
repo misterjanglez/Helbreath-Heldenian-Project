@@ -132,6 +132,9 @@
     <ClInclude Include="ItemNameFormatter.h">
       <Filter>Managers</Filter>
     </ClInclude>
+    <ClInclude Include="ModifierCatalog.h">
+      <Filter>Managers</Filter>
+    </ClInclude>
     <ClInclude Include="ItemSpriteMetadata.h">
       <Filter>Managers</Filter>
     </ClInclude>
@@ -585,6 +588,9 @@
       <Filter>Shared\Packet</Filter>
     </ClInclude>
     <ClInclude Include="..\Dependencies\Shared\Packet\PacketCommon.h">
+      <Filter>Shared\Packet</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Dependencies\Shared\Packet\PacketModifierCatalog.h">
       <Filter>Shared\Packet</Filter>
     </ClInclude>
     <ClInclude Include="..\Dependencies\Shared\Packet\PacketConfigCache.h">

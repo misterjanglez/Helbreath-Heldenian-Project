@@ -200,7 +200,7 @@ void DialogBox_Magic::on_draw()
 			if (player().m_item_list[i]->get_prefix_type() == hb::shared::item::modifier_id::spell_success)
 			{
 				v1 = static_cast<double>(result);
-				v2 = static_cast<double>(player().m_item_list[i]->get_prefix_value() * m_game->m_modifier_multiplier[hb::shared::item::modifier_id::spell_success]);
+				v2 = static_cast<double>(player().m_item_list[i]->get_prefix_value() * m_game->m_modifier_catalog[hb::shared::item::modifier_id::spell_success].multiplier);
 				v3 = v1 + v2;
 				result = static_cast<int>(v3);
 				break;
