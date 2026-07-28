@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003" DefaultTargets="Build" ToolsVersion="Current">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|x64">
@@ -221,8 +221,10 @@
     <ClInclude Include="CmdBroadcast.h" />
     <ClInclude Include="CmdShowChat.h" />
     <ClInclude Include="CmdGiveItem.h" />
+    <ClInclude Include="CmdMintCheck.h" />
     <ClInclude Include="CmdReload.h" />
     <ClInclude Include="CmdRollSmoke.h" />
+    <ClInclude Include="GmMintSpec.h" />
     <ClInclude Include="GameChatCommand.h" />
     <ClInclude Include="GameCmdWhisper.h" />
     <ClInclude Include="GameCmdBlock.h" />
@@ -362,8 +364,10 @@
     <ClCompile Include="CmdBroadcast.cpp" />
     <ClCompile Include="CmdShowChat.cpp" />
     <ClCompile Include="CmdGiveItem.cpp" />
+    <ClCompile Include="CmdMintCheck.cpp" />
     <ClCompile Include="CmdReload.cpp" />
     <ClCompile Include="CmdRollSmoke.cpp" />
+    <ClCompile Include="GmMintSpec.cpp" />
     <ClCompile Include="GameChatCommand.cpp" />
     <ClCompile Include="GameCmdWhisper.cpp" />
     <ClCompile Include="GameCmdBlock.cpp" />

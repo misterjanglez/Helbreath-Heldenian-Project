@@ -108,4 +108,41 @@ bool legacy_roll_strategy::roll(CItem& item, const roll_context&)
 	return true;
 }
 
+std::string legacy_roll_strategy::mint(CItem& item, const item_attribute_data& requested)
+{
+	// Legacy items carry no tier and exactly two positional lines. Slots
+	// [2]/[3] and the tier byte are the tiered strategy's vocabulary — a
+	// request carrying them came from a client talking to the wrong mode.
+	if (requested.tier != 0)
+		return "tiers do not exist in legacy mode";
+	if (requested.modifiers[2].type != 0 || requested.modifiers[3].type != 0)
+		return "legacy mode carries a prefix and a secondary only";
+
+	item.set_custom_made(requested.custom_made != 0);
+	item.set_prefix(requested.modifiers[0].type, requested.modifiers[0].value);
+	item.set_secondary(requested.modifiers[1].type, requested.modifiers[1].value);
+	item.set_enchant_bonus(requested.enchant_bonus);
+	m_game.m_item_manager->apply_modifier_derived_stats(&item);
+
+	// Prefix dye tint, unified palette weapon indices 16-21. Deliberately
+	// ungated on item kind (fork issue #2): a GM-minted prefixed special is a
+	// tester tool and the tint is what marks it as non-base. This mapping is
+	// the creator's own, not m_modifier_weapon_color's — the two disagree and
+	// reconciling them is issue #2's call, not this cycle's.
+	switch (item.get_prefix_type())
+	{
+	case modifier_id::agile:         item.m_instance.item_color = 16; break;
+	case modifier_id::light:         item.m_instance.item_color = 16; break;
+	case modifier_id::strong:        item.m_instance.item_color = 16; break;
+	case modifier_id::poisoning:     item.m_instance.item_color = 17; break;
+	case modifier_id::critical:      item.m_instance.item_color = 18; break;
+	case modifier_id::spell_success: item.m_instance.item_color = 18; break;
+	case modifier_id::sharp:         item.m_instance.item_color = 19; break;
+	case modifier_id::righteous:     item.m_instance.item_color = 20; break;
+	case modifier_id::ancient:       item.m_instance.item_color = 21; break;
+	default: break;
+	}
+	return {};
+}
+
 } // namespace hb::server

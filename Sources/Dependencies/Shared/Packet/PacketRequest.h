@@ -2,6 +2,7 @@
 
 #include "PacketHeaders.h"
 #include "NetConstants.h"
+#include "Item/ItemAttributeData.h"
 
 #include <cstdint>
 
@@ -116,6 +117,22 @@ namespace net {
 		int32_t v3;
 		char text[hb::shared::limits::ItemNameLen];
 		int32_t v4;
+	};
+
+	// GM tiered mint (Item Tiers 3-G, CommonType::TesterCreateItemTiered).
+	// Layout is PacketCommandCommonWithString plus the attribute POD, so the
+	// generic CommandCommon pre-cast in the dispatcher reads only bytes the
+	// client really sent; the handler re-casts to this type for `attributes`.
+	// The GM states the whole instance (tier + up to four modifier slots +
+	// enchant + custom-made); the server is the legality authority.
+	struct HB_PACKED PacketCommandTesterCreateItemTiered : packet_base {
+		PacketCommandCommonBase base;
+		int32_t item_id;
+		int32_t count;
+		int32_t reserved1;
+		char text[hb::shared::limits::ItemNameLen];   // unused; keeps the common-with-string prefix
+		int32_t reserved2;
+		hb::shared::item::item_attribute_data attributes;
 	};
 
 	struct HB_PACKED PacketCommandCommonItems : packet_base {

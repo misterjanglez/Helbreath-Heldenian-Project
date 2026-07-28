@@ -15,6 +15,7 @@
 #include "Item.h"
 #include "Log.h"
 #include "TierConfigStore.h"
+#include "TierConfigValidator.h"
 #include <algorithm>
 #include <iterator>
 #include <vector>
@@ -188,6 +189,42 @@ bool tiered_roll_strategy::roll(CItem& item, const roll_context& context)
 	// untouched — tiered gear never tints (spec §11).
 	item.set_attributes(attributes);
 	return true;
+}
+
+std::string tiered_roll_strategy::mint(CItem& item, const item_attribute_data& requested)
+{
+	const tier_config& config = m_game.get_tier_config();
+
+	// A plain mint — no tier, no lines — is legal on anything: base gear,
+	// consumables, quest props. Everything below is about tiered instances.
+	if (requested.tier == 0)
+	{
+		if (requested.modifier_count() != 0)
+			return "modifiers require a tier (1-4)";
+	}
+	else
+	{
+		const auto item_class = derive_tier_item_class(item.get_item_sub_type(),
+			item.get_weapon_class(), item.get_equip_pos());
+		if (item_class == tier_item_class::none)
+			return "this item is outside tier scope and cannot carry a tier";
+		if (is_special_item(item.m_id_num))
+			return "named uniques never carry a tier";
+
+		// The one structural audit, shared with the roll smoke harness: tier
+		// 1..4, count == tier, one modifier per Bucket, min-tier ladder,
+		// values inside the band/window. Per-class eligibility is deliberately
+		// NOT a gate — it weights what may roll, and a GM minting an off-class
+		// line is a legitimate test instrument.
+		std::string violation = validate_tiered_instance(config, requested);
+		if (!violation.empty()) return violation;
+	}
+
+	// Stored stats never mutate for a tiered item (spec §6.5 / cycle 3-C):
+	// no apply_modifier_derived_stats, no dye tint (§11) — every effect the
+	// lines carry derives at equip time from the same catalog rows.
+	item.set_attributes(requested);
+	return {};
 }
 
 } // namespace hb::server

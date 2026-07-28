@@ -197,6 +197,10 @@ namespace ItemLogAction
 		TpRefund                                = 37,   // Offer items auto-returned (delist/finalize)
 		TpTradeOut                              = 38,   // winning Offer delivered to the Seller
 		TpTradeIn                               = 39,   // Listing bundle delivered to the winner
+		// GM minting (Item Tiers 3-G). Items created out of nothing, so the
+		// economy audit wants every one of them. This action has no receiving
+		// player: `recv_h` carries the minted quantity instead.
+		GmMint                                  = 40,
 	};
 }
 

@@ -57,7 +57,26 @@ static std::string format_item_info(CItem* item)
 		item->m_instance.touch_effect_value1,
 		item->m_instance.touch_effect_value2,
 		item->m_instance.touch_effect_value3);
-	return buf;
+	std::string info = buf;
+
+	// Tiered instances carry up to four lines, and pfx/sec above only ever
+	// show the first two. Appended rather than substituted so a legacy line
+	// reads exactly as it always has.
+	const auto& attributes = item->get_attributes();
+	if (attributes.tier != 0)
+	{
+		std::snprintf(buf, sizeof(buf), " (tier=%d", (int)attributes.tier);
+		info += buf;
+		for (const auto& mod : attributes.modifiers)
+		{
+			if (mod.type == 0) continue;
+			std::snprintf(buf, sizeof(buf), " %d:%d:%d",
+				(int)mod.type, (int)mod.value, (int)mod.value2);
+			info += buf;
+		}
+		info += ")";
+	}
+	return info;
 }
 
 static bool is_item_suspicious(CItem* item)
@@ -589,7 +608,73 @@ int ItemManager::add_client_bulk_item_list(int client_h, const char* item_name, 
 		pkt.item_id = first_item->m_id_num;
 		pkt.max_durability = first_item->m_durability;
 		m_game->m_client_list[client_h]->m_socket->send_msg(reinterpret_cast<char*>(&pkt), sizeof(pkt));
+
+		// Every caller of this helper is a GM creation command, so the bundle
+		// is a mint: one audit line for the batch (the copies are identical).
+		item_log(ItemLogAction::GmMint, client_h, created, first_item);
 	}
+
+	return created;
+}
+
+int ItemManager::mint_gm_items(int client_h, int item_id, int count,
+	const item_attribute_data& requested, std::string& error)
+{
+	error.clear();
+	if (m_game->m_client_list[client_h] == nullptr) return 0;
+	if (item_id < 0 || item_id >= MaxItemTypes || m_game->m_item_config_list[item_id] == nullptr)
+	{
+		error = "invalid item id";
+		return 0;
+	}
+	if (count < 1) count = 1;
+
+	int created = 0;
+	// The most recent copy, kept readable until the audit line is written.
+	// A stackable copy merges into an existing slot and becomes ours to
+	// delete; holding it one iteration longer is what lets the log describe
+	// what was minted rather than what happened to survive.
+	CItem* minted = nullptr;
+	bool minted_is_ours = false;
+	for (int i = 0; i < count; i++)
+	{
+		CItem* item = new CItem();
+		if (init_item_attr(item, item_id) == false)
+		{
+			delete item;
+			error = "item config init failed";
+			break;
+		}
+
+		// The mode decides what a legal instance is. A rejection is a property
+		// of the request, not of this copy, so the first one ends the run.
+		error = m_game->get_roll_strategy().mint(*item, requested);
+		if (!error.empty())
+		{
+			delete item;
+			break;
+		}
+
+		int erase_req = 0;
+		if (add_client_item_list(client_h, item, &erase_req) == false)
+		{
+			delete item;
+			error = "no room to carry it";
+			break;
+		}
+
+		send_item_notify_msg(client_h, Notify::ItemObtained, item, 0);
+		if (minted_is_ours) delete minted;
+		minted = item;
+		minted_is_ours = (erase_req == 1);   // merged into an existing stack
+		created++;
+	}
+
+	// One audit line per request: every copy is identical, so the quantity is
+	// the only thing that varies across them.
+	if (created > 0 && minted != nullptr)
+		item_log(ItemLogAction::GmMint, client_h, created, minted);
+	if (minted_is_ours) delete minted;
 
 	return created;
 }
@@ -5052,6 +5137,11 @@ bool ItemManager::item_log(int action, int give_h, int recv_h, CItem* item, bool
 
 	case ItemLogAction::UpgradeSuccess:
 		hb::logger::log<log_channel::upgrades>("{} IP({}) Upgrade {} {} at {}({},{})", m_game->m_client_list[give_h]->m_char_name, m_game->m_client_list[give_h]->m_ip_address, true ? "Success" : "Fail", format_item_info(item), m_game->m_client_list[give_h]->m_map_name, m_game->m_client_list[give_h]->m_x, m_game->m_client_list[give_h]->m_y);
+		break;
+
+	// GM minting has no receiving player, so recv_h carries the quantity.
+	case ItemLogAction::GmMint:
+		hb::logger::log<log_channel::trade>("{} IP({}) GmMint {}x {} at {}({},{})", m_game->m_client_list[give_h]->m_char_name, m_game->m_client_list[give_h]->m_ip_address, recv_h, format_item_info(item), m_game->m_client_list[give_h]->m_map_name, m_game->m_client_list[give_h]->m_x, m_game->m_client_list[give_h]->m_y);
 		break;
 
 	default:

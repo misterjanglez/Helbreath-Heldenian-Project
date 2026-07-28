@@ -31,6 +31,13 @@ public:
 
 	bool roll(CItem& item, const roll_context& context) override;
 
+	// Tiered legality: the item must be tierable gear, and the requested
+	// instance must survive the same structural audit a rolled one does
+	// (validate_tiered_instance). Rarity is not a constraint — a GM may mint
+	// any legal shape at any tier (spec §10).
+	std::string mint(CItem& item,
+		const hb::shared::item::item_attribute_data& requested) override;
+
 	uint32_t first_drop_chance(uint8_t loot_grade) const override;
 
 private:

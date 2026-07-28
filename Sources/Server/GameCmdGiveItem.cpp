@@ -72,6 +72,11 @@ bool GameCmdGiveItem::execute(CGame* game, int client_h, const char* args)
 			{
 				game->m_item_manager->send_item_notify_msg(target_h, Notify::ItemObtained, item, 0);
 				created = amount;
+				// Audited against the receiving character — what the economy
+				// audit reads is items entering an inventory out of nothing.
+				game->m_item_manager->item_log(hb::server::net::ItemLogAction::GmMint,
+					target_h, created, item);
+				if (erase_req == 1) delete item;   // merged into an existing stack
 			}
 			else
 			{

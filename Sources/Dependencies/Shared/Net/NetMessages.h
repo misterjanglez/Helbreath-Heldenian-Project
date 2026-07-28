@@ -161,6 +161,12 @@ namespace CommonType
 		TesterCreateItem                        = 0x0A78,
 		TesterMapList                           = 0x0A79,
 		TesterNpcSearch                         = 0x0A7A,
+		// Tiered mint (Item Tiers 3-G). A separate command rather than more
+		// fields on TesterCreateItem: the message queue copies only the bytes
+		// a client actually sent into a buffer it does not clear, so trailing
+		// fields of the short legacy request read stale bytes from whatever
+		// message came before. The command id is what tells the two apart.
+		TesterCreateItemTiered                  = 0x0A7C,
 #endif // TESTER_ONLY
 		ReqRepairAll                            = 0x0F10,
 		ReqRepairAllDelete                      = 0x0F12,

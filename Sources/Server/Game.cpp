@@ -6041,6 +6041,37 @@ bool CGame::get_msg_queue(char* pFrom, char* data, size_t* msg_size, int* index,
 	return m_msgQueue.pop(pFrom, data, msg_size, index, key);
 }
 
+int CGame::gm_mint_items(int client_h, int item_id, int count,
+	const hb::shared::item::item_attribute_data& requested)
+{
+	if (m_client_list[client_h] == nullptr) return 0;
+
+	std::string error;
+	const int created = m_item_manager->mint_gm_items(client_h, item_id, count, requested, error);
+
+	char buf[192];
+	if (created == 0)
+		std::snprintf(buf, sizeof(buf), "Mint rejected: %s",
+			error.empty() ? "nothing was created" : error.c_str());
+	else if (error.empty())
+		std::snprintf(buf, sizeof(buf), "Created %dx %s (ID: %d)",
+			created, m_item_config_list[item_id]->m_name, item_id);
+	else
+		std::snprintf(buf, sizeof(buf), "Created %dx %s (ID: %d) - stopped: %s",
+			created, m_item_config_list[item_id]->m_name, item_id, error.c_str());
+	send_notify_msg(0, client_h, Notify::NoticeMsg, 0, 0, 0, buf);
+
+	// The economy audit rides the trade channel (ItemLogAction::GmMint); this
+	// line is the operator-facing half, and the only record of a REJECTED
+	// attempt — which is the interesting one when a client is crafting packets.
+	hb::logger::log<log_channel::commands>("[GmMint] '{}' item {} x{} tier {} mods {} -> {} created{}{}",
+		m_client_list[client_h]->m_char_name, item_id, count,
+		(int)requested.tier, (int)requested.modifier_count(), created,
+		error.empty() ? "" : ", rejected: ", error);
+
+	return created;
+}
+
 void CGame::client_common_handler(int client_h, char* data)
 {
 	uint16_t command;
@@ -6660,85 +6691,40 @@ void CGame::client_common_handler(int client_h, char* data)
 	{
 		if (m_client_list[client_h] == nullptr) break;
 
-		int item_id = static_cast<int>(v1);
-		uint32_t attribute = static_cast<uint32_t>(v2);
-		int count = std::clamp(static_cast<int>(v3), 1, 10);
+		const int item_id = static_cast<int>(v1);
+		const uint32_t attribute = static_cast<uint32_t>(v2);
+		const int count = std::clamp(static_cast<int>(v3), 1, 10);
 
-		if (item_id < 0 || item_id >= hb::server::config::MaxItemTypes
-			|| m_item_config_list[item_id] == nullptr)
-		{
-			send_notify_msg(0, client_h, Notify::NoticeMsg, 0, 0, 0, "Invalid item ID.");
-			break;
-		}
-
-		// Unpack legacy bitmask from tester command into individual fields.
+		// Unpack legacy bitmask from tester command into the attribute POD.
 		// The 4-bit wire nibbles stay in the legacy 1-12 spaces; translate to
-		// unified modifier IDs here at the boundary.
-		uint8_t prefix_type = hb::shared::item::legacy_prefix_to_modifier_id((attribute >> 20) & 0x0F);
-		uint8_t prefix_value = static_cast<uint8_t>((attribute >> 16) & 0x0F);
-		uint8_t secondary_type = hb::shared::item::legacy_secondary_to_modifier_id((attribute >> 12) & 0x0F);
-		uint8_t secondary_value = static_cast<uint8_t>((attribute >> 8) & 0x0F);
-		uint8_t enchant_bonus = static_cast<uint8_t>((attribute >> 28) & 0x0F);
-		bool custom_made = (attribute & 0x00000001) != 0;
+		// unified modifier IDs here at the boundary. In tiered mode the Roll
+		// strategy rejects anything but a plain mint through this route — the
+		// tiered creator speaks TesterCreateItemTiered.
+		hb::shared::item::item_attribute_data requested;
+		requested.custom_made = (attribute & 0x00000001) != 0 ? 1 : 0;
+		requested.modifiers[0].type = hb::shared::item::legacy_prefix_to_modifier_id((attribute >> 20) & 0x0F);
+		requested.modifiers[0].value = static_cast<uint8_t>((attribute >> 16) & 0x0F);
+		requested.modifiers[1].type = hb::shared::item::legacy_secondary_to_modifier_id((attribute >> 12) & 0x0F);
+		requested.modifiers[1].value = static_cast<uint8_t>((attribute >> 8) & 0x0F);
+		requested.enchant_bonus = static_cast<uint8_t>((attribute >> 28) & 0x0F);
 
-		int created = 0;
-		for (int i = 0; i < count; i++)
-		{
-			CItem* item = new CItem();
-			if (!m_item_manager->init_item_attr(item, item_id))
-			{
-				delete item;
-				continue;
-			}
+		gm_mint_items(client_h, item_id, count, requested);
+		break;
+	}
 
-			item->set_custom_made(custom_made);
-			item->set_prefix(prefix_type, prefix_value);
-			item->set_secondary(secondary_type, secondary_value);
-			item->set_enchant_bonus(enchant_bonus);
-			m_item_manager->apply_modifier_derived_stats(item);
+	case CommonType::TesterCreateItemTiered:
+	{
+		if (m_client_list[client_h] == nullptr) break;
 
-			// Set item color based on prefix type — unified palette weapon indices (16-21)
-			switch (item->get_prefix_type())
-			{
-			case hb::shared::item::modifier_id::agile:           item->m_instance.item_color = 16; break;
-			case hb::shared::item::modifier_id::light:           item->m_instance.item_color = 16; break;
-			case hb::shared::item::modifier_id::strong:          item->m_instance.item_color = 16; break;
-			case hb::shared::item::modifier_id::poisoning:       item->m_instance.item_color = 17; break;
-			case hb::shared::item::modifier_id::critical:        item->m_instance.item_color = 18; break;
-			case hb::shared::item::modifier_id::spell_success:   item->m_instance.item_color = 18; break;
-			case hb::shared::item::modifier_id::sharp:           item->m_instance.item_color = 19; break;
-			case hb::shared::item::modifier_id::righteous:       item->m_instance.item_color = 20; break;
-			case hb::shared::item::modifier_id::ancient:         item->m_instance.item_color = 21; break;
-			default: break;
-			}
+		const auto* mint = hb::net::PacketCast<hb::net::PacketCommandTesterCreateItemTiered>(
+			data, sizeof(hb::net::PacketCommandTesterCreateItemTiered));
+		if (mint == nullptr) break;
 
-			int erase_req = 0;
-			if (m_item_manager->add_client_item_list(client_h, item, &erase_req))
-			{
-				m_item_manager->send_item_notify_msg(client_h, Notify::ItemObtained, item, 0);
-				created++;
-			}
-			else
-			{
-				delete item;
-				send_notify_msg(0, client_h, Notify::CannotCarryMoreItem, 0, 0, 0, 0);
-				break;
-			}
-		}
-
-		if (created > 0)
-		{
-			char buf[128];
-			std::snprintf(buf, sizeof(buf), "Created %dx %s (ID: %d)", created, m_item_config_list[item_id]->m_name, item_id);
-			send_notify_msg(0, client_h, Notify::NoticeMsg, 0, 0, 0, buf);
-		}
-		else
-		{
-			send_notify_msg(0, client_h, Notify::NoticeMsg, 0, 0, 0, "Failed to create item.");
-		}
-
-		hb::logger::log<log_channel::commands>("[TesterMenu] '{}' created {}x item ID {} attr=0x{:08X}",
-			m_client_list[client_h]->m_char_name, created, item_id, attribute);
+		// The GM states the whole instance; every structural rule (count ==
+		// tier, one modifier per Bucket, min-tiers, Bands) is checked
+		// server-side, so a hand-crafted packet buys nothing.
+		gm_mint_items(client_h, static_cast<int>(mint->item_id),
+			std::clamp(static_cast<int>(mint->count), 1, 10), mint->attributes);
 		break;
 	}
 #endif // TESTER_ONLY

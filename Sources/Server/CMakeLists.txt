@@ -24,6 +24,7 @@ set(SERVER_SOURCES
     CmdBroadcast.cpp
     CmdGiveItem.cpp
     CmdHelp.cpp
+    CmdMintCheck.cpp
     CmdReload.cpp
     CmdRollSmoke.cpp
     CmdSetAdmin.cpp
@@ -41,6 +42,7 @@ set(SERVER_SOURCES
     EntityManager.cpp
     FishingManager.cpp
     Game.cpp
+    GmMintSpec.cpp
     GameChatCommand.cpp
     GameCmdBeginApocalypse.cpp
     GameCmdBeginCrusade.cpp

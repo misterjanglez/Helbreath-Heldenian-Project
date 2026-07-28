@@ -3,26 +3,71 @@
 #include "ItemManager.h"
 #include "Item.h"
 #include "Item/ItemEnums.h"
+#include "GmMintSpec.h"
+#include <algorithm>
 #include <cstring>
 #include <cstdio>
+#include <string>
+#include <vector>
 
 using namespace hb::shared::net;
 using namespace hb::server::config;
+
+namespace
+{
+
+constexpr const char* usage_text =
+	"Usage: /createitem <item_id> [amount] [tier] [mod_id:value[:value2] ...]";
+
+// Highest tiered mint this command will make in one go. A tiered mint sends
+// one item notification per copy (they are distinct instances, unlike a
+// stack), so the chat venue keeps the tester menu's ceiling.
+constexpr int max_tiered_amount = 10;
+
+} // namespace
+
 bool GameCmdCreateItem::execute(CGame* game, int client_h, const char* args)
 {
 	if (game->m_client_list[client_h] == nullptr)
 		return true;
 
+	const std::vector<std::string> tokens = hb::server::split_args(args);
+
 	int item_id = 0, amount = 1;
-	if (args == nullptr || args[0] == '\0' || sscanf(args, "%d %d", &item_id, &amount) < 1)
+	if (tokens.empty() || std::sscanf(tokens[0].c_str(), "%d", &item_id) != 1)
 	{
-		game->send_notify_msg(0, client_h, Notify::NoticeMsg, 0, 0, 0, "Usage: /createitem <item_id> [amount]");
+		game->send_notify_msg(0, client_h, Notify::NoticeMsg, 0, 0, 0, usage_text);
+		return true;
+	}
+	if (tokens.size() > 1 && std::sscanf(tokens[1].c_str(), "%d", &amount) != 1)
+	{
+		game->send_notify_msg(0, client_h, Notify::NoticeMsg, 0, 0, 0, usage_text);
 		return true;
 	}
 
 	if (item_id < 0 || item_id >= MaxItemTypes || game->m_item_config_list[item_id] == nullptr)
 	{
 		game->send_notify_msg(0, client_h, Notify::NoticeMsg, 0, 0, 0, "Invalid item ID.");
+		return true;
+	}
+
+	// Attributed mint (Item Tiers 3-G): a tier plus up to four modifier
+	// slots, stated by the GM and gated by the running mode's Roll strategy.
+	// This is the venue that can attempt an ILLEGAL mint, which is how the
+	// legality gate gets exercised without a client that knows the rules.
+	if (tokens.size() > 2)
+	{
+		hb::shared::item::item_attribute_data requested;
+		const std::string complaint = hb::server::parse_mint_spec(tokens, 2, requested);
+		if (!complaint.empty())
+		{
+			game->send_notify_msg(0, client_h, Notify::NoticeMsg, 0, 0, 0, complaint.c_str());
+			game->send_notify_msg(0, client_h, Notify::NoticeMsg, 0, 0, 0, usage_text);
+			return true;
+		}
+
+		game->gm_mint_items(client_h, item_id,
+			std::clamp(amount, 1, max_tiered_amount), requested);
 		return true;
 	}
 
@@ -47,6 +92,9 @@ bool GameCmdCreateItem::execute(CGame* game, int client_h, const char* args)
 			{
 				game->m_item_manager->send_item_notify_msg(client_h, Notify::ItemObtained, item, 0);
 				created = amount;
+				game->m_item_manager->item_log(hb::server::net::ItemLogAction::GmMint,
+					client_h, created, item);
+				if (erase_req == 1) delete item;   // merged into an existing stack
 			}
 			else
 			{

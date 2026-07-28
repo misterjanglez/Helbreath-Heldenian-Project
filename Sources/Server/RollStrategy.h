@@ -16,6 +16,9 @@
 #pragma once
 
 #include <cstdint>
+#include <string>
+
+#include "Item/ItemAttributeData.h"
 
 class CItem;
 
@@ -45,10 +48,19 @@ class roll_strategy
 public:
 	virtual ~roll_strategy() = default;
 
-	// Rolls attributes onto a freshly initialized drop (spawn_npc_drop_item;
-	// GM minting routes here in 3-G). False = no attributes rolled; the
-	// item keeps its init_item_attr state and spawns plain.
+	// Rolls attributes onto a freshly initialized drop (spawn_npc_drop_item).
+	// False = no attributes rolled; the item keeps its init_item_attr state
+	// and spawns plain.
 	virtual bool roll(CItem& item, const roll_context& context) = 0;
+
+	// Applies a GM-stated attribute set to a freshly initialized item — the
+	// spec §10 creator, which specifies rather than rolls. Empty return =
+	// applied; otherwise the structural-legality violation that rejected the
+	// request, phrased for the GM. Legality is mode-owned (what a legal item
+	// even looks like is exactly what the two strategies disagree about), so
+	// the gate lives here beside the roll it must agree with.
+	virtual std::string mint(CItem& item,
+		const hb::shared::item::item_attribute_data& requested) = 0;
 
 	// The stage-1 base drop chance (out of 10000) this strategy's drop
 	// economy uses. Default = the legacy flat base; tiered overrides with

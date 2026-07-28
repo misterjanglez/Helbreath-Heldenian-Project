@@ -2,7 +2,9 @@
 
 #include <cstdint>
 #include <map>
+#include <string>
 
+#include "Item/ItemAttributeData.h"
 #include "DirectionHelpers.h"
 using hb::shared::direction::direction;
 
@@ -42,9 +44,21 @@ public:
 	// legacy attribute tables and is dormant data in tiered mode.
 	int modifier_multiplier(uint8_t modifier_id) const;
 
+	// The one GM-mint venue (spec §10, cycle 3-G). Puts `count` copies of
+	// item `item_id` carrying `requested` into the GM's inventory, with the
+	// attribute set gated by the running mode's Roll strategy, and logs the
+	// mint for the economy audit. Returns how many were created; `error` is
+	// empty on a clean run and otherwise names why minting stopped — a
+	// rejected request creates nothing, since legality does not vary between
+	// two identical copies.
+	int mint_gm_items(int client_h, int item_id, int count,
+		const hb::shared::item::item_attribute_data& requested, std::string& error);
+
 	// Inventory management
 	bool add_item(int client_h, CItem* item, char mode);
 	bool add_client_item_list(int client_h, CItem* item, int* del_req);
+	// Bulk GM creation: `amount` distinct copies into free slots (no merging),
+	// one bulk notification, one GmMint audit line. Returns how many landed.
 	int add_client_bulk_item_list(int client_h, const char* item_name, int amount);
 	void release_item_handler(int client_h, short item_index, bool notice);
 	int set_item_count(int client_h, int item_index, uint64_t count);

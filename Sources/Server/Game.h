@@ -434,6 +434,13 @@ public:
 
 	
 	void client_common_handler(int client_h, char * data);
+
+	// One GM mint request through ItemManager::mint_gm_items, plus the
+	// GM-facing outcome line (a rejection is information the GM needs, not a
+	// silent no-op). Shared by both creator venues — the tester commands and
+	// the /createitem chat command. Item Tiers cycle 3-G.
+	int  gm_mint_items(int client_h, int item_id, int count,
+		const hb::shared::item::item_attribute_data& requested);
 	bool get_msg_queue(char * pFrom, char * data, size_t* msg_size, int * index, char * key);
 	void msg_process();
 	bool put_msg_queue(char cFrom, char * data, size_t msg_size, int index, char key);
