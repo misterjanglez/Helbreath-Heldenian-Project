@@ -8510,6 +8510,9 @@ bool CGame::init_npc_attr(class CNpc* npc, int npc_config_id, short sClass, char
 				npc->m_gold_dice_min = m_npc_config_list[config_idx]->m_gold_dice_min;
 				npc->m_gold_dice_max = m_npc_config_list[config_idx]->m_gold_dice_max;
 				npc->m_drop_table_id = m_npc_config_list[config_idx]->m_drop_table_id;
+				// Travels with the drop table it grades: the tiered roll reads
+				// the loot grade off the spawned NPC, not off the config row.
+				npc->m_loot_grade = m_npc_config_list[config_idx]->m_loot_grade;
 				npc->m_exp = (dice(1, (m_npc_config_list[config_idx]->m_exp_dice_max - m_npc_config_list[config_idx]->m_exp_dice_min)) + m_npc_config_list[config_idx]->m_exp_dice_min);
 
 				npc->m_hp_min = m_npc_config_list[config_idx]->m_hp_min;
