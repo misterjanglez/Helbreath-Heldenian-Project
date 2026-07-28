@@ -132,44 +132,56 @@ void DialogBox_ItemCreator::build_valid_options(int16_t effect_type)
 	m_valid_prefixes.push_back({0, "None", 0});
 	m_valid_secondaries.push_back({0, "None", 0});
 
+	// Option ids are the legacy 4-bit nibble values the TesterCreateItem
+	// bitmask carries (the server translates them to unified modifier IDs);
+	// multiplier display lookups route through the one translation table.
+	auto add_prefix = [this](uint8_t legacy_id, const char* name)
+	{
+		m_valid_prefixes.push_back({legacy_id, name, m_game->m_modifier_multiplier[legacy_prefix_to_modifier_id(legacy_id)]});
+	};
+	auto add_secondary = [this](uint8_t legacy_id, const char* name)
+	{
+		m_valid_secondaries.push_back({legacy_id, name, m_game->m_modifier_multiplier[legacy_secondary_to_modifier_id(legacy_id)]});
+	};
+
 	switch (m_category)
 	{
 	case item_category::weapon:
-		m_valid_prefixes.push_back({1, "Critical", m_game->m_prefix_multiplier[1]});
-		m_valid_prefixes.push_back({2, "Poisoning", m_game->m_prefix_multiplier[2]});
-		m_valid_prefixes.push_back({3, "Righteous", m_game->m_prefix_multiplier[3]});
-		m_valid_prefixes.push_back({5, "Agile", m_game->m_prefix_multiplier[5]});
-		m_valid_prefixes.push_back({6, "Light", m_game->m_prefix_multiplier[6]});
-		m_valid_prefixes.push_back({7, "Sharp", m_game->m_prefix_multiplier[7]});
-		m_valid_prefixes.push_back({8, "Strong", m_game->m_prefix_multiplier[8]});
-		m_valid_prefixes.push_back({9, "Ancient", m_game->m_prefix_multiplier[9]});
-		m_valid_secondaries.push_back({2, "HitProb", m_game->m_secondary_multiplier[2]});
-		m_valid_secondaries.push_back({10, "ConsecAtk", m_game->m_secondary_multiplier[10]});
-		m_valid_secondaries.push_back({11, "ExpBonus", m_game->m_secondary_multiplier[11]});
-		m_valid_secondaries.push_back({12, "GoldBonus", m_game->m_secondary_multiplier[12]});
+		add_prefix(1, "Critical");
+		add_prefix(2, "Poisoning");
+		add_prefix(3, "Righteous");
+		add_prefix(5, "Agile");
+		add_prefix(6, "Light");
+		add_prefix(7, "Sharp");
+		add_prefix(8, "Strong");
+		add_prefix(9, "Ancient");
+		add_secondary(2, "HitProb");
+		add_secondary(10, "ConsecAtk");
+		add_secondary(11, "ExpBonus");
+		add_secondary(12, "GoldBonus");
 		break;
 
 	case item_category::armor:
-		m_valid_prefixes.push_back({8, "Strong", m_game->m_prefix_multiplier[8]});
-		m_valid_prefixes.push_back({6, "Light", m_game->m_prefix_multiplier[6]});
-		m_valid_prefixes.push_back({11, "ManaConvert", m_game->m_prefix_multiplier[11]});
-		m_valid_prefixes.push_back({12, "CritChance", m_game->m_prefix_multiplier[12]});
-		m_valid_secondaries.push_back({3, "DefRatio", m_game->m_secondary_multiplier[3]});
-		m_valid_secondaries.push_back({1, "PoisonRes", m_game->m_secondary_multiplier[1]});
-		m_valid_secondaries.push_back({5, "SPRecov", m_game->m_secondary_multiplier[5]});
-		m_valid_secondaries.push_back({4, "HPRecov", m_game->m_secondary_multiplier[4]});
-		m_valid_secondaries.push_back({6, "MPRecov", m_game->m_secondary_multiplier[6]});
-		m_valid_secondaries.push_back({7, "MagicRes", m_game->m_secondary_multiplier[7]});
-		m_valid_secondaries.push_back({8, "PhysAbsorb", m_game->m_secondary_multiplier[8]});
-		m_valid_secondaries.push_back({9, "MagicAbsorb", m_game->m_secondary_multiplier[9]});
+		add_prefix(8, "Strong");
+		add_prefix(6, "Light");
+		add_prefix(11, "ManaConvert");
+		add_prefix(12, "CritChance");
+		add_secondary(3, "DefRatio");
+		add_secondary(1, "PoisonRes");
+		add_secondary(5, "SPRecov");
+		add_secondary(4, "HPRecov");
+		add_secondary(6, "MPRecov");
+		add_secondary(7, "MagicRes");
+		add_secondary(8, "PhysAbsorb");
+		add_secondary(9, "MagicAbsorb");
 		break;
 
 	case item_category::magic_weapon:
-		m_valid_prefixes.push_back({10, "Special", m_game->m_prefix_multiplier[10]});
-		m_valid_secondaries.push_back({2, "HitProb", m_game->m_secondary_multiplier[2]});
-		m_valid_secondaries.push_back({10, "ConsecAtk", m_game->m_secondary_multiplier[10]});
-		m_valid_secondaries.push_back({11, "ExpBonus", m_game->m_secondary_multiplier[11]});
-		m_valid_secondaries.push_back({12, "GoldBonus", m_game->m_secondary_multiplier[12]});
+		add_prefix(10, "Special");
+		add_secondary(2, "HitProb");
+		add_secondary(10, "ConsecAtk");
+		add_secondary(11, "ExpBonus");
+		add_secondary(12, "GoldBonus");
 		break;
 
 	default:

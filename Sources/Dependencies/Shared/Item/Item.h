@@ -11,7 +11,6 @@
 #pragma once
 
 #include "ItemEnums.h"
-#include "ItemAttributes.h"
 #include "ItemInstanceData.h"
 #include "NetConstants.h"
 #include "Game/BalanceConstants.h"
@@ -262,14 +261,21 @@ public:
     // Attribute Helpers
     //------------------------------------------------------------------------
 
-    hb::shared::item::AttributePrefixType get_prefix_type() const
+    // Types are unified modifier IDs (ModifierIds.h); prefix/secondary are
+    // the legacy-strategy views over modifier slots [0]/[1].
+    uint8_t get_prefix_type() const
     {
-        return static_cast<hb::shared::item::AttributePrefixType>(m_instance.get_prefix_type());
+        return m_instance.get_prefix_type();
     }
 
-    hb::shared::item::SecondaryEffectType get_secondary_type() const
+    uint8_t get_secondary_type() const
     {
-        return static_cast<hb::shared::item::SecondaryEffectType>(m_instance.get_secondary_type());
+        return m_instance.get_secondary_type();
+    }
+
+    uint8_t get_tier() const
+    {
+        return m_instance.get_tier();
     }
 
     uint8_t get_prefix_value() const
@@ -360,7 +366,7 @@ public:
     // Light attribute percentage — prefix_value is already the actual percentage
     int get_light_percent() const
     {
-        if (get_prefix_type() == hb::shared::item::AttributePrefixType::Light)
+        if (get_prefix_type() == hb::shared::item::modifier_id::light)
             return get_prefix_value();
         return 0;
     }

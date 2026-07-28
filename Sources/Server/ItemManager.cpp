@@ -50,8 +50,8 @@ static std::string format_item_info(CItem* item)
 	std::snprintf(buf, sizeof(buf), "%s(count=%llu pfx=%d:%d sec=%d:%d enc=%d cm=%d touch=%d:%d:%d:%d)",
 		item->m_name,
 		static_cast<unsigned long long>(item->m_instance.count),
-		static_cast<int>(item->get_prefix_type()), item->get_prefix_value(),
-		static_cast<int>(item->get_secondary_type()), item->get_secondary_value(),
+		item->get_prefix_type(), item->get_prefix_value(),
+		item->get_secondary_type(), item->get_secondary_value(),
 		item->get_enchant_bonus(), item->is_custom_made() ? 1 : 0,
 		item->m_instance.touch_effect_type,
 		item->m_instance.touch_effect_value1,
@@ -2644,19 +2644,19 @@ void ItemManager::req_sell_item_handler(int client_h, char item_id, char sell_to
 			// Attribute bonus pricing for equipment with special attributes
 			add_price1 = 0;
 			add_price2 = 0;
-			if (m_game->m_client_list[client_h]->m_item_list[item_id]->get_prefix_type() != hb::shared::item::AttributePrefixType::None) {
-				swe_type = static_cast<int>(m_game->m_client_list[client_h]->m_item_list[item_id]->get_prefix_type());
+			if (m_game->m_client_list[client_h]->m_item_list[item_id]->get_prefix_type() != hb::shared::item::modifier_id::empty) {
+				swe_type = m_game->m_client_list[client_h]->m_item_list[item_id]->get_prefix_type();
 				swe_value = m_game->m_client_list[client_h]->m_item_list[item_id]->get_prefix_value();
 
 				switch (swe_type) {
-				case 6: mul1 = 2; break;
-				case 8: mul1 = 2; break;
-				case 5: mul1 = 3; break;
-				case 1: mul1 = 4; break;
-				case 7: mul1 = 5; break;
-				case 2: mul1 = 6; break;
-				case 3: mul1 = 15; break;
-				case 9: mul1 = 20; break;
+				case modifier_id::light:     mul1 = 2; break;
+				case modifier_id::strong:    mul1 = 2; break;
+				case modifier_id::agile:     mul1 = 3; break;
+				case modifier_id::critical:  mul1 = 4; break;
+				case modifier_id::sharp:     mul1 = 5; break;
+				case modifier_id::poisoning: mul1 = 6; break;
+				case modifier_id::righteous: mul1 = 15; break;
+				case modifier_id::ancient:   mul1 = 20; break;
 				default: mul1 = 1; break;
 				}
 
@@ -2682,25 +2682,25 @@ void ItemManager::req_sell_item_handler(int client_h, char item_id, char sell_to
 				add_price1 = (int)(d1 + d3);
 			}
 
-			if (m_game->m_client_list[client_h]->m_item_list[item_id]->get_secondary_type() != hb::shared::item::SecondaryEffectType::None) {
-				swe_type = static_cast<int>(m_game->m_client_list[client_h]->m_item_list[item_id]->get_secondary_type());
+			if (m_game->m_client_list[client_h]->m_item_list[item_id]->get_secondary_type() != hb::shared::item::modifier_id::empty) {
+				swe_type = m_game->m_client_list[client_h]->m_item_list[item_id]->get_secondary_type();
 				swe_value = m_game->m_client_list[client_h]->m_item_list[item_id]->get_secondary_value();
 
 				switch (swe_type) {
-				case 1:
-				case 12: mul2 = 2; break;
+				case modifier_id::poison_resist:
+				case modifier_id::gold: mul2 = 2; break;
 
-				case 2:
-				case 3:
-				case 4:
-				case 5:
-				case 6:
-				case 7: mul2 = 4; break;
+				case modifier_id::hitting_probability:
+				case modifier_id::defense_ratio:
+				case modifier_id::hp_recovery:
+				case modifier_id::sp_recovery:
+				case modifier_id::mp_recovery:
+				case modifier_id::magic_resist: mul2 = 4; break;
 
-				case 8:
-				case 9:
-				case 10:
-				case 11: mul2 = 6; break;
+				case modifier_id::physical_absorb:
+				case modifier_id::magic_absorb:
+				case modifier_id::consecutive_attack:
+				case modifier_id::experience: mul2 = 6; break;
 				}
 
 				d1 = (double)price * mul2;
@@ -2811,21 +2811,19 @@ void ItemManager::req_sell_item_confirm_handler(int client_h, char item_id, int 
 
 			add_price1 = 0;
 			add_price2 = 0;
-			if (m_game->m_client_list[client_h]->m_item_list[item_id]->get_prefix_type() != hb::shared::item::AttributePrefixType::None) {
-				swe_type = static_cast<int>(m_game->m_client_list[client_h]->m_item_list[item_id]->get_prefix_type());
+			if (m_game->m_client_list[client_h]->m_item_list[item_id]->get_prefix_type() != hb::shared::item::modifier_id::empty) {
+				swe_type = m_game->m_client_list[client_h]->m_item_list[item_id]->get_prefix_type();
 				swe_value = m_game->m_client_list[client_h]->m_item_list[item_id]->get_prefix_value();
 
-				// 0-None 1- 2- 3- 4-
-				// 5- 6- 7- 8- 9-
 				switch (swe_type) {
-				case 6: mul1 = 2; break;
-				case 8: mul1 = 2; break;
-				case 5: mul1 = 3; break;
-				case 1: mul1 = 4; break;
-				case 7: mul1 = 5; break;
-				case 2: mul1 = 6; break;
-				case 3: mul1 = 15; break;
-				case 9: mul1 = 20; break;
+				case modifier_id::light:     mul1 = 2; break;
+				case modifier_id::strong:    mul1 = 2; break;
+				case modifier_id::agile:     mul1 = 3; break;
+				case modifier_id::critical:  mul1 = 4; break;
+				case modifier_id::sharp:     mul1 = 5; break;
+				case modifier_id::poisoning: mul1 = 6; break;
+				case modifier_id::righteous: mul1 = 15; break;
+				case modifier_id::ancient:   mul1 = 20; break;
 				default: mul1 = 1; break;
 				}
 
@@ -2850,28 +2848,28 @@ void ItemManager::req_sell_item_confirm_handler(int client_h, char item_id, int 
 				add_price1 = (int)(d1 + d3);
 			}
 
-			if (m_game->m_client_list[client_h]->m_item_list[item_id]->get_secondary_type() != hb::shared::item::SecondaryEffectType::None) {
-				swe_type = static_cast<int>(m_game->m_client_list[client_h]->m_item_list[item_id]->get_secondary_type());
+			if (m_game->m_client_list[client_h]->m_item_list[item_id]->get_secondary_type() != hb::shared::item::modifier_id::empty) {
+				swe_type = m_game->m_client_list[client_h]->m_item_list[item_id]->get_secondary_type();
 				swe_value = m_game->m_client_list[client_h]->m_item_list[item_id]->get_secondary_value();
 
 				// (1),  (2),  (3), HP  (4), SP  (5)
 				// MP  (6),  (7),   (8),   (9)
 				// (10),   (11),  Gold(12)
 				switch (swe_type) {
-				case 1:
-				case 12: mul2 = 2; break;
+				case modifier_id::poison_resist:
+				case modifier_id::gold: mul2 = 2; break;
 
-				case 2:
-				case 3:
-				case 4:
-				case 5:
-				case 6:
-				case 7: mul2 = 4; break;
+				case modifier_id::hitting_probability:
+				case modifier_id::defense_ratio:
+				case modifier_id::hp_recovery:
+				case modifier_id::sp_recovery:
+				case modifier_id::mp_recovery:
+				case modifier_id::magic_resist: mul2 = 4; break;
 
-				case 8:
-				case 9:
-				case 10:
-				case 11: mul2 = 6; break;
+				case modifier_id::physical_absorb:
+				case modifier_id::magic_absorb:
+				case modifier_id::consecutive_attack:
+				case modifier_id::experience: mul2 = 6; break;
 				}
 
 				d1 = (double)price * mul2;
@@ -3277,54 +3275,48 @@ void ItemManager::calc_total_item_effect(int client_h, int equip_item_id, bool n
 					}
 				}
 
-				if (m_game->m_client_list[client_h]->m_item_list[item_index]->get_prefix_type() != hb::shared::item::AttributePrefixType::None) {
-					swe_type = static_cast<int>(m_game->m_client_list[client_h]->m_item_list[item_index]->get_prefix_type());
+				if (m_game->m_client_list[client_h]->m_item_list[item_index]->get_prefix_type() != hb::shared::item::modifier_id::empty) {
+					swe_type = m_game->m_client_list[client_h]->m_item_list[item_index]->get_prefix_type();
 					swe_value = m_game->m_client_list[client_h]->m_item_list[item_index]->get_prefix_value();
 
-					// 0-None 1- 2- 3- 4-
-					// 5- 6- 7- 8- 9- 10-
 					m_game->m_client_list[client_h]->m_special_weapon_effect_type = (int)swe_type;
 					m_game->m_client_list[client_h]->m_special_weapon_effect_value = (int)swe_value;
 
 					switch (swe_type) {
-					case 7:
-						m_game->m_client_list[client_h]->m_attack_bonus_sm += (int)swe_value * m_game->m_prefix_multiplier[7];
-						m_game->m_client_list[client_h]->m_attack_bonus_l += (int)swe_value * m_game->m_prefix_multiplier[7];
+					case modifier_id::sharp:
+						m_game->m_client_list[client_h]->m_attack_bonus_sm += (int)swe_value * m_game->m_modifier_multiplier[modifier_id::sharp];
+						m_game->m_client_list[client_h]->m_attack_bonus_l += (int)swe_value * m_game->m_modifier_multiplier[modifier_id::sharp];
 						break;
 
-					case 9:
-						m_game->m_client_list[client_h]->m_attack_bonus_sm += (int)swe_value * m_game->m_prefix_multiplier[9];
-						m_game->m_client_list[client_h]->m_attack_bonus_l += (int)swe_value * m_game->m_prefix_multiplier[9];
+					case modifier_id::ancient:
+						m_game->m_client_list[client_h]->m_attack_bonus_sm += (int)swe_value * m_game->m_modifier_multiplier[modifier_id::ancient];
+						m_game->m_client_list[client_h]->m_attack_bonus_l += (int)swe_value * m_game->m_modifier_multiplier[modifier_id::ancient];
 						break;
 					}
 				}
 
-				if (m_game->m_client_list[client_h]->m_item_list[item_index]->get_secondary_type() != hb::shared::item::SecondaryEffectType::None) {
-					swe_type = static_cast<int>(m_game->m_client_list[client_h]->m_item_list[item_index]->get_secondary_type());
+				if (m_game->m_client_list[client_h]->m_item_list[item_index]->get_secondary_type() != hb::shared::item::modifier_id::empty) {
+					swe_type = m_game->m_client_list[client_h]->m_item_list[item_index]->get_secondary_type();
 					swe_value = m_game->m_client_list[client_h]->m_item_list[item_index]->get_secondary_value();
 
-					// (1),  (2),  (3), HP  (4), SP  (5)
-					// MP  (6),  (7),   (8),   (9)
-					// (10),   (11),  Gold(12)
-
 					switch (swe_type) {
-					case 0:  break;
-					case 1:  m_game->m_client_list[client_h]->m_add_poison_resistance += (int)swe_value * m_game->m_secondary_multiplier[1]; break;
-					case 2:  m_game->m_client_list[client_h]->m_add_attack_ratio += (int)swe_value * m_game->m_secondary_multiplier[2]; break;
-					case 3:  m_game->m_client_list[client_h]->m_add_defense_ratio += (int)swe_value * m_game->m_secondary_multiplier[3]; break;
-					case 4:  m_game->m_client_list[client_h]->m_add_hp += (int)swe_value * m_game->m_secondary_multiplier[4]; break;
-					case 5:  m_game->m_client_list[client_h]->m_add_sp += (int)swe_value * m_game->m_secondary_multiplier[5]; break;
-					case 6:  m_game->m_client_list[client_h]->m_add_mp += (int)swe_value * m_game->m_secondary_multiplier[6]; break;
-					case 7:  m_game->m_client_list[client_h]->m_add_magic_resistance += (int)swe_value * m_game->m_secondary_multiplier[7]; break;
-					case 8:  m_game->m_client_list[client_h]->m_damage_absorption_armor[m_game->m_client_list[client_h]->m_item_list[item_index]->m_equip_pos] += (int)swe_value * m_game->m_secondary_multiplier[8]; break;
-					case 9:  m_game->m_client_list[client_h]->m_add_abs_magical_defense += (int)swe_value * m_game->m_secondary_multiplier[9]; break;
-					case 10: m_game->m_client_list[client_h]->m_add_combo_damage += (int)swe_value * m_game->m_secondary_multiplier[10]; break;
-					case 11: m_game->m_client_list[client_h]->m_add_exp += (int)swe_value * m_game->m_secondary_multiplier[11]; break;
-					case 12: m_game->m_client_list[client_h]->m_add_gold += (int)swe_value * m_game->m_secondary_multiplier[12]; break;
+					case modifier_id::empty: break;
+					case modifier_id::poison_resist:  m_game->m_client_list[client_h]->m_add_poison_resistance += (int)swe_value * m_game->m_modifier_multiplier[modifier_id::poison_resist]; break;
+					case modifier_id::hitting_probability: m_game->m_client_list[client_h]->m_add_attack_ratio += (int)swe_value * m_game->m_modifier_multiplier[modifier_id::hitting_probability]; break;
+					case modifier_id::defense_ratio:  m_game->m_client_list[client_h]->m_add_defense_ratio += (int)swe_value * m_game->m_modifier_multiplier[modifier_id::defense_ratio]; break;
+					case modifier_id::hp_recovery:    m_game->m_client_list[client_h]->m_add_hp += (int)swe_value * m_game->m_modifier_multiplier[modifier_id::hp_recovery]; break;
+					case modifier_id::sp_recovery:    m_game->m_client_list[client_h]->m_add_sp += (int)swe_value * m_game->m_modifier_multiplier[modifier_id::sp_recovery]; break;
+					case modifier_id::mp_recovery:    m_game->m_client_list[client_h]->m_add_mp += (int)swe_value * m_game->m_modifier_multiplier[modifier_id::mp_recovery]; break;
+					case modifier_id::magic_resist:   m_game->m_client_list[client_h]->m_add_magic_resistance += (int)swe_value * m_game->m_modifier_multiplier[modifier_id::magic_resist]; break;
+					case modifier_id::physical_absorb: m_game->m_client_list[client_h]->m_damage_absorption_armor[m_game->m_client_list[client_h]->m_item_list[item_index]->m_equip_pos] += (int)swe_value * m_game->m_modifier_multiplier[modifier_id::physical_absorb]; break;
+					case modifier_id::magic_absorb:   m_game->m_client_list[client_h]->m_add_abs_magical_defense += (int)swe_value * m_game->m_modifier_multiplier[modifier_id::magic_absorb]; break;
+					case modifier_id::consecutive_attack: m_game->m_client_list[client_h]->m_add_combo_damage += (int)swe_value * m_game->m_modifier_multiplier[modifier_id::consecutive_attack]; break;
+					case modifier_id::experience:     m_game->m_client_list[client_h]->m_add_exp += (int)swe_value * m_game->m_modifier_multiplier[modifier_id::experience]; break;
+					case modifier_id::gold:           m_game->m_client_list[client_h]->m_add_gold += (int)swe_value * m_game->m_modifier_multiplier[modifier_id::gold]; break;
 					}
 
 					switch (swe_type) {
-					case 9: if (m_game->m_client_list[client_h]->m_add_abs_magical_defense > 80) m_game->m_client_list[client_h]->m_add_abs_magical_defense = 80; break;
+					case modifier_id::magic_absorb: if (m_game->m_client_list[client_h]->m_add_abs_magical_defense > 80) m_game->m_client_list[client_h]->m_add_abs_magical_defense = 80; break;
 					}
 				}
 
@@ -3514,62 +3506,55 @@ void ItemManager::calc_total_item_effect(int client_h, int equip_item_id, bool n
 					//PutLogList(G_cTxt);
 				}
 
-				if (m_game->m_client_list[client_h]->m_item_list[item_index]->get_prefix_type() != hb::shared::item::AttributePrefixType::None) {
-					swe_type = static_cast<int>(m_game->m_client_list[client_h]->m_item_list[item_index]->get_prefix_type());
+				if (m_game->m_client_list[client_h]->m_item_list[item_index]->get_prefix_type() != hb::shared::item::modifier_id::empty) {
+					swe_type = m_game->m_client_list[client_h]->m_item_list[item_index]->get_prefix_type();
 					swe_value = m_game->m_client_list[client_h]->m_item_list[item_index]->get_prefix_value();
 
-					// 0-None 1- 2- 3- 4-
-					// 5- 6- 7- 8- 9- 10- 11- 12-
-
 					switch (swe_type) {
-					case 7:
-						m_game->m_client_list[client_h]->m_attack_bonus_sm += (int)swe_value * m_game->m_prefix_multiplier[7];
-						m_game->m_client_list[client_h]->m_attack_bonus_l += (int)swe_value * m_game->m_prefix_multiplier[7];
+					case modifier_id::sharp:
+						m_game->m_client_list[client_h]->m_attack_bonus_sm += (int)swe_value * m_game->m_modifier_multiplier[modifier_id::sharp];
+						m_game->m_client_list[client_h]->m_attack_bonus_l += (int)swe_value * m_game->m_modifier_multiplier[modifier_id::sharp];
 						break;
 
-					case 9:
-						m_game->m_client_list[client_h]->m_attack_bonus_sm += (int)swe_value * m_game->m_prefix_multiplier[9];
-						m_game->m_client_list[client_h]->m_attack_bonus_l += (int)swe_value * m_game->m_prefix_multiplier[9];
+					case modifier_id::ancient:
+						m_game->m_client_list[client_h]->m_attack_bonus_sm += (int)swe_value * m_game->m_modifier_multiplier[modifier_id::ancient];
+						m_game->m_client_list[client_h]->m_attack_bonus_l += (int)swe_value * m_game->m_modifier_multiplier[modifier_id::ancient];
 						break;
 
-					case 11:
-						m_game->m_client_list[client_h]->m_add_trans_mana += (int)swe_value * m_game->m_prefix_multiplier[11];
+					case modifier_id::mana_converting:
+						m_game->m_client_list[client_h]->m_add_trans_mana += (int)swe_value * m_game->m_modifier_multiplier[modifier_id::mana_converting];
 						if (m_game->m_client_list[client_h]->m_add_trans_mana > 13) m_game->m_client_list[client_h]->m_add_trans_mana = 13;
 						break;
 
-					case 12:
-						m_game->m_client_list[client_h]->m_add_charge_critical += (int)swe_value * m_game->m_prefix_multiplier[12];
+					case modifier_id::crit_chance:
+						m_game->m_client_list[client_h]->m_add_charge_critical += (int)swe_value * m_game->m_modifier_multiplier[modifier_id::crit_chance];
 						if (m_game->m_client_list[client_h]->m_add_charge_critical > 20) m_game->m_client_list[client_h]->m_add_charge_critical = 20;
 						break;
 					}
 				}
 
-				if (m_game->m_client_list[client_h]->m_item_list[item_index]->get_secondary_type() != hb::shared::item::SecondaryEffectType::None) {
-					swe_type = static_cast<int>(m_game->m_client_list[client_h]->m_item_list[item_index]->get_secondary_type());
+				if (m_game->m_client_list[client_h]->m_item_list[item_index]->get_secondary_type() != hb::shared::item::modifier_id::empty) {
+					swe_type = m_game->m_client_list[client_h]->m_item_list[item_index]->get_secondary_type();
 					swe_value = m_game->m_client_list[client_h]->m_item_list[item_index]->get_secondary_value();
 
-					// (1),  (2),  (3), HP  (4), SP  (5)
-					// MP  (6),  (7),   (8),   (9)
-					// (10),   (11),  Gold(12)
-
 					switch (swe_type) {
-					case 0:  break;
-					case 1:  m_game->m_client_list[client_h]->m_add_poison_resistance += (int)swe_value * m_game->m_secondary_multiplier[1]; break;
-					case 2:  m_game->m_client_list[client_h]->m_add_attack_ratio += (int)swe_value * m_game->m_secondary_multiplier[2]; break;
-					case 3:  m_game->m_client_list[client_h]->m_add_defense_ratio += (int)swe_value * m_game->m_secondary_multiplier[3]; break;
-					case 4:  m_game->m_client_list[client_h]->m_add_hp += (int)swe_value * m_game->m_secondary_multiplier[4]; break;
-					case 5:  m_game->m_client_list[client_h]->m_add_sp += (int)swe_value * m_game->m_secondary_multiplier[5]; break;
-					case 6:  m_game->m_client_list[client_h]->m_add_mp += (int)swe_value * m_game->m_secondary_multiplier[6]; break;
-					case 7:  m_game->m_client_list[client_h]->m_add_magic_resistance += (int)swe_value * m_game->m_secondary_multiplier[7]; break;
-					case 8:  m_game->m_client_list[client_h]->m_damage_absorption_armor[m_game->m_client_list[client_h]->m_item_list[item_index]->m_equip_pos] += (int)swe_value * m_game->m_secondary_multiplier[8]; break;
-					case 9:  m_game->m_client_list[client_h]->m_add_abs_magical_defense += (int)swe_value * m_game->m_secondary_multiplier[9]; break;
-					case 10: m_game->m_client_list[client_h]->m_add_combo_damage += (int)swe_value * m_game->m_secondary_multiplier[10]; break;
-					case 11: m_game->m_client_list[client_h]->m_add_exp += (int)swe_value * m_game->m_secondary_multiplier[11]; break;
-					case 12: m_game->m_client_list[client_h]->m_add_gold += (int)swe_value * m_game->m_secondary_multiplier[12]; break;
+					case modifier_id::empty: break;
+					case modifier_id::poison_resist:  m_game->m_client_list[client_h]->m_add_poison_resistance += (int)swe_value * m_game->m_modifier_multiplier[modifier_id::poison_resist]; break;
+					case modifier_id::hitting_probability: m_game->m_client_list[client_h]->m_add_attack_ratio += (int)swe_value * m_game->m_modifier_multiplier[modifier_id::hitting_probability]; break;
+					case modifier_id::defense_ratio:  m_game->m_client_list[client_h]->m_add_defense_ratio += (int)swe_value * m_game->m_modifier_multiplier[modifier_id::defense_ratio]; break;
+					case modifier_id::hp_recovery:    m_game->m_client_list[client_h]->m_add_hp += (int)swe_value * m_game->m_modifier_multiplier[modifier_id::hp_recovery]; break;
+					case modifier_id::sp_recovery:    m_game->m_client_list[client_h]->m_add_sp += (int)swe_value * m_game->m_modifier_multiplier[modifier_id::sp_recovery]; break;
+					case modifier_id::mp_recovery:    m_game->m_client_list[client_h]->m_add_mp += (int)swe_value * m_game->m_modifier_multiplier[modifier_id::mp_recovery]; break;
+					case modifier_id::magic_resist:   m_game->m_client_list[client_h]->m_add_magic_resistance += (int)swe_value * m_game->m_modifier_multiplier[modifier_id::magic_resist]; break;
+					case modifier_id::physical_absorb: m_game->m_client_list[client_h]->m_damage_absorption_armor[m_game->m_client_list[client_h]->m_item_list[item_index]->m_equip_pos] += (int)swe_value * m_game->m_modifier_multiplier[modifier_id::physical_absorb]; break;
+					case modifier_id::magic_absorb:   m_game->m_client_list[client_h]->m_add_abs_magical_defense += (int)swe_value * m_game->m_modifier_multiplier[modifier_id::magic_absorb]; break;
+					case modifier_id::consecutive_attack: m_game->m_client_list[client_h]->m_add_combo_damage += (int)swe_value * m_game->m_modifier_multiplier[modifier_id::consecutive_attack]; break;
+					case modifier_id::experience:     m_game->m_client_list[client_h]->m_add_exp += (int)swe_value * m_game->m_modifier_multiplier[modifier_id::experience]; break;
+					case modifier_id::gold:           m_game->m_client_list[client_h]->m_add_gold += (int)swe_value * m_game->m_modifier_multiplier[modifier_id::gold]; break;
 					}
 
 					switch (swe_type) {
-					case 9: if (m_game->m_client_list[client_h]->m_add_abs_magical_defense > 80) m_game->m_client_list[client_h]->m_add_abs_magical_defense = 80; break;
+					case modifier_id::magic_absorb: if (m_game->m_client_list[client_h]->m_add_abs_magical_defense > 80) m_game->m_client_list[client_h]->m_add_abs_magical_defense = 80; break;
 					}
 				}
 
@@ -4647,9 +4632,11 @@ void ItemManager::build_item_handler(int client_h, char* data)
 
 				}
 				else {
-					// Copy prefix attributes from build item definition
+					// Copy prefix attributes from build item definition.
+					// Recipe nibbles stay in the legacy 1-12 prefix space;
+					// translate to unified modifier IDs at this boundary.
 					uint16_t build_attr = m_game->m_build_item_list[i]->m_attribute;
-					item->set_prefix(static_cast<uint8_t>((build_attr >> 4) & 0x0F), static_cast<uint8_t>(build_attr & 0x0F));
+					item->set_prefix(legacy_prefix_to_modifier_id((build_attr >> 4) & 0x0F), static_cast<uint8_t>(build_attr & 0x0F));
 					item->set_enchant_bonus(static_cast<uint8_t>((build_attr >> 12) & 0x0F));
 
 					result_value = (total_value - m_game->m_build_item_list[i]->m_average_value);
@@ -4732,32 +4719,30 @@ void ItemManager::adjust_rare_item_value(CItem* item)
 	uint32_t swe_type, swe_value;
 	double v1, v2, v3;
 
-	if (item->get_prefix_type() != hb::shared::item::AttributePrefixType::None) {
-		swe_type = static_cast<int>(item->get_prefix_type());
+	if (item->get_prefix_type() != hb::shared::item::modifier_id::empty) {
+		swe_type = item->get_prefix_type();
 		swe_value = item->get_prefix_value();
-		// 0-None 1- 2- 3-
-		// 5- 6- 7- 8- 9-
 		switch (swe_type) {
-		case 0: break;
+		case modifier_id::empty: break;
 
-		case 5:
+		case modifier_id::agile:
 			item->m_swing_speed--;
 			if (item->m_swing_speed < 0) item->m_swing_speed = 0;
 			break;
 
-		case 6:
+		case modifier_id::light:
 			v2 = (double)item->m_weight;
-			v3 = (double)(swe_value * m_game->m_prefix_multiplier[6]);
+			v3 = (double)(swe_value * m_game->m_modifier_multiplier[modifier_id::light]);
 			v1 = (v3 / 100.0f) * v2;
 			item->m_weight -= (int)v1;
 
 			if (item->m_weight < 1) item->m_weight = 1;
 			break;
 
-		case 8:
-		case 9:
+		case modifier_id::strong:
+		case modifier_id::ancient:
 			v2 = (double)item->m_durability;
-			v3 = (double)(swe_value * m_game->m_prefix_multiplier[swe_type]);
+			v3 = (double)(swe_value * m_game->m_modifier_multiplier[swe_type]);
 			v1 = (v3 / 100.0f) * v2;
 			item->m_durability += (int)v1;
 			break;
@@ -4792,9 +4777,9 @@ bool ItemManager::generate_item_attributes(CItem* item)
 {
 	if (item == nullptr) return false;
 
-	AttributePrefixType primaryType = AttributePrefixType::None;
+	uint8_t primaryType = modifier_id::empty;
 	int primaryValue = 0;
-	SecondaryEffectType secondaryType = SecondaryEffectType::None;
+	uint8_t secondaryType = modifier_id::empty;
 	int secondaryValue = 0;
 	int item_color = 0;
 
@@ -4803,15 +4788,15 @@ bool ItemManager::generate_item_attributes(CItem* item)
 		int roll = rand() % 10000;
 		int cumul = 0;
 
-		struct { int weight; AttributePrefixType type; int color; } attackPrimary[] = {
-			{ 299,  AttributePrefixType::Light,      16 },
-			{ 700,  AttributePrefixType::Strong,     16 },
-			{ 1500, AttributePrefixType::Critical,   18 },
-			{ 2000, AttributePrefixType::Agile,      16 },
-			{ 2000, AttributePrefixType::Righteous,  20 },
-			{ 1600, AttributePrefixType::Poisoning,  17 },
-			{ 1600, AttributePrefixType::Sharp,      19 },
-			{ 301,  AttributePrefixType::Ancient,    21 },
+		struct { int weight; uint8_t type; int color; } attackPrimary[] = {
+			{ 299,  modifier_id::light,      16 },
+			{ 700,  modifier_id::strong,     16 },
+			{ 1500, modifier_id::critical,   18 },
+			{ 2000, modifier_id::agile,      16 },
+			{ 2000, modifier_id::righteous,  20 },
+			{ 1600, modifier_id::poisoning,  17 },
+			{ 1600, modifier_id::sharp,      19 },
+			{ 301,  modifier_id::ancient,    21 },
 		};
 
 		for (auto& entry : attackPrimary) {
@@ -4819,8 +4804,7 @@ bool ItemManager::generate_item_attributes(CItem* item)
 			if (roll < cumul) {
 				primaryType = entry.type;
 				item_color = entry.color;
-				int idx = static_cast<int>(entry.type);
-				primaryValue = roll_attribute_value(m_game->m_prefix_min_value[idx], m_game->m_prefix_max_value[idx]);
+				primaryValue = roll_attribute_value(m_game->m_modifier_min_value[entry.type], m_game->m_modifier_max_value[entry.type]);
 				break;
 			}
 		}
@@ -4830,11 +4814,11 @@ bool ItemManager::generate_item_attributes(CItem* item)
 		int secRoll = rand() % 10000;
 		int secCumul = 0;
 
-		struct { int weight; SecondaryEffectType type; int minVal; int maxVal; int fixedVal; } attackSecondary[] = {
-			{ 4999, SecondaryEffectType::HittingProb,       3, 13, 0 },
-			{ 3500, SecondaryEffectType::ConsecutiveAttack,  1, 7,  0 },
-			{ 1000, SecondaryEffectType::GoldBonus,          0, 0,  5 },
-			{ 501,  SecondaryEffectType::ExperienceBonus,    0, 0,  2 },
+		struct { int weight; uint8_t type; int minVal; int maxVal; int fixedVal; } attackSecondary[] = {
+			{ 4999, modifier_id::hitting_probability, 3, 13, 0 },
+			{ 3500, modifier_id::consecutive_attack,  1, 7,  0 },
+			{ 1000, modifier_id::gold,                0, 0,  5 },
+			{ 501,  modifier_id::experience,          0, 0,  2 },
 		};
 
 		for (auto& entry : attackSecondary) {
@@ -4856,11 +4840,11 @@ bool ItemManager::generate_item_attributes(CItem* item)
 		int roll = rand() % 10000;
 		int cumul = 0;
 
-		struct { int weight; AttributePrefixType type; bool halved; } defensePrimary[] = {
-			{ 5999, AttributePrefixType::Strong,         false },
-			{ 3000, AttributePrefixType::Light,          false },
-			{ 555,  AttributePrefixType::ManaConverting,  true },
-			{ 446,  AttributePrefixType::CritChance,      true },
+		struct { int weight; uint8_t type; bool halved; } defensePrimary[] = {
+			{ 5999, modifier_id::strong,          false },
+			{ 3000, modifier_id::light,           false },
+			{ 555,  modifier_id::mana_converting,  true },
+			{ 446,  modifier_id::crit_chance,      true },
 		};
 
 		for (auto& entry : defensePrimary) {
@@ -4868,8 +4852,7 @@ bool ItemManager::generate_item_attributes(CItem* item)
 			if (roll < cumul) {
 				primaryType = entry.type;
 				item_color = 0;
-				int idx = static_cast<int>(entry.type);
-				primaryValue = roll_attribute_value(m_game->m_prefix_min_value[idx], m_game->m_prefix_max_value[idx]);
+				primaryValue = roll_attribute_value(m_game->m_modifier_min_value[entry.type], m_game->m_modifier_max_value[entry.type]);
 				if (entry.halved) primaryValue = primaryValue / 2;
 				break;
 			}
@@ -4880,15 +4863,15 @@ bool ItemManager::generate_item_attributes(CItem* item)
 		int secRoll = rand() % 10001;
 		int secCumul = 0;
 
-		struct { int weight; SecondaryEffectType type; int minVal; int maxVal; } defenseSecondary[] = {
-			{ 1000, SecondaryEffectType::DefenseRatio,      3, 13 },
-			{ 3000, SecondaryEffectType::PoisonResistance,  3, 13 },
-			{ 1500, SecondaryEffectType::SPRecovery,        1, 13 },
-			{ 1000, SecondaryEffectType::HPRecovery,        1, 13 },
-			{ 1000, SecondaryEffectType::MPRecovery,        1, 13 },
-			{ 1900, SecondaryEffectType::MagicResistance,   3, 13 },
-			{ 400,  SecondaryEffectType::PhysicalAbsorb,    3, 13 },
-			{ 201,  SecondaryEffectType::MagicAbsorb,       3, 13 },
+		struct { int weight; uint8_t type; int minVal; int maxVal; } defenseSecondary[] = {
+			{ 1000, modifier_id::defense_ratio,   3, 13 },
+			{ 3000, modifier_id::poison_resist,   3, 13 },
+			{ 1500, modifier_id::sp_recovery,     1, 13 },
+			{ 1000, modifier_id::hp_recovery,     1, 13 },
+			{ 1000, modifier_id::mp_recovery,     1, 13 },
+			{ 1900, modifier_id::magic_resist,    3, 13 },
+			{ 400,  modifier_id::physical_absorb, 3, 13 },
+			{ 201,  modifier_id::magic_absorb,    3, 13 },
 		};
 
 		for (auto& entry : defenseSecondary) {
@@ -4902,13 +4885,10 @@ bool ItemManager::generate_item_attributes(CItem* item)
 		} // end 40% secondary chance
 	}
 	else if (item->get_item_effect_type() == ItemEffectType::AttackManaSave) {
-		// AttackManaSave - always type Special
-		primaryType = AttributePrefixType::Special;
+		// AttackManaSave - always spell success (legacy "Special")
+		primaryType = modifier_id::spell_success;
 		item_color = 5;
-		{
-			int idx = static_cast<int>(AttributePrefixType::Special);
-			primaryValue = roll_attribute_value(m_game->m_prefix_min_value[idx], m_game->m_prefix_max_value[idx]);
-		}
+		primaryValue = roll_attribute_value(m_game->m_modifier_min_value[modifier_id::spell_success], m_game->m_modifier_max_value[modifier_id::spell_success]);
 
 		// Secondary effect - 40% chance (original rate)
 		// Same secondary pool as attack weapons
@@ -4916,11 +4896,11 @@ bool ItemManager::generate_item_attributes(CItem* item)
 		int secRoll = rand() % 10000;
 		int secCumul = 0;
 
-		struct { int weight; SecondaryEffectType type; int minVal; int maxVal; int fixedVal; } manaSaveSecondary[] = {
-			{ 4999, SecondaryEffectType::HittingProb,       3, 13, 0 },
-			{ 3500, SecondaryEffectType::ConsecutiveAttack,  1, 7,  0 },
-			{ 1000, SecondaryEffectType::GoldBonus,          0, 0,  5 },
-			{ 501,  SecondaryEffectType::ExperienceBonus,    0, 0,  2 },
+		struct { int weight; uint8_t type; int minVal; int maxVal; int fixedVal; } manaSaveSecondary[] = {
+			{ 4999, modifier_id::hitting_probability, 3, 13, 0 },
+			{ 3500, modifier_id::consecutive_attack,  1, 7,  0 },
+			{ 1000, modifier_id::gold,                0, 0,  5 },
+			{ 501,  modifier_id::experience,          0, 0,  2 },
 		};
 
 		for (auto& entry : manaSaveSecondary) {
@@ -4942,14 +4922,10 @@ bool ItemManager::generate_item_attributes(CItem* item)
 		return false;
 	}
 
-	// Clamp values to nibble range (0-15)
-	if (primaryValue > 15) primaryValue = 15;
-	if (secondaryValue > 15) secondaryValue = 15;
-
 	item->m_instance.item_color = (char)item_color;
 	item->set_custom_made(false);
-	item->set_prefix(static_cast<uint8_t>(primaryType), static_cast<uint8_t>(primaryValue));
-	item->set_secondary(static_cast<uint8_t>(secondaryType), static_cast<uint8_t>(secondaryValue));
+	item->set_prefix(primaryType, static_cast<uint8_t>(primaryValue));
+	item->set_secondary(secondaryType, static_cast<uint8_t>(secondaryValue));
 	item->set_enchant_bonus(0);
 
 	adjust_rare_item_value(item);
@@ -5825,7 +5801,7 @@ void ItemManager::request_item_upgrade_handler(int client_h, int item_index)
 
 		default:
 
-			if (m_game->m_client_list[client_h]->m_item_list[item_index]->get_prefix_type() == hb::shared::item::AttributePrefixType::Ancient) {
+			if (m_game->m_client_list[client_h]->m_item_list[item_index]->get_prefix_type() == hb::shared::item::modifier_id::ancient) {
 					m_game->send_notify_msg(0, client_h, Notify::ItemUpgradeFail, 2, 0, 0, 0);
 					return;
 			}
@@ -5878,7 +5854,7 @@ void ItemManager::request_item_upgrade_handler(int client_h, int item_index)
 		break;
 
 	case 5:
-		if (m_game->m_client_list[client_h]->m_item_list[item_index]->get_prefix_type() == hb::shared::item::AttributePrefixType::Strong) {
+		if (m_game->m_client_list[client_h]->m_item_list[item_index]->get_prefix_type() == hb::shared::item::modifier_id::strong) {
 				m_game->send_notify_msg(0, client_h, Notify::ItemUpgradeFail, 2, 0, 0, 0);
 				return;
 		}
@@ -5964,7 +5940,7 @@ void ItemManager::request_item_upgrade_handler(int client_h, int item_index)
 			return;
 
 		default:
-			if (m_game->m_client_list[client_h]->m_item_list[item_index]->get_prefix_type() == hb::shared::item::AttributePrefixType::Strong) {
+			if (m_game->m_client_list[client_h]->m_item_list[item_index]->get_prefix_type() == hb::shared::item::modifier_id::strong) {
 					m_game->send_notify_msg(0, client_h, Notify::ItemUpgradeFail, 2, 0, 0, 0);
 					return;
 			}

@@ -57,8 +57,9 @@ public:
 	// Inject item config list (address must remain stable)
 	void set_item_configs(const std::array<std::unique_ptr<CItem>, 5000>& configs);
 
-	// Inject multiplier lookup arrays (pointers must remain stable)
-	void set_multipliers(const uint8_t* prefix, const uint8_t* secondary);
+	// Inject the modifier multiplier lookup array, keyed by unified modifier
+	// ID (pointer must remain stable)
+	void set_multipliers(const uint8_t* multipliers);
 
 	// format item name, returning name + attribute strings + special flag
 	ItemNameInfo format(CItem* item);
@@ -71,6 +72,5 @@ private:
 	CItem* get_config(int item_id) const;
 
 	const std::array<std::unique_ptr<CItem>, 5000>* m_item_configs = nullptr;
-	const uint8_t* m_prefix_multiplier = nullptr;
-	const uint8_t* m_secondary_multiplier = nullptr;
+	const uint8_t* m_modifier_multiplier = nullptr;
 };

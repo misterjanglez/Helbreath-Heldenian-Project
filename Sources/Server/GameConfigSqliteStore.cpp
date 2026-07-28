@@ -6,6 +6,7 @@
 #include <unordered_map>
 
 #include "Item.h"
+#include "Item/ModifierIds.h"
 #include "FormulaEngine.h"
 #include "BuildItem.h"
 #include "Game.h"
@@ -1533,10 +1534,15 @@ bool LoadAttributePrefixTypes(sqlite3* db, std::vector<attribute_prefix_type_ent
     while (sqlite3_step(stmt) == SQLITE_ROW)
     {
         attribute_prefix_type_entry entry = {};
-        entry.prefix_id  = static_cast<uint8_t>(sqlite3_column_int(stmt, 0));
+        // DB rows are keyed by the legacy prefix ids (until the Tiers 1-D
+        // modifier catalog replaces this table); translate to unified
+        // modifier IDs here at the load boundary.
+        entry.prefix_id  = hb::shared::item::legacy_prefix_to_modifier_id(
+            static_cast<uint8_t>(sqlite3_column_int(stmt, 0)));
         entry.multiplier = static_cast<uint8_t>(sqlite3_column_int(stmt, 1));
         entry.min_value  = static_cast<uint8_t>(sqlite3_column_int(stmt, 2));
         entry.max_value  = static_cast<uint8_t>(sqlite3_column_int(stmt, 3));
+        if (entry.prefix_id == hb::shared::item::modifier_id::empty) continue;
         out.push_back(entry);
     }
 
@@ -1563,10 +1569,13 @@ bool LoadAttributeSecondaryTypes(sqlite3* db, std::vector<attribute_secondary_ty
     while (sqlite3_step(stmt) == SQLITE_ROW)
     {
         attribute_secondary_type_entry entry = {};
-        entry.secondary_id = static_cast<uint8_t>(sqlite3_column_int(stmt, 0));
+        // Legacy-keyed DB rows -> unified modifier IDs (see prefix loader).
+        entry.secondary_id = hb::shared::item::legacy_secondary_to_modifier_id(
+            static_cast<uint8_t>(sqlite3_column_int(stmt, 0)));
         entry.multiplier   = static_cast<uint8_t>(sqlite3_column_int(stmt, 1));
         entry.min_value    = static_cast<uint8_t>(sqlite3_column_int(stmt, 2));
         entry.max_value    = static_cast<uint8_t>(sqlite3_column_int(stmt, 3));
+        if (entry.secondary_id == hb::shared::item::modifier_id::empty) continue;
         out.push_back(entry);
     }
 

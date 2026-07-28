@@ -3,7 +3,7 @@
 #ifdef TESTER_ONLY
 #include "IDialogBox.h"
 #include "Packet/PacketNotify.h"
-#include "Item/ItemAttributes.h"
+#include "Item/ModifierIds.h"
 #include <string>
 #include <vector>
 

@@ -21,7 +21,7 @@
 #include "SHA256.h"
 #include "SharedCalculations.h"
 #include "BalanceConstants.h"
-#include "Item/ItemAttributes.h"
+#include "Item/ModifierIds.h"
 #include "ObjectIDRange.h"
 #include "DirectionHelpers.h"
 #include "GameChatCommand.h"
@@ -2894,41 +2894,30 @@ bool CGame::send_client_color_palette(int client_h)
 
 void CGame::build_multiplier_lookup()
 {
-	// Default all to 1 (safe fallback)
-	for (int i = 0; i < 16; i++)
+	// Default all to 1 (safe fallback); index 0 = empty slot
+	for (int i = 1; i < 256; i++)
 	{
-		m_prefix_multiplier[i] = 1;
-		m_prefix_min_value[i] = 1;
-		m_prefix_max_value[i] = 13;
-		m_secondary_multiplier[i] = 1;
-		m_secondary_min_value[i] = 1;
-		m_secondary_max_value[i] = 13;
+		m_modifier_multiplier[i] = 1;
+		m_modifier_min_value[i] = 1;
+		m_modifier_max_value[i] = 13;
 	}
-	// None types get 0
-	m_prefix_multiplier[0] = 0;
-	m_prefix_min_value[0] = 0;
-	m_prefix_max_value[0] = 0;
-	m_secondary_multiplier[0] = 0;
-	m_secondary_min_value[0] = 0;
-	m_secondary_max_value[0] = 0;
+	m_modifier_multiplier[0] = 0;
+	m_modifier_min_value[0] = 0;
+	m_modifier_max_value[0] = 0;
 
+	// Entry ids are unified modifier IDs (translated from the legacy-keyed
+	// DB rows at load); the two tables cover disjoint parts of the space.
 	for (const auto& e : m_attribute_prefix_types)
 	{
-		if (e.prefix_id < 16)
-		{
-			m_prefix_multiplier[e.prefix_id] = e.multiplier;
-			m_prefix_min_value[e.prefix_id] = e.min_value;
-			m_prefix_max_value[e.prefix_id] = e.max_value;
-		}
+		m_modifier_multiplier[e.prefix_id] = e.multiplier;
+		m_modifier_min_value[e.prefix_id] = e.min_value;
+		m_modifier_max_value[e.prefix_id] = e.max_value;
 	}
 	for (const auto& e : m_attribute_secondary_types)
 	{
-		if (e.secondary_id < 16)
-		{
-			m_secondary_multiplier[e.secondary_id] = e.multiplier;
-			m_secondary_min_value[e.secondary_id] = e.min_value;
-			m_secondary_max_value[e.secondary_id] = e.max_value;
-		}
+		m_modifier_multiplier[e.secondary_id] = e.multiplier;
+		m_modifier_min_value[e.secondary_id] = e.min_value;
+		m_modifier_max_value[e.secondary_id] = e.max_value;
 	}
 
 	hb::logger::log("Attribute multiplier lookup built: {} prefix, {} secondary entries",
@@ -5580,21 +5569,21 @@ int CGame::client_motion_attack_handler(int client_h, short sX, short sY, short 
 				else item_index = -1;
 
 				if (item_index != -1 && m_client_list[client_h]->m_item_list[item_index] != 0) {
-					if (m_client_list[client_h]->m_item_list[item_index]->get_prefix_type() != hb::shared::item::AttributePrefixType::None) {
-						type1 = static_cast<int>(m_client_list[client_h]->m_item_list[item_index]->get_prefix_type());
+					if (m_client_list[client_h]->m_item_list[item_index]->get_prefix_type() != hb::shared::item::modifier_id::empty) {
+						type1 = m_client_list[client_h]->m_item_list[item_index]->get_prefix_type();
 						value1 = m_client_list[client_h]->m_item_list[item_index]->get_prefix_value();
-						type2 = static_cast<int>(m_client_list[client_h]->m_item_list[item_index]->get_secondary_type());
+						type2 = m_client_list[client_h]->m_item_list[item_index]->get_secondary_type();
 						value2 = m_client_list[client_h]->m_item_list[item_index]->get_secondary_value();
 					}
 
-					if (type1 == 2) {
+					if (type1 == hb::shared::item::modifier_id::poisoning) {
 						// Centuu - fix for poison
 						switch (owner_type) {
 						case hb::shared::owner_class::Player:
 							if (!m_client_list[owner]->m_is_poisoned && !m_combat_manager->check_resisting_poison_success(owner, owner_type))
 							{
 								m_client_list[owner]->m_is_poisoned = true;
-								m_client_list[owner]->m_poison_level = value1 * m_prefix_multiplier[2];
+								m_client_list[owner]->m_poison_level = value1 * m_modifier_multiplier[hb::shared::item::modifier_id::poisoning];
 								m_client_list[owner]->m_poison_time = time;
 								m_status_effect_manager->set_poison_flag(owner, owner_type, true);
 								send_notify_msg(0, owner, Notify::MagicEffectOn, hb::shared::magic::Poison, m_client_list[owner]->m_poison_level, 0, 0);
@@ -6635,10 +6624,12 @@ void CGame::client_common_handler(int client_h, char* data)
 			break;
 		}
 
-		// Unpack legacy bitmask from tester command into individual fields
-		auto prefix_type = static_cast<hb::shared::item::AttributePrefixType>((attribute >> 20) & 0x0F);
+		// Unpack legacy bitmask from tester command into individual fields.
+		// The 4-bit wire nibbles stay in the legacy 1-12 spaces; translate to
+		// unified modifier IDs here at the boundary.
+		uint8_t prefix_type = hb::shared::item::legacy_prefix_to_modifier_id((attribute >> 20) & 0x0F);
 		uint8_t prefix_value = static_cast<uint8_t>((attribute >> 16) & 0x0F);
-		auto secondary_type = static_cast<hb::shared::item::SecondaryEffectType>((attribute >> 12) & 0x0F);
+		uint8_t secondary_type = hb::shared::item::legacy_secondary_to_modifier_id((attribute >> 12) & 0x0F);
 		uint8_t secondary_value = static_cast<uint8_t>((attribute >> 8) & 0x0F);
 		uint8_t enchant_bonus = static_cast<uint8_t>((attribute >> 28) & 0x0F);
 		bool custom_made = (attribute & 0x00000001) != 0;
@@ -6654,23 +6645,23 @@ void CGame::client_common_handler(int client_h, char* data)
 			}
 
 			item->set_custom_made(custom_made);
-			item->set_prefix(static_cast<uint8_t>(prefix_type), prefix_value);
-			item->set_secondary(static_cast<uint8_t>(secondary_type), secondary_value);
+			item->set_prefix(prefix_type, prefix_value);
+			item->set_secondary(secondary_type, secondary_value);
 			item->set_enchant_bonus(enchant_bonus);
 			m_item_manager->adjust_rare_item_value(item);
 
 			// Set item color based on prefix type — unified palette weapon indices (16-21)
 			switch (item->get_prefix_type())
 			{
-			case hb::shared::item::AttributePrefixType::Agile:      item->m_instance.item_color = 16; break;
-			case hb::shared::item::AttributePrefixType::Light:       item->m_instance.item_color = 16; break;
-			case hb::shared::item::AttributePrefixType::Strong:      item->m_instance.item_color = 16; break;
-			case hb::shared::item::AttributePrefixType::Poisoning:   item->m_instance.item_color = 17; break;
-			case hb::shared::item::AttributePrefixType::Critical:    item->m_instance.item_color = 18; break;
-			case hb::shared::item::AttributePrefixType::Special:     item->m_instance.item_color = 18; break;
-			case hb::shared::item::AttributePrefixType::Sharp:       item->m_instance.item_color = 19; break;
-			case hb::shared::item::AttributePrefixType::Righteous:   item->m_instance.item_color = 20; break;
-			case hb::shared::item::AttributePrefixType::Ancient:     item->m_instance.item_color = 21; break;
+			case hb::shared::item::modifier_id::agile:           item->m_instance.item_color = 16; break;
+			case hb::shared::item::modifier_id::light:           item->m_instance.item_color = 16; break;
+			case hb::shared::item::modifier_id::strong:          item->m_instance.item_color = 16; break;
+			case hb::shared::item::modifier_id::poisoning:       item->m_instance.item_color = 17; break;
+			case hb::shared::item::modifier_id::critical:        item->m_instance.item_color = 18; break;
+			case hb::shared::item::modifier_id::spell_success:   item->m_instance.item_color = 18; break;
+			case hb::shared::item::modifier_id::sharp:           item->m_instance.item_color = 19; break;
+			case hb::shared::item::modifier_id::righteous:       item->m_instance.item_color = 20; break;
+			case hb::shared::item::modifier_id::ancient:         item->m_instance.item_color = 21; break;
 			default: break;
 			}
 

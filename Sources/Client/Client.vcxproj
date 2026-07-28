@@ -374,7 +374,6 @@
     <ClInclude Include="..\Dependencies\Shared\Render\Event.h" />
     <ClInclude Include="..\Dependencies\Shared\Render\IWindow.h" />
     <ClInclude Include="..\Dependencies\Shared\Item\Item.h" />
-    <ClInclude Include="..\Dependencies\Shared\Item\ItemAttributes.h" />
     <ClInclude Include="..\Dependencies\Shared\Item\ItemEnums.h" />
     <ClInclude Include="..\Dependencies\Shared\Item\ItemInstanceData.h" />
     <ClInclude Include="..\Dependencies\Shared\Item\ModifierIds.h" />

@@ -2813,20 +2813,20 @@ uint32_t CombatManager::calculate_attack_effect(short target_h, char target_type
 			iAP_L += combo_bonus;
 
 			switch (m_game->m_client_list[attacker_h]->m_special_weapon_effect_type) {
-			case 0: break;
-			case 1:
+			case modifier_id::empty: break;
+			case modifier_id::critical:
 				if ((m_game->m_client_list[attacker_h]->m_super_attack_left > 0) && (attack_mode >= 20)) {
-					iAP_SM += m_game->m_client_list[attacker_h]->m_special_weapon_effect_value * m_game->m_prefix_multiplier[1];
-					iAP_L += m_game->m_client_list[attacker_h]->m_special_weapon_effect_value * m_game->m_prefix_multiplier[1];
+					iAP_SM += m_game->m_client_list[attacker_h]->m_special_weapon_effect_value * m_game->m_modifier_multiplier[modifier_id::critical];
+					iAP_L += m_game->m_client_list[attacker_h]->m_special_weapon_effect_value * m_game->m_modifier_multiplier[modifier_id::critical];
 				}
 				break;
 
-			case 2:
+			case modifier_id::poisoning:
 				attacker_sa = 61;
-				attacker_s_avalue = m_game->m_client_list[attacker_h]->m_special_weapon_effect_value * m_game->m_prefix_multiplier[2];
+				attacker_s_avalue = m_game->m_client_list[attacker_h]->m_special_weapon_effect_value * m_game->m_modifier_multiplier[modifier_id::poisoning];
 				break;
 
-			case 3:
+			case modifier_id::righteous:
 				attacker_sa = 62;
 				break;
 			}

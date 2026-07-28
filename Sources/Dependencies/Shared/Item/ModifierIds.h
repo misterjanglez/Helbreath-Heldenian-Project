@@ -1,8 +1,8 @@
 // ModifierIds.h: Unified modifier ID space for the Item Tiers system
 //
 // The flat namespace every rolled item modifier occupies in storage, on the
-// wire, and in the DB — successor to the positional AttributePrefixType /
-// SecondaryEffectType pair (ItemAttributes.h), which dies in Tiers 1-B.
+// wire, and in the DB — successor to the retired positional
+// AttributePrefixType / SecondaryEffectType pair (Tiers 1-B).
 // Both Roll strategies (legacy and tiered) emit unified IDs: strategies
 // differ in what they roll, never in what they store.
 //
@@ -111,10 +111,7 @@ enum modifier_id : uint8_t
 //
 // Values are arbitrary stable keys, grouped legacy-then-new; they imply NO
 // numeric correspondence with the legacy enums. The authoritative
-// legacy -> unified translation table lands in Tiers 1-B. Note there are
-// THREE legacy behavior enums to reconcile there: AttributePrefixType,
-// SecondaryEffectType (both ItemAttributes.h), and the accessory-scoped
-// AddEffectType (ItemEnums.h).
+// legacy -> unified translation table is below.
 //------------------------------------------------------------------------
 namespace effect_id {
 enum effect_id : uint8_t
@@ -161,6 +158,64 @@ enum effect_id : uint8_t
 	cast_time_reduction = 31,
 	move_speed          = 32
 };
+}
+
+//------------------------------------------------------------------------
+// Legacy -> unified translation — THE one table (Tiers 1-B).
+//
+// The retired positional enums survive only as raw numbers at three
+// boundaries: crafted-item recipe nibbles (CBuildItem::m_attribute), the
+// GM tester-menu attribute bitmask (both 4-bit, so they must stay in the
+// legacy 1-12 spaces on the wire), and the legacy-keyed
+// attribute_prefix_types / attribute_secondary_types config rows (replaced
+// by the modifier catalog in Tiers 1-D). Translate to unified IDs at those
+// boundaries; everything past them speaks modifier_id only.
+//
+// The third legacy behavior enum, AddEffectType (ItemEnums.h), needs no
+// row here: accessory add-effects are base-item config read from
+// m_item_effect_value1/2, not rolled instance modifiers — accessories are
+// outside tier scope (spec §1) and never enter the unified ID space.
+//
+// Legacy prefix 4 was a reserved hole; it maps to empty.
+//------------------------------------------------------------------------
+constexpr uint8_t legacy_prefix_to_modifier_id(uint8_t legacy)
+{
+	constexpr uint8_t table[13] = {
+		modifier_id::empty,               //  0 None
+		modifier_id::critical,            //  1 Critical
+		modifier_id::poisoning,           //  2 Poisoning
+		modifier_id::righteous,           //  3 Righteous
+		modifier_id::empty,               //  4 Reserved (unused)
+		modifier_id::agile,               //  5 Agile
+		modifier_id::light,               //  6 Light
+		modifier_id::sharp,               //  7 Sharp
+		modifier_id::strong,              //  8 Strong
+		modifier_id::ancient,             //  9 Ancient
+		modifier_id::spell_success,       // 10 Special
+		modifier_id::mana_converting,     // 11 ManaConverting
+		modifier_id::crit_chance          // 12 CritChance
+	};
+	return legacy < 13 ? table[legacy] : modifier_id::empty;
+}
+
+constexpr uint8_t legacy_secondary_to_modifier_id(uint8_t legacy)
+{
+	constexpr uint8_t table[13] = {
+		modifier_id::empty,               //  0 None
+		modifier_id::poison_resist,       //  1 PoisonResistance
+		modifier_id::hitting_probability, //  2 HittingProb
+		modifier_id::defense_ratio,       //  3 DefenseRatio
+		modifier_id::hp_recovery,         //  4 HPRecovery
+		modifier_id::sp_recovery,         //  5 SPRecovery
+		modifier_id::mp_recovery,         //  6 MPRecovery
+		modifier_id::magic_resist,        //  7 MagicResistance
+		modifier_id::physical_absorb,     //  8 PhysicalAbsorb
+		modifier_id::magic_absorb,        //  9 MagicAbsorb
+		modifier_id::consecutive_attack,  // 10 ConsecutiveAttack
+		modifier_id::experience,          // 11 ExperienceBonus
+		modifier_id::gold                 // 12 GoldBonus
+	};
+	return legacy < 13 ? table[legacy] : modifier_id::empty;
 }
 
 //------------------------------------------------------------------------

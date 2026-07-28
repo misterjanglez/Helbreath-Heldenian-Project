@@ -1744,9 +1744,9 @@ bool SaveCharacterSnapshot(sqlite3* db, const CClient* client)
         ok &= (sqlite3_bind_int(stmt, col++, client->m_item_list[i]->m_instance.special_effect_value3) == SQLITE_OK);
         ok &= (sqlite3_bind_int(stmt, col++, client->m_item_list[i]->m_instance.cur_durability) == SQLITE_OK);
         ok &= (sqlite3_bind_int(stmt, col++, client->m_item_list[i]->is_custom_made()) == SQLITE_OK);
-        ok &= (sqlite3_bind_int(stmt, col++, static_cast<int>(client->m_item_list[i]->get_prefix_type())) == SQLITE_OK);
+        ok &= (sqlite3_bind_int(stmt, col++, client->m_item_list[i]->get_prefix_type()) == SQLITE_OK);
         ok &= (sqlite3_bind_int(stmt, col++, client->m_item_list[i]->get_prefix_value()) == SQLITE_OK);
-        ok &= (sqlite3_bind_int(stmt, col++, static_cast<int>(client->m_item_list[i]->get_secondary_type())) == SQLITE_OK);
+        ok &= (sqlite3_bind_int(stmt, col++, client->m_item_list[i]->get_secondary_type()) == SQLITE_OK);
         ok &= (sqlite3_bind_int(stmt, col++, client->m_item_list[i]->get_secondary_value()) == SQLITE_OK);
         ok &= (sqlite3_bind_int(stmt, col++, client->m_item_list[i]->get_enchant_bonus()) == SQLITE_OK);
         ok &= (sqlite3_bind_int(stmt, col++, client->m_item_pos_list[i].x) == SQLITE_OK);
@@ -1807,9 +1807,9 @@ bool SaveCharacterSnapshot(sqlite3* db, const CClient* client)
         ok &= (sqlite3_bind_int(stmt, col++, client->m_item_in_bank_list[i]->m_instance.special_effect_value3) == SQLITE_OK);
         ok &= (sqlite3_bind_int(stmt, col++, client->m_item_in_bank_list[i]->m_instance.cur_durability) == SQLITE_OK);
         ok &= (sqlite3_bind_int(stmt, col++, client->m_item_in_bank_list[i]->is_custom_made()) == SQLITE_OK);
-        ok &= (sqlite3_bind_int(stmt, col++, static_cast<int>(client->m_item_in_bank_list[i]->get_prefix_type())) == SQLITE_OK);
+        ok &= (sqlite3_bind_int(stmt, col++, client->m_item_in_bank_list[i]->get_prefix_type()) == SQLITE_OK);
         ok &= (sqlite3_bind_int(stmt, col++, client->m_item_in_bank_list[i]->get_prefix_value()) == SQLITE_OK);
-        ok &= (sqlite3_bind_int(stmt, col++, static_cast<int>(client->m_item_in_bank_list[i]->get_secondary_type())) == SQLITE_OK);
+        ok &= (sqlite3_bind_int(stmt, col++, client->m_item_in_bank_list[i]->get_secondary_type()) == SQLITE_OK);
         ok &= (sqlite3_bind_int(stmt, col++, client->m_item_in_bank_list[i]->get_secondary_value()) == SQLITE_OK);
         ok &= (sqlite3_bind_int(stmt, col++, client->m_item_in_bank_list[i]->get_enchant_bonus()) == SQLITE_OK);
 

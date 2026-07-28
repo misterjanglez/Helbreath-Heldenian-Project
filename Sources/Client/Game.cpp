@@ -199,14 +199,27 @@ CGame::CGame(hb::shared::types::NativeInstance native_instance, int icon_resourc
 	m_item_drop = false;
 
 	// Initialize attribute multiplier fallbacks (hardcoded defaults matching original values)
-	std::memset(m_prefix_multiplier, 0, sizeof(m_prefix_multiplier));
-	std::memset(m_secondary_multiplier, 0, sizeof(m_secondary_multiplier));
-	m_prefix_multiplier[1] = 1; m_prefix_multiplier[2] = 5; m_prefix_multiplier[6] = 4;
-	m_prefix_multiplier[7] = 1; m_prefix_multiplier[8] = 7; m_prefix_multiplier[9] = 1;
-	m_prefix_multiplier[10] = 3; m_prefix_multiplier[11] = 1; m_prefix_multiplier[12] = 1;
-	for (int i = 1; i <= 7; i++) m_secondary_multiplier[i] = 7;
-	m_secondary_multiplier[8] = 3; m_secondary_multiplier[9] = 3; m_secondary_multiplier[10] = 1;
-	m_secondary_multiplier[11] = 10; m_secondary_multiplier[12] = 10;
+	m_modifier_multiplier[modifier_id::critical] = 1;
+	m_modifier_multiplier[modifier_id::poisoning] = 5;
+	m_modifier_multiplier[modifier_id::light] = 4;
+	m_modifier_multiplier[modifier_id::sharp] = 1;
+	m_modifier_multiplier[modifier_id::strong] = 7;
+	m_modifier_multiplier[modifier_id::ancient] = 1;
+	m_modifier_multiplier[modifier_id::spell_success] = 3;
+	m_modifier_multiplier[modifier_id::mana_converting] = 1;
+	m_modifier_multiplier[modifier_id::crit_chance] = 1;
+	m_modifier_multiplier[modifier_id::poison_resist] = 7;
+	m_modifier_multiplier[modifier_id::hitting_probability] = 7;
+	m_modifier_multiplier[modifier_id::defense_ratio] = 7;
+	m_modifier_multiplier[modifier_id::hp_recovery] = 7;
+	m_modifier_multiplier[modifier_id::sp_recovery] = 7;
+	m_modifier_multiplier[modifier_id::mp_recovery] = 7;
+	m_modifier_multiplier[modifier_id::magic_resist] = 7;
+	m_modifier_multiplier[modifier_id::physical_absorb] = 3;
+	m_modifier_multiplier[modifier_id::magic_absorb] = 3;
+	m_modifier_multiplier[modifier_id::consecutive_attack] = 1;
+	m_modifier_multiplier[modifier_id::experience] = 10;
+	m_modifier_multiplier[modifier_id::gold] = 10;
 
 	combat_system::get().set_game(*this);
 	inventory_manager::get().set_game(this);
@@ -312,7 +325,7 @@ bool CGame::on_initialize()
 	weather_manager::get().initialize();
 	ChatManager::get().initialize();
 	item_name_formatter::get().set_item_configs(m_item_config_list);
-	item_name_formatter::get().set_multipliers(m_prefix_multiplier, m_secondary_multiplier);
+	item_name_formatter::get().set_multipliers(m_modifier_multiplier);
 	LocalCacheManager::get().initialize();
 
 	return true;
@@ -1263,6 +1276,9 @@ bool CGame::cache_process_attribute_types(char* data, uint32_t msg_size)
 	uint16_t entryCount = pktHeader->entryCount;
 	uint8_t entryType = pktHeader->entryType;
 
+	// Entry ids are unified modifier IDs (the server translates its
+	// legacy-keyed config rows before sending); both entry types fill the
+	// one flat multiplier table.
 	if (entryType == 0)
 	{
 		// Prefix entries
@@ -1271,10 +1287,7 @@ bool CGame::cache_process_attribute_types(char* data, uint32_t msg_size)
 
 		const auto* entries = reinterpret_cast<const hb::net::PacketAttributePrefixTypeEntry*>(data + headerSize);
 		for (uint16_t i = 0; i < entryCount; i++)
-		{
-			if (entries[i].prefix_id < 16)
-				m_prefix_multiplier[entries[i].prefix_id] = entries[i].multiplier;
-		}
+			m_modifier_multiplier[entries[i].prefix_id] = entries[i].multiplier;
 	}
 	else if (entryType == 1)
 	{
@@ -1284,10 +1297,7 @@ bool CGame::cache_process_attribute_types(char* data, uint32_t msg_size)
 
 		const auto* entries = reinterpret_cast<const hb::net::PacketAttributeSecondaryTypeEntry*>(data + headerSize);
 		for (uint16_t i = 0; i < entryCount; i++)
-		{
-			if (entries[i].secondary_id < 16)
-				m_secondary_multiplier[entries[i].secondary_id] = entries[i].multiplier;
-		}
+			m_modifier_multiplier[entries[i].secondary_id] = entries[i].multiplier;
 	}
 
 	// Finalize cache after receiving data (both prefix and secondary come as separate packets)

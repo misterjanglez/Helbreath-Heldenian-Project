@@ -395,9 +395,9 @@ void MagicManager::player_magic_handler(int client_h, int dX, int dY, short type
 	case 3: result = result - (result / 5);  break;
 	}
 
-	if (m_game->m_client_list[client_h]->m_special_weapon_effect_type == 10) {
+	if (m_game->m_client_list[client_h]->m_special_weapon_effect_type == modifier_id::spell_success) {
 		dv1 = (double)result;
-		dv2 = (double)(m_game->m_client_list[client_h]->m_special_weapon_effect_value * m_game->m_prefix_multiplier[10]);
+		dv2 = (double)(m_game->m_client_list[client_h]->m_special_weapon_effect_value * m_game->m_modifier_multiplier[modifier_id::spell_success]);
 		dv3 = dv1 + dv2;
 		result = (int)dv3;
 	}

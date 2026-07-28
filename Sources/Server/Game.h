@@ -579,12 +579,12 @@ public:
 	std::vector<color_palette_entry> m_weapon_color_palette;
 	std::vector<attribute_prefix_type_entry> m_attribute_prefix_types;
 	std::vector<attribute_secondary_type_entry> m_attribute_secondary_types;
-	uint8_t m_prefix_multiplier[16]{};
-	uint8_t m_prefix_min_value[16]{};
-	uint8_t m_prefix_max_value[16]{};
-	uint8_t m_secondary_multiplier[16]{};
-	uint8_t m_secondary_min_value[16]{};
-	uint8_t m_secondary_max_value[16]{};
+	// Keyed by unified modifier ID (ModifierIds.h) — one flat space for the
+	// former prefix/secondary tables. Interim until the modifier catalog
+	// (Tiers 1-D) replaces the attribute-type config entirely.
+	uint8_t m_modifier_multiplier[256]{};
+	uint8_t m_modifier_min_value[256]{};
+	uint8_t m_modifier_max_value[256]{};
 	void build_multiplier_lookup();
 
 	class hb::shared::net::ASIOSocket* _lsock;
