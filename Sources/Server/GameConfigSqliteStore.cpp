@@ -23,6 +23,14 @@
 #include "StringCompat.h"
 using namespace hb::server::config;
 
+// Single source of truth for the game-config schema version, spliced into the
+// DDL stamp. Bump on any gamedata.db schema change. Unlike the account/trading
+// post stores there is no refusal gate: gamedata.db holds curated balance data
+// that cannot be recreated by deleting the file, so this store self-heals in
+// place (idempotent CREATE TABLE IF NOT EXISTS + HasColumn/ALTER migrations)
+// and the stamp is bookkeeping for operators, not a migration input.
+#define GAMECONFIG_DB_SCHEMA_VERSION "8"
+
 namespace
 {
     bool ExecSql(sqlite3* db, const char* sql)
@@ -175,7 +183,10 @@ bool EnsureGameConfigDatabase(sqlite3** outDb, std::string& outPath, bool* outCr
         " key TEXT PRIMARY KEY,"
         " value TEXT NOT NULL"
         ");"
-        "INSERT OR REPLACE INTO meta(key, value) VALUES('schema_version','7');"
+        "INSERT OR REPLACE INTO meta(key, value) VALUES('schema_version','" GAMECONFIG_DB_SCHEMA_VERSION "');"
+        // Item-system strategy switch: 'legacy' or 'tiered'. Restart-only by design
+        // (excluded from CmdReload); OR IGNORE preserves an operator's choice.
+        "INSERT OR IGNORE INTO meta(key, value) VALUES('item_system','legacy');"
         "CREATE TABLE IF NOT EXISTS items ("
         " item_id INTEGER PRIMARY KEY,"
         " name TEXT NOT NULL,"
@@ -259,7 +270,8 @@ bool EnsureGameConfigDatabase(sqlite3** outDb, std::string& outPath, bool* outCr
         " max_mana INTEGER NOT NULL,"
         " magic_hit_ratio INTEGER NOT NULL,"
         " attack_range INTEGER NOT NULL,"
-        " drop_table_id INTEGER NOT NULL DEFAULT 0"
+        " drop_table_id INTEGER NOT NULL DEFAULT 0,"
+        " loot_grade INTEGER NOT NULL DEFAULT 2"
         ");"
         "CREATE TABLE IF NOT EXISTS drop_tables ("
         " drop_table_id INTEGER PRIMARY KEY,"
@@ -478,6 +490,98 @@ bool EnsureGameConfigDatabase(sqlite3** outDb, std::string& outPath, bool* outCr
         " max_value INTEGER NOT NULL DEFAULT 0,"
         " multiplier INTEGER NOT NULL DEFAULT 1"
         ");"
+        // ---- Item Tiers (tiered strategy) schema, per PLANS/ItemTiers_Implementation_Plan.md
+        // DDL draft. Server-owned, seeded empty: empty tables in tiered mode are the
+        // intended unconfigured-world guard (the 2-D validator blocks boot); seeding is
+        // Scripts/seed_item_tiers.py. band_min/band_max/aggregate_cap are DISPLAY units;
+        // stored roll values are the uint8_t wire bytes (display = byte x multiplier).
+        "CREATE TABLE IF NOT EXISTS tier_buckets ("
+        " bucket_id INTEGER PRIMARY KEY,"
+        " name TEXT NOT NULL UNIQUE,"
+        " sort_order INTEGER NOT NULL"
+        ");"
+        "CREATE TABLE IF NOT EXISTS modifier_catalog ("
+        " modifier_id INTEGER PRIMARY KEY,"        // unified modifier ID, 1..255 (0 reserved = empty)
+        " name TEXT NOT NULL UNIQUE,"
+        " display_name TEXT NOT NULL,"
+        " effect_label TEXT NOT NULL,"
+        " effect_format TEXT NOT NULL,"
+        " effect_id INTEGER NOT NULL,"             // behavior key (enum in Item/ModifierIds.h)
+        " effect_param1 INTEGER NOT NULL DEFAULT 0,"
+        " effect_param2 INTEGER NOT NULL DEFAULT 0,"
+        " bucket_id INTEGER NOT NULL REFERENCES tier_buckets(bucket_id),"
+        " multiplier INTEGER NOT NULL DEFAULT 1,"
+        " min_tier INTEGER NOT NULL DEFAULT 1,"
+        " marquee INTEGER NOT NULL DEFAULT 0,"
+        " band_min INTEGER NOT NULL,"
+        " band_max INTEGER NOT NULL,"
+        " aggregate_cap INTEGER NOT NULL,"
+        // per-tier windows: NULL = full band
+        " window_min_t1 INTEGER, window_max_t1 INTEGER,"
+        " window_min_t2 INTEGER, window_max_t2 INTEGER,"
+        " window_min_t3 INTEGER, window_max_t3 INTEGER,"
+        " window_min_t4 INTEGER, window_max_t4 INTEGER"
+        ");"
+        "CREATE TABLE IF NOT EXISTS modifier_eligibility ("
+        " modifier_id INTEGER NOT NULL REFERENCES modifier_catalog(modifier_id),"
+        " item_class INTEGER NOT NULL,"            // tier_item_class enum
+        " weight INTEGER NOT NULL,"
+        " PRIMARY KEY (modifier_id, item_class)"
+        ");"
+        "CREATE TABLE IF NOT EXISTS bucket_class_rules ("
+        " bucket_id INTEGER NOT NULL REFERENCES tier_buckets(bucket_id),"
+        " item_class INTEGER NOT NULL,"
+        " mandatory INTEGER NOT NULL DEFAULT 0,"
+        " PRIMARY KEY (bucket_id, item_class)"
+        ");"
+        "CREATE TABLE IF NOT EXISTS tier_curves ("
+        " curve_id INTEGER PRIMARY KEY,"
+        " name TEXT NOT NULL UNIQUE,"
+        " p50 REAL NOT NULL,"                      // normalized band position anchors
+        " p90 REAL NOT NULL,"
+        " p99 REAL NOT NULL,"
+        " cap_chance_den INTEGER NOT NULL"         // P(cap) = 1 / cap_chance_den
+        ");"
+        "CREATE TABLE IF NOT EXISTS tier_curve_overrides ("
+        " modifier_id INTEGER NOT NULL REFERENCES modifier_catalog(modifier_id),"
+        " tier INTEGER NOT NULL,"
+        " cap_chance_den INTEGER NOT NULL,"
+        " PRIMARY KEY (modifier_id, tier)"
+        ");"
+        "CREATE TABLE IF NOT EXISTS loot_grades ("
+        " grade INTEGER PRIMARY KEY,"              // 1..5 vermin/standard/veteran/elite/boss
+        " name TEXT NOT NULL,"
+        " weight_common INTEGER NOT NULL,"         // out of 10000; zero = staircase hard gate
+        " weight_rare INTEGER NOT NULL,"
+        " weight_epic INTEGER NOT NULL,"
+        " weight_legendary INTEGER NOT NULL,"
+        " first_drop_chance INTEGER NOT NULL"      // out of 10000
+        ");"
+        "CREATE TABLE IF NOT EXISTS enchant_categories ("
+        " category INTEGER PRIMARY KEY,"           // code enum: weapon/shield/armor/wand/crafted_weapon
+        " name TEXT NOT NULL,"
+        " cap INTEGER NOT NULL,"
+        " endurance_growth_pct INTEGER NOT NULL"
+        ");"
+        "CREATE TABLE IF NOT EXISTS enchant_steps ("
+        " category INTEGER NOT NULL REFERENCES enchant_categories(category),"
+        " step INTEGER NOT NULL,"                  // attempting +step
+        " success_pct INTEGER NOT NULL,"           // basis points
+        " destroy_on_fail INTEGER NOT NULL,"
+        " PRIMARY KEY (category, step)"
+        ");"
+        "CREATE TABLE IF NOT EXISTS tier_presentation ("
+        " tier INTEGER PRIMARY KEY,"               // 1..4
+        " name TEXT NOT NULL,"
+        " color_r INTEGER NOT NULL,"
+        " color_g INTEGER NOT NULL,"
+        " color_b INTEGER NOT NULL,"
+        " name_template TEXT NOT NULL"
+        ");"
+        "CREATE TABLE IF NOT EXISTS tier_settings ("
+        " key TEXT PRIMARY KEY,"
+        " value TEXT NOT NULL"
+        ");"
         "COMMIT;";
 
     if (!ExecSql(db, schemaSql)) {
@@ -629,6 +733,11 @@ bool EnsureGameConfigDatabase(sqlite3** outDb, std::string& outPath, bool* outCr
 
     if (!HasColumn(db, "npc_configs", "drop_table_id")) {
         ExecSql(db, "ALTER TABLE npc_configs ADD COLUMN drop_table_id INTEGER NOT NULL DEFAULT 0;");
+    }
+
+    if (!HasColumn(db, "npc_configs", "loot_grade")) {
+        // Default 2 = standard grade (loot_grades table, spec §8).
+        ExecSql(db, "ALTER TABLE npc_configs ADD COLUMN loot_grade INTEGER NOT NULL DEFAULT 2;");
     }
 
     if (!HasColumn(db, "admins", "admin_level")) {
