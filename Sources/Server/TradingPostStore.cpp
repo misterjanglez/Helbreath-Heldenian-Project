@@ -211,7 +211,7 @@ namespace hb::server
 		item->m_instance.special_effect_value3 = e.spec_effect_value3;
 		item->m_instance.cur_durability = e.cur_durability;
 		item->load_attributes_from(e);
-		if (item->m_instance.custom_made) {
+		if (item->is_custom_made()) {
 			item->m_durability = item->m_instance.special_effect_value1;
 		}
 		m_game->m_item_manager->adjust_rare_item_value(item);

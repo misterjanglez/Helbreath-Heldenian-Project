@@ -31,6 +31,47 @@ struct item_instance_data
 	void clear() { *this = {}; }
 	bool has_attributes() const { return custom_made || prefix_type || secondary_type || enchant_bonus; }
 
+	// Attribute accessors — the single funnel for the attribute portion
+	// (custom_made through enchant_bonus). All outside code must go through
+	// these (or the CItem delegates) instead of touching the fields directly,
+	// so the Item Tiers struct reshape only reimplements these bodies.
+	uint8_t get_prefix_type() const { return prefix_type; }
+	uint8_t get_prefix_value() const { return prefix_value; }
+	uint8_t get_secondary_type() const { return secondary_type; }
+	uint8_t get_secondary_value() const { return secondary_value; }
+	uint8_t get_enchant_bonus() const { return enchant_bonus; }
+	bool is_custom_made() const { return custom_made != 0; }
+	bool has_prefix() const { return prefix_type != 0; }
+
+	void set_custom_made(bool custom) { custom_made = custom ? 1 : 0; }
+	void set_prefix(uint8_t type, uint8_t value) { prefix_type = type; prefix_value = value; }
+	void set_secondary(uint8_t type, uint8_t value) { secondary_type = type; secondary_value = value; }
+	void set_enchant_bonus(uint8_t value) { enchant_bonus = value; }
+
+	// Copy the attribute portion to a packet or DB struct with matching field names.
+	template <typename T>
+	void copy_attributes_to(T& target) const
+	{
+		target.custom_made = custom_made;
+		target.prefix_type = prefix_type;
+		target.prefix_value = prefix_value;
+		target.secondary_type = secondary_type;
+		target.secondary_value = secondary_value;
+		target.enchant_bonus = enchant_bonus;
+	}
+
+	// Load the attribute portion from a packet or DB struct with matching field names.
+	template <typename T>
+	void load_attributes_from(const T& source)
+	{
+		custom_made = source.custom_made;
+		prefix_type = source.prefix_type;
+		prefix_value = source.prefix_value;
+		secondary_type = source.secondary_type;
+		secondary_value = source.secondary_value;
+		enchant_bonus = source.enchant_bonus;
+	}
+
 	// Populate from any packet type that has matching field names
 	// (e.g. PacketEventGroundItem). Keeps this header dependency-free.
 	// item_id is NOT set — caller reads pkt.item_id separately.
@@ -48,12 +89,7 @@ struct item_instance_data
 		d.special_effect_value2 = pkt.special_effect_value2;
 		d.special_effect_value3 = pkt.special_effect_value3;
 		d.cur_durability = pkt.cur_durability;
-		d.custom_made = pkt.custom_made;
-		d.prefix_type = pkt.prefix_type;
-		d.prefix_value = pkt.prefix_value;
-		d.secondary_type = pkt.secondary_type;
-		d.secondary_value = pkt.secondary_value;
-		d.enchant_bonus = pkt.enchant_bonus;
+		d.load_attributes_from(pkt);
 		return d;
 	}
 };

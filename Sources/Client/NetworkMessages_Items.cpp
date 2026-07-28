@@ -145,12 +145,7 @@ namespace NetworkMessageHandlers {
 		{
 			hb::shared::item::item_instance_data idata;
 			idata.count = static_cast<uint64_t>(count);
-			idata.custom_made = pkt->custom_made;
-			idata.prefix_type = pkt->prefix_type;
-			idata.prefix_value = pkt->prefix_value;
-			idata.secondary_type = pkt->secondary_type;
-			idata.secondary_value = pkt->secondary_value;
-			idata.enchant_bonus = pkt->enchant_bonus;
+			idata.load_attributes_from(*pkt);
 			idata.special_effect_value2 = static_cast<int16_t>(pkt->spec_value2);
 			auto info = item_name_formatter::get().format(pkt->item_id, idata);
 			txt = std::format(NOTIFYMSG_ITEMOBTAINED2, info.name);
@@ -249,12 +244,7 @@ namespace NetworkMessageHandlers {
 		{
 			hb::shared::item::item_instance_data idata;
 			idata.count = static_cast<uint64_t>(total_count);
-			idata.custom_made = pkt->custom_made;
-			idata.prefix_type = pkt->prefix_type;
-			idata.prefix_value = pkt->prefix_value;
-			idata.secondary_type = pkt->secondary_type;
-			idata.secondary_value = pkt->secondary_value;
-			idata.enchant_bonus = pkt->enchant_bonus;
+			idata.load_attributes_from(*pkt);
 			idata.special_effect_value2 = special_ev2;
 			auto info = item_name_formatter::get().format(item_id, idata);
 			txt = std::format(NOTIFYMSG_ITEMOBTAINED2, info.name);
@@ -832,12 +822,7 @@ namespace NetworkMessageHandlers {
 		exDlg->m_slots[i].str2.assign(char_name, strnlen(char_name, hb::shared::limits::CharNameLen));
 		exDlg->m_slots[i].item_id = item_id;
 		exDlg->m_slots[i].item_data = {};
-		exDlg->m_slots[i].item_data.custom_made = pkt->custom_made;
-		exDlg->m_slots[i].item_data.prefix_type = pkt->prefix_type;
-		exDlg->m_slots[i].item_data.prefix_value = pkt->prefix_value;
-		exDlg->m_slots[i].item_data.secondary_type = pkt->secondary_type;
-		exDlg->m_slots[i].item_data.secondary_value = pkt->secondary_value;
-		exDlg->m_slots[i].item_data.enchant_bonus = pkt->enchant_bonus;
+		exDlg->m_slots[i].item_data.load_attributes_from(*pkt);
 	}
 
 	void HandleOpenExchangeWindow(CGame* game, char* data)
@@ -902,12 +887,7 @@ namespace NetworkMessageHandlers {
 		exDlg->m_slots[i].str2.assign(char_name, strnlen(char_name, hb::shared::limits::CharNameLen));
 		exDlg->m_slots[i].item_id = item_id;
 		exDlg->m_slots[i].item_data = {};
-		exDlg->m_slots[i].item_data.custom_made = pkt->custom_made;
-		exDlg->m_slots[i].item_data.prefix_type = pkt->prefix_type;
-		exDlg->m_slots[i].item_data.prefix_value = pkt->prefix_value;
-		exDlg->m_slots[i].item_data.secondary_type = pkt->secondary_type;
-		exDlg->m_slots[i].item_data.secondary_value = pkt->secondary_value;
-		exDlg->m_slots[i].item_data.enchant_bonus = pkt->enchant_bonus;
+		exDlg->m_slots[i].item_data.load_attributes_from(*pkt);
 	}
 
 	void HandleCurDurability(CGame* game, char* data)
@@ -956,14 +936,14 @@ namespace NetworkMessageHandlers {
 		v1 = static_cast<short>(pkt->item_index);
 		if (v1 < 0 || v1 >= hb::shared::limits::MaxItems) return;
 		if (!game->m_player->m_item_list[v1]) return;
-		uint8_t old_enchant = game->m_player->m_item_list[v1]->m_instance.enchant_bonus;
+		uint8_t old_enchant = game->m_player->m_item_list[v1]->get_enchant_bonus();
 		game->m_player->m_item_list[v1]->load_attributes_from(*pkt);
 		if (pkt->spec_value1 != 0)
 			game->m_player->m_item_list[v1]->m_instance.special_effect_value1 = static_cast<short>(pkt->spec_value1);
 		if (pkt->spec_value2 != 0)
 			game->m_player->m_item_list[v1]->m_instance.special_effect_value2 = static_cast<short>(pkt->spec_value2);
 
-		if (old_enchant == game->m_player->m_item_list[v1]->m_instance.enchant_bonus)
+		if (old_enchant == game->m_player->m_item_list[v1]->get_enchant_bonus())
 		{
 			if (game->get_dialog_box_manager().is_enabled(DialogBoxId::ItemUpgrade) == true)
 			{

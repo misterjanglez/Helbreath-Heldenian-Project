@@ -1,3 +1,26 @@
+# Item Tiers Cycle 0-B — item attribute field access funneled through accessors (shared/server/client)
+
+Issue #38 (epic #36). Prefactor per `PLANS/ItemTiers_Implementation_Plan.md` Cycle 0-B: every direct read/write of the item-instance attribute fields (`custom_made`, `prefix_type/value`, `secondary_type/value`, `enchant_bonus`) now routes through accessors, so the Phase-1 struct reshape only touches the accessor bodies. Zero behavior change (verified by `git diff` review + acceptance grep: no `m_instance.<attr>` access remains outside the two shared headers).
+
+- `ItemInstanceData.h` is the canonical funnel: raw getters/setters (`get_prefix_type`, `set_prefix(type, value)`, `set_enchant_bonus`, `is_custom_made`, `has_prefix`, …) plus `copy_attributes_to` / `load_attributes_from` templates moved down from `CItem`.
+- `Item.h` (`CItem`): existing enum-typed getters kept as legacy views; all attribute helpers (incl. `get_light_percent`, `has_special_attributes`, `copy_attributes_from`) now delegate to the instance-data funnel; new value/enchant getters and setters added.
+- Server: `ItemManager.cpp` (~70 sites — pricing, `calc_total_item_effect`, enchant/upgrade paths, crafting nibble decode, attribute roll), `Game.cpp` (map-data encode via `copy_attributes_to`, GM item creation, attack prefix reads), `AccountSqliteStore.cpp` (save binds), `CraftingManager.cpp`, `TradingPostStore.cpp`.
+- Client: packet→instance copy blocks collapse to `load_attributes_from` (`NetworkMessages_Items.cpp` ×4, `Game.cpp` map item, `DialogBox_TradingPost.cpp`); reads funneled in `ItemNameFormatter.cpp`, `InventoryManager.cpp`, `DialogBox_Magic/ItemUpgrade`, `Screen_OnGame*` (shared `has_prefix()` replaces two divergent inline predicates).
+- Out of scope by design: DB-row/wire-packet struct field names (`AccountSqliteStore` rows, `TradingPostStore`/`TradingPostManager` escrow, `LoginServer`, packet headers) — those reshape in Phase 1-C/1-E.
+- Also: `DialogBox_NpcSpawner.cpp` — pre-existing Linux/GCC build break (packed `npc_id` field can't bind to `std::format`'s reference parameter) fixed with an int cast; found by the first full Linux client build in a while.
+- Verified: Windows `-Target All`, Linux server, and Linux client builds all green (Linux pair built on the test box; client prereqs now include `libxi-dev`, which the documented apt line was missing).
+- No version bump: internal refactor, no behavior or protocol change.
+
+# Item Tiers Cycle 0-A — drop-pipeline "tier" vocabulary renamed to "stage" (server)
+
+Issue #37 (epic #36). Pure rename per the Item Tiers spec §8 naming mandate — "tier" now means item Tier exclusively; drop-table rungs are **stages**. Zero behavior change (verified by `git diff` review: identifiers and comments only).
+
+- `Game.h` `DropTable::tierEntries` → `stage_entries`.
+- `EntityManager.h/.cpp` `roll_drop_table_item(table, tier, …)` → `(table, stage, …)`.
+- `GameConfigSqliteStore.cpp` loader local `tier` → `stage`. The `drop_entries.tier` **DB column keeps its name** (recorded implementation-time pick) — SQL strings untouched.
+- Drop-pipeline comments in `EntityManager.*`, `Game.h`, `Npc.h` follow ("tier-2 drop" → "stage-2 drop"). The magic-tier comment at `EntityManager.cpp:593` is unrelated and untouched.
+- No version bump: identifier rename only, no behavior or protocol change.
+
 # Griffin polish — correct diagonals, family-length E, gust-of-wind ranged attack
 
 Follow-up round driven by in-game testing of the re-shoot.

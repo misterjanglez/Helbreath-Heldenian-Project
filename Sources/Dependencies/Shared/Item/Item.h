@@ -264,65 +264,82 @@ public:
 
     hb::shared::item::AttributePrefixType get_prefix_type() const
     {
-        return static_cast<hb::shared::item::AttributePrefixType>(m_instance.prefix_type);
+        return static_cast<hb::shared::item::AttributePrefixType>(m_instance.get_prefix_type());
     }
 
     hb::shared::item::SecondaryEffectType get_secondary_type() const
     {
-        return static_cast<hb::shared::item::SecondaryEffectType>(m_instance.secondary_type);
+        return static_cast<hb::shared::item::SecondaryEffectType>(m_instance.get_secondary_type());
+    }
+
+    uint8_t get_prefix_value() const
+    {
+        return m_instance.get_prefix_value();
+    }
+
+    uint8_t get_secondary_value() const
+    {
+        return m_instance.get_secondary_value();
+    }
+
+    uint8_t get_enchant_bonus() const
+    {
+        return m_instance.get_enchant_bonus();
+    }
+
+    void set_enchant_bonus(uint8_t value)
+    {
+        m_instance.set_enchant_bonus(value);
+    }
+
+    void set_prefix(uint8_t type, uint8_t value)
+    {
+        m_instance.set_prefix(type, value);
+    }
+
+    void set_secondary(uint8_t type, uint8_t value)
+    {
+        m_instance.set_secondary(type, value);
+    }
+
+    bool has_prefix() const
+    {
+        return m_instance.has_prefix();
     }
 
     bool is_custom_made() const
     {
-        return m_instance.custom_made != 0;
+        return m_instance.is_custom_made();
     }
 
     void set_custom_made(bool custom)
     {
-        m_instance.custom_made = custom ? 1 : 0;
+        m_instance.set_custom_made(custom);
     }
 
     bool has_special_attributes() const
     {
-        return m_instance.prefix_type != 0 ||
-               m_instance.secondary_type != 0 ||
-               m_instance.enchant_bonus > 0 ||
-               m_instance.custom_made != 0;
+        return m_instance.has_attributes();
     }
 
     // Copy attribute fields to a packet or DB struct that has matching field names
     template <typename T>
     void copy_attributes_to(T& target) const
     {
-        target.custom_made = m_instance.custom_made;
-        target.prefix_type = m_instance.prefix_type;
-        target.prefix_value = m_instance.prefix_value;
-        target.secondary_type = m_instance.secondary_type;
-        target.secondary_value = m_instance.secondary_value;
-        target.enchant_bonus = m_instance.enchant_bonus;
+        m_instance.copy_attributes_to(target);
     }
 
     // Load attribute fields from a packet or DB struct that has matching field names
     template <typename T>
     void load_attributes_from(const T& source)
     {
-        m_instance.custom_made = source.custom_made;
-        m_instance.prefix_type = source.prefix_type;
-        m_instance.prefix_value = source.prefix_value;
-        m_instance.secondary_type = source.secondary_type;
-        m_instance.secondary_value = source.secondary_value;
-        m_instance.enchant_bonus = source.enchant_bonus;
+        m_instance.load_attributes_from(source);
     }
 
     // Copy all attribute fields from another CItem
     void copy_attributes_from(const CItem* other)
     {
-        m_instance.custom_made = other->m_instance.custom_made;
-        m_instance.prefix_type = other->m_instance.prefix_type;
-        m_instance.prefix_value = other->m_instance.prefix_value;
-        m_instance.secondary_type = other->m_instance.secondary_type;
-        m_instance.secondary_value = other->m_instance.secondary_value;
-        m_instance.enchant_bonus = other->m_instance.enchant_bonus;
+        m_instance.load_attributes_from(other->m_instance);
     }
 
     // Return a const reference to the instance data
@@ -343,8 +360,8 @@ public:
     // Light attribute percentage — prefix_value is already the actual percentage
     int get_light_percent() const
     {
-        if (m_instance.prefix_type == static_cast<uint8_t>(hb::shared::item::AttributePrefixType::Light))
-            return m_instance.prefix_value;
+        if (get_prefix_type() == hb::shared::item::AttributePrefixType::Light)
+            return get_prefix_value();
         return 0;
     }
 

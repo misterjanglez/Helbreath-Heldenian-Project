@@ -1926,12 +1926,7 @@ void CGame::read_map_data(short pivot_x, short pivot_y, const char* packet_data)
 			short map_item_id = item->item_id;
 			idata.count = static_cast<uint64_t>(std::max<std::int16_t>(item->count, 0));
 			idata.item_color = static_cast<int8_t>(item->color);
-			idata.custom_made = item->custom_made;
-			idata.prefix_type = item->prefix_type;
-			idata.prefix_value = item->prefix_value;
-			idata.secondary_type = item->secondary_type;
-			idata.secondary_value = item->secondary_value;
-			idata.enchant_bonus = item->enchant_bonus;
+			idata.load_attributes_from(*item);
 			cursor += sizeof(hb::net::PacketMapDataItem);
 			m_map_data->set_item(pivot_x + map_x, pivot_y + map_y, map_item_id, idata, false);
 		}
@@ -2621,7 +2616,7 @@ void CGame::init_item_list(char* packet_data)
 			&& (m_is_item_equipped[i] == true)
 			&& (cfg->get_equip_pos() >= EquipPos::LeftFinger))
 		{
-			angel_value = m_player->m_item_list[i]->m_instance.enchant_bonus;
+			angel_value = m_player->m_item_list[i]->get_enchant_bonus();
 			if (m_player->m_item_list[i]->m_id_num == hb::shared::item::ItemId::AngelicPendantSTR)
 				m_player->m_angelic_str = 1 + angel_value;
 			else if (m_player->m_item_list[i]->m_id_num == hb::shared::item::ItemId::AngelicPendantDEX)

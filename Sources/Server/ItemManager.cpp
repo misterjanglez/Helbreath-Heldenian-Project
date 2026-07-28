@@ -50,9 +50,9 @@ static std::string format_item_info(CItem* item)
 	std::snprintf(buf, sizeof(buf), "%s(count=%llu pfx=%d:%d sec=%d:%d enc=%d cm=%d touch=%d:%d:%d:%d)",
 		item->m_name,
 		static_cast<unsigned long long>(item->m_instance.count),
-		static_cast<int>(item->m_instance.prefix_type), item->m_instance.prefix_value,
-		static_cast<int>(item->m_instance.secondary_type), item->m_instance.secondary_value,
-		item->m_instance.enchant_bonus, item->m_instance.custom_made ? 1 : 0,
+		static_cast<int>(item->get_prefix_type()), item->get_prefix_value(),
+		static_cast<int>(item->get_secondary_type()), item->get_secondary_value(),
+		item->get_enchant_bonus(), item->is_custom_made() ? 1 : 0,
 		item->m_instance.touch_effect_type,
 		item->m_instance.touch_effect_value1,
 		item->m_instance.touch_effect_value2,
@@ -644,7 +644,7 @@ bool ItemManager::equip_item_handler(int client_h, short item_index, bool notify
 
 	if (m_game->m_client_list[client_h]->m_item_list[item_index]->m_instance.cur_durability == 0) return false;
 
-	if (!(m_game->m_client_list[client_h]->m_item_list[item_index]->m_instance.custom_made) &&
+	if (!m_game->m_client_list[client_h]->m_item_list[item_index]->is_custom_made() &&
 		(m_game->m_client_list[client_h]->m_item_list[item_index]->m_level_requirement > m_game->m_client_list[client_h]->m_level)) return false;
 
 	if (m_game->m_client_list[client_h]->m_item_list[item_index]->m_gender_requirement != 0) {
@@ -894,7 +894,7 @@ void ItemManager::validate_equipped_items(int client_h)
 		bool must_unequip = false;
 
 		// Level check (skip custom-made items — bit 0 of attribute)
-		if (!(item->m_instance.custom_made) &&
+		if (!item->is_custom_made() &&
 			(item->m_level_requirement > p->m_level))
 			must_unequip = true;
 
@@ -2644,9 +2644,9 @@ void ItemManager::req_sell_item_handler(int client_h, char item_id, char sell_to
 			// Attribute bonus pricing for equipment with special attributes
 			add_price1 = 0;
 			add_price2 = 0;
-			if (m_game->m_client_list[client_h]->m_item_list[item_id]->m_instance.prefix_type != static_cast<uint8_t>(hb::shared::item::AttributePrefixType::None)) {
-				swe_type = static_cast<int>(m_game->m_client_list[client_h]->m_item_list[item_id]->m_instance.prefix_type);
-				swe_value = m_game->m_client_list[client_h]->m_item_list[item_id]->m_instance.prefix_value;
+			if (m_game->m_client_list[client_h]->m_item_list[item_id]->get_prefix_type() != hb::shared::item::AttributePrefixType::None) {
+				swe_type = static_cast<int>(m_game->m_client_list[client_h]->m_item_list[item_id]->get_prefix_type());
+				swe_value = m_game->m_client_list[client_h]->m_item_list[item_id]->get_prefix_value();
 
 				switch (swe_type) {
 				case 6: mul1 = 2; break;
@@ -2682,9 +2682,9 @@ void ItemManager::req_sell_item_handler(int client_h, char item_id, char sell_to
 				add_price1 = (int)(d1 + d3);
 			}
 
-			if (m_game->m_client_list[client_h]->m_item_list[item_id]->m_instance.secondary_type != static_cast<uint8_t>(hb::shared::item::SecondaryEffectType::None)) {
-				swe_type = static_cast<int>(m_game->m_client_list[client_h]->m_item_list[item_id]->m_instance.secondary_type);
-				swe_value = m_game->m_client_list[client_h]->m_item_list[item_id]->m_instance.secondary_value;
+			if (m_game->m_client_list[client_h]->m_item_list[item_id]->get_secondary_type() != hb::shared::item::SecondaryEffectType::None) {
+				swe_type = static_cast<int>(m_game->m_client_list[client_h]->m_item_list[item_id]->get_secondary_type());
+				swe_value = m_game->m_client_list[client_h]->m_item_list[item_id]->get_secondary_value();
 
 				switch (swe_type) {
 				case 1:
@@ -2811,9 +2811,9 @@ void ItemManager::req_sell_item_confirm_handler(int client_h, char item_id, int 
 
 			add_price1 = 0;
 			add_price2 = 0;
-			if (m_game->m_client_list[client_h]->m_item_list[item_id]->m_instance.prefix_type != static_cast<uint8_t>(hb::shared::item::AttributePrefixType::None)) {
-				swe_type = static_cast<int>(m_game->m_client_list[client_h]->m_item_list[item_id]->m_instance.prefix_type);
-				swe_value = m_game->m_client_list[client_h]->m_item_list[item_id]->m_instance.prefix_value;
+			if (m_game->m_client_list[client_h]->m_item_list[item_id]->get_prefix_type() != hb::shared::item::AttributePrefixType::None) {
+				swe_type = static_cast<int>(m_game->m_client_list[client_h]->m_item_list[item_id]->get_prefix_type());
+				swe_value = m_game->m_client_list[client_h]->m_item_list[item_id]->get_prefix_value();
 
 				// 0-None 1- 2- 3- 4-
 				// 5- 6- 7- 8- 9-
@@ -2850,9 +2850,9 @@ void ItemManager::req_sell_item_confirm_handler(int client_h, char item_id, int 
 				add_price1 = (int)(d1 + d3);
 			}
 
-			if (m_game->m_client_list[client_h]->m_item_list[item_id]->m_instance.secondary_type != static_cast<uint8_t>(hb::shared::item::SecondaryEffectType::None)) {
-				swe_type = static_cast<int>(m_game->m_client_list[client_h]->m_item_list[item_id]->m_instance.secondary_type);
-				swe_value = m_game->m_client_list[client_h]->m_item_list[item_id]->m_instance.secondary_value;
+			if (m_game->m_client_list[client_h]->m_item_list[item_id]->get_secondary_type() != hb::shared::item::SecondaryEffectType::None) {
+				swe_type = static_cast<int>(m_game->m_client_list[client_h]->m_item_list[item_id]->get_secondary_type());
+				swe_value = m_game->m_client_list[client_h]->m_item_list[item_id]->get_secondary_value();
 
 				// (1),  (2),  (3), HP  (4), SP  (5)
 				// MP  (6),  (7),   (8),   (9)
@@ -3209,7 +3209,7 @@ void ItemManager::calc_total_item_effect(int client_h, int equip_item_id, bool n
 				m_game->m_client_list[client_h]->m_attack_dice_range_l = m_game->m_client_list[client_h]->m_item_list[item_index]->m_item_effect_value5;
 				m_game->m_client_list[client_h]->m_attack_bonus_l = m_game->m_client_list[client_h]->m_item_list[item_index]->m_item_effect_value6;
 
-				temp = m_game->m_client_list[client_h]->m_item_list[item_index]->m_instance.enchant_bonus;
+				temp = m_game->m_client_list[client_h]->m_item_list[item_index]->get_enchant_bonus();
 				//testcode
 				//std::snprintf(G_cTxt, sizeof(G_cTxt), "Add Damage: %d", temp);
 				//PutLogList(G_cTxt);
@@ -3223,7 +3223,7 @@ void ItemManager::calc_total_item_effect(int client_h, int equip_item_id, bool n
 				//m_game->m_client_list[client_h]->m_iHitRatio_ItemEffect_L  += m_game->m_client_list[client_h]->m_item_list[item_index]->m_sL_HitRatio;
 				m_game->m_client_list[client_h]->m_using_weapon_skill = m_game->m_client_list[client_h]->m_item_list[item_index]->m_related_skill;
 
-				if (m_game->m_client_list[client_h]->m_item_list[item_index]->m_instance.custom_made) {
+				if (m_game->m_client_list[client_h]->m_item_list[item_index]->is_custom_made()) {
 					m_game->m_client_list[client_h]->m_custom_item_value_attack += m_game->m_client_list[client_h]->m_item_list[item_index]->m_instance.special_effect_value2;
 					if (m_game->m_client_list[client_h]->m_custom_item_value_attack > 100)
 						m_game->m_client_list[client_h]->m_custom_item_value_attack = 100;
@@ -3277,9 +3277,9 @@ void ItemManager::calc_total_item_effect(int client_h, int equip_item_id, bool n
 					}
 				}
 
-				if (m_game->m_client_list[client_h]->m_item_list[item_index]->m_instance.prefix_type != static_cast<uint8_t>(hb::shared::item::AttributePrefixType::None)) {
-					swe_type = static_cast<int>(m_game->m_client_list[client_h]->m_item_list[item_index]->m_instance.prefix_type);
-					swe_value = m_game->m_client_list[client_h]->m_item_list[item_index]->m_instance.prefix_value;
+				if (m_game->m_client_list[client_h]->m_item_list[item_index]->get_prefix_type() != hb::shared::item::AttributePrefixType::None) {
+					swe_type = static_cast<int>(m_game->m_client_list[client_h]->m_item_list[item_index]->get_prefix_type());
+					swe_value = m_game->m_client_list[client_h]->m_item_list[item_index]->get_prefix_value();
 
 					// 0-None 1- 2- 3- 4-
 					// 5- 6- 7- 8- 9- 10-
@@ -3299,9 +3299,9 @@ void ItemManager::calc_total_item_effect(int client_h, int equip_item_id, bool n
 					}
 				}
 
-				if (m_game->m_client_list[client_h]->m_item_list[item_index]->m_instance.secondary_type != static_cast<uint8_t>(hb::shared::item::SecondaryEffectType::None)) {
-					swe_type = static_cast<int>(m_game->m_client_list[client_h]->m_item_list[item_index]->m_instance.secondary_type);
-					swe_value = m_game->m_client_list[client_h]->m_item_list[item_index]->m_instance.secondary_value;
+				if (m_game->m_client_list[client_h]->m_item_list[item_index]->get_secondary_type() != hb::shared::item::SecondaryEffectType::None) {
+					swe_type = static_cast<int>(m_game->m_client_list[client_h]->m_item_list[item_index]->get_secondary_type());
+					swe_value = m_game->m_client_list[client_h]->m_item_list[item_index]->get_secondary_value();
 
 					// (1),  (2),  (3), HP  (4), SP  (5)
 					// MP  (6),  (7),   (8),   (9)
@@ -3437,25 +3437,25 @@ void ItemManager::calc_total_item_effect(int client_h, int equip_item_id, bool n
 
 					// ******* Angel Code - Begin ******* //			
 				case 16: // Angel STR//AngelicPendant(STR)
-					temp = m_game->m_client_list[client_h]->m_item_list[item_index]->m_instance.enchant_bonus;
+					temp = m_game->m_client_list[client_h]->m_item_list[item_index]->get_enchant_bonus();
 					m_game->m_client_list[client_h]->m_angelic_str = temp + 1;
 					m_game->m_status_effect_manager->set_angel_flag(client_h, hb::shared::owner_class::Player, 1, temp);
 					m_game->send_notify_msg(0, client_h, Notify::SettingSuccess, 0, 0, 0, 0);
 					break;
 				case 17: // Angel DEX //AngelicPendant(DEX)
-					temp = m_game->m_client_list[client_h]->m_item_list[item_index]->m_instance.enchant_bonus;
+					temp = m_game->m_client_list[client_h]->m_item_list[item_index]->get_enchant_bonus();
 					m_game->m_client_list[client_h]->m_angelic_dex = temp + 1;
 					m_game->m_status_effect_manager->set_angel_flag(client_h, hb::shared::owner_class::Player, 2, temp);
 					m_game->send_notify_msg(0, client_h, Notify::SettingSuccess, 0, 0, 0, 0);
 					break;
 				case 18: // Angel INT//AngelicPendant(INT)
-					temp = m_game->m_client_list[client_h]->m_item_list[item_index]->m_instance.enchant_bonus;
+					temp = m_game->m_client_list[client_h]->m_item_list[item_index]->get_enchant_bonus();
 					m_game->m_client_list[client_h]->m_angelic_int = temp + 1;
 					m_game->m_status_effect_manager->set_angel_flag(client_h, hb::shared::owner_class::Player, 3, temp);
 					m_game->send_notify_msg(0, client_h, Notify::SettingSuccess, 0, 0, 0, 0);
 					break;
 				case 19: // Angel MAG//AngelicPendant(MAG)
-					temp = m_game->m_client_list[client_h]->m_item_list[item_index]->m_instance.enchant_bonus;
+					temp = m_game->m_client_list[client_h]->m_item_list[item_index]->get_enchant_bonus();
 					m_game->m_client_list[client_h]->m_angelic_mag = temp + 1;
 					m_game->m_status_effect_manager->set_angel_flag(client_h, hb::shared::owner_class::Player, 4, temp);
 					m_game->send_notify_msg(0, client_h, Notify::SettingSuccess, 0, 0, 0, 0);
@@ -3498,7 +3498,7 @@ void ItemManager::calc_total_item_effect(int client_h, int equip_item_id, bool n
 			case ItemEffectType::Defense:
 				m_game->m_client_list[client_h]->m_defense_ratio += m_game->m_client_list[client_h]->m_item_list[item_index]->m_item_effect_value1;
 
-				if (m_game->m_client_list[client_h]->m_item_list[item_index]->m_instance.custom_made) {
+				if (m_game->m_client_list[client_h]->m_item_list[item_index]->is_custom_made()) {
 					m_game->m_client_list[client_h]->m_custom_item_value_defense += m_game->m_client_list[client_h]->m_item_list[item_index]->m_instance.special_effect_value2;
 
 					v2 = (double)m_game->m_client_list[client_h]->m_item_list[item_index]->m_instance.special_effect_value2;
@@ -3514,9 +3514,9 @@ void ItemManager::calc_total_item_effect(int client_h, int equip_item_id, bool n
 					//PutLogList(G_cTxt);
 				}
 
-				if (m_game->m_client_list[client_h]->m_item_list[item_index]->m_instance.prefix_type != static_cast<uint8_t>(hb::shared::item::AttributePrefixType::None)) {
-					swe_type = static_cast<int>(m_game->m_client_list[client_h]->m_item_list[item_index]->m_instance.prefix_type);
-					swe_value = m_game->m_client_list[client_h]->m_item_list[item_index]->m_instance.prefix_value;
+				if (m_game->m_client_list[client_h]->m_item_list[item_index]->get_prefix_type() != hb::shared::item::AttributePrefixType::None) {
+					swe_type = static_cast<int>(m_game->m_client_list[client_h]->m_item_list[item_index]->get_prefix_type());
+					swe_value = m_game->m_client_list[client_h]->m_item_list[item_index]->get_prefix_value();
 
 					// 0-None 1- 2- 3- 4-
 					// 5- 6- 7- 8- 9- 10- 11- 12-
@@ -3544,9 +3544,9 @@ void ItemManager::calc_total_item_effect(int client_h, int equip_item_id, bool n
 					}
 				}
 
-				if (m_game->m_client_list[client_h]->m_item_list[item_index]->m_instance.secondary_type != static_cast<uint8_t>(hb::shared::item::SecondaryEffectType::None)) {
-					swe_type = static_cast<int>(m_game->m_client_list[client_h]->m_item_list[item_index]->m_instance.secondary_type);
-					swe_value = m_game->m_client_list[client_h]->m_item_list[item_index]->m_instance.secondary_value;
+				if (m_game->m_client_list[client_h]->m_item_list[item_index]->get_secondary_type() != hb::shared::item::SecondaryEffectType::None) {
+					swe_type = static_cast<int>(m_game->m_client_list[client_h]->m_item_list[item_index]->get_secondary_type());
+					swe_value = m_game->m_client_list[client_h]->m_item_list[item_index]->get_secondary_value();
 
 					// (1),  (2),  (3), HP  (4), SP  (5)
 					// MP  (6),  (7),   (8),   (9)
@@ -4014,7 +4014,7 @@ bool ItemManager::transform_majestic_item(int client_h, int item_index, int new_
 	item->m_instance.touch_effect_value1 = m_game->m_client_list[client_h]->m_char_id_num1;
 	item->m_instance.touch_effect_value2 = m_game->m_client_list[client_h]->m_char_id_num2;
 	item->m_instance.touch_effect_value3 = m_game->m_client_list[client_h]->m_char_id_num3;
-	item->m_instance.enchant_bonus = new_value;
+	item->set_enchant_bonus(new_value);
 	if (glow_color != 0) item->m_instance.item_color = glow_color;
 
 	m_game->send_gizon_item_change(client_h, item_index, item);
@@ -4635,7 +4635,7 @@ void ItemManager::build_item_handler(int client_h, char* data)
 				}
 
 				// Custom-Made
-				item->m_instance.custom_made = 1;
+				item->set_custom_made(true);
 
 				if (item->get_item_type() == hb::shared::item::item_type::material) {
 					temp = m_game->dice(1, (player_skill_level / 2) + 1) - 1;
@@ -4649,9 +4649,8 @@ void ItemManager::build_item_handler(int client_h, char* data)
 				else {
 					// Copy prefix attributes from build item definition
 					uint16_t build_attr = m_game->m_build_item_list[i]->m_attribute;
-					item->m_instance.prefix_value = static_cast<uint8_t>(build_attr & 0x0F);
-					item->m_instance.prefix_type = static_cast<uint8_t>((build_attr >> 4) & 0x0F);
-					item->m_instance.enchant_bonus = static_cast<uint8_t>((build_attr >> 12) & 0x0F);
+					item->set_prefix(static_cast<uint8_t>((build_attr >> 4) & 0x0F), static_cast<uint8_t>(build_attr & 0x0F));
+					item->set_enchant_bonus(static_cast<uint8_t>((build_attr >> 12) & 0x0F));
 
 					result_value = (total_value - m_game->m_build_item_list[i]->m_average_value);
 					// : SpecEffectValue1 , SpecEffectValue2
@@ -4733,9 +4732,9 @@ void ItemManager::adjust_rare_item_value(CItem* item)
 	uint32_t swe_type, swe_value;
 	double v1, v2, v3;
 
-	if (item->m_instance.prefix_type != static_cast<uint8_t>(hb::shared::item::AttributePrefixType::None)) {
-		swe_type = static_cast<int>(item->m_instance.prefix_type);
-		swe_value = item->m_instance.prefix_value;
+	if (item->get_prefix_type() != hb::shared::item::AttributePrefixType::None) {
+		swe_type = static_cast<int>(item->get_prefix_type());
+		swe_value = item->get_prefix_value();
 		// 0-None 1- 2- 3-
 		// 5- 6- 7- 8- 9-
 		switch (swe_type) {
@@ -4948,12 +4947,10 @@ bool ItemManager::generate_item_attributes(CItem* item)
 	if (secondaryValue > 15) secondaryValue = 15;
 
 	item->m_instance.item_color = (char)item_color;
-	item->m_instance.custom_made = 0;
-	item->m_instance.prefix_type = static_cast<uint8_t>(primaryType);
-	item->m_instance.prefix_value = static_cast<uint8_t>(primaryValue);
-	item->m_instance.secondary_type = static_cast<uint8_t>(secondaryType);
-	item->m_instance.secondary_value = static_cast<uint8_t>(secondaryValue);
-	item->m_instance.enchant_bonus = 0;
+	item->set_custom_made(false);
+	item->set_prefix(static_cast<uint8_t>(primaryType), static_cast<uint8_t>(primaryValue));
+	item->set_secondary(static_cast<uint8_t>(secondaryType), static_cast<uint8_t>(secondaryValue));
+	item->set_enchant_bonus(0);
 
 	adjust_rare_item_value(item);
 	// New item: current durability should equal max durability
@@ -5545,7 +5542,7 @@ bool ItemManager::check_is_item_upgrade_success(int client_h, int item_index, in
 
 	if (m_game->m_client_list[client_h]->m_item_list[som_h] == 0) return false;
 
-	value = m_game->m_client_list[client_h]->m_item_list[item_index]->m_instance.enchant_bonus;
+	value = m_game->m_client_list[client_h]->m_item_list[item_index]->get_enchant_bonus();
 
 	switch (value) {
 	case 0: prob = 30; break;  // +1 :90%     +1~+2
@@ -5561,7 +5558,7 @@ bool ItemManager::check_is_item_upgrade_success(int client_h, int item_index, in
 	default: prob = 1; break;
 	}
 
-	if ((m_game->m_client_list[client_h]->m_item_list[item_index]->m_instance.custom_made) && (m_game->m_client_list[client_h]->m_item_list[item_index]->m_instance.special_effect_value2 > 100)) {
+	if ((m_game->m_client_list[client_h]->m_item_list[item_index]->is_custom_made()) && (m_game->m_client_list[client_h]->m_item_list[item_index]->m_instance.special_effect_value2 > 100)) {
 		if (prob > 20)
 			prob += (m_game->m_client_list[client_h]->m_item_list[item_index]->m_instance.special_effect_value2 / 10);
 		else if (prob > 7)
@@ -5633,7 +5630,7 @@ void ItemManager::request_item_upgrade_handler(int client_h, int item_index)
 	if ((item_index < 0) || (item_index >= hb::shared::limits::MaxItems)) return;
 	if (m_game->m_client_list[client_h]->m_item_list[item_index] == 0) return;
 
-	value = m_game->m_client_list[client_h]->m_item_list[item_index]->m_instance.enchant_bonus;
+	value = m_game->m_client_list[client_h]->m_item_list[item_index]->get_enchant_bonus();
 	if (value >= 15 || value < 0) {
 		m_game->send_notify_msg(0, client_h, Notify::ItemUpgradeFail, 1, 0, 0, 0);
 		return;
@@ -5732,7 +5729,7 @@ void ItemManager::request_item_upgrade_handler(int client_h, int item_index)
 				m_game->send_notify_msg(0, client_h, Notify::GizonItemUpgradeLeft, m_game->m_client_list[client_h]->m_gizon_item_upgrade_left, 0, 0, 0);
 				value++;
 				if (value > 10) value = 10;
-				m_game->m_client_list[client_h]->m_item_list[item_index]->m_instance.enchant_bonus = value;
+				m_game->m_client_list[client_h]->m_item_list[item_index]->set_enchant_bonus(value);
 
 				m_game->send_item_attribute_change(client_h, item_index, m_game->m_client_list[client_h]->m_item_list[item_index]);
 				item_log(ItemLogAction::UpgradeSuccess, client_h, (int)-1, m_game->m_client_list[client_h]->m_item_list[item_index]);
@@ -5809,7 +5806,7 @@ void ItemManager::request_item_upgrade_handler(int client_h, int item_index)
 			else if ((value >= 14) && (m_game->m_client_list[client_h]->m_item_list[item_index]->m_id_num == ItemId::DarkKnightSword))
 			{
 				// Maxed out — the Templar starts glowing
-				m_game->m_client_list[client_h]->m_item_list[item_index]->m_instance.enchant_bonus = 15;
+				m_game->m_client_list[client_h]->m_item_list[item_index]->set_enchant_bonus(15);
 				m_game->m_client_list[client_h]->m_item_list[item_index]->m_instance.item_color = dark_templar_glow_color;
 
 				m_game->send_gizon_item_change(client_h, item_index, m_game->m_client_list[client_h]->m_item_list[item_index]);
@@ -5819,7 +5816,7 @@ void ItemManager::request_item_upgrade_handler(int client_h, int item_index)
 			{
 				value += 2;
 				if (value > 15) value = 15;
-				m_game->m_client_list[client_h]->m_item_list[item_index]->m_instance.enchant_bonus = value;
+				m_game->m_client_list[client_h]->m_item_list[item_index]->set_enchant_bonus(value);
 
 				m_game->send_item_attribute_change(client_h, item_index, m_game->m_client_list[client_h]->m_item_list[item_index]);
 				item_log(ItemLogAction::UpgradeSuccess, client_h, (int)-1, m_game->m_client_list[client_h]->m_item_list[item_index]);
@@ -5828,7 +5825,7 @@ void ItemManager::request_item_upgrade_handler(int client_h, int item_index)
 
 		default:
 
-			if (m_game->m_client_list[client_h]->m_item_list[item_index]->m_instance.prefix_type == static_cast<uint8_t>(hb::shared::item::AttributePrefixType::Ancient)) {
+			if (m_game->m_client_list[client_h]->m_item_list[item_index]->get_prefix_type() == hb::shared::item::AttributePrefixType::Ancient) {
 					m_game->send_notify_msg(0, client_h, Notify::ItemUpgradeFail, 2, 0, 0, 0);
 					return;
 			}
@@ -5843,18 +5840,18 @@ void ItemManager::request_item_upgrade_handler(int client_h, int item_index)
 			if (so_x > 0) {
 				if (check_is_item_upgrade_success(client_h, item_index, sox_h) == false) {
 					m_game->send_item_attribute_change(client_h, item_index, m_game->m_client_list[client_h]->m_item_list[item_index]);
-					value = m_game->m_client_list[client_h]->m_item_list[item_index]->m_instance.enchant_bonus; // v2.172
+					value = m_game->m_client_list[client_h]->m_item_list[item_index]->get_enchant_bonus(); // v2.172
 					if (value >= 1) item_deplete_handler(client_h, item_index, false);
 					item_deplete_handler(client_h, sox_h, false);
 					return;
 				}
 
-				if (m_game->m_client_list[client_h]->m_item_list[item_index]->m_instance.custom_made) {
+				if (m_game->m_client_list[client_h]->m_item_list[item_index]->is_custom_made()) {
 					value++;
 					if (value > 10)
 						value = 10;
 					else {
-						m_game->m_client_list[client_h]->m_item_list[item_index]->m_instance.enchant_bonus = value;
+						m_game->m_client_list[client_h]->m_item_list[item_index]->set_enchant_bonus(value);
 		
 						item_deplete_handler(client_h, sox_h, false);
 					}
@@ -5864,7 +5861,7 @@ void ItemManager::request_item_upgrade_handler(int client_h, int item_index)
 					if (value > 7)
 						value = 7;
 					else {
-						m_game->m_client_list[client_h]->m_item_list[item_index]->m_instance.enchant_bonus = value;
+						m_game->m_client_list[client_h]->m_item_list[item_index]->set_enchant_bonus(value);
 		
 						item_deplete_handler(client_h, sox_h, false);
 					}
@@ -5881,7 +5878,7 @@ void ItemManager::request_item_upgrade_handler(int client_h, int item_index)
 		break;
 
 	case 5:
-		if (m_game->m_client_list[client_h]->m_item_list[item_index]->m_instance.prefix_type == static_cast<uint8_t>(hb::shared::item::AttributePrefixType::Strong)) {
+		if (m_game->m_client_list[client_h]->m_item_list[item_index]->get_prefix_type() == hb::shared::item::AttributePrefixType::Strong) {
 				m_game->send_notify_msg(0, client_h, Notify::ItemUpgradeFail, 2, 0, 0, 0);
 				return;
 		}
@@ -5904,7 +5901,7 @@ void ItemManager::request_item_upgrade_handler(int client_h, int item_index)
 		if (so_m > 0) {
 			if (check_is_item_upgrade_success(client_h, item_index, som_h, true) == false) {
 				m_game->send_item_attribute_change(client_h, item_index, m_game->m_client_list[client_h]->m_item_list[item_index]);
-				value = m_game->m_client_list[client_h]->m_item_list[item_index]->m_instance.enchant_bonus; // v2.172
+				value = m_game->m_client_list[client_h]->m_item_list[item_index]->get_enchant_bonus(); // v2.172
 				if (value >= 1) item_deplete_handler(client_h, item_index, false);
 				item_deplete_handler(client_h, som_h, false);
 				return;
@@ -5914,10 +5911,10 @@ void ItemManager::request_item_upgrade_handler(int client_h, int item_index)
 			if (value > 10)
 				value = 10;
 			else {
-				m_game->m_client_list[client_h]->m_item_list[item_index]->m_instance.enchant_bonus = value;
+				m_game->m_client_list[client_h]->m_item_list[item_index]->set_enchant_bonus(value);
 
 
-				if (m_game->m_client_list[client_h]->m_item_list[item_index]->m_instance.custom_made) {
+				if (m_game->m_client_list[client_h]->m_item_list[item_index]->is_custom_made()) {
 					// +20%
 					v1 = (double)m_game->m_client_list[client_h]->m_item_list[item_index]->m_durability;
 					v2 = 0.2f * v1;
@@ -5967,7 +5964,7 @@ void ItemManager::request_item_upgrade_handler(int client_h, int item_index)
 			return;
 
 		default:
-			if (m_game->m_client_list[client_h]->m_item_list[item_index]->m_instance.prefix_type == static_cast<uint8_t>(hb::shared::item::AttributePrefixType::Strong)) {
+			if (m_game->m_client_list[client_h]->m_item_list[item_index]->get_prefix_type() == hb::shared::item::AttributePrefixType::Strong) {
 					m_game->send_notify_msg(0, client_h, Notify::ItemUpgradeFail, 2, 0, 0, 0);
 					return;
 			}
@@ -5982,7 +5979,7 @@ void ItemManager::request_item_upgrade_handler(int client_h, int item_index)
 			if (so_m > 0) {
 				if (check_is_item_upgrade_success(client_h, item_index, som_h, true) == false) {
 					m_game->send_item_attribute_change(client_h, item_index, m_game->m_client_list[client_h]->m_item_list[item_index]);
-					value = m_game->m_client_list[client_h]->m_item_list[item_index]->m_instance.enchant_bonus;
+					value = m_game->m_client_list[client_h]->m_item_list[item_index]->get_enchant_bonus();
 					if (value >= 1) item_deplete_handler(client_h, item_index, false);
 					item_deplete_handler(client_h, som_h, false);
 					return;
@@ -5991,10 +5988,10 @@ void ItemManager::request_item_upgrade_handler(int client_h, int item_index)
 				if (value > 10)
 					value = 10;
 				else {
-					m_game->m_client_list[client_h]->m_item_list[item_index]->m_instance.enchant_bonus = value;
+					m_game->m_client_list[client_h]->m_item_list[item_index]->set_enchant_bonus(value);
 	
 
-					if (m_game->m_client_list[client_h]->m_item_list[item_index]->m_instance.custom_made) {
+					if (m_game->m_client_list[client_h]->m_item_list[item_index]->is_custom_made()) {
 						v1 = (double)m_game->m_client_list[client_h]->m_item_list[item_index]->m_durability;
 						v2 = 0.2f * v1;
 						v3 = v1 + v2;
@@ -6078,7 +6075,7 @@ void ItemManager::request_item_upgrade_handler(int client_h, int item_index)
 			else if ((value >= 14) && (m_game->m_client_list[client_h]->m_item_list[item_index]->m_id_num == ItemId::DarkMageDragonWand))
 			{
 				// Maxed out — the Dragon Wand starts glowing
-				m_game->m_client_list[client_h]->m_item_list[item_index]->m_instance.enchant_bonus = 15;
+				m_game->m_client_list[client_h]->m_item_list[item_index]->set_enchant_bonus(15);
 				m_game->m_client_list[client_h]->m_item_list[item_index]->m_instance.item_color = dark_templar_glow_color;
 
 				m_game->send_gizon_item_change(client_h, item_index, m_game->m_client_list[client_h]->m_item_list[item_index]);
@@ -6089,7 +6086,7 @@ void ItemManager::request_item_upgrade_handler(int client_h, int item_index)
 			{
 				value += 2;
 				if (value > 15) value = 15;
-				m_game->m_client_list[client_h]->m_item_list[item_index]->m_instance.enchant_bonus = value;
+				m_game->m_client_list[client_h]->m_item_list[item_index]->set_enchant_bonus(value);
 
 				m_game->send_item_attribute_change(client_h, item_index, m_game->m_client_list[client_h]->m_item_list[item_index]);
 				item_log(ItemLogAction::UpgradeSuccess, client_h, (int)-1, m_game->m_client_list[client_h]->m_item_list[item_index]);
@@ -6108,7 +6105,7 @@ void ItemManager::request_item_upgrade_handler(int client_h, int item_index)
 			if (so_x > 0) {
 				if (check_is_item_upgrade_success(client_h, item_index, sox_h) == false) {
 					m_game->send_item_attribute_change(client_h, item_index, m_game->m_client_list[client_h]->m_item_list[item_index]);
-					value = m_game->m_client_list[client_h]->m_item_list[item_index]->m_instance.enchant_bonus; // v2.172
+					value = m_game->m_client_list[client_h]->m_item_list[item_index]->get_enchant_bonus(); // v2.172
 					if (value >= 1) item_deplete_handler(client_h, item_index, false);
 					item_deplete_handler(client_h, sox_h, false);
 					return;
@@ -6118,7 +6115,7 @@ void ItemManager::request_item_upgrade_handler(int client_h, int item_index)
 				if (value > 7)
 					value = 7;
 				else {
-					m_game->m_client_list[client_h]->m_item_list[item_index]->m_instance.enchant_bonus = value;
+					m_game->m_client_list[client_h]->m_item_list[item_index]->set_enchant_bonus(value);
 	
 					item_deplete_handler(client_h, sox_h, false);
 				}

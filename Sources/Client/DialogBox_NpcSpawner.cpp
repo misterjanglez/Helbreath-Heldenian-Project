@@ -137,7 +137,7 @@ void DialogBox_NpcSpawner::on_draw()
 
 		auto color = (idx == m_selected_index) ? GameColors::UIPaleYellow
 			: (hover ? GameColors::UIWhite : GameColors::UIMagicBlue);
-		auto label = std::format("[{}] {}", entry.npc_id, entry.name);
+		auto label = std::format("[{}] {}", static_cast<int>(entry.npc_id), entry.name);
 		hb::shared::text::draw_text_aligned(GameFont::Default,
 			sX + layout::content_x1 + 6, ry, layout::content_w - 12, 15,
 			label.c_str(),

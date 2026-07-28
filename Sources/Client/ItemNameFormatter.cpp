@@ -92,7 +92,7 @@ ItemNameInfo item_name_formatter::format(short item_id, const hb::shared::item::
 
 	if (hb::shared::item::is_special_item(item_id)) result.is_special = true;
 
-	if (data.custom_made)
+	if (data.is_custom_made())
 	{
 		result.is_special = true;
 		result.name = name;
@@ -114,10 +114,10 @@ ItemNameInfo item_name_formatter::format(short item_id, const hb::shared::item::
 			result.name = std::format(DRAW_DIALOGBOX_SELLOR_REPAIR_ITEM1, data.count, name);
 	}
 
-	type1 = data.prefix_type;
-	value1 = data.prefix_value;
-	type2 = data.secondary_type;
-	value2 = data.secondary_value;
+	type1 = data.get_prefix_type();
+	value1 = data.get_prefix_value();
+	type2 = data.get_secondary_type();
+	value2 = data.get_secondary_value();
 
 	if (type1 != 0 || type2 != 0)
 	{
@@ -179,7 +179,7 @@ ItemNameInfo item_name_formatter::format(short item_id, const hb::shared::item::
 		}
 	}
 
-	value3 = data.enchant_bonus;
+	value3 = data.get_enchant_bonus();
 	if (value3 > 0)
 	{
 		auto plusPos = result.name.rfind('+');

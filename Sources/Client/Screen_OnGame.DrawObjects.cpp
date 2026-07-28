@@ -796,7 +796,7 @@ void Screen_OnGame::draw_objects(short pivot_x, short pivot_y, short div_x, shor
 		auto itemInfo = item_name_formatter::get().format(item_selected_id, item_selected);
 
 		item_tooltip tooltip;
-		bool has_prefix = item_selected.prefix_type != 0;
+		bool has_prefix = item_selected.has_prefix();
 		if (has_prefix && item_selected.item_color != 0)
 		{
 			const auto& dye = m_game->m_color_palette[static_cast<uint8_t>(item_selected.item_color)];

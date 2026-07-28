@@ -4065,12 +4065,7 @@ int CGame::compose_move_map_data(short sX, short sY, int client_h, direction dir
 				hb::net::PacketMapDataItem itemObj{};
 				itemObj.item_id = tile->m_item[0]->m_id_num;
 				itemObj.color = tile->m_item[0]->m_instance.item_color;
-				itemObj.custom_made = tile->m_item[0]->m_instance.custom_made ? 1 : 0;
-				itemObj.prefix_type = static_cast<uint8_t>(tile->m_item[0]->m_instance.prefix_type);
-				itemObj.prefix_value = tile->m_item[0]->m_instance.prefix_value;
-				itemObj.secondary_type = static_cast<uint8_t>(tile->m_item[0]->m_instance.secondary_type);
-				itemObj.secondary_value = tile->m_item[0]->m_instance.secondary_value;
-				itemObj.enchant_bonus = tile->m_item[0]->m_instance.enchant_bonus;
+				tile->m_item[0]->copy_attributes_to(itemObj);
 				itemObj.count = CItem::count_to_v2(tile->m_item[0]->m_instance.count);
 				std::memcpy(cp, &itemObj, sizeof(itemObj));
 				cp += sizeof(itemObj);
@@ -4590,7 +4585,7 @@ bool CGame::load_player_data_from_db(int client_h)
 		m_client_list[client_h]->m_item_list[item.slot]->m_instance.cur_durability = (short)item.cur_durability;
 		m_client_list[client_h]->m_item_list[item.slot]->load_attributes_from(item);
 
-		if (m_client_list[client_h]->m_item_list[item.slot]->m_instance.custom_made) {
+		if (m_client_list[client_h]->m_item_list[item.slot]->is_custom_made()) {
 			m_client_list[client_h]->m_item_list[item.slot]->m_durability = m_client_list[client_h]->m_item_list[item.slot]->m_instance.special_effect_value1;
 		}
 		m_item_manager->adjust_rare_item_value(m_client_list[client_h]->m_item_list[item.slot]);
@@ -4626,7 +4621,7 @@ bool CGame::load_player_data_from_db(int client_h)
 		m_client_list[client_h]->m_item_in_bank_list[item.slot]->m_instance.special_effect_value3 = item.spec_effect_value3;
 		m_client_list[client_h]->m_item_in_bank_list[item.slot]->m_instance.cur_durability = (short)item.cur_durability;
 		m_client_list[client_h]->m_item_in_bank_list[item.slot]->load_attributes_from(item);
-		if (m_client_list[client_h]->m_item_in_bank_list[item.slot]->m_instance.custom_made) {
+		if (m_client_list[client_h]->m_item_in_bank_list[item.slot]->is_custom_made()) {
 			m_client_list[client_h]->m_item_in_bank_list[item.slot]->m_durability = m_client_list[client_h]->m_item_in_bank_list[item.slot]->m_instance.special_effect_value1;
 		}
 		m_item_manager->adjust_rare_item_value(m_client_list[client_h]->m_item_in_bank_list[item.slot]);
@@ -5585,11 +5580,11 @@ int CGame::client_motion_attack_handler(int client_h, short sX, short sY, short 
 				else item_index = -1;
 
 				if (item_index != -1 && m_client_list[client_h]->m_item_list[item_index] != 0) {
-					if (m_client_list[client_h]->m_item_list[item_index]->m_instance.prefix_type != static_cast<uint8_t>(hb::shared::item::AttributePrefixType::None)) {
-						type1 = static_cast<int>(m_client_list[client_h]->m_item_list[item_index]->m_instance.prefix_type);
-						value1 = m_client_list[client_h]->m_item_list[item_index]->m_instance.prefix_value;
-						type2 = static_cast<int>(m_client_list[client_h]->m_item_list[item_index]->m_instance.secondary_type);
-						value2 = m_client_list[client_h]->m_item_list[item_index]->m_instance.secondary_value;
+					if (m_client_list[client_h]->m_item_list[item_index]->get_prefix_type() != hb::shared::item::AttributePrefixType::None) {
+						type1 = static_cast<int>(m_client_list[client_h]->m_item_list[item_index]->get_prefix_type());
+						value1 = m_client_list[client_h]->m_item_list[item_index]->get_prefix_value();
+						type2 = static_cast<int>(m_client_list[client_h]->m_item_list[item_index]->get_secondary_type());
+						value2 = m_client_list[client_h]->m_item_list[item_index]->get_secondary_value();
 					}
 
 					if (type1 == 2) {
@@ -6658,16 +6653,14 @@ void CGame::client_common_handler(int client_h, char* data)
 				continue;
 			}
 
-			item->m_instance.custom_made = custom_made ? 1 : 0;
-			item->m_instance.prefix_type = static_cast<uint8_t>(prefix_type);
-			item->m_instance.prefix_value = prefix_value;
-			item->m_instance.secondary_type = static_cast<uint8_t>(secondary_type);
-			item->m_instance.secondary_value = secondary_value;
-			item->m_instance.enchant_bonus = enchant_bonus;
+			item->set_custom_made(custom_made);
+			item->set_prefix(static_cast<uint8_t>(prefix_type), prefix_value);
+			item->set_secondary(static_cast<uint8_t>(secondary_type), secondary_value);
+			item->set_enchant_bonus(enchant_bonus);
 			m_item_manager->adjust_rare_item_value(item);
 
 			// Set item color based on prefix type — unified palette weapon indices (16-21)
-			switch (static_cast<hb::shared::item::AttributePrefixType>(item->m_instance.prefix_type))
+			switch (item->get_prefix_type())
 			{
 			case hb::shared::item::AttributePrefixType::Agile:      item->m_instance.item_color = 16; break;
 			case hb::shared::item::AttributePrefixType::Light:       item->m_instance.item_color = 16; break;

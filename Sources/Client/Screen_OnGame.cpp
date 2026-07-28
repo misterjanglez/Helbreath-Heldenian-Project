@@ -865,7 +865,7 @@ void Screen_OnGame::render_item_tooltip()
     item_tooltip tooltip;
 
     // 1. Name — dye-colored for prefixed items, special color, or white
-    bool has_prefix = item->m_instance.prefix_type != static_cast<uint8_t>(hb::shared::item::AttributePrefixType::None);
+    bool has_prefix = item->has_prefix();
     if (has_prefix && item_color != 0)
     {
         const auto& dye = m_game->m_color_palette[item_color];

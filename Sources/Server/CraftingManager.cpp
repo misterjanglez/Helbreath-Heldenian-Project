@@ -478,7 +478,7 @@ void CraftingManager::req_create_crafting_handler(int client_h, char* data)
 			if (purity != 0)
 			{
 				item->m_instance.special_effect_value2 = purity;
-				item->m_instance.custom_made = 1;
+				item->set_custom_made(true);
 			}
 			item->set_touch_effect_type(TouchEffectType::ID);
 			item->m_instance.touch_effect_value1 = static_cast<short>(m_game->dice(1, 100000));

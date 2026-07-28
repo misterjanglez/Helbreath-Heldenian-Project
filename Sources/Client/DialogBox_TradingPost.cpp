@@ -125,12 +125,7 @@ namespace
 		hb::shared::item::item_instance_data d;
 		d.count = w.count;
 		d.item_color = static_cast<int8_t>(w.item_color);
-		d.custom_made = w.custom_made;
-		d.prefix_type = w.prefix_type;
-		d.prefix_value = w.prefix_value;
-		d.secondary_type = w.secondary_type;
-		d.secondary_value = w.secondary_value;
-		d.enchant_bonus = w.enchant_bonus;
+		d.load_attributes_from(w);
 		return d;
 	}
 
