@@ -315,6 +315,19 @@ CClient::CClient(asio::io_context& ctx)
 	m_spell_count = 0;
 	m_magic_pause_time = false;
 
+	// Frequency-check state. These were never initialized: a garbage
+	// m_move_freq_time makes the first move packet's gap arbitrary, which the
+	// move check reads as a speed violation.
+	m_magic_freq_time = 0;
+	m_move_freq_time = 0;
+	m_attack_freq_time = 0;
+	m_was_running = false;
+	m_move_violations = 0;
+	m_move_violation_log_time = 0;
+	m_cast_violations = 0;
+	m_cast_violation_log_time = 0;
+	m_is_move_blocked = false;
+
 }
 
 CClient::~CClient()

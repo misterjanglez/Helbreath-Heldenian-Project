@@ -351,6 +351,20 @@ int tier_config::setting_int(const std::string& key, int fallback) const
 	catch (...) { return fallback; }
 }
 
+std::optional<bool> tier_config::parse_posture(const std::string& value)
+{
+	if (hb_stricmp(value.c_str(), "disconnect") == 0) return true;
+	if (hb_stricmp(value.c_str(), "log") == 0) return false;
+	return std::nullopt;
+}
+
+bool tier_config::setting_disconnects(const std::string& key, bool fallback) const
+{
+	auto it = settings.find(key);
+	if (it == settings.end()) return fallback;
+	return parse_posture(it->second).value_or(fallback);
+}
+
 const modifier_catalog_config* tier_config::find_modifier(uint8_t modifier_id) const
 {
 	auto it = std::find_if(catalog.begin(), catalog.end(),
@@ -430,6 +444,13 @@ bool load_tier_config(sqlite3* db, tier_config& out)
 	marquee.bleed_duration_ms = fresh.setting_int("bleed_duration_ms", marquee.bleed_duration_ms);
 	marquee.cast_check_floor_ms = fresh.setting_int("cast_check_floor_ms", marquee.cast_check_floor_ms);
 
+	// Same treatment for the §5 anti-cheat knobs: the move and cast checks run
+	// per packet and read plain fields, never the string map.
+	auto& anticheat = fresh.anticheat;
+	anticheat.move_grace_pct = fresh.setting_int("move_grace_pct", anticheat.move_grace_pct);
+	anticheat.move_check_disconnects = fresh.setting_disconnects("posture_move", anticheat.move_check_disconnects);
+	anticheat.cast_check_disconnects = fresh.setting_disconnects("posture_cast", anticheat.cast_check_disconnects);
+
 	int pool_entries = 0;
 	for (const auto& pool : fresh.attribute_pools)
 		pool_entries += (int)(pool.prefix_entries.size() + pool.secondary_entries.size());
@@ -440,6 +461,14 @@ bool load_tier_config(sqlite3* db, tier_config& out)
 		(int)fresh.catalog.size(), (int)fresh.buckets.size(), (int)fresh.eligibility.size(),
 		(int)fresh.curves.size(), (int)fresh.loot_grades.size(), (int)fresh.enchant_steps.size(),
 		(int)fresh.settings.size(), (int)fresh.attribute_pools.size(), pool_entries);
+
+	// Posture is the one setting whose value decides whether players get
+	// disconnected, so what the running server actually resolved it to belongs
+	// in the boot/reload log rather than only in the DB.
+	hb::logger::log("Anti-cheat posture: move={} cast={}, move floor = expected tile time x {}%",
+		anticheat.move_check_disconnects ? "disconnect" : "log",
+		anticheat.cast_check_disconnects ? "disconnect" : "log",
+		anticheat.move_grace_pct);
 
 	out = std::move(fresh);
 	return true;

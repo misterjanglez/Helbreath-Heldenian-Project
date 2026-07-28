@@ -10,6 +10,7 @@
 #include "PlayerStatusData.h"
 #include "ActionID.h"
 #include "DirectionHelpers.h"
+#include "BalanceConstants.h"
 
 class CItem;
 
@@ -36,8 +37,11 @@ struct AnimDef
 
 namespace PlayerAnim {
 	static constexpr AnimDef stop       = { 14, 60,  false };
-	static constexpr AnimDef Move       = {  7, 70,  false };
-	static constexpr AnimDef Run        = {  7, 39,  false };
+	// Move/Run timing is shared with the server: it sets the expected tile time
+	// the anti-cheat move floor is derived from (spec §5), so the two must
+	// never drift.
+	static constexpr AnimDef Move       = { hb::shared::balance::move_frames - 1, hb::shared::balance::walk_frame_time, false };
+	static constexpr AnimDef Run        = { hb::shared::balance::move_frames - 1, hb::shared::balance::run_frame_time,  false };
 	static constexpr AnimDef Attack     = {  7, 78,  false };
 	static constexpr AnimDef AttackMove = { 12, 78,  false };
 	static constexpr AnimDef Magic      = { 15, 88,  false };

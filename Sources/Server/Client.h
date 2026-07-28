@@ -31,6 +31,19 @@ namespace hb::server::config { constexpr int ClientSocketBlockLimit = 2000; } //
 
 namespace hb::server::config { constexpr int SpecialAbilityTimeSec = 1200; }
 
+// True at most once per interval per counter, and always on the first call.
+// The log-only anti-cheat posture (spec §5) has no disconnect to bound how
+// often an offender reaches the security channel, so the checks count every
+// violation and let this decide which ones get a line. Stamps `last_log_time`
+// when it says yes.
+inline bool should_log_violation(uint32_t& last_log_time, uint32_t now, uint32_t interval_ms)
+{
+	if (last_log_time != 0 && (now - last_log_time) < interval_ms) return false;
+	last_log_time = now;
+	return true;
+}
+namespace hb::server::config { constexpr uint32_t ViolationLogIntervalMs = 5000; }
+
 class CClient  
 {
 public:
@@ -47,6 +60,18 @@ public:
 
 	// Hack Checkers
 	uint32_t m_magic_freq_time, m_move_freq_time, m_attack_freq_time;
+	// Whether the move `m_move_freq_time` was stamped for was a run. The gap the
+	// move check measures is the duration of that *previous* motion, so its
+	// legal floor has to come from it too — scoring a run's 312 ms gap against
+	// a walk floor would flag every player who stops running (spec §5).
+	bool m_was_running;
+	// Violation accounting for the log-only anti-cheat posture. A disconnect
+	// used to bound the log to one line per offender; log-only would otherwise
+	// emit one per offending packet for the whole session, and every line takes
+	// the global log mutex and flushes. Count everything, log occasionally —
+	// see should_log_violation.
+	uint32_t m_move_violations, m_move_violation_log_time;
+	uint32_t m_cast_violations, m_cast_violation_log_time;
 	bool m_is_move_blocked, m_magic_item;
 	uint32_t client_time;
 	bool m_magic_confirm;

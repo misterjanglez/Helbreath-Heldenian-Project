@@ -341,7 +341,7 @@ public:
 	//	void RequestTeleportD2Handler(int client_h, char * data);
 	
 	// Hack Checks
-	bool check_client_move_frequency(int client_h, uint32_t client_time);
+	bool check_client_move_frequency(int client_h, uint32_t client_time, bool is_running);
 
 	// bool bCheckClientInvisibility(short client_h);
 

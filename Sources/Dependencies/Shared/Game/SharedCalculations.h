@@ -159,4 +159,59 @@ inline int swing_time(int atk_delay_value)
 	return balance::swing_frames * (balance::base_frame_time + atk_delay_value * balance::delay_per_frame);
 }
 
+// ============================================================================
+// Movement Pacing (Item Tiers spec §5)
+// ============================================================================
+//
+// `move_speed_pct` throughout is the Marquee move-speed total the server
+// publishes on PlayerStatusData.
+
+// How long one walk/run frame takes for a player in a given state — the
+// client's animation math (MapData.cpp status-modifier block), where haste and
+// frozen adjust the *frame* additively.
+inline int move_frame_time(bool running, bool haste, bool frozen, int move_speed_pct)
+{
+	const int base = running ? balance::run_frame_time : balance::walk_frame_time;
+
+	int frame = base;
+	if (frozen) frame += base >> 2;
+	if (haste)  frame -= balance::haste_frame_bonus;
+
+	frame = frame * (100 - std::clamp(move_speed_pct, 0, 99)) / 100;
+	return std::max(frame, 1);
+}
+
+// How long the client interpolates the slide across one tile
+// (EntityMotion::get_duration_for_action), where haste and frozen scale the
+// whole *duration* multiplicatively.
+inline int move_interpolation_time(bool running, bool haste, bool frozen, int move_speed_pct)
+{
+	int duration = balance::move_frames * (running ? balance::run_frame_time : balance::walk_frame_time);
+	if (haste)  duration = duration * balance::haste_move_duration_pct / 100;
+	if (frozen) duration = duration * balance::frozen_move_duration_pct / 100;
+
+	duration = duration * (100 - std::clamp(move_speed_pct, 0, 99)) / 100;
+	return std::max(duration, 1);
+}
+
+// The fastest a legal client can cross one tile — the expected gap between two
+// consecutive move packets, and so the basis of the anti-cheat move floor.
+//
+// Two client paths release the next move command and a legal client uses
+// whichever fires first, so this is the faster of the two (Screen_OnGame.cpp):
+//   - animation completion — move_frames x the per-frame time;
+//   - quick-actions chaining — 95% of the interpolated tile duration.
+// The two models agree with no status effects and diverge under haste/frozen
+// (a hasted walk is 432 ms by frames but 372 ms by interpolation), so taking
+// the minimum is what keeps the floor below every legal cadence. Cycle 4-C
+// unifies the client onto one model, at which point the two terms collapse.
+inline int move_tile_time(bool running, bool haste, bool frozen, int move_speed_pct)
+{
+	const int animation_ms = balance::move_frames * move_frame_time(running, haste, frozen, move_speed_pct);
+	const int chained_ms = move_interpolation_time(running, haste, frozen, move_speed_pct)
+		* balance::quick_action_unlock_pct / 100;
+
+	return std::max(std::min(animation_ms, chained_ms), 1);
+}
+
 } // namespace hb::shared::calc

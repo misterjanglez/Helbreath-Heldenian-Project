@@ -5,25 +5,25 @@
 #define VER_CLIENT_MAJOR         0
 #define VER_CLIENT_MINOR         7
 #define VER_CLIENT_PATCH         5
-#define VER_CLIENT_BUILD         381
-#define VER_CLIENT_FILEVERSION   0,7,5,381
+#define VER_CLIENT_BUILD         382
+#define VER_CLIENT_FILEVERSION   0,7,5,382
 #define VER_CLIENT_DISPLAY       "0.7.5-alpha"
-#define VER_CLIENT_FULL          "0.7.5-alpha+build.381"
+#define VER_CLIENT_FULL          "0.7.5-alpha+build.382"
 
 // Server version
 #define VER_SERVER_MAJOR         0
 #define VER_SERVER_MINOR         10
-#define VER_SERVER_PATCH         0
-#define VER_SERVER_BUILD         267
-#define VER_SERVER_FILEVERSION   0,10,0,267
-#define VER_SERVER_DISPLAY       "0.10-alpha"
-#define VER_SERVER_FULL          "0.10.0-alpha+build.267"
+#define VER_SERVER_PATCH         1
+#define VER_SERVER_BUILD         268
+#define VER_SERVER_FILEVERSION   0,10,1,268
+#define VER_SERVER_DISPLAY       "0.10.1-alpha"
+#define VER_SERVER_FULL          "0.10.1-alpha+build.268"
 
 // Launcher version
 #define VER_LAUNCHER_MAJOR         0
 #define VER_LAUNCHER_MINOR         1
 #define VER_LAUNCHER_PATCH         0
-#define VER_LAUNCHER_BUILD         14
-#define VER_LAUNCHER_FILEVERSION   0,1,0,14
+#define VER_LAUNCHER_BUILD         15
+#define VER_LAUNCHER_FILEVERSION   0,1,0,15
 #define VER_LAUNCHER_DISPLAY       "0.1-alpha"
-#define VER_LAUNCHER_FULL          "0.1.0-alpha+build.14"
+#define VER_LAUNCHER_FULL          "0.1.0-alpha+build.15"

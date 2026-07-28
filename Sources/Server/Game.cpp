@@ -1424,7 +1424,7 @@ void CGame::client_motion_handler(int client_h, char* data)
 		else if (ret == 2) send_object_motion_reject_msg(client_h);
 		if ((m_client_list[client_h] != 0) && (m_client_list[client_h]->m_hp <= 0)) m_combat_manager->client_killed_handler(client_h, 0, 0, 1); // v1.4
 		// v2.171
-		check_client_move_frequency(client_h, client_time);
+		check_client_move_frequency(client_h, client_time, true);
 		break;
 
 	case Type::Move:
@@ -1435,7 +1435,7 @@ void CGame::client_motion_handler(int client_h, char* data)
 		else if (ret == 2) send_object_motion_reject_msg(client_h);
 		if ((m_client_list[client_h] != 0) && (m_client_list[client_h]->m_hp <= 0)) m_combat_manager->client_killed_handler(client_h, 0, 0, 1); // v1.4
 		// v2.171
-		check_client_move_frequency(client_h, client_time);
+		check_client_move_frequency(client_h, client_time, false);
 		break;
 
 	case Type::DamageMove:
@@ -12153,11 +12153,22 @@ void CGame::request_resurrect_player(int client_h, bool resurrect)
 	request_teleport_handler(client_h, "2   ", m_client_list[client_h]->m_map_name, m_client_list[client_h]->m_x, m_client_list[client_h]->m_y);
 }
 
-bool CGame::check_client_move_frequency(int client_h, uint32_t client_time)
+// The legal gap between two move packets is per-player, not a constant: haste,
+// frozen and Marquee move-speed gear all change how fast the client legitimately
+// crosses a tile, so the floor is the client's own expected tile time with a
+// grace margin (spec §5). The old flat 200 ms disconnected any hasted runner
+// (8 x 23 = 184 ms per tile) and let a 20%-speed walker cheat by half a tile.
+// Posture is a tier_settings knob; at launch this logs and never disconnects.
+bool CGame::check_client_move_frequency(int client_h, uint32_t client_time, bool is_running)
 {
 	uint32_t time_gap;
 
 	if (m_client_list[client_h] == 0) return false;
+
+	// Stamped for the motion just performed — the *next* call measures its
+	// duration and needs to know which pacing to score it against.
+	const bool was_running = m_client_list[client_h]->m_was_running;
+	m_client_list[client_h]->m_was_running = is_running;
 
 	if (m_client_list[client_h]->m_move_freq_time == 0)
 		m_client_list[client_h]->m_move_freq_time = client_time;
@@ -12177,21 +12188,39 @@ bool CGame::check_client_move_frequency(int client_h, uint32_t client_time)
 		time_gap = client_time - m_client_list[client_h]->m_move_freq_time;
 		m_client_list[client_h]->m_move_freq_time = client_time;
 
-		if ((time_gap < 200) && (time_gap >= 0)) {
+		const auto& status = m_client_list[client_h]->m_status;
+		const int tile_time = hb::shared::calc::move_tile_time(was_running,
+			status.haste, status.frozen, status.move_speed_pct);
+		const int move_floor_ms = tile_time * get_tier_config().anticheat.move_grace_pct / 100;
+
+		if (time_gap < static_cast<uint32_t>(move_floor_ms)) {
 			try
 			{
-				hb::logger::warn<log_channel::security>("Speed hack: IP={} player={}, running too fast", m_client_list[client_h]->m_ip_address, m_client_list[client_h]->m_char_name);
-				delete_client(client_h, true, true);
+				m_client_list[client_h]->m_move_violations++;
+
+				// Under log-only posture a persistent offender trips this on
+				// every move packet — the count carries the rate, the throttle
+				// keeps the security channel readable. A disconnect is a
+				// one-off, so it always logs.
+				const bool disconnecting = get_tier_config().anticheat.move_check_disconnects;
+				if (disconnecting || should_log_violation(m_client_list[client_h]->m_move_violation_log_time,
+					GameClock::GetTimeMS(), hb::server::config::ViolationLogIntervalMs))
+				{
+					hb::logger::warn<log_channel::security>("Speed move: IP={} player={}, {} gap {} ms below floor {} ms (tile {} ms, move speed {}%{}{}) [violation {}]",
+						m_client_list[client_h]->m_ip_address, m_client_list[client_h]->m_char_name,
+						was_running ? "run" : "walk", time_gap, move_floor_ms, tile_time,
+						(int)status.move_speed_pct, status.haste ? ", haste" : "", status.frozen ? ", frozen" : "",
+						m_client_list[client_h]->m_move_violations);
+				}
+
+				if (disconnecting)
+					delete_client(client_h, true, true);
 			}
 			catch (...)
 			{
 			}
 			return false;
 		}
-
-		// testcode
-		// std::snprintf(G_cTxt, sizeof(G_cTxt), "Move: %d", time_gap);
-		// PutLogList(G_cTxt);
 	}
 
 	return false;

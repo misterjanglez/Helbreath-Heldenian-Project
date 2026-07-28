@@ -66,6 +66,27 @@ const CItem* ordinary_tier_gear(const tier_validation_context& context, int item
 	return item;
 }
 
+// Anti-cheat knobs (spec §5), both modes — the move and cast checks run
+// against every world. A typo'd posture would silently fall back to the code
+// default, so it is an error here rather than a quiet mismatch between what
+// the DB says and what the server does. A grace of 0 would make every legal
+// move a violation; above 100 the floor exceeds the client's own pacing and
+// every legal move is a violation too.
+void check_anticheat_settings(const tier_config& config, validation_state& v)
+{
+	for (const char* key : { "posture_move", "posture_cast" })
+	{
+		auto it = config.settings.find(key);
+		if (it == config.settings.end()) continue;
+		if (tier_config::parse_posture(it->second)) continue;
+		v.add("tier_settings {}: '{}' is not a posture (expected 'log' or 'disconnect')", key, it->second);
+	}
+
+	if (config.anticheat.move_grace_pct < 1 || config.anticheat.move_grace_pct > 100)
+		v.add("tier_settings move_grace_pct: {} outside 1..100 (the floor is a fraction of the expected tile time)",
+			config.anticheat.move_grace_pct);
+}
+
 void check_buckets(const tier_config& config, validation_state& v)
 {
 	std::set<uint8_t> seen;
@@ -538,6 +559,7 @@ std::vector<std::string> validate_tier_config(const tier_config& config,
 	// dataset errors here — the rows exist in the DB but not in the model.
 	validation_state v{ config.load_anomalies };
 
+	check_anticheat_settings(config, v);
 	check_buckets(config, v);
 	check_catalog(config, v);
 	check_eligibility(config, v);

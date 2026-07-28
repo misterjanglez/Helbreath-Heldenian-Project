@@ -190,6 +190,17 @@ struct tier_config
 		int cast_check_floor_ms = 1500;
 	} marquee;
 
+	// Anti-cheat posture + floors (spec §5). Posture is data so escalating a
+	// check from log-only to disconnect is a `reload tiers` away, not a build —
+	// which is the whole point of launching log-only: the floors get proven
+	// against live data first. Launch defaults mirror the seeded rows.
+	struct anticheat_settings_config
+	{
+		int  move_grace_pct = 85;             // legal floor = expected tile time x this
+		bool move_check_disconnects = false;  // posture_move
+		bool cast_check_disconnects = false;  // posture_cast
+	} anticheat;
+
 	// Legacy pools (consumed by the legacy Roll strategy, Tiers 2-C). The
 	// per-item pool assignment lives on CItem (items.attribute_pool_id via
 	// LoadItemConfigs) so `reload items` keeps item data and pool ids in step.
@@ -209,6 +220,15 @@ struct tier_config
 	// or unparseable. The 2-D validator refuses an empty tier_settings table in
 	// tiered mode, so the fallback only covers legacy-mode worlds and live edits.
 	int setting_int(const std::string& key, int fallback) const;
+
+	// A posture row: true for "disconnect", false for "log". Any other value
+	// keeps `fallback` — the validator is what reports the typo, so a bad row
+	// never silently arms a disconnect.
+	bool setting_disconnects(const std::string& key, bool fallback) const;
+
+	// The posture vocabulary, owned here so the loader and the validator
+	// cannot disagree about what a legal value is. Empty for anything else.
+	static std::optional<bool> parse_posture(const std::string& value);
 
 	const modifier_catalog_config* find_modifier(uint8_t modifier_id) const;
 	const attribute_pool_config* find_attribute_pool(int pool_id) const;
