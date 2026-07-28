@@ -306,7 +306,9 @@ namespace ItemId
     constexpr short GuildSecessionTicket = 89;
     constexpr short Gold = 90;
     constexpr short MagicWandMShield = 259;
+    constexpr short FlamebergePlus3LLF = 290;
     constexpr short MagicWandMS30LLF = 291;
+    constexpr short GoldenAxeLLF = 292;
     constexpr short MagicNecklaceRM10 = 300;
     constexpr short MagicNecklaceDMp1 = 305;
     constexpr short MagicNecklaceMS10 = 308;
@@ -348,6 +350,7 @@ namespace ItemId
     constexpr short RingofArcmage = 734;
     constexpr short RingofDragonpower = 735;
     constexpr short ZemstoneofSacrifice = 753;
+    constexpr short GiantBattleHammer = 762;
     constexpr short StormBringer = 845;
     constexpr short KlonessBlade = 849;
     constexpr short KlonessAxe = 850;
@@ -366,9 +369,11 @@ namespace ItemId
     constexpr short AcientTabletLD = 869;
     constexpr short AcientTabletRU = 870;
     constexpr short AcientTabletRD = 871;
-    constexpr short DarkExecutor = 879;
-    constexpr short TheDevastator = 880;
-    constexpr short LightingBlade = 881;
+    // 846-848 in item data; the old 879/880/881 values pointed at summon
+    // scrolls and an armor dye (fixed in Tiers 2-E)
+    constexpr short TheDevastator = 846;
+    constexpr short DarkExecutor = 847;
+    constexpr short LightingBlade = 848;
     constexpr short MagicNecklaceDFp15 = 1086;
     constexpr short MagicNecklaceRM30 = 1101;
     constexpr short AngelicPendantSTR = 1108;
@@ -452,6 +457,9 @@ inline bool is_special_item(short i_dnum)
     case ItemId::RingofArcmage:
     case ItemId::RingofDragonpower:
     case ItemId::ZemstoneofSacrifice:
+    case ItemId::FlamebergePlus3LLF:
+    case ItemId::GoldenAxeLLF:
+    case ItemId::GiantBattleHammer:
     case ItemId::StormBringer:
     case ItemId::KlonessBlade:
     case ItemId::KlonessAxe:

@@ -2090,7 +2090,7 @@ bool CombatManager::calculate_durability_decrement(short target_h, short attacke
 						if (m_game->m_client_list[attacker_h]->m_item_list[item_index]->m_id_num == 761) { // BattleHammer
 							down_value = 30;
 						}
-						if (m_game->m_client_list[attacker_h]->m_item_list[item_index]->m_id_num == 762) { // GiantBattleHammer
+						if (m_game->m_client_list[attacker_h]->m_item_list[item_index]->m_id_num == hb::shared::item::ItemId::GiantBattleHammer) {
 							down_value = 35;
 						}
 						if (m_game->m_client_list[attacker_h]->m_item_list[item_index]->m_id_num == 843) { // BarbarianHammer
@@ -2150,7 +2150,7 @@ bool CombatManager::calculate_durability_decrement(short target_h, short attacke
 				if (m_game->m_client_list[attacker_h]->m_item_list[item_index]->m_id_num == 761) { // BattleHammer
 					hammer_chance -= hammer_chance >> 1;
 				}
-				if (m_game->m_client_list[attacker_h]->m_item_list[item_index]->m_id_num == 762) { // GiantBattleHammer
+				if (m_game->m_client_list[attacker_h]->m_item_list[item_index]->m_id_num == hb::shared::item::ItemId::GiantBattleHammer) {
 					hammer_chance = (((hammer_chance * 5) + 7) >> 3);
 				}
 				if (m_game->m_client_list[attacker_h]->m_item_list[item_index]->m_id_num == 843) { // BarbarianHammer

@@ -13483,7 +13483,7 @@ void CGame::party_operation(char* data)
 								down_value = 30;
 								break;
 							}
-							if (m_client_list[attacker_h]->m_item_list[item_index]->m_id_num == 762) { // GiantBattleHammer
+							if (m_client_list[attacker_h]->m_item_list[item_index]->m_id_num == hb::shared::item::ItemId::GiantBattleHammer) {
 								down_value = 35;
 								break;
 							}
@@ -13491,7 +13491,7 @@ void CGame::party_operation(char* data)
 								down_value = 30;
 								break;
 							}
-							if (m_client_list[attacker_h]->m_item_list[item_index]->m_id_num == 745) { // BarbarianHammer
+							if (m_client_list[attacker_h]->m_item_list[item_index]->m_id_num == 745) { // Dark Knight Templar sword
 								down_value = 30;
 								break;
 							}
@@ -13552,13 +13552,13 @@ void CGame::party_operation(char* data)
 					if (m_client_list[attacker_h]->m_item_list[item_index]->m_id_num == 761) { // BattleHammer
 						hammer_chance = hammer_chance/2;
 					}
-					if (m_client_list[attacker_h]->m_item_list[item_index]->m_id_num == 762) { // GiantBattleHammer
+					if (m_client_list[attacker_h]->m_item_list[item_index]->m_id_num == hb::shared::item::ItemId::GiantBattleHammer) {
 						hammer_chance = ((hammer_chance*10)/9);
 					}
-					if (m_client_list[attacker_h]->m_item_list[item_index]->m_id_num == 843) { // GiantBattleHammer
+					if (m_client_list[attacker_h]->m_item_list[item_index]->m_id_num == 843) { // Barbarian Hammer
 						hammer_chance = ((hammer_chance*10)/9);
 					}
-					if (m_client_list[attacker_h]->m_item_list[item_index]->m_id_num == 745) { // GiantBattleHammer
+					if (m_client_list[attacker_h]->m_item_list[item_index]->m_id_num == 745) { // Dark Knight Templar sword
 						hammer_chance = ((hammer_chance*10)/9);
 					}
 				}
