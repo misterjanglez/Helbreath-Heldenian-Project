@@ -1328,7 +1328,7 @@ void CombatManager::effect_hp_up_spot(short attacker_h, char attacker_type, shor
 	case hb::shared::owner_class::Player:
 		if (m_game->m_client_list[target_h] == 0) return;
 		if (m_game->m_client_list[target_h]->m_is_killed) return;
-		max_hp = (3 * m_game->m_client_list[target_h]->m_vit) + (2 * m_game->m_client_list[target_h]->m_level) + ((m_game->m_client_list[target_h]->m_str + m_game->m_client_list[target_h]->m_angelic_str) / 2);
+		max_hp = (3 * m_game->m_client_list[target_h]->effective_vit()) + (2 * m_game->m_client_list[target_h]->m_level) + ((m_game->m_client_list[target_h]->effective_str() + m_game->m_client_list[target_h]->m_angelic_str) / 2);
 		if (m_game->m_client_list[target_h]->m_side_effect_max_hp_down != 0)
 			max_hp = max_hp - (max_hp / m_game->m_client_list[target_h]->m_side_effect_max_hp_down);
 		if (m_game->m_client_list[target_h]->m_hp < max_hp) {
@@ -1372,7 +1372,7 @@ void CombatManager::effect_sp_down_spot(short attacker_h, char attacker_type, sh
 		// Is the user having an invincibility slate
 		if (m_game->m_client_list[target_h]->m_status.slate_invincible) return;
 
-		max_sp = (2 * (m_game->m_client_list[target_h]->m_str + m_game->m_client_list[target_h]->m_angelic_str)) + (2 * m_game->m_client_list[target_h]->m_level);
+		max_sp = (2 * (m_game->m_client_list[target_h]->effective_str() + m_game->m_client_list[target_h]->m_angelic_str)) + (2 * m_game->m_client_list[target_h]->m_level);
 		if (m_game->m_client_list[target_h]->m_sp > 0) {
 
 			//v1.42 
@@ -1405,7 +1405,7 @@ void CombatManager::effect_sp_up_spot(short attacker_h, char attacker_type, shor
 		if (m_game->m_client_list[target_h] == 0) return;
 		if (m_game->m_client_list[target_h]->m_is_killed) return;
 
-		max_sp = (2 * (m_game->m_client_list[target_h]->m_str + m_game->m_client_list[target_h]->m_angelic_str)) + (2 * m_game->m_client_list[target_h]->m_level);
+		max_sp = (2 * (m_game->m_client_list[target_h]->effective_str() + m_game->m_client_list[target_h]->m_angelic_str)) + (2 * m_game->m_client_list[target_h]->m_level);
 		if (m_game->m_client_list[target_h]->m_sp < max_sp) {
 			m_game->m_client_list[target_h]->m_sp += sp;
 
@@ -2247,7 +2247,7 @@ uint32_t CombatManager::calculate_attack_effect(short target_h, char target_type
 		attacker_side = m_game->m_client_list[attacker_h]->m_side;
 
 		if (wc == weapon_class::none) {
-			iAP_SM = iAP_L = m_game->dice(1, ((m_game->m_client_list[attacker_h]->m_str + m_game->m_client_list[attacker_h]->m_angelic_str) / 12));
+			iAP_SM = iAP_L = m_game->dice(1, ((m_game->m_client_list[attacker_h]->effective_str() + m_game->m_client_list[attacker_h]->m_angelic_str) / 12));
 			if (iAP_SM <= 0) iAP_SM = 1;
 			if (iAP_L <= 0) iAP_L = 1;
 			attacker_hit_ratio = m_game->m_client_list[attacker_h]->m_hit_ratio + m_game->m_client_list[attacker_h]->m_skill_mastery[5];
@@ -2264,14 +2264,14 @@ uint32_t CombatManager::calculate_attack_effect(short target_h, char target_type
 			attacker_hit_ratio = m_game->m_client_list[attacker_h]->m_hit_ratio;
 
 			tmp1 = (double)iAP_SM;
-			tmp2 = (double)(m_game->m_client_list[attacker_h]->m_str + m_game->m_client_list[attacker_h]->m_angelic_str);
+			tmp2 = (double)(m_game->m_client_list[attacker_h]->effective_str() + m_game->m_client_list[attacker_h]->m_angelic_str);
 
 			tmp2 = tmp2 / 5.0f;
 			tmp3 = tmp1 + (tmp1 * (tmp2 / 100.0f));
 			iAP_SM = (int)(tmp3 + 0.5f);
 
 			tmp1 = (double)iAP_L;
-			tmp2 = (double)(m_game->m_client_list[attacker_h]->m_str + m_game->m_client_list[attacker_h]->m_angelic_str);
+			tmp2 = (double)(m_game->m_client_list[attacker_h]->effective_str() + m_game->m_client_list[attacker_h]->m_angelic_str);
 
 			tmp2 = tmp2 / 5.0f;
 			tmp3 = tmp1 + (tmp1 * (tmp2 / 100.0f));
@@ -2287,8 +2287,8 @@ uint32_t CombatManager::calculate_attack_effect(short target_h, char target_type
 			attacker_hit_ratio = m_game->m_client_list[attacker_h]->m_hit_ratio;
 			normal_missile_attack = true;
 
-			iAP_SM += m_game->dice(1, ((m_game->m_client_list[attacker_h]->m_str + m_game->m_client_list[attacker_h]->m_angelic_str) / 20));
-			iAP_L += m_game->dice(1, ((m_game->m_client_list[attacker_h]->m_str + m_game->m_client_list[attacker_h]->m_angelic_str) / 20));
+			iAP_SM += m_game->dice(1, ((m_game->m_client_list[attacker_h]->effective_str() + m_game->m_client_list[attacker_h]->m_angelic_str) / 20));
+			iAP_L += m_game->dice(1, ((m_game->m_client_list[attacker_h]->effective_str() + m_game->m_client_list[attacker_h]->m_angelic_str) / 20));
 		}
 
 		attacker_hit_ratio += 50;

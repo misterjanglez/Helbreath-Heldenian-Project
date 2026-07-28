@@ -27,9 +27,20 @@ public:
 	bool init_item_attr(CItem* item, int item_id);
 	void reload_item_configs();
 
-	// Recomputes derived stats (weight/durability/price) from an item's
-	// rolled attributes; shared by the roll and the DB-load repair paths.
-	void adjust_rare_item_value(CItem* item);
+	// Recomputes the item's max durability from its rolled Strong/Ancient
+	// lines (spec §4.5). Callers set the durability baseline immediately
+	// before calling — init_item_attr from item config, or the custom-made
+	// override from special_effect_value1 — so this is idempotent as used and
+	// never accumulates. Weight and swing speed are read-time derivations on
+	// CItem instead; only durability needs the value materialized on the item
+	// (cur_durability is persisted and clamped against it).
+	void apply_modifier_derived_stats(CItem* item);
+
+	// Display scale of a catalog modifier (display = stored value x this), 1
+	// when the modifier has no row. The modifier catalog is the one multiplier
+	// source — the legacy m_modifier_multiplier[] lookup covers only the two
+	// legacy attribute tables and is dormant data in tiered mode.
+	int modifier_multiplier(uint8_t modifier_id) const;
 
 	// Inventory management
 	bool add_item(int client_h, CItem* item, char mode);

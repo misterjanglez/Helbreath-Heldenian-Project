@@ -121,6 +121,24 @@ public:
 	int  m_level;
 	int  m_str, m_int, m_vit, m_dex, m_mag, m_charisma;
 	// char m_cLU_Str, m_cLU_Int, m_cLU_Vit, m_cLU_Dex, m_cLU_Mag, m_cLU_Char;   //  ?  .
+
+	// Attribute-ladder totals from equipped gear (Item Tiers spec §4, the
+	// ATTRIBUTES bucket), recomputed by calc_total_item_effect and already
+	// clamped at the per-attribute aggregate cap. Keyed by tier_attribute so
+	// the recalc can fill it in a loop — six named members invited a silently
+	// transposed index. The base m_str family stays the character's own stats:
+	// creation, level-up and persistence read those and must never see gear.
+	// Gameplay reads effective_*() below.
+	int  m_add_attribute[hb::shared::item::tier_attribute::charisma + 1];
+
+	// Base + gear. Angelic bonuses stay their own additive channel, added at
+	// the sites that already add them, exactly as before.
+	int effective_str() const      { return m_str + m_add_attribute[hb::shared::item::tier_attribute::strength]; }
+	int effective_int() const      { return m_int + m_add_attribute[hb::shared::item::tier_attribute::intelligence]; }
+	int effective_vit() const      { return m_vit + m_add_attribute[hb::shared::item::tier_attribute::vitality]; }
+	int effective_dex() const      { return m_dex + m_add_attribute[hb::shared::item::tier_attribute::dexterity]; }
+	int effective_mag() const      { return m_mag + m_add_attribute[hb::shared::item::tier_attribute::magic]; }
+	int effective_charisma() const { return m_charisma + m_add_attribute[hb::shared::item::tier_attribute::charisma]; }
 	int  m_luck; 
 	int  m_levelup_pool;
 	char m_aura;

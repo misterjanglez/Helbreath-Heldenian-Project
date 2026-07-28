@@ -209,7 +209,7 @@ void SkillManager::calculate_ssn_skill_index(int client_h, short skill_index, in
 		case 4:
 		case 18: // Crafting
 		case 21:
-			if (m_game->m_client_list[client_h]->m_skill_mastery[skill_index] > ((m_game->m_client_list[client_h]->m_mag + m_game->m_client_list[client_h]->m_angelic_mag) * 2)) {
+			if (m_game->m_client_list[client_h]->m_skill_mastery[skill_index] > ((m_game->m_client_list[client_h]->effective_mag() + m_game->m_client_list[client_h]->m_angelic_mag) * 2)) {
 				m_game->m_client_list[client_h]->m_skill_mastery[skill_index]--;
 				m_game->m_client_list[client_h]->m_skill_progress[skill_index] = old_ssn;
 			}
@@ -223,7 +223,7 @@ void SkillManager::calculate_ssn_skill_index(int client_h, short skill_index, in
 		case 9:
 		case 10:
 		case 11:
-			if (m_game->m_client_list[client_h]->m_skill_mastery[skill_index] > ((m_game->m_client_list[client_h]->m_dex + m_game->m_client_list[client_h]->m_angelic_dex) * 2)) {
+			if (m_game->m_client_list[client_h]->m_skill_mastery[skill_index] > ((m_game->m_client_list[client_h]->effective_dex() + m_game->m_client_list[client_h]->m_angelic_dex) * 2)) {
 				m_game->m_client_list[client_h]->m_skill_mastery[skill_index]--;
 				m_game->m_client_list[client_h]->m_skill_progress[skill_index] = old_ssn;
 			}
@@ -236,7 +236,7 @@ void SkillManager::calculate_ssn_skill_index(int client_h, short skill_index, in
 		case 15:
 		case 19:
 		case 20: // Enchanting
-			if (m_game->m_client_list[client_h]->m_skill_mastery[skill_index] > ((m_game->m_client_list[client_h]->m_int + m_game->m_client_list[client_h]->m_angelic_int) * 2)) {
+			if (m_game->m_client_list[client_h]->m_skill_mastery[skill_index] > ((m_game->m_client_list[client_h]->effective_int() + m_game->m_client_list[client_h]->m_angelic_int) * 2)) {
 				m_game->m_client_list[client_h]->m_skill_mastery[skill_index]--;
 				m_game->m_client_list[client_h]->m_skill_progress[skill_index] = old_ssn;
 			}

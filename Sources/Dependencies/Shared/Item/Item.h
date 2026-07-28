@@ -356,21 +356,66 @@ public:
         return parse_dice(m_item_effect_value1, m_item_effect_value2, m_item_effect_value3);
     }
 
-    // Light attribute percentage — prefix_value is already the actual percentage
-    int get_light_percent() const
+    //------------------------------------------------------------------------
+    // Derived stats (Item Tiers §4.5 — stat-touchers compute from modifier
+    // data; the roll never mutates the item's stored stats)
+    //
+    // Light and Agile are read-time derivations: base config value in,
+    // modifier-adjusted value out, idempotent by construction. Callers pass
+    // the modifier's catalog multiplier because only they own a catalog
+    // (server m_modifier_multiplier[], client m_modifier_catalog[]) — the
+    // stored roll value is in multiplier units, display units are value x it.
+    //
+    // Strong/Ancient max durability is NOT here: cur_durability is persisted
+    // and clamped against the max, and creation/repair set cur = max, so the
+    // effective max has to exist on the item before anything reads it. The
+    // server recomputes m_durability from the config baseline at every
+    // materialization point instead (ItemManager::apply_modifier_derived_stats).
+    //------------------------------------------------------------------------
+
+    // Stored roll value of a modifier this item carries, 0 if it has none.
+    uint8_t get_modifier_value(uint8_t modifier_id) const
     {
-        if (get_prefix_type() == hb::shared::item::modifier_id::light)
-            return get_prefix_value();
-        return 0;
+        return m_instance.attributes.modifier_value(modifier_id);
     }
 
-    // Weight adjusted for light attribute
-    int get_effective_weight() const
+    bool has_modifier(uint8_t modifier_id) const
     {
-        int light = get_light_percent();
-        if (light > 0)
-            return static_cast<int>(m_weight) * (100 - light) / 100;
-        return m_weight;
+        return m_instance.attributes.has_modifier(modifier_id);
+    }
+
+    // Light weight reduction in percent, capped at 100 so a data edit can
+    // never invert the weight.
+    int get_light_percent(int light_multiplier) const
+    {
+        int percent = get_modifier_value(hb::shared::item::modifier_id::light) * light_multiplier;
+        return percent < 100 ? percent : 100;
+    }
+
+    // The one Light reduction formula. Callers that already hold a base weight
+    // (the client reads it from the item config rather than the instance) use
+    // this directly; get_effective_weight is the instance-bound form.
+    static inline constexpr int apply_light_reduction(int base_weight, int light_percent)
+    {
+        if (light_percent <= 0) return base_weight;
+        return base_weight * (100 - light_percent) / 100;
+    }
+
+    // Weight after the Light reduction — the value every weight gate and
+    // carry-load sum must use.
+    int get_effective_weight(int light_multiplier) const
+    {
+        return apply_light_reduction(m_weight, get_light_percent(light_multiplier));
+    }
+
+    // Swing speed after Agile. Agile is a value-less flag (catalog multiplier
+    // 0, band 0..0) worth a flat -1, retail-faithful per spec §6.
+    int get_effective_swing_speed() const
+    {
+        int speed = m_swing_speed;
+        if (has_modifier(hb::shared::item::modifier_id::agile))
+            --speed;
+        return speed > 0 ? speed : 0;
     }
 
     // Total weight for a stack of items (effective_weight * count), 0 for zero-weight items

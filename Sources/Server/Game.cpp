@@ -2253,7 +2253,7 @@ void CGame::request_init_data_handler(int client_h, char* data, char key, size_t
 		send_notify_msg(0, client_h, Notify::Crusade, (uint32_t)m_is_crusade_mode, m_client_list[client_h]->m_crusade_duty, 0, 0);
 	}
 	else if (m_is_heldenian_mode) {
-		summon_points = m_client_list[client_h]->m_charisma * 300;
+		summon_points = m_client_list[client_h]->effective_charisma() * 300;
 		if (summon_points > m_max_summon_points) summon_points = m_max_summon_points;
 		if (m_client_list[client_h]->m_heldenian_guid == 0) {
 			m_client_list[client_h]->m_heldenian_guid = m_heldenian_guid;
@@ -4620,7 +4620,7 @@ bool CGame::load_player_data_from_db(int client_h)
 		if (m_client_list[client_h]->m_item_list[item.slot]->is_custom_made()) {
 			m_client_list[client_h]->m_item_list[item.slot]->m_durability = m_client_list[client_h]->m_item_list[item.slot]->m_instance.special_effect_value1;
 		}
-		m_item_manager->adjust_rare_item_value(m_client_list[client_h]->m_item_list[item.slot]);
+		m_item_manager->apply_modifier_derived_stats(m_client_list[client_h]->m_item_list[item.slot]);
 		if (m_client_list[client_h]->m_item_list[item.slot]->m_instance.cur_durability > m_client_list[client_h]->m_item_list[item.slot]->m_durability) {
 			m_client_list[client_h]->m_item_list[item.slot]->m_instance.cur_durability = m_client_list[client_h]->m_item_list[item.slot]->m_durability;
 		}
@@ -4660,7 +4660,7 @@ bool CGame::load_player_data_from_db(int client_h)
 		if (m_client_list[client_h]->m_item_in_bank_list[item.slot]->is_custom_made()) {
 			m_client_list[client_h]->m_item_in_bank_list[item.slot]->m_durability = m_client_list[client_h]->m_item_in_bank_list[item.slot]->m_instance.special_effect_value1;
 		}
-		m_item_manager->adjust_rare_item_value(m_client_list[client_h]->m_item_in_bank_list[item.slot]);
+		m_item_manager->apply_modifier_derived_stats(m_client_list[client_h]->m_item_in_bank_list[item.slot]);
 		if (m_client_list[client_h]->m_item_in_bank_list[item.slot]->m_instance.cur_durability > m_client_list[client_h]->m_item_in_bank_list[item.slot]->m_durability) {
 			m_client_list[client_h]->m_item_in_bank_list[item.slot]->m_instance.cur_durability = m_client_list[client_h]->m_item_in_bank_list[item.slot]->m_durability;
 		}
@@ -6695,7 +6695,7 @@ void CGame::client_common_handler(int client_h, char* data)
 			item->set_prefix(prefix_type, prefix_value);
 			item->set_secondary(secondary_type, secondary_value);
 			item->set_enchant_bonus(enchant_bonus);
-			m_item_manager->adjust_rare_item_value(item);
+			m_item_manager->apply_modifier_derived_stats(item);
 
 			// Set item color based on prefix type — unified palette weapon indices (16-21)
 			switch (item->get_prefix_type())
@@ -9154,7 +9154,7 @@ void CGame::request_teleport_handler(int client_h, const char* data, const char*
 		send_notify_msg(0, client_h, Notify::Crusade, (uint32_t)m_is_crusade_mode, m_client_list[client_h]->m_crusade_duty, 0, 0);
 	}
 	else if (m_is_heldenian_mode) {
-		summon_points = m_client_list[client_h]->m_charisma * 300;
+		summon_points = m_client_list[client_h]->effective_charisma() * 300;
 		if (summon_points > m_max_summon_points) summon_points = m_max_summon_points;
 		if (m_client_list[client_h]->m_heldenian_guid == 0) {
 			m_client_list[client_h]->m_heldenian_guid = m_heldenian_guid;
@@ -9649,8 +9649,8 @@ void CGame::level_up_settings_handler(int client_h, char* data, size_t msg_size)
 	if (weapon_index != -1 && m_client_list[client_h]->m_item_list[weapon_index] != nullptr)
 	{
 		m_client_list[client_h]->m_status.attack_delay = static_cast<uint8_t>(hb::shared::calc::attack_delay(
-			m_client_list[client_h]->m_item_list[weapon_index]->m_swing_speed,
-			m_client_list[client_h]->m_str,
+			m_client_list[client_h]->m_item_list[weapon_index]->get_effective_swing_speed(),
+			m_client_list[client_h]->effective_str(),
 			m_client_list[client_h]->m_angelic_str));
 	}
 
@@ -9729,7 +9729,7 @@ int CGame::calc_max_load(int client_h)
 	if (m_client_list[client_h] == 0) return 0;
 
 	return hb::shared::calc::max_load(m_formula_engine,
-		hb::shared::calc::str{(double)m_client_list[client_h]->m_str},
+		hb::shared::calc::str{(double)m_client_list[client_h]->effective_str()},
 		hb::shared::calc::angelic_str{(double)m_client_list[client_h]->m_angelic_str},
 		hb::shared::calc::level{(double)m_client_list[client_h]->m_level})
 		* hb::shared::balance::weight_units_per_stone;
@@ -10791,9 +10791,9 @@ int CGame::get_max_hp(int client_h)
 	if (m_client_list[client_h] == 0) return 0;
 
 	int ret = hb::shared::calc::max_hp(m_formula_engine,
-		hb::shared::calc::vit{(double)m_client_list[client_h]->m_vit},
+		hb::shared::calc::vit{(double)m_client_list[client_h]->effective_vit()},
 		hb::shared::calc::level{(double)m_client_list[client_h]->m_level},
-		hb::shared::calc::str{(double)m_client_list[client_h]->m_str},
+		hb::shared::calc::str{(double)m_client_list[client_h]->effective_str()},
 		hb::shared::calc::angelic_str{(double)m_client_list[client_h]->m_angelic_str});
 
 	// Apply side effect reduction if active
@@ -10808,10 +10808,10 @@ int CGame::get_max_mp(int client_h)
 	if (m_client_list[client_h] == 0) return 0;
 
 	return hb::shared::calc::max_mp(m_formula_engine,
-		hb::shared::calc::mag{(double)m_client_list[client_h]->m_mag},
+		hb::shared::calc::mag{(double)m_client_list[client_h]->effective_mag()},
 		hb::shared::calc::angelic_mag{(double)m_client_list[client_h]->m_angelic_mag},
 		hb::shared::calc::level{(double)m_client_list[client_h]->m_level},
-		hb::shared::calc::intel{(double)m_client_list[client_h]->m_int},
+		hb::shared::calc::intel{(double)m_client_list[client_h]->effective_int()},
 		hb::shared::calc::angelic_int{(double)m_client_list[client_h]->m_angelic_int});
 }
 
@@ -10820,7 +10820,7 @@ int CGame::get_max_sp(int client_h)
 	if (m_client_list[client_h] == 0) return 0;
 
 	return hb::shared::calc::max_sp(m_formula_engine,
-		hb::shared::calc::str{(double)m_client_list[client_h]->m_str},
+		hb::shared::calc::str{(double)m_client_list[client_h]->effective_str()},
 		hb::shared::calc::angelic_str{(double)m_client_list[client_h]->m_angelic_str},
 		hb::shared::calc::level{(double)m_client_list[client_h]->m_level});
 }

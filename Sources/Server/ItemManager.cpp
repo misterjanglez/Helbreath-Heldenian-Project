@@ -624,7 +624,7 @@ bool ItemManager::equip_item_handler(int client_h, short item_index, bool notify
 		}
 	}
 
-	if (get_item_weight(m_game->m_client_list[client_h]->m_item_list[item_index], 1) > (m_game->m_client_list[client_h]->m_str + m_game->m_client_list[client_h]->m_angelic_str) * hb::shared::balance::weight_units_per_stone) return false;
+	if (get_item_weight(m_game->m_client_list[client_h]->m_item_list[item_index], 1) > (m_game->m_client_list[client_h]->effective_str() + m_game->m_client_list[client_h]->m_angelic_str) * hb::shared::balance::weight_units_per_stone) return false;
 
 	equip_pos = m_game->m_client_list[client_h]->m_item_list[item_index]->get_equip_pos();
 
@@ -632,7 +632,7 @@ bool ItemManager::equip_item_handler(int client_h, short item_index, bool notify
 		(equip_pos == EquipPos::Arms) || (equip_pos == EquipPos::Head)) {
 		switch (m_game->m_client_list[client_h]->m_item_list[item_index]->m_item_effect_value4) {
 		case 10: // Str
-			if ((m_game->m_client_list[client_h]->m_str + m_game->m_client_list[client_h]->m_angelic_str) < m_game->m_client_list[client_h]->m_item_list[item_index]->m_item_effect_value5) {
+			if ((m_game->m_client_list[client_h]->effective_str() + m_game->m_client_list[client_h]->m_angelic_str) < m_game->m_client_list[client_h]->m_item_list[item_index]->m_item_effect_value5) {
 				m_game->send_notify_msg(0, client_h, Notify::ItemReleased, m_game->m_client_list[client_h]->m_item_list[item_index]->m_equip_pos, item_index, 0, 0);
 				release_item_handler(client_h, m_game->m_client_list[client_h]->m_item_equipment_status[to_int(equip_pos)], true);
 				return false;
@@ -793,8 +793,8 @@ bool ItemManager::equip_item_handler(int client_h, short item_index, bool notify
 	// Weapon-specific: compute attack delay and reset combo
 	if (equip_pos == EquipPos::RightHand || equip_pos == EquipPos::TwoHand) {
 		m_game->m_client_list[client_h]->m_status.attack_delay = static_cast<uint8_t>(hb::shared::calc::attack_delay(
-			m_game->m_client_list[client_h]->m_item_list[item_index]->m_swing_speed,
-			m_game->m_client_list[client_h]->m_str,
+			m_game->m_client_list[client_h]->m_item_list[item_index]->get_effective_swing_speed(),
+			m_game->m_client_list[client_h]->effective_str(),
 			m_game->m_client_list[client_h]->m_angelic_str));
 		m_game->m_client_list[client_h]->m_combo_attack_count = 0;
 	}
@@ -862,7 +862,7 @@ void ItemManager::validate_equipped_items(int client_h)
 
 		// Weight check
 		if (!must_unequip &&
-			get_item_weight(item, 1) > (p->m_str + p->m_angelic_str) * hb::shared::balance::weight_units_per_stone)
+			get_item_weight(item, 1) > (p->effective_str() + p->m_angelic_str) * hb::shared::balance::weight_units_per_stone)
 			must_unequip = true;
 
 		// Armor stat requirements (effect_value4 = stat type 10-15)
@@ -872,7 +872,7 @@ void ItemManager::validate_equipped_items(int client_h)
 			int req = item->m_item_effect_value5;
 			switch (item->m_item_effect_value4)
 			{
-			case 10: must_unequip = (p->m_str + p->m_angelic_str) < req; break;
+			case 10: must_unequip = (p->effective_str() + p->m_angelic_str) < req; break;
 			case 11: must_unequip = (p->m_dex + p->m_angelic_dex) < req; break;
 			case 12: must_unequip = p->m_vit < req; break;
 			case 13: must_unequip = (p->m_int + p->m_angelic_int) < req; break;
@@ -1709,7 +1709,7 @@ void ItemManager::calculate_ssn_item_index(int client_h, short weapon_index, int
 		case 0:  // Mining
 		case 5:  // Hand-Attack
 		case 13: // Manufacturing
-			if (m_game->m_client_list[client_h]->m_skill_mastery[skill_index] > ((m_game->m_client_list[client_h]->m_str + m_game->m_client_list[client_h]->m_angelic_str) * 2)) {
+			if (m_game->m_client_list[client_h]->m_skill_mastery[skill_index] > ((m_game->m_client_list[client_h]->effective_str() + m_game->m_client_list[client_h]->m_angelic_str) * 2)) {
 				m_game->m_client_list[client_h]->m_skill_mastery[skill_index]--;
 				m_game->m_client_list[client_h]->m_skill_progress[skill_index] = old_ssn;
 			}
@@ -3048,13 +3048,206 @@ void ItemManager::req_repair_item_cofirm_handler(int client_h, char item_id, con
 	}
 }
 
+namespace {
+
+// Per-recalc accumulation of every rolled modifier line across the equipped
+// set (Item Tiers spec §6.5 Aggregate caps).
+//
+// Lines are summed here during the equipment walk and applied only afterwards,
+// so the cap clamps the TOTAL of a modifier. Clamping the destination
+// accumulator instead would also clamp angel, unique built-in and hero-armor
+// bonuses, which §6.5 exempts. That exemption needs no roster check and no
+// mode branch: only rolled modifier slots reach this struct, while every
+// config-sourced bonus (add_effect cases, m_item_effect_value*) goes straight
+// to its accumulator and is never counted or clamped here.
+struct modifier_totals
+{
+	// Display units, keyed by unified modifier ID. The cap is not stored
+	// alongside: the apply pass refetches the catalog row anyway, and one
+	// source for aggregate_cap cannot drift from the other.
+	int by_modifier[256] = {};
+
+	// The ATTRIBUTES ladder caps per attribute, not per modifier row: a single,
+	// a pair half and ALL STATS all feed the same +20 (spec §7, "ALL counts
+	// into each"). Indexed by tier_attribute.
+	int attribute[tier_attribute::charisma + 1] = {};
+	int attribute_cap[tier_attribute::charisma + 1] = {};
+
+	// Physical Absorb lands in a per-slot accumulator, so it sums per equip
+	// position rather than set-wide. Its cap (spec §7) is the historical
+	// per-hit-location clamp, and the authoritative one still runs at damage
+	// time in CombatManager, which merges Leggings+Boots into one location.
+	int physical_absorb_by_pos[hb::shared::item::DEF_MAXITEMEQUIPPOS] = {};
+	int physical_absorb_cap = 0;
+
+	// Set when the equipped weapon cannot attack (a bow with no arrows), so
+	// weapon damage lines stay off the zeroed attack values.
+	bool attack_disabled = false;
+
+	// The held weapon's signature line — Critical / Poisoning / Righteous on
+	// melee and bows, Spell Success on wands. Combat and magic read it through
+	// m_special_weapon_effect_*; the DAMAGE and CASTING Buckets are exclusive,
+	// so a weapon carries at most one.
+	uint8_t signature_type = modifier_id::empty;
+	uint8_t signature_value = 0;
+
+	void add_attribute(int attr, int value, int row_cap)
+	{
+		if (attr <= tier_attribute::none || attr > tier_attribute::charisma) return;
+		attribute[attr] += value;
+		// Harsher wins when contributing rows disagree (ratchet law, §6.4).
+		attribute_cap[attr] = (attribute_cap[attr] == 0 || row_cap < attribute_cap[attr])
+			? row_cap : attribute_cap[attr];
+	}
+
+	static int clamped(int sum, int cap)
+	{
+		return (cap > 0 && sum > cap) ? cap : sum;
+	}
+};
+
+// Records one equipped item's rolled lines. Slot position is meaningless
+// (spec §4.2) — legacy items park two lines in [0]/[1], tiered items fill 1-4
+// in roll order, and both are read the same way here.
+void collect_item_modifiers(const hb::server::tier_config& config, const CItem& item,
+	int equip_pos, modifier_totals& totals)
+{
+	// Only the held weapon publishes a signature line. Melee, bows and wands
+	// all occupy these two slots; a shield is LeftHand and never does.
+	const bool is_held_weapon = (equip_pos == to_int(EquipPos::RightHand))
+		|| (equip_pos == to_int(EquipPos::TwoHand));
+
+	for (const auto& mod : item.get_attributes().modifiers)
+	{
+		if (mod.type == modifier_id::empty) continue;
+
+		const auto* row = config.find_modifier(mod.type);
+		// An ID with no catalog row cannot be interpreted; the 2-D boot
+		// validator refuses such a dataset, so this only guards live edits.
+		if (row == nullptr) continue;
+
+		const int value = mod.value * row->multiplier;
+
+		switch (row->effect_id)
+		{
+		case effect_id::critical:
+		case effect_id::poisoning:
+		case effect_id::righteous:
+		case effect_id::spell_success:
+			// Consumed at their point of use (CombatManager hit resolution,
+			// MagicManager cast), so they are published rather than summed.
+			if (is_held_weapon)
+			{
+				totals.signature_type = mod.type;
+				totals.signature_value = mod.value;
+			}
+			break;
+
+		case effect_id::add_attribute:
+			totals.add_attribute(row->effect_param1, value, row->aggregate_cap);
+			break;
+
+		case effect_id::add_attribute_pair:
+			// Two independent rolls, one per named attribute (spec §4.4).
+			totals.add_attribute(row->effect_param1, value, row->aggregate_cap);
+			totals.add_attribute(row->effect_param2, mod.value2 * row->multiplier, row->aggregate_cap);
+			break;
+
+		case effect_id::add_all_attributes:
+			// One shared N applied to every attribute (spec §4.4).
+			for (int attr = tier_attribute::strength; attr <= tier_attribute::charisma; attr++)
+				totals.add_attribute(attr, value, row->aggregate_cap);
+			break;
+
+		case effect_id::physical_absorb:
+			if (equip_pos >= 0 && equip_pos < hb::shared::item::DEF_MAXITEMEQUIPPOS)
+			{
+				totals.physical_absorb_by_pos[equip_pos] += value;
+				totals.physical_absorb_cap = row->aggregate_cap;
+			}
+			break;
+
+		default:
+			totals.by_modifier[mod.type] += value;
+			break;
+		}
+	}
+}
+
+// Applies every collected line at its capped total. Dispatch is on the
+// catalog's effect_id, never on the modifier ID, so a new catalog row that
+// reuses an existing behavior needs no code change (spec §2, the code/data line).
+void apply_modifier_totals(const hb::server::tier_config& config, CClient* client,
+	const modifier_totals& totals)
+{
+	for (int id = 1; id < 256; id++)
+	{
+		const int sum = totals.by_modifier[id];
+		if (sum == 0) continue;
+
+		const auto* row = config.find_modifier(static_cast<uint8_t>(id));
+		if (row == nullptr) continue;
+
+		const int value = modifier_totals::clamped(sum, row->aggregate_cap);
+
+		switch (row->effect_id)
+		{
+		case effect_id::sharp:
+		case effect_id::ancient:
+			if (!totals.attack_disabled)
+			{
+				client->m_attack_bonus_sm += value;
+				client->m_attack_bonus_l += value;
+			}
+			break;
+
+		case effect_id::poison_resist:       client->m_add_poison_resistance += value; break;
+		case effect_id::hitting_probability: client->m_add_attack_ratio += value; break;
+		case effect_id::defense_ratio:       client->m_add_defense_ratio += value; break;
+		case effect_id::hp_recovery:         client->m_add_hp += value; break;
+		case effect_id::sp_recovery:         client->m_add_sp += value; break;
+		case effect_id::mp_recovery:         client->m_add_mp += value; break;
+		case effect_id::magic_resist:        client->m_add_magic_resistance += value; break;
+		case effect_id::magic_absorb:        client->m_add_abs_magical_defense += value; break;
+		case effect_id::consecutive_attack:  client->m_add_combo_damage += value; break;
+		case effect_id::experience_bonus:    client->m_add_exp += value; break;
+		case effect_id::gold_bonus:          client->m_add_gold += value; break;
+		case effect_id::mana_converting:     client->m_add_trans_mana += value; break;
+		case effect_id::crit_chance:         client->m_add_charge_critical += value; break;
+
+		// Everything else is consumed where it acts rather than summed here:
+		// agile / light / strong / ancient are derived item stats
+		// (CItem::get_effective_*, ItemManager::apply_modifier_derived_stats),
+		// the signature lines ride m_special_weapon_effect_* (collected above),
+		// and the six Marquee behaviors arrive in Cycle 3-D (spec §5) — until
+		// then the status-broadcast speed fields stay 0 and the procs do nothing.
+		default: break;
+		}
+	}
+
+	for (int attr = tier_attribute::strength; attr <= tier_attribute::charisma; attr++)
+		client->m_add_attribute[attr] +=
+			modifier_totals::clamped(totals.attribute[attr], totals.attribute_cap[attr]);
+
+	client->m_special_weapon_effect_type = totals.signature_type;
+	client->m_special_weapon_effect_value = totals.signature_value;
+
+	for (int pos = 0; pos < hb::shared::item::DEF_MAXITEMEQUIPPOS; pos++)
+	{
+		if (totals.physical_absorb_by_pos[pos] == 0) continue;
+		client->m_damage_absorption_armor[pos] +=
+			modifier_totals::clamped(totals.physical_absorb_by_pos[pos], totals.physical_absorb_cap);
+	}
+}
+
+} // namespace
+
 void ItemManager::calc_total_item_effect(int client_h, int equip_item_id, bool notify)
 {
 	short item_index;
 	int arrow_index, prev_sa_type, temp;
 	EquipPos equip_pos;
 	double v1, v2, v3;
-	uint32_t  swe_type, swe_value;
 
 	if (m_game->m_client_list[client_h] == 0) return;
 
@@ -3070,8 +3263,15 @@ void ItemManager::calc_total_item_effect(int client_h, int equip_item_id, bool n
 	m_game->m_client_list[client_h]->m_angelic_str = 0; // By Snoopy81
 	m_game->m_client_list[client_h]->m_angelic_int = 0; // By Snoopy81
 	m_game->m_client_list[client_h]->m_angelic_dex = 0; // By Snoopy81
-	m_game->m_client_list[client_h]->m_angelic_mag = 0; // By Snoopy81	
+	m_game->m_client_list[client_h]->m_angelic_mag = 0; // By Snoopy81
 	m_game->m_status_effect_manager->set_angel_flag(client_h, hb::shared::owner_class::Player, 0, 0);
+
+	for (int& gear_attribute : m_game->m_client_list[client_h]->m_add_attribute) gear_attribute = 0;
+
+	// Every rolled modifier line on the equipped set lands here first and is
+	// applied once the walk finishes, so aggregate caps clamp totals rather
+	// than individual lines (spec §6.5).
+	modifier_totals totals;
 
 	m_game->m_client_list[client_h]->m_attack_dice_throw_sm = 0;
 	m_game->m_client_list[client_h]->m_attack_dice_range_sm = 0;
@@ -3150,6 +3350,13 @@ void ItemManager::calc_total_item_effect(int client_h, int equip_item_id, bool n
 			(m_game->m_client_list[client_h]->m_is_item_equipped[item_index])) {
 
 			equip_pos = m_game->m_client_list[client_h]->m_item_list[item_index]->get_equip_pos();
+
+			// Rolled lines are collected for every equipped piece regardless of
+			// its base effect type — modifiers are item-instance data, not a
+			// property of the item's role.
+			collect_item_modifiers(m_game->get_tier_config(),
+				*m_game->m_client_list[client_h]->m_item_list[item_index],
+				m_game->m_client_list[client_h]->m_item_list[item_index]->m_equip_pos, totals);
 
 			switch (m_game->m_client_list[client_h]->m_item_list[item_index]->get_item_effect_type()) {
 
@@ -3237,48 +3444,24 @@ void ItemManager::calc_total_item_effect(int client_h, int equip_item_id, bool n
 					}
 				}
 
-				if (m_game->m_client_list[client_h]->m_item_list[item_index]->get_prefix_type() != hb::shared::item::modifier_id::empty) {
-					swe_type = m_game->m_client_list[client_h]->m_item_list[item_index]->get_prefix_type();
-					swe_value = m_game->m_client_list[client_h]->m_item_list[item_index]->get_prefix_value();
+				// The weapon's signature line (Critical / Poisoning / Righteous
+				// on melee and bows, Spell Success on wands) drives combat and
+				// magic through m_special_weapon_effect_*. The DAMAGE and
+				// CASTING Buckets are exclusive, so an item carries at most one.
+				for (const auto& mod : m_game->m_client_list[client_h]->m_item_list[item_index]->get_attributes().modifiers) {
+					if (mod.type == modifier_id::empty) continue;
+					const auto* row = m_game->get_tier_config().find_modifier(mod.type);
+					if (row == nullptr) continue;
 
-					m_game->m_client_list[client_h]->m_special_weapon_effect_type = (int)swe_type;
-					m_game->m_client_list[client_h]->m_special_weapon_effect_value = (int)swe_value;
-
-					switch (swe_type) {
-					case modifier_id::sharp:
-						m_game->m_client_list[client_h]->m_attack_bonus_sm += (int)swe_value * m_game->m_modifier_multiplier[modifier_id::sharp];
-						m_game->m_client_list[client_h]->m_attack_bonus_l += (int)swe_value * m_game->m_modifier_multiplier[modifier_id::sharp];
+					switch (row->effect_id) {
+					case effect_id::critical:
+					case effect_id::poisoning:
+					case effect_id::righteous:
+					case effect_id::spell_success:
+						m_game->m_client_list[client_h]->m_special_weapon_effect_type = (int)mod.type;
+						m_game->m_client_list[client_h]->m_special_weapon_effect_value = (int)mod.value;
 						break;
-
-					case modifier_id::ancient:
-						m_game->m_client_list[client_h]->m_attack_bonus_sm += (int)swe_value * m_game->m_modifier_multiplier[modifier_id::ancient];
-						m_game->m_client_list[client_h]->m_attack_bonus_l += (int)swe_value * m_game->m_modifier_multiplier[modifier_id::ancient];
-						break;
-					}
-				}
-
-				if (m_game->m_client_list[client_h]->m_item_list[item_index]->get_secondary_type() != hb::shared::item::modifier_id::empty) {
-					swe_type = m_game->m_client_list[client_h]->m_item_list[item_index]->get_secondary_type();
-					swe_value = m_game->m_client_list[client_h]->m_item_list[item_index]->get_secondary_value();
-
-					switch (swe_type) {
-					case modifier_id::empty: break;
-					case modifier_id::poison_resist:  m_game->m_client_list[client_h]->m_add_poison_resistance += (int)swe_value * m_game->m_modifier_multiplier[modifier_id::poison_resist]; break;
-					case modifier_id::hitting_probability: m_game->m_client_list[client_h]->m_add_attack_ratio += (int)swe_value * m_game->m_modifier_multiplier[modifier_id::hitting_probability]; break;
-					case modifier_id::defense_ratio:  m_game->m_client_list[client_h]->m_add_defense_ratio += (int)swe_value * m_game->m_modifier_multiplier[modifier_id::defense_ratio]; break;
-					case modifier_id::hp_recovery:    m_game->m_client_list[client_h]->m_add_hp += (int)swe_value * m_game->m_modifier_multiplier[modifier_id::hp_recovery]; break;
-					case modifier_id::sp_recovery:    m_game->m_client_list[client_h]->m_add_sp += (int)swe_value * m_game->m_modifier_multiplier[modifier_id::sp_recovery]; break;
-					case modifier_id::mp_recovery:    m_game->m_client_list[client_h]->m_add_mp += (int)swe_value * m_game->m_modifier_multiplier[modifier_id::mp_recovery]; break;
-					case modifier_id::magic_resist:   m_game->m_client_list[client_h]->m_add_magic_resistance += (int)swe_value * m_game->m_modifier_multiplier[modifier_id::magic_resist]; break;
-					case modifier_id::physical_absorb: m_game->m_client_list[client_h]->m_damage_absorption_armor[m_game->m_client_list[client_h]->m_item_list[item_index]->m_equip_pos] += (int)swe_value * m_game->m_modifier_multiplier[modifier_id::physical_absorb]; break;
-					case modifier_id::magic_absorb:   m_game->m_client_list[client_h]->m_add_abs_magical_defense += (int)swe_value * m_game->m_modifier_multiplier[modifier_id::magic_absorb]; break;
-					case modifier_id::consecutive_attack: m_game->m_client_list[client_h]->m_add_combo_damage += (int)swe_value * m_game->m_modifier_multiplier[modifier_id::consecutive_attack]; break;
-					case modifier_id::experience:     m_game->m_client_list[client_h]->m_add_exp += (int)swe_value * m_game->m_modifier_multiplier[modifier_id::experience]; break;
-					case modifier_id::gold:           m_game->m_client_list[client_h]->m_add_gold += (int)swe_value * m_game->m_modifier_multiplier[modifier_id::gold]; break;
-					}
-
-					switch (swe_type) {
-					case modifier_id::magic_absorb: if (m_game->m_client_list[client_h]->m_add_abs_magical_defense > 80) m_game->m_client_list[client_h]->m_add_abs_magical_defense = 80; break;
+					default: break;
 					}
 				}
 
@@ -3434,6 +3617,10 @@ void ItemManager::calc_total_item_effect(int client_h, int equip_item_id, bool n
 					m_game->m_client_list[client_h]->m_attack_dice_throw_l = 0;
 					m_game->m_client_list[client_h]->m_attack_dice_range_l = 0;
 					m_game->m_client_list[client_h]->m_attack_bonus_l = 0;
+					// Bows became full tier-system members (spec §4.8), so Sharp
+					// now reaches this branch — keep a quiverless bow at zero
+					// damage instead of letting the bonus stand alone.
+					totals.attack_disabled = true;
 				}
 				else {
 					arrow_index = m_game->m_client_list[client_h]->m_arrow_index;
@@ -3468,58 +3655,6 @@ void ItemManager::calc_total_item_effect(int client_h, int equip_item_id, bool n
 					//PutLogList(G_cTxt);
 				}
 
-				if (m_game->m_client_list[client_h]->m_item_list[item_index]->get_prefix_type() != hb::shared::item::modifier_id::empty) {
-					swe_type = m_game->m_client_list[client_h]->m_item_list[item_index]->get_prefix_type();
-					swe_value = m_game->m_client_list[client_h]->m_item_list[item_index]->get_prefix_value();
-
-					switch (swe_type) {
-					case modifier_id::sharp:
-						m_game->m_client_list[client_h]->m_attack_bonus_sm += (int)swe_value * m_game->m_modifier_multiplier[modifier_id::sharp];
-						m_game->m_client_list[client_h]->m_attack_bonus_l += (int)swe_value * m_game->m_modifier_multiplier[modifier_id::sharp];
-						break;
-
-					case modifier_id::ancient:
-						m_game->m_client_list[client_h]->m_attack_bonus_sm += (int)swe_value * m_game->m_modifier_multiplier[modifier_id::ancient];
-						m_game->m_client_list[client_h]->m_attack_bonus_l += (int)swe_value * m_game->m_modifier_multiplier[modifier_id::ancient];
-						break;
-
-					case modifier_id::mana_converting:
-						m_game->m_client_list[client_h]->m_add_trans_mana += (int)swe_value * m_game->m_modifier_multiplier[modifier_id::mana_converting];
-						if (m_game->m_client_list[client_h]->m_add_trans_mana > 13) m_game->m_client_list[client_h]->m_add_trans_mana = 13;
-						break;
-
-					case modifier_id::crit_chance:
-						m_game->m_client_list[client_h]->m_add_charge_critical += (int)swe_value * m_game->m_modifier_multiplier[modifier_id::crit_chance];
-						if (m_game->m_client_list[client_h]->m_add_charge_critical > 20) m_game->m_client_list[client_h]->m_add_charge_critical = 20;
-						break;
-					}
-				}
-
-				if (m_game->m_client_list[client_h]->m_item_list[item_index]->get_secondary_type() != hb::shared::item::modifier_id::empty) {
-					swe_type = m_game->m_client_list[client_h]->m_item_list[item_index]->get_secondary_type();
-					swe_value = m_game->m_client_list[client_h]->m_item_list[item_index]->get_secondary_value();
-
-					switch (swe_type) {
-					case modifier_id::empty: break;
-					case modifier_id::poison_resist:  m_game->m_client_list[client_h]->m_add_poison_resistance += (int)swe_value * m_game->m_modifier_multiplier[modifier_id::poison_resist]; break;
-					case modifier_id::hitting_probability: m_game->m_client_list[client_h]->m_add_attack_ratio += (int)swe_value * m_game->m_modifier_multiplier[modifier_id::hitting_probability]; break;
-					case modifier_id::defense_ratio:  m_game->m_client_list[client_h]->m_add_defense_ratio += (int)swe_value * m_game->m_modifier_multiplier[modifier_id::defense_ratio]; break;
-					case modifier_id::hp_recovery:    m_game->m_client_list[client_h]->m_add_hp += (int)swe_value * m_game->m_modifier_multiplier[modifier_id::hp_recovery]; break;
-					case modifier_id::sp_recovery:    m_game->m_client_list[client_h]->m_add_sp += (int)swe_value * m_game->m_modifier_multiplier[modifier_id::sp_recovery]; break;
-					case modifier_id::mp_recovery:    m_game->m_client_list[client_h]->m_add_mp += (int)swe_value * m_game->m_modifier_multiplier[modifier_id::mp_recovery]; break;
-					case modifier_id::magic_resist:   m_game->m_client_list[client_h]->m_add_magic_resistance += (int)swe_value * m_game->m_modifier_multiplier[modifier_id::magic_resist]; break;
-					case modifier_id::physical_absorb: m_game->m_client_list[client_h]->m_damage_absorption_armor[m_game->m_client_list[client_h]->m_item_list[item_index]->m_equip_pos] += (int)swe_value * m_game->m_modifier_multiplier[modifier_id::physical_absorb]; break;
-					case modifier_id::magic_absorb:   m_game->m_client_list[client_h]->m_add_abs_magical_defense += (int)swe_value * m_game->m_modifier_multiplier[modifier_id::magic_absorb]; break;
-					case modifier_id::consecutive_attack: m_game->m_client_list[client_h]->m_add_combo_damage += (int)swe_value * m_game->m_modifier_multiplier[modifier_id::consecutive_attack]; break;
-					case modifier_id::experience:     m_game->m_client_list[client_h]->m_add_exp += (int)swe_value * m_game->m_modifier_multiplier[modifier_id::experience]; break;
-					case modifier_id::gold:           m_game->m_client_list[client_h]->m_add_gold += (int)swe_value * m_game->m_modifier_multiplier[modifier_id::gold]; break;
-					}
-
-					switch (swe_type) {
-					case modifier_id::magic_absorb: if (m_game->m_client_list[client_h]->m_add_abs_magical_defense > 80) m_game->m_client_list[client_h]->m_add_abs_magical_defense = 80; break;
-					}
-				}
-
 				switch (equip_pos) {
 				case EquipPos::LeftHand:
 					// .  70%
@@ -3546,8 +3681,24 @@ void ItemManager::calc_total_item_effect(int client_h, int equip_item_id, bool n
 		}
 	}
 
-	// Snoopy: Bonus for Angels	
+	// Every rolled line at its capped total (spec §6.5). Runs after the walk so
+	// the caps see the whole equipped set, and after the base-item values the
+	// walk assigned, which the damage lines add on top of.
+	apply_modifier_totals(m_game->get_tier_config(), m_game->m_client_list[client_h], totals);
+
+	// Combined ceiling, preserved from pre-3-C behavior. The catalog's
+	// aggregate_cap already bounds the rolled lines at 80; this bounds rolled
+	// PLUS exempt sources (Magin Emerald and kin), because the value is a
+	// percentage of magic damage and must never approach immunity. It is a
+	// hard property of the damage formula, not a balance knob — hence code.
+	if (m_game->m_client_list[client_h]->m_add_abs_magical_defense > 80)
+		m_game->m_client_list[client_h]->m_add_abs_magical_defense = 80;
+
+	// Snoopy: Bonus for Angels — and the gear DEX lines, which ride the same
+	// x2 the base defense ratio is built from at the top of this function.
 	m_game->m_client_list[client_h]->m_defense_ratio += m_game->m_client_list[client_h]->m_angelic_dex * 2;
+	m_game->m_client_list[client_h]->m_defense_ratio +=
+		m_game->m_client_list[client_h]->m_add_attribute[tier_attribute::dexterity] * 2;
 	if (m_game->m_client_list[client_h]->m_hp > m_game->get_max_hp(client_h)) m_game->m_client_list[client_h]->m_hp = m_game->get_max_hp(client_h);
 	if (m_game->m_client_list[client_h]->m_mp > m_game->get_max_mp(client_h)) m_game->m_client_list[client_h]->m_mp = m_game->get_max_mp(client_h);
 	if (m_game->m_client_list[client_h]->m_sp > m_game->get_max_sp(client_h)) m_game->m_client_list[client_h]->m_sp = m_game->get_max_sp(client_h);
@@ -4676,40 +4827,42 @@ void ItemManager::build_item_handler(int client_h, char* data)
 
 }
 
-void ItemManager::adjust_rare_item_value(CItem* item)
+int ItemManager::modifier_multiplier(uint8_t modifier_id) const
 {
-	uint32_t swe_type, swe_value;
-	double v1, v2, v3;
+	const auto* row = m_game->get_tier_config().find_modifier(modifier_id);
+	return row ? row->multiplier : 1;
+}
 
-	if (item->get_prefix_type() != hb::shared::item::modifier_id::empty) {
-		swe_type = item->get_prefix_type();
-		swe_value = item->get_prefix_value();
-		switch (swe_type) {
-		case modifier_id::empty: break;
+void ItemManager::apply_modifier_derived_stats(CItem* item)
+{
+	// Strong and Ancient both carry the endurance rider; the Bucket law makes
+	// them mutually exclusive on an item, but summing is the honest reading of
+	// "modifiers are independent lines" and costs nothing.
+	const auto& config = m_game->get_tier_config();
+	int growth_pct = 0;
 
-		case modifier_id::agile:
-			item->m_swing_speed--;
-			if (item->m_swing_speed < 0) item->m_swing_speed = 0;
+	for (const auto& mod : item->get_attributes().modifiers)
+	{
+		if (mod.type == modifier_id::empty) continue;
+
+		const auto* row = config.find_modifier(mod.type);
+		if (row == nullptr) continue;
+
+		switch (row->effect_id)
+		{
+		case effect_id::strong:
+		case effect_id::ancient:
+			growth_pct += mod.value * row->multiplier;
 			break;
-
-		case modifier_id::light:
-			v2 = (double)item->m_weight;
-			v3 = (double)(swe_value * m_game->m_modifier_multiplier[modifier_id::light]);
-			v1 = (v3 / 100.0f) * v2;
-			item->m_weight -= (int)v1;
-
-			if (item->m_weight < 1) item->m_weight = 1;
-			break;
-
-		case modifier_id::strong:
-		case modifier_id::ancient:
-			v2 = (double)item->m_durability;
-			v3 = (double)(swe_value * m_game->m_modifier_multiplier[swe_type]);
-			v1 = (v3 / 100.0f) * v2;
-			item->m_durability += (int)v1;
+		default:
 			break;
 		}
 	}
+
+	if (growth_pct <= 0) return;
+
+	double base = (double)item->m_durability;
+	item->m_durability += (int)((double)growth_pct / 100.0f * base);
 }
 
 void ItemManager::request_sell_item_list_handler(int client_h, char* data)
@@ -4738,7 +4891,8 @@ void ItemManager::request_sell_item_list_handler(int client_h, char* data)
 int ItemManager::get_item_weight(CItem* item, int count)
 {
 	if (count < 0) count = 1;
-	return CItem::calc_item_stack_weight(item->get_effective_weight(), count);
+	return CItem::calc_item_stack_weight(
+		item->get_effective_weight(modifier_multiplier(modifier_id::light)), count);
 }
 
 bool ItemManager::copy_item_contents(CItem* copy, CItem* original)

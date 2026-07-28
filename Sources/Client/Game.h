@@ -445,6 +445,26 @@ std::array<bool, hb::shared::limits::MaxItems> m_is_item_equipped{};
 	// (ModifierIds.h). Tier presentation + item-system mode ride the same
 	// config-cache slot.
 	modifier_catalog_entry m_modifier_catalog[256];
+
+	// Display scale of a replicated modifier (display = stored value x this).
+	// Mirrors ItemManager::modifier_multiplier on the server so both sides
+	// scale a rolled value identically.
+	int modifier_multiplier(uint8_t modifier_id) const
+	{
+		return m_modifier_catalog[modifier_id].multiplier;
+	}
+
+	// Weight after the Light reduction, computed from the item's base config
+	// weight — the server's ItemManager::get_item_weight twin. Rolled Light
+	// never mutates a stored weight (Item Tiers spec §4.5), so the reduction
+	// has to be derived at every read on both sides.
+	int effective_item_weight(int base_weight, const CItem* item) const
+	{
+		if (item == nullptr) return base_weight;
+		return CItem::apply_light_reduction(base_weight,
+			item->get_light_percent(modifier_multiplier(hb::shared::item::modifier_id::light)));
+	}
+
 	tier_presentation_entry m_tier_presentation[hb::shared::item::tier_count];
 	std::string m_tier_name_template;
 	uint8_t m_item_system_mode = hb::shared::item::item_system_mode::legacy;

@@ -80,6 +80,14 @@ void check_buckets(const tier_config& config, validation_state& v)
 
 void check_catalog(const tier_config& config, validation_state& v)
 {
+	// Required in BOTH modes since Tiers 3-C: equip effect application
+	// dispatches on modifier_catalog.effect_id whichever Roll strategy runs,
+	// and the catalog has been the only source of tooltip labels since 1-D. An
+	// empty catalog would silently stop every rolled line working — exactly
+	// what fail-fast exists to prevent.
+	if (config.catalog.empty())
+		v.add("modifier_catalog: empty - both modes require seeded data");
+
 	std::set<uint8_t> seen;
 	for (const auto& row : config.catalog)
 	{
@@ -372,7 +380,6 @@ void check_legacy_multipliers(const tier_config& config,
 void check_tiered_required_data(const tier_config& config, validation_state& v)
 {
 	if (config.buckets.empty()) v.add("tier_buckets: empty - tiered mode requires seeded data");
-	if (config.catalog.empty()) v.add("modifier_catalog: empty - tiered mode requires seeded data");
 	if (config.eligibility.empty()) v.add("modifier_eligibility: empty - tiered mode requires seeded data");
 	if (config.curves.empty()) v.add("tier_curves: empty - tiered mode requires seeded data");
 	if (config.loot_grades.empty()) v.add("loot_grades: empty - tiered mode requires seeded data");

@@ -221,7 +221,7 @@ namespace hb::server
 		if (item->is_custom_made()) {
 			item->m_durability = item->m_instance.special_effect_value1;
 		}
-		m_game->m_item_manager->adjust_rare_item_value(item);
+		m_game->m_item_manager->apply_modifier_derived_stats(item);
 		if (item->m_instance.cur_durability > item->m_durability) {
 			item->m_instance.cur_durability = item->m_durability;
 		}

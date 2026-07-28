@@ -275,7 +275,7 @@ void MagicManager::player_magic_handler(int client_h, int dX, int dY, short type
 
 	// Direct INT check at cast time — reject if player no longer meets the spell's INT requirement
 	if (item_effect == false && m_game->m_magic_config_list[type]->m_intelligence_limit >
-		(m_game->m_client_list[client_h]->m_int + m_game->m_client_list[client_h]->m_angelic_int))
+		(m_game->m_client_list[client_h]->effective_int() + m_game->m_client_list[client_h]->m_angelic_int))
 	{
 		m_game->send_notify_msg(0, client_h, Notify::NoticeMsg, 0, 0, 0,
 			"Insufficient Intelligence to cast this spell.");
@@ -371,8 +371,8 @@ void MagicManager::player_magic_handler(int client_h, int dX, int dY, short type
 	dv1 = dv2 * dv3;
 	result = (int)dv1;
 
-	if ((m_game->m_client_list[client_h]->m_int + m_game->m_client_list[client_h]->m_angelic_int) > 50)
-		result += ((m_game->m_client_list[client_h]->m_int + m_game->m_client_list[client_h]->m_angelic_int) - 50) / 2;
+	if ((m_game->m_client_list[client_h]->effective_int() + m_game->m_client_list[client_h]->m_angelic_int) > 50)
+		result += ((m_game->m_client_list[client_h]->effective_int() + m_game->m_client_list[client_h]->m_angelic_int) - 50) / 2;
 
 	level_magic = (m_game->m_client_list[client_h]->m_level / 10);
 	if (magic_circle != level_magic) {
@@ -465,7 +465,7 @@ void MagicManager::player_magic_handler(int client_h, int dX, int dY, short type
 	}
 
 	result = m_game->m_client_list[client_h]->m_skill_mastery[4];
-	if ((m_game->m_client_list[client_h]->m_mag + m_game->m_client_list[client_h]->m_angelic_mag) > 50) result += ((m_game->m_client_list[client_h]->m_mag + m_game->m_client_list[client_h]->m_angelic_mag) - 50);
+	if ((m_game->m_client_list[client_h]->effective_mag() + m_game->m_client_list[client_h]->m_angelic_mag) > 50) result += ((m_game->m_client_list[client_h]->effective_mag() + m_game->m_client_list[client_h]->m_angelic_mag) - 50);
 
 	level_magic = (m_game->m_client_list[client_h]->m_level / 10);
 	if (magic_circle != level_magic) {
@@ -2553,7 +2553,7 @@ void MagicManager::request_study_magic_handler(int client_h, const char* name, b
 		//if (m_game->m_client_list[client_h]->m_is_inside_wizard_tower == false && is_purchase) return;
 		if (m_game->m_client_list[client_h]->m_magic_mastery[ret] != 0) return;
 
-		if ((req_int <= (m_game->m_client_list[client_h]->m_int + m_game->m_client_list[client_h]->m_angelic_int)) && (magic)) {
+		if ((req_int <= (m_game->m_client_list[client_h]->effective_int() + m_game->m_client_list[client_h]->m_angelic_int)) && (magic)) {
 
 			if (is_purchase) m_game->m_item_manager->set_item_count_by_id(client_h, hb::shared::item::ItemId::Gold, gold_count - cost);
 

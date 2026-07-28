@@ -99,7 +99,7 @@ bool legacy_roll_strategy::roll(CItem& item, const roll_context&)
 	item.set_secondary(secondaryType, static_cast<uint8_t>(secondaryValue));
 	item.set_enchant_bonus(0);
 
-	m_game.m_item_manager->adjust_rare_item_value(&item);
+	m_game.m_item_manager->apply_modifier_derived_stats(&item);
 	// New item: current durability should equal max durability
 	item.m_instance.cur_durability = item.m_durability;
 	return true;

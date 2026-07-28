@@ -51,6 +51,34 @@ struct HB_PACKED item_attribute_data
 	{
 		return tier == 0 || modifier_count() == tier;
 	}
+
+	// Slot-position-blind lookup by unified modifier ID — the Bucket law
+	// (spec §4.2) makes a modifier unique within an item, so the first match
+	// is the only match. Returns nullptr when the item does not carry it.
+	// Everything that asks "does this item have modifier X, and at what
+	// value" goes through here rather than indexing a slot: legacy items park
+	// their two lines in [0]/[1], tiered items fill 1-4 slots in roll order.
+	const item_modifier* find_modifier(uint8_t modifier_id) const
+	{
+		if (modifier_id == 0) return nullptr;
+		for (const auto& mod : modifiers)
+			if (mod.type == modifier_id) return &mod;
+		return nullptr;
+	}
+
+	bool has_modifier(uint8_t modifier_id) const
+	{
+		return find_modifier(modifier_id) != nullptr;
+	}
+
+	// Stored (pre-multiplier) roll value, 0 when absent. Display units are
+	// value x the catalog row's multiplier — resolve that at the caller,
+	// which is the side that owns a catalog.
+	uint8_t modifier_value(uint8_t modifier_id) const
+	{
+		const item_modifier* mod = find_modifier(modifier_id);
+		return mod ? mod->value : uint8_t{ 0 };
+	}
 };
 HB_PACK_END
 

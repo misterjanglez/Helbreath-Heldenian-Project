@@ -127,8 +127,7 @@ void DialogBox_Bank::draw_item_details(short sX, short sY, short size_x, int ite
 	}
 
 	// Weight for equipment (use cfg base weight, apply light attribute from item)
-	int bank_light = item->get_light_percent();
-	int eff_weight = (bank_light > 0) ? cfg->m_weight * (100 - bank_light) / 100 : cfg->m_weight;
+	int eff_weight = m_game->effective_item_weight(cfg->m_weight, item);
 	int wups = hb::shared::balance::weight_units_per_stone;
 	if ((cfg->get_equip_pos() != EquipPos::None) &&
 		(eff_weight >= hb::shared::balance::equip_str_threshold)) {

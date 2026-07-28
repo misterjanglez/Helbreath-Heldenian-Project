@@ -41,6 +41,7 @@ CClient::CClient(asio::io_context& ctx)
 	m_afk_activity_time = 0;
 
 	m_angelic_str = m_angelic_int = m_angelic_dex = m_angelic_mag = 0;
+	for (int& gear_attribute : m_add_attribute) gear_attribute = 0;
 
 	//m_cLU_Str = m_cLU_Int = m_cLU_Vit = m_cLU_Dex = m_cLU_Mag = m_cLU_Char = 0;
 	m_levelup_pool = 0;

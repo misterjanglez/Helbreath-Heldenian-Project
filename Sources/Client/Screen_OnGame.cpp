@@ -1016,14 +1016,13 @@ void Screen_OnGame::render_item_tooltip()
         tooltip.add_line(G_cTxt, GameColors::InfoGrayLight);
     }
 
-    int light_pct = item->get_light_percent();
-    int eff_weight = (light_pct > 0) ? cfg->m_weight * (100 - light_pct) / 100 : cfg->m_weight;
+    int eff_weight = m_game->effective_item_weight(cfg->m_weight, item);
     if (is_equippable && eff_weight >= hb::shared::balance::equip_str_threshold)
     {
         int req_str = static_cast<int>(std::ceil(eff_weight / static_cast<float>(hb::shared::balance::weight_units_per_stone)));
         if (cfg->get_equip_pos() == EquipPos::RightHand || cfg->get_equip_pos() == EquipPos::TwoHand)
         {
-            int full_speed_str = cfg->m_swing_speed * hb::shared::balance::swing_str_divisor;
+            int full_speed_str = item->get_effective_swing_speed() * hb::shared::balance::swing_str_divisor;
             G_cTxt = std::format("Required Str: {} ({} full speed)", req_str, full_speed_str);
         }
         else

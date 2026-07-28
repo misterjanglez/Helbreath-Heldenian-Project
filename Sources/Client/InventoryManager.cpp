@@ -64,8 +64,7 @@ int inventory_manager::calc_total_weight()
 		CItem* cfg = m_game->get_item_config(item->m_id_num);
 		if (!cfg) continue;
 
-		int lp = item->get_light_percent();
-		int eff_w = (lp > 0) ? cfg->m_weight * (100 - lp) / 100 : cfg->m_weight;
+		int eff_w = m_game->effective_item_weight(cfg->m_weight, item);
 		weight += CItem::calc_item_stack_weight(eff_w, static_cast<int>(item->m_instance.count));
 	}
 	return static_cast<int>(std::min<int64_t>(weight, INT_MAX));
@@ -202,8 +201,7 @@ void inventory_manager::equip_item(int item_id)
 		m_game->add_event_list(BITEMDROP_CHARACTER1, 10);
 		return;
 	}
-	int light_pct = m_game->m_player->m_item_list[item_id]->get_light_percent();
-	int equip_weight = (light_pct > 0) ? cfg->m_weight * (100 - light_pct) / 100 : cfg->m_weight;
+	int equip_weight = m_game->effective_item_weight(cfg->m_weight, m_game->m_player->m_item_list[item_id].get());
 	int wups = hb::shared::balance::weight_units_per_stone;
 	if (equip_weight / wups > m_game->m_player->m_str + m_game->m_player->m_angelic_str)
 	{
