@@ -232,6 +232,13 @@ enum item_system_mode : uint8_t
 };
 }
 
+// Display name for logs and console output — the one mapping from the
+// mode enum to its operator-facing word.
+inline constexpr const char* item_system_mode_name(uint8_t mode)
+{
+	return mode == item_system_mode::tiered ? "tiered" : "legacy";
+}
+
 // Number of tiers (Common / Rare / Epic / Legendary) — sizes the wire
 // presentation table and every client/server tier array.
 inline constexpr uint8_t tier_count = 4;

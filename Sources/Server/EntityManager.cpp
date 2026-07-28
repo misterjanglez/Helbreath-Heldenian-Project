@@ -2824,7 +2824,7 @@ bool CEntityManager::spawn_npc_drop_item(int npc_h, int item_id, int min_count, 
 		return false;
 	}
 	item->m_instance.count = count;
-	m_game->m_item_manager->generate_item_attributes(item);
+	m_game->get_roll_strategy().roll(*item);
 	item->set_touch_effect_type(TouchEffectType::ID);
 	item->m_instance.touch_effect_value1 = static_cast<short>(m_game->dice(1, 100000));
 	item->m_instance.touch_effect_value2 = static_cast<short>(m_game->dice(1, 100000));

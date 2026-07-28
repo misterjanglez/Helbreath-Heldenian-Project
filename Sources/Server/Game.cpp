@@ -14,6 +14,8 @@
 #include "AccountSqliteStore.h"
 #include "GameConfigSqliteStore.h"
 #include "TierConfigValidator.h"
+#include "LegacyRollStrategy.h"
+#include "TieredRollStrategy.h"
 #include "TradingPostStore.h"
 #include "TradingPostManager.h"
 #include "MapInfoSqliteStore.h"
@@ -1187,6 +1189,10 @@ bool CGame::init()
 			return false;
 		}
 	}
+
+	// Tiers 3-A: pick the Roll strategy for this process, now that the
+	// mode is loaded and both strategies' datasets are validated.
+	select_roll_strategy();
 
 	m_is_magic_available = false;
 	if (HasGameConfigRows(configDb, "magic_configs")) {
@@ -2979,6 +2985,17 @@ bool CGame::load_modifier_datasets(sqlite3* configDb)
 	return hb::server::load_tier_config(configDb, m_tier_config);
 }
 
+// The one place a Roll strategy is ever constructed (see RollStrategy.h).
+void CGame::select_roll_strategy()
+{
+	if (m_tier_config.item_system == hb::shared::item::item_system_mode::tiered)
+		m_roll_strategy = std::make_unique<hb::server::tiered_roll_strategy>(*this);
+	else
+		m_roll_strategy = std::make_unique<hb::server::legacy_roll_strategy>(*this);
+	hb::logger::log("Roll strategy selected: {}",
+		hb::shared::item::item_system_mode_name(m_tier_config.item_system));
+}
+
 hb::server::tier_validation_context CGame::running_validation_context() const
 {
 	hb::server::tier_validation_context context;
@@ -3086,7 +3103,7 @@ bool CGame::reload_tier_tables()
 		if (candidate.item_system != m_tier_config.item_system)
 		{
 			hb::logger::warn("meta.item_system changed on disk - the mode is restart-only, still running '{}'",
-				m_tier_config.item_system == hb::shared::item::item_system_mode::tiered ? "tiered" : "legacy");
+				hb::shared::item::item_system_mode_name(m_tier_config.item_system));
 			candidate.item_system = m_tier_config.item_system;
 		}
 

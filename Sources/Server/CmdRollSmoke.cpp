@@ -1,9 +1,10 @@
 // CmdRollSmoke.cpp: roll-distribution smoke harness (Tiers 2-C)
 //
-// Repeatedly runs ItemManager::generate_item_attributes on a fresh instance
+// Repeatedly runs the boot-selected Roll strategy on a fresh instance
 // of one item and histograms the outcome. Used to prove drop-roll parity
-// across roll-code changes (2-C data wiring, 3-B tiered strategy): capture a
-// baseline before the change, re-run after, compare the ROLLSMOKE lines.
+// across roll-code changes (2-C data wiring, 3-A seam extraction, 3-B
+// tiered strategy): capture a baseline before the change, re-run after,
+// compare the ROLLSMOKE lines.
 //
 //////////////////////////////////////////////////////////////////////
 
@@ -47,7 +48,7 @@ void CmdRollSmoke::execute(CGame* game, const char* args)
 			hb::console::error("init_item_attr failed for item ID {}.", item_id);
 			return;
 		}
-		if (game->m_item_manager->generate_item_attributes(&item) == false)
+		if (game->get_roll_strategy().roll(item) == false)
 		{
 			no_roll++;
 			continue;

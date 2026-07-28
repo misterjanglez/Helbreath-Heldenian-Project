@@ -485,6 +485,9 @@
       <Filter>Console</Filter>
     </ClInclude>
     <ClInclude Include="ItemManager.h" />
+    <ClInclude Include="RollStrategy.h" />
+    <ClInclude Include="LegacyRollStrategy.h" />
+    <ClInclude Include="TieredRollStrategy.h" />
     <ClInclude Include="MagicManager.h" />
     <ClInclude Include="SkillManager.h" />
     <ClInclude Include="WarManager.h" />
@@ -684,6 +687,8 @@
       <Filter>Console</Filter>
     </ClCompile>
     <ClCompile Include="ItemManager.cpp" />
+    <ClCompile Include="LegacyRollStrategy.cpp" />
+    <ClCompile Include="TieredRollStrategy.cpp" />
     <ClCompile Include="MagicManager.cpp" />
     <ClCompile Include="SkillManager.cpp" />
     <ClCompile Include="WarManager.cpp" />

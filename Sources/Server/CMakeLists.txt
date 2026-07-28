@@ -66,6 +66,7 @@ set(SERVER_SOURCES
     ServerConfig.cpp
     GuildManager.cpp
     ItemManager.cpp
+    LegacyRollStrategy.cpp
     LoginServer.cpp
     LootManager.cpp
     MagicManager.cpp
@@ -84,6 +85,7 @@ set(SERVER_SOURCES
     StatusEffectManager.cpp
     TierConfigStore.cpp
     TierConfigValidator.cpp
+    TieredRollStrategy.cpp
     Tile.cpp
     TradingPostManager.cpp
     TradingPostStore.cpp

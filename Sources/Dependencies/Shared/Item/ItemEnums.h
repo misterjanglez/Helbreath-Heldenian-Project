@@ -255,8 +255,9 @@ constexpr bool is_attack_effect_type(ItemEffectType type)
 }
 
 // The legacy roll gate: only these effect types ever roll attributes.
-// Shared by ItemManager::generate_item_attributes and the Tiers 2-D
-// validator so the roll and its pool-coverage rule cannot diverge.
+// Shared by the legacy Roll strategy (Server LegacyRollStrategy.cpp) and
+// the Tiers 2-D validator so the roll and its pool-coverage rule cannot
+// diverge.
 constexpr bool is_legacy_rollable_effect_type(ItemEffectType type)
 {
     return type == ItemEffectType::Attack ||

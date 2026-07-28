@@ -55,6 +55,7 @@ extern bool G_bRunning;
 #include "GameConfigSqliteStore.h"
 #include "TierConfigStore.h"
 #include "TierConfigValidator.h"
+#include "RollStrategy.h"
 
 namespace hb::server::config
 {
@@ -883,9 +884,15 @@ private:
 	// Sources the replicated modifier catalog stream.
 	hb::server::tier_config m_tier_config;
 
+	// The boot-selected Roll strategy; see RollStrategy.h for the seam's
+	// selection and reload contract.
+	std::unique_ptr<hb::server::roll_strategy> m_roll_strategy;
+	void select_roll_strategy();
+
 public:
 
 	const hb::server::tier_config& get_tier_config() const { return m_tier_config; }
+	hb::server::roll_strategy& get_roll_strategy() { return *m_roll_strategy; }
 
 	void check_force_recall_time(int client_h);
 	void set_playing_status(int client_h);

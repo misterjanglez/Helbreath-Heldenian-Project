@@ -27,10 +27,9 @@ public:
 	bool init_item_attr(CItem* item, int item_id);
 	void reload_item_configs();
 
-	// Item attribute generation
+	// Recomputes derived stats (weight/durability/price) from an item's
+	// rolled attributes; shared by the roll and the DB-load repair paths.
 	void adjust_rare_item_value(CItem* item);
-	bool generate_item_attributes(CItem* item);
-	int roll_attribute_value(int min_val, int max_val);
 
 	// Inventory management
 	bool add_item(int client_h, CItem* item, char mode);

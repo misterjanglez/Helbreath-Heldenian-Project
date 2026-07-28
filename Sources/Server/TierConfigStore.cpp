@@ -400,7 +400,7 @@ bool load_tier_config(sqlite3* db, tier_config& out)
 
 	hb::logger::log("Tier config loaded ({} mode): {} catalog rows, {} buckets, {} eligibility rows, "
 		"{} curves, {} grades, {} enchant steps, {} settings; legacy pools: {} pools, {} entries",
-		fresh.item_system == hb::shared::item::item_system_mode::tiered ? "tiered" : "legacy",
+		hb::shared::item::item_system_mode_name(fresh.item_system),
 		(int)fresh.catalog.size(), (int)fresh.buckets.size(), (int)fresh.eligibility.size(),
 		(int)fresh.curves.size(), (int)fresh.loot_grades.size(), (int)fresh.enchant_steps.size(),
 		(int)fresh.settings.size(), (int)fresh.attribute_pools.size(), pool_entries);

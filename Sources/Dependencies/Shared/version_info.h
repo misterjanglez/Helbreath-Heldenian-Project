@@ -19,11 +19,11 @@ namespace server
 {
 constexpr int major = 0;
 constexpr int minor = 9;
-constexpr int patch = 6;
+constexpr int patch = 7;
 constexpr int build_number = 267;
 constexpr const char* stage = "alpha";
-constexpr const char* display_version = "0.9.6-alpha";
-constexpr const char* full_version = "0.9.6-alpha+build.267";
+constexpr const char* display_version = "0.9.7-alpha";
+constexpr const char* full_version = "0.9.7-alpha+build.267";
 } // namespace server
 
 namespace client
@@ -48,6 +48,6 @@ constexpr const char* display_version = "0.1-alpha";
 constexpr const char* full_version = "0.1.0-alpha+build.14";
 } // namespace launcher
 
-constexpr const char* build_timestamp = "2026-07-28T03:22:13";
+constexpr const char* build_timestamp = "2026-07-28T03:38:45";
 
 } // namespace hb::version
