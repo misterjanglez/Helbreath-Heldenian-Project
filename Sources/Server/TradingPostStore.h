@@ -20,9 +20,8 @@ namespace hb::server
 	// tradingpost.db, and an account DB. This is the currency of every escrow
 	// transition: pulled out of inventory on escrow-in, stored as a
 	// listing/offer item, and handed back to deliver_to_bank on escrow-out.
-	// The attribute portion is the shared POD; the store's sqlite bind/read
-	// sites bridge it to the legacy prefix/secondary columns until the 1-E
-	// DDL swap.
+	// The attribute portion is the shared POD, stored as the 15 flat
+	// attribute columns.
 	struct escrow_item
 	{
 		int16_t  item_id             = 0;

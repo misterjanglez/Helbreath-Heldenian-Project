@@ -9,6 +9,11 @@
 #include "Packet/PacketTradingPost.h"
 #include "sqlite3.h"
 #include "Log.h"
+
+// Single source of truth for the tradingpost.db schema version: spliced into
+// the DDL stamp and passed to the VerifySqliteSchemaVersion gate. Bump on any
+// escrow schema change (fresh start - stale dev DBs are refused).
+#define TRADING_POST_SCHEMA_VERSION "2"
 #include "ServerLogChannels.h"
 
 #include <chrono>
@@ -103,18 +108,28 @@ namespace hb::server
 
 	bool trading_post_store::ensure_schema()
 	{
-		// Item columns mirror character_bank_items (AccountSqliteStore.cpp:434).
+		// Item columns mirror character_bank_items (AccountSqliteStore.cpp).
 		// ON DELETE CASCADE on the item/offer tables relies on foreign_keys=ON,
 		// set in open(): deleting a listings row removes its listing_items,
 		// offers, and (transitively) offer_items; deleting an offers row removes
 		// its offer_items.
+		const sqlite_schema_state schema_state =
+			VerifySqliteSchemaVersion(m_db, "tradingpost.db", TRADING_POST_SCHEMA_VERSION);
+		if (schema_state == sqlite_schema_state::mismatch) {
+			return false;
+		}
+		if (schema_state == sqlite_schema_state::current) {
+			return true;
+		}
+
+		// Fresh database: build the full schema at the current version.
 		const char* schema =
 			"BEGIN;"
 			"CREATE TABLE IF NOT EXISTS meta ("
 			" key TEXT PRIMARY KEY,"
 			" value TEXT NOT NULL"
 			");"
-			"INSERT OR IGNORE INTO meta(key, value) VALUES('schema_version','1');"
+			"INSERT INTO meta(key, value) VALUES('schema_version','" TRADING_POST_SCHEMA_VERSION "');"
 			"CREATE TABLE IF NOT EXISTS listings ("
 			" listing_id      INTEGER PRIMARY KEY AUTOINCREMENT,"
 			" seller_name     TEXT NOT NULL,"
@@ -138,12 +153,7 @@ namespace hb::server
 			" spec_effect_value2 INTEGER NOT NULL,"
 			" spec_effect_value3 INTEGER NOT NULL,"
 			" cur_durability INTEGER NOT NULL,"
-			" custom_made INTEGER NOT NULL,"
-			" prefix_type INTEGER NOT NULL,"
-			" prefix_value INTEGER NOT NULL,"
-			" secondary_type INTEGER NOT NULL,"
-			" secondary_value INTEGER NOT NULL,"
-			" enchant_bonus INTEGER NOT NULL,"
+			HB_ITEM_ATTR_COLUMNS_DDL
 			" PRIMARY KEY (listing_id, slot)"
 			");"
 			"CREATE TABLE IF NOT EXISTS offers ("
@@ -168,12 +178,7 @@ namespace hb::server
 			" spec_effect_value2 INTEGER NOT NULL,"
 			" spec_effect_value3 INTEGER NOT NULL,"
 			" cur_durability INTEGER NOT NULL,"
-			" custom_made INTEGER NOT NULL,"
-			" prefix_type INTEGER NOT NULL,"
-			" prefix_value INTEGER NOT NULL,"
-			" secondary_type INTEGER NOT NULL,"
-			" secondary_value INTEGER NOT NULL,"
-			" enchant_bonus INTEGER NOT NULL,"
+			HB_ITEM_ATTR_COLUMNS_DDL
 			" PRIMARY KEY (offer_id, slot)"
 			");"
 			"CREATE TABLE IF NOT EXISTS notices ("
@@ -193,8 +198,9 @@ namespace hb::server
 			return nullptr;
 		}
 
-		// Mirror the bank-row -> CItem deserialization (Game.cpp:4283): config
-		// template via init_item_attr, then overlay the stored instance columns.
+		// Mirror the bank-row -> CItem deserialization in CGame's character
+		// load: config template via init_item_attr, then overlay the stored
+		// instance columns.
 		CItem* item = new CItem();
 		if (!m_game->m_item_manager->init_item_attr(item, static_cast<int>(e.item_id))) {
 			delete item;
@@ -358,13 +364,13 @@ namespace hb::server
 	bool trading_post_store::insert_item_rows(const char* table, const char* id_column,
 		int64_t owner_id, const std::vector<escrow_item>& items)
 	{
-		char sql[640];
+		char sql[1024];
 		std::snprintf(sql, sizeof(sql),
 			"INSERT INTO %s(%s, slot, item_id, count, touch_effect_type,"
 			" touch_effect_value1, touch_effect_value2, touch_effect_value3, item_color,"
 			" spec_effect_value1, spec_effect_value2, spec_effect_value3, cur_durability,"
-			" custom_made, prefix_type, prefix_value, secondary_type, secondary_value, enchant_bonus)"
-			" VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?);",
+			HB_ITEM_ATTR_COLUMNS_SQL ")"
+			" VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?," HB_ITEM_ATTR_PLACEHOLDERS_SQL ");",
 			table, id_column);
 
 		sqlite3_stmt* stmt = nullptr;
@@ -391,14 +397,7 @@ namespace hb::server
 			ok &= (sqlite3_bind_int(stmt, c++, e.spec_effect_value2) == SQLITE_OK);
 			ok &= (sqlite3_bind_int(stmt, c++, e.spec_effect_value3) == SQLITE_OK);
 			ok &= (sqlite3_bind_int(stmt, c++, e.cur_durability) == SQLITE_OK);
-			// Legacy prefix/secondary columns until the 1-E DDL swap; tier and
-			// modifier slots [2]/[3] have no columns yet and are 0 pre-Phase-3.
-			ok &= (sqlite3_bind_int(stmt, c++, e.attributes.custom_made) == SQLITE_OK);
-			ok &= (sqlite3_bind_int(stmt, c++, e.attributes.modifiers[0].type) == SQLITE_OK);
-			ok &= (sqlite3_bind_int(stmt, c++, e.attributes.modifiers[0].value) == SQLITE_OK);
-			ok &= (sqlite3_bind_int(stmt, c++, e.attributes.modifiers[1].type) == SQLITE_OK);
-			ok &= (sqlite3_bind_int(stmt, c++, e.attributes.modifiers[1].value) == SQLITE_OK);
-			ok &= (sqlite3_bind_int(stmt, c++, e.attributes.enchant_bonus) == SQLITE_OK);
+			ok &= BindItemAttributeColumns(stmt, c, e.attributes);
 			if (ok && sqlite3_step(stmt) != SQLITE_DONE) {
 				ok = false;
 			}
@@ -624,7 +623,7 @@ namespace hb::server
 			"SELECT item_id, count, touch_effect_type, touch_effect_value1,"
 			" touch_effect_value2, touch_effect_value3, item_color, spec_effect_value1,"
 			" spec_effect_value2, spec_effect_value3, cur_durability,"
-			" custom_made, prefix_type, prefix_value, secondary_type, secondary_value, enchant_bonus"
+			HB_ITEM_ATTR_COLUMNS_SQL
 			" FROM offer_items WHERE offer_id=? ORDER BY slot;",
 			-1, &stmt, nullptr) != SQLITE_OK) {
 			return false;
@@ -644,17 +643,7 @@ namespace hb::server
 			e.spec_effect_value2 = static_cast<int16_t>(sqlite3_column_int(stmt, c++));
 			e.spec_effect_value3 = static_cast<int16_t>(sqlite3_column_int(stmt, c++));
 			e.cur_durability = static_cast<uint16_t>(sqlite3_column_int(stmt, c++));
-			// Legacy prefix/secondary columns until the 1-E DDL swap.
-			{
-				int custom_made = sqlite3_column_int(stmt, c++);
-				int prefix_type = sqlite3_column_int(stmt, c++);
-				int prefix_value = sqlite3_column_int(stmt, c++);
-				int secondary_type = sqlite3_column_int(stmt, c++);
-				int secondary_value = sqlite3_column_int(stmt, c++);
-				int enchant_bonus = sqlite3_column_int(stmt, c++);
-				e.attributes = hb::shared::item::item_attribute_data::from_legacy_fields(
-					custom_made, prefix_type, prefix_value, secondary_type, secondary_value, enchant_bonus);
-			}
+			e.attributes = ReadItemAttributeColumns(stmt, c);
 			out_items.push_back(e);
 		}
 		sqlite3_finalize(stmt);
@@ -767,13 +756,7 @@ namespace hb::server
 			r.spec_effect_value2 = e.spec_effect_value2;
 			r.spec_effect_value3 = e.spec_effect_value3;
 			r.cur_durability = e.cur_durability;
-			// The bank row's legacy int columns feed the INSERT binds until 1-E.
-			r.custom_made = e.attributes.custom_made;
-			r.prefix_type = e.attributes.modifiers[0].type;
-			r.prefix_value = e.attributes.modifiers[0].value;
-			r.secondary_type = e.attributes.modifiers[1].type;
-			r.secondary_value = e.attributes.modifiers[1].value;
-			r.enchant_bonus = e.attributes.enchant_bonus;
+			r.attributes = e.attributes;
 			rows.push_back(r);
 		}
 
@@ -982,7 +965,7 @@ namespace hb::server
 			"SELECT item_id, count, touch_effect_type, touch_effect_value1,"
 			" touch_effect_value2, touch_effect_value3, item_color, spec_effect_value1,"
 			" spec_effect_value2, spec_effect_value3, cur_durability,"
-			" custom_made, prefix_type, prefix_value, secondary_type, secondary_value, enchant_bonus"
+			HB_ITEM_ATTR_COLUMNS_SQL
 			" FROM listing_items WHERE listing_id = ? ORDER BY slot;",
 			-1, &stmt, nullptr) != SQLITE_OK) {
 			return false;
@@ -1002,17 +985,7 @@ namespace hb::server
 			e.spec_effect_value2 = static_cast<int16_t>(sqlite3_column_int(stmt, c++));
 			e.spec_effect_value3 = static_cast<int16_t>(sqlite3_column_int(stmt, c++));
 			e.cur_durability = static_cast<uint16_t>(sqlite3_column_int(stmt, c++));
-			// Legacy prefix/secondary columns until the 1-E DDL swap.
-			{
-				int custom_made = sqlite3_column_int(stmt, c++);
-				int prefix_type = sqlite3_column_int(stmt, c++);
-				int prefix_value = sqlite3_column_int(stmt, c++);
-				int secondary_type = sqlite3_column_int(stmt, c++);
-				int secondary_value = sqlite3_column_int(stmt, c++);
-				int enchant_bonus = sqlite3_column_int(stmt, c++);
-				e.attributes = hb::shared::item::item_attribute_data::from_legacy_fields(
-					custom_made, prefix_type, prefix_value, secondary_type, secondary_value, enchant_bonus);
-			}
+			e.attributes = ReadItemAttributeColumns(stmt, c);
 			out.push_back(e);
 		}
 		sqlite3_finalize(stmt);

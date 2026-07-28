@@ -7,6 +7,7 @@
 #include "Item/ItemAttributeData.h"
 
 struct sqlite3;
+struct sqlite3_stmt;
 
 struct AccountDbAccountData
 {
@@ -135,18 +136,11 @@ struct AccountDbItemRow
     int spec_effect_value2;
     int spec_effect_value3;
     int cur_durability;
-    int custom_made;
-    int prefix_type;
-    int prefix_value;
-    int secondary_type;
-    int secondary_value;
-    int enchant_bonus;
     int pos_x;
     int pos_y;
     int is_equipped;
-    // Attribute POD assembled from the legacy columns above by the load
-    // functions (not itself a DB column until the 1-E DDL swap). Insert
-    // paths bind the legacy int columns directly.
+    // Loaded/inserted through the 15 flat attribute columns as one unit
+    // (HB_ITEM_ATTR_COLUMNS_SQL below).
     hb::shared::item::item_attribute_data attributes;
 };
 
@@ -164,15 +158,8 @@ struct AccountDbBankItemRow
     int spec_effect_value2;
     int spec_effect_value3;
     int cur_durability;
-    int custom_made;
-    int prefix_type;
-    int prefix_value;
-    int secondary_type;
-    int secondary_value;
-    int enchant_bonus;
-    // Attribute POD assembled from the legacy columns above by the load
-    // functions (not itself a DB column until the 1-E DDL swap). Insert
-    // paths bind the legacy int columns directly.
+    // Loaded/inserted through the 15 flat attribute columns as one unit
+    // (HB_ITEM_ATTR_COLUMNS_SQL below).
     hb::shared::item::item_attribute_data attributes;
 };
 
@@ -189,6 +176,49 @@ struct AccountDbEquippedItem
 };
 
 class CClient;
+
+// The 15 flat item-attribute columns shared by every item table
+// (character_items, character_bank_items, trading-post listing_items /
+// offer_items), in item_attribute_data field order. Macros (not constexpr)
+// because they splice into adjacent SQL string literals at compile time.
+// Helpers bind/read the whole POD as one unit; col advances past all 15.
+#define HB_ITEM_ATTR_COLUMNS_SQL \
+    " custom_made, tier," \
+    " mod1_type, mod1_value, mod1_value2, mod2_type, mod2_value, mod2_value2," \
+    " mod3_type, mod3_value, mod3_value2, mod4_type, mod4_value, mod4_value2," \
+    " enchant_bonus"
+#define HB_ITEM_ATTR_PLACEHOLDERS_SQL "?,?,?,?,?,?,?,?,?,?,?,?,?,?,?"
+#define HB_ITEM_ATTR_COLUMNS_DDL \
+    " custom_made INTEGER NOT NULL DEFAULT 0," \
+    " tier INTEGER NOT NULL DEFAULT 0," \
+    " mod1_type INTEGER NOT NULL DEFAULT 0," \
+    " mod1_value INTEGER NOT NULL DEFAULT 0," \
+    " mod1_value2 INTEGER NOT NULL DEFAULT 0," \
+    " mod2_type INTEGER NOT NULL DEFAULT 0," \
+    " mod2_value INTEGER NOT NULL DEFAULT 0," \
+    " mod2_value2 INTEGER NOT NULL DEFAULT 0," \
+    " mod3_type INTEGER NOT NULL DEFAULT 0," \
+    " mod3_value INTEGER NOT NULL DEFAULT 0," \
+    " mod3_value2 INTEGER NOT NULL DEFAULT 0," \
+    " mod4_type INTEGER NOT NULL DEFAULT 0," \
+    " mod4_value INTEGER NOT NULL DEFAULT 0," \
+    " mod4_value2 INTEGER NOT NULL DEFAULT 0," \
+    " enchant_bonus INTEGER NOT NULL DEFAULT 0,"
+bool BindItemAttributeColumns(sqlite3_stmt* stmt, int& col, const hb::shared::item::item_attribute_data& attributes);
+hb::shared::item::item_attribute_data ReadItemAttributeColumns(sqlite3_stmt* stmt, int& col);
+
+// Loud stale-schema gate: a dev DB whose meta.schema_version differs from
+// expected_version refuses to load (fresh start — no migrations). A database
+// with tables but no readable version row is pre-versioning and also refused.
+// Only the item-carrying stores use this; GameConfig/MapInfo stores rebuild or
+// self-heal their content in place instead.
+enum class sqlite_schema_state
+{
+    fresh,      // no tables at all - caller must run its DDL
+    current,    // schema_version matches - caller may skip its DDL
+    mismatch,   // stale or unreadable - refuse to load (already logged)
+};
+sqlite_schema_state VerifySqliteSchemaVersion(sqlite3* db, const char* db_label, const char* expected_version);
 
 bool EnsureAccountDatabase(const char* account_name, sqlite3** outDb, std::string& outPath);
 bool LoadAccountRecord(sqlite3* db, const char* account_name, AccountDbAccountData& outData);

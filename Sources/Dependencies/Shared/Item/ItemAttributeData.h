@@ -35,25 +35,6 @@ struct HB_PACKED item_attribute_data
 		return custom_made || tier || enchant_bonus
 			|| modifiers[0].type || modifiers[1].type || modifiers[2].type || modifiers[3].type;
 	}
-
-	// Bridge for the legacy prefix/secondary DB columns (character_items,
-	// character_bank_items, trading-post escrow) until the 1-E DDL swap moves
-	// storage to the flat 13-column layout. Values are unified modifier IDs;
-	// tier and slots [2]/[3] cannot be represented in the legacy columns and
-	// stay 0 (always true before the tiered strategy exists — nothing lost).
-	// Takes int so sqlite column reads pass through uncast.
-	static item_attribute_data from_legacy_fields(int custom_made, int prefix_type, int prefix_value,
-		int secondary_type, int secondary_value, int enchant_bonus)
-	{
-		item_attribute_data a;
-		a.custom_made = static_cast<uint8_t>(custom_made);
-		a.modifiers[0].type = static_cast<uint8_t>(prefix_type);
-		a.modifiers[0].value = static_cast<uint8_t>(prefix_value);
-		a.modifiers[1].type = static_cast<uint8_t>(secondary_type);
-		a.modifiers[1].value = static_cast<uint8_t>(secondary_value);
-		a.enchant_bonus = static_cast<uint8_t>(enchant_bonus);
-		return a;
-	}
 };
 HB_PACK_END
 
