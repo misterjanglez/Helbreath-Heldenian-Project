@@ -14,6 +14,9 @@
 #include <format>
 #include <string>
 #include "Screen_OnGame.h"
+#ifdef TESTER_ONLY
+#include "DialogBox_ItemCreator.h"
+#endif
 
 using namespace hb::shared::net;
 namespace NetworkMessageHandlers {
@@ -61,6 +64,17 @@ void HandleNoticeMsg(CGame* game, char* data)
 		data, sizeof(hb::net::PacketNotifyNoticeMsg));
 	if (!pkt) return;
 	game->add_event_list(pkt->text, 10);
+
+#ifdef TESTER_ONLY
+	// A GM mint is answered with a notice — "Created Nx ..." or "Mint
+	// rejected: <reason>". While the creator is waiting for that answer it
+	// claims the text so the reason (the Bands and the tier scope never
+	// replicate) lands beside the pickers instead of scrolling away.
+	auto* creator = dynamic_cast<DialogBox_ItemCreator*>(
+		game->get_dialog_box_manager().get_dialog_box(DialogBoxId::ItemCreator));
+	if (creator != nullptr && creator->wants_server_notice())
+		creator->receive_server_notice(pkt->text);
+#endif
 }
 
 void HandleStatusText(CGame* game, char* data)

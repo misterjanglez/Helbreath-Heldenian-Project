@@ -11,6 +11,7 @@
 #include "TextLibExt.h"
 #include "TextInputManager.h"
 #include "TextFieldRenderer.h"
+#include "ItemNameFormatter.h"
 #include "Item/ItemEnums.h"
 #include <algorithm>
 #include <format>
@@ -69,6 +70,29 @@ namespace layout
 	constexpr int preview_text_y = 198;
 	constexpr int btn_y = 234;
 	constexpr int btn_w = 100;
+
+	// --- Tiered configure page (Item Tiers 4-D) ---------------------------
+	// The frame is a fixed 258x339 sprite, so the vertical budget is sized
+	// against the worst case: a Legendary with four modifier rows.
+	constexpr int t_col_w = 68;                    // three columns across the top row
+	constexpr int t_col1_x = 22;
+	constexpr int t_col2_x = 95;
+	constexpr int t_col3_x = 168;
+	constexpr int t_top_label_y = 56;
+	constexpr int t_top_sel_y = 70;
+	constexpr int t_slot_label_y = 90;
+	constexpr int t_slot_y = 104;                  // first modifier row
+	constexpr int t_slot_pitch = 18;
+	constexpr int t_type_x = 22;
+	constexpr int t_type_w = 140;
+	constexpr int t_value_x = 166;
+	constexpr int t_value_w = 70;
+	constexpr int t_pair_w = 34;                   // a pair splits the value column
+	constexpr int t_pair2_x = 202;
+	constexpr int t_preview_y = 180;
+	constexpr int t_notice_y = 198;                // server reply, up to two lines
+	constexpr int t_notice_pitch = 13;
+	constexpr int t_notice_chars = 44;             // wrap width at GameFont::Default
 }
 
 // Dropdown visual style — warm tones to match parchment dialog background
@@ -97,6 +121,7 @@ bool DialogBox_ItemCreator::on_disable()
 	m_initial_load = false;
 	m_last_sent_search.clear();
 	m_open_dropdown = dropdown_id::none;
+	reset_tier_state();
 	return true;
 }
 
@@ -189,10 +214,162 @@ void DialogBox_ItemCreator::build_valid_options(int16_t effect_type)
 	}
 }
 
+// ---------------------------------------------------------------------------
+// TIERED MODE (Item Tiers 4-D)
+// ---------------------------------------------------------------------------
+
+namespace {
+
+// Picker label for a catalog row: the item-name prefix word when the row has
+// one, else the tooltip label (trailing padding trimmed), clipped to what a
+// dropdown column can actually render.
+std::string catalog_label(const modifier_catalog_entry& row, uint8_t modifier_id)
+{
+	std::string label = row.display_name.empty() ? row.effect_label : row.display_name;
+	while (!label.empty() && label.back() == ' ') label.pop_back();
+	if (label.empty()) label = std::format("Modifier {}", (int)modifier_id);
+	if (label.size() > 26) label.resize(26);
+	return label;
+}
+
+} // namespace
+
+void DialogBox_ItemCreator::reset_tier_state()
+{
+	m_tier = 0;
+	for (auto& slot : m_tier_slots) slot = {};
+	m_awaiting_mint_reply = false;
+	m_server_notice.clear();
+	m_server_notice_ok = false;
+}
+
+// Picking a Tier retires every slot the new Tier cannot carry: the ones past
+// the count (count == tier, spec §3) and any modifier whose min-tier ladder
+// now sits above it. Both rules are replicated, so the dialog can hold them
+// without asking.
+void DialogBox_ItemCreator::apply_tier_change(int tier)
+{
+	m_tier = tier;
+	for (int i = 0; i < static_cast<int>(hb::shared::item::modifier_slot_count); i++)
+	{
+		const uint8_t id = m_tier_slots[i].modifier_id;
+		if (i >= tier || (id != 0 && m_game->m_modifier_catalog[id].min_tier > tier))
+			m_tier_slots[i] = {};
+	}
+}
+
+std::vector<DialogBox_ItemCreator::tier_option> DialogBox_ItemCreator::tier_options_for_slot(int slot) const
+{
+	std::vector<tier_option> options;
+	options.push_back({ 0, "None" });
+	if (m_tier <= 0) return options;
+
+	// A Bucket another slot already spoke for is absent rather than greyed:
+	// the Bucket law is structural, and offering a pick the server must
+	// refuse is not a choice.
+	bool bucket_taken[256] = {};
+	for (int i = 0; i < static_cast<int>(hb::shared::item::modifier_slot_count); i++)
+	{
+		if (i == slot) continue;
+		const uint8_t id = m_tier_slots[i].modifier_id;
+		if (id != 0) bucket_taken[m_game->m_modifier_catalog[id].bucket_id] = true;
+	}
+
+	for (int id = 1; id < 256; id++)
+	{
+		const auto& row = m_game->m_modifier_catalog[id];
+		if (!row.present || row.min_tier > m_tier || bucket_taken[row.bucket_id]) continue;
+		options.push_back({ static_cast<uint8_t>(id), catalog_label(row, static_cast<uint8_t>(id)) });
+	}
+	return options;
+}
+
+// Bands do not replicate (the catalog packet carries multiplier, bucket and
+// min-tier only), so the value picker offers the whole raw range and the
+// server's rejection names the legal window. Options read in display units,
+// which is what the tooltip and the rejection string both speak.
+std::vector<std::string> DialogBox_ItemCreator::value_options(int multiplier) const
+{
+	std::vector<std::string> options;
+	if (multiplier <= 0) return options;   // value-less modifier (Agile)
+	for (int raw = 1; raw <= max_tiered_value; raw++)
+		options.push_back(std::to_string(raw * multiplier));
+	return options;
+}
+
+// The one local gate: count == tier is the invariant the pickers own, and an
+// empty slot would be rejected on arrival with nothing to point at.
+std::string DialogBox_ItemCreator::missing_tier_input() const
+{
+	for (int i = 0; i < m_tier; i++)
+		if (m_tier_slots[i].modifier_id == 0)
+			return std::format("Pick a modifier for all {} slots.", m_tier);
+	return {};
+}
+
+hb::shared::item::item_attribute_data DialogBox_ItemCreator::build_requested_attributes() const
+{
+	hb::shared::item::item_attribute_data attributes{};
+	attributes.tier = static_cast<uint8_t>(m_tier);
+	attributes.enchant_bonus = static_cast<uint8_t>(m_enchant_value);
+
+	for (int i = 0; i < m_tier; i++)
+	{
+		const auto& slot = m_tier_slots[i];
+		if (slot.modifier_id == 0) continue;
+		const auto& row = m_game->m_modifier_catalog[slot.modifier_id];
+		attributes.modifiers[i].type = slot.modifier_id;
+		// A value-less modifier must ride at 0 and a non-pair must leave
+		// value2 at 0 — both are structural rules, so the picker never even
+		// shows the field that would break them.
+		attributes.modifiers[i].value = row.multiplier == 0 ? 0 : static_cast<uint8_t>(slot.value);
+		attributes.modifiers[i].value2 = row.is_pair()
+			? static_cast<uint8_t>(slot.value2) : 0;
+	}
+	return attributes;
+}
+
+void DialogBox_ItemCreator::send_tiered_mint()
+{
+	if (m_selected_index < 0 || m_selected_index >= m_result_count) return;
+
+	hb::net::PacketCommandTesterCreateItemTiered pkt{};
+	pkt.base.header.msg_id = hb::shared::net::MsgId::CommandCommon;
+	pkt.base.header.msg_type = CommonType::TesterCreateItemTiered;
+	pkt.base.x = player().m_player_x;
+	pkt.base.y = player().m_player_y;
+	pkt.item_id = m_results[m_selected_index].item_id;
+	pkt.count = m_item_count;
+	pkt.attributes = build_requested_attributes();
+
+	m_awaiting_mint_reply = true;
+	m_server_notice.clear();
+	send_game_packet(pkt);
+}
+
+void DialogBox_ItemCreator::receive_server_notice(const char* text)
+{
+	m_awaiting_mint_reply = false;
+	m_server_notice = text != nullptr ? text : "";
+	// The server phrases an accepted mint as "Created Nx ..." and a refused
+	// one as "Mint rejected: <reason>"; a partial run says both.
+	m_server_notice_ok = m_server_notice.rfind("Created", 0) == 0;
+}
+
 std::string DialogBox_ItemCreator::build_preview_string() const
 {
 	if (m_selected_index < 0 || m_selected_index >= m_result_count)
 		return "";
+
+	// Tiered mode previews the real thing: the same POD the mint will carry,
+	// run through the same formatter every other surface uses, so the Tier
+	// word and the modifier lines are the server's own presentation data.
+	if (m_game->is_tiered_mode())
+	{
+		hb::shared::item::item_instance_data data{};
+		data.attributes = build_requested_attributes();
+		return item_name_formatter::get().format(m_results[m_selected_index].item_id, data).name;
+	}
 
 	std::string result;
 
@@ -240,7 +417,7 @@ void DialogBox_ItemCreator::receive_search_results(const hb::net::PacketNotifyTe
 // ---------------------------------------------------------------------------
 
 void DialogBox_ItemCreator::draw_dropdown_field(int x, int y, int w,
-	const char* text, bool is_open, bool is_hover)
+	const char* text, bool is_open, bool is_hover, const hb::shared::render::Color& text_color)
 {
 	// Background box
 	m_game->m_Renderer->draw_rect_filled(x, y, w, dropdown_h, dd_style::bg);
@@ -249,22 +426,118 @@ void DialogBox_ItemCreator::draw_dropdown_field(int x, int y, int w,
 	auto border = is_open ? dd_style::border_open : (is_hover ? dd_style::border_hover : dd_style::border);
 	m_game->m_Renderer->draw_rect_outline(x, y, w, dropdown_h, border);
 
-	// Selected value text (left-aligned with padding) — always gold
-	put_string(x + 4, y + 2, text, GameColors::UIPaleYellow);
+	// Selected value text (left-aligned with padding)
+	put_string(x + 4, y + 2, text, text_color);
 }
 
-int DialogBox_ItemCreator::get_open_dropdown_count() const
+// The one description of the open dropdown. The overlay draws what this
+// returns and the click handler hit-tests the same thing, so the list on
+// screen and the list being indexed can never drift apart.
+std::vector<std::string> DialogBox_ItemCreator::open_dropdown_options(short sX, short sY,
+	int& out_x, int& out_y, int& out_w, int& out_selected) const
 {
+	const int lx = sX + layout::col_left_x1;
+	const int rx = sX + layout::col_right_x1;
+
+	std::vector<std::string> options;
+	out_x = out_y = out_w = 0;
+	out_selected = -1;
+
+	auto anchor = [&](int x, int y, int w, int selected)
+	{
+		out_x = x; out_y = sY + y; out_w = w; out_selected = selected;
+	};
+
 	switch (m_open_dropdown)
 	{
-	case dropdown_id::prefix_type:  return static_cast<int>(m_valid_prefixes.size());
-	case dropdown_id::effect_type:  return static_cast<int>(m_valid_secondaries.size());
-	case dropdown_id::prefix_value: return max_value;
-	case dropdown_id::effect_value: return max_value;
-	case dropdown_id::upgrade:      return 16;
-	case dropdown_id::count:        return 10;
-	default:                        return 0;
+	case dropdown_id::prefix_type:
+		anchor(lx, layout::row1_sel_y, layout::col_left_w, m_prefix_index);
+		for (const auto& p : m_valid_prefixes) options.push_back(p.name);
+		break;
+	case dropdown_id::effect_type:
+		anchor(rx, layout::row1_sel_y, layout::col_right_w, m_secondary_index);
+		for (const auto& s : m_valid_secondaries) options.push_back(s.name);
+		break;
+	case dropdown_id::prefix_value:
+		if (m_prefix_index > 0 && m_prefix_index < static_cast<int>(m_valid_prefixes.size()))
+		{
+			anchor(lx, layout::row2_sel_y, layout::col_left_w, m_prefix_value - 1);
+			const int mult = m_valid_prefixes[m_prefix_index].multiplier;
+			for (int i = 1; i <= max_value; i++) options.push_back(std::to_string(i * mult));
+		}
+		break;
+	case dropdown_id::effect_value:
+		if (m_secondary_index > 0 && m_secondary_index < static_cast<int>(m_valid_secondaries.size()))
+		{
+			anchor(rx, layout::row2_sel_y, layout::col_right_w, m_secondary_value - 1);
+			const int mult = m_valid_secondaries[m_secondary_index].multiplier;
+			for (int i = 1; i <= max_value; i++) options.push_back(std::to_string(i * mult));
+		}
+		break;
+
+	// Upgrade and Count sit on row 3 in legacy mode and on the tiered page's
+	// top row; the mode picks the anchor, the contents are the same.
+	case dropdown_id::upgrade:
+		if (m_game->is_tiered_mode())
+			anchor(sX + layout::t_col2_x, layout::t_top_sel_y, layout::t_col_w, m_enchant_value);
+		else
+			anchor(lx, layout::row3_sel_y, layout::col_left_w, m_enchant_value);
+		for (int i = 0; i <= 15; i++) options.push_back(std::format("+{}", i));
+		break;
+	case dropdown_id::count:
+		if (m_game->is_tiered_mode())
+			anchor(sX + layout::t_col3_x, layout::t_top_sel_y, layout::t_col_w, m_item_count - 1);
+		else
+			anchor(rx, layout::row3_sel_y, layout::col_right_w, m_item_count - 1);
+		for (int i = 1; i <= 10; i++) options.push_back(std::to_string(i));
+		break;
+
+	case dropdown_id::tier:
+	{
+		anchor(sX + layout::t_col1_x, layout::t_top_sel_y, layout::t_col_w, m_tier);
+		options.push_back("None");
+		for (uint8_t t = 1; t <= hb::shared::item::tier_count; t++)
+		{
+			const auto& row = m_game->m_tier_presentation[t - 1];
+			options.push_back(row.name.empty() ? std::format("Tier {}", (int)t) : row.name);
+		}
+		break;
 	}
+	case dropdown_id::mod_type:
+	{
+		const auto tier_opts = tier_options_for_slot(m_open_slot);
+		int selected = 0;
+		for (size_t i = 0; i < tier_opts.size(); i++)
+		{
+			options.push_back(tier_opts[i].label);
+			if (tier_opts[i].modifier_id == m_tier_slots[m_open_slot].modifier_id)
+				selected = static_cast<int>(i);
+		}
+		anchor(sX + layout::t_type_x, layout::t_slot_y + m_open_slot * layout::t_slot_pitch,
+			layout::t_type_w, selected);
+		break;
+	}
+	case dropdown_id::mod_value:
+	case dropdown_id::mod_value2:
+	{
+		const uint8_t id = m_tier_slots[m_open_slot].modifier_id;
+		if (id == 0) break;
+		const auto& row = m_game->m_modifier_catalog[id];
+		const bool pair = row.is_pair();
+		const bool second = (m_open_dropdown == dropdown_id::mod_value2);
+		const int x = second ? layout::t_pair2_x : layout::t_value_x;
+		const int w = pair ? layout::t_pair_w : layout::t_value_w;
+		anchor(sX + x, layout::t_slot_y + m_open_slot * layout::t_slot_pitch, w,
+			(second ? m_tier_slots[m_open_slot].value2 : m_tier_slots[m_open_slot].value) - 1);
+		options = value_options(row.multiplier);
+		break;
+	}
+
+	default:
+		break;
+	}
+
+	return options;
 }
 
 // ---------------------------------------------------------------------------
@@ -360,6 +633,149 @@ void DialogBox_ItemCreator::draw_search_page(short sX, short sY, short size_x, s
 }
 
 // ---------------------------------------------------------------------------
+// CONFIGURE PAGE — TIERED BODY
+// ---------------------------------------------------------------------------
+
+void DialogBox_ItemCreator::draw_tiered_body(short sX, short sY, short size_x, short mouse_x, short mouse_y)
+{
+	auto field = [&](dropdown_id id, int slot, int x, int y, int w, const std::string& text,
+		const hb::shared::render::Color& color = GameColors::UIPaleYellow)
+	{
+		const bool open = (m_open_dropdown == id && m_open_slot == slot);
+		const bool hover = !open && mouse_x >= x && mouse_x <= x + w
+			&& mouse_y >= y && mouse_y < y + dropdown_h;
+		draw_dropdown_field(x, y, w, text.c_str(), open, hover, color);
+	};
+
+	// --- TOP ROW: Tier / Upgrade / Count ---
+	const int c1 = sX + layout::t_col1_x;
+	const int c2 = sX + layout::t_col2_x;
+	const int c3 = sX + layout::t_col3_x;
+
+	put_string(c1 + 2, sY + layout::t_top_label_y, "Tier", GameColors::UIWhite);
+	put_string(c2 + 2, sY + layout::t_top_label_y, "Upgrade", GameColors::UIWhite);
+	put_string(c3 + 2, sY + layout::t_top_label_y, "Count", GameColors::UIWhite);
+
+	const tier_presentation_entry* tier_row = item_name_formatter::get().tier_row(static_cast<uint8_t>(m_tier));
+	const std::string tier_text = (m_tier == 0) ? "None"
+		: (tier_row != nullptr && !tier_row->name.empty() ? tier_row->name : std::format("Tier {}", m_tier));
+	field(dropdown_id::tier, 0, c1, sY + layout::t_top_sel_y, layout::t_col_w, tier_text,
+		tier_row != nullptr ? tier_row->color : GameColors::UIPaleYellow);
+	field(dropdown_id::upgrade, 0, c2, sY + layout::t_top_sel_y, layout::t_col_w,
+		std::format("+{}", m_enchant_value));
+	field(dropdown_id::count, 0, c3, sY + layout::t_top_sel_y, layout::t_col_w,
+		std::to_string(m_item_count));
+
+	// --- MODIFIER SLOTS: exactly `tier` of them (spec §3, count == tier) ---
+	if (m_tier == 0)
+	{
+		put_aligned_string(sX + layout::col_left_x1, sX + layout::col_right_x2,
+			sY + layout::t_slot_label_y + 10, "Plain item - no tier, no modifiers.", GameColors::UIWhite);
+	}
+	else
+	{
+		put_string(sX + layout::t_type_x + 2, sY + layout::t_slot_label_y, "Modifiers", GameColors::UIWhite);
+		put_string(sX + layout::t_value_x + 2, sY + layout::t_slot_label_y, "Value", GameColors::UIWhite);
+
+		for (int i = 0; i < m_tier; i++)
+		{
+			const int y = sY + layout::t_slot_y + i * layout::t_slot_pitch;
+			const auto& slot = m_tier_slots[i];
+			const std::string type_text = (slot.modifier_id == 0) ? "None"
+				: catalog_label(m_game->m_modifier_catalog[slot.modifier_id], slot.modifier_id);
+			field(dropdown_id::mod_type, i, sX + layout::t_type_x, y, layout::t_type_w, type_text);
+
+			if (slot.modifier_id == 0) continue;
+
+			// A value-less modifier (multiplier 0) has nothing to pick; a pair
+			// splits the column into its two independent rolls.
+			const auto& row = m_game->m_modifier_catalog[slot.modifier_id];
+			if (row.multiplier == 0) continue;
+
+			const bool pair = row.is_pair();
+			field(dropdown_id::mod_value, i, sX + layout::t_value_x, y,
+				pair ? layout::t_pair_w : layout::t_value_w,
+				std::to_string(slot.value * row.multiplier));
+			if (pair)
+				field(dropdown_id::mod_value2, i, sX + layout::t_pair2_x, y, layout::t_pair_w,
+					std::to_string(slot.value2 * row.multiplier));
+		}
+	}
+
+	// --- PREVIEW: the requested instance, formatted like any other item ---
+	const auto preview = build_preview_string();
+	if (!preview.empty())
+	{
+		hb::shared::text::draw_text_aligned(GameFont::Default,
+			sX, sY + layout::t_preview_y, size_x, 15,
+			preview.c_str(),
+			hb::shared::text::TextStyle::from_color(tier_row != nullptr ? tier_row->color : GameColors::UIPaleYellow),
+			hb::shared::text::Align::TopCenter);
+	}
+
+	// --- SERVER REPLY: the Bands and the tier scope are the server's word,
+	// so its rejection is the only place a GM learns them.
+	if (!m_server_notice.empty())
+	{
+		const auto color = m_server_notice_ok ? GameColors::ChatEventGreen : GameColors::UIWarningRed;
+		for (size_t pos = 0, line = 0; pos < m_server_notice.size() && line < 2; line++)
+		{
+			hb::shared::text::draw_text_aligned(GameFont::Default,
+				sX, sY + layout::t_notice_y + static_cast<int>(line) * layout::t_notice_pitch, size_x, 15,
+				m_server_notice.substr(pos, layout::t_notice_chars).c_str(),
+				hb::shared::text::TextStyle::from_color(color),
+				hb::shared::text::Align::TopCenter);
+			pos += layout::t_notice_chars;
+		}
+	}
+}
+
+bool DialogBox_ItemCreator::on_click_tiered_body(short sX, short sY)
+{
+	const short mouse_x = static_cast<short>(hb::shared::input::get_mouse_x());
+	const short mouse_y = static_cast<short>(hb::shared::input::get_mouse_y());
+
+	auto try_open = [&](dropdown_id id, int slot, int x, int y, int w) -> bool
+	{
+		if (mouse_x < x || mouse_x > x + w || mouse_y < y || mouse_y >= y + dropdown_h)
+			return false;
+		m_open_dropdown = id;
+		m_open_slot = slot;
+		m_dropdown_scroll = 0;
+		audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
+		return true;
+	};
+
+	if (try_open(dropdown_id::tier, 0, sX + layout::t_col1_x, sY + layout::t_top_sel_y, layout::t_col_w))
+		return true;
+	if (try_open(dropdown_id::upgrade, 0, sX + layout::t_col2_x, sY + layout::t_top_sel_y, layout::t_col_w))
+		return true;
+	if (try_open(dropdown_id::count, 0, sX + layout::t_col3_x, sY + layout::t_top_sel_y, layout::t_col_w))
+		return true;
+
+	for (int i = 0; i < m_tier; i++)
+	{
+		const int y = sY + layout::t_slot_y + i * layout::t_slot_pitch;
+		if (try_open(dropdown_id::mod_type, i, sX + layout::t_type_x, y, layout::t_type_w))
+			return true;
+
+		const uint8_t id = m_tier_slots[i].modifier_id;
+		if (id == 0) continue;
+		const auto& row = m_game->m_modifier_catalog[id];
+		if (row.multiplier == 0) continue;
+
+		const bool pair = row.is_pair();
+		if (try_open(dropdown_id::mod_value, i, sX + layout::t_value_x, y,
+			pair ? layout::t_pair_w : layout::t_value_w))
+			return true;
+		if (pair && try_open(dropdown_id::mod_value2, i, sX + layout::t_pair2_x, y, layout::t_pair_w))
+			return true;
+	}
+
+	return false;
+}
+
+// ---------------------------------------------------------------------------
 // CONFIGURE PAGE
 // ---------------------------------------------------------------------------
 
@@ -387,7 +803,14 @@ void DialogBox_ItemCreator::draw_configure_page(short sX, short sY, short size_x
 	int lx = sX + layout::col_left_x1;
 	int rx = sX + layout::col_right_x1;
 
-	if (m_category == item_category::none)
+	// Tiered mode states an instance (Tier + slots); legacy mode states a
+	// prefix and a secondary. The two pages share only the frame, the
+	// buttons and the dropdown overlay.
+	if (m_game->is_tiered_mode())
+	{
+		draw_tiered_body(sX, sY, size_x, mouse_x, mouse_y);
+	}
+	else if (m_category == item_category::none)
 	{
 		put_aligned_string(sX + layout::col_left_x1, sX + layout::col_right_x2, sY + layout::row1_label_y + 10, "No attributes for this type.", GameColors::UIWhite);
 		put_aligned_string(sX + layout::col_left_x1, sX + layout::col_right_x2, sY + layout::row1_label_y + 30, "Item will be created plain.", GameColors::UIWhite);
@@ -506,71 +929,21 @@ void DialogBox_ItemCreator::draw_configure_page(short sX, short sY, short size_x
 	// --- DROPDOWN OVERLAY (drawn last, on top of everything) ---
 	if (m_open_dropdown != dropdown_id::none)
 	{
+		int dd_x = 0, dd_y = 0, dd_w = 0, dd_selected = -1;
+		const std::vector<std::string> options = open_dropdown_options(sX, sY, dd_x, dd_y, dd_w, dd_selected);
+		const int dd_count = static_cast<int>(options.size());
+
 		// Mouse wheel scrolls the open dropdown list
 		if (m_game->get_dialog_box_manager().get_top_id() == DialogBoxId::ItemCreator && z != 0)
 		{
-			int total = get_open_dropdown_count();
-			if (total > dropdown_max_vis)
+			if (dd_count > dropdown_max_vis)
 			{
 				m_dropdown_scroll -= z / 60;
-				int max_scroll = total - dropdown_max_vis;
+				int max_scroll = dd_count - dropdown_max_vis;
 				m_dropdown_scroll = std::clamp(m_dropdown_scroll, 0, max_scroll);
 			}
 		}
 
-		// Determine dropdown anchor position and build option list
-		int dd_x = 0, dd_y = 0, dd_w = 0;
-		int dd_count = 0;
-		int dd_selected = -1;
-
-		// Temporary option text buffer (tester-only, allocation is fine)
-		std::vector<std::string> options;
-
-		switch (m_open_dropdown)
-		{
-		case dropdown_id::prefix_type:
-			dd_x = lx; dd_y = sY + layout::row1_sel_y; dd_w = layout::col_left_w;
-			dd_selected = m_prefix_index;
-			for (auto& p : m_valid_prefixes) options.push_back(p.name);
-			break;
-		case dropdown_id::effect_type:
-			dd_x = rx; dd_y = sY + layout::row1_sel_y; dd_w = layout::col_right_w;
-			dd_selected = m_secondary_index;
-			for (auto& s : m_valid_secondaries) options.push_back(s.name);
-			break;
-		case dropdown_id::prefix_value:
-			if (m_prefix_index > 0 && m_prefix_index < static_cast<int>(m_valid_prefixes.size()))
-			{
-				dd_x = lx; dd_y = sY + layout::row2_sel_y; dd_w = layout::col_left_w;
-				dd_selected = m_prefix_value - 1;
-				int mult = m_valid_prefixes[m_prefix_index].multiplier;
-				for (int i = 1; i <= max_value; i++) options.push_back(std::to_string(i * mult));
-			}
-			break;
-		case dropdown_id::effect_value:
-			if (m_secondary_index > 0 && m_secondary_index < static_cast<int>(m_valid_secondaries.size()))
-			{
-				dd_x = rx; dd_y = sY + layout::row2_sel_y; dd_w = layout::col_right_w;
-				dd_selected = m_secondary_value - 1;
-				int mult = m_valid_secondaries[m_secondary_index].multiplier;
-				for (int i = 1; i <= max_value; i++) options.push_back(std::to_string(i * mult));
-			}
-			break;
-		case dropdown_id::upgrade:
-			dd_x = lx; dd_y = sY + layout::row3_sel_y; dd_w = layout::col_left_w;
-			dd_selected = m_enchant_value;
-			for (int i = 0; i <= 15; i++) options.push_back(std::format("+{}", i));
-			break;
-		case dropdown_id::count:
-			dd_x = rx; dd_y = sY + layout::row3_sel_y; dd_w = layout::col_right_w;
-			dd_selected = m_item_count - 1;
-			for (int i = 1; i <= 10; i++) options.push_back(std::to_string(i));
-			break;
-		default:
-			break;
-		}
-
-		dd_count = static_cast<int>(options.size());
 		if (dd_count > 0)
 		{
 			int list_y = dd_y + dropdown_h;
@@ -657,6 +1030,7 @@ bool DialogBox_ItemCreator::on_click_search(short sX, short sY, short size_x)
 			m_enchant_value = 0;
 			m_item_count = 1;
 			m_open_dropdown = dropdown_id::none;
+			reset_tier_state();
 			m_page = 1;
 			audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 			return true;
@@ -685,37 +1059,11 @@ bool DialogBox_ItemCreator::on_click_configure(short sX, short sY, short size_x)
 	// --- STEP 1: Handle clicks when a dropdown list is open ---
 	if (m_open_dropdown != dropdown_id::none)
 	{
-		// Determine the open dropdown's anchor and option count
-		int dd_x = 0, dd_y = 0, dd_w = 0, dd_count = 0;
-
-		switch (m_open_dropdown)
-		{
-		case dropdown_id::prefix_type:
-			dd_x = lx; dd_y = sY + layout::row1_sel_y; dd_w = layout::col_left_w;
-			dd_count = static_cast<int>(m_valid_prefixes.size());
-			break;
-		case dropdown_id::effect_type:
-			dd_x = rx; dd_y = sY + layout::row1_sel_y; dd_w = layout::col_right_w;
-			dd_count = static_cast<int>(m_valid_secondaries.size());
-			break;
-		case dropdown_id::prefix_value:
-			dd_x = lx; dd_y = sY + layout::row2_sel_y; dd_w = layout::col_left_w;
-			dd_count = max_value;
-			break;
-		case dropdown_id::effect_value:
-			dd_x = rx; dd_y = sY + layout::row2_sel_y; dd_w = layout::col_right_w;
-			dd_count = max_value;
-			break;
-		case dropdown_id::upgrade:
-			dd_x = lx; dd_y = sY + layout::row3_sel_y; dd_w = layout::col_left_w;
-			dd_count = 16;
-			break;
-		case dropdown_id::count:
-			dd_x = rx; dd_y = sY + layout::row3_sel_y; dd_w = layout::col_right_w;
-			dd_count = 10;
-			break;
-		default: break;
-		}
+		// The same description the overlay drew — anchor, options, selection.
+		int dd_x = 0, dd_y = 0, dd_w = 0, dd_selected = -1;
+		const std::vector<std::string> dd_options =
+			open_dropdown_options(sX, sY, dd_x, dd_y, dd_w, dd_selected);
+		const int dd_count = static_cast<int>(dd_options.size());
 
 		int list_y = dd_y + dropdown_h;
 		int vis = std::min(dd_count, static_cast<int>(dropdown_max_vis));
@@ -759,6 +1107,28 @@ bool DialogBox_ItemCreator::on_click_configure(short sX, short sY, short size_x)
 				case dropdown_id::count:
 					m_item_count = clicked_idx + 1;
 					break;
+
+				// Tier index 0 is "None" (a plain mint), 1-4 are the tiers.
+				case dropdown_id::tier:
+					apply_tier_change(clicked_idx);
+					break;
+				case dropdown_id::mod_type:
+				{
+					const auto tier_opts = tier_options_for_slot(m_open_slot);
+					if (clicked_idx < static_cast<int>(tier_opts.size()))
+					{
+						m_tier_slots[m_open_slot] = {};
+						m_tier_slots[m_open_slot].modifier_id = tier_opts[clicked_idx].modifier_id;
+					}
+					break;
+				}
+				case dropdown_id::mod_value:
+					m_tier_slots[m_open_slot].value = clicked_idx + 1;
+					break;
+				case dropdown_id::mod_value2:
+					m_tier_slots[m_open_slot].value2 = clicked_idx + 1;
+					break;
+
 				default: break;
 				}
 			}
@@ -778,6 +1148,7 @@ bool DialogBox_ItemCreator::on_click_configure(short sX, short sY, short size_x)
 			&& mouse_y >= y && mouse_y < y + dropdown_h)
 		{
 			m_open_dropdown = id;
+			m_open_slot = 0;
 			m_dropdown_scroll = 0;
 			audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 			return true;
@@ -785,7 +1156,12 @@ bool DialogBox_ItemCreator::on_click_configure(short sX, short sY, short size_x)
 		return false;
 	};
 
-	if (m_category == item_category::none)
+	if (m_game->is_tiered_mode())
+	{
+		if (on_click_tiered_body(sX, sY))
+			return true;
+	}
+	else if (m_category == item_category::none)
 	{
 		// Count dropdown
 		if (try_open_dropdown(dropdown_id::count, rx, sY + layout::row3_sel_y, layout::col_right_w))
@@ -823,7 +1199,22 @@ bool DialogBox_ItemCreator::on_click_configure(short sX, short sY, short size_x)
 	if (mouse_x >= left_btn_x && mouse_x <= left_btn_x + layout::btn_w
 		&& mouse_y >= sY + layout::btn_y && mouse_y <= sY + layout::btn_y + 18)
 	{
-		if (m_selected_index >= 0 && m_selected_index < m_result_count)
+		if (m_game->is_tiered_mode())
+		{
+			// count == tier is the one rule the pickers own outright, so an
+			// empty slot is answered here instead of by a round trip.
+			const auto missing = missing_tier_input();
+			if (missing.empty())
+			{
+				send_tiered_mint();
+			}
+			else
+			{
+				m_server_notice = missing;
+				m_server_notice_ok = false;
+			}
+		}
+		else if (m_selected_index >= 0 && m_selected_index < m_result_count)
 		{
 			int item_id = m_results[m_selected_index].item_id;
 
