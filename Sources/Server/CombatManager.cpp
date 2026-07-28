@@ -369,8 +369,10 @@ void CombatManager::effect_damage_spot(short attacker_h, char attacker_type, sho
 				if (m_game->m_client_list[attacker_h]->m_item_list[item_index]->m_id_num == 863 || m_game->m_client_list[attacker_h]->m_item_list[item_index]->m_id_num == 864) {
 					if (m_game->m_client_list[attacker_h]->m_rating > 0) {
 						rep_damage = m_game->m_client_list[attacker_h]->m_rating / 100;
-						if (rep_damage < 5) rep_damage = 5;
-						if (rep_damage > 15) rep_damage = 15;
+						// Retail-strict: capped at 5, no floor. The leaked source's
+						// 5..15 clamp handed every positive-rep attacker a free +5
+						// and let the term run to +15 (spec 6, 13).
+						if (rep_damage > 5) rep_damage = 5;
 						damage += rep_damage;
 					}
 					if (target_type == hb::shared::owner_class::Player) {
@@ -621,7 +623,9 @@ void CombatManager::effect_damage_spot(short attacker_h, char attacker_type, sho
 				}
 
 				if (m_game->m_client_list[target_h]->m_add_charge_critical > 0) {
-					if (m_game->dice(1, 100) <= static_cast<uint32_t>(m_game->m_client_list[target_h]->m_add_charge_critical)) {
+					// Strict '<': the sum is a percent chance out of 100 and retail's
+					// '<=' quietly granted one point more than it (spec 6, 13).
+					if (m_game->dice(1, 100) < static_cast<uint32_t>(m_game->m_client_list[target_h]->m_add_charge_critical)) {
 						max_super_attack = (m_game->m_client_list[target_h]->m_level / 10);
 						if (m_game->m_client_list[target_h]->m_super_attack_left < max_super_attack) m_game->m_client_list[target_h]->m_super_attack_left++;
 						m_game->send_notify_msg(0, target_h, Notify::SuperAttackLeft, 0, 0, 0, 0);
@@ -1107,7 +1111,9 @@ void CombatManager::effect_damage_spot_damage_move(short attacker_h, char attack
 				}
 
 				if (m_game->m_client_list[target_h]->m_add_charge_critical > 0) {
-					if (m_game->dice(1, 100) <= static_cast<uint32_t>(m_game->m_client_list[target_h]->m_add_charge_critical)) {
+					// Strict '<': the sum is a percent chance out of 100 and retail's
+					// '<=' quietly granted one point more than it (spec 6, 13).
+					if (m_game->dice(1, 100) < static_cast<uint32_t>(m_game->m_client_list[target_h]->m_add_charge_critical)) {
 						max_super_attack = (m_game->m_client_list[target_h]->m_level / 10);
 						if (m_game->m_client_list[target_h]->m_super_attack_left < max_super_attack) m_game->m_client_list[target_h]->m_super_attack_left++;
 						m_game->send_notify_msg(0, target_h, Notify::SuperAttackLeft, 0, 0, 0, 0);
@@ -2486,8 +2492,10 @@ uint32_t CombatManager::calculate_attack_effect(short target_h, char target_type
 				(m_game->m_client_list[attacker_h]->m_item_list[item_index]->m_id_num == 864)) { // KlonessWand(MS.10) 
 				if (m_game->m_client_list[attacker_h]->m_rating > 0) {
 					rep_damage = m_game->m_client_list[attacker_h]->m_rating / 100;
-					if (rep_damage < 5) rep_damage = 5;
-					if (rep_damage > 15) rep_damage = 15;
+					// Retail-strict: capped at 5, no floor. The leaked source's
+					// 5..15 clamp handed every positive-rep attacker a free +5
+					// and let the term run to +15 (spec 6, 13).
+					if (rep_damage > 5) rep_damage = 5;
 					iAP_SM += rep_damage;
 					iAP_L += rep_damage;
 				}
@@ -2524,8 +2532,10 @@ uint32_t CombatManager::calculate_attack_effect(short target_h, char target_type
 				(m_game->m_client_list[attacker_h]->m_item_list[item_index]->m_id_num == 850)) { // KlonessAxe
 				if (m_game->m_client_list[attacker_h]->m_rating > 0) {
 					rep_damage = m_game->m_client_list[attacker_h]->m_rating / 100;
-					if (rep_damage < 5) rep_damage = 5;
-					if (rep_damage > 15) rep_damage = 15;
+					// Retail-strict: capped at 5, no floor. The leaked source's
+					// 5..15 clamp handed every positive-rep attacker a free +5
+					// and let the term run to +15 (spec 6, 13).
+					if (rep_damage > 5) rep_damage = 5;
 					iAP_SM += rep_damage;
 					iAP_L += rep_damage;
 				}
@@ -2997,6 +3007,21 @@ uint32_t CombatManager::calculate_attack_effect(short target_h, char target_type
 
 			case modifier_id::righteous:
 				attacker_sa = 62;
+				// The retail Righteous term, restored: rep damage against
+				// negative-reputation players only, valued from the roll and
+				// capped by it (spec 6, 13). The prefix has been cosmetic
+				// since the port — it set this marker and nothing else.
+				if (target_type == hb::shared::owner_class::Player) {
+					if (m_game->m_client_list[target_h] == 0) return 0;
+					if (m_game->m_client_list[target_h]->m_rating < 0) {
+						const int righteous_value = m_game->m_client_list[attacker_h]->m_special_weapon_effect_value
+							* m_game->m_modifier_multiplier[modifier_id::righteous];
+						rep_damage = (abs(m_game->m_client_list[target_h]->m_rating) / 10);
+						if (rep_damage > righteous_value) rep_damage = righteous_value;
+						iAP_SM += rep_damage;
+						iAP_L += rep_damage;
+					}
+				}
 				break;
 			}
 
@@ -3287,7 +3312,9 @@ uint32_t CombatManager::calculate_attack_effect(short target_h, char target_type
 							if (m_game->m_client_list[target_h]->m_mp > temp) m_game->m_client_list[target_h]->m_mp = temp;
 						}
 						if (m_game->m_client_list[target_h]->m_add_charge_critical > 0) {
-							if (m_game->dice(1, 100) <= static_cast<uint32_t>(m_game->m_client_list[target_h]->m_add_charge_critical)) {
+							// Strict '<': the sum is a percent chance out of 100 and retail's
+							// '<=' quietly granted one point more than it (spec 6, 13).
+							if (m_game->dice(1, 100) < static_cast<uint32_t>(m_game->m_client_list[target_h]->m_add_charge_critical)) {
 								max_super_attack = (m_game->m_client_list[target_h]->m_level / 10);
 								if (m_game->m_client_list[target_h]->m_super_attack_left < max_super_attack) m_game->m_client_list[target_h]->m_super_attack_left++;
 								m_game->send_notify_msg(0, target_h, Notify::SuperAttackLeft, 0, 0, 0, 0);

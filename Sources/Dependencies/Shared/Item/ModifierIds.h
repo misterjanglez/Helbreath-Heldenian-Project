@@ -323,6 +323,23 @@ enum tier_item_class : uint8_t
 };
 }
 
+//------------------------------------------------------------------------
+// Enchant categories — the key of enchant_categories/enchant_steps
+// (spec §10). Derived from the tier item class, so gear classification has
+// exactly one implementation (spec §13 / cycle 3-F).
+//------------------------------------------------------------------------
+namespace enchant_category {
+enum enchant_category : uint8_t
+{
+	none           = 0,   // not stone-enchantable (bows, capes, jewelry, boots)
+	weapon         = 1,
+	shield         = 2,
+	armor          = 3,   // helms, body armor, leggings
+	wand           = 4,
+	crafted_weapon = 5    // a custom-made weapon: its own cap and ladder
+};
+}
+
 // Derive the tier item class from base item config. Mirrors the enchant
 // route switch (Server/ItemManager.cpp request_item_upgrade_handler), with
 // armor split by slot — capes are item_sub_type::armor in the item data,
@@ -355,6 +372,28 @@ constexpr tier_item_class::tier_item_class derive_tier_item_class(
 	case EquipPos::Leggings: return tier_item_class::leggings;
 	case EquipPos::Back:     return tier_item_class::cape;
 	default:                 return tier_item_class::none;  // boots etc.
+	}
+}
+
+// The enchant category a gear class upgrades under. Bows, capes and
+// everything outside §1 scope carry no category and never take a stone —
+// bows were always a no-op route, and the hero cape has its own
+// contribution-priced upgrade. `custom_made` splits crafted weapons off
+// onto their longer ladder; crafted shields and armor stay in their own
+// category (spec §13 grants the +10 cap to crafted *weapons* only).
+constexpr enchant_category::enchant_category enchant_category_for_item_class(
+	tier_item_class::tier_item_class item_class, bool custom_made)
+{
+	switch (item_class)
+	{
+	case tier_item_class::melee_weapon:
+		return custom_made ? enchant_category::crafted_weapon : enchant_category::weapon;
+	case tier_item_class::shield:     return enchant_category::shield;
+	case tier_item_class::helm:
+	case tier_item_class::body_armor:
+	case tier_item_class::leggings:   return enchant_category::armor;
+	case tier_item_class::wand:       return enchant_category::wand;
+	default:                          return enchant_category::none;
 	}
 }
 

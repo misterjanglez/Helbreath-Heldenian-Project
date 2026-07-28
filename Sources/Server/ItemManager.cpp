@@ -5500,51 +5500,6 @@ void ItemManager::cancel_exchange_item(int client_h)
 	clear_exchange_status(client_h);
 }
 
-bool ItemManager::check_is_item_upgrade_success(int client_h, int item_index, int som_h, bool bonus)
-{
-	int value, prob, result;
-
-	if (m_game->m_client_list[client_h]->m_item_list[som_h] == 0) return false;
-
-	value = m_game->m_client_list[client_h]->m_item_list[item_index]->get_enchant_bonus();
-
-	switch (value) {
-	case 0: prob = 30; break;  // +1 :90%     +1~+2
-	case 1: prob = 25; break;  // +2 :80%      +3
-	case 2: prob = 20; break;  // +3 :48%      +4 
-	case 3: prob = 15; break;  // +4 :24%      +5
-	case 4: prob = 10; break;  // +5 :9.6%     +6
-	case 5: prob = 10; break;  // +6 :2.8%     +7
-	case 6: prob = 8; break;  // +7 :0.57%    +8
-	case 7: prob = 8; break;  // +8 :0.05%    +9
-	case 8: prob = 5; break;  // +9 :0.004%   +10
-	case 9: prob = 3; break;  // +10:0.00016%
-	default: prob = 1; break;
-	}
-
-	if ((m_game->m_client_list[client_h]->m_item_list[item_index]->is_custom_made()) && (m_game->m_client_list[client_h]->m_item_list[item_index]->m_instance.special_effect_value2 > 100)) {
-		if (prob > 20)
-			prob += (m_game->m_client_list[client_h]->m_item_list[item_index]->m_instance.special_effect_value2 / 10);
-		else if (prob > 7)
-			prob += (m_game->m_client_list[client_h]->m_item_list[item_index]->m_instance.special_effect_value2 / 20);
-		else
-			prob += (m_game->m_client_list[client_h]->m_item_list[item_index]->m_instance.special_effect_value2 / 40);
-	}
-	if (bonus) prob *= 2;
-
-	prob *= 100;
-	result = m_game->dice(1, 10000);
-
-	if (prob >= result) {
-		item_log(ItemLogAction::UpgradeSuccess, client_h, (int)-1, m_game->m_client_list[client_h]->m_item_list[item_index]);
-		return true;
-	}
-
-	item_log(ItemLogAction::UpgradeFail, client_h, (int)-1, m_game->m_client_list[client_h]->m_item_list[item_index]);
-
-	return false;
-}
-
 void ItemManager::reload_item_configs()
 {
 	sqlite3* configDb = nullptr;
@@ -5581,600 +5536,502 @@ void ItemManager::reload_item_configs()
 // Instance color the client's dk_glare renders as the pulsating Templar glow
 constexpr int dark_templar_glow_color = 9;
 
-void ItemManager::request_item_upgrade_handler(int client_h, int item_index)
+namespace
 {
-	int item_x, item_y, so_m, so_x, som_h, sox_h, value; // v2.172
-	double v1, v2, v3;
-	short item_upgrade = 2;
+// Which stone an enchant category consumes. The Merien route is shields and
+// armor — verified against the original handler, where those two pass the
+// Merien stone with the bonus flag and weapons/wands pass Xelima without it.
+// That doubling is already folded into the seeded per-step rates, so the flag
+// survives here only to price the crafted-quality uplift correctly.
+constexpr bool is_merien_enchant_route(uint8_t category)
+{
+	return category == enchant_category::shield || category == enchant_category::armor;
+}
 
-	//hbest
-	int bugint = 0;
+constexpr short enchant_stone_for_category(uint8_t category)
+{
+	return is_merien_enchant_route(category) ? ItemId::StoneOfMerien : ItemId::StoneOfXelima;
+}
 
-	if (m_game->m_client_list[client_h] == 0) return;
-	if ((item_index < 0) || (item_index >= hb::shared::limits::MaxItems)) return;
-	if (m_game->m_client_list[client_h]->m_item_list[item_index] == 0) return;
+// Endurance growth for a custom-made piece, in percent. The per-category base
+// is data (enchant_categories.endurance_growth_pct); this uplift stays
+// code-side beside the crafted success bonus (plan Q1).
+constexpr int crafted_endurance_growth_pct = 20;
 
-	value = m_game->m_client_list[client_h]->m_item_list[item_index]->get_enchant_bonus();
-	if (value >= 15 || value < 0) {
+// The two majestic lines — a weapon or wand that evolves every two upgrade
+// steps instead of taking a stone. An item on the route with no row here (the
+// Dark Knight Great Sword, the LLF Magic Wand) just gains +2 forever.
+struct majestic_upgrade_step
+{
+	short item_id;
+	int   evolve_at;     // enchant bonus at which the item changes form
+	short evolves_to;    // 0 = final form: it starts glowing instead
+};
+
+constexpr majestic_upgrade_step majestic_upgrade_steps[] = {
+	{ ItemId::DarkKnightFlameberge,  2, ItemId::DarkKnightGiantSword },
+	{ ItemId::DarkKnightGiantSword,  6, ItemId::DarkKnightSword      },
+	{ ItemId::DarkKnightSword,      14, 0                            },
+	{ ItemId::DarkMageMagicStaff,    2, ItemId::DarkMageMagicWand    },
+	{ ItemId::DarkMageMagicStaffW,   2, ItemId::DarkMageMagicWand    },
+	{ ItemId::DarkMageMagicWand,     6, ItemId::DarkMageDragonWand   },
+	{ ItemId::DarkMageDragonWand,   14, 0                            },
+};
+
+const majestic_upgrade_step* find_majestic_upgrade_step(short item_id)
+{
+	for (const auto& step : majestic_upgrade_steps)
+		if (step.item_id == item_id) return &step;
+	return nullptr;
+}
+
+// Whether this weapon or wand takes the gizon-priced majestic route rather
+// than a stone. The Great Sword (battle-mage weapon) and the LLF Magic Wand
+// ride the route without ever evolving.
+constexpr bool is_majestic_upgrade_item(short item_id)
+{
+	return item_id == ItemId::DarkKnightGreatSword
+		|| item_id == ItemId::DarkKnightFlameberge
+		|| item_id == ItemId::DarkKnightGiantSword
+		|| item_id == ItemId::DarkKnightSword
+		|| item_id == ItemId::MagicWandMS30LLF
+		|| item_id == ItemId::DarkMageMagicStaff
+		|| item_id == ItemId::DarkMageMagicStaffW
+		|| item_id == ItemId::DarkMageMagicWand
+		|| item_id == ItemId::DarkMageDragonWand;
+}
+
+// Armor and shields the handler refuses outright: the Merien and GM shields,
+// and the Merien / Dark Knight / Dark Mage sets, whose upgrade is a quest
+// rather than a stone.
+constexpr bool is_unenchantable_armor(short item_id)
+{
+	switch (item_id)
+	{
+	case ItemId::MerienShield:
+	case ItemId::MerienPlateMailM:
+	case ItemId::MerienPlateMailW:
+	case 700: case 701: case 702: case 704:   // retail ids with no row in items
+	case ItemId::DarkKnightHauberkM:
+	case ItemId::DarkKnightFullHelmM:
+	case ItemId::DarkKnightLeggingsM:
+	case ItemId::DarkKnightPlateMailM:
+	case ItemId::DarkMageHauberkM:
+	case ItemId::DarkMageChainMailM:
+	case ItemId::DarkMageLeggingsM:
+	case ItemId::DarkKnightHauberkW:
+	case ItemId::DarkKnightFullHelmW:
+	case ItemId::DarkKnightLeggingsW:
+	case ItemId::DarkKnightPlateMailW:
+	case ItemId::DarkMageHauberkW:
+	case ItemId::DarkMageChainMailW:
+	case ItemId::DarkMageLeggingsW:
+		return true;
+	default:
+		return false;
+	}
+}
+} // namespace
+
+// The last inventory slot holding `item_id`, or -1. Last rather than first
+// only to keep the retail scan's choice among duplicate stones.
+int ItemManager::find_inventory_item(int client_h, short item_id) const
+{
+	auto* client = m_game->m_client_list[client_h];
+	int found = -1;
+	for (int i = 0; i < hb::shared::limits::MaxItems; i++)
+		if ((client->m_item_list[i] != 0) && (client->m_item_list[i]->m_id_num == item_id))
+			found = i;
+	return found;
+}
+
+// One enchant roll against the seeded per-step rate (basis points out of
+// 10000). The old hardcoded 30/25/20/15/10/10/8/8/5/3% ladder now lives in
+// `enchant_steps`, with the Merien route's doubling already folded into the
+// stored value (spec §10, plan Q1).
+//
+// The crafted-quality uplift stays code-side, as Q1 ruled. Retail adds it in
+// whole percent *before* the Merien doubling, so on that route the uplift
+// doubles with everything else — which is why the undoubled percent has to be
+// recovered here.
+bool ItemManager::roll_stone_enchant_success(int client_h, int item_index,
+	uint8_t category, int success_pct)
+{
+	CItem* item = m_game->m_client_list[client_h]->m_item_list[item_index];
+	const bool merien_route = is_merien_enchant_route(category);
+
+	int prob = success_pct;
+
+	const int quality = item->m_instance.special_effect_value2;
+	if (item->is_custom_made() && quality > 100)
+	{
+		const int base_pct = prob / (merien_route ? 200 : 100);
+		const int uplift_pct = (base_pct > 20) ? quality / 10
+			: (base_pct > 7) ? quality / 20
+			: quality / 40;
+		prob += uplift_pct * 100 * (merien_route ? 2 : 1);
+	}
+
+	if (prob >= static_cast<int>(m_game->dice(1, 10000)))
+	{
+		item_log(ItemLogAction::UpgradeSuccess, client_h, (int)-1, item);
+		return true;
+	}
+
+	item_log(ItemLogAction::UpgradeFail, client_h, (int)-1, item);
+	return false;
+}
+
+// The stone-enchant route: weapons, shields, armor and wands. Caps, per-step
+// success and the destroy-on-fail rule all come from enchant_categories /
+// enchant_steps (spec §10, §13), so retail's +15-via-stones ceiling and its
+// "any failure past +1 destroys the item" rule both die here. Endurance
+// growth is kept.
+void ItemManager::attempt_stone_enchant(int client_h, int item_index, uint8_t category)
+{
+	auto* client = m_game->m_client_list[client_h];
+	CItem* item = client->m_item_list[item_index];
+
+	const auto& config = m_game->get_tier_config();
+	const auto* category_row = config.find_enchant_category(category);
+	if (category_row == nullptr)
+	{
+		// The boot validator requires these rows in both modes, so this only
+		// covers a live DB edit that removed one.
+		m_game->send_notify_msg(0, client_h, Notify::ItemUpgradeFail, 2, 0, 0, 0);
+		return;
+	}
+
+	const int value = item->get_enchant_bonus();
+	const auto* step = config.find_enchant_step(category, value + 1);
+	if ((value >= category_row->cap) || (step == nullptr))
+	{
+		// Already at this category's cap. Retail rolled anyway, so a maxed
+		// item could still be destroyed on the failure branch; the cap is a
+		// gate now.
 		m_game->send_notify_msg(0, client_h, Notify::ItemUpgradeFail, 1, 0, 0, 0);
 		return;
 	}
 
-	// Route upgrade by equipment type (replaces old category switch)
-	auto upgrade_ep = m_game->m_client_list[client_h]->m_item_list[item_index]->get_equip_pos();
-	auto upgrade_wc = m_game->m_client_list[client_h]->m_item_list[item_index]->get_weapon_class();
-	auto upgrade_ist = m_game->m_client_list[client_h]->m_item_list[item_index]->get_item_sub_type();
-	int upgrade_route;
-	if (upgrade_ist == hb::shared::item::item_sub_type::accessory)
-		upgrade_route = 46; // pendants/accessories
-	else if (upgrade_wc == hb::shared::item::weapon_class::bow)
-		upgrade_route = 3;  // bows
-	else if (upgrade_wc == hb::shared::item::weapon_class::wand)
-		upgrade_route = 8;  // wands
-	else if (upgrade_ep == EquipPos::LeftHand)
-		upgrade_route = 5;  // shields
-	else if (upgrade_ist == hb::shared::item::item_sub_type::weapon)
-		upgrade_route = 1;  // melee weapons
-	else if (upgrade_ist == hb::shared::item::item_sub_type::armor)
-		upgrade_route = 6;  // armor
-	else if (upgrade_ep == EquipPos::Back)
-		upgrade_route = 13; // capes
-	else
-		upgrade_route = 0;
-
-	switch (upgrade_route) {
-	case 46: // Pendants/accessories
-		if (m_game->m_client_list[client_h]->m_item_list[item_index]->get_item_type() != hb::shared::item::item_type::equipment)
-		{
-			m_game->send_notify_msg(0, client_h, Notify::ItemUpgradeFail, 2, 0, 0, 0);
-			return; // Pendants are type Equip
-		}
-		if (m_game->m_client_list[client_h]->m_item_list[item_index]->m_equip_pos < 11)
-		{
-			m_game->send_notify_msg(0, client_h, Notify::ItemUpgradeFail, 2, 0, 0, 0);
-			return; // Pendants are left finger or more
-		}
-		if (m_game->m_client_list[client_h]->m_item_list[item_index]->get_item_effect_type() != ItemEffectType::add_effect)
-		{
-			m_game->send_notify_msg(0, client_h, Notify::ItemUpgradeFail, 2, 0, 0, 0);
-			return; // Pendants are EffectType add_effect
-		}
-		switch (m_game->m_client_list[client_h]->m_item_list[item_index]->m_item_effect_value1) {
-		default: // Other items are not upgradable
-			m_game->send_notify_msg(0, client_h, Notify::ItemUpgradeFail, 2, 0, 0, 0);
-			return; // Pendants are EffectType 14
-
-		case 16: // AngelicPendant(STR)
-		case 17: // AngelicPendant(DEX)
-		case 18: // AngelicPendant(INT)
-		case 19: // AngelicPendant(MAG)
-			if (m_game->m_client_list[client_h]->m_gizon_item_upgrade_left <= 0)
-			{
-				m_game->send_notify_msg(0, client_h, Notify::ItemUpgradeFail, 3, 0, 0, 0);
-				return;
-			}
-			if (value >= 10)
-			{
-				m_game->send_notify_msg(0, client_h, Notify::ItemUpgradeFail, 3, 0, 0, 0);
-				return;
-			}
-			switch (value) {
-			case 0:	item_upgrade = 10; break;
-			case 1: item_upgrade = 11; break;
-			case 2: item_upgrade = 13; break;
-			case 3: item_upgrade = 16; break;
-			case 4: item_upgrade = 20; break;
-			case 5: item_upgrade = 25; break;
-			case 6: item_upgrade = 31; break;
-			case 7: item_upgrade = 38; break;
-			case 8: item_upgrade = 46; break;
-			case 9: item_upgrade = 55; break;
-			default:
-				m_game->send_notify_msg(0, client_h, Notify::ItemUpgradeFail, 3, 0, 0, 0);
-				return;
-				break;
-			}
-			if ((m_game->m_client_list[client_h]->m_item_list[item_index]->m_instance.touch_effect_value1 != m_game->m_client_list[client_h]->m_char_id_num1)
-				|| (m_game->m_client_list[client_h]->m_item_list[item_index]->m_instance.touch_effect_value2 != m_game->m_client_list[client_h]->m_char_id_num2)
-				|| (m_game->m_client_list[client_h]->m_item_list[item_index]->m_instance.touch_effect_value3 != m_game->m_client_list[client_h]->m_char_id_num3))
-			{
-				m_game->send_notify_msg(0, client_h, Notify::ItemUpgradeFail, 2, 0, 0, 0);
-				return;
-			}
-			if ((m_game->m_client_list[client_h]->m_gizon_item_upgrade_left - item_upgrade) < 0)
-			{
-				m_game->send_notify_msg(0, client_h, Notify::ItemUpgradeFail, 3, 0, 0, 0);
-				return;
-			}
-			int dice_pta = m_game->dice(1, 100);
-			if (dice_pta <= 70)
-			{
-				m_game->m_client_list[client_h]->m_gizon_item_upgrade_left -= item_upgrade;
-				m_game->send_notify_msg(0, client_h, Notify::GizonItemUpgradeLeft, m_game->m_client_list[client_h]->m_gizon_item_upgrade_left, 0, 0, 0);
-				value++;
-				if (value > 10) value = 10;
-				m_game->m_client_list[client_h]->m_item_list[item_index]->set_enchant_bonus(value);
-
-				m_game->send_item_attribute_change(client_h, item_index, m_game->m_client_list[client_h]->m_item_list[item_index]);
-				item_log(ItemLogAction::UpgradeSuccess, client_h, (int)-1, m_game->m_client_list[client_h]->m_item_list[item_index]);
-			}
-			else
-			{
-				m_game->m_client_list[client_h]->m_gizon_item_upgrade_left--;
-				m_game->send_notify_msg(0, client_h, Notify::GizonItemUpgradeLeft, m_game->m_client_list[client_h]->m_gizon_item_upgrade_left, 0, 0, 0);
-				m_game->send_notify_msg(0, client_h, Notify::ItemUpgradeFail, 3, 0, 0, 0);
-			}
-			return;
-			break;
-		}
-		break;
-
-	case 1: // weapons upgrade
-		switch (m_game->m_client_list[client_h]->m_item_list[item_index]->m_id_num) {
-		// Dark Knight majestic line: Flameberge -> Giant Sword at +4,
-		// Giant Sword -> Dark Knight Templar at +8, Templar starts glowing at
-		// +15 — mirroring the mage line Staff -> Wand -> Dragon Wand. The
-		// Great Sword (battle-mage weapon) never evolves. Steps are +2 per
-		// upgrade; cost stays the official x(x+6)/8+2 curve.
-		case ItemId::DarkKnightGreatSword:
-		case ItemId::DarkKnightFlameberge:
-		case ItemId::DarkKnightGiantSword:
-		case ItemId::DarkKnightSword: // Dark Knight Templar
-			if (m_game->m_client_list[client_h]->m_gizon_item_upgrade_left <= 0)
-			{
-				m_game->send_notify_msg(0, client_h, Notify::ItemUpgradeFail, 3, 0, 0, 0);
-				return;
-			}
-
-			item_upgrade = (value * (value + 6) / 8) + 2;
-
-			if ((m_game->m_client_list[client_h]->m_item_list[item_index]->m_instance.touch_effect_value1 != m_game->m_client_list[client_h]->m_char_id_num1) ||
-				(m_game->m_client_list[client_h]->m_item_list[item_index]->m_instance.touch_effect_value2 != m_game->m_client_list[client_h]->m_char_id_num2) ||
-				(m_game->m_client_list[client_h]->m_item_list[item_index]->m_instance.touch_effect_value3 != m_game->m_client_list[client_h]->m_char_id_num3))
-			{
-				if (value != 0) {
-					m_game->send_notify_msg(0, client_h, Notify::ItemUpgradeFail, 2, 0, 0, 0);
-					return;
-				}
-			}
-
-			if ((m_game->m_client_list[client_h]->m_gizon_item_upgrade_left - item_upgrade) < 0)
-			{
-				m_game->send_notify_msg(0, client_h, Notify::ItemUpgradeFail, 3, 0, 0, 0);
-				return;
-			}
-
-			m_game->m_client_list[client_h]->m_gizon_item_upgrade_left -= item_upgrade;
-
-			m_game->send_notify_msg(0, client_h, Notify::GizonItemUpgradeLeft, m_game->m_client_list[client_h]->m_gizon_item_upgrade_left, 0, 0, 0);
-
-			// First upgrade binds the item to its owner (claimed items already are)
-			if (value == 0)
-			{
-				m_game->m_client_list[client_h]->m_item_list[item_index]->set_touch_effect_type(TouchEffectType::UniqueOwner);
-				m_game->m_client_list[client_h]->m_item_list[item_index]->m_instance.touch_effect_value1 = m_game->m_client_list[client_h]->m_char_id_num1;
-				m_game->m_client_list[client_h]->m_item_list[item_index]->m_instance.touch_effect_value2 = m_game->m_client_list[client_h]->m_char_id_num2;
-				m_game->m_client_list[client_h]->m_item_list[item_index]->m_instance.touch_effect_value3 = m_game->m_client_list[client_h]->m_char_id_num3;
-			}
-
-			if ((value >= 2) && (m_game->m_client_list[client_h]->m_item_list[item_index]->m_id_num == ItemId::DarkKnightFlameberge))
-			{
-				int next_value = (value + 2 > 15) ? 15 : value + 2;
-				transform_majestic_item(client_h, item_index, ItemId::DarkKnightGiantSword, next_value, 0);
-			}
-			else if ((value >= 6) && (m_game->m_client_list[client_h]->m_item_list[item_index]->m_id_num == ItemId::DarkKnightGiantSword))
-			{
-				int next_value = (value + 2 > 15) ? 15 : value + 2;
-				transform_majestic_item(client_h, item_index, ItemId::DarkKnightSword, next_value, 0);
-			}
-			else if ((value >= 14) && (m_game->m_client_list[client_h]->m_item_list[item_index]->m_id_num == ItemId::DarkKnightSword))
-			{
-				// Maxed out — the Templar starts glowing
-				m_game->m_client_list[client_h]->m_item_list[item_index]->set_enchant_bonus(15);
-				m_game->m_client_list[client_h]->m_item_list[item_index]->m_instance.item_color = dark_templar_glow_color;
-
-				m_game->send_gizon_item_change(client_h, item_index, m_game->m_client_list[client_h]->m_item_list[item_index]);
-				item_log(ItemLogAction::UpgradeSuccess, client_h, (int)-1, m_game->m_client_list[client_h]->m_item_list[item_index]);
-			}
-			else
-			{
-				value += 2;
-				if (value > 15) value = 15;
-				m_game->m_client_list[client_h]->m_item_list[item_index]->set_enchant_bonus(value);
-
-				m_game->send_item_attribute_change(client_h, item_index, m_game->m_client_list[client_h]->m_item_list[item_index]);
-				item_log(ItemLogAction::UpgradeSuccess, client_h, (int)-1, m_game->m_client_list[client_h]->m_item_list[item_index]);
-			}
-			break;
-
-		default:
-
-			if (m_game->m_client_list[client_h]->m_item_list[item_index]->get_prefix_type() == hb::shared::item::modifier_id::ancient) {
-					m_game->send_notify_msg(0, client_h, Notify::ItemUpgradeFail, 2, 0, 0, 0);
-					return;
-			}
-			so_x = so_m = 0;
-			for(int i = 0; i < hb::shared::limits::MaxItems; i++)
-				if (m_game->m_client_list[client_h]->m_item_list[i] != 0) {
-					switch (m_game->m_client_list[client_h]->m_item_list[i]->m_id_num) {
-					case 656: so_x++; sox_h = i; break;
-					case 657: so_m++; som_h = i; break;
-					}
-				}
-			if (so_x > 0) {
-				if (check_is_item_upgrade_success(client_h, item_index, sox_h) == false) {
-					m_game->send_item_attribute_change(client_h, item_index, m_game->m_client_list[client_h]->m_item_list[item_index]);
-					value = m_game->m_client_list[client_h]->m_item_list[item_index]->get_enchant_bonus(); // v2.172
-					if (value >= 1) item_deplete_handler(client_h, item_index, false);
-					item_deplete_handler(client_h, sox_h, false);
-					return;
-				}
-
-				if (m_game->m_client_list[client_h]->m_item_list[item_index]->is_custom_made()) {
-					value++;
-					if (value > 10)
-						value = 10;
-					else {
-						m_game->m_client_list[client_h]->m_item_list[item_index]->set_enchant_bonus(value);
-		
-						item_deplete_handler(client_h, sox_h, false);
-					}
-				}
-				else {
-					value++;
-					if (value > 7)
-						value = 7;
-					else {
-						m_game->m_client_list[client_h]->m_item_list[item_index]->set_enchant_bonus(value);
-		
-						item_deplete_handler(client_h, sox_h, false);
-					}
-				}
-			}
-
-			m_game->send_item_attribute_change(client_h, item_index, m_game->m_client_list[client_h]->m_item_list[item_index]);
-			break;
-		}
-		break;
-
-	case 3:
-		m_game->send_item_attribute_change(client_h, item_index, m_game->m_client_list[client_h]->m_item_list[item_index]);
-		break;
-
-	case 5:
-		if (m_game->m_client_list[client_h]->m_item_list[item_index]->get_prefix_type() == hb::shared::item::modifier_id::strong) {
-				m_game->send_notify_msg(0, client_h, Notify::ItemUpgradeFail, 2, 0, 0, 0);
-				return;
-		}
-		switch (m_game->m_client_list[client_h]->m_item_list[item_index]->m_id_num) {
-		case 620:
-			m_game->send_notify_msg(0, client_h, Notify::ItemUpgradeFail, 2, 0, 0, 0);
-			return;
-		default: break;
-		}
-
-		so_x = so_m = 0;
-		for(int i = 0; i < hb::shared::limits::MaxItems; i++)
-			if (m_game->m_client_list[client_h]->m_item_list[i] != 0) {
-				switch (m_game->m_client_list[client_h]->m_item_list[i]->m_id_num) {
-				case 656: so_x++; sox_h = i; break;
-				case 657: so_m++; som_h = i; break;
-				}
-			}
-
-		if (so_m > 0) {
-			if (check_is_item_upgrade_success(client_h, item_index, som_h, true) == false) {
-				m_game->send_item_attribute_change(client_h, item_index, m_game->m_client_list[client_h]->m_item_list[item_index]);
-				value = m_game->m_client_list[client_h]->m_item_list[item_index]->get_enchant_bonus(); // v2.172
-				if (value >= 1) item_deplete_handler(client_h, item_index, false);
-				item_deplete_handler(client_h, som_h, false);
-				return;
-			}
-
-			value++;
-			if (value > 10)
-				value = 10;
-			else {
-				m_game->m_client_list[client_h]->m_item_list[item_index]->set_enchant_bonus(value);
-
-
-				if (m_game->m_client_list[client_h]->m_item_list[item_index]->is_custom_made()) {
-					// +20%
-					v1 = (double)m_game->m_client_list[client_h]->m_item_list[item_index]->m_durability;
-					v2 = 0.2f * v1;
-					v3 = v1 + v2;
-				}
-				else {
-					// +15%
-					v1 = (double)m_game->m_client_list[client_h]->m_item_list[item_index]->m_durability;
-					v2 = 0.15f * v1;
-					v3 = v1 + v2;
-				}
-				m_game->m_client_list[client_h]->m_item_list[item_index]->m_instance.special_effect_value1 = (short)v3;
-				if (m_game->m_client_list[client_h]->m_item_list[item_index]->m_instance.special_effect_value1 < 0)
-					m_game->m_client_list[client_h]->m_item_list[item_index]->m_instance.special_effect_value1 = m_game->m_client_list[client_h]->m_item_list[item_index]->m_durability;
-
-				m_game->m_client_list[client_h]->m_item_list[item_index]->m_durability = m_game->m_client_list[client_h]->m_item_list[item_index]->m_instance.special_effect_value1;
-				item_deplete_handler(client_h, som_h, false);
-			}
-		}
-		m_game->send_item_attribute_change(client_h, item_index, m_game->m_client_list[client_h]->m_item_list[item_index], m_game->m_client_list[client_h]->m_item_list[item_index]->m_instance.special_effect_value1, m_game->m_client_list[client_h]->m_item_list[item_index]->m_instance.special_effect_value2);
-		break;
-
-	case 6: // armors upgrade
-		switch (m_game->m_client_list[client_h]->m_item_list[item_index]->m_id_num) {
-		case 621:
-		case 622:
-
-		case 700:
-		case 701:
-		case 702:
-		case 704:
-		case 706:
-		case 707:
-		case 708:
-		case 710:
-		case 711:
-		case 712:
-		case 713:
-		case 724:
-		case 725:
-		case 726:
-		case 728:
-		case 729:
-		case 730:
-		case 731:
-			m_game->send_notify_msg(0, client_h, Notify::ItemUpgradeFail, 2, 0, 0, 0);
-			return;
-
-		default:
-			if (m_game->m_client_list[client_h]->m_item_list[item_index]->get_prefix_type() == hb::shared::item::modifier_id::strong) {
-					m_game->send_notify_msg(0, client_h, Notify::ItemUpgradeFail, 2, 0, 0, 0);
-					return;
-			}
-			so_x = so_m = 0;
-			for(int i = 0; i < hb::shared::limits::MaxItems; i++)
-				if (m_game->m_client_list[client_h]->m_item_list[i] != 0) {
-					switch (m_game->m_client_list[client_h]->m_item_list[i]->m_id_num) {
-					case 656: so_x++; sox_h = i; break;
-					case 657: so_m++; som_h = i; break;
-					}
-				}
-			if (so_m > 0) {
-				if (check_is_item_upgrade_success(client_h, item_index, som_h, true) == false) {
-					m_game->send_item_attribute_change(client_h, item_index, m_game->m_client_list[client_h]->m_item_list[item_index]);
-					value = m_game->m_client_list[client_h]->m_item_list[item_index]->get_enchant_bonus();
-					if (value >= 1) item_deplete_handler(client_h, item_index, false);
-					item_deplete_handler(client_h, som_h, false);
-					return;
-				}
-				value++;
-				if (value > 10)
-					value = 10;
-				else {
-					m_game->m_client_list[client_h]->m_item_list[item_index]->set_enchant_bonus(value);
-	
-
-					if (m_game->m_client_list[client_h]->m_item_list[item_index]->is_custom_made()) {
-						v1 = (double)m_game->m_client_list[client_h]->m_item_list[item_index]->m_durability;
-						v2 = 0.2f * v1;
-						v3 = v1 + v2;
-					}
-					else {
-						v1 = (double)m_game->m_client_list[client_h]->m_item_list[item_index]->m_durability;
-						v2 = 0.15f * v1;
-						v3 = v1 + v2;
-					}
-					m_game->m_client_list[client_h]->m_item_list[item_index]->m_instance.special_effect_value1 = (short)v3;
-					if (m_game->m_client_list[client_h]->m_item_list[item_index]->m_instance.special_effect_value1 < 0)
-						m_game->m_client_list[client_h]->m_item_list[item_index]->m_instance.special_effect_value1 = m_game->m_client_list[client_h]->m_item_list[item_index]->m_durability;
-
-					m_game->m_client_list[client_h]->m_item_list[item_index]->m_durability = m_game->m_client_list[client_h]->m_item_list[item_index]->m_instance.special_effect_value1;
-					item_deplete_handler(client_h, som_h, false);
-				}
-			}
-			m_game->send_item_attribute_change(client_h, item_index, m_game->m_client_list[client_h]->m_item_list[item_index], m_game->m_client_list[client_h]->m_item_list[item_index]->m_instance.special_effect_value1, m_game->m_client_list[client_h]->m_item_list[item_index]->m_instance.special_effect_value2);
-			break;
-		}
-		break;
-
-	case 8: // wands upgrade 
-		switch (m_game->m_client_list[client_h]->m_item_list[item_index]->m_id_num) {
-		case 291: // MagicWand(LLF)
-
-		case 714:
-		case 732:
-		case 738:
-		case 746:
-
-			if ((m_game->m_client_list[client_h]->m_item_list[item_index]->m_instance.touch_effect_value1 != m_game->m_client_list[client_h]->m_char_id_num1) ||
-				(m_game->m_client_list[client_h]->m_item_list[item_index]->m_instance.touch_effect_value2 != m_game->m_client_list[client_h]->m_char_id_num2) ||
-				(m_game->m_client_list[client_h]->m_item_list[item_index]->m_instance.touch_effect_value3 != m_game->m_client_list[client_h]->m_char_id_num3))
-			{
-				if (value != 0) {
-					m_game->send_notify_msg(0, client_h, Notify::ItemUpgradeFail, 2, 0, 0, 0);
-					return;
-				}
-			}
-
-			if (m_game->m_client_list[client_h]->m_gizon_item_upgrade_left <= 0)
-			{
-				m_game->send_notify_msg(0, client_h, Notify::ItemUpgradeFail, 3, 0, 0, 0);
-				return;
-			}
-			item_upgrade = (value * (value + 6) / 8) + 2;
-
-			if ((m_game->m_client_list[client_h]->m_gizon_item_upgrade_left - item_upgrade) < 0)
-			{
-				m_game->send_notify_msg(0, client_h, Notify::ItemUpgradeFail, 3, 0, 0, 0);
-				return;
-			}
-
-			m_game->m_client_list[client_h]->m_gizon_item_upgrade_left -= item_upgrade;
-			m_game->send_notify_msg(0, client_h, Notify::GizonItemUpgradeLeft, m_game->m_client_list[client_h]->m_gizon_item_upgrade_left, 0, 0, 0);
-
-			if (value == 0) {
-				m_game->m_client_list[client_h]->m_item_list[item_index]->set_touch_effect_type(TouchEffectType::UniqueOwner);
-				m_game->m_client_list[client_h]->m_item_list[item_index]->m_instance.touch_effect_value1 = m_game->m_client_list[client_h]->m_char_id_num1;
-				m_game->m_client_list[client_h]->m_item_list[item_index]->m_instance.touch_effect_value2 = m_game->m_client_list[client_h]->m_char_id_num2;
-				m_game->m_client_list[client_h]->m_item_list[item_index]->m_instance.touch_effect_value3 = m_game->m_client_list[client_h]->m_char_id_num3;
-			}
-
-			// Dark Mage majestic line: Staff (M/W) -> Magic Wand at +4,
-			// Magic Wand -> Dragon Wand at +8, Dragon Wand starts glowing at
-			// +15. Steps are +2 per upgrade. (The Dragon Wand is legacy item
-			// 746 — BlackMageTemple in the CENTUU cfg.)
-			if ((value >= 2) && ((m_game->m_client_list[client_h]->m_item_list[item_index]->m_id_num == ItemId::DarkMageMagicStaff) || (m_game->m_client_list[client_h]->m_item_list[item_index]->m_id_num == ItemId::DarkMageMagicStaffW)))
-			{
-				int next_value = (value + 2 > 15) ? 15 : value + 2;
-				transform_majestic_item(client_h, item_index, ItemId::DarkMageMagicWand, next_value, 0);
-				break;
-			}
-			else if ((value >= 6) && (m_game->m_client_list[client_h]->m_item_list[item_index]->m_id_num == ItemId::DarkMageMagicWand))
-			{
-				int next_value = (value + 2 > 15) ? 15 : value + 2;
-				transform_majestic_item(client_h, item_index, ItemId::DarkMageDragonWand, next_value, 0);
-				break;
-			}
-			else if ((value >= 14) && (m_game->m_client_list[client_h]->m_item_list[item_index]->m_id_num == ItemId::DarkMageDragonWand))
-			{
-				// Maxed out — the Dragon Wand starts glowing
-				m_game->m_client_list[client_h]->m_item_list[item_index]->set_enchant_bonus(15);
-				m_game->m_client_list[client_h]->m_item_list[item_index]->m_instance.item_color = dark_templar_glow_color;
-
-				m_game->send_gizon_item_change(client_h, item_index, m_game->m_client_list[client_h]->m_item_list[item_index]);
-				item_log(ItemLogAction::UpgradeSuccess, client_h, (int)-1, m_game->m_client_list[client_h]->m_item_list[item_index]);
-				break;
-			}
-			else
-			{
-				value += 2;
-				if (value > 15) value = 15;
-				m_game->m_client_list[client_h]->m_item_list[item_index]->set_enchant_bonus(value);
-
-				m_game->send_item_attribute_change(client_h, item_index, m_game->m_client_list[client_h]->m_item_list[item_index]);
-				item_log(ItemLogAction::UpgradeSuccess, client_h, (int)-1, m_game->m_client_list[client_h]->m_item_list[item_index]);
-				break;
-			}
-
-		default:
-			so_x = so_m = 0;
-			for(int i = 0; i < hb::shared::limits::MaxItems; i++)
-				if (m_game->m_client_list[client_h]->m_item_list[i] != 0) {
-					switch (m_game->m_client_list[client_h]->m_item_list[i]->m_id_num) {
-					case 656: so_x++; sox_h = i; break;
-					case 657: so_m++; som_h = i; break;
-					}
-				}
-			if (so_x > 0) {
-				if (check_is_item_upgrade_success(client_h, item_index, sox_h) == false) {
-					m_game->send_item_attribute_change(client_h, item_index, m_game->m_client_list[client_h]->m_item_list[item_index]);
-					value = m_game->m_client_list[client_h]->m_item_list[item_index]->get_enchant_bonus(); // v2.172
-					if (value >= 1) item_deplete_handler(client_h, item_index, false);
-					item_deplete_handler(client_h, sox_h, false);
-					return;
-				}
-
-				value++;
-				if (value > 7)
-					value = 7;
-				else {
-					m_game->m_client_list[client_h]->m_item_list[item_index]->set_enchant_bonus(value);
-	
-					item_deplete_handler(client_h, sox_h, false);
-				}
-			}
-
-			m_game->send_item_attribute_change(client_h, item_index, m_game->m_client_list[client_h]->m_item_list[item_index]);
-
-			break;
-		}
-		break;
-
-		//hbest hero cape upgrade
-	case 13:
-		switch (m_game->m_client_list[client_h]->m_item_list[item_index]->m_id_num) {
-		case 400:
-		case 401:
-			so_x = so_m = 0;
-			for(int i = 0; i < hb::shared::limits::MaxItems; i++)
-				if (m_game->m_client_list[client_h]->m_item_list[i] != 0) {
-					switch (m_game->m_client_list[client_h]->m_item_list[i]->m_id_num) {
-					case 656: so_x++; sox_h = i; break;
-					case 657: so_m++; som_h = i; break;
-					}
-				}
-
-			if (so_m < 1) {
-				return;
-			}
-
-			bugint = m_game->m_client_list[client_h]->m_item_list[item_index]->m_id_num;
-			if ((m_game->m_client_list[client_h]->m_item_list[item_index]->m_instance.touch_effect_value1 != m_game->m_client_list[client_h]->m_char_id_num1) ||
-				(m_game->m_client_list[client_h]->m_item_list[item_index]->m_instance.touch_effect_value2 != m_game->m_client_list[client_h]->m_char_id_num2) ||
-				(m_game->m_client_list[client_h]->m_item_list[item_index]->m_instance.touch_effect_value3 != m_game->m_client_list[client_h]->m_char_id_num3))
-			{
-				m_game->send_notify_msg(0, client_h, Notify::ItemUpgradeFail, 2, 0, 0, 0);
-				return;
-			}
-
-			if ((m_game->m_client_list[client_h]->m_contribution < 50) || (m_game->m_client_list[client_h]->m_enemy_kill_count < 50))
-			{
-				m_game->send_notify_msg(0, client_h, Notify::ItemUpgradeFail, 3, 0, 0, 0);
-				return;
-			}
-
-			m_game->m_client_list[client_h]->m_contribution -= 50;
-			m_game->m_client_list[client_h]->m_enemy_kill_count -= 50;
-			m_game->send_notify_msg(0, client_h, Notify::EnemyKills, m_game->m_client_list[client_h]->m_enemy_kill_count, 0, 0, 0);
-
-			if (value == 0)
-			{
-				item_x = m_game->m_client_list[client_h]->m_item_pos_list[item_index].x;
-				item_y = m_game->m_client_list[client_h]->m_item_pos_list[item_index].y;
-
-				delete m_game->m_client_list[client_h]->m_item_list[item_index];
-				m_game->m_client_list[client_h]->m_item_list[item_index] = 0;
-
-				m_game->m_client_list[client_h]->m_item_list[item_index] = new CItem;
-
-				m_game->m_client_list[client_h]->m_item_pos_list[item_index].x = item_x;
-				m_game->m_client_list[client_h]->m_item_pos_list[item_index].y = item_y;
-
-				if (bugint == 400) {
-					if (init_item_attr(m_game->m_client_list[client_h]->m_item_list[item_index], 427) == false) {
-						m_game->send_item_attribute_change(client_h, item_index, m_game->m_client_list[client_h]->m_item_list[item_index]);
-						return;
-					}
-				}
-				else {
-					if (init_item_attr(m_game->m_client_list[client_h]->m_item_list[item_index], 428) == false) {
-						m_game->send_item_attribute_change(client_h, item_index, m_game->m_client_list[client_h]->m_item_list[item_index]);
-						return;
-					}
-				}
-
-				m_game->m_client_list[client_h]->m_item_list[item_index]->set_touch_effect_type(TouchEffectType::UniqueOwner);
-				m_game->m_client_list[client_h]->m_item_list[item_index]->m_instance.touch_effect_value1 = m_game->m_client_list[client_h]->m_char_id_num1;
-				m_game->m_client_list[client_h]->m_item_list[item_index]->m_instance.touch_effect_value2 = m_game->m_client_list[client_h]->m_char_id_num2;
-				m_game->m_client_list[client_h]->m_item_list[item_index]->m_instance.touch_effect_value3 = m_game->m_client_list[client_h]->m_char_id_num3;
-
-				item_deplete_handler(client_h, som_h, false);
-
-				m_game->send_gizon_item_change(client_h, item_index, m_game->m_client_list[client_h]->m_item_list[item_index]);
-				item_log(ItemLogAction::UpgradeSuccess, client_h, (int)-1, m_game->m_client_list[client_h]->m_item_list[item_index]);
-				break;
-
-			}
-
-		default: break;
-		}
-		break;
-
-	default:
-		m_game->send_item_attribute_change(client_h, item_index, m_game->m_client_list[client_h]->m_item_list[item_index]);
-		break;
+	const int stone_h = find_inventory_item(client_h, enchant_stone_for_category(category));
+	if (stone_h == -1)
+	{
+		// No stone: the attempt is a silent no-op, as it always was.
+		m_game->send_item_attribute_change(client_h, item_index, item);
+		return;
 	}
+
+	if (roll_stone_enchant_success(client_h, item_index, category, step->success_pct) == false)
+	{
+		m_game->send_item_attribute_change(client_h, item_index, item);
+		if (step->destroy_on_fail) item_deplete_handler(client_h, item_index, false);
+		item_deplete_handler(client_h, stone_h, false);
+		return;
+	}
+
+	item->set_enchant_bonus(value + 1);
+
+	int growth_pct = category_row->endurance_growth_pct;
+	if ((growth_pct > 0) && item->is_custom_made()) growth_pct = crafted_endurance_growth_pct;
+	if (growth_pct > 0)
+	{
+		const int grown = item->m_durability + (item->m_durability * growth_pct) / 100;
+		item->m_instance.special_effect_value1 = static_cast<short>(grown);
+		if (item->m_instance.special_effect_value1 < 0)
+			item->m_instance.special_effect_value1 = item->m_durability;
+		item->m_durability = item->m_instance.special_effect_value1;
+	}
+
+	item_deplete_handler(client_h, stone_h, false);
+	m_game->send_item_attribute_change(client_h, item_index, item,
+		item->m_instance.special_effect_value1, item->m_instance.special_effect_value2);
+}
+
+// Angelic pendants: priced on a per-step gizon-crystal ladder at a flat 70%
+// success, capped at +10. Accessories are outside tier scope (spec §1), so
+// none of the drift fixes touch this route.
+void ItemManager::upgrade_angelic_pendant(int client_h, int item_index)
+{
+	auto* client = m_game->m_client_list[client_h];
+	CItem* item = client->m_item_list[item_index];
+	const int value = item->get_enchant_bonus();
+
+	if (item->get_item_type() != item_type::equipment)
+	{
+		m_game->send_notify_msg(0, client_h, Notify::ItemUpgradeFail, 2, 0, 0, 0);
+		return; // Pendants are type Equip
+	}
+	if (item->m_equip_pos < 11)
+	{
+		m_game->send_notify_msg(0, client_h, Notify::ItemUpgradeFail, 2, 0, 0, 0);
+		return; // Pendants are left finger or more
+	}
+	if (item->get_item_effect_type() != ItemEffectType::add_effect)
+	{
+		m_game->send_notify_msg(0, client_h, Notify::ItemUpgradeFail, 2, 0, 0, 0);
+		return; // Pendants are EffectType add_effect
+	}
+
+	switch (item->m_item_effect_value1)
+	{
+	case 16: // AngelicPendant(STR)
+	case 17: // AngelicPendant(DEX)
+	case 18: // AngelicPendant(INT)
+	case 19: // AngelicPendant(MAG)
+		break;
+	default: // Other items are not upgradable
+		m_game->send_notify_msg(0, client_h, Notify::ItemUpgradeFail, 2, 0, 0, 0);
+		return;
+	}
+
+	if (client->m_gizon_item_upgrade_left <= 0)
+	{
+		m_game->send_notify_msg(0, client_h, Notify::ItemUpgradeFail, 3, 0, 0, 0);
+		return;
+	}
+
+	static constexpr short pendant_upgrade_cost[] = { 10, 11, 13, 16, 20, 25, 31, 38, 46, 55 };
+	static constexpr int pendant_upgrade_cap = 10;   // rows above; the pendant cap
+	if (value >= pendant_upgrade_cap)
+	{
+		m_game->send_notify_msg(0, client_h, Notify::ItemUpgradeFail, 3, 0, 0, 0);
+		return;
+	}
+	const short item_upgrade = pendant_upgrade_cost[value];
+
+	if ((item->m_instance.touch_effect_value1 != client->m_char_id_num1)
+		|| (item->m_instance.touch_effect_value2 != client->m_char_id_num2)
+		|| (item->m_instance.touch_effect_value3 != client->m_char_id_num3))
+	{
+		m_game->send_notify_msg(0, client_h, Notify::ItemUpgradeFail, 2, 0, 0, 0);
+		return;
+	}
+	if ((client->m_gizon_item_upgrade_left - item_upgrade) < 0)
+	{
+		m_game->send_notify_msg(0, client_h, Notify::ItemUpgradeFail, 3, 0, 0, 0);
+		return;
+	}
+
+	if (m_game->dice(1, 100) <= 70)
+	{
+		client->m_gizon_item_upgrade_left -= item_upgrade;
+		m_game->send_notify_msg(0, client_h, Notify::GizonItemUpgradeLeft, client->m_gizon_item_upgrade_left, 0, 0, 0);
+		item->set_enchant_bonus(value + 1);
+
+		m_game->send_item_attribute_change(client_h, item_index, item);
+		item_log(ItemLogAction::UpgradeSuccess, client_h, (int)-1, item);
+	}
+	else
+	{
+		client->m_gizon_item_upgrade_left--;
+		m_game->send_notify_msg(0, client_h, Notify::GizonItemUpgradeLeft, client->m_gizon_item_upgrade_left, 0, 0, 0);
+		m_game->send_notify_msg(0, client_h, Notify::ItemUpgradeFail, 3, 0, 0, 0);
+	}
+}
+
+// The Dark Knight blade and Dark Mage staff/wand lines: +2 per upgrade on the
+// official x(x+6)/8+2 gizon curve, evolving at fixed steps and glowing at
+// +15. Never fails, never takes a stone.
+void ItemManager::upgrade_majestic_item(int client_h, int item_index)
+{
+	auto* client = m_game->m_client_list[client_h];
+	CItem* item = client->m_item_list[item_index];
+	const int value = item->get_enchant_bonus();
+
+	if (client->m_gizon_item_upgrade_left <= 0)
+	{
+		m_game->send_notify_msg(0, client_h, Notify::ItemUpgradeFail, 3, 0, 0, 0);
+		return;
+	}
+
+	// The first upgrade binds the item to its owner, so only an already-bound
+	// item has to match; an unclaimed one is claimed below.
+	if ((value != 0)
+		&& ((item->m_instance.touch_effect_value1 != client->m_char_id_num1)
+			|| (item->m_instance.touch_effect_value2 != client->m_char_id_num2)
+			|| (item->m_instance.touch_effect_value3 != client->m_char_id_num3)))
+	{
+		m_game->send_notify_msg(0, client_h, Notify::ItemUpgradeFail, 2, 0, 0, 0);
+		return;
+	}
+
+	const int item_upgrade = (value * (value + 6) / 8) + 2;
+	if ((client->m_gizon_item_upgrade_left - item_upgrade) < 0)
+	{
+		m_game->send_notify_msg(0, client_h, Notify::ItemUpgradeFail, 3, 0, 0, 0);
+		return;
+	}
+
+	client->m_gizon_item_upgrade_left -= item_upgrade;
+	m_game->send_notify_msg(0, client_h, Notify::GizonItemUpgradeLeft, client->m_gizon_item_upgrade_left, 0, 0, 0);
+
+	if (value == 0)
+	{
+		item->set_touch_effect_type(TouchEffectType::UniqueOwner);
+		item->m_instance.touch_effect_value1 = client->m_char_id_num1;
+		item->m_instance.touch_effect_value2 = client->m_char_id_num2;
+		item->m_instance.touch_effect_value3 = client->m_char_id_num3;
+	}
+
+	const int next_value = (value + 2 > 15) ? 15 : value + 2;
+	const auto* step = find_majestic_upgrade_step(item->m_id_num);
+
+	if ((step != nullptr) && (value >= step->evolve_at))
+	{
+		if (step->evolves_to != 0)
+		{
+			transform_majestic_item(client_h, item_index, step->evolves_to, next_value, 0);
+			return;
+		}
+
+		// Maxed out — the final form starts glowing.
+		item->set_enchant_bonus(15);
+		item->m_instance.item_color = dark_templar_glow_color;
+
+		m_game->send_gizon_item_change(client_h, item_index, item);
+		item_log(ItemLogAction::UpgradeSuccess, client_h, (int)-1, item);
+		return;
+	}
+
+	item->set_enchant_bonus(next_value);
+	m_game->send_item_attribute_change(client_h, item_index, item);
+	item_log(ItemLogAction::UpgradeSuccess, client_h, (int)-1, item);
+}
+
+// The hero cape: a one-shot transform into its +1 form, priced in war
+// contribution and enemy kills plus a Stone of Merien. Reachable again now
+// that the route derives from derive_tier_item_class — the old hand-rolled
+// chain tested item_sub_type::armor before EquipPos::Back, so capes fell into
+// the armor route and this one was dead code. A cape that already carries a
+// bonus (only reachable through that bug) drops out before anything is spent;
+// retail charged the contribution first and then did nothing.
+void ItemManager::upgrade_hero_cape(int client_h, int item_index)
+{
+	auto* client = m_game->m_client_list[client_h];
+	const short cape_id = client->m_item_list[item_index]->m_id_num;
+
+	if ((cape_id != ItemId::AresdenHeroCape) && (cape_id != ItemId::ElvineHeroCape)) return;
+	if (client->m_item_list[item_index]->get_enchant_bonus() != 0) return;
+
+	const int stone_h = find_inventory_item(client_h, ItemId::StoneOfMerien);
+	if (stone_h == -1) return;
+
+	if ((client->m_item_list[item_index]->m_instance.touch_effect_value1 != client->m_char_id_num1)
+		|| (client->m_item_list[item_index]->m_instance.touch_effect_value2 != client->m_char_id_num2)
+		|| (client->m_item_list[item_index]->m_instance.touch_effect_value3 != client->m_char_id_num3))
+	{
+		m_game->send_notify_msg(0, client_h, Notify::ItemUpgradeFail, 2, 0, 0, 0);
+		return;
+	}
+
+	if ((client->m_contribution < 50) || (client->m_enemy_kill_count < 50))
+	{
+		m_game->send_notify_msg(0, client_h, Notify::ItemUpgradeFail, 3, 0, 0, 0);
+		return;
+	}
+
+	client->m_contribution -= 50;
+	client->m_enemy_kill_count -= 50;
+	m_game->send_notify_msg(0, client_h, Notify::EnemyKills, client->m_enemy_kill_count, 0, 0, 0);
+
+	const int item_x = client->m_item_pos_list[item_index].x;
+	const int item_y = client->m_item_pos_list[item_index].y;
+
+	delete client->m_item_list[item_index];
+	client->m_item_list[item_index] = new CItem;
+
+	client->m_item_pos_list[item_index].x = item_x;
+	client->m_item_pos_list[item_index].y = item_y;
+
+	const short upgraded_id = (cape_id == ItemId::AresdenHeroCape)
+		? ItemId::AresdenHeroCapePlus1 : ItemId::ElvineHeroCapePlus1;
+	if (init_item_attr(client->m_item_list[item_index], upgraded_id) == false)
+	{
+		m_game->send_item_attribute_change(client_h, item_index, client->m_item_list[item_index]);
+		return;
+	}
+
+	client->m_item_list[item_index]->set_touch_effect_type(TouchEffectType::UniqueOwner);
+	client->m_item_list[item_index]->m_instance.touch_effect_value1 = client->m_char_id_num1;
+	client->m_item_list[item_index]->m_instance.touch_effect_value2 = client->m_char_id_num2;
+	client->m_item_list[item_index]->m_instance.touch_effect_value3 = client->m_char_id_num3;
+
+	item_deplete_handler(client_h, stone_h, false);
+
+	m_game->send_gizon_item_change(client_h, item_index, client->m_item_list[item_index]);
+	item_log(ItemLogAction::UpgradeSuccess, client_h, (int)-1, client->m_item_list[item_index]);
+}
+
+void ItemManager::request_item_upgrade_handler(int client_h, int item_index)
+{
+	if (m_game->m_client_list[client_h] == 0) return;
+	if ((item_index < 0) || (item_index >= hb::shared::limits::MaxItems)) return;
+	if (m_game->m_client_list[client_h]->m_item_list[item_index] == 0) return;
+
+	CItem* item = m_game->m_client_list[client_h]->m_item_list[item_index];
+
+	const int value = item->get_enchant_bonus();
+	if ((value >= 15) || (value < 0))
+	{
+		m_game->send_notify_msg(0, client_h, Notify::ItemUpgradeFail, 1, 0, 0, 0);
+		return;
+	}
+
+	// Accessories sit outside tier scope, so derive_tier_item_class folds them
+	// in with boots and the rest; the gizon pendant route keys off the
+	// sub-type directly.
+	if (item->get_item_sub_type() == item_sub_type::accessory)
+	{
+		upgrade_angelic_pendant(client_h, item_index);
+		return;
+	}
+
+	const auto item_class = derive_tier_item_class(item->get_item_sub_type(),
+		item->get_weapon_class(), item->get_equip_pos());
+
+	switch (item_class)
+	{
+	case tier_item_class::melee_weapon:
+	case tier_item_class::wand:
+		if (is_majestic_upgrade_item(item->m_id_num))
+		{
+			upgrade_majestic_item(client_h, item_index);
+			return;
+		}
+		// Retail refuses to enchant an Ancient-prefixed weapon. In tiered mode
+		// Ancient is a rollable prefix like any other, so the block would
+		// arbitrarily bar a whole slice of dropped gear (spec §13).
+		if ((m_game->get_tier_config().item_system != item_system_mode::tiered)
+			&& (item->get_prefix_type() == modifier_id::ancient))
+		{
+			m_game->send_notify_msg(0, client_h, Notify::ItemUpgradeFail, 2, 0, 0, 0);
+			return;
+		}
+		break;
+
+	case tier_item_class::shield:
+	case tier_item_class::helm:
+	case tier_item_class::body_armor:
+	case tier_item_class::leggings:
+		if (is_unenchantable_armor(item->m_id_num)
+			|| (item->get_prefix_type() == modifier_id::strong))
+		{
+			m_game->send_notify_msg(0, client_h, Notify::ItemUpgradeFail, 2, 0, 0, 0);
+			return;
+		}
+		break;
+
+	case tier_item_class::cape:
+		upgrade_hero_cape(client_h, item_index);
+		return;
+
+	default: // bows never had an upgrade route; boots and the rest have none
+		m_game->send_item_attribute_change(client_h, item_index, item);
+		return;
+	}
+
+	attempt_stone_enchant(client_h, item_index,
+		enchant_category_for_item_class(item_class, item->is_custom_made()));
 }
 
 char ItemManager::check_hero_item_equipped(int client_h)

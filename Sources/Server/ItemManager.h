@@ -108,7 +108,6 @@ public:
 	void build_item_handler(int client_h, char* data);
 
 	// Upgrade
-	bool check_is_item_upgrade_success(int client_h, int item_index, int som_h, bool bonus = false);
 	void request_item_upgrade_handler(int client_h, int item_index);
 
 	// Hero / special
@@ -126,5 +125,17 @@ public:
 	bool check_good_item(CItem* item);
 
 private:
+	// The four upgrade routes request_item_upgrade_handler dispatches to,
+	// keyed off derive_tier_item_class. Only the stone route is data-driven
+	// (enchant_categories/enchant_steps, spec §10); the other three are
+	// priced in gizon crystals or war contribution and are unchanged.
+	void attempt_stone_enchant(int client_h, int item_index, uint8_t category);
+	bool roll_stone_enchant_success(int client_h, int item_index, uint8_t category, int success_pct);
+	void upgrade_angelic_pendant(int client_h, int item_index);
+	void upgrade_majestic_item(int client_h, int item_index);
+	void upgrade_hero_cape(int client_h, int item_index);
+
+	int find_inventory_item(int client_h, short item_id) const;
+
 	CGame* m_game = nullptr;
 };

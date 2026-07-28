@@ -235,6 +235,12 @@ struct tier_config
 	const tier_bucket_config* find_bucket(uint8_t bucket_id) const;
 	const loot_grade_config* find_loot_grade(uint8_t grade) const;
 	const tier_curve_config* find_tier_curve(uint8_t tier) const;
+	const enchant_category_config* find_enchant_category(uint8_t category) const;
+
+	// The row for attempting +step in `category`. Absent for a step past the
+	// category's cap, which is how the enchant handler learns an item is
+	// maxed — the cap and the ladder can never disagree.
+	const enchant_step_config* find_enchant_step(uint8_t category, int step) const;
 };
 
 // Loads the full dataset and replaces `out` wholesale on success; on

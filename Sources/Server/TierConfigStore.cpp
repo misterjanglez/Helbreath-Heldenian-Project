@@ -393,6 +393,21 @@ const loot_grade_config* tier_config::find_loot_grade(uint8_t grade) const
 	return it != loot_grades.end() ? &*it : nullptr;
 }
 
+const enchant_category_config* tier_config::find_enchant_category(uint8_t category) const
+{
+	auto it = std::find_if(enchant_categories.begin(), enchant_categories.end(),
+		[category](const enchant_category_config& row) { return row.category == category; });
+	return it != enchant_categories.end() ? &*it : nullptr;
+}
+
+const enchant_step_config* tier_config::find_enchant_step(uint8_t category, int step) const
+{
+	auto it = std::find_if(enchant_steps.begin(), enchant_steps.end(),
+		[category, step](const enchant_step_config& row)
+		{ return row.category == category && row.step == step; });
+	return it != enchant_steps.end() ? &*it : nullptr;
+}
+
 const tier_curve_config* tier_config::find_tier_curve(uint8_t tier) const
 {
 	if (tier < 1 || tier > hb::shared::item::tier_count) return nullptr;

@@ -11,6 +11,7 @@
 #include "Game.h"
 #include "ItemManager.h"
 #include "Item.h"
+#include <algorithm>
 #include <cstdlib>
 #include <vector>
 
@@ -76,10 +77,12 @@ bool legacy_roll_strategy::roll(CItem& item, const roll_context&)
 
 	int primaryValue = roll_attribute_value(m_game.m_modifier_min_value[primaryType],
 		m_game.m_modifier_max_value[primaryType]);
-	// Legacy halving for the two charge-style armor prefixes (dead zero kept
-	// until drift fix 3-F).
+	// The two charge-style armor prefixes roll on the shared 1..13 ladder and
+	// are halved onto their own 1..7 band. Retail's `v / 2` put a seventh of
+	// that ladder on a dead zero — a rolled line that did nothing at all;
+	// `(v + 1) / 2`, floored at 1, is the retail-correct halving (spec §6, §13).
 	if (primaryType == modifier_id::mana_converting || primaryType == modifier_id::crit_chance)
-		primaryValue = primaryValue / 2;
+		primaryValue = std::max(1, (primaryValue + 1) / 2);
 
 	uint8_t secondaryType = modifier_id::empty;
 	int secondaryValue = 0;

@@ -277,12 +277,15 @@ LOOT_GRADES = [
 
 # ---------------------------------------------------------------------------
 # Seed data - spec 10 enchant. Success % extracted verbatim from
-# check_is_item_upgrade_success (ItemManager.cpp:5381): base ladder
-# 30/25/20/15/10/10/8/8/5/3% by current bonus; the Merien-stone route
-# (armor + wands) doubles it. Stored as basis points out of 10000. The crafted
-# quality bonus (special_effect_value2) stays code-side. Caps +7 (+10 crafted),
-# destroy-on-fail from +4 (safe through +3), endurance growth 15% armor/wand,
-# 20% crafted (spec 10 launch values).
+# check_is_item_upgrade_success: base ladder 30/25/20/15/10/10/8/8/5/3% by
+# current bonus; the Merien-stone route doubles it. Which routes take which
+# stone is the original's, verified against repos/HelbreathServer Game.cpp:
+# shields (:52471) and armor (:52558) consume the Stone of Merien and grow
+# durability; weapons (:52389) and wands (:52795) consume the Stone of Xelima
+# and do not. (The first seeding of this table had shield and wand swapped.)
+# Stored as basis points out of 10000. The crafted quality bonus
+# (special_effect_value2) and the custom-made +20% endurance uplift both stay
+# code-side. Caps +7 (+10 crafted), destroy-on-fail from +4 (safe through +3).
 # Category ids are the 3-F code enum: 1 weapon, 2 shield, 3 armor, 4 wand,
 # 5 crafted_weapon. The last two columns (merien_doubled, safe_through) are
 # step-derivation inputs only - the DB table stores the first four.
@@ -291,10 +294,10 @@ LOOT_GRADES = [
 ENCHANT_CATEGORIES = [
     # category, name, cap, endurance_growth_pct, merien_doubled, safe_through
     (1, 'weapon', 7, 0, False, 3),
-    (2, 'shield', 7, 0, False, 3),
+    (2, 'shield', 7, 15, True, 3),
     (3, 'armor', 7, 15, True, 3),
-    (4, 'wand', 7, 15, True, 3),
-    (5, 'crafted_weapon', 10, 20, False, 3),
+    (4, 'wand', 7, 0, False, 3),
+    (5, 'crafted_weapon', 10, 0, False, 3),
 ]
 
 _XELIMA_LADDER = [3000, 2500, 2000, 1500, 1000, 1000, 800, 800, 500, 300]
@@ -345,14 +348,30 @@ TIER_SETTINGS = [
 #   - Experience: multiplier 10 -> 5, min/max 2 -> 4 (fixed roll stays fixed;
 #     effect and display stay 4 x 5 = +20%). Fresh-start rule covers any
 #     dev-world item that stored the old byte.
+# The 3-F rows below are the promised follow-ups plus one seeding correction;
+# unlike the 2-E pair they DO change legacy rolls, which is the point of the
+# spec 13 drift ledger. The fresh-start rule covers items already rolled.
 # ---------------------------------------------------------------------------
 
 LEGACY_PARITY = [
     ("UPDATE attribute_prefix_types SET multiplier = 1 WHERE prefix_id = 3 AND multiplier <> 1",
-     'righteous multiplier 0 -> 1 (min/max stay 0)'),
+     'righteous multiplier 0 -> 1'),
+    # 3-F: the combat hook landed, so the value now means something in legacy
+    # mode too (owner answer Q2 = both modes). Band matches the catalog's 3..10.
+    ("UPDATE attribute_prefix_types SET min_value = 3, max_value = 10 "
+     "WHERE prefix_id = 3 AND max_value <> 10",
+     'righteous band 0..0 -> 3..10 (the value now drives rep damage)'),
     ("UPDATE attribute_secondary_types SET multiplier = 5, min_value = 4, max_value = 4 "
      "WHERE secondary_id = 11 AND multiplier <> 5",
      'experience multiplier 10 -> 5, fixed roll 2 -> 4 (effect stays +20%)'),
+    # 3-F: ManaConverting / CritChance draw the SHARED 1..13 armour-prefix
+    # ladder in the original and are halved to 1..7 in code (Game.cpp:48942,
+    # '(dwValue+1)/2'). The band was seeded as 1..6 - the effective range of
+    # the buggy 'v / 2' this cycle replaces - so the halving ran twice and the
+    # rolls landed 0..3. Restore the ladder; the code owns the halving.
+    ("UPDATE attribute_prefix_types SET min_value = 1, max_value = 13 "
+     "WHERE prefix_id IN (11, 12) AND max_value <> 13",
+     'MC/CC band 1..6 -> the shared 1..13 ladder (code halves it to 1..7)'),
 ]
 
 # ---------------------------------------------------------------------------

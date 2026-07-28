@@ -272,6 +272,9 @@ void check_loot_grades(const tier_config& config, validation_state& v)
 	}
 }
 
+// Both modes: since cycle 3-F the enchant handler reads caps, per-step
+// success and destroy flags from these tables in legacy mode too, so an
+// unseeded world would silently stop enchanting. Fail the boot instead.
 void check_enchant_tables(const tier_config& config, validation_state& v)
 {
 	std::set<uint8_t> categories;
@@ -281,6 +284,27 @@ void check_enchant_tables(const tier_config& config, validation_state& v)
 			v.add("enchant_categories category {}: duplicate category", (int)category.category);
 		if (category.cap < 0)
 			v.add("enchant_categories category {} '{}': negative cap {}", (int)category.category, category.name, category.cap);
+		if (category.endurance_growth_pct < 0)
+			v.add("enchant_categories category {} '{}': negative endurance_growth_pct {}",
+				(int)category.category, category.name, category.endurance_growth_pct);
+	}
+
+	// Every category the handler can derive must exist, and its ladder must
+	// cover +1..+cap with no holes — a missing step reads as "maxed" and
+	// would cap the item short of its own row.
+	for (uint8_t category = enchant_category::weapon; category <= enchant_category::crafted_weapon; category++)
+	{
+		const auto* row = config.find_enchant_category(category);
+		if (row == nullptr)
+		{
+			v.add("enchant_categories: category {} missing (categories {}..{} are required)",
+				(int)category, (int)enchant_category::weapon, (int)enchant_category::crafted_weapon);
+			continue;
+		}
+		for (int step = 1; step <= row->cap; step++)
+			if (config.find_enchant_step(category, step) == nullptr)
+				v.add("enchant_steps category {} '{}': no row for step {} (cap is {})",
+					(int)category, row->name, step, row->cap);
 	}
 
 	std::set<std::pair<uint8_t, int>> seen;
@@ -404,9 +428,8 @@ void check_tiered_required_data(const tier_config& config, validation_state& v)
 	if (config.eligibility.empty()) v.add("modifier_eligibility: empty - tiered mode requires seeded data");
 	if (config.curves.empty()) v.add("tier_curves: empty - tiered mode requires seeded data");
 	if (config.loot_grades.empty()) v.add("loot_grades: empty - tiered mode requires seeded data");
-	if (config.enchant_categories.empty()) v.add("enchant_categories: empty - tiered mode requires seeded data");
-	if (config.enchant_steps.empty()) v.add("enchant_steps: empty - tiered mode requires seeded data");
 	if (config.settings.empty()) v.add("tier_settings: empty - tiered mode requires seeded data");
+	// The enchant tables are required in BOTH modes — check_enchant_tables.
 
 	// Checked through the load-time tier -> curve binding (find_tier_curve)
 	// so name matching has exactly one implementation.
