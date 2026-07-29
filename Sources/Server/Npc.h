@@ -7,6 +7,7 @@
 #include "Magic.h"
 #include "GameGeometry.h"
 #include "Appearance.h"
+#include "NpcConfigFields.h"
 #include "PlayerStatusData.h"
 #include "MarqueeEffects.h"
 #include "DirectionHelpers.h"
@@ -57,7 +58,10 @@ struct PendingDrop
 	short dy;
 };
 
-class CNpc
+// Config-sourced fields live in the base (NpcConfigFields.h); everything below
+// is state the creature acquires at spawn or in play. init_npc_attr copies the
+// base wholesale, so a new config field needs no work here — see #64.
+class CNpc : public hb::server::npc_config_fields
 {
 public:
 	CNpc(const char * name5);
@@ -65,8 +69,6 @@ public:
 
 	// Auras
 	char m_magic_config_list[100];
-
-	char  m_npc_name[hb::shared::limits::NpcNameLen];
 
 	char  m_name[6];
 	char  m_map_index;
@@ -81,16 +83,14 @@ public:
 	char  m_action;
 	char  m_turn;
 
-	short m_type;
 	short m_original_type;
 	short m_npc_config_id;
 	hb::shared::entity::EntityAppearance m_appearance;
 	hb::shared::entity::EntityStatus m_status;
 
 	uint32_t m_time;
-	uint32_t m_action_time;
 	uint32_t m_hp_up_time, m_mp_up_time;
-	uint32_t m_dead_time, m_regen_time;
+	uint32_t m_dead_time;
 
 	// Second-stage (stage-2) loot rolled at death and placed when the corpse
 	// decays. Sized to the 5x5 scatter spiral. See CEntityManager drop logic.
@@ -98,44 +98,16 @@ public:
 	PendingDrop m_pending_drops[MaxPendingDrops];
 	int m_pending_drop_count = 0;
 
-	int  m_hp, m_max_hp;						// Hit Point 
+	int  m_hp, m_max_hp;						// Hit Point
 	uint32_t  m_exp;                    // ? ? . ExpDice  .
 
-	int  m_hp_min;
-	int  m_hp_max;
-	int  m_hold_resist;
-	int  m_defense_ratio;			// Defense Ratio
-	int  m_hit_ratio;				// HitRatio
-	int  m_magic_hit_ratio;
-	int  m_min_bravery;
-	uint32_t  m_exp_dice_min;
-	uint32_t	 m_exp_dice_max;
-	uint32_t  m_gold_dice_min;
-	uint32_t  m_gold_dice_max;
-	int   m_drop_table_id;
-	// Loot grade 1..5 vermin/standard/veteran/elite/boss (loot_grades table,
-	// spec §8) — the tiered drop-economics dial. Default 2 = standard.
-	int   m_loot_grade = 2;
-
-	char m_side;
-	char m_action_limit;            // 1 Move   .    2    . 3 Dummy.  ,
-
-	char m_size;					// 0: Small-Medium 1: Large
-	int m_min_damage;
-	int m_max_damage;
 	int m_attack_bonus;
 	char m_bravery;
-	char m_resist_magic;
-	char m_magic_level;
-	char m_day_of_week_limit;
-	char m_chat_msg_presence;		// ? Chat Msg
 	int  m_mana;                   // MagicLevel*30
-	int  m_max_mana;
-																    
+
 	char  m_move_type;
 	char  m_behavior;
 	short m_behavior_turn_count;
-	char  m_target_search_range;
 
 	int   m_follow_owner_index;
 	char  m_follow_owner_type;		// (NPC or Player)
@@ -161,9 +133,8 @@ public:
 	int   m_attack_strategy;
 	int   m_ai_level;
 
-	int   m_attack_range;
 	/*
-		AI-Level 
+		AI-Level
 			1: ���� �ൿ 
 			2: �������� ���� ���� ��ǥ���� ���� 
 			3: ���� ��ȣ���� ��ǥ�� ���� ���ݴ�󿡼�? ���� 
@@ -174,8 +145,6 @@ public:
 
 	int   m_last_damage;
 	int   m_summon_control_mode;		// ?: 0 Free, 1 Hold 2 Tgt
-	char  m_attribute;				// :   1  2  3  4
-	int   m_abs_damage;
 
 	int   m_item_ratio;
 	int   m_assigned_item;

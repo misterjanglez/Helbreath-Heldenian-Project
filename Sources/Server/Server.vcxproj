@@ -205,6 +205,7 @@
     <ClInclude Include="Misc.h" />
     <ClInclude Include="NetworkMsg.h" />
     <ClInclude Include="Npc.h" />
+    <ClInclude Include="NpcConfigFields.h" />
     <ClInclude Include="OccupyFlag.h" />
     <ClInclude Include="PartyManager.h" />
     <ClInclude Include="Portion.h" />

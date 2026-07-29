@@ -250,6 +250,9 @@
     <ClInclude Include="Npc.h">
       <Filter>World</Filter>
     </ClInclude>
+    <ClInclude Include="NpcConfigFields.h">
+      <Filter>World</Filter>
+    </ClInclude>
     <ClInclude Include="OccupyFlag.h">
       <Filter>Data Types</Filter>
     </ClInclude>

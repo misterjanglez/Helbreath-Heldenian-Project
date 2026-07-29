@@ -25,22 +25,18 @@ CNpc::CNpc(const char * name5)
 	m_bypass_mob_limit   = false;
 	m_is_perm_attack_mode = false;
 
-	m_regen_time = 0;
 	m_is_killed   = false;
 
 	m_original_type      = 0;
 	m_npc_config_id       = -1;
 	m_summon_control_mode = 0;
-	
-	m_attribute = 0;
-	m_abs_damage = 0;
+
 	m_status.clear();
 	m_marquee_debuffs.clear();
 	m_appearance.clear();
 
-	m_attack_range    = 1;
 	m_special_ability = 0;
-	
+
 	m_exp = 0;
 
 	m_build_count = 0;
@@ -54,9 +50,9 @@ CNpc::CNpc(const char * name5)
 
 	m_npc_item_type = 0;
 	m_npc_item_max = 0;
-	m_drop_table_id = 0;
 
-	std::memset(m_npc_name, 0, sizeof(m_npc_name));
+	// Config-sourced fields carry their defaults from npc_config_fields and are
+	// replaced wholesale by init_npc_attr at spawn — nothing to do here.
 
 	// OPTIMIZATION FIX #3: initialize previous position for delta detection
 	m_prev_x = -1;

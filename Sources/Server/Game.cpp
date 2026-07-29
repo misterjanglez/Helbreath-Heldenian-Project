@@ -8563,54 +8563,31 @@ bool CGame::init_npc_attr(class CNpc* npc, int npc_config_id, short sClass, char
 	}
 
 	{
-		int config_idx = npc_config_id;
+		const hb::server::npc_config_fields& config = *m_npc_config_list[npc_config_id];
+
 				npc->m_npc_config_id = static_cast<short>(npc_config_id);
 
-				std::memset(npc->m_npc_name, 0, sizeof(npc->m_npc_name));
-				memcpy(npc->m_npc_name, m_npc_config_list[config_idx]->m_npc_name, hb::shared::limits::NpcNameLen - 1);
+				// The whole config, in one memberwise copy. A field added to
+				// npc_config_fields reaches every spawned NPC for free — the
+				// hand-written copy this replaced is what shipped #63, where
+				// m_loot_grade was loaded, validated, then silently left at
+				// CNpc's default on every monster in the game. Everything below
+				// is state DERIVED from the config, not carried from it.
+				static_cast<hb::server::npc_config_fields&>(*npc) = config;
 
-				npc->m_type = m_npc_config_list[config_idx]->m_type;
-
-				int hp_range = m_npc_config_list[config_idx]->m_hp_max - m_npc_config_list[config_idx]->m_hp_min;
+				int hp_range = config.m_hp_max - config.m_hp_min;
 				if (hp_range > 0)
-					npc->m_hp = dice(1, hp_range) + m_npc_config_list[config_idx]->m_hp_min;
+					npc->m_hp = dice(1, hp_range) + config.m_hp_min;
 				else
-					npc->m_hp = m_npc_config_list[config_idx]->m_hp_min;
+					npc->m_hp = config.m_hp_min;
 				if (npc->m_hp <= 0) npc->m_hp = 1;
 
 				//50Cent - HP Bar
 				npc->m_max_hp = npc->m_hp;
 
-				npc->m_exp_dice_min = m_npc_config_list[config_idx]->m_exp_dice_min;
-				npc->m_exp_dice_max = m_npc_config_list[config_idx]->m_exp_dice_max;
-				npc->m_gold_dice_min = m_npc_config_list[config_idx]->m_gold_dice_min;
-				npc->m_gold_dice_max = m_npc_config_list[config_idx]->m_gold_dice_max;
-				npc->m_drop_table_id = m_npc_config_list[config_idx]->m_drop_table_id;
-				// Travels with the drop table it grades: the tiered roll reads
-				// the loot grade off the spawned NPC, not off the config row.
-				npc->m_loot_grade = m_npc_config_list[config_idx]->m_loot_grade;
-				npc->m_exp = (dice(1, (m_npc_config_list[config_idx]->m_exp_dice_max - m_npc_config_list[config_idx]->m_exp_dice_min)) + m_npc_config_list[config_idx]->m_exp_dice_min);
+				npc->m_exp = (dice(1, (config.m_exp_dice_max - config.m_exp_dice_min)) + config.m_exp_dice_min);
 
-				npc->m_hp_min = m_npc_config_list[config_idx]->m_hp_min;
-				npc->m_hp_max = m_npc_config_list[config_idx]->m_hp_max;
-				npc->m_hold_resist = m_npc_config_list[config_idx]->m_hold_resist;
-				npc->m_defense_ratio = m_npc_config_list[config_idx]->m_defense_ratio;
-				npc->m_hit_ratio = m_npc_config_list[config_idx]->m_hit_ratio;
-				npc->m_min_bravery = m_npc_config_list[config_idx]->m_min_bravery;
-				npc->m_min_damage = m_npc_config_list[config_idx]->m_min_damage;
-				npc->m_max_damage = m_npc_config_list[config_idx]->m_max_damage;
-				npc->m_size = m_npc_config_list[config_idx]->m_size;
-				npc->m_side = m_npc_config_list[config_idx]->m_side;
-				npc->m_action_limit = m_npc_config_list[config_idx]->m_action_limit;
-				npc->m_action_time = m_npc_config_list[config_idx]->m_action_time;
-				npc->m_regen_time = m_npc_config_list[config_idx]->m_regen_time;
-				npc->m_resist_magic = m_npc_config_list[config_idx]->m_resist_magic;
-				npc->m_magic_level = m_npc_config_list[config_idx]->m_magic_level;
-				npc->m_max_mana = m_npc_config_list[config_idx]->m_max_mana; // v1.4
-				npc->m_mana = m_npc_config_list[config_idx]->m_max_mana;
-				npc->m_chat_msg_presence = m_npc_config_list[config_idx]->m_chat_msg_presence;
-				npc->m_day_of_week_limit = m_npc_config_list[config_idx]->m_day_of_week_limit;
-				npc->m_target_search_range = m_npc_config_list[config_idx]->m_target_search_range;
+				npc->m_mana = config.m_max_mana; // v1.4
 
 				switch (sClass) {
 				case 43:
@@ -8627,11 +8604,8 @@ bool CGame::init_npc_attr(class CNpc* npc, int npc_config_id, short sClass, char
 				}
 
 				npc->m_ai_level = dice(1, 3);
-				npc->m_abs_damage = m_npc_config_list[config_idx]->m_abs_damage;
-				npc->m_magic_hit_ratio = m_npc_config_list[config_idx]->m_magic_hit_ratio;
-				npc->m_attack_range = m_npc_config_list[config_idx]->m_attack_range;
 				npc->m_special_ability = sa;
-				npc->m_build_count = m_npc_config_list[config_idx]->m_min_bravery;
+				npc->m_build_count = config.m_min_bravery;
 
 				switch (npc->m_special_ability) {
 				case 1:

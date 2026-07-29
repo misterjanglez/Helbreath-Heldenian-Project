@@ -15,6 +15,7 @@
 #include "QuestManager.h"
 #include "Magic.h"
 #include "Npc.h"
+#include "NpcConfigFields.h"
 #include "Portion.h"
 #include "Quest.h"
 #include "Skill.h"
@@ -1338,6 +1339,96 @@ bool LoadCommandPermissions(sqlite3* db, CGame* game)
     return true;
 }
 
+namespace {
+
+// The npc_configs columns, in npc_config_fields declaration order. One list
+// splices into the INSERT and the SELECT so the two can never disagree about
+// which column is which. Macros (not constexpr) because they concatenate with
+// adjacent SQL string literals — same reason as HB_ITEM_ATTR_COLUMNS_SQL.
+#define HB_NPC_CONFIG_COLUMNS_SQL \
+    " name, npc_type, hp_min, hp_max, hold_resist, defense_ratio, hit_ratio, min_bravery," \
+    " exp_min, exp_max, gold_min, gold_max, min_damage, max_damage," \
+    " npc_size, side, action_limit, action_time, resist_magic, magic_level," \
+    " day_of_week_limit, chat_msg_presence, target_search_range, regen_time," \
+    " attribute, abs_damage, max_mana, magic_hit_ratio, attack_range, drop_table_id, loot_grade"
+
+// Both helpers take npc_config_fields, NOT CNpc: a config-sourced field added
+// to CNpc instead of the struct is not in scope here, so it cannot be persisted
+// and the mistake is a compile error rather than a field that silently reads as
+// its default on every spawned NPC (#63, #64). col advances past all 31.
+bool BindNpcConfigColumns(sqlite3_stmt* stmt, int& col, const hb::server::npc_config_fields& cfg)
+{
+    bool ok = PrepareAndBindText(stmt, col++, cfg.m_npc_name);
+    ok &= (sqlite3_bind_int(stmt, col++, cfg.m_type) == SQLITE_OK);
+    ok &= (sqlite3_bind_int(stmt, col++, cfg.m_hp_min) == SQLITE_OK);
+    ok &= (sqlite3_bind_int(stmt, col++, cfg.m_hp_max) == SQLITE_OK);
+    ok &= (sqlite3_bind_int(stmt, col++, cfg.m_hold_resist) == SQLITE_OK);
+    ok &= (sqlite3_bind_int(stmt, col++, cfg.m_defense_ratio) == SQLITE_OK);
+    ok &= (sqlite3_bind_int(stmt, col++, cfg.m_hit_ratio) == SQLITE_OK);
+    ok &= (sqlite3_bind_int(stmt, col++, cfg.m_min_bravery) == SQLITE_OK);
+    ok &= (sqlite3_bind_int(stmt, col++, static_cast<int>(cfg.m_exp_dice_min)) == SQLITE_OK);
+    ok &= (sqlite3_bind_int(stmt, col++, static_cast<int>(cfg.m_exp_dice_max)) == SQLITE_OK);
+    ok &= (sqlite3_bind_int(stmt, col++, static_cast<int>(cfg.m_gold_dice_min)) == SQLITE_OK);
+    ok &= (sqlite3_bind_int(stmt, col++, static_cast<int>(cfg.m_gold_dice_max)) == SQLITE_OK);
+    ok &= (sqlite3_bind_int(stmt, col++, cfg.m_min_damage) == SQLITE_OK);
+    ok &= (sqlite3_bind_int(stmt, col++, cfg.m_max_damage) == SQLITE_OK);
+    ok &= (sqlite3_bind_int(stmt, col++, cfg.m_size) == SQLITE_OK);
+    ok &= (sqlite3_bind_int(stmt, col++, cfg.m_side) == SQLITE_OK);
+    ok &= (sqlite3_bind_int(stmt, col++, cfg.m_action_limit) == SQLITE_OK);
+    ok &= (sqlite3_bind_int(stmt, col++, static_cast<int>(cfg.m_action_time)) == SQLITE_OK);
+    ok &= (sqlite3_bind_int(stmt, col++, cfg.m_resist_magic) == SQLITE_OK);
+    ok &= (sqlite3_bind_int(stmt, col++, cfg.m_magic_level) == SQLITE_OK);
+    ok &= (sqlite3_bind_int(stmt, col++, cfg.m_day_of_week_limit) == SQLITE_OK);
+    ok &= (sqlite3_bind_int(stmt, col++, cfg.m_chat_msg_presence) == SQLITE_OK);
+    ok &= (sqlite3_bind_int(stmt, col++, cfg.m_target_search_range) == SQLITE_OK);
+    ok &= (sqlite3_bind_int(stmt, col++, static_cast<int>(cfg.m_regen_time)) == SQLITE_OK);
+    ok &= (sqlite3_bind_int(stmt, col++, cfg.m_attribute) == SQLITE_OK);
+    ok &= (sqlite3_bind_int(stmt, col++, cfg.m_abs_damage) == SQLITE_OK);
+    ok &= (sqlite3_bind_int(stmt, col++, cfg.m_max_mana) == SQLITE_OK);
+    ok &= (sqlite3_bind_int(stmt, col++, cfg.m_magic_hit_ratio) == SQLITE_OK);
+    ok &= (sqlite3_bind_int(stmt, col++, cfg.m_attack_range) == SQLITE_OK);
+    ok &= (sqlite3_bind_int(stmt, col++, cfg.m_drop_table_id) == SQLITE_OK);
+    ok &= (sqlite3_bind_int(stmt, col++, cfg.m_loot_grade) == SQLITE_OK);
+    return ok;
+}
+
+void ReadNpcConfigColumns(sqlite3_stmt* stmt, int& col, hb::server::npc_config_fields& cfg)
+{
+    CopyColumnText(stmt, col++, cfg.m_npc_name, sizeof(cfg.m_npc_name));
+    cfg.m_type = (short)sqlite3_column_int(stmt, col++);
+    cfg.m_hp_min = sqlite3_column_int(stmt, col++);
+    cfg.m_hp_max = sqlite3_column_int(stmt, col++);
+    cfg.m_hold_resist = sqlite3_column_int(stmt, col++);
+    cfg.m_defense_ratio = sqlite3_column_int(stmt, col++);
+    cfg.m_hit_ratio = sqlite3_column_int(stmt, col++);
+    cfg.m_min_bravery = sqlite3_column_int(stmt, col++);
+    cfg.m_exp_dice_min = sqlite3_column_int(stmt, col++);
+    cfg.m_exp_dice_max = sqlite3_column_int(stmt, col++);
+    cfg.m_gold_dice_min = sqlite3_column_int(stmt, col++);
+    cfg.m_gold_dice_max = sqlite3_column_int(stmt, col++);
+    cfg.m_min_damage = sqlite3_column_int(stmt, col++);
+    cfg.m_max_damage = sqlite3_column_int(stmt, col++);
+    cfg.m_size = (char)sqlite3_column_int(stmt, col++);
+    cfg.m_side = (char)sqlite3_column_int(stmt, col++);
+    cfg.m_action_limit = (char)sqlite3_column_int(stmt, col++);
+    cfg.m_action_time = (uint32_t)sqlite3_column_int(stmt, col++);
+    cfg.m_resist_magic = (char)sqlite3_column_int(stmt, col++);
+    cfg.m_magic_level = (char)sqlite3_column_int(stmt, col++);
+    cfg.m_day_of_week_limit = (char)sqlite3_column_int(stmt, col++);
+    cfg.m_chat_msg_presence = (char)sqlite3_column_int(stmt, col++);
+    cfg.m_target_search_range = (char)sqlite3_column_int(stmt, col++);
+    cfg.m_regen_time = (uint32_t)sqlite3_column_int(stmt, col++);
+    cfg.m_attribute = (char)sqlite3_column_int(stmt, col++);
+    cfg.m_abs_damage = sqlite3_column_int(stmt, col++);
+    cfg.m_max_mana = sqlite3_column_int(stmt, col++);
+    cfg.m_magic_hit_ratio = sqlite3_column_int(stmt, col++);
+    cfg.m_attack_range = sqlite3_column_int(stmt, col++);
+    cfg.m_drop_table_id = sqlite3_column_int(stmt, col++);
+    cfg.m_loot_grade = sqlite3_column_int(stmt, col++);
+}
+
+} // namespace
+
 bool SaveNpcConfigs(sqlite3* db, const CGame* game)
 {
     if (db == nullptr || game == nullptr) {
@@ -1354,12 +1445,7 @@ bool SaveNpcConfigs(sqlite3* db, const CGame* game)
     }
 
     const char* sql =
-        "INSERT INTO npc_configs("
-        " npc_id, name, npc_type, hp_min, hp_max, hold_resist, defense_ratio, hit_ratio, min_bravery,"
-        " exp_min, exp_max, gold_min, gold_max, min_damage, max_damage,"
-        " npc_size, side, action_limit, action_time, resist_magic, magic_level,"
-        " day_of_week_limit, chat_msg_presence, target_search_range, regen_time,"
-        " attribute, abs_damage, max_mana, magic_hit_ratio, attack_range, drop_table_id, loot_grade"
+        "INSERT INTO npc_configs( npc_id," HB_NPC_CONFIG_COLUMNS_SQL
         ") VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?);";
 
     sqlite3_stmt* stmt = nullptr;
@@ -1368,48 +1454,29 @@ bool SaveNpcConfigs(sqlite3* db, const CGame* game)
         return false;
     }
 
+    const int placeholder_count = sqlite3_bind_parameter_count(stmt);
+
     for(int i = 0; i < MaxNpcTypes; i++) {
         if (game->m_npc_config_list[i] == nullptr) {
             continue;
         }
 
-        const CNpc* npc = game->m_npc_config_list[i];
         sqlite3_reset(stmt);
         sqlite3_clear_bindings(stmt);
         int col = 1;
-        bool ok = true;
-        ok &= (sqlite3_bind_int(stmt, col++, i) == SQLITE_OK);
-        ok &= PrepareAndBindText(stmt, col++, npc->m_npc_name);
-        ok &= (sqlite3_bind_int(stmt, col++, npc->m_type) == SQLITE_OK);
-        ok &= (sqlite3_bind_int(stmt, col++, npc->m_hp_min) == SQLITE_OK);
-        ok &= (sqlite3_bind_int(stmt, col++, npc->m_hp_max) == SQLITE_OK);
-        ok &= (sqlite3_bind_int(stmt, col++, npc->m_hold_resist) == SQLITE_OK);
-        ok &= (sqlite3_bind_int(stmt, col++, npc->m_defense_ratio) == SQLITE_OK);
-        ok &= (sqlite3_bind_int(stmt, col++, npc->m_hit_ratio) == SQLITE_OK);
-        ok &= (sqlite3_bind_int(stmt, col++, npc->m_min_bravery) == SQLITE_OK);
-        ok &= (sqlite3_bind_int(stmt, col++, static_cast<int>(npc->m_exp_dice_min)) == SQLITE_OK);
-        ok &= (sqlite3_bind_int(stmt, col++, static_cast<int>(npc->m_exp_dice_max)) == SQLITE_OK);
-        ok &= (sqlite3_bind_int(stmt, col++, static_cast<int>(npc->m_gold_dice_min)) == SQLITE_OK);
-        ok &= (sqlite3_bind_int(stmt, col++, static_cast<int>(npc->m_gold_dice_max)) == SQLITE_OK);
-        ok &= (sqlite3_bind_int(stmt, col++, npc->m_min_damage) == SQLITE_OK);
-        ok &= (sqlite3_bind_int(stmt, col++, npc->m_max_damage) == SQLITE_OK);
-        ok &= (sqlite3_bind_int(stmt, col++, npc->m_size) == SQLITE_OK);
-        ok &= (sqlite3_bind_int(stmt, col++, npc->m_side) == SQLITE_OK);
-        ok &= (sqlite3_bind_int(stmt, col++, npc->m_action_limit) == SQLITE_OK);
-        ok &= (sqlite3_bind_int(stmt, col++, static_cast<int>(npc->m_action_time)) == SQLITE_OK);
-        ok &= (sqlite3_bind_int(stmt, col++, npc->m_resist_magic) == SQLITE_OK);
-        ok &= (sqlite3_bind_int(stmt, col++, npc->m_magic_level) == SQLITE_OK);
-        ok &= (sqlite3_bind_int(stmt, col++, npc->m_day_of_week_limit) == SQLITE_OK);
-        ok &= (sqlite3_bind_int(stmt, col++, npc->m_chat_msg_presence) == SQLITE_OK);
-        ok &= (sqlite3_bind_int(stmt, col++, npc->m_target_search_range) == SQLITE_OK);
-        ok &= (sqlite3_bind_int(stmt, col++, static_cast<int>(npc->m_regen_time)) == SQLITE_OK);
-        ok &= (sqlite3_bind_int(stmt, col++, npc->m_attribute) == SQLITE_OK);
-        ok &= (sqlite3_bind_int(stmt, col++, npc->m_abs_damage) == SQLITE_OK);
-        ok &= (sqlite3_bind_int(stmt, col++, npc->m_max_mana) == SQLITE_OK);
-        ok &= (sqlite3_bind_int(stmt, col++, npc->m_magic_hit_ratio) == SQLITE_OK);
-        ok &= (sqlite3_bind_int(stmt, col++, npc->m_attack_range) == SQLITE_OK);
-        ok &= (sqlite3_bind_int(stmt, col++, npc->m_drop_table_id) == SQLITE_OK);
-        ok &= (sqlite3_bind_int(stmt, col++, npc->m_loot_grade) == SQLITE_OK);
+        bool ok = (sqlite3_bind_int(stmt, col++, i) == SQLITE_OK);
+        ok &= BindNpcConfigColumns(stmt, col, *game->m_npc_config_list[i]);
+
+        // The helper must fill every placeholder the INSERT declared. A column
+        // added to one and not the other stops the save here instead of writing
+        // a NULL that would read back as a silent default.
+        if (col - 1 != placeholder_count) {
+            hb::logger::error("SaveNpcConfigs: bound {} of {} npc_configs columns - column list and bind helper disagree",
+                col - 1, placeholder_count);
+            sqlite3_finalize(stmt);
+            RollbackTransaction(db);
+            return false;
+        }
 
         if (!ok || sqlite3_step(stmt) != SQLITE_DONE) {
             sqlite3_finalize(stmt);
@@ -1438,17 +1505,15 @@ bool LoadNpcConfigs(sqlite3* db, CGame* game)
     }
 
     const char* sql =
-        "SELECT npc_id, name, npc_type, hp_min, hp_max, hold_resist, defense_ratio, hit_ratio, min_bravery,"
-        " exp_min, exp_max, gold_min, gold_max, min_damage, max_damage,"
-        " npc_size, side, action_limit, action_time, resist_magic, magic_level,"
-        " day_of_week_limit, chat_msg_presence, target_search_range, regen_time,"
-        " attribute, abs_damage, max_mana, magic_hit_ratio, attack_range, drop_table_id, loot_grade"
+        "SELECT npc_id," HB_NPC_CONFIG_COLUMNS_SQL
         " FROM npc_configs ORDER BY npc_id;";
 
     sqlite3_stmt* stmt = nullptr;
     if (sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) != SQLITE_OK) {
         return false;
     }
+
+    const int selected_count = sqlite3_column_count(stmt);
 
     while (sqlite3_step(stmt) == SQLITE_ROW) {
         int col = 0;
@@ -1458,38 +1523,19 @@ bool LoadNpcConfigs(sqlite3* db, CGame* game)
         }
 
         CNpc* npc = new CNpc(" ");
-        std::memset(npc->m_npc_name, 0, sizeof(npc->m_npc_name));
-        CopyColumnText(stmt, col++, npc->m_npc_name, sizeof(npc->m_npc_name));
-        npc->m_type = (short)sqlite3_column_int(stmt, col++);
-        npc->m_hp_min = sqlite3_column_int(stmt, col++);
-        npc->m_hp_max = sqlite3_column_int(stmt, col++);
-        npc->m_hold_resist = sqlite3_column_int(stmt, col++);
-        npc->m_defense_ratio = sqlite3_column_int(stmt, col++);
-        npc->m_hit_ratio = sqlite3_column_int(stmt, col++);
-        npc->m_min_bravery = sqlite3_column_int(stmt, col++);
-        npc->m_exp_dice_min = sqlite3_column_int(stmt, col++);
-        npc->m_exp_dice_max = sqlite3_column_int(stmt, col++);
-        npc->m_gold_dice_min = sqlite3_column_int(stmt, col++);
-        npc->m_gold_dice_max = sqlite3_column_int(stmt, col++);
-        npc->m_min_damage = sqlite3_column_int(stmt, col++);
-        npc->m_max_damage = sqlite3_column_int(stmt, col++);
-        npc->m_size = (char)sqlite3_column_int(stmt, col++);
-        npc->m_side = (char)sqlite3_column_int(stmt, col++);
-        npc->m_action_limit = (char)sqlite3_column_int(stmt, col++);
-        npc->m_action_time = (uint32_t)sqlite3_column_int(stmt, col++);
-        npc->m_resist_magic = (char)sqlite3_column_int(stmt, col++);
-        npc->m_magic_level = (char)sqlite3_column_int(stmt, col++);
-        npc->m_day_of_week_limit = (char)sqlite3_column_int(stmt, col++);
-        npc->m_chat_msg_presence = (char)sqlite3_column_int(stmt, col++);
-        npc->m_target_search_range = (char)sqlite3_column_int(stmt, col++);
-        npc->m_regen_time = (uint32_t)sqlite3_column_int(stmt, col++);
-        npc->m_attribute = (char)sqlite3_column_int(stmt, col++);
-        npc->m_abs_damage = sqlite3_column_int(stmt, col++);
-        npc->m_max_mana = sqlite3_column_int(stmt, col++);
-        npc->m_magic_hit_ratio = sqlite3_column_int(stmt, col++);
-        npc->m_attack_range = sqlite3_column_int(stmt, col++);
-        npc->m_drop_table_id = sqlite3_column_int(stmt, col++);
-        npc->m_loot_grade = sqlite3_column_int(stmt, col++);
+        ReadNpcConfigColumns(stmt, col, *npc);
+
+        // The helper must consume every column the SELECT asked for. A column
+        // added to one and not the other fails the load here, loudly, instead
+        // of leaving the field at its default on every config row — which is
+        // exactly how #63 stayed invisible.
+        if (col != selected_count) {
+            hb::logger::error("LoadNpcConfigs: read {} of {} npc_configs columns - column list and read helper disagree",
+                col, selected_count);
+            delete npc;
+            sqlite3_finalize(stmt);
+            return false;
+        }
 
         game->m_npc_config_list[npcId] = npc;
     }
