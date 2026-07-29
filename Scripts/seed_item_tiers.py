@@ -329,8 +329,8 @@ TIER_PRESENTATION = [
 TIER_SETTINGS = [
     ('sunder_defense_delta', '-50'),
     ('sunder_duration_ms', '5000'),
-    ('bleed_tick_damage', '5'),
-    ('bleed_tick_interval_ms', '2000'),
+    ('bleed_tick_damage', '25'),
+    ('bleed_tick_interval_ms', '1000'),
     ('bleed_duration_ms', '8000'),
     ('cast_check_floor_ms', '1500'),
     ('move_grace_pct', '85'),

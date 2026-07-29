@@ -87,11 +87,13 @@ Body armor / helms / shields have exactly four eligible buckets, so Legendary co
 | Exotic | Rolled value | Max | Fixed launch defaults |
 |---|---|---|---|
 | **Sunder** | proc chance per landed hit | 15% | −50 defense ratio for 5 s; re-proc refreshes |
-| **Bleed** | proc chance per landed hit | 15% | 5 dmg per 2 s for 8 s; refreshes; ignores poison resist; not Cure-curable |
+| **Bleed** | proc chance per landed hit | 15% | 25 dmg per 1 s for 8 s; refreshes; ignores poison resist; not Cure-curable |
 | **MP drain** | flat MP per landed hit | 15 | always-on, deterministic |
 | **SP drain** | flat SP per landed hit | 15 | always-on, deterministic |
 
 Bleed stays distinct from Poisoning on every axis (fixed tick vs `dice(1,level)`; refreshes vs blocked-while-poisoned; unresistable; uncurable); one weapon can roll Poisoning + Bleed (cross-bucket). All four work on players and NPCs; no new resist axes in v1; no boss special-casing.
+
+**Bleed tuning amendment (owner, 2026-07-28).** The launch default was 5 dmg per 2 s for 8 s — four ticks, 20 damage per proc — which at the 3–15% proc band contributed roughly 3 DPS and read as "bleed is not working" in the first live wave. Retuned to **25 dmg per 1 s for 8 s** (eight ticks, 200 damage per proc). Sunder's constants are unchanged. These are `gamedata.db` values per the rule above, so this is a data edit applied with `reload tiers`, but the recorded default is amended here so the contract and the seed agree. **Tick cadence caveat:** the two `tick_bleed` poll sites differ — NPC victims are polled every 300 ms by `npc_process()`, player victims every 1000 ms by `check_client_response_time()` — so a 1 s interval is exact on NPCs and marginal on players until the player tick moves onto the faster poll.
 
 **Movement speed % (capes + leggings only):**
 - Scales locomotion only — walk (560 ms) and run (312 ms). Composition multiplicative: `duration = base × haste(0.7) × frozen(1.25) × (1 − speed_total)`. AttackMove/DamageMove untouched.
