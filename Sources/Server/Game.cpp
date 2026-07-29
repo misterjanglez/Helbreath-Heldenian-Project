@@ -4950,6 +4950,12 @@ void CGame::init_player_data(int client_h, char* data, uint32_t size)
 
 	m_client_list[client_h]->m_is_init_complete = true;
 
+	// The equip recalc that ran during init could not send this — it is gated on
+	// m_is_init_complete, which only became true on the line above. Sent
+	// unconditionally so a character who logs in already wearing attribute gear
+	// starts with the right numbers instead of waiting for the first re-equip.
+	send_notify_msg(0, client_h, Notify::GearStats, 0, 0, 0, 0);
+
 	// Trading Post login hook: deliver any notices queued while the character was
 	// offline as system chat lines, then clear them.
 	if (m_trading_post_manager != nullptr) {
@@ -8433,6 +8439,21 @@ void CGame::send_notify_msg(int from_h, int to_h, uint16_t msg_type, uint32_t v1
 		pkt.mag = m_client_list[to_h]->m_mag;
 		pkt.chr = m_client_list[to_h]->m_charisma;
 		pkt.attack_delay = m_client_list[to_h]->m_status.attack_delay;
+		ret = m_client_list[to_h]->m_socket->send_msg(reinterpret_cast<char*>(&pkt), sizeof(pkt));
+		break;
+	}
+
+	case Notify::GearStats:
+	{
+		// The stats above stay the character's own — creation, level-up and
+		// persistence read those. This carries the gear contribution alongside
+		// so the client can render and re-derive with the same numbers the
+		// server's effective_*() already use.
+		hb::net::PacketNotifyGearStats pkt{};
+		pkt.header.msg_id = MsgId::Notify;
+		pkt.header.msg_type = msg_type;
+		for (std::size_t i = 0; i < std::size(pkt.add_attribute); i++)
+			pkt.add_attribute[i] = static_cast<int16_t>(m_client_list[to_h]->m_add_attribute[i]);
 		ret = m_client_list[to_h]->m_socket->send_msg(reinterpret_cast<char*>(&pkt), sizeof(pkt));
 		break;
 	}

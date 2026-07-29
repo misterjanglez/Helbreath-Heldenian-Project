@@ -41,6 +41,7 @@ void CPlayer::reset()
     m_angelic_int = 0;
     m_angelic_dex = 0;
     m_angelic_mag = 0;
+    for (int& gear_attribute : m_gear_attribute) gear_attribute = 0;
 
     // PROGRESSION
     m_level = 0;

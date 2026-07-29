@@ -17,6 +17,7 @@ namespace NetworkMessageHandlers {
 	void HandleLevelUp(CGame* game, char* data);
 	void HandleLevelUpPoints(CGame* game, char* data);
 	void HandleForceStatRefresh(CGame* game, char* data);
+	void HandleGearStats(CGame* game, char* data);
 
 	// Exchange
 	void HandleExchangeItemComplete(CGame* game, char* data);
@@ -240,6 +241,7 @@ bool NetworkMessageManager::process_message(uint32_t msg_id, char* data, uint32_
 		case Notify::LevelUp: NetworkMessageHandlers::HandleLevelUp(m_game, data); return true;
 		case Notify::LevelUpPoints: NetworkMessageHandlers::HandleLevelUpPoints(m_game, data); return true;
 		case Notify::ForceStatRefresh: NetworkMessageHandlers::HandleForceStatRefresh(m_game, data); return true;
+		case Notify::GearStats: NetworkMessageHandlers::HandleGearStats(m_game, data); return true;
 
 		// Items - Purchased/Obtained
 		case Notify::ItemPurchased: NetworkMessageHandlers::HandleItemPurchased(m_game, data); return true;

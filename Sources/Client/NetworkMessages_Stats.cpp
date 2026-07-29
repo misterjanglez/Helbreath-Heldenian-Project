@@ -9,6 +9,7 @@
 #include <cstring>
 #include <cmath>
 #include <format>
+#include <iterator>
 #include <string>
 #include "Screen_OnGame.h"
 #include "AudioManager.h"
@@ -184,5 +185,15 @@ namespace NetworkMessageHandlers {
 		game->m_player->m_charisma = pkt->chr;
 		game->m_player->m_playerStatus.attack_delay = pkt->attack_delay;
 		game->m_player->m_lu_str = game->m_player->m_lu_vit = game->m_player->m_lu_dex = game->m_player->m_lu_int = game->m_player->m_lu_mag = game->m_player->m_lu_char = 0;
+	}
+
+	void HandleGearStats(CGame* game, char* data)
+	{
+		const auto* pkt = hb::net::PacketCast<hb::net::PacketNotifyGearStats>(
+			data, sizeof(hb::net::PacketNotifyGearStats));
+		if (!pkt) return;
+
+		for (std::size_t i = 0; i < std::size(pkt->add_attribute); i++)
+			game->m_player->m_gear_attribute[i] = pkt->add_attribute[i];
 	}
 } // namespace NetworkMessageHandlers

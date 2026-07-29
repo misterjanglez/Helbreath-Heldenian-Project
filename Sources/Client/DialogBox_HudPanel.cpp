@@ -56,10 +56,13 @@ void DialogBox_HudPanel::draw_gauge_bars()
 	uint32_t time = m_game->m_cur_time;
 	auto sprite = m_game->m_sprite[InterfaceNdIconPanel];
 
-	// HP bar
+	// HP bar. Gear attributes feed the gauge maxima here for the same reason
+	// they do on the character screen — these re-derive CGame::get_max_* and
+	// have to read the same inputs, or a +VIT roll leaves the bar reading full
+	// while the server thinks there is headroom.
 	max_point = hb::shared::calc::max_hp(m_game->m_formula_engine,
-		hb::shared::calc::vit{(double)player().m_vit}, hb::shared::calc::level{(double)player().m_level},
-		hb::shared::calc::str{(double)player().m_str}, hb::shared::calc::angelic_str{(double)player().m_angelic_str});
+		hb::shared::calc::vit{(double)player().effective_vit()}, hb::shared::calc::level{(double)player().m_level},
+		hb::shared::calc::str{(double)player().effective_str()}, hb::shared::calc::angelic_str{(double)player().m_angelic_str});
 	if (max_point <= 0) max_point = 1;
 	display_value = std::min(player().m_hp, max_point);
 	bar_width = HP_MP_BAR_WIDTH - (display_value * HP_MP_BAR_WIDTH) / max_point;
@@ -85,8 +88,8 @@ void DialogBox_HudPanel::draw_gauge_bars()
 
 	// MP bar
 	max_point = hb::shared::calc::max_mp(m_game->m_formula_engine,
-		hb::shared::calc::mag{(double)player().m_mag}, hb::shared::calc::angelic_mag{(double)player().m_angelic_mag},
-		hb::shared::calc::level{(double)player().m_level}, hb::shared::calc::intel{(double)player().m_int},
+		hb::shared::calc::mag{(double)player().effective_mag()}, hb::shared::calc::angelic_mag{(double)player().m_angelic_mag},
+		hb::shared::calc::level{(double)player().m_level}, hb::shared::calc::intel{(double)player().effective_int()},
 		hb::shared::calc::angelic_int{(double)player().m_angelic_int});
 	if (max_point <= 0) max_point = 1;
 	display_value = std::min(player().m_mp, max_point);
@@ -102,7 +105,7 @@ void DialogBox_HudPanel::draw_gauge_bars()
 
 	// SP bar
 	max_point = hb::shared::calc::max_sp(m_game->m_formula_engine,
-		hb::shared::calc::str{(double)player().m_str}, hb::shared::calc::angelic_str{(double)player().m_angelic_str},
+		hb::shared::calc::str{(double)player().effective_str()}, hb::shared::calc::angelic_str{(double)player().m_angelic_str},
 		hb::shared::calc::level{(double)player().m_level});
 	if (max_point <= 0) max_point = 1;
 	display_value = std::min(player().m_sp, max_point);

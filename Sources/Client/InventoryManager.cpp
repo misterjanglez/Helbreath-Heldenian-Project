@@ -203,7 +203,10 @@ void inventory_manager::equip_item(int item_id)
 	}
 	int equip_weight = m_game->effective_item_weight(cfg->m_weight, m_game->m_player->m_item_list[item_id].get());
 	int wups = hb::shared::balance::weight_units_per_stone;
-	if (equip_weight / wups > m_game->m_player->m_str + m_game->m_player->m_angelic_str)
+	// Gear STR counts here because the server's matching gate counts it
+	// (ItemManager.cpp, the weight check in the equipment sweep). Reading base
+	// STR let the client refuse an equip the server would have accepted.
+	if (equip_weight / wups > m_game->m_player->effective_str() + m_game->m_player->m_angelic_str)
 	{
 		m_game->add_event_list(BITEMDROP_CHARACTER2, 10);
 		return;

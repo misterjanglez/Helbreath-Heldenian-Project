@@ -90,18 +90,19 @@ DialogBox_Character::DialogBox_Character(CGame* game)
 }
 
 // Helper: Display stat with optional angelic bonus (blue if boosted)
-void DialogBox_Character::draw_stat(int x1, int x2, int y, int baseStat, int angelicBonus)
+void DialogBox_Character::draw_stat(int x1, int x2, int y, int baseStat, int angelicBonus, int gearBonus)
 {
-	if (angelicBonus == 0)
-	{
-		auto buf = std::format("{}", baseStat);
-		put_aligned_string(x1, x2, y, buf.c_str(), GameColors::UILabel);
-	}
-	else
-	{
-		auto buf = std::format("{}", baseStat + angelicBonus);
-		put_aligned_string(x1, x2, y, buf.c_str(), GameColors::UIModifiedStat);
-	}
+	// Angelic keeps folding into the number, exactly as it always has — it is a
+	// property of one legacy pendant and the display predates this. Gear
+	// attributes render split ("18 (+3)") because the whole point is to show
+	// what the equipped set is contributing, which a single total hides.
+	const int shown = baseStat + angelicBonus;
+	const auto buf = (gearBonus != 0)
+		? std::format("{} (+{})", shown, gearBonus)
+		: std::format("{}", shown);
+
+	put_aligned_string(x1, x2, y, buf.c_str(),
+		((angelicBonus != 0) || (gearBonus != 0)) ? GameColors::UIModifiedStat : GameColors::UILabel);
 }
 
 // Find the topmost equipped slot colliding with the mouse, using the given table.
@@ -267,19 +268,22 @@ void DialogBox_Character::on_draw()
 	statBuf = m_game->format_comma_number(m_game->get_level_exp(player().m_level + 1));
 	put_aligned_string(sX + 180, sX + 250, sY + 142, statBuf.c_str(), GameColors::UILabel);
 
-	// Calculate max stats
+	// Calculate max stats. Gear attributes feed these exactly as they do in
+	// CGame::get_max_hp / get_max_mp / get_max_sp / calc_max_load — the client
+	// re-derives the same formulas, so it has to read the same inputs or the
+	// bars and the carry limit disagree with the server's.
 	int max_hp = hb::shared::calc::max_hp(m_game->m_formula_engine,
-		hb::shared::calc::vit{(double)player().m_vit}, hb::shared::calc::level{(double)player().m_level},
-		hb::shared::calc::str{(double)player().m_str}, hb::shared::calc::angelic_str{(double)player().m_angelic_str});
+		hb::shared::calc::vit{(double)player().effective_vit()}, hb::shared::calc::level{(double)player().m_level},
+		hb::shared::calc::str{(double)player().effective_str()}, hb::shared::calc::angelic_str{(double)player().m_angelic_str});
 	int max_mp = hb::shared::calc::max_mp(m_game->m_formula_engine,
-		hb::shared::calc::mag{(double)player().m_mag}, hb::shared::calc::angelic_mag{(double)player().m_angelic_mag},
-		hb::shared::calc::level{(double)player().m_level}, hb::shared::calc::intel{(double)player().m_int},
+		hb::shared::calc::mag{(double)player().effective_mag()}, hb::shared::calc::angelic_mag{(double)player().m_angelic_mag},
+		hb::shared::calc::level{(double)player().m_level}, hb::shared::calc::intel{(double)player().effective_int()},
 		hb::shared::calc::angelic_int{(double)player().m_angelic_int});
 	int max_sp = hb::shared::calc::max_sp(m_game->m_formula_engine,
-		hb::shared::calc::str{(double)player().m_str}, hb::shared::calc::angelic_str{(double)player().m_angelic_str},
+		hb::shared::calc::str{(double)player().effective_str()}, hb::shared::calc::angelic_str{(double)player().m_angelic_str},
 		hb::shared::calc::level{(double)player().m_level});
 	int max_load = hb::shared::calc::max_load(m_game->m_formula_engine,
-		hb::shared::calc::str{(double)player().m_str}, hb::shared::calc::angelic_str{(double)player().m_angelic_str},
+		hb::shared::calc::str{(double)player().effective_str()}, hb::shared::calc::angelic_str{(double)player().m_angelic_str},
 		hb::shared::calc::level{(double)player().m_level});
 
 	// HP, MP, SP
@@ -302,18 +306,24 @@ void DialogBox_Character::on_draw()
 	valueBuf = std::format("{}", player().m_enemy_kill_count);
 	put_aligned_string(sX + 180, sX + 250, sY + 257, valueBuf.c_str(), GameColors::UILabel);
 
-	// Stats with angelic bonuses
-	draw_stat(sX + 44, sX + 86, sY + 285, player().m_str, player().m_angelic_str);   // Str
-	draw_stat(sX + 48, sX + 86, sY + 304, player().m_dex, player().m_angelic_dex);   // Dex
-	draw_stat(sX + 131, sX + 171, sY + 285, player().m_int, player().m_angelic_int); // Int
-	draw_stat(sX + 131, sX + 171, sY + 304, player().m_mag, player().m_angelic_mag); // Mag
+	// Stats with angelic and gear bonuses
+	namespace tier_attribute = hb::shared::item::tier_attribute;
+	draw_stat(sX + 44, sX + 86, sY + 285, player().m_str, player().m_angelic_str,
+		player().m_gear_attribute[tier_attribute::strength]);       // Str
+	draw_stat(sX + 48, sX + 86, sY + 304, player().m_dex, player().m_angelic_dex,
+		player().m_gear_attribute[tier_attribute::dexterity]);      // Dex
+	draw_stat(sX + 131, sX + 171, sY + 285, player().m_int, player().m_angelic_int,
+		player().m_gear_attribute[tier_attribute::intelligence]);   // Int
+	draw_stat(sX + 131, sX + 171, sY + 304, player().m_mag, player().m_angelic_mag,
+		player().m_gear_attribute[tier_attribute::magic]);          // Mag
 
-	// Vit and Chr (no angelic bonus)
-	std::string vitChrBuf;
-	vitChrBuf = std::format("{}", player().m_vit);
-	put_aligned_string(sX + 214, sX + 255, sY + 285, vitChrBuf.c_str(), GameColors::UILabel);
-	vitChrBuf = std::format("{}", player().m_charisma);
-	put_aligned_string(sX + 214, sX + 255, sY + 304, vitChrBuf.c_str(), GameColors::UILabel);
+	// Vit and Chr have no angelic pendant, but gear rolls both, so they route
+	// through the same drawer instead of the two hand-rolled lines that were
+	// here — otherwise a +VIT roll would be the one bonus that stayed invisible.
+	draw_stat(sX + 214, sX + 255, sY + 285, player().m_vit, 0,
+		player().m_gear_attribute[tier_attribute::vitality]);       // Vit
+	draw_stat(sX + 214, sX + 255, sY + 304, player().m_charisma, 0,
+		player().m_gear_attribute[tier_attribute::charisma]);       // Chr
 
 	// Build equipment status array
 	char equip_poi_status[DEF_MAXITEMEQUIPPOS];

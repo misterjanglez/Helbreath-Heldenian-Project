@@ -2,6 +2,7 @@
 
 #include "PacketHeaders.h"
 #include "Item/ItemAttributeData.h"
+#include "Item/ModifierIds.h"
 #include "NetConstants.h"
 
 #include <cstddef>
@@ -631,6 +632,16 @@ namespace net {
 		int32_t mag;
 		int32_t chr;
 		uint8_t attack_delay;
+	};
+
+	// Gear attribute totals, already clamped at the per-attribute aggregate cap
+	// server-side. Indexed by hb::shared::item::tier_attribute so both ends fill
+	// and read it in a loop — six named fields invited a silently transposed
+	// assignment, the same reasoning that shaped CClient::m_add_attribute.
+	// int16 rather than uint8: the cap is a data value, not a wire guarantee.
+	struct HB_PACKED PacketNotifyGearStats {
+		PacketHeader header;
+		int16_t add_attribute[hb::shared::item::tier_attribute::charisma + 1];
 	};
 
 	struct HB_PACKED PacketNotifyQuestReward {

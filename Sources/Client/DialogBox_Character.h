@@ -24,7 +24,7 @@ public:
 	bool cancels_text_input_on_enable() const override { return false; }
 private:
 	// Helper methods
-	void draw_stat(int x1, int x2, int y, int baseStat, int angelicBonus);
+	void draw_stat(int x1, int x2, int y, int baseStat, int angelicBonus, int gearBonus);
 	void draw_equipped_item(hb::shared::item::EquipPos equipPos, int drawX, int drawY,
 		const char* equip_poi_status, bool highlight, int spriteOffset = 0);
 	void draw_hover_button(int sX, int sY, int btnX, int btnY,

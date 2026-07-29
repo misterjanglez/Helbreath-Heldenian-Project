@@ -25,6 +25,9 @@
 #include "StringCompat.h"
 #include "TimeUtils.h"
 
+#include <algorithm>
+#include <iterator>
+
 using namespace hb::shared::net;
 using namespace hb::shared::direction;
 
@@ -3388,6 +3391,13 @@ void ItemManager::calc_total_item_effect(int client_h, int equip_item_id, bool n
 	m_game->m_client_list[client_h]->m_angelic_mag = 0; // By Snoopy81
 	m_game->m_status_effect_manager->set_angel_flag(client_h, hb::shared::owner_class::Player, 0, 0);
 
+	// Snapshotted before the zeroing below so the recalc can tell whether the
+	// equipped set actually changed the totals — the client is only told when
+	// they move, the same way the two speed bytes are handled further down.
+	int prev_add_attribute[std::size(m_game->m_client_list[client_h]->m_add_attribute)];
+	std::copy(std::begin(m_game->m_client_list[client_h]->m_add_attribute),
+		std::end(m_game->m_client_list[client_h]->m_add_attribute), std::begin(prev_add_attribute));
+
 	for (int& gear_attribute : m_game->m_client_list[client_h]->m_add_attribute) gear_attribute = 0;
 
 	// Marquee lines from the equipped set (spec §5). The two speed values also
@@ -3825,6 +3835,18 @@ void ItemManager::calc_total_item_effect(int client_h, int equip_item_id, bool n
 	{
 		m_game->send_event_to_near_client_type_a(client_h, hb::shared::owner_class::Player,
 			MsgId::EventMotion, Type::NullAction, 0, 0, 0);
+	}
+
+	// Gear attribute totals are private to the wearer, so unlike the speed bytes
+	// this goes to the owner alone. Sent from here because this is the one place
+	// the totals are recomputed — level-up is not the only thing that moves them,
+	// which is exactly why the character screen used to show nothing on equip.
+	// Pre-init recalcs are skipped; the login path sends the first one.
+	if (m_game->m_client_list[client_h]->m_is_init_complete &&
+		!std::equal(std::begin(prev_add_attribute), std::end(prev_add_attribute),
+			std::begin(m_game->m_client_list[client_h]->m_add_attribute)))
+	{
+		m_game->send_notify_msg(0, client_h, Notify::GearStats, 0, 0, 0, 0);
 	}
 
 	// Combined ceiling, preserved from pre-3-C behavior. The catalog's

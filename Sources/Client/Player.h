@@ -11,6 +11,7 @@
 #include "ActionID.h"
 #include "DirectionHelpers.h"
 #include "BalanceConstants.h"
+#include "Item/ModifierIds.h"
 
 class CItem;
 
@@ -95,6 +96,23 @@ public:
     // BASE STATS
     int m_str, m_vit, m_dex, m_int, m_mag, m_charisma;
     int m_angelic_str, m_angelic_int, m_angelic_dex, m_angelic_mag;
+
+    // Attribute-ladder totals from equipped gear (Item Tiers spec §4), server
+    // -authoritative: filled from Notify::GearStats, never derived locally the
+    // way the angelic pendants above are. Indexed by tier_attribute to match
+    // the packet and CClient::m_add_attribute exactly, so the copy is a loop.
+    int m_gear_attribute[hb::shared::item::tier_attribute::charisma + 1]{};
+
+    // Base + gear, mirroring CClient::effective_*() so the formulas the client
+    // re-derives (max HP/SP, carry weight, the equip gate) agree with the
+    // server's. Angelic stays its own additive channel, added where it already
+    // is — folding it in here would double-count at every one of those sites.
+    int effective_str() const      { return m_str + m_gear_attribute[hb::shared::item::tier_attribute::strength]; }
+    int effective_int() const      { return m_int + m_gear_attribute[hb::shared::item::tier_attribute::intelligence]; }
+    int effective_vit() const      { return m_vit + m_gear_attribute[hb::shared::item::tier_attribute::vitality]; }
+    int effective_dex() const      { return m_dex + m_gear_attribute[hb::shared::item::tier_attribute::dexterity]; }
+    int effective_mag() const      { return m_mag + m_gear_attribute[hb::shared::item::tier_attribute::magic]; }
+    int effective_charisma() const { return m_charisma + m_gear_attribute[hb::shared::item::tier_attribute::charisma]; }
 
     // PROGRESSION
     int m_level;
