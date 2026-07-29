@@ -75,13 +75,15 @@ LEGACY_ROLLABLE_EFFECT_TYPES = {1, 2, 13}  # Attack / Defense / AttackManaSave
 # 2-E fixes: TheDevastator/DarkExecutor/LightingBlade corrected to 846/847/848
 # (the old 879/880/881 pointed at summon scrolls + an armor dye), and the
 # owner-ruled stage-2 named uniques Flameberge +3 LLF (290), Golden Axe LLF
-# (292), Giant Battle Hammer (762). verify_special_roster_sync() re-derives
-# this set from the header on every run and fails loud on drift.
+# (292), Giant Battle Hammer (762). 2-F corrects ZemstoneofSacrifice 753 -> 650
+# (753 is Wizard Hat (M), which now tier-rolls like its (W) half).
+# verify_special_roster_sync() re-derives this set from the header on every run
+# and fails loud on drift.
 SPECIAL_ITEMS = frozenset(
     {20, 259, 290, 291, 292, 300, 305, 308, 311, 335, 336, 337, 400, 401,
      427, 428, 490, 491, 492, 610, 611, 612, 613, 614, 616, 618, 620, 621,
-     622, 630, 631, 632, 633, 634, 635, 636, 646, 647, 648, 656, 657, 734,
-     735, 753, 762, 845, 846, 847, 848, 849, 850, 851, 858, 859, 860, 861,
+     622, 630, 631, 632, 633, 634, 635, 636, 646, 647, 648, 650, 656, 657,
+     734, 735, 762, 845, 846, 847, 848, 849, 850, 851, 858, 859, 860, 861,
      862, 863, 864, 865, 866, 867, 868, 869, 870, 871, 1108, 1109, 1110, 1111}
     | set(range(403, 427))       # Hero items 403-426
     | set(range(1086, 1102)))    # Magic necklaces 1086-1101

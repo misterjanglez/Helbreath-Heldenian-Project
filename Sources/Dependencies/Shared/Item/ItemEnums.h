@@ -344,13 +344,16 @@ namespace ItemId
     constexpr short NecklaceOfBeholder = 646;
     constexpr short NecklaceOfStoneGol = 647;
     constexpr short NecklaceOfLiche = 648;
+    // 650 in the original item data and in the shipped items table; 753 is
+    // Wizard Hat (M). The original decided "special" by item NAME, not id, so
+    // there was no id to port — 753 was invented here (fixed in Tiers 2-F).
+    constexpr short ZemstoneofSacrifice = 650;
     constexpr short StoneOfXelima = 656;
     constexpr short StoneOfMerien = 657;
     constexpr short SwordofMedusa = 613;
     constexpr short SwordofIceElemental = 614;
     constexpr short RingofArcmage = 734;
     constexpr short RingofDragonpower = 735;
-    constexpr short ZemstoneofSacrifice = 753;
     constexpr short GiantBattleHammer = 762;
     constexpr short StormBringer = 845;
     constexpr short KlonessBlade = 849;
