@@ -26,6 +26,7 @@
 #include "TimeUtils.h"
 
 #include <algorithm>
+#include <array>
 #include <iterator>
 
 using namespace hb::shared::net;
@@ -3394,9 +3395,11 @@ void ItemManager::calc_total_item_effect(int client_h, int equip_item_id, bool n
 	// Snapshotted before the zeroing below so the recalc can tell whether the
 	// equipped set actually changed the totals — the client is only told when
 	// they move, the same way the two speed bytes are handled further down.
-	int prev_add_attribute[std::size(m_game->m_client_list[client_h]->m_add_attribute)];
+	// std::array, not a C array sized by std::size(): GCC treats that bound as
+	// non-constant and the result decays into a VLA, which has no begin/end.
+	std::array<int, hb::shared::item::tier_attribute::charisma + 1> prev_add_attribute{};
 	std::copy(std::begin(m_game->m_client_list[client_h]->m_add_attribute),
-		std::end(m_game->m_client_list[client_h]->m_add_attribute), std::begin(prev_add_attribute));
+		std::end(m_game->m_client_list[client_h]->m_add_attribute), prev_add_attribute.begin());
 
 	for (int& gear_attribute : m_game->m_client_list[client_h]->m_add_attribute) gear_attribute = 0;
 
@@ -3843,7 +3846,7 @@ void ItemManager::calc_total_item_effect(int client_h, int equip_item_id, bool n
 	// which is exactly why the character screen used to show nothing on equip.
 	// Pre-init recalcs are skipped; the login path sends the first one.
 	if (m_game->m_client_list[client_h]->m_is_init_complete &&
-		!std::equal(std::begin(prev_add_attribute), std::end(prev_add_attribute),
+		!std::equal(prev_add_attribute.begin(), prev_add_attribute.end(),
 			std::begin(m_game->m_client_list[client_h]->m_add_attribute)))
 	{
 		m_game->send_notify_msg(0, client_h, Notify::GearStats, 0, 0, 0, 0);
