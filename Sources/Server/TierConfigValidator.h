@@ -42,6 +42,13 @@ struct tier_validation_context
 	const std::vector<attribute_secondary_type_entry>* attribute_secondary_types = nullptr;
 };
 
+// The spec's central drop-table noun: the item config behind `item_id` when
+// it is gear the tier system would roll. Null for the "nothing"/gold slots,
+// unknown ids, out-of-scope classes and the named-unique roster. The gate is
+// the roller's own (is_tier_scope_gear) — the §8 drop-table sweeps below and
+// the dropodds report both ask this rather than restating the rule.
+const CItem* ordinary_tier_gear(const tier_validation_context& context, int item_id);
+
 // Full §2 sweep. Each returned string is one error naming its table and
 // row; an empty result means the dataset may run in config.item_system.
 // Mode-scoped rules: empty tiered tables fail only in tiered mode (the

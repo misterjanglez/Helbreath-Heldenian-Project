@@ -14,14 +14,32 @@
 #include "Item.h"
 #include "Npc.h"
 #include "Log.h"
+#include "RollStrategy.h"           // is_tier_scope_gear
 
 namespace hb::server
 {
 
+using namespace hb::shared::item;
+
+// One item config out of the context, or null for an id the running world
+// has no config for.
+static const CItem* item_config(const tier_validation_context& context, int item_id)
+{
+	if (context.item_configs == nullptr) return nullptr;
+	if (item_id < 0 || item_id >= context.item_config_count) return nullptr;
+	return context.item_configs[item_id];
+}
+
+const CItem* ordinary_tier_gear(const tier_validation_context& context, int item_id)
+{
+	if (item_id == 0 || item_id == 90) return nullptr;  // nothing / gold
+	const CItem* item = item_config(context, item_id);
+	if (item == nullptr) return nullptr;
+	return is_tier_scope_gear(*item) ? item : nullptr;
+}
+
 namespace
 {
-
-using namespace hb::shared::item;
 
 struct validation_state
 {
@@ -42,28 +60,6 @@ bool known_effect_id(uint8_t id)
 bool valid_item_class(uint8_t item_class)
 {
 	return item_class >= tier_item_class::melee_weapon && item_class <= tier_item_class::cape;
-}
-
-const CItem* item_config(const tier_validation_context& context, int item_id)
-{
-	if (context.item_configs == nullptr) return nullptr;
-	if (item_id < 0 || item_id >= context.item_config_count) return nullptr;
-	return context.item_configs[item_id];
-}
-
-// The spec's central drop-table noun: gear the tier system would roll.
-// Null for the "nothing"/gold slots, unknown items, out-of-scope classes,
-// and the named-unique roster (is_special_item never rolls, spec §8).
-const CItem* ordinary_tier_gear(const tier_validation_context& context, int item_id)
-{
-	if (item_id == 0 || item_id == 90) return nullptr;  // nothing / gold
-	const CItem* item = item_config(context, item_id);
-	if (item == nullptr) return nullptr;
-	if (derive_tier_item_class(item->get_item_sub_type(),
-		item->get_weapon_class(), item->get_equip_pos()) == tier_item_class::none)
-		return nullptr;
-	if (is_special_item(static_cast<short>(item_id))) return nullptr;
-	return item;
 }
 
 // Anti-cheat knobs (spec §5), both modes — the move and cast checks run

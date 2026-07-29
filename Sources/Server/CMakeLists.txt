@@ -22,6 +22,7 @@ set(SERVER_SOURCES
     AccountSqliteStore.cpp
     Client.cpp
     CmdBroadcast.cpp
+    CmdDropOdds.cpp
     CmdGiveItem.cpp
     CmdHelp.cpp
     CmdMintCheck.cpp

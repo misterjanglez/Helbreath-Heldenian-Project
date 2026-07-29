@@ -114,6 +114,21 @@ struct loot_grade_config
 	int weight_epic;
 	int weight_legendary;
 	int first_drop_chance;            // out of 10000
+
+	// The weight for `tier` (1..tier_count). The one place that maps a tier
+	// onto its column, so the roll and the odds report cannot disagree about
+	// which weight belongs to Epic.
+	int tier_weight(uint8_t tier) const
+	{
+		switch (tier)
+		{
+		case 1:  return weight_common;
+		case 2:  return weight_rare;
+		case 3:  return weight_epic;
+		case 4:  return weight_legendary;
+		default: return 0;
+		}
+	}
 };
 
 struct enchant_category_config

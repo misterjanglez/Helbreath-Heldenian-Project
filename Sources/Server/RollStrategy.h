@@ -43,6 +43,14 @@ struct roll_context
 // per-grade data column — the drop pipeline no longer owns this number.
 inline constexpr uint32_t base_primary_drop_chance = 1000;
 
+// The spec §1 scope gate exactly as the tiered roll applies it: gear class
+// shape (derive_tier_item_class) plus the named-unique exclusion. It lives on
+// the seam rather than inside the strategy because two other readers need the
+// roller's own answer — the boot validator's drop-table sweeps and the
+// dropodds report, which would be worse than useless if it disagreed with the
+// roll about what counts as tierable gear.
+bool is_tier_scope_gear(const CItem& item);
+
 class roll_strategy
 {
 public:

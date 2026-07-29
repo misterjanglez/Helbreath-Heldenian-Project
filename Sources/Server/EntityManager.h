@@ -15,6 +15,39 @@
 
 struct DropTable;
 
+namespace hb::server
+{
+
+// Base drop chances out of 10000, before the server_config.json multipliers.
+// A gold drop preempts the stage-1 item drop, so base_gold_drop_chance is the
+// first term of every drop-odds calculation — it lives here rather than in the
+// pipeline's .cpp so the dropodds report reads the same number the pipeline
+// rolls against. The stage-1 primary base is strategy policy instead
+// (base_primary_drop_chance / first_drop_chance, RollStrategy.h).
+inline constexpr uint32_t base_gold_drop_chance = 3000;       // 30%
+inline constexpr uint32_t base_secondary_drop_chance = 500;   // 5%
+
+// NPC types the drop pipeline refuses outright: guards, dummies and crops
+// never roll a drop. Shared with the report so its per-grade averages exclude
+// exactly what the pipeline excludes, no more and no less.
+inline bool npc_type_never_drops(short npc_type)
+{
+	return npc_type == 21 || npc_type == 34 || npc_type == 64;
+}
+
+// A base chance out of 10000 scaled by its server_config.json drop-rate
+// multiplier and clamped back into 0..10000. Shared with the report for the
+// same reason as the constants above.
+inline uint32_t apply_drop_multiplier(uint32_t base_chance, float multiplier)
+{
+	double result = static_cast<double>(base_chance) * static_cast<double>(multiplier);
+	if (result > 10000.0) return 10000;
+	if (result < 0.0) return 0;
+	return static_cast<uint32_t>(result);
+}
+
+} // namespace hb::server
+
 class CEntityManager
 {
 public:

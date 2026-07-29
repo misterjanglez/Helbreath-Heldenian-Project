@@ -72,6 +72,9 @@
     <ClInclude Include="CmdBroadcast.h">
       <Filter>Console\Commands</Filter>
     </ClInclude>
+    <ClInclude Include="CmdDropOdds.h">
+      <Filter>Console\Commands</Filter>
+    </ClInclude>
     <ClInclude Include="CmdGiveItem.h">
       <Filter>Console\Commands</Filter>
     </ClInclude>
@@ -502,6 +505,9 @@
       <Filter>World</Filter>
     </ClCompile>
     <ClCompile Include="CmdBroadcast.cpp">
+      <Filter>Console\Commands</Filter>
+    </ClCompile>
+    <ClCompile Include="CmdDropOdds.cpp">
       <Filter>Console\Commands</Filter>
     </ClCompile>
     <ClCompile Include="CmdGiveItem.cpp">

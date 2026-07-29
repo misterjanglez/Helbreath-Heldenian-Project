@@ -219,6 +219,7 @@
     <ClInclude Include="ServerCommand.h" />
     <ClInclude Include="CmdHelp.h" />
     <ClInclude Include="CmdBroadcast.h" />
+    <ClInclude Include="CmdDropOdds.h" />
     <ClInclude Include="CmdShowChat.h" />
     <ClInclude Include="CmdGiveItem.h" />
     <ClInclude Include="CmdMintCheck.h" />
@@ -362,6 +363,7 @@
     <ClCompile Include="ServerCommand.cpp" />
     <ClCompile Include="CmdHelp.cpp" />
     <ClCompile Include="CmdBroadcast.cpp" />
+    <ClCompile Include="CmdDropOdds.cpp" />
     <ClCompile Include="CmdShowChat.cpp" />
     <ClCompile Include="CmdGiveItem.cpp" />
     <ClCompile Include="CmdMintCheck.cpp" />

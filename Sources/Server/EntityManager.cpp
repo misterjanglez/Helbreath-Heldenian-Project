@@ -2598,21 +2598,6 @@ void CEntityManager::delete_npc_internal(int npc_h)
 	m_npc_list[npc_h] = nullptr;
 }
 
-// Helper to apply drop rate multiplier (capped at 10000 = 100%)
-static uint32_t ApplyDropMultiplier(uint32_t baseChance, float multiplier)
-{
-	double result = static_cast<double>(baseChance) * static_cast<double>(multiplier);
-	if (result > 10000.0) return 10000;
-	if (result < 0.0) return 0;
-	return static_cast<uint32_t>(result);
-}
-
-// Base drop chances (out of 10000 = 100%). The stage-1 primary base moved
-// to the Roll strategy seam (base_primary_drop_chance, RollStrategy.h) —
-// it is strategy policy since Tiers 3-B.
-static constexpr uint32_t BASE_GOLD_DROP_CHANCE = 3000;      // 30% base gold drop chance
-static constexpr uint32_t BASE_SECONDARY_DROP_CHANCE = 500;  // 5% base secondary/bonus drop chance
-
 // Center-out square spiral of tile offsets for scattered boss loot, ported
 // from the original ITEMSPREAD_FIEXD_COORD table. It fills a 5x5 area (offsets
 // -2..+2) from the center outward, so the Nth scattered item lands on the Nth
@@ -2630,12 +2615,7 @@ void CEntityManager::npc_dead_item_generator(int npc_h, short attacker_h, char a
 	if ((attacker_type != hb::shared::owner_class::Player) || (m_npc_list[npc_h]->m_is_summoned)) return;
 	if (m_npc_list[npc_h]->m_is_unsummoned) return;
 
-	switch (m_npc_list[npc_h]->m_type) {
-	case 21: // Guard
-	case 34: // Dummy
-	case 64: // Crop
-		return;
-	}
+	if (hb::server::npc_type_never_drops(m_npc_list[npc_h]->m_type)) return;
 
 	const DropTable* table = m_game->m_item_manager->get_drop_table(m_npc_list[npc_h]->m_drop_table_id);
 
@@ -2643,11 +2623,12 @@ void CEntityManager::npc_dead_item_generator(int npc_h, short attacker_h, char a
 	// At 1.0: normal, at 1.5: 150% more likely, at 2.0: 200%, etc.
 	// The base first-drop chance is strategy policy (spec §8): legacy keeps
 	// the flat base, tiered reads the monster's loot-grade row.
-	uint32_t primaryChance = ApplyDropMultiplier(
+	uint32_t primaryChance = hb::server::apply_drop_multiplier(
 		m_game->get_roll_strategy().first_drop_chance(
 			static_cast<uint8_t>(m_npc_list[npc_h]->m_loot_grade)),
 		m_game->m_primary_drop_rate);
-	uint32_t goldChance = ApplyDropMultiplier(BASE_GOLD_DROP_CHANCE, m_game->m_gold_drop_rate);
+	uint32_t goldChance = hb::server::apply_drop_multiplier(
+		hb::server::base_gold_drop_chance, m_game->m_gold_drop_rate);
 
 	bool droppedGold = false;
 	if (m_game->dice(1, 10000) <= goldChance) {
@@ -2741,7 +2722,7 @@ void CEntityManager::npc_dead_item_generator(int npc_h, short attacker_h, char a
 				}
 
 				// Calculate effective secondary drop chance with rating modifier and multiplier
-				double baseSecondary = static_cast<double>(BASE_SECONDARY_DROP_CHANCE) - ratingModifier;
+				double baseSecondary = static_cast<double>(hb::server::base_secondary_drop_chance) - ratingModifier;
 				double effectiveSecondary = baseSecondary * static_cast<double>(m_game->m_secondary_drop_rate);
 				if (effectiveSecondary > 10000.0) effectiveSecondary = 10000.0;
 				if (effectiveSecondary < 0.0) effectiveSecondary = 0.0;

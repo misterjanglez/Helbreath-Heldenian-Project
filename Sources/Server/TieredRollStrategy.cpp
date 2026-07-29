@@ -51,6 +51,16 @@ int pick_weighted(const Range& range, WeightOf weight_of, std::mt19937& rng)
 
 } // namespace
 
+// §1 scope classes only, with the named-unique roster excluded explicitly —
+// Kloness-class weapons pass the class check but must never roll (spec §8
+// implementation note).
+bool is_tier_scope_gear(const CItem& item)
+{
+	if (derive_tier_item_class(item.get_item_sub_type(), item.get_weapon_class(),
+		item.get_equip_pos()) == tier_item_class::none) return false;
+	return !is_special_item(item.m_id_num);
+}
+
 uint32_t tiered_roll_strategy::first_drop_chance(uint8_t loot_grade) const
 {
 	const loot_grade_config* grade = m_game.get_tier_config().find_loot_grade(loot_grade);
@@ -64,8 +74,9 @@ uint32_t tiered_roll_strategy::first_drop_chance(uint8_t loot_grade) const
 // the validator guarantees at least one weight is positive.
 uint8_t tiered_roll_strategy::roll_tier(const loot_grade_config& grade)
 {
-	const int weights[tier_count] = { grade.weight_common, grade.weight_rare,
-		grade.weight_epic, grade.weight_legendary };
+	int weights[tier_count];
+	for (uint8_t tier = 1; tier <= tier_count; tier++)
+		weights[tier - 1] = grade.tier_weight(tier);
 	return static_cast<uint8_t>(pick_weighted(weights,
 		[](int weight) { return weight; }, m_rng) + 1);
 }
@@ -122,13 +133,11 @@ bool tiered_roll_strategy::roll(CItem& item, const roll_context& context)
 	// the unique/special venue; GM minting joins in 3-G.
 	if (!context.first_drop) return false;
 
-	// §1 scope classes only, with the named-unique roster excluded
-	// explicitly — Kloness-class weapons pass the class check but must
-	// never roll (spec §8 implementation note).
+	if (!is_tier_scope_gear(item)) return false;
+
+	// The class the gate just accepted, needed again to weight the roll.
 	const auto item_class = derive_tier_item_class(item.get_item_sub_type(),
 		item.get_weapon_class(), item.get_equip_pos());
-	if (item_class == tier_item_class::none) return false;
-	if (is_special_item(item.m_id_num)) return false;
 
 	const tier_config& config = m_game.get_tier_config();
 	const loot_grade_config* grade = config.find_loot_grade(context.loot_grade);
@@ -204,12 +213,12 @@ std::string tiered_roll_strategy::mint(CItem& item, const item_attribute_data& r
 	}
 	else
 	{
-		const auto item_class = derive_tier_item_class(item.get_item_sub_type(),
-			item.get_weapon_class(), item.get_equip_pos());
-		if (item_class == tier_item_class::none)
-			return "this item is outside tier scope and cannot carry a tier";
-		if (is_special_item(item.m_id_num))
-			return "named uniques never carry a tier";
+		// The same gate the roll applies, split back into its two halves so
+		// the GM learns which rule refused the spec.
+		if (!is_tier_scope_gear(item))
+			return is_special_item(item.m_id_num)
+				? "named uniques never carry a tier"
+				: "this item is outside tier scope and cannot carry a tier";
 
 		// The one structural audit, shared with the roll smoke harness: tier
 		// 1..4, count == tier, one modifier per Bucket, min-tier ladder,
