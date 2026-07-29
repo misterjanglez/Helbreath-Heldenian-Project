@@ -57,7 +57,7 @@ void rollsmoke_tiered(CGame* game, int item_id, int count, int grade)
 		}
 		hb::server::roll_context context;
 		context.loot_grade = static_cast<uint8_t>(grade);
-		context.first_drop = true;
+		context.tier_rolls = true;
 		if (game->get_roll_strategy().roll(item, context) == false)
 		{
 			no_roll++;

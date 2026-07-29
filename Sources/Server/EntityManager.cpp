@@ -2617,170 +2617,104 @@ void CEntityManager::npc_dead_item_generator(int npc_h, short attacker_h, char a
 
 	if (hb::server::npc_type_never_drops(m_npc_list[npc_h]->m_type)) return;
 
-	const DropTable* table = m_game->m_item_manager->get_drop_table(m_npc_list[npc_h]->m_drop_table_id);
-
-	// Apply drop rate multipliers to base chances
-	// At 1.0: normal, at 1.5: 150% more likely, at 2.0: 200%, etc.
-	// The base first-drop chance is strategy policy (spec §8): legacy keeps
-	// the flat base, tiered reads the monster's loot-grade row.
-	uint32_t primaryChance = hb::server::apply_drop_multiplier(
-		m_game->get_roll_strategy().first_drop_chance(
-			static_cast<uint8_t>(m_npc_list[npc_h]->m_loot_grade)),
-		m_game->m_primary_drop_rate);
-	uint32_t goldChance = hb::server::apply_drop_multiplier(
-		hb::server::base_gold_drop_chance, m_game->m_gold_drop_rate);
-
-	bool droppedGold = false;
-	if (m_game->dice(1, 10000) <= goldChance) {
-		int minGold = static_cast<int>(m_npc_list[npc_h]->m_gold_dice_min);
-		int maxGold = static_cast<int>(m_npc_list[npc_h]->m_gold_dice_max);
-		if (minGold < 0) minGold = 0;
-		if (maxGold < minGold) maxGold = minGold;
-		// Only a monster with gold dice places anything here, and only a placed
-		// gold drop preempts the item roll below - so this is the predicate the
-		// dropodds report has to price the preempt with (EntityManager.h).
-		if (hb::server::npc_places_gold(*m_npc_list[npc_h])) {
-			int amount = minGold;
-			if (maxGold > minGold) {
-				amount = m_game->dice(1, (maxGold - minGold)) + minGold;
-			}
-			if (amount > 0) {
-				if ((attacker_type == hb::shared::owner_class::Player) &&
-					(m_game->m_client_list[attacker_h] != nullptr) &&
-					(m_game->m_client_list[attacker_h]->m_add_gold != 0)) {
-					double bonus = (double)m_game->m_client_list[attacker_h]->m_add_gold;
-					amount += static_cast<int>((bonus / 100.0f) * static_cast<double>(amount));
-				}
-				spawn_npc_drop_item(npc_h, 90, amount, amount);
-				droppedGold = true;
-			}
-		}
-	}
-
-	// Primary item drop (from drop table stage 1) - uses same primary chance
-	if (!droppedGold && table != nullptr) {
-		if (m_game->dice(1, 10000) <= primaryChance) {
-			int min_count = 1;
-			int max_count = 1;
-			int item_id = roll_drop_table_item(table, 1, min_count, max_count);
-			if (item_id != 0) {
-				if (item_id == 90) {
-					min_count = static_cast<int>(m_npc_list[npc_h]->m_gold_dice_min);
-					max_count = static_cast<int>(m_npc_list[npc_h]->m_gold_dice_max);
-				}
-				spawn_npc_drop_item(npc_h, item_id, min_count, max_count, 0, 0, /*first_drop=*/true);
-			}
-		}
-	}
-
-	// Secondary/bonus drop (from drop table stage 2).
+	// One engine, run twice. The slot a table was reached through is the ONLY
+	// thing "stage" means: it picks the stage multiplier and decides whether
+	// the result tier-rolls (spec §8 keeps stage 2 out of the tier roll).
+	// Nothing else below branches on it — a stage-1 table set to
+	// scatter/corpse-decay behaves exactly like a stage-2 one.
 	//
-	// This is the "second drop": in the original game it appears a little later
-	// than the death drop, when the corpse decays. So instead of placing it now
-	// we roll it here (while the attacker is still valid) and queue it as a
-	// pending drop; spawn_pending_drops() places it in npc_behavior_dead when
-	// the corpse's regen timer elapses.
-	if (table != nullptr) {
-		// Guaranteed-drop bosses (e.g. Helclaw, Tiger Worm, Wyverns, Abaddon)
-		// always roll their stage-2 table and skip the "nothing" slot, so a real
-		// second item drops on every kill. All other NPCs use the normal
-		// rating-modified secondary chance and may roll nothing.
-		bool guaranteed = table->guaranteed_secondary;
-
-		if (table->scatter_count > 0) {
-			// Scatter bosses (Wyvern / Fire-Wyvern / Abaddon): roll the stage-2
-			// table scatter_count times and spread the real hits over the 5x5
-			// spiral. The first roll skips the "nothing" slot when the table is
-			// guaranteed (preserving one guaranteed item); the remaining rolls
-			// include it as bonus attempts, so most of them miss.
-			int placed = 0;
-			for (int k = 0; k < table->scatter_count; k++) {
-				int min_count = 1;
-				int max_count = 1;
-				bool exclude_empty = (k == 0 && guaranteed);
-				int item_id = roll_drop_table_item(table, 2, min_count, max_count, exclude_empty);
-				if (item_id == 0) continue;
-				if (item_id == 90) {
-					min_count = static_cast<int>(m_npc_list[npc_h]->m_gold_dice_min);
-					max_count = static_cast<int>(m_npc_list[npc_h]->m_gold_dice_max);
-				}
-				int idx = placed;
-				if (idx >= NpcScatterCoordCount) idx = NpcScatterCoordCount - 1;
-				queue_pending_drop(npc_h, item_id, min_count, max_count,
-					NpcScatterCoord[idx][0], NpcScatterCoord[idx][1]);
-				placed++;
-			}
-		}
-		else {
-			// Ordinary single second drop, placed on the exact corpse tile.
-			bool do_secondary = guaranteed;
-
-			if (!guaranteed) {
-				// Base secondary chance, modified by player rating
-				double ratingModifier = 0.0;
-				if (m_game->m_client_list[attacker_h] != nullptr) {
-					ratingModifier = m_game->m_client_list[attacker_h]->m_rating * m_game->m_rep_drop_modifier;
-					if (ratingModifier > 1000) ratingModifier = 1000;
-					if (ratingModifier < -1000) ratingModifier = -1000;
-				}
-
-				// Calculate effective secondary drop chance with rating modifier and multiplier
-				double baseSecondary = static_cast<double>(hb::server::base_secondary_drop_chance) - ratingModifier;
-				double effectiveSecondary = baseSecondary * static_cast<double>(m_game->m_secondary_drop_rate);
-				if (effectiveSecondary > 10000.0) effectiveSecondary = 10000.0;
-				if (effectiveSecondary < 0.0) effectiveSecondary = 0.0;
-
-				do_secondary = (m_game->dice(1, 10000) <= static_cast<uint32_t>(effectiveSecondary));
-			}
-
-			if (do_secondary) {
-				int min_count = 1;
-				int max_count = 1;
-				int item_id = roll_drop_table_item(table, 2, min_count, max_count, /*exclude_empty=*/guaranteed);
-				if (item_id != 0) {
-					if (item_id == 90) {
-						min_count = static_cast<int>(m_npc_list[npc_h]->m_gold_dice_min);
-						max_count = static_cast<int>(m_npc_list[npc_h]->m_gold_dice_max);
-					}
-					queue_pending_drop(npc_h, item_id, min_count, max_count, 0, 0);
-				}
-			}
-		}
-	}
+	// There is no gold preempt any more and no flat per-stage gate: gold is an
+	// ordinary row competing on its own absolute chance, and every other row
+	// states its own. The leftover probability is "nothing".
+	roll_drop_slot(npc_h, attacker_h, 1, m_npc_list[npc_h]->m_stage1_table_id);
+	roll_drop_slot(npc_h, attacker_h, 2, m_npc_list[npc_h]->m_stage2_table_id);
 }
 
-int CEntityManager::roll_drop_table_item(const DropTable* table, int stage, int& outMinCount, int& outMaxCount, bool exclude_empty) const
+// One table, rolled roll_count times, its winnings placed where and when the
+// table says. Stage 2's old machinery — the flat 5% gate, guaranteed_secondary,
+// scatter_count, the rating modifier — is all gone: what survives is the table
+// properties any table may carry.
+void CEntityManager::roll_drop_slot(int npc_h, short attacker_h, int stage_slot, int table_id)
 {
-	if (table == nullptr) return 0;
-	if (stage < 1 || stage > 2) return 0;
+	const hb::server::drop_table* table = m_game->m_item_manager->get_drop_table(table_id);
+	if (table == nullptr) return;
+	CNpc* npc = m_npc_list[npc_h];
+	if (npc == nullptr) return;
 
-	// When exclude_empty is set, the item_id=0 "nothing" slot is ignored so a
-	// real item is always chosen (guaranteed-drop bosses). The roll then runs
-	// against the summed weight of the real entries only, preserving their
-	// relative rarity.
-	int total = table->total_weight[stage];
-	if (exclude_empty) {
-		total = 0;
-		for (const auto& entry : table->stage_entries[stage]) {
-			if (entry.item_id != 0) total += entry.weight;
+	// The generosity stack and proportional saturation, resolved through the
+	// same function the dropodds report calls, so the two cannot disagree.
+	std::vector<uint32_t> chances;
+	hb::server::resolve_drop_chances(*table, m_game->get_tier_config().generosity,
+		stage_slot, static_cast<uint8_t>(npc->m_loot_grade),
+		m_game->m_item_config_list, hb::server::config::MaxItemTypes, chances);
+
+	// How many times the table is rolled is an AUTHORED property, never touched
+	// by a multiplier: turning stage 2 up must not make a scatter boss spread
+	// more items.
+	int rolls = table->roll_count_min;
+	if (table->roll_count_max > rolls)
+		rolls += static_cast<int>(std::uniform_int_distribution<int>(
+			0, table->roll_count_max - rolls)(m_drop_rng));
+
+	// The tier roll is the one deliberate asymmetry, and it is not part of the
+	// drop calculation — it is what happens to an item after it is chosen.
+	const bool tier_rolls = (stage_slot == 1);
+
+	std::uniform_int_distribution<uint32_t> draw(
+		0, hb::server::drop_chance_denominator - 1);
+
+	int placed = 0;
+	for (int k = 0; k < rolls; k++) {
+		const int index = hb::server::roll_drop_row(chances, draw(m_drop_rng));
+		if (index < 0) continue;                       // the remainder: nothing
+		const hb::server::drop_entry& entry = table->entries[index];
+
+		int min_count = entry.min_count;
+		int max_count = entry.max_count;
+		if (entry.item_id == hb::shared::item::ItemId::Gold) {
+			// Gold's amount comes from the monster's dice rather than the row,
+			// and the killer's add-gold bonus applies to it, exactly as before.
+			min_count = static_cast<int>(npc->m_gold_dice_min);
+			max_count = static_cast<int>(npc->m_gold_dice_max);
+			if (min_count < 0) min_count = 0;
+			if (max_count < min_count) max_count = min_count;
+			int amount = min_count;
+			if (max_count > min_count)
+				amount = m_game->dice(1, (max_count - min_count)) + min_count;
+			if (amount <= 0) continue;
+			if ((m_game->m_client_list[attacker_h] != nullptr) &&
+				(m_game->m_client_list[attacker_h]->m_add_gold != 0)) {
+				const double bonus = (double)m_game->m_client_list[attacker_h]->m_add_gold;
+				amount += static_cast<int>((bonus / 100.0) * static_cast<double>(amount));
+			}
+			min_count = max_count = amount;
+		}
+
+		// Spiral placement fills the 5x5 centre-out square in the order items
+		// were won, so the Nth item lands on the Nth innermost cell.
+		short dx = 0, dy = 0;
+		if (table->placement == hb::server::drop_placement::spiral) {
+			const int cell = placed < NpcScatterCoordCount
+				? placed : NpcScatterCoordCount - 1;
+			dx = NpcScatterCoord[cell][0];
+			dy = NpcScatterCoord[cell][1];
+		}
+
+		if (table->delay == hb::server::drop_delay::decay) {
+			// Rolled now, while the attacker is still valid, and placed by
+			// spawn_pending_drops when the corpse's regen timer elapses.
+			queue_pending_drop(npc_h, entry.item_id, min_count, max_count,
+				dx, dy, tier_rolls);
+			placed++;
+		}
+		else if (spawn_npc_drop_item(npc_h, entry.item_id, min_count, max_count,
+			dx, dy, tier_rolls)) {
+			placed++;
 		}
 	}
-	if (total <= 0) return 0;
-	int roll = m_game->dice(1, total);
-	int cumulative = 0;
-	for (const auto& entry : table->stage_entries[stage]) {
-		if (exclude_empty && entry.item_id == 0) continue;
-		cumulative += entry.weight;
-		if (roll <= cumulative) {
-			outMinCount = entry.min_count;
-			outMaxCount = entry.max_count;
-			return entry.item_id;
-		}
-	}
-	return 0;
 }
 
-bool CEntityManager::spawn_npc_drop_item(int npc_h, int item_id, int min_count, int max_count, short dx, short dy, bool first_drop)
+bool CEntityManager::spawn_npc_drop_item(int npc_h, int item_id, int min_count, int max_count, short dx, short dy, bool tier_rolls)
 {
 	if (item_id <= 0) return false;
 	if (m_npc_list[npc_h] == nullptr) return false;
@@ -2828,7 +2762,7 @@ bool CEntityManager::spawn_npc_drop_item(int npc_h, int item_id, int min_count, 
 	item->m_instance.count = count;
 	hb::server::roll_context roll_context;
 	roll_context.loot_grade = static_cast<uint8_t>(m_npc_list[npc_h]->m_loot_grade);
-	roll_context.first_drop = first_drop;
+	roll_context.tier_rolls = tier_rolls;
 	m_game->get_roll_strategy().roll(*item, roll_context);
 	item->set_touch_effect_type(TouchEffectType::ID);
 	item->m_instance.touch_effect_value1 = static_cast<short>(m_game->dice(1, 100000));
@@ -2841,8 +2775,8 @@ bool CEntityManager::spawn_npc_drop_item(int npc_h, int item_id, int min_count, 
 	return true;
 }
 
-// Queue a stage-2 drop rolled at death for placement when the corpse decays.
-void CEntityManager::queue_pending_drop(int npc_h, int item_id, int min_count, int max_count, short dx, short dy)
+// Queue a drop rolled at death for placement when the corpse decays.
+void CEntityManager::queue_pending_drop(int npc_h, int item_id, int min_count, int max_count, short dx, short dy, bool tier_rolls)
 {
 	if (m_npc_list[npc_h] == 0) return;
 	CNpc* npc = m_npc_list[npc_h];
@@ -2854,11 +2788,12 @@ void CEntityManager::queue_pending_drop(int npc_h, int item_id, int min_count, i
 	d.max_count = max_count;
 	d.dx = dx;
 	d.dy = dy;
+	d.tier_rolls = tier_rolls;
 }
 
-// Place all pending (delayed) second-stage drops for a decaying corpse. Called
-// from npc_behavior_dead once the regen timer elapses, just before the NPC is
-// removed, so the second drop appears a little after the death drop.
+// Place all pending (delayed) drops for a decaying corpse. Called from
+// npc_behavior_dead once the regen timer elapses, just before the NPC is
+// removed, so a corpse-decay drop appears a little after the death drop.
 void CEntityManager::spawn_pending_drops(int npc_h)
 {
 	if (m_npc_list[npc_h] == 0) return;
@@ -2866,7 +2801,8 @@ void CEntityManager::spawn_pending_drops(int npc_h)
 
 	for (int i = 0; i < npc->m_pending_drop_count; i++) {
 		const PendingDrop& d = npc->m_pending_drops[i];
-		spawn_npc_drop_item(npc_h, d.item_id, d.min_count, d.max_count, d.dx, d.dy);
+		spawn_npc_drop_item(npc_h, d.item_id, d.min_count, d.max_count, d.dx, d.dy,
+			d.tier_rolls);
 	}
 	npc->m_pending_drop_count = 0;
 }

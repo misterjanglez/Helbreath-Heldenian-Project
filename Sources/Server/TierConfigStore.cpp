@@ -5,7 +5,9 @@
 #include "TierConfigStore.h"
 
 #include <algorithm>
+#include <cstdlib>
 #include <format>
+#include <string>
 #include <utility>
 
 #include "sqlite3.h"
@@ -196,7 +198,7 @@ bool load_loot_grades(sqlite3* db, tier_config& config)
 {
 	return for_each_row(db,
 		"SELECT grade, name, weight_common, weight_rare, weight_epic,"
-		" weight_legendary, first_drop_chance FROM loot_grades ORDER BY grade;",
+		" weight_legendary FROM loot_grades ORDER BY grade;",
 		"loot_grades",
 		[&](sqlite3_stmt* stmt)
 	{
@@ -207,8 +209,60 @@ bool load_loot_grades(sqlite3* db, tier_config& config)
 		row.weight_rare       = sqlite3_column_int(stmt, 3);
 		row.weight_epic       = sqlite3_column_int(stmt, 4);
 		row.weight_legendary  = sqlite3_column_int(stmt, 5);
-		row.first_drop_chance = sqlite3_column_int(stmt, 6);
 		config.loot_grades.push_back(std::move(row));
+	});
+}
+
+// The four generosity layers (#73). Every row defaults to 1.0 and an absent
+// table leaves the whole stack neutral, so a world that has never tuned its
+// drops behaves exactly as authored. An unrecognised scope/key is recorded
+// rather than ignored: a multiplier nobody applies is a tuning knob that
+// silently does nothing.
+bool load_drop_multipliers(sqlite3* db, tier_config& config)
+{
+	return for_each_row(db,
+		"SELECT scope, key, multiplier FROM drop_multipliers;",
+		"drop_multipliers",
+		[&](sqlite3_stmt* stmt)
+	{
+		const std::string scope = column_text(stmt, 0);
+		const std::string key   = column_text(stmt, 1);
+		const double value      = sqlite3_column_double(stmt, 2);
+
+		if (value < 0.0)
+		{
+			config.load_anomalies.push_back(
+				"drop_multipliers " + scope + "/" + key + ": negative multiplier");
+			return;
+		}
+
+		drop_multipliers& m = config.generosity;
+		if (scope == "global" && key.empty()) { m.global = value; return; }
+		if (scope == "stage")
+		{
+			const int slot = std::atoi(key.c_str());
+			if (slot >= 1 && slot <= drop_multipliers::max_stage)
+			{
+				m.stage[slot] = value;
+				return;
+			}
+		}
+		else if (scope == "grade")
+		{
+			const int grade = std::atoi(key.c_str());
+			if (grade >= 1 && grade <= drop_multipliers::max_grade)
+			{
+				m.grade[grade] = value;
+				return;
+			}
+		}
+		else if (scope == "category")
+		{
+			for (uint8_t c = 0; c < drop_category::count; c++)
+				if (key == drop_category_name(c)) { m.category[c] = value; return; }
+		}
+		config.load_anomalies.push_back(
+			"drop_multipliers: unknown scope/key '" + scope + "'/'" + key + "'");
 	});
 }
 
@@ -429,6 +483,7 @@ bool load_tier_config(sqlite3* db, tier_config& out)
 		&& load_curves(db, fresh)
 		&& load_curve_overrides(db, fresh)
 		&& load_loot_grades(db, fresh)
+		&& load_drop_multipliers(db, fresh)
 		&& load_enchant_categories(db, fresh)
 		&& load_enchant_steps(db, fresh)
 		&& load_presentation(db, fresh)

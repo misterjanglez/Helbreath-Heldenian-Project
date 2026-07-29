@@ -75,6 +75,9 @@
     <ClInclude Include="CmdDropOdds.h">
       <Filter>Console\Commands</Filter>
     </ClInclude>
+    <ClInclude Include="DropModel.h">
+      <Filter>Items</Filter>
+    </ClInclude>
     <ClInclude Include="CmdGiveItem.h">
       <Filter>Console\Commands</Filter>
     </ClInclude>
@@ -557,6 +560,9 @@
     </ClCompile>
     <ClCompile Include="DelayEventManager.cpp">
       <Filter>World</Filter>
+    </ClCompile>
+    <ClCompile Include="DropModel.cpp">
+      <Filter>Items</Filter>
     </ClCompile>
     <ClCompile Include="DynamicObjectManager.cpp">
       <Filter>World</Filter>

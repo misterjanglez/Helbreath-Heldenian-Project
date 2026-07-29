@@ -221,6 +221,7 @@
     <ClInclude Include="CmdHelp.h" />
     <ClInclude Include="CmdBroadcast.h" />
     <ClInclude Include="CmdDropOdds.h" />
+    <ClInclude Include="DropModel.h" />
     <ClInclude Include="CmdShowChat.h" />
     <ClInclude Include="CmdGiveItem.h" />
     <ClInclude Include="CmdMintCheck.h" />
@@ -333,6 +334,7 @@
     <ClCompile Include="QuestManager.cpp" />
     <ClCompile Include="GuildManager.cpp" />
     <ClCompile Include="DelayEventManager.cpp" />
+    <ClCompile Include="DropModel.cpp" />
     <ClCompile Include="DynamicObjectManager.cpp" />
     <ClCompile Include="LootManager.cpp" />
     <ClCompile Include="CombatManager.cpp" />

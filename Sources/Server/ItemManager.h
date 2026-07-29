@@ -8,7 +8,7 @@
 #include "DirectionHelpers.h"
 using hb::shared::direction::direction;
 
-struct DropTable;
+namespace hb::server { struct drop_table; }
 class CGame;
 class CItem;
 struct ShopData;
@@ -23,7 +23,7 @@ public:
 
 	// Item config / init
 	bool send_client_item_configs(int client_h);
-	const DropTable* get_drop_table(int id) const;
+	const hb::server::drop_table* get_drop_table(int id) const;
 	void clear_item_config_list();
 	bool init_item_attr(CItem* item, const char* item_name);
 	bool init_item_attr(CItem* item, int item_id);

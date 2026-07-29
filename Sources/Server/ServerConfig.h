@@ -4,14 +4,9 @@
 
 struct server_config
 {
-	// Drop rates (multipliers, 1.0 = normal)
-	struct
-	{
-		float primary = 1.0f;
-		float gold = 1.0f;
-		float secondary = 1.0f;
-		int rep_modifier = 5;
-	} drop_rates;
+	// The drop_rates block retired with #73. Drop generosity is four
+	// multipliers in gamedata.db now (drop_multipliers), which reload live -
+	// these were restart-only, and the base chances they scaled no longer exist.
 
 	// Timing intervals (milliseconds)
 	struct

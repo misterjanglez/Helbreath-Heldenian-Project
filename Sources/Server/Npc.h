@@ -56,6 +56,11 @@ struct PendingDrop
 	int   max_count;
 	short dx;
 	short dy;
+	// Whether this drop tier-rolls when it finally lands. Carried on the queue
+	// because delay is a table property now (#73): a STAGE-1 table set to
+	// corpse-decay still tier-rolls, and a stage-2 one still never does, so the
+	// answer cannot be re-derived at placement time.
+	bool  tier_rolls;
 };
 
 // Config-sourced fields live in the base (NpcConfigFields.h); everything below

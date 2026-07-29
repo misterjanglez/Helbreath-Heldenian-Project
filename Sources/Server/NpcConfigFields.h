@@ -58,7 +58,13 @@ struct npc_config_fields
 	int      m_max_mana = 0;
 	int      m_magic_hit_ratio = 0;
 	int      m_attack_range = 1;
-	int      m_drop_table_id = 0;
+	// The two drop-table slots (#73). Referencing a table in a slot is the ONLY
+	// thing "stage" means: the roll routine, the rate model, the multipliers and
+	// the validator are all identical for both, and the slot decides only which
+	// stage multiplier applies and whether the result tier-rolls (spec §8 keeps
+	// stage 2 out of the tier roll). 0 = this monster has no table in that slot.
+	int      m_stage1_table_id = 0;
+	int      m_stage2_table_id = 0;
 	// Loot grade 1..5 vermin/standard/veteran/elite/boss (loot_grades table,
 	// spec §8) — the tiered drop-economics dial. Default 2 = standard.
 	int      m_loot_grade = 2;

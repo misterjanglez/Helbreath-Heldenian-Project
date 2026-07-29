@@ -20,6 +20,7 @@
 #include <string>
 #include <vector>
 
+#include "DropModel.h"
 #include "Item/ModifierIds.h"
 
 struct sqlite3;
@@ -113,7 +114,6 @@ struct loot_grade_config
 	int weight_rare;
 	int weight_epic;
 	int weight_legendary;
-	int first_drop_chance;            // out of 10000
 
 	// The weight for `tier` (1..tier_count). The one place that maps a tier
 	// onto its column, so the roll and the odds report cannot disagree about
@@ -188,6 +188,11 @@ struct tier_config
 	std::vector<tier_curve_config> curves;
 	std::vector<tier_curve_override_config> curve_overrides;
 	std::vector<loot_grade_config> loot_grades;
+
+	// The four generosity layers (#73), all defaulting to 1.0. They live here
+	// so `reload tiers` moves them live for free - there is no restart-only
+	// term left anywhere in the drop chain.
+	drop_multipliers generosity;
 	std::vector<enchant_category_config> enchant_categories;
 	std::vector<enchant_step_config> enchant_steps;
 	tier_presentation_config presentation[hb::shared::item::tier_count];

@@ -7,6 +7,6 @@ class CmdDropOdds : public ServerCommand
 public:
 	const char* get_name() const override { return "dropodds"; }
 	const char* GetDescription() const override { return "Report effective per-kill drop odds per loot grade"; }
-	const char* GetHelp() const override { return "Usage: dropodds [grade]\n  Resolves the whole stage-1 drop chain from the running config and prints,\n  per loot grade, the per-kill odds that an item drops at all, that it is\n  tier-eligible gear, and the tier it lands on - plus the stage-1 gear share\n  of every drop table in use, which is the term that dominates the product.\n  With a grade (1-5) it also lists that grade's monsters one by one.\n  Machine-readable lines: DROPODDS MODE|GRADE|SPLIT|TABLE ...\n  Headless: Server --dropodds [grade] runs this and exits."; }
+	const char* GetHelp() const override { return "Usage: dropodds [grade] | dropodds npc <id|name>\n  Prints, per loot grade, the ABSOLUTE per-kill odds that a stage-1 drop\n  yields anything, yields an item, yields tier-eligible gear, and the tier\n  it lands on - read straight off the drop tables, with the generosity\n  multiplier stack shown. There is no chain left to multiply.\n  With a grade (1-5) it also lists that grade's monsters one by one.\n  'dropodds npc <id|name>' lists BOTH stages of one monster row by row as\n  \"1 in N kills\", including what is left over for nothing.\n  Machine-readable lines: DROPODDS MODE|GRADE|SPLIT|TABLE ...\n  Headless: Server --dropodds [grade] runs this and exits."; }
 	void execute(CGame* game, const char* args) override;
 };

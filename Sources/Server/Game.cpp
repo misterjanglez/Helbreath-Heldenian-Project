@@ -383,9 +383,6 @@ CGame::CGame()
 	m_char_point_limit = 0;
 	m_slate_success_rate = 0;
 	m_force_recall_time = 0;
-	m_primary_drop_rate = 1.0f;    // 1.0 = normal (10% base), 1.5 = 150%, etc.
-	m_gold_drop_rate = 1.0f;       // 1.0 = normal (30% base), 1.5 = 150%, etc.
-	m_secondary_drop_rate = 1.0f;  // 1.0 = normal (5% base), 1.5 = 150%, etc.
 
 	//Show Debug hb::shared::render::Window
 	//DbgWnd = new CDebugWindow();
@@ -1164,7 +1161,12 @@ bool CGame::init()
 			if (npc == nullptr) {
 				continue;
 			}
-			if (npc->m_drop_table_id == 0 &&
+			// A monster the pipeline refuses outright (guard, dummy, crop) having
+			// no drop table is correct, not a gap worth naming.
+			if (hb::server::npc_type_never_drops(npc->m_type)) {
+				continue;
+			}
+			if (npc->m_stage1_table_id == 0 && npc->m_stage2_table_id == 0 &&
 				(npc->m_exp_dice_max > 0 || npc->m_gold_dice_max > 0)) {
 				hb::logger::warn("NPC missing drop table: {} (exp {}-{}, gold {}-{})", npc->m_npc_name, static_cast<unsigned int>(npc->m_exp_dice_min), static_cast<unsigned int>(npc->m_exp_dice_max), static_cast<unsigned int>(npc->m_gold_dice_min), static_cast<unsigned int>(npc->m_gold_dice_max));
 				missingDrops++;
@@ -1181,7 +1183,9 @@ bool CGame::init()
 	// skip-and-warn); empty tiered tables failing in tiered mode is the
 	// intended unconfigured-world guard.
 	{
-		auto errors = hb::server::validate_tier_config(m_tier_config, running_validation_context());
+		std::vector<std::string> notes;
+		auto errors = hb::server::validate_tier_config(m_tier_config, running_validation_context(), &notes);
+		hb::server::log_tier_validation_notes(notes);
 		if (!errors.empty()) {
 			hb::server::log_tier_validation_errors(errors);
 			hb::logger::error("Cannot start server: tier dataset failed validation ({} error(s))", errors.size());
@@ -3004,6 +3008,7 @@ hb::server::tier_validation_context CGame::running_validation_context() const
 	context.npc_configs = m_npc_config_list;
 	context.npc_config_count = hb::server::config::MaxNpcTypes;
 	context.drop_tables = &m_drop_tables;
+	context.drop_table_anomalies = &m_drop_table_anomalies;
 	context.attribute_prefix_types = &m_attribute_prefix_types;
 	context.attribute_secondary_types = &m_attribute_secondary_types;
 	return context;
@@ -3118,7 +3123,8 @@ bool CGame::reload_tier_tables()
 		auto context = running_validation_context();
 		context.attribute_prefix_types = &prefix_types;
 		context.attribute_secondary_types = &secondary_types;
-		auto errors = hb::server::validate_tier_config(candidate, context);
+		std::vector<std::string> notes;
+		auto errors = hb::server::validate_tier_config(candidate, context, &notes);
 		if (!errors.empty())
 		{
 			hb::server::log_tier_validation_errors(errors);
@@ -3126,6 +3132,10 @@ bool CGame::reload_tier_tables()
 		}
 		else
 		{
+			// Multipliers just moved: re-name every table they still cannot
+			// move, so raising one and seeing nothing change is explained in
+			// the same log rather than discovered in play.
+			hb::server::log_tier_validation_notes(notes);
 			m_tier_config = std::move(candidate);
 			m_attribute_prefix_types = std::move(prefix_types);
 			m_attribute_secondary_types = std::move(secondary_types);
@@ -14247,10 +14257,6 @@ void CGame::apply_server_config(const server_config& cfg)
 	m_server_config = cfg;
 
 	// Drop rates
-	m_primary_drop_rate = cfg.drop_rates.primary;
-	m_gold_drop_rate = cfg.drop_rates.gold;
-	m_secondary_drop_rate = cfg.drop_rates.secondary;
-	m_rep_drop_modifier = static_cast<char>(cfg.drop_rates.rep_modifier);
 
 	// Timing
 	m_client_timeout = cfg.timing.client_timeout_ms;

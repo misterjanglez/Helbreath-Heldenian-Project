@@ -3,6 +3,8 @@
 #include <filesystem>
 #include <cstdio>
 #include <cstring>
+#include <format>
+#include <string>
 #include <unordered_map>
 
 #include "Item.h"
@@ -30,7 +32,8 @@ using namespace hb::server::config;
 // that cannot be recreated by deleting the file, so this store self-heals in
 // place (idempotent CREATE TABLE IF NOT EXISTS + HasColumn/ALTER migrations)
 // and the stamp is bookkeeping for operators, not a migration input.
-#define GAMECONFIG_DB_SCHEMA_VERSION "9"
+// 10: drop tables carry absolute per-kill rarity in ppb and split by stage (#73).
+#define GAMECONFIG_DB_SCHEMA_VERSION "10"
 
 namespace
 {
@@ -107,6 +110,14 @@ namespace
             return;
         }
         std::snprintf(dest, destSize, "%s", reinterpret_cast<const char*>(text));
+    }
+
+    // The std::string half of CopyColumnText, for rows whose text has no fixed
+    // width to copy into. A NULL column reads as empty.
+    std::string ColumnTextOrEmpty(sqlite3_stmt* stmt, int col)
+    {
+        const unsigned char* text = sqlite3_column_text(stmt, col);
+        return text != nullptr ? reinterpret_cast<const char*>(text) : "";
     }
 
     bool InsertKeyValue(sqlite3_stmt* stmt, const char* key, const char* value)
@@ -273,25 +284,43 @@ bool EnsureGameConfigDatabase(sqlite3** outDb, std::string& outPath, bool* outCr
         " max_mana INTEGER NOT NULL,"
         " magic_hit_ratio INTEGER NOT NULL,"
         " attack_range INTEGER NOT NULL,"
-        " drop_table_id INTEGER NOT NULL DEFAULT 0,"
+        " stage1_table_id INTEGER NOT NULL DEFAULT 0,"
+        " stage2_table_id INTEGER NOT NULL DEFAULT 0,"
         " loot_grade INTEGER NOT NULL DEFAULT 2"
         ");"
         "CREATE TABLE IF NOT EXISTS drop_tables ("
         " drop_table_id INTEGER PRIMARY KEY,"
         " name TEXT NOT NULL,"
         " description TEXT NOT NULL,"
-        " guaranteed_secondary INTEGER NOT NULL DEFAULT 0,"
-        " scatter_count INTEGER NOT NULL DEFAULT 0"
+        " stage INTEGER NOT NULL DEFAULT 1,"
+        " roll_count_min INTEGER NOT NULL DEFAULT 1,"
+        " roll_count_max INTEGER NOT NULL DEFAULT 1,"
+        " placement TEXT NOT NULL DEFAULT 'single',"
+        " delay TEXT NOT NULL DEFAULT 'death'"
         ");"
         "CREATE TABLE IF NOT EXISTS drop_entries ("
         " drop_table_id INTEGER NOT NULL,"
-        " tier INTEGER NOT NULL,"
         " item_id INTEGER NOT NULL,"
-        " weight INTEGER NOT NULL,"
+        " drop_chance_ppb INTEGER NOT NULL,"
         " min_count INTEGER NOT NULL,"
         " max_count INTEGER NOT NULL,"
-        " PRIMARY KEY (drop_table_id, tier, item_id)"
+        " PRIMARY KEY (drop_table_id, item_id)"
         ");"
+        "CREATE TABLE IF NOT EXISTS drop_multipliers ("
+        " scope TEXT NOT NULL,"
+        " key TEXT NOT NULL,"
+        " multiplier REAL NOT NULL DEFAULT 1.0,"
+        " PRIMARY KEY (scope, key)"
+        ");"
+        // Rarity is authored and reasoned about as "1 in N"; the column is ppb
+        // so the guaranteed-table rule can be an exact integer equality. This
+        // view is the readable half, for hand-editing gamedata.db.
+        "CREATE VIEW IF NOT EXISTS drop_entries_readable AS"
+        " SELECT e.drop_table_id, t.name AS table_name, t.stage, e.item_id,"
+        " e.drop_chance_ppb, 1000000000.0 / e.drop_chance_ppb AS one_in,"
+        " e.min_count, e.max_count"
+        " FROM drop_entries e JOIN drop_tables t USING (drop_table_id)"
+        " ORDER BY e.drop_table_id, e.drop_chance_ppb DESC;"
         "CREATE TABLE IF NOT EXISTS magic_configs ("
         " magic_id INTEGER PRIMARY KEY,"
         " name TEXT NOT NULL,"
@@ -575,8 +604,7 @@ bool EnsureGameConfigDatabase(sqlite3** outDb, std::string& outPath, bool* outCr
         " weight_common INTEGER NOT NULL,"         // out of 10000; zero = staircase hard gate
         " weight_rare INTEGER NOT NULL,"
         " weight_epic INTEGER NOT NULL,"
-        " weight_legendary INTEGER NOT NULL,"
-        " first_drop_chance INTEGER NOT NULL"      // out of 10000
+        " weight_legendary INTEGER NOT NULL"
         ");"
         "CREATE TABLE IF NOT EXISTS enchant_categories ("
         " category INTEGER PRIMARY KEY,"           // code enum: weapon/shield/armor/wand/crafted_weapon
@@ -1350,12 +1378,13 @@ namespace {
     " exp_min, exp_max, gold_min, gold_max, min_damage, max_damage," \
     " npc_size, side, action_limit, action_time, resist_magic, magic_level," \
     " day_of_week_limit, chat_msg_presence, target_search_range, regen_time," \
-    " attribute, abs_damage, max_mana, magic_hit_ratio, attack_range, drop_table_id, loot_grade"
+    " attribute, abs_damage, max_mana, magic_hit_ratio, attack_range," \
+    " stage1_table_id, stage2_table_id, loot_grade"
 
 // Both helpers take npc_config_fields, NOT CNpc: a config-sourced field added
 // to CNpc instead of the struct is not in scope here, so it cannot be persisted
 // and the mistake is a compile error rather than a field that silently reads as
-// its default on every spawned NPC (#63, #64). col advances past all 31.
+// its default on every spawned NPC (#63, #64). col advances past all 32.
 bool BindNpcConfigColumns(sqlite3_stmt* stmt, int& col, const hb::server::npc_config_fields& cfg)
 {
     bool ok = PrepareAndBindText(stmt, col++, cfg.m_npc_name);
@@ -1387,7 +1416,8 @@ bool BindNpcConfigColumns(sqlite3_stmt* stmt, int& col, const hb::server::npc_co
     ok &= (sqlite3_bind_int(stmt, col++, cfg.m_max_mana) == SQLITE_OK);
     ok &= (sqlite3_bind_int(stmt, col++, cfg.m_magic_hit_ratio) == SQLITE_OK);
     ok &= (sqlite3_bind_int(stmt, col++, cfg.m_attack_range) == SQLITE_OK);
-    ok &= (sqlite3_bind_int(stmt, col++, cfg.m_drop_table_id) == SQLITE_OK);
+    ok &= (sqlite3_bind_int(stmt, col++, cfg.m_stage1_table_id) == SQLITE_OK);
+    ok &= (sqlite3_bind_int(stmt, col++, cfg.m_stage2_table_id) == SQLITE_OK);
     ok &= (sqlite3_bind_int(stmt, col++, cfg.m_loot_grade) == SQLITE_OK);
     return ok;
 }
@@ -1423,7 +1453,8 @@ void ReadNpcConfigColumns(sqlite3_stmt* stmt, int& col, hb::server::npc_config_f
     cfg.m_max_mana = sqlite3_column_int(stmt, col++);
     cfg.m_magic_hit_ratio = sqlite3_column_int(stmt, col++);
     cfg.m_attack_range = sqlite3_column_int(stmt, col++);
-    cfg.m_drop_table_id = sqlite3_column_int(stmt, col++);
+    cfg.m_stage1_table_id = sqlite3_column_int(stmt, col++);
+    cfg.m_stage2_table_id = sqlite3_column_int(stmt, col++);
     cfg.m_loot_grade = sqlite3_column_int(stmt, col++);
 }
 
@@ -1446,7 +1477,7 @@ bool SaveNpcConfigs(sqlite3* db, const CGame* game)
 
     const char* sql =
         "INSERT INTO npc_configs( npc_id," HB_NPC_CONFIG_COLUMNS_SQL
-        ") VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?);";
+        ") VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?);";
 
     sqlite3_stmt* stmt = nullptr;
     if (sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) != SQLITE_OK) {
@@ -1551,68 +1582,85 @@ bool LoadDropTables(sqlite3* db, CGame* game)
     }
 
     game->m_drop_tables.clear();
+    game->m_drop_table_anomalies.clear();
 
-    // Self-healing migration: ensure the guaranteed_secondary and scatter_count
-    // columns exist on older databases created before they were added. Ignore
-    // the "duplicate column" error when they are already present.
-    sqlite3_exec(db, "ALTER TABLE drop_tables ADD COLUMN guaranteed_secondary INTEGER NOT NULL DEFAULT 0;",
-        nullptr, nullptr, nullptr);
-    sqlite3_exec(db, "ALTER TABLE drop_tables ADD COLUMN scatter_count INTEGER NOT NULL DEFAULT 0;",
-        nullptr, nullptr, nullptr);
-
-    const char* tableSql = "SELECT drop_table_id, name, description, guaranteed_secondary, scatter_count FROM drop_tables ORDER BY drop_table_id;";
+    const char* tableSql =
+        "SELECT drop_table_id, name, description, stage, roll_count_min,"
+        " roll_count_max, placement, delay FROM drop_tables ORDER BY drop_table_id;";
     sqlite3_stmt* stmt = nullptr;
     if (sqlite3_prepare_v2(db, tableSql, -1, &stmt, nullptr) != SQLITE_OK) {
+        hb::logger::error("LoadDropTables: drop_tables is missing the #73 columns"
+            " (stage/roll_count_min/roll_count_max/placement/delay). Run"
+            " Scripts/migrate_drop_chances.py against this database.");
         return false;
     }
 
     while (sqlite3_step(stmt) == SQLITE_ROW) {
-        DropTable table = {};
+        hb::server::drop_table table;
         table.id = sqlite3_column_int(stmt, 0);
-        std::memset(table.name, 0, sizeof(table.name));
-        std::memset(table.description, 0, sizeof(table.description));
-        CopyColumnText(stmt, 1, table.name, sizeof(table.name));
-        CopyColumnText(stmt, 2, table.description, sizeof(table.description));
-        std::memset(table.total_weight, 0, sizeof(table.total_weight));
-        table.guaranteed_secondary = (sqlite3_column_int(stmt, 3) != 0);
-        table.scatter_count = sqlite3_column_int(stmt, 4);
-        game->m_drop_tables[table.id] = table;
+        table.name = ColumnTextOrEmpty(stmt, 1);
+        table.description = ColumnTextOrEmpty(stmt, 2);
+        table.stage = sqlite3_column_int(stmt, 3);
+        table.roll_count_min = sqlite3_column_int(stmt, 4);
+        table.roll_count_max = sqlite3_column_int(stmt, 5);
+        // An unparseable placement/delay keeps the default AND is recorded, so
+        // a typo is a validator error rather than loot silently landing in the
+        // wrong place at the wrong time.
+        const std::string placement = ColumnTextOrEmpty(stmt, 6);
+        const std::string delay = ColumnTextOrEmpty(stmt, 7);
+        if (!hb::server::parse_drop_placement(placement, table.placement))
+            game->m_drop_table_anomalies.push_back(std::format(
+                "drop_tables {} '{}': placement '{}' is not 'single' or 'spiral'",
+                table.id, table.name, placement));
+        if (!hb::server::parse_drop_delay(delay, table.delay))
+            game->m_drop_table_anomalies.push_back(std::format(
+                "drop_tables {} '{}': delay '{}' is not 'death' or 'decay'",
+                table.id, table.name, delay));
+        game->m_drop_tables[table.id] = std::move(table);
     }
     sqlite3_finalize(stmt);
 
     const char* entrySql =
-        "SELECT drop_table_id, tier, item_id, weight, min_count, max_count"
-        " FROM drop_entries ORDER BY drop_table_id, tier;";
+        "SELECT drop_table_id, item_id, drop_chance_ppb, min_count, max_count"
+        " FROM drop_entries ORDER BY drop_table_id, drop_chance_ppb DESC, item_id;";
     if (sqlite3_prepare_v2(db, entrySql, -1, &stmt, nullptr) != SQLITE_OK) {
+        hb::logger::error("LoadDropTables: drop_entries is missing drop_chance_ppb."
+            " Run Scripts/migrate_drop_chances.py against this database.");
         return false;
     }
 
     while (sqlite3_step(stmt) == SQLITE_ROW) {
-        int tableId = sqlite3_column_int(stmt, 0);
-        int stage = sqlite3_column_int(stmt, 1);
-        int item_id = sqlite3_column_int(stmt, 2);
-        int weight = sqlite3_column_int(stmt, 3);
-        int min_count = sqlite3_column_int(stmt, 4);
-        int max_count = sqlite3_column_int(stmt, 5);
-
+        const int tableId = sqlite3_column_int(stmt, 0);
         auto it = game->m_drop_tables.find(tableId);
         if (it == game->m_drop_tables.end()) {
-            continue;
-        }
-        if (stage < 1 || stage > 2) {
-            continue;
-        }
-        if (weight <= 0) {
+            game->m_drop_table_anomalies.push_back(std::format(
+                "drop_entries references drop_table_id {}, which does not exist",
+                tableId));
             continue;
         }
 
-        DropEntry entry = {};
-        entry.item_id = item_id;
-        entry.weight = weight;
-        entry.min_count = min_count;
-        entry.max_count = max_count;
-        it->second.stage_entries[stage].push_back(entry);
-        it->second.total_weight[stage] += weight;
+        hb::server::drop_entry entry;
+        entry.item_id = sqlite3_column_int(stmt, 1);
+        const sqlite3_int64 ppb = sqlite3_column_int64(stmt, 2);
+        entry.min_count = sqlite3_column_int(stmt, 3);
+        entry.max_count = sqlite3_column_int(stmt, 4);
+
+        // "Nothing" is the remainder, never a row, and a row that cannot come
+        // up is data nobody meant to write. Both are validator errors rather
+        // than quiet skips: a dropped row changes no other row's odds under
+        // this model, so it would vanish without a trace.
+        if (entry.item_id == 0 || ppb <= 0 ||
+            ppb > hb::server::drop_chance_denominator) {
+            game->m_drop_table_anomalies.push_back(std::format(
+                "drop_entries table {} '{}' item {}: drop_chance_ppb {} is"
+                " outside 1..{}", tableId, it->second.name, entry.item_id, ppb,
+                hb::server::drop_chance_denominator));
+            continue;
+        }
+
+        entry.chance_ppb = static_cast<uint32_t>(ppb);
+        it->second.total_ppb += entry.chance_ppb;
+        it->second.entries.push_back(entry);
     }
     sqlite3_finalize(stmt);
 

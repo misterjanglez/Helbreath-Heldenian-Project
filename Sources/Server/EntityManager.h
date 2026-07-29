@@ -13,50 +13,13 @@
 #include "Map.h"
 #include "Game.h"  // For hb::server::config::MaxNpcs
 
-struct DropTable;
+#include <random>
 
-namespace hb::server
-{
-
-// Base drop chances out of 10000, before the server_config.json multipliers.
-// A gold drop preempts the stage-1 item drop, so base_gold_drop_chance is the
-// first term of every drop-odds calculation — it lives here rather than in the
-// pipeline's .cpp so the dropodds report reads the same number the pipeline
-// rolls against. The stage-1 primary base is strategy policy instead
-// (base_primary_drop_chance / first_drop_chance, RollStrategy.h).
-inline constexpr uint32_t base_gold_drop_chance = 3000;       // 30%
-inline constexpr uint32_t base_secondary_drop_chance = 500;   // 5%
-
-// NPC types the drop pipeline refuses outright: guards, dummies and crops
-// never roll a drop. Shared with the report so its per-grade averages exclude
-// exactly what the pipeline excludes, no more and no less.
-inline bool npc_type_never_drops(short npc_type)
-{
-	return npc_type == 21 || npc_type == 34 || npc_type == 64;
-}
-
-// Whether a hit on the gold roll actually places gold. The preempt above is
-// conditional on this: a monster with no gold dice spends its gold roll on
-// nothing and falls through to the stage-1 item roll at full rate. The pipeline
-// guards its gold spawn with this and the report prices the preempt with it, so
-// the two cannot disagree about which monsters are preempted at all.
-inline bool npc_places_gold(const CNpc& npc)
-{
-	return npc.m_gold_dice_min > 0 || npc.m_gold_dice_max > 0;
-}
-
-// A base chance out of 10000 scaled by its server_config.json drop-rate
-// multiplier and clamped back into 0..10000. Shared with the report for the
-// same reason as the constants above.
-inline uint32_t apply_drop_multiplier(uint32_t base_chance, float multiplier)
-{
-	double result = static_cast<double>(base_chance) * static_cast<double>(multiplier);
-	if (result > 10000.0) return 10000;
-	if (result < 0.0) return 0;
-	return static_cast<uint32_t>(result);
-}
-
-} // namespace hb::server
+// The flat base chances, the gold preempt and the server_config drop-rate
+// multipliers all retired with #73: every drop-table row carries its own
+// absolute per-kill chance in ppb, and the generosity stack that scales it
+// lives in gamedata.db. The model, and npc_type_never_drops with it, is in
+// DropModel.h.
 
 class CEntityManager
 {
@@ -335,10 +298,14 @@ private:
     void delete_npc_internal(int npc_h);
 
     void npc_dead_item_generator(int npc_h, short attacker_h, char attacker_type);
-    int roll_drop_table_item(const DropTable* table, int stage, int& outMinCount, int& outMaxCount, bool exclude_empty = false) const;
-    bool spawn_npc_drop_item(int npc_h, int item_id, int min_count, int max_count, short dx = 0, short dy = 0, bool first_drop = false);
+    // One drop table, rolled roll_count times and its winnings placed where
+    // and when the table says. Called once per slot; the slot number picks the
+    // stage multiplier and decides whether the result tier-rolls, and nothing
+    // else in here branches on it.
+    void roll_drop_slot(int npc_h, short attacker_h, int stage_slot, int table_id);
+    bool spawn_npc_drop_item(int npc_h, int item_id, int min_count, int max_count, short dx = 0, short dy = 0, bool tier_rolls = false);
     // Queue a stage-2 drop rolled at death to be placed when the corpse decays.
-    void queue_pending_drop(int npc_h, int item_id, int min_count, int max_count, short dx, short dy);
+    void queue_pending_drop(int npc_h, int item_id, int min_count, int max_count, short dx, short dy, bool tier_rolls);
     // Place all pending (delayed) stage-2 drops for a decaying corpse.
     void spawn_pending_drops(int npc_h);
 
@@ -391,6 +358,12 @@ private:
     class CMap** m_map_list;                // Reference to map list (from CGame)
     class CGame* m_game;                   // Reference to game instance
     int m_max_maps;                         // Number of maps
+
+    // The drop roll draws over a 1,000,000,000 denominator, and CGame::dice is
+    // rand()-based — MSVC's RAND_MAX of 32767 cannot reach past the first
+    // 0.0033% of that range, which would hand every kill the same first row.
+    // Same reason tiered_roll_strategy keeps its own engine (TieredRollStrategy.h).
+    std::mt19937 m_drop_rng{ std::random_device{}() };
 
     // Entity Statistics
     int m_total_entities;                   // Total active entities (same as m_active_entity_count)

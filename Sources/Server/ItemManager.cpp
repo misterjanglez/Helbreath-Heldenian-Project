@@ -220,7 +220,7 @@ bool ItemManager::send_client_item_configs(int client_h)
 	return true;
 }
 
-const DropTable* ItemManager::get_drop_table(int id) const
+const hb::server::drop_table* ItemManager::get_drop_table(int id) const
 {
 	if (id <= 0) {
 		return nullptr;

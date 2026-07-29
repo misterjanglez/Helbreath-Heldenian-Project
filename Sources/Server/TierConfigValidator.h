@@ -16,11 +16,11 @@
 #include <vector>
 
 #include "Item/ItemAttributeData.h"
+#include "DropModel.h"
 #include "TierConfigStore.h"
 
 class CItem;
 class CNpc;
-struct DropTable;
 struct attribute_prefix_type_entry;
 struct attribute_secondary_type_entry;
 
@@ -37,7 +37,11 @@ struct tier_validation_context
 	int item_config_count = 0;
 	CNpc* const* npc_configs = nullptr;         // slot index == npc id; null slots allowed
 	int npc_config_count = 0;
-	const std::map<int, DropTable>* drop_tables = nullptr;
+	const std::map<int, drop_table>* drop_tables = nullptr;
+	// Rows LoadDropTables had to refuse. They are dataset errors here: under
+	// an absolute-rarity model a dropped row changes no other row's odds, so
+	// it would otherwise vanish without a trace.
+	const std::vector<std::string>* drop_table_anomalies = nullptr;
 	const std::vector<attribute_prefix_type_entry>* attribute_prefix_types = nullptr;
 	const std::vector<attribute_secondary_type_entry>* attribute_secondary_types = nullptr;
 };
@@ -55,11 +59,18 @@ const CItem* ordinary_tier_gear(const tier_validation_context& context, int item
 // unconfigured-world guard), the stage-2 gear rule is tiered-only, and
 // pool-coverage / multiplier checks are legacy-only.
 std::vector<std::string> validate_tier_config(const tier_config& config,
-	const tier_validation_context& context);
+	const tier_validation_context& context,
+	std::vector<std::string>* notes = nullptr);
 
 // One "tier validator: <error>" log line per error — the shared reporting
 // half every caller (boot, reload) pairs with its own outcome summary.
 void log_tier_validation_errors(const std::vector<std::string>& errors);
+
+// The other half: things the operator must see that are NOT defects — a drop
+// table whose rows sum to 1.0, so a generosity multiplier cannot move it. That
+// is deliberate for the five bosses' guaranteed second drop and a defect for a
+// first one (#87); which it is, is a data question the log makes askable.
+void log_tier_validation_notes(const std::vector<std::string>& notes);
 
 // Structural-legality audit of one rolled/minted tiered instance against
 // the catalog: tier 1..4, count == tier, one modifier per Bucket, min-tier

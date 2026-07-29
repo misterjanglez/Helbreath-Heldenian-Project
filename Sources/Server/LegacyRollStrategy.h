@@ -24,7 +24,6 @@ public:
 
 	// The context is deliberately unused: legacy rolls every spawn venue
 	// (stage-1 and stage-2 drops alike), exactly as before the seam.
-	// first_drop_chance keeps the seam's flat-base default.
 	bool roll(CItem& item, const roll_context& context) override;
 
 	// Legacy legality: the two positional lines (prefix + secondary), an

@@ -38,7 +38,6 @@ public:
 	std::string mint(CItem& item,
 		const hb::shared::item::item_attribute_data& requested) override;
 
-	uint32_t first_drop_chance(uint8_t loot_grade) const override;
 
 private:
 	uint8_t roll_tier(const loot_grade_config& grade);

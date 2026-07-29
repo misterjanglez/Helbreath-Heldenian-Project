@@ -44,11 +44,21 @@ namespace
 struct validation_state
 {
 	std::vector<std::string> errors;
+	// Things the operator must SEE but that are not defects. A multiplier
+	// no-op on a guaranteed table is the design, not a fault — but it should
+	// never be a surprise, so it is named rather than silently true.
+	std::vector<std::string> notes;
 
 	template <typename... Args>
 	void add(std::format_string<Args...> fmt, Args&&... args)
 	{
 		errors.push_back(std::format(fmt, std::forward<Args>(args)...));
+	}
+
+	template <typename... Args>
+	void add_note(std::format_string<Args...> fmt, Args&&... args)
+	{
+		notes.push_back(std::format(fmt, std::forward<Args>(args)...));
 	}
 };
 
@@ -263,8 +273,6 @@ void check_loot_grades(const tier_config& config, validation_state& v)
 			v.add("loot_grades grade {} '{}': negative tier weight", g, grade.name);
 		else if (grade.weight_common + grade.weight_rare + grade.weight_epic + grade.weight_legendary == 0)
 			v.add("loot_grades grade {} '{}': all tier weights zero (grade can never roll a tier)", g, grade.name);
-		if (grade.first_drop_chance < 0 || grade.first_drop_chance > 10000)
-			v.add("loot_grades grade {} '{}': first_drop_chance {} outside 0..10000", g, grade.name, grade.first_drop_chance);
 	}
 }
 
@@ -376,9 +384,8 @@ void check_legacy_item_coverage(const tier_config& config,
 
 	std::set<int> droppable;
 	for (const auto& [table_id, table] : *context.drop_tables)
-		for (int stage = 1; stage <= 2; stage++)
-			for (const auto& entry : table.stage_entries[stage])
-				droppable.insert(entry.item_id);
+		for (const auto& entry : table.entries)
+			droppable.insert(entry.item_id);
 
 	for (int id : droppable)
 	{
@@ -497,18 +504,121 @@ void check_class_fillability(const tier_config& config, validation_state& v)
 
 // Tiered-only §8 stage-2 rule: stage-2 drop tables hold uniques, specials
 // and consumables only — ordinary tier-eligible gear must live in stage 1
-// so "hunted gear is always tiered" holds structurally.
+// so "hunted gear is always tiered" holds structurally. This reads the
+// table's DECLARED stage, which is the only thing that column is for: the
+// roll, the rate model and the multipliers never branch on it.
 void check_stage2_gear(const tier_validation_context& context, validation_state& v)
 {
 	if (context.drop_tables == nullptr) return;
 	for (const auto& [table_id, table] : *context.drop_tables)
 	{
-		for (const auto& entry : table.stage_entries[2])
+		if (table.stage != 2) continue;
+		for (const auto& entry : table.entries)
 		{
 			const CItem* item = ordinary_tier_gear(context, entry.item_id);
 			if (item == nullptr) continue;
-			v.add("drop_entries table {} '{}' stage 2: item {} '{}' is tier-eligible gear (stage-2 tables hold uniques/specials/consumables only)",
+			v.add("drop_entries table {} '{}' (stage 2): item {} '{}' is tier-eligible gear (stage-2 tables hold uniques/specials/consumables only)",
 				table_id, table.name, entry.item_id, item->m_name);
+		}
+	}
+}
+
+// The #73 drop-table rules, both modes. Structure is an error; a table a live
+// multiplier cannot move is reported by name but is NOT an error — it is
+// deliberate for the five bosses' guaranteed stage-2 tables, and a defect at
+// stage 1 (#87). The validator's job is to make sure it is never a surprise.
+void check_drop_tables(const tier_validation_context& context,
+	const std::map<int, drop_table>* tables, validation_state& v)
+{
+	if (context.drop_table_anomalies != nullptr)
+		for (const auto& anomaly : *context.drop_table_anomalies)
+			v.add("{}", anomaly);
+	if (tables == nullptr) return;
+
+	for (const auto& [table_id, table] : *tables)
+	{
+		if (table.stage < 1 || table.stage > drop_multipliers::max_stage)
+			v.add("drop_tables {} '{}': stage {} is not 1 or 2",
+				table_id, table.name, table.stage);
+		if (table.roll_count_min < 1 || table.roll_count_max < table.roll_count_min)
+			v.add("drop_tables {} '{}': roll_count {}..{} is not a positive range",
+				table_id, table.name, table.roll_count_min, table.roll_count_max);
+		if (table.entries.empty())
+		{
+			v.add("drop_tables {} '{}': no rows - a table that can never yield anything",
+				table_id, table.name);
+			continue;
+		}
+
+		// Authored sums are compared as EXACT integers. That is the whole
+		// reason the column is ppb rather than the "1 in N" it is authored in:
+		// "rows sum to exactly 1.0" is what makes a drop guaranteed, and a
+		// float tolerance cannot carry it.
+		if (table.total_ppb > drop_chance_denominator)
+			v.add("drop_tables {} '{}': rows sum to {} ppb, over the {} denominator - the table is malformed, not merely saturated",
+				table_id, table.name, table.total_ppb, drop_chance_denominator);
+		else if (table.total_ppb == drop_chance_denominator)
+			v.add_note("drop_tables {} '{}' (stage {}): rows sum to exactly 1.0 - something drops on every roll, so a generosity multiplier is a no-op here",
+				table_id, table.name, table.stage);
+
+		std::set<int> seen;
+		for (const auto& entry : table.entries)
+		{
+			if (!seen.insert(entry.item_id).second)
+				v.add("drop_entries table {} '{}': item {} appears twice",
+					table_id, table.name, entry.item_id);
+			if (item_config(context, entry.item_id) == nullptr)
+				v.add("drop_entries table {} '{}': item {} is not in item_configs",
+					table_id, table.name, entry.item_id);
+			if (entry.min_count < 0 || entry.max_count < entry.min_count)
+				v.add("drop_entries table {} '{}' item {}: count {}..{} is not a valid range",
+					table_id, table.name, entry.item_id, entry.min_count, entry.max_count);
+		}
+	}
+}
+
+// Every monster's stage-1 rows must sum to under 1.0, so the stage-1
+// multiplier can actually move them. Saturation is correct for a guaranteed
+// SECOND drop and wrong for a first one — the same number with opposite
+// verdicts, which is why the two slots are checked separately (#87).
+void check_npc_drop_slots(const tier_validation_context& context,
+	const std::map<int, drop_table>* tables, validation_state& v)
+{
+	if (tables == nullptr || context.npc_configs == nullptr) return;
+
+	for (int id = 0; id < context.npc_config_count; id++)
+	{
+		const CNpc* npc = context.npc_configs[id];
+		if (npc == nullptr) continue;
+
+		const int slots[2] = { npc->m_stage1_table_id, npc->m_stage2_table_id };
+		for (int slot = 0; slot < 2; slot++)
+		{
+			if (slots[slot] == 0) continue;
+			const auto found = tables->find(slots[slot]);
+			if (found == tables->end())
+			{
+				v.add("npc_configs id {} '{}': stage{}_table_id {} is not in drop_tables",
+					id, npc->m_npc_name, slot + 1, slots[slot]);
+				continue;
+			}
+			// A table authored for one slot and referenced from the other is
+			// legal — one engine, and the slot is the only meaning of stage —
+			// but it silently changes which multiplier moves it and whether it
+			// tier-rolls, so it is worth naming.
+			if (found->second.stage != slot + 1)
+				v.add_note("npc_configs id {} '{}': stage{}_table_id {} '{}' is authored for stage {}",
+					id, npc->m_npc_name, slot + 1, slots[slot],
+					found->second.name, found->second.stage);
+			// Saturation WARNS rather than blocking boot. Whether it is a defect
+			// is a data question the log makes askable: it is the design for a
+			// guaranteed SECOND drop and an accident for a first one (#87). A
+			// table that is genuinely malformed - rows summing past 1.0 - is
+			// the error, and check_drop_tables raises it.
+			if (slot == 0 && found->second.total_ppb >= drop_chance_denominator &&
+				npc_type_never_drops(npc->m_type) == false)
+				v.add_note("npc_configs id {} '{}': stage-1 table {} '{}' is saturated (rows sum to 1.0), so the stage-1 multiplier can never move it - stage 1 was never meant to be a certainty (#87)",
+					id, npc->m_npc_name, slots[slot], found->second.name);
 		}
 	}
 }
@@ -572,7 +682,7 @@ std::string validate_tiered_instance(const tier_config& config,
 }
 
 std::vector<std::string> validate_tier_config(const tier_config& config,
-	const tier_validation_context& context)
+	const tier_validation_context& context, std::vector<std::string>* notes)
 {
 	// Row anomalies the loader had to skip (unresolvable references) are
 	// dataset errors here — the rows exist in the DB but not in the model.
@@ -589,6 +699,8 @@ std::vector<std::string> validate_tier_config(const tier_config& config,
 	check_attribute_pools(config, v);
 	check_legacy_item_coverage(config, context, v);
 	check_legacy_multipliers(config, context, v);
+	check_drop_tables(context, context.drop_tables, v);
+	check_npc_drop_slots(context, context.drop_tables, v);
 
 	if (config.item_system == item_system_mode::tiered)
 	{
@@ -598,7 +710,14 @@ std::vector<std::string> validate_tier_config(const tier_config& config,
 		check_stage2_gear(context, v);
 	}
 
+	if (notes != nullptr) *notes = std::move(v.notes);
 	return v.errors;
+}
+
+void log_tier_validation_notes(const std::vector<std::string>& notes)
+{
+	for (const auto& note : notes)
+		hb::logger::warn("drop tables: {}", note);
 }
 
 } // namespace hb::server

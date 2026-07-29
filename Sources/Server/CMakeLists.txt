@@ -39,6 +39,7 @@ set(SERVER_SOURCES
     CraftingManager.cpp
     RegenManager.cpp
     DelayEventManager.cpp
+    DropModel.cpp
     DynamicObjectManager.cpp
     EntityManager.cpp
     FishingManager.cpp

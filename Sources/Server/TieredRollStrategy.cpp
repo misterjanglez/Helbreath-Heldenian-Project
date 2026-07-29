@@ -61,14 +61,6 @@ bool is_tier_scope_gear(const CItem& item)
 	return !is_special_item(item.m_id_num);
 }
 
-uint32_t tiered_roll_strategy::first_drop_chance(uint8_t loot_grade) const
-{
-	const loot_grade_config* grade = m_game.get_tier_config().find_loot_grade(loot_grade);
-	// The boot validator guarantees every npc grade resolves; a grade-less
-	// venue gets no first drop rather than a quiet legacy-rate import.
-	return grade != nullptr ? static_cast<uint32_t>(grade->first_drop_chance) : 0;
-}
-
 // Grade -> Tier: one weighted pick over the grade's four tier weights.
 // Staircase zero-weights are the hard gate (vermin can only land Common);
 // the validator guarantees at least one weight is positive.
@@ -131,7 +123,7 @@ bool tiered_roll_strategy::roll(CItem& item, const roll_context& context)
 {
 	// Only the stage-1 first drop tier-rolls (spec §8). Second drops stay
 	// the unique/special venue; GM minting joins in 3-G.
-	if (!context.first_drop) return false;
+	if (!context.tier_rolls) return false;
 
 	if (!is_tier_scope_gear(item)) return false;
 

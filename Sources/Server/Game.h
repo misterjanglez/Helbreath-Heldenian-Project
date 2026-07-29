@@ -3,6 +3,7 @@
 #pragma once
 
 #include "CommonTypes.h"
+#include "DropModel.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -139,34 +140,12 @@ constexpr int MaxWarContribution        = 200000;
 
 #define NO_MSGSPEEDCHECK
 
-struct DropEntry
-{
-	int item_id;
-	int weight;
-	int min_count;
-	int max_count;
-};
-
-struct DropTable
-{
-	int id;
-	char name[64];
-	char description[128];
-	std::vector<DropEntry> stage_entries[3];
-	int total_weight[3];
-	// When true, the stage-2 (secondary) table is always rolled and its
-	// item_id=0 "nothing" slot is skipped, so a real second item drops on
-	// every kill. Used for guaranteed-drop bosses (Helclaw, Tiger Worm,
-	// Wyverns, Abaddon). Normal NPCs keep the gated/weighted secondary chance.
-	bool guaranteed_secondary = false;
-	// When > 0, the stage-2 drop is rolled this many times and the resulting
-	// items are scattered over a 5x5 center-out spiral around the corpse
-	// (faithful to the original Wyvern/Fire-Wyvern/Abaddon loot spread). Each
-	// roll after the first includes the "nothing" slot, so most miss. 0 keeps
-	// the single-item behavior. The scatter (and all stage-2 drops) are placed
-	// when the corpse decays, not instantly on death.
-	int scatter_count = 0;
-};
+// Drop tables are hb::server::drop_table (DropModel.h): every row carries an
+// absolute per-kill chance in ppb, both stages run one identical engine, and
+// what a table does (roll count, placement, delay) is its own property rather
+// than a stage-2 special case. `guaranteed_secondary` and `scatter_count` are
+// retired — the first is now "this table's rows sum to exactly 1.0", the
+// second is roll_count_min/max plus placement.
 
 // Shop system structures
 struct NpcShopMapping
@@ -563,7 +542,12 @@ public:
 	bool			m_is_item_available, m_is_build_item_available, m_is_npc_available, m_is_magic_available;
 	bool			m_is_skill_available, m_is_portion_available, m_is_quest_available, m_is_teleport_available;
 	bool			m_is_drop_table_available;
-	std::map<int, DropTable> m_drop_tables;
+	std::map<int, hb::server::drop_table> m_drop_tables;
+	// Rows LoadDropTables had to refuse — a dangling table reference, an
+	// unparseable placement/delay, a chance outside 1..1e9. The boot validator
+	// reports these as errors: under an absolute-rarity model a dropped row
+	// changes no other row's odds, so it would vanish without a trace.
+	std::vector<std::string> m_drop_table_anomalies;
 
 	// Shop system - server sends shop contents to client by item IDs
 	bool m_is_shop_data_available;
@@ -800,10 +784,10 @@ public:
 	// 17/05/2004
 	short m_force_recall_time;
 
-	// 22/05/2004 - Drop rate multipliers (1.0 = normal, 1.5 = 150%, 0.5 = 50%)
-	float m_primary_drop_rate;    // Primary item drops (base 10%)
-	float m_gold_drop_rate;       // Gold drops (base 30%)
-	float m_secondary_drop_rate;  // Bonus/secondary drops (base 5%)
+	// The four server_config.json drop_rates multipliers retired with #73:
+	// every drop-table row carries its own absolute per-kill chance, and the
+	// generosity stack that scales it lives in gamedata.db (tier_config
+	// ::generosity) where `reload tiers` moves it live. These were restart-only.
 
 	// 25/05/2004
 	int m_final_shutdown_count;
@@ -836,7 +820,6 @@ public:
 
 	// Limit Checks
 	bool m_allow_100_all_skill;
-	char m_rep_drop_modifier;
 
 	// ============================================================================
 	// Configurable Settings (loaded from server_config.json)

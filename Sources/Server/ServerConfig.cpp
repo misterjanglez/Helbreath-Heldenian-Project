@@ -66,14 +66,6 @@ bool load_server_config(const std::string& path, server_config& cfg)
 	}
 
 	// Drop rates
-	if (root.contains("drop_rates"))
-	{
-		auto& dr = root["drop_rates"];
-		read_value(dr, "primary", cfg.drop_rates.primary);
-		read_value(dr, "gold", cfg.drop_rates.gold);
-		read_value(dr, "secondary", cfg.drop_rates.secondary);
-		read_value(dr, "rep_modifier", cfg.drop_rates.rep_modifier);
-	}
 
 	// Timing
 	if (root.contains("timing"))
@@ -162,10 +154,6 @@ bool save_server_config(const std::string& path, const server_config& cfg)
 	json root;
 
 	// Drop rates
-	root["drop_rates"]["primary"] = cfg.drop_rates.primary;
-	root["drop_rates"]["gold"] = cfg.drop_rates.gold;
-	root["drop_rates"]["secondary"] = cfg.drop_rates.secondary;
-	root["drop_rates"]["rep_modifier"] = cfg.drop_rates.rep_modifier;
 
 	// Timing
 	root["timing"]["client_timeout_ms"] = cfg.timing.client_timeout_ms;

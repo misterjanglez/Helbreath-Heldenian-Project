@@ -33,15 +33,17 @@ struct roll_context
 	// 0 = no grade (non-drop venues — GM minting until 3-G).
 	uint8_t loot_grade = 0;
 
-	// True only for the stage-1 drop rolled at the moment of death — the
-	// only venue that tier-rolls (spec §8: second drops never tiered).
-	bool first_drop = false;
+	// Whether this drop tier-rolls. True for anything the STAGE-1 slot
+	// produced and false for the stage-2 slot — spec §8's one deliberate
+	// asymmetry, and the only thing left that distinguishes the two stages.
+	// It is NOT "the drop at the moment of death": delay is a table property
+	// now (#73), so a stage-1 table set to corpse-decay still tier-rolls.
+	bool tier_rolls = false;
 };
 
-// The legacy flat base chance for the stage-1 first drop, out of 10000
-// (10%). Strategy policy since spec §8 made the tiered replacement a
-// per-grade data column — the drop pipeline no longer owns this number.
-inline constexpr uint32_t base_primary_drop_chance = 1000;
+// The stage-1 base drop chance retired with #73: every drop-table row now
+// carries its own absolute per-kill rarity, so there is no flat base left for
+// a strategy to own. What survives here is the tier-scope gate below.
 
 // The spec §1 scope gate exactly as the tiered roll applies it: gear class
 // shape (derive_tier_item_class) plus the named-unique exclusion. It lives on
@@ -69,15 +71,6 @@ public:
 	// the gate lives here beside the roll it must agree with.
 	virtual std::string mint(CItem& item,
 		const hb::shared::item::item_attribute_data& requested) = 0;
-
-	// The stage-1 base drop chance (out of 10000) this strategy's drop
-	// economy uses. Default = the legacy flat base; tiered overrides with
-	// the grade's first_drop_chance row (spec §8) so drop odds stay
-	// live-reloadable.
-	virtual uint32_t first_drop_chance(uint8_t) const
-	{
-		return base_primary_drop_chance;
-	}
 };
 
 } // namespace hb::server
