@@ -27,6 +27,11 @@ powershell -ExecutionPolicy Bypass -File Sources\build.ps1 -Target Server -Confi
 - Deploy: `cp Sources/Debug/HelbreathServer Binaries/Server/ && chmod +x Binaries/Server/HelbreathServer`
 - Run from: `cd Binaries/Server && ./HelbreathServer`
 
+**TRAP — a partial source sync builds green while silently omitting your new file.** `SERVER_SOURCES` in `Sources/Server/CMakeLists.txt` is an **explicit list, not a glob**. Copying only your changed `.cpp` files to a Linux box leaves that box's `CMakeLists.txt` stale, so the new file is never compiled — and the build still reports success. Hit on 2026-07-29 (#72): the box's tree predated #66, `CmdDropOdds.cpp` had never been compiled by GCC, the "green" gate proved nothing, and the binary answered `Unknown command: 'dropodds'`.
+
+- Whenever a cycle **adds** a file, sync the whole server subset (`Sources/{Server,Dependencies/Shared,Dependencies/Server,cmake}` + version files), not just the diff. The incremental build reconfigures itself when `CMakeLists.txt` changes.
+- **Never treat "build succeeded" as the gate.** Exercise the change on the Linux binary — for a console command, `./HelbreathServer --<command>` against a copy of the Windows `gamedata.db` gives machine-readable output that should be byte-identical to Windows.
+
 ### Linux (CMake — Client)
 ```bash
 ./Sources/build_client_linux.sh                 # Incremental debug build
@@ -35,12 +40,14 @@ powershell -ExecutionPolicy Bypass -File Sources\build.ps1 -Target Server -Confi
 ./Sources/build_client_linux.sh clean release   # Clean then rebuild release
 ```
 - CMakeLists.txt: `Sources/Client/CMakeLists.txt`
-- Output: `Sources/Debug/HelbreathClient` or `Sources/Release/HelbreathClient` (mirrors Windows layout)
+- Output: `Sources/Debug/Game_x64_linux` or `Sources/Release/Game_x64_linux` — the CMake target is `HelbreathClient` but `OUTPUT_NAME` is `Game_${arch}_linux` (`Sources/Client/CMakeLists.txt:100`)
 - Auto-reconfigures when switching between Debug and Release
 - SFML 3 is auto-fetched and built via CMake FetchContent (no manual SFML install needed)
-- Prerequisites: `sudo apt install cmake g++ libx11-dev libxrandr-dev libxcursor-dev libgl1-mesa-dev libudev-dev libfreetype-dev`
-- Deploy: `cp Sources/Debug/HelbreathClient Binaries/Game/ && chmod +x Binaries/Game/HelbreathClient`
-- Run from: `cd Binaries/Game && ./HelbreathClient`
+- Prerequisites: `sudo apt install cmake g++ libx11-dev libxi-dev libxrandr-dev libxcursor-dev libgl1-mesa-dev libudev-dev libfreetype-dev`
+- Deploy: `cp Sources/Debug/Game_x64_linux Binaries/Game/ && chmod +x Binaries/Game/Game_x64_linux`
+- Run from: `cd Binaries/Game && ./Game_x64_linux`
+- The client CMake needs `Sources/AutoUpdater/` — don't exclude it when syncing sources to a Linux box
+- A failed configure leaves a poisoned `build_linux/` cache and the script then reports "no makefile found" — run `clean` first
 
 ## Workflow
 

@@ -1,6 +1,8 @@
 # Drop rarity becomes an absolute "1 in N" per (item, monster)
 
-**Status: Proposed** — recommendation from [#68](https://github.com/misterjanglez/Helbreath-Heldenian-Project/issues/68), pending owner ratification. Nothing in the code or data has changed. Amendment A1 to `PLANS/ItemTiers_Plan.md` §8 activates only if this ADR is accepted.
+**Status: Accepted** — 2026-07-29, from [#68](https://github.com/misterjanglez/Helbreath-Heldenian-Project/issues/68). Amendment A1 to `PLANS/ItemTiers_Plan.md` §8 is in force. No code or data has changed yet; implementation is [#73](https://github.com/misterjanglez/Helbreath-Heldenian-Project/issues/73).
+
+The decision was shaped materially by owner review after the first draft: the authored number is `N` in "1 in N kills" rather than a chance-out-of-denominator; a **stage** multiplier joined the stack; stage 1 and stage 2 split into separate tables driven by one identical engine; and multipliers scale row rarity only — never `roll_count`, so a table whose rows already sum to 1.0 is deliberately unaffected.
 
 Every drop-table row stops being a weight relative to whatever else happens to be in its table, and becomes an **absolute rarity — the `N` in "1 in N kills" — for that item from that monster**. Both stages. Bigger `N` is rarer; the leftover probability is "nothing", so a roll still yields at most one item. On top sit four multiplier layers — global, stage, category, loot grade — for holistic tuning that cannot bend the per-monster rarities underneath it.
 
@@ -22,13 +24,13 @@ Option D fails (1) outright: it sets gear frequency per *grade*, and §8 forbids
 
 | grade | npcs | first roll | any item | gear | 1 in N gear | Common | Rare | Epic | Legendary |
 |---|---|---|---|---|---|---|---|---|---|
-| 1 vermin | 69 | 10% | 5.58%\* | 0.0592% | 1,690 | 0.0592% | — | — | — |
+| 1 vermin | 69 | 10% | 7.71%\* | 0.0592% | 1,690 | 0.0592% | — | — | — |
 | 2 standard | 14 | 10% | 7.00% | 0.6546% | 153 | 0.5891% | 0.0655% | — | — |
 | 3 veteran | 15 | 10% | 7.00% | 0.7058% | 142 | 0.5294% | 0.1553% | 0.0212% | — |
 | 4 elite | 8 | 10% | 7.00% | 0.6252% | 160 | 0.3751% | 0.2001% | 0.0469% | 0.0031% |
 | 5 boss | 5 | 100% | 70.00% | 8.8746% | 11 | 3.1061% | 3.5499% | 1.9524% | 0.2662% |
 
-\* Understated — see side findings.
+\* The report printed 5.58% when this ADR was written, understating the figure by 38.2% — see side findings. Corrected by [#72](https://github.com/misterjanglez/Helbreath-Heldenian-Project/issues/72); the value above is the corrected one, and no other cell moved.
 
 ### Weights don't mean anything today, and the data proves it twice
 
@@ -72,10 +74,11 @@ ADR 0002 makes `legacy` the retail-faithful launch candidate. It is 43% richer i
 
 ## The decision
 
-Every row in `drop_entries`, both stages, carries `drop_one_in` — the **`N` in "1 in N kills"** for that item from that monster — instead of a relative weight. Bigger is rarer. `350` is a common drop; `2000000` is a lifetime chase.
+Every row in `drop_entries`, both stages, carries an **absolute rarity for that item from that monster** instead of a weight relative to its table. It is authored, read and reported as **"1 in N kills"** — bigger is rarer, `350` is a common drop and `2000000` a lifetime chase — and stored as `drop_chance_ppb INTEGER`, parts per billion (see the correction below for why the column is not `N` itself).
 
 ```
-effective_one_in = drop_one_in / (global x stage x category x grade)
+effective_ppb = drop_chance_ppb x (global x stage x category x grade)
+                                  // generosity: larger ppb = more likely
 ```
 
 Multipliers are **generosity**: `1.0` ships the authored number, `2.0` makes every row twice as likely, shrinking the chance of nothing (see below). All four default to `1.0`, live in `gamedata.db`, and reload live. Categories are gear / consumable / gold / unique, so consumables tune without touching gear.
@@ -92,7 +95,7 @@ Multipliers are **generosity**: `1.0` ships the authored number, `2.0` makes eve
 
 A global lever generous enough to move stage 2 meaningfully would saturate stage 1 several times over. "Stage 1 feels good, stage 2 feels stingy" is a sentence the data supports and the other three layers cannot express — category is orthogonal (stage 2 holds consumables and manuals as well as uniques; stage 1 holds gear), and grade cuts across both stages at once.
 
-The server converts each row to an internal fixed-point probability at load (parts per billion, which holds the full authored range in a `uint32`). That is an implementation detail — `1 in N` is what the data says and what every tool reports.
+Parts per billion holds the full authored range in a `uint32` and makes the validator’s exact-sum rule expressible. `1 in N` is what every tool reports and what a human reads.
 
 - **One roll per stage**, one uniform draw; the row probabilities lay out cumulatively and anything past the last row is "nothing". At most one item, exactly as today. Explicit `item_id = 0` rows are deleted — "nothing" is the remainder, not a row.
 - **Adding or removing a row cannot change any other row's odds.** This is the property that kills both failures above, at both stages, without splitting pools.
@@ -123,7 +126,7 @@ A drop table carries:
 
 | property | meaning | default |
 |---|---|---|
-| rows | `(item_id, drop_one_in, min_count, max_count)` | — |
+| rows | `(item_id, drop_chance_ppb, min_count, max_count)` | — |
 | `roll_count_min` / `roll_count_max` | how many times the table is rolled | 1 / 1 |
 | `placement` | single tile, or the fixed spiral spread | single |
 | `delay` | on death, or on corpse decay | on death |
@@ -155,6 +158,25 @@ Worked, at `stage 2 x 2.0`: a Liche’s second drop moves 1 in 57 -> 1 in 29, wh
 
 Stage 1 and stage 2 carry independent multipliers, so either can be moved without touching the other — which is the whole point of the stage layer.
 
+### Correction (2026-07-29): the column is integer ppb; "1 in N" is presentation
+
+The first draft of this ADR said both that the authored column is `drop_one_in` **and** that parts per billion is the internal representation. Those cannot both hold, and implementation review (#73) hit the seam: an INTEGER `drop_one_in` cannot express 30% — 1 in 3.3333 rounds to `N = 3`, or 33.33%, an 11% relative jump on the gold row of all 48 gold-carrying monsters, shipped as a side effect of an encoding migration. 36 rows drift more than 1%.
+
+**The column is `drop_chance_ppb INTEGER`** — parts per billion. Gold is exactly `300000000`. The owner requirement that produced "1 in N" was *readability*, which is satisfied by presentation, not by the column type.
+
+Precision does not decide this; a REAL `drop_one_in` is also accurate enough (both land under 0.02% worst error against all 1,852 priced rows, where INTEGER `1 in N` reaches 11.11%). Three other things decide it:
+
+1. **The validator has a hard equality rule.** A guaranteed table's rows must sum to **exactly 1.0** — that is what makes the five bosses' second drop guaranteed. Summed floats cannot carry an exact equality check; integers sum to exactly `1_000_000_000` or they do not.
+2. **Byte-identical cross-platform output is an established gate.** #66 and #72 were both verified by diffing `dropodds` machine-readable lines between Windows and Linux. Float accumulation order can differ between compilers; integer arithmetic cannot.
+3. **Multipliers compound both.** `effective = base / (global x stage x category x grade)` divides by a product of four floats and then compares sums against 1.0.
+
+The residual 0.0138% is a **one-time quantisation of 2004-era weights at migration**, not an ongoing precision tax: after migration the stored ppb *is* the authoritative number, with no truer value behind it. The migration gate already reads "agree to within one part per billion", which this satisfies.
+
+**Readability is still a requirement, delivered as presentation** — the owner hand-edits `gamedata.db` directly:
+
+- a SQL view exposing `1000000000.0 / drop_chance_ppb AS one_in` beside the raw rows
+- `dropodds` reporting rarity as "1 in N", and as a percentage where that reads better (nobody thinks of gold as "1 in 3.33")
+
 ### Why "1 in N" and not a chance-out-of-D
 
 Both encode the same thing; the difference is entirely who does the arithmetic. An earlier draft of this ADR specified parts per billion, which made the snake’s Sword of Medusa the number `500` and Plate Mail from a Tiger Worm `2857142`. Owner review rejected it: rarity is reasoned about as "1 in N", so the stored number should be `N`. Writing `2000000` and `350` needs no conversion in either direction, and misreading it is nearly impossible — bigger is rarer, full stop.
@@ -183,7 +205,7 @@ All of that is real work and none of it belongs here. It lands as its own ticket
 Mechanical, per table and stage:
 
 ```
-drop_one_in(row) = round( table.total_weight / (gate(stage, monster) × row.weight) )
+drop_chance_ppb(row) = round( gate(stage, monster) × row.weight / table.total_weight × 1_000_000_000 )
 ```
 
 where `gate` is today's gating — for stage 1, `0.70 × first_drop_chance` (the gold preempt times the grade's chance); for stage 2, `0.05` for ordinary tables and `1.0` for the five `guaranteed_secondary` bosses. Gold becomes an ordinary row at `drop_one_in = 3` (today’s 30%). All multipliers start at 1.0.
@@ -210,4 +232,4 @@ Four, none in scope here.
 - **Boss stage-1 fires 100% of the time.** `loot_grades` grade 5 carries `first_drop_chance = 10000`, and §8 states it deliberately. Owner review rejects this: stage *2* is the guaranteed venue for the five bosses (`guaranteed_secondary = 1`), and stage 1 was never intended to be certain. It yields boss tiered gear 1 in 11 kills and a boss Legendary 1 in 376, which the ratchet law makes unrevokable after launch. It also leaves bosses with zero multiplier headroom under G.
 - **The reputation modifier is inverted.** `baseSecondary = 500 - rating × rep_drop_modifier` with `rep_drop_modifier = 5`, so a player at **rating 100 or above gets no stage-2 drop at all** — no uniques, ever. The original applied the same term to the consumable/equipment split, where good reputation was a *bonus*. Needs confirming against real player rating values.
 - **`ItemId::ZemstoneofSacrifice` is 753**, but `items` puts Zemstone at 650 and **Wizard Hat (M) at 753**. `is_special_item(753)` is true in the running server, so Wizard Hat (M) never tier-rolls while Wizard Hat (W) does. Live in 5 drop tables — [#71](https://github.com/misterjanglez/Helbreath-Heldenian-Project/issues/71).
-- **`dropodds` applies the gold preempt to NPCs with no gold dice**, which fall through to a full-rate item roll. Grade-1 "any item" understated by 38.2% — [#72](https://github.com/misterjanglez/Helbreath-Heldenian-Project/issues/72).
+- **`dropodds` applied the gold preempt to NPCs with no gold dice**, which fall through to a full-rate item roll. Grade-1 "any item" was understated by 38.2% — [#72](https://github.com/misterjanglez/Helbreath-Heldenian-Project/issues/72), **fixed**; the preempt is now priced per monster and the table above carries the corrected figure. Gear and tier columns were never affected, so nothing else in this ADR moves.
