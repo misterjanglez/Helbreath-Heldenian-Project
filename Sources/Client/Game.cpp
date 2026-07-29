@@ -1798,6 +1798,17 @@ void CGame::common_event_handler(char* data)
 	m_effect_manager->add_effect(static_cast<EffectType>(v3), sX, sY, v1, v2, 0, dw_v4);
 	break;
 
+	case CommonType::DotTick:
+	{
+		// v1 = victim object id, v2 = amount, v3 = dot_kind. Bound to the
+		// object rather than to the local player, so a bleed ticking on a mob
+		// or on another player renders over them and not over us.
+		const auto kind = (v3 == hb::shared::net::dot_kind::bleed)
+			? dot_text_type::bleed : dot_text_type::poison;
+		get_floating_text().add_dot_damage(kind, v2, m_cur_time, v1, m_map_data.get());
+	}
+	break;
+
 	}
 }
 

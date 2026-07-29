@@ -87,6 +87,18 @@ int floating_text_manager::add_notify_text(notify_text_type eType, std::string_v
 	return bind_to_tile(i, object_id, map_data, -10, -10);
 }
 
+// One damage-over-time tick over its victim. Reads like a damage number
+// because it is one; the color is what says which DoT produced it.
+int floating_text_manager::add_dot_damage(dot_text_type eType, int damage, uint32_t time,
+                                       int object_id, CMapData* map_data)
+{
+	if (damage <= 0) return 0;
+	int i = find_free_slot();
+	if (i == 0) return 0;
+	m_messages[i] = std::make_unique<floating_text>(eType, std::format("-{}Pts", damage), time);
+	return bind_to_tile(i, object_id, map_data, -10, -10);
+}
+
 int floating_text_manager::add_damage_from_value(int damage, bool last_hit, uint32_t time,
                                              int object_id, CMapData* map_data)
 {
@@ -305,10 +317,13 @@ void floating_text_manager::draw_message(const floating_text& msg, short sX, sho
 		}
 		else
 		{
-			// Damage/LevelUp/enemy_kill: yellow sprite font with multi-line support
+			// Damage/LevelUp/enemy_kill/DoT: sprite font with multi-line support.
+			// The color comes from the params row rather than a hardcoded
+			// Yellow2x, which is what lets a DoT tick be green or red. The
+			// existing rows declare Yellow2x, so nothing here changes color.
 			auto style = is_trans
-				? hb::shared::text::TextStyle::from_color(GameColors::Yellow2x).with_alpha(0.7f).with_additive()
-				: hb::shared::text::TextStyle::with_two_point_shadow(GameColors::Yellow2x).with_additive();
+				? hb::shared::text::TextStyle::from_color(params.m_color).with_alpha(0.7f).with_additive()
+				: hb::shared::text::TextStyle::with_two_point_shadow(params.m_color).with_additive();
 
 			switch (lines) {
 			case 1:

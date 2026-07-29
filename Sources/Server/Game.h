@@ -461,6 +461,13 @@ public:
 	void check_client_response_time();
 	void on_timer(char type);
 	int compose_move_map_data(short sX, short sY, int client_h, direction dir, char * data);
+	// Player bleed ticks, on the 300 ms game tick (see the definition for why
+	// they cannot ride the 1 s client-response gate).
+	void tick_player_bleed();
+	// One damage-over-time tick, to everyone in view of the victim. Owns the
+	// "where is the victim" lookup for both owner classes so the two callers
+	// (poison, bleed) state only who and how much.
+	void send_dot_tick(short owner_h, char owner_type, int amount, uint8_t kind);
 	void send_event_to_near_client_type_b(uint32_t msg_id, uint16_t msg_type, char map_index, short sX, short sY, short v1, short v2, short v3, short v4 = 0);
 	void send_event_to_near_client_type_b(uint32_t msg_id, uint16_t msg_type, char map_index, short sX, short sY, short v1, short v2, short v3, uint32_t v4 = 0);
 	void send_ground_item_event(uint16_t msg_type, char map_index, short sX, short sY, const CItem* item);

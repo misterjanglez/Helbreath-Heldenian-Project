@@ -5,7 +5,6 @@
 #include "Game.h"
 #include "Client.h"
 #include "CombatManager.h"
-#include "StatusEffectManager.h"
 #include "SharedCalculations.h"
 #include "Log.h"
 #include <algorithm>
@@ -25,11 +24,11 @@ void RegenManager::process_client_tick(int client_h, uint32_t time)
 	tick_sp(client_h, time, hunger_delay);
 	tick_poison(client_h, time);
 
-	// Bleed (Item Tiers spec §5) rides here beside poison because it is the same
-	// shape of effect, but it shares no state with it: no resist, no cure, its
-	// own clock. StatusEffectManager owns the state machine.
-	m_game->m_status_effect_manager->tick_bleed(static_cast<short>(client_h),
-		hb::shared::owner_class::Player, time);
+	// Bleed used to ride here beside poison. It moved to CGame::tick_player_bleed
+	// on the 300 ms game tick because this function runs on the 1 s
+	// check_client_response_time gate, and tick_bleed settles at most one tick
+	// per poll — at a 1 s bleed interval that silently dropped ticks. Poison
+	// stays because its interval is the far coarser m_poison_damage_interval.
 }
 
 bool RegenManager::is_regen_suppressed(int client_h) const

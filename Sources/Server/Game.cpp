@@ -4976,6 +4976,7 @@ void CGame::game_process()
 	// MODERNIZED: Socket polling moved to EventLoop (wmain.cpp) for continuous responsiveness
 	// This function now handles only game logic processing
 	npc_process();
+	tick_player_bleed();
 	msg_process();
 	force_recall_process();
 	m_delay_event_manager->delay_event_process();
@@ -6755,6 +6756,66 @@ void CGame::client_common_handler(int client_h, char* data)
 //  description			:: check if player is dropping item or picking up item
 //  last updated		:: October 29, 2004; 7:12 PM; Hypnotoad
 //	return value		:: int
+
+void CGame::tick_player_bleed()
+{
+	// Bleed is time-driven, so it polls on the 300 ms game tick rather than the
+	// 1 s client-response gate where it used to live: tick_bleed settles at most
+	// one tick per poll and its catch-up clause drops a backlog instead of
+	// firing it, so a poll no faster than the bleed interval loses ticks. NPC
+	// victims have always polled here (EntityManager's npc sweep), and the
+	// bleed_tick_interval_ms knob has to mean the same thing for both.
+	//
+	// Gated on the debuff being live before the call, so the overwhelmingly
+	// common not-bleeding client costs one load and a branch — the same shape
+	// the NPC sweep uses for the same reason.
+	const uint32_t time = GameClock::GetTimeMS();
+	for (int i = 0; m_client_shortcut[i] != 0; i++)
+	{
+		const int client_h = m_client_shortcut[i];
+		if (m_client_list[client_h] == nullptr) continue;
+		if (m_client_list[client_h]->m_marquee_debuffs.bleed_expire_time == 0) continue;
+
+		m_status_effect_manager->tick_bleed(static_cast<short>(client_h),
+			hb::shared::owner_class::Player, time);
+	}
+}
+
+void CGame::send_dot_tick(short owner_h, char owner_type, int amount, uint8_t kind)
+{
+	if (amount <= 0) return;
+
+	char map_index;
+	short x, y;
+	uint16_t object_id;
+
+	if (owner_type == hb::shared::owner_class::Player)
+	{
+		const auto* victim = m_client_list[owner_h];
+		if (victim == nullptr) return;
+		map_index = static_cast<char>(victim->m_map_index);
+		x = victim->m_x;
+		y = victim->m_y;
+		object_id = static_cast<uint16_t>(owner_h);
+	}
+	else
+	{
+		const auto* victim = m_npc_list[owner_h];
+		if (victim == nullptr) return;
+		map_index = static_cast<char>(victim->m_map_index);
+		x = victim->m_x;
+		y = victim->m_y;
+		object_id = static_cast<uint16_t>(owner_h + hb::shared::object_id::NpcMin);
+	}
+
+	// Object ids top out at NpcMax (30000), so they fit the type-B short fields
+	// without a wider packet. Nearby rather than victim-only: this matches how
+	// ordinary damage numbers already behave, and Notify::StatusText could not
+	// have been reused for it — the client hardcodes that one to the local
+	// player, so remote victims would never have rendered.
+	send_event_to_near_client_type_b(MsgId::EventCommon, CommonType::DotTick, map_index, x, y,
+		static_cast<short>(object_id), static_cast<short>(amount), static_cast<short>(kind), (short)0);
+}
 
 void CGame::send_event_to_near_client_type_b(uint32_t msg_id, uint16_t msg_type, char map_index, short sX, short sY, short v1, short v2, short v3, short v4)
 {

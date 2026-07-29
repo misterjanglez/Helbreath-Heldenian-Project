@@ -98,6 +98,17 @@ namespace MsgId
 	};
 }
 
+// Which damage-over-time produced a tick (CommonType::DotTick, v3). Drives the
+// floating number's color so a player can tell poison from bleed at a glance.
+namespace dot_kind
+{
+	enum : uint8_t
+	{
+		poison = 0,
+		bleed  = 1
+	};
+}
+
 // Common Action Types - Client sends action requests, Server processes them
 namespace CommonType
 {
@@ -154,6 +165,12 @@ namespace CommonType
 		UpgradeEnchant                          = 0x0A74,
 		DisenchantItem                          = 0x0A75,
 		ReqGetDarkItem                          = 0x0A7B,	// 0x0A76-0x0A7A reserved by the tester block below
+		// Damage-over-time tick, broadcast to everyone in view of the victim so
+		// the number floats over remote victims too. Rides the type-B nearby
+		// transport: v1 = object id, v2 = amount, v3 = dot_kind. Deliberately
+		// NOT a Type::Damage motion event — that path locks the controller and
+		// cancels casting, so a bleed would interrupt its victim on every tick.
+		DotTick                                 = 0x0A7C,
 #ifdef TESTER_ONLY
 		// TESTER MENU — tester-only commands
 		TesterAction                            = 0x0A76,

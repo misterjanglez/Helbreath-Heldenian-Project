@@ -424,10 +424,15 @@ void StatusEffectManager::tick_bleed(short target_h, char target_type, uint32_t 
 	if (state == nullptr) return;
 	if (state->bleed_expire_time == 0) return;
 
-	// A due tick is settled before expiry is considered. The launch constants
-	// put the last tick exactly on the duration boundary (8 s / 2 s = four
-	// ticks, ~20 damage per proc), and expiring first would silently swallow
-	// it every time the tick loop arrived a millisecond late.
+	// A due tick is settled before expiry is considered. The constants put the
+	// last tick exactly on the duration boundary (8 s / 1 s = eight ticks, 200
+	// damage per proc since the 2026-07-28 retune), and expiring first would
+	// silently swallow it every time the tick loop arrived a millisecond late.
+	//
+	// Note the shape this imposes on the callers: at most ONE tick is settled
+	// per call, and the catch-up below drops a backlog rather than firing it,
+	// so a caller must poll strictly faster than bleed_tick_interval_ms or the
+	// knob quietly under-delivers. Both callers poll at 300 ms.
 	bool alive = true;
 	if (static_cast<int32_t>(state->bleed_next_tick_time - now) <= 0) {
 		state->bleed_next_tick_time += state->bleed_interval_ms;

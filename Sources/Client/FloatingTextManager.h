@@ -24,6 +24,10 @@ public:
 	int add_damage_from_value(int damage, bool last_hit, uint32_t time,
 	                       int object_id, CMapData* map_data);
 
+	// One damage-over-time tick over its victim, colored by which DoT it is.
+	int add_dot_damage(dot_text_type eType, int damage, uint32_t time,
+	                int object_id, CMapData* map_data);
+
 	void remove_by_object_id(int object_id);
 	void release_expired(uint32_t time);
 	void clear(int index);

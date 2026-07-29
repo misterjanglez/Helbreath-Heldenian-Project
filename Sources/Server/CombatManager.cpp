@@ -1638,6 +1638,12 @@ void CombatManager::poison_effect(int client_h, int v1)
 		char buf[64]{};
 		std::snprintf(buf, sizeof(buf), "You took -%d poison damage.", damage);
 		m_game->send_notify_msg(0, client_h, Notify::NoticeMsg, 0, 0, 0, buf);
+		// The chat line was the only feedback a tick ever produced; the number
+		// now floats over the victim for everyone in view, as it does for
+		// ordinary damage. Reports the HP actually lost, which is not `damage`
+		// when the clamp at 1 HP above caught the tick.
+		m_game->send_dot_tick(static_cast<short>(client_h), hb::shared::owner_class::Player,
+			prev_hp - m_game->m_client_list[client_h]->m_hp, hb::shared::net::dot_kind::poison);
 	}
 
 	prob = m_game->m_client_list[client_h]->m_skill_mastery[23] - 10 + m_game->m_client_list[client_h]->m_add_poison_resistance;
@@ -1758,6 +1764,10 @@ bool CombatManager::bleed_effect(short target_h, char target_type, const hb::ser
 		// GMs shrug it off, the way poison_effect already lets them shrug off poison.
 		if (victim->m_is_gm_mode) return false;
 
+		// Each exit below takes a different amount — the full tick, or only
+		// down to 1 HP when the attacker cannot be verified — so the floating
+		// number is computed per path rather than assumed to be bleed_damage.
+		const int prev_hp = victim->m_hp;
 		victim->m_hp -= state.bleed_damage;
 
 		if (victim->m_hp > 0) {
@@ -1765,6 +1775,8 @@ bool CombatManager::bleed_effect(short target_h, char target_type, const hb::ser
 			char buf[64]{};
 			std::snprintf(buf, sizeof(buf), "You took -%d bleeding damage.", state.bleed_damage);
 			m_game->send_notify_msg(0, target_h, Notify::NoticeMsg, 0, 0, 0, buf);
+			m_game->send_dot_tick(target_h, hb::shared::owner_class::Player,
+				prev_hp - victim->m_hp, hb::shared::net::dot_kind::bleed);
 			return true;
 		}
 
@@ -1776,8 +1788,16 @@ bool CombatManager::bleed_effect(short target_h, char target_type, const hb::ser
 		if (!is_bleed_attacker_valid(m_game, state)) {
 			victim->m_hp = 1;
 			m_game->send_notify_msg(0, target_h, Notify::Hp, 0, 0, 0, 0);
+			m_game->send_dot_tick(target_h, hb::shared::owner_class::Player,
+				prev_hp - victim->m_hp, hb::shared::net::dot_kind::bleed);
 			return false;
 		}
+
+		// Sent before the kill is resolved: client_killed_handler tears the
+		// victim down, and a killing tick deserves its number the same way an
+		// ordinary killing blow gets one.
+		m_game->send_dot_tick(target_h, hb::shared::owner_class::Player,
+			prev_hp, hb::shared::net::dot_kind::bleed);
 
 		analyze_criminal_action(state.bleed_attacker_h, victim->m_x, victim->m_y);
 		client_killed_handler(target_h, state.bleed_attacker_h, hb::shared::owner_class::Player,
@@ -1791,15 +1811,26 @@ bool CombatManager::bleed_effect(short target_h, char target_type, const hb::ser
 		if (victim->m_is_killed) return false;
 		if (victim->m_behavior == Behavior::Dead) return false;
 
+		const int prev_hp = victim->m_hp;
 		victim->m_hp -= state.bleed_damage;
-		if (victim->m_hp > 0) return true;
+		if (victim->m_hp > 0) {
+			m_game->send_dot_tick(target_h, hb::shared::owner_class::Npc,
+				prev_hp - victim->m_hp, hb::shared::net::dot_kind::bleed);
+			return true;
+		}
 
 		// Same rule as players: no identifiable source, no kill (and no exp or
 		// loot handed to whoever inherited the handle).
 		if (!is_bleed_attacker_valid(m_game, state)) {
 			victim->m_hp = 1;
+			m_game->send_dot_tick(target_h, hb::shared::owner_class::Npc,
+				prev_hp - victim->m_hp, hb::shared::net::dot_kind::bleed);
 			return false;
 		}
+
+		// Before on_entity_killed, which can retire the entity outright.
+		m_game->send_dot_tick(target_h, hb::shared::owner_class::Npc,
+			prev_hp, hb::shared::net::dot_kind::bleed);
 
 		m_game->m_entity_manager->on_entity_killed(target_h,
 			static_cast<short>(state.bleed_attacker_h), hb::shared::owner_class::Player,
