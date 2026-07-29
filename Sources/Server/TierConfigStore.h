@@ -55,6 +55,10 @@ struct modifier_catalog_config
 	uint8_t multiplier;               // display = stored byte x multiplier
 	uint8_t min_tier;
 	bool marquee;
+	uint8_t effect_placement;         // replicated: effect_placement enum
+	// Resolved at load from tier_buckets.sort_order for this row's bucket, so
+	// the packet can carry it per row (buckets have no packet of their own).
+	uint8_t bucket_sort_order;
 	int band_min;                     // display units
 	int band_max;
 	int aggregate_cap;                // display units

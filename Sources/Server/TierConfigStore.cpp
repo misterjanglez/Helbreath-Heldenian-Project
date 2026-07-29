@@ -84,7 +84,7 @@ bool load_catalog(sqlite3* db, tier_config& config)
 	return for_each_row(db,
 		"SELECT modifier_id, name, display_name, effect_label, effect_format,"
 		" effect_id, effect_param1, effect_param2, bucket_id, multiplier,"
-		" min_tier, marquee, band_min, band_max, aggregate_cap,"
+		" min_tier, marquee, effect_placement, band_min, band_max, aggregate_cap,"
 		" window_min_t1, window_max_t1, window_min_t2, window_max_t2,"
 		" window_min_t3, window_max_t3, window_min_t4, window_max_t4"
 		" FROM modifier_catalog ORDER BY modifier_id;",
@@ -105,6 +105,7 @@ bool load_catalog(sqlite3* db, tier_config& config)
 		row.multiplier    = static_cast<uint8_t>(sqlite3_column_int(stmt, c++));
 		row.min_tier      = static_cast<uint8_t>(sqlite3_column_int(stmt, c++));
 		row.marquee       = sqlite3_column_int(stmt, c++) != 0;
+		row.effect_placement = static_cast<uint8_t>(sqlite3_column_int(stmt, c++));
 		row.band_min      = sqlite3_column_int(stmt, c++);
 		row.band_max      = sqlite3_column_int(stmt, c++);
 		row.aggregate_cap = sqlite3_column_int(stmt, c++);
@@ -448,6 +449,21 @@ bool load_tier_config(sqlite3* db, tier_config& out)
 				fresh.curve_index_by_tier[tier] = i;
 				break;
 			}
+
+	// Denormalize each bucket's sort_order onto the catalog rows that name it,
+	// once, so the packet can carry the tooltip ordering key per row without a
+	// bucket packet of its own. A row whose bucket is missing falls back to its
+	// bucket_id, which is what the tooltip sorted on before this replicated.
+	for (auto& row : fresh.catalog)
+	{
+		row.bucket_sort_order = row.bucket_id;
+		for (const auto& bucket : fresh.buckets)
+			if (bucket.bucket_id == row.bucket_id)
+			{
+				row.bucket_sort_order = static_cast<uint8_t>(bucket.sort_order);
+				break;
+			}
+	}
 
 	// Resolve the §5 Marquee constants once, so the proc and cast paths read
 	// plain ints. Each keeps its struct default when the row is absent.

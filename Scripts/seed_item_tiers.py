@@ -155,6 +155,19 @@ TIER_BUCKETS = [
 # tier_attribute params: STR 1, DEX 2, INT 3, VIT 4, MAG 5, CHR 6.
 # ---------------------------------------------------------------------------
 
+# Tooltip line placement (effect_placement enum, Item/ModifierIds.h). Keyed by
+# modifier_id and spliced in at build time rather than widened into the 40-row
+# table below, so the four rows that are NOT standalone stay readable instead of
+# becoming a 0 in every tuple's 13th position. These four are exactly the switch
+# that used to live in the client's category_for_modifier (#65 moved it to data).
+#   1 = inline_damage  2 = inline_defense  3 = inline_weight  4 = inline_durability
+MODIFIER_PLACEMENT = {
+    1: 1,    # sharp   -> merged into the damage line
+    5: 1,    # ancient -> merged into the damage line
+    9: 3,    # light   -> merged into the weight line
+    10: 4,   # strong  -> merged into the durability line
+}
+
 MODIFIER_CATALOG = [
     # id name display_name effect_label effect_format eff p1 p2 bkt mult mt mq bmin bmax cap
     (1, 'sharp', 'Sharp', '', '+{}', 6, 0, 0, 1, 1, 1, 0, 1, 13, 13),
@@ -499,13 +512,15 @@ def output_path(filename):
 # ---------------------------------------------------------------------------
 
 def seed(db):
-    catalog_rows = [row + (None,) * 8 for row in MODIFIER_CATALOG]  # window columns NULL
+    # effect_placement splices in after marquee (index 11); window columns NULL.
+    catalog_rows = [row[:12] + (MODIFIER_PLACEMENT.get(row[0], 0),) + row[12:] + (None,) * 8
+                    for row in MODIFIER_CATALOG]
     eligibility = build_eligibility()
     enchant_steps = build_enchant_steps()
 
     catalog_columns = ('modifier_id, name, display_name, effect_label, effect_format,'
                        ' effect_id, effect_param1, effect_param2, bucket_id, multiplier,'
-                       ' min_tier, marquee, band_min, band_max, aggregate_cap,'
+                       ' min_tier, marquee, effect_placement, band_min, band_max, aggregate_cap,'
                        ' window_min_t1, window_max_t1, window_min_t2, window_max_t2,'
                        ' window_min_t3, window_max_t3, window_min_t4, window_max_t4')
     plan = [
@@ -518,7 +533,7 @@ def seed(db):
         ('tier_buckets',
          'INSERT INTO tier_buckets (bucket_id, name, sort_order) VALUES (?,?,?)', TIER_BUCKETS),
         ('modifier_catalog',
-         f'INSERT INTO modifier_catalog ({catalog_columns}) VALUES ({",".join("?" * 23)})',
+         f'INSERT INTO modifier_catalog ({catalog_columns}) VALUES ({",".join("?" * 24)})',
          catalog_rows),
         ('modifier_eligibility',
          'INSERT INTO modifier_eligibility (modifier_id, item_class, weight)'

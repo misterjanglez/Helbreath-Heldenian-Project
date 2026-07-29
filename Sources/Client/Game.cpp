@@ -1291,6 +1291,10 @@ bool CGame::cache_process_modifier_catalog(char* data, uint32_t msg_size)
 		e.bucket_id = entries[i].bucket_id;
 		e.min_tier = entries[i].min_tier;
 		e.marquee = entries[i].marquee != 0;
+		e.effect_placement = entries[i].effect_placement;
+		e.bucket_sort_order = entries[i].bucket_sort_order;
+		e.band_min = entries[i].band_min;
+		e.band_max = entries[i].band_max;
 	}
 
 	// Modifier IDs are unique per stream, so completeness = present count

@@ -3055,6 +3055,14 @@ std::vector<std::vector<char>> CGame::build_modifier_catalog_packets() const
 			entries[i].bucket_id = row.bucket_id;
 			entries[i].min_tier = row.min_tier;
 			entries[i].marquee = row.marquee ? 1 : 0;
+			entries[i].effect_placement = row.effect_placement;
+			entries[i].bucket_sort_order = row.bucket_sort_order;
+			// Bands are display units and the widest seeded one tops out at 91,
+			// so a byte is honest data rather than a squeeze. Clamped rather
+			// than truncated so a future out-of-range band degrades to "the
+			// picker offers less than it could", never to a wrapped window.
+			entries[i].band_min = static_cast<uint8_t>(std::clamp(row.band_min, 0, 255));
+			entries[i].band_max = static_cast<uint8_t>(std::clamp(row.band_max, 0, 255));
 		}
 
 		packets.push_back(std::move(buf));

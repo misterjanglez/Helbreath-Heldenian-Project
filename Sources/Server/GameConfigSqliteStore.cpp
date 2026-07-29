@@ -29,7 +29,7 @@ using namespace hb::server::config;
 // that cannot be recreated by deleting the file, so this store self-heals in
 // place (idempotent CREATE TABLE IF NOT EXISTS + HasColumn/ALTER migrations)
 // and the stamp is bookkeeping for operators, not a migration input.
-#define GAMECONFIG_DB_SCHEMA_VERSION "8"
+#define GAMECONFIG_DB_SCHEMA_VERSION "9"
 
 namespace
 {
@@ -531,6 +531,8 @@ bool EnsureGameConfigDatabase(sqlite3** outDb, std::string& outPath, bool* outCr
         " multiplier INTEGER NOT NULL DEFAULT 1,"
         " min_tier INTEGER NOT NULL DEFAULT 1,"
         " marquee INTEGER NOT NULL DEFAULT 0,"
+        // tooltip line placement (enum in Item/ModifierIds.h); 0 = standalone
+        " effect_placement INTEGER NOT NULL DEFAULT 0,"
         " band_min INTEGER NOT NULL,"
         " band_max INTEGER NOT NULL,"
         " aggregate_cap INTEGER NOT NULL,"
@@ -756,6 +758,14 @@ bool EnsureGameConfigDatabase(sqlite3** outDb, std::string& outPath, bool* outCr
     if (!HasColumn(db, "npc_configs", "loot_grade")) {
         // Default 2 = standard grade (loot_grades table, spec §8).
         ExecSql(db, "ALTER TABLE npc_configs ADD COLUMN loot_grade INTEGER NOT NULL DEFAULT 2;");
+    }
+
+    if (!HasColumn(db, "modifier_catalog", "effect_placement")) {
+        // Tooltip line placement became catalog data in #65 (was a hardcoded
+        // switch on four modifier IDs in the client). 0 = standalone, which is
+        // what every row but those four was already doing; the seed sets the
+        // four inline ones. Default keeps a pre-#65 world rendering correctly.
+        ExecSql(db, "ALTER TABLE modifier_catalog ADD COLUMN effect_placement INTEGER NOT NULL DEFAULT 0;");
     }
 
     if (!HasColumn(db, "items", "attribute_pool_id")) {

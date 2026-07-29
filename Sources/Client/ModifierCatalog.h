@@ -19,9 +19,13 @@ struct modifier_catalog_entry
 	std::string effect_label;   // "{}" inside = whole-line format
 	std::string effect_format;  // value format ("" = label-only line)
 	uint8_t multiplier = 1;     // display scale applied to rolled values
-	uint8_t bucket_id = 0;
+	uint8_t bucket_id = 0;      // bucket identity, not an ordering key
 	uint8_t min_tier = 0;
 	bool marquee = false;
+	uint8_t effect_placement = 0;   // effect_placement enum: standalone vs inline
+	uint8_t bucket_sort_order = 0;  // THE tooltip ordering key (tier_buckets.sort_order)
+	uint8_t band_min = 0;           // display-unit band, for the GM creator's picker
+	uint8_t band_max = 0;
 
 	// An attribute-pair row rolls two independent values and says so with a
 	// second placeholder in its format — the only replicated signal for what

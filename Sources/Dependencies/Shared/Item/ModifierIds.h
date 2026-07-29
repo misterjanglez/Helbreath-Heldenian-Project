@@ -286,6 +286,25 @@ enum tier_bucket : uint8_t
 }
 
 //------------------------------------------------------------------------
+// Where a modifier's tooltip text goes (modifier_catalog.effect_placement).
+// Presentation data rather than client behavior: every other presentation
+// fact about a modifier — its label, its format, its display multiplier —
+// already lives in the catalog and replicates, so this one does too. Adding
+// an inline modifier is a data edit plus `reload tiers`, not a client build.
+// Values are the wire encoding; the client's effect_category mirrors them.
+//------------------------------------------------------------------------
+namespace effect_placement {
+enum effect_placement : uint8_t
+{
+	standalone        = 0,   // its own tooltip line
+	inline_damage     = 1,   // merged into the damage line
+	inline_defense    = 2,   // merged into the defense line
+	inline_weight     = 3,   // merged into the weight line
+	inline_durability = 4    // merged into the durability line
+};
+}
+
+//------------------------------------------------------------------------
 // Attribute keys for the ATTRIBUTES-ladder effect params
 // (modifier_catalog.effect_param1/effect_param2). Values match the
 // hb::shared::net::StatId wire ids (NetMessages.h) so the two attribute

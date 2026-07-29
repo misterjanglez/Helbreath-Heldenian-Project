@@ -37,9 +37,20 @@ namespace net {
 		char effect_label[48];
 		char effect_format[16];
 		uint8_t multiplier;      // display scale applied to rolled values
-		uint8_t bucket_id;       // tier_bucket; stable tooltip ordering
+		uint8_t bucket_id;       // tier_bucket identity (FK target, not an order)
 		uint8_t min_tier;        // lowest tier the modifier rolls at (0 = any)
 		uint8_t marquee;         // 1 = Legendary-only marquee bucket entry
+		uint8_t effect_placement; // effect_placement; standalone vs inline line
+		// tier_buckets.sort_order for this row's bucket, denormalized onto the
+		// row because buckets have no packet of their own. THE tooltip ordering
+		// key: bucket_id is an identity and a foreign-key target, so reordering
+		// the tooltip must not mean renumbering it everywhere it is referenced.
+		uint8_t bucket_sort_order;
+		// Display-unit band, so the GM creator's value picker can offer only
+		// legal values instead of learning the window from a rejection string.
+		// uint8 covers the seeded data (widest band tops out at 91).
+		uint8_t band_min;
+		uint8_t band_max;
 	};
 
 	// The presentation fields (mode, template, tiers) are meaningful in

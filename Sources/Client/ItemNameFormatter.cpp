@@ -86,18 +86,20 @@ std::string apply_name_template(const std::string& tmpl, const std::string& tier
 	return out;
 }
 
-// Tooltip line placement is client rendering behavior, not catalog data:
-// these modifiers merge into the base-stat lines instead of standing alone.
-effect_category category_for_modifier(uint8_t modifier)
+// Tooltip line placement is catalog data (#65): the client renders whatever
+// the replicated row says. It used to be a hardcoded switch on four modifier
+// IDs here, which made adding an inline modifier a client rebuild while every
+// other presentation change was a database edit.
+effect_category category_from_placement(uint8_t placement)
 {
 	using namespace hb::shared::item;
-	switch (modifier)
+	switch (placement)
 	{
-	case modifier_id::sharp:
-	case modifier_id::ancient: return effect_category::inline_damage;
-	case modifier_id::light:   return effect_category::inline_weight;
-	case modifier_id::strong:  return effect_category::inline_durability;
-	default:                   return effect_category::standalone;
+	case effect_placement::inline_damage:     return effect_category::inline_damage;
+	case effect_placement::inline_defense:    return effect_category::inline_defense;
+	case effect_placement::inline_weight:     return effect_category::inline_weight;
+	case effect_placement::inline_durability: return effect_category::inline_durability;
+	default:                                  return effect_category::standalone;
 	}
 }
 
@@ -122,7 +124,7 @@ void item_name_formatter::append_modifier_effect(std::vector<tooltip_effect>& ef
 
 	uint32_t value = rolled_value * entry.multiplier;
 	uint32_t value2 = rolled_value2 * entry.multiplier;
-	effect_category category = category_for_modifier(modifier);
+	effect_category category = category_from_placement(entry.effect_placement);
 
 	bool whole_line = entry.effect_label.empty() || entry.effect_label.find("{}") != std::string::npos;
 	if (whole_line)
@@ -265,9 +267,11 @@ ItemNameInfo item_name_formatter::format(short item_id, const hb::shared::item::
 	// Rolled modifier lines. Legacy items park their two lines in slots
 	// [0]/[1]; tiered items fill one to four slots in roll order (spec §12),
 	// which bounds the tooltip at four modifier lines by construction. Tiered
-	// items order the lines by the catalog Bucket — spec §12 makes bucket_id
-	// the stable tooltip sort key. Legacy items keep prefix-then-secondary so
-	// their tooltips read exactly as they did before tiers existed.
+	// items order the lines by the Bucket's replicated sort_order (#65) —
+	// bucket_id is an identity and a foreign-key target, so reordering the
+	// tooltip must not mean renumbering it everywhere it is referenced. Legacy
+	// items keep prefix-then-secondary so their tooltips read exactly as they
+	// did before tiers existed.
 	const auto& mods = data.attributes.modifiers;
 	std::array<hb::shared::item::item_modifier, hb::shared::item::modifier_slot_count> lines{};
 	std::array<uint8_t, hb::shared::item::modifier_slot_count> buckets{};
@@ -276,7 +280,7 @@ ItemNameInfo item_name_formatter::format(short item_id, const hb::shared::item::
 	{
 		if (mod.type == 0) continue;
 		const modifier_catalog_entry* row = catalog_row(mod.type);
-		buckets[line_count] = row ? row->bucket_id : uint8_t{0};
+		buckets[line_count] = row ? row->bucket_sort_order : uint8_t{0};
 		lines[line_count++] = mod;
 	}
 

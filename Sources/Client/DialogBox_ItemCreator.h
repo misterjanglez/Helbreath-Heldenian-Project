@@ -6,6 +6,7 @@
 #include "Packet/PacketNotify.h"
 #include "Item/ModifierIds.h"
 #include "Item/ItemAttributeData.h"
+#include "ModifierCatalog.h"
 #include <cstdint>
 #include <string>
 #include <vector>
@@ -94,7 +95,15 @@ private:
 	bool m_awaiting_mint_reply = false;
 	std::string m_server_notice;
 	bool m_server_notice_ok = false;
-	static constexpr int max_tiered_value = 20;   // widest raw value any seeded Band reaches
+
+	// The raw values a modifier may legally hold, derived from its replicated
+	// display band and multiplier. Empty (max < min) = no legal value.
+	struct raw_range
+	{
+		int min = 1;
+		int max = 0;
+	};
+	static raw_range legal_raw_range(const modifier_catalog_entry& row);
 
 	// Dropdown state
 	enum class dropdown_id : int
@@ -129,7 +138,7 @@ private:
 	void reset_tier_state();
 	void apply_tier_change(int tier);
 	std::vector<tier_option> tier_options_for_slot(int slot) const;
-	std::vector<std::string> value_options(int multiplier) const;
+	std::vector<std::string> value_options(const modifier_catalog_entry& row) const;
 	std::string missing_tier_input() const;
 	void send_tiered_mint();
 	void draw_tiered_body(short sX, short sY, short size_x, short mouse_x, short mouse_y);

@@ -284,16 +284,35 @@ std::vector<DialogBox_ItemCreator::tier_option> DialogBox_ItemCreator::tier_opti
 	return options;
 }
 
-// Bands do not replicate (the catalog packet carries multiplier, bucket and
-// min-tier only), so the value picker offers the whole raw range and the
-// server's rejection names the legal window. Options read in display units,
-// which is what the tooltip and the rejection string both speak.
-std::vector<std::string> DialogBox_ItemCreator::value_options(int multiplier) const
+// The raw values a modifier may legally hold. Bands are display units and the
+// stored byte is raw, so the legal raw window is the band divided by the
+// multiplier — rounded INWARD at both ends, because a raw value whose display
+// falls outside the band is exactly what the server rejects. An empty range
+// means the row has no legal value at all (a value-less modifier like Agile,
+// or a band the multiplier cannot land inside).
+DialogBox_ItemCreator::raw_range DialogBox_ItemCreator::legal_raw_range(
+	const modifier_catalog_entry& row)
+{
+	if (row.multiplier <= 0) return {};
+
+	raw_range range;
+	// Ceiling division for the low end, floor for the high end.
+	range.min = std::max(1, (row.band_min + row.multiplier - 1) / row.multiplier);
+	range.max = row.band_max / row.multiplier;
+	if (range.max < range.min) return {};
+	return range;
+}
+
+// Bands replicate as of #65, so the picker offers only values the server will
+// accept instead of the whole raw span with the rejection string as the only
+// teacher. Options read in display units, which is what the tooltip and the
+// rejection string both speak.
+std::vector<std::string> DialogBox_ItemCreator::value_options(const modifier_catalog_entry& row) const
 {
 	std::vector<std::string> options;
-	if (multiplier <= 0) return options;   // value-less modifier (Agile)
-	for (int raw = 1; raw <= max_tiered_value; raw++)
-		options.push_back(std::to_string(raw * multiplier));
+	const raw_range range = legal_raw_range(row);
+	for (int raw = range.min; raw <= range.max; raw++)
+		options.push_back(std::to_string(raw * row.multiplier));
 	return options;
 }
 
@@ -527,9 +546,12 @@ std::vector<std::string> DialogBox_ItemCreator::open_dropdown_options(short sX, 
 		const bool second = (m_open_dropdown == dropdown_id::mod_value2);
 		const int x = second ? layout::t_pair2_x : layout::t_value_x;
 		const int w = pair ? layout::t_pair_w : layout::t_value_w;
+		// Options start at the band's low end, not at raw 1, so the selected
+		// row is the offset into the legal window rather than the raw value.
+		const int low = legal_raw_range(row).min;
 		anchor(sX + x, layout::t_slot_y + m_open_slot * layout::t_slot_pitch, w,
-			(second ? m_tier_slots[m_open_slot].value2 : m_tier_slots[m_open_slot].value) - 1);
-		options = value_options(row.multiplier);
+			(second ? m_tier_slots[m_open_slot].value2 : m_tier_slots[m_open_slot].value) - low);
+		options = value_options(row);
 		break;
 	}
 
@@ -1117,17 +1139,31 @@ bool DialogBox_ItemCreator::on_click_configure(short sX, short sY, short size_x)
 					const auto tier_opts = tier_options_for_slot(m_open_slot);
 					if (clicked_idx < static_cast<int>(tier_opts.size()))
 					{
+						const uint8_t picked = tier_opts[clicked_idx].modifier_id;
 						m_tier_slots[m_open_slot] = {};
-						m_tier_slots[m_open_slot].modifier_id = tier_opts[clicked_idx].modifier_id;
+						m_tier_slots[m_open_slot].modifier_id = picked;
+						// Seed both halves at the band's low end. A fresh slot
+						// used to hold value 0, which is out of band for every
+						// modifier that has one — the GM had to open the value
+						// picker before the mint could possibly be accepted.
+						const int low = legal_raw_range(m_game->m_modifier_catalog[picked]).min;
+						m_tier_slots[m_open_slot].value = static_cast<uint8_t>(low);
+						m_tier_slots[m_open_slot].value2 = static_cast<uint8_t>(low);
 					}
 					break;
 				}
 				case dropdown_id::mod_value:
-					m_tier_slots[m_open_slot].value = clicked_idx + 1;
-					break;
 				case dropdown_id::mod_value2:
-					m_tier_slots[m_open_slot].value2 = clicked_idx + 1;
+				{
+					const uint8_t id = m_tier_slots[m_open_slot].modifier_id;
+					if (id == 0) break;
+					const int picked = clicked_idx + legal_raw_range(m_game->m_modifier_catalog[id]).min;
+					if (m_open_dropdown == dropdown_id::mod_value2)
+						m_tier_slots[m_open_slot].value2 = static_cast<uint8_t>(picked);
+					else
+						m_tier_slots[m_open_slot].value = static_cast<uint8_t>(picked);
 					break;
+				}
 
 				default: break;
 				}
