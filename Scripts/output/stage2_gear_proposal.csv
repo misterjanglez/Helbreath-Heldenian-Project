@@ -1,0 +1,13 @@
+drop_table_id,table_name,stage,item_id,item_name,weight,min_count,max_count,action
+20032,drops_Unicorn,2,848,Lighting Blade,2,1,1,move_stage1
+20033,drops_WereWolf,2,290,Flameberge +3 (LLF),2,1,1,move_stage1
+20033,drops_WereWolf,2,292,Golden Axe (LLF),2,1,1,move_stage1
+20048,drops_Stalker,2,290,Flameberge +3 (LLF),2,1,1,move_stage1
+20048,drops_Stalker,2,292,Golden Axe (LLF),2,1,1,move_stage1
+20050,drops_Tigerworm,2,290,Flameberge +3 (LLF),50,1,1,move_stage1
+20052,drops_Gagoyle,2,847,Dark Executor,2,1,1,move_stage1
+20058,drops_Mountain-Giant,2,762,Giant Battle Hammer,1,1,1,move_stage1
+20059,drops_Ettin,2,762,Giant Battle Hammer,1,1,1,move_stage1
+20070,drops_Barlog,2,847,Dark Executor,3,1,1,move_stage1
+20085,drops_Centaurus,2,848,Lighting Blade,2,1,1,move_stage1
+20091,drops_Fire-Wyvern,2,290,Flameberge +3 (LLF),10,1,1,move_stage1

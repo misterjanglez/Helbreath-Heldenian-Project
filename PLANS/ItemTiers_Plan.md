@@ -225,6 +225,26 @@ Boss-rate note (spec-assembly review, 2026-07-27): the boss row was originally r
 - **No zone layer** — tier odds are the monster's grade, full stop. (A global drop-event tier multiplier was parked to fog.)
 - **Capes**: generic Cape (item 402) becomes a restricted-mob drop (Plate Mail pattern; which mobs is drop-table data entry at implementation). It tier-rolls like any gear. Reward capes stay untiered and unchanged.
 
+### Amendment A1 — drop rarity becomes an absolute "1 in N" per (item, monster) (PROPOSED, not in force)
+
+Proposed by [#68](https://github.com/misterjanglez/Helbreath-Heldenian-Project/issues/68), recorded as [ADR 0005](../docs/adr/0005-absolute-drop-chances.md). **§8 above remains in force verbatim until that ADR is accepted.** Recorded here so the locked section is never silently contradicted.
+
+Every `drop_entries` row, **both stages**, carries `drop_one_in` — the `N` in "1 in N kills" for that item from that monster — instead of a weight relative to its table. Bigger is rarer; the leftover probability is "nothing", so a roll still yields at most one item. Four **generosity** multipliers — global, stage, category (gear / consumable / gold / unique), loot grade — divide into `N` without changing any ratio between rows (`1.0` = as authored, `2.0` = twice as likely, all defaulting to `1.0` and reloading live). The stage layer is load-bearing: stage 1 sits at 37% of kills for an ordinary monster and stage 2 at under 1.5%, so one lever cannot serve both. Multipliers scale **row rarity only** — they shrink a table’s "nothing" remainder and never touch `roll_count`, so turning stage 2 up cannot make a scatter boss spread more items. On a table whose rows already sum to 1.0 a multiplier is a deliberate no-op: something drops on every roll already. The boot validator reports every table a live multiplier cannot move, by name, so the no-op is visible rather than a surprise — deliberate for the five bosses at stage 2, a defect at stage 1 (#87).
+
+If accepted, three §8 statements are superseded — and only these three:
+
+1. *"the gold-preempt ordering is unchanged"* — the hardcoded 30% gold chance, the `drop_rates.gold` multiplier and the preempt branch are deleted; gold is an ordinary row with its own chance.
+2. *"`first_drop_chance` replaces the hardcoded primary drop chance"* — `first_drop_chance` and `drop_rates.primary` are subsumed by the per-row chances and retire.
+3. *"when the stage-1 table yields tier-eligible gear … it gets the grade→tier roll"* — gear no longer emerges from a weighted mix shared with consumables. Each gear row states its own per-monster rate; the tier roll still runs on whatever gear the roll produced.
+
+**A1 reaches stage 2, unlike the other options considered.** Stage-2 *mechanics* are untouched — corpse-decay timing and placement, `guaranteed_secondary`, scatter spread and count, the five guaranteed bosses, the stage-2 validator rule, and the fact that stage 2 never tier-rolls. Only the encoding of its row chances changes, for the same reason as stage 1: identical authored weights currently produce a 216× rarity gap for the same unique on two different monsters.
+
+Unchanged by A1: the grade→tier weight table above, the staircase access rule, the ratchet law, and the no-zone-layer and cape rules.
+
+**Stage 1 and stage 2 split into separate tables.** `drop_tables` declares its `stage`, `drop_entries` loses the stage discriminator, and `npc_configs` references a stage-1 and a stage-2 table independently; `guaranteed_secondary` and `scatter_count` move onto the stage-2 table. Today 61 of 98 tables carry a dead stage-2 half, and stage 1 has 98 row-sets across only 23 distinct contents because the bundling forces every monster to copy the shared potion block. Both stages then run **one identical engine**: same rate model, same multipliers, same validator. Every former stage-2-only behaviour becomes an ordinary table property available to either slot — `base_secondary_drop_chance` retires like `first_drop_chance`, `guaranteed_secondary` becomes a validator-enforced "rows sum to 1.0", and `scatter_count` becomes `roll_count_min`/`roll_count_max` plus a `placement` and `delay` property (which also restores the original’s guaranteed 5–15 scattered items rather than our fixed 15 rolls that mostly miss). "Stage" then means only which slot a monster references. The single deliberate asymmetry is not part of the calculation: §8 keeps stage 2 out of the tier roll.
+
+Migration is mechanical and reproduces every current per-kill rate exactly before any retune, verified by `dropodds` agreeing per grade to four decimals and per row to within one part per billion. Baseline, encoding rationale and migration formula are in ADR 0005.
+
 ## 9. Power ceiling ([Power ceiling #25](https://github.com/misterjanglez/Helbreath-Heldenian-Project/issues/25))
 
 - **Legendary is the apex, decisively**: a god-roll outclasses +15 Dark weapons and top uniques at a glance (double-digit-percent stronger). Dark Items become the reliable free level-180 baseline; uniques a mid-chase lottery with exclusive signatures; god-roll farming the eternal endgame.

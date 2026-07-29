@@ -164,3 +164,29 @@ _Avoid_: upgrade level (collides with majestic upgrades)
 
 **Tier presentation**:
 How tier reads to the player. The tier word leads the item name ("Legendary Chain Mail" — continuing the prefix-word tradition) and the whole name renders in the tier color everywhere names appear (tooltip, pickup chat line). Palette is Helbreath-native, from the game's own dye table: Common white, Rare green rgb(128,192,128), Epic blue rgb(150,160,225), Legendary gold rgb(255,176,16) — no imported MMO purple/orange. Tier names Common/Rare/Epic/Legendary are final and player-facing. Tooltip layout is otherwise today's exactly (gray labels, green values, one line per modifier). Sprites are never tinted in tiered mode — tier reads from name color, tooltip, and beam; legacy mode keeps its prefix dye-tints. Every tiered ground drop emits a light-beam in its tier color (Common's a faint neutral). No server broadcasts, no map banners. Names, colors, and the name template live in the tier-presentation table replicated via the config cache. (Presentation decision, 2026-07-27.)
+
+### Provenance Ledger (item identity & audit)
+
+Design locked 2026-07-29. Binding contract: `PLANS/ItemLedger_Plan.md`; decision records: `docs/adr/0003-item-provenance-ledger.md` (Serials + ledger), `docs/adr/0004-single-game-db.md` (Game DB consolidation).
+
+**Serial**:
+The permanent server-global identity of one Instanced item — a monotonic int64 minted once at creation, never reused, never sent to the client. Serials are server + database facts only; a tampered client cannot observe the tracking, and no Compatibility bump is ever involved.
+
+**Provenance Ledger**:
+The append-only `itemledger.db` recording every Instanced item's creation (`item_instances`) and every custody/state transition it undergoes (`item_events`), plus aggregate flows for Counted items. A passive audit trail: the in-RAM world and snapshot saves stay authoritative.
+
+**Instanced / Counted**:
+The two tracking granularities. An item type is Instanced iff non-stackable (gear, named uniques, angels, Dark Items — Commons included); stackables (gold, potions, ammo) are Counted via daily flow counters, because stack merge/split dissolves identity.
+_Avoid_: tracked/untracked (everything is tracked; the tiers differ in granularity)
+
+**Mint**:
+Creating an item instance and assigning its Serial. All creation funnels through the minting factory in `ItemManager` — a raw `new CItem` in game code is a review defect. (Aligns with the existing GmMint action and the tiers GM creator, #56.)
+
+**Biography**:
+One Serial's ordered event history — the query that settles ownership disputes and feeds the legal-transition replay.
+
+**Reconciliation**:
+The comparison of snapshot state (inventories, Warehouse) against the ledger's derived current-holder state. Mismatches — one Serial in two inventories, a holder the ledger never saw — are the dupe detector.
+
+**Game DB**:
+The single consolidated account/character store (`game.db`) replacing the per-account `accounts/*.db` files: `UNIQUE` character names, one persistent WAL connection, atomic multi-account transactions (Exchange, Trading Post custody). `gamedata.db`, `MapInfo.db`, and `itemledger.db` remain separate.

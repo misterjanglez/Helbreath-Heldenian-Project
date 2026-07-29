@@ -1,0 +1,54 @@
+drop_table_id,table_name,stage,item_id,item_name,weight,min_count,max_count,action
+20049,drops_Helclaw,1,675,Knight Plate Mail (M),50,1,1,upsert
+20049,drops_Helclaw,1,676,Knight Plate Mail (W),50,1,1,upsert
+20049,drops_Helclaw,1,685,Wizard Robe (M),50,1,1,upsert
+20049,drops_Helclaw,1,686,Wizard Robe (W),50,1,1,upsert
+20049,drops_Helclaw,1,679,Knight Full-Helm (M),50,1,1,upsert
+20049,drops_Helclaw,1,680,Knight Full-Helm (W),50,1,1,upsert
+20049,drops_Helclaw,1,677,Knight Plate Leggings (M),50,1,1,upsert
+20049,drops_Helclaw,1,678,Knight Plate Leggings (W),50,1,1,upsert
+20049,drops_Helclaw,1,87,Tower Shield,100,1,1,upsert
+20049,drops_Helclaw,1,617,Composite Bow,100,1,1,upsert
+20049,drops_Helclaw,1,256,Magic Wand (MS20),100,1,1,upsert
+20050,drops_Tigerworm,1,675,Knight Plate Mail (M),50,1,1,upsert
+20050,drops_Tigerworm,1,676,Knight Plate Mail (W),50,1,1,upsert
+20050,drops_Tigerworm,1,685,Wizard Robe (M),50,1,1,upsert
+20050,drops_Tigerworm,1,686,Wizard Robe (W),50,1,1,upsert
+20050,drops_Tigerworm,1,679,Knight Full-Helm (M),50,1,1,upsert
+20050,drops_Tigerworm,1,680,Knight Full-Helm (W),50,1,1,upsert
+20050,drops_Tigerworm,1,677,Knight Plate Leggings (M),50,1,1,upsert
+20050,drops_Tigerworm,1,678,Knight Plate Leggings (W),50,1,1,upsert
+20050,drops_Tigerworm,1,87,Tower Shield,100,1,1,upsert
+20050,drops_Tigerworm,1,617,Composite Bow,100,1,1,upsert
+20090,drops_Wyvern,1,675,Knight Plate Mail (M),50,1,1,upsert
+20090,drops_Wyvern,1,676,Knight Plate Mail (W),50,1,1,upsert
+20090,drops_Wyvern,1,685,Wizard Robe (M),50,1,1,upsert
+20090,drops_Wyvern,1,686,Wizard Robe (W),50,1,1,upsert
+20090,drops_Wyvern,1,679,Knight Full-Helm (M),50,1,1,upsert
+20090,drops_Wyvern,1,680,Knight Full-Helm (W),50,1,1,upsert
+20090,drops_Wyvern,1,677,Knight Plate Leggings (M),50,1,1,upsert
+20090,drops_Wyvern,1,678,Knight Plate Leggings (W),50,1,1,upsert
+20090,drops_Wyvern,1,87,Tower Shield,100,1,1,upsert
+20090,drops_Wyvern,1,617,Composite Bow,100,1,1,upsert
+20091,drops_Fire-Wyvern,1,675,Knight Plate Mail (M),50,1,1,upsert
+20091,drops_Fire-Wyvern,1,676,Knight Plate Mail (W),50,1,1,upsert
+20091,drops_Fire-Wyvern,1,685,Wizard Robe (M),50,1,1,upsert
+20091,drops_Fire-Wyvern,1,686,Wizard Robe (W),50,1,1,upsert
+20091,drops_Fire-Wyvern,1,679,Knight Full-Helm (M),50,1,1,upsert
+20091,drops_Fire-Wyvern,1,680,Knight Full-Helm (W),50,1,1,upsert
+20091,drops_Fire-Wyvern,1,677,Knight Plate Leggings (M),50,1,1,upsert
+20091,drops_Fire-Wyvern,1,678,Knight Plate Leggings (W),50,1,1,upsert
+20091,drops_Fire-Wyvern,1,87,Tower Shield,100,1,1,upsert
+20091,drops_Fire-Wyvern,1,617,Composite Bow,100,1,1,upsert
+20092,drops_Abaddon,1,675,Knight Plate Mail (M),50,1,1,upsert
+20092,drops_Abaddon,1,676,Knight Plate Mail (W),50,1,1,upsert
+20092,drops_Abaddon,1,685,Wizard Robe (M),50,1,1,upsert
+20092,drops_Abaddon,1,686,Wizard Robe (W),50,1,1,upsert
+20092,drops_Abaddon,1,679,Knight Full-Helm (M),50,1,1,upsert
+20092,drops_Abaddon,1,680,Knight Full-Helm (W),50,1,1,upsert
+20092,drops_Abaddon,1,751,Wings Helm (M),50,1,1,upsert
+20092,drops_Abaddon,1,755,Wings Helm (W),50,1,1,upsert
+20092,drops_Abaddon,1,677,Knight Plate Leggings (M),50,1,1,upsert
+20092,drops_Abaddon,1,678,Knight Plate Leggings (W),50,1,1,upsert
+20092,drops_Abaddon,1,87,Tower Shield,100,1,1,upsert
+20092,drops_Abaddon,1,617,Composite Bow,100,1,1,upsert

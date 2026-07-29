@@ -1,0 +1,118 @@
+npc_id,name,exp_max,hp_max,drop_table_id,current_grade,proposed_grade,reason
+49,Crop,0,12000,0,2,1,exp_max < 50
+50,Energy Sphere,0,60,0,2,1,exp_max < 50
+51,Gate,0,12000,0,2,1,exp_max < 50
+52,Gate,0,12000,0,2,1,exp_max < 50
+53,Mcgaffin,0,18000,0,2,1,exp_max < 50
+54,Perry,0,18000,0,2,1,exp_max < 50
+55,Devlin,0,18000,0,2,1,exp_max < 50
+56,Shop Keeper,0,60,0,2,1,exp_max < 50
+57,Sorcerer,0,60,0,2,1,exp_max < 50
+58,Warehouse Keeper,0,60,0,2,1,exp_max < 50
+59,Guard,0,690,0,2,1,exp_max < 50
+60,Guard,0,690,0,2,1,exp_max < 50
+61,Guard,0,690,0,2,1,exp_max < 50
+62,BlackSmith Keeper,0,60,0,2,1,exp_max < 50
+63,Cityhall Officer,0,60,0,2,1,exp_max < 50
+64,Guildhall Officer,0,60,0,2,1,exp_max < 50
+65,Gail,0,60,0,2,1,exp_max < 50
+66,Arrow Guard Tower,0,3000,20093,2,1,exp_max < 50
+67,Arrow Guard Tower,0,3000,20094,2,1,exp_max < 50
+68,Cannon Guard Tower,0,3000,20095,2,1,exp_max < 50
+69,Cannon Guard Tower,0,3000,20096,2,1,exp_max < 50
+70,Mana Collector,0,3000,20097,2,1,exp_max < 50
+71,Mana Collector,0,3000,20098,2,1,exp_max < 50
+72,Detector,0,3000,20099,2,1,exp_max < 50
+73,Detector,0,3000,20100,2,1,exp_max < 50
+74,Energy Shield Generator,0,3000,20101,2,1,exp_max < 50
+75,Energy Shield Generator,0,3000,20102,2,1,exp_max < 50
+76,Grand Magic Generator,0,300000,20103,2,1,exp_max < 50
+77,Grand Magic Generator,0,300000,20104,2,1,exp_max < 50
+78,Mana Stone,0,300000,20105,2,1,exp_max < 50
+79,Light War Beetle,0,1500,20106,2,1,exp_max < 50
+80,Light War Beetle,0,1500,20107,2,1,exp_max < 50
+81,God's Hand Knight,0,2100,20108,2,1,exp_max < 50
+82,God's Hand Knight,0,4800,20109,2,1,exp_max < 50
+83,Temple Knight,0,2100,20110,2,1,exp_max < 50
+84,Battle Golem,0,4800,20111,2,1,exp_max < 50
+85,Catapult,0,510,20112,2,1,exp_max < 50
+86,Catapult,0,510,20113,2,1,exp_max < 50
+87,Catapult,0,510,20114,2,1,exp_max < 50
+88,Catapult,0,510,20115,2,1,exp_max < 50
+89,Catapult,0,510,20116,2,1,exp_max < 50
+90,Catapult,0,510,20117,2,1,exp_max < 50
+91,Catapult,0,510,20118,2,1,exp_max < 50
+92,Catapult,0,510,20119,2,1,exp_max < 50
+93,Catapult,0,510,20120,2,1,exp_max < 50
+94,Catapult,0,510,20121,2,1,exp_max < 50
+95,Catapult,0,510,20122,2,1,exp_max < 50
+96,Catapult,0,510,20123,2,1,exp_max < 50
+97,Catapult,0,3000,20124,2,1,exp_max < 50
+98,Catapult,0,3000,20125,2,1,exp_max < 50
+99,Sorceress,0,1800,20126,2,1,exp_max < 50
+100,Sorceress,0,1800,20127,2,1,exp_max < 50
+101,Ancient Temple Knight,0,4800,20128,2,1,exp_max < 50
+102,Ancient Temple Knight,0,4800,20129,2,1,exp_max < 50
+103,Elf Master,0,1500,20130,2,1,exp_max < 50
+104,Elf Master,0,1500,20131,2,1,exp_max < 50
+105,Dark Shadow Knight,0,3000,20132,2,1,exp_max < 50
+106,Dark Shadow Knight,0,3000,20133,2,1,exp_max < 50
+107,Heavy Battle Tank,0,3000,20134,2,1,exp_max < 50
+108,Heavy Battle Tank,0,3000,20135,2,1,exp_max < 50
+109,Crossbow Turret,0,4800,20136,2,1,exp_max < 50
+110,Crossbow Turret,0,4800,20137,2,1,exp_max < 50
+111,Barbarian,0,2100,20138,2,1,exp_max < 50
+112,Barbarian,0,2100,20139,2,1,exp_max < 50
+113,Ancient Giant Cannon,0,6000,20140,2,1,exp_max < 50
+114,Ancient Giant Cannon,0,6000,20141,2,1,exp_max < 50
+116,Vince,0,60,0,2,1,exp_max < 50
+0,Slime,13,10,20010,2,1,exp_max < 50
+3,Giant Ant,23,15,20016,2,1,exp_max < 50
+1,Rabbit,34,20,20071,2,1,exp_max < 50
+2,Cat,39,20,20072,2,1,exp_max < 50
+4,Snake,39,20,20022,2,1,exp_max < 50
+5,Orc,40,20,20014,2,1,exp_max < 50
+9,Giant Scorpion,90,36,20017,2,2,exp_max < 2000
+6,Dummy,112,60,20073,2,2,exp_max < 2000
+10,Skeleton,128,48,20011,2,2,exp_max < 2000
+8,Zombie,161,60,20018,2,2,exp_max < 2000
+7,Attack Dummy,182,60,20074,2,2,exp_max < 2000
+11,Orc Mage,191,72,20075,2,2,exp_max < 2000
+13,Stone Golem,475,150,20012,2,2,exp_max < 2000
+12,Clay Golem,574,180,20023,2,2,exp_max < 2000
+14,Helhound,683,210,20027,2,2,exp_max < 2000
+15,Frog,683,210,20076,2,2,exp_max < 2000
+16,Rudolph,790,240,20077,2,2,exp_max < 2000
+17,Troll,1108,330,20028,2,2,exp_max < 2000
+18,Cyclops,1235,360,20013,2,2,exp_max < 2000
+19,Ice Golem,1235,360,20078,2,2,exp_max < 2000
+26,Giant Crayfish,1480,420,20082,2,2,exp_max < 2000
+25,Tentocle,1685,480,20081,2,2,exp_max < 2000
+27,Giant Tree,2122,600,20083,2,3,exp_max < 7000
+20,Beholder,2141,600,20053,2,3,exp_max < 7000
+21,Plant,2234,630,20079,2,3,exp_max < 7000
+23,Mountain Giant,2236,600,20058,2,3,exp_max < 7000
+22,Ogre,2503,690,20029,2,3,exp_max < 7000
+33,Claw Turtle,2696,720,20084,2,3,exp_max < 7000
+24,Direboar,2790,780,20080,2,3,exp_max < 7000
+29,Stalker,2930,780,20048,2,3,exp_max < 7000
+28,Liche,2953,780,20030,2,3,exp_max < 7000
+32,Frost,2953,780,20063,2,3,exp_max < 7000
+31,Darkelf,3025,840,20054,2,3,exp_max < 7000
+30,Werewolf,3124,840,20033,2,3,exp_max < 7000
+35,Ettin,4277,1080,20059,2,3,exp_max < 7000
+41,Master Mage Orc,5851,1500,20087,2,3,exp_max < 7000
+43,Nizie,6773,1680,20089,2,3,exp_max < 7000
+36,Demon,8563,2040,20031,2,4,exp_max >= 7000
+37,Unicorn,8563,2040,20032,2,4,exp_max >= 7000
+42,Minotaur,8789,2040,20088,2,4,exp_max >= 7000
+39,Centaur,8933,2100,20085,2,4,exp_max >= 7000
+117,Griffin,8933,2100,20085,2,4,exp_max >= 7000
+38,Gargoyle,10242,2400,20052,2,4,exp_max >= 7000
+40,Giant Lizard,11296,2700,20086,2,4,exp_max >= 7000
+34,Dragon,12521,3000,20070,2,4,exp_max >= 7000
+44,Helclaw,26678,6000,20049,2,5,Apocalypse boss roster
+47,Fire Wyvern,30119,18000,20091,2,5,Apocalypse boss roster
+45,Tiger Worm,55879,12000,20050,2,5,Apocalypse boss roster
+46,Wyvern,74990,15000,20090,2,5,Apocalypse boss roster
+48,Abaddon,449990,90000,20092,2,5,Apocalypse boss roster
