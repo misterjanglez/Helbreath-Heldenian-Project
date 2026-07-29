@@ -4,6 +4,7 @@
 #include "GameCmdUnblock.h"
 #include "GameCmdGM.h"
 #include "GameCmdRegen.h"
+#include "GameCmdRep.h"
 #include "GameCmdCreateItem.h"
 #include "GameCmdGiveItem.h"
 #include "GameCmdSpawn.h"
@@ -128,6 +129,8 @@ void GameChatCommandManager::register_built_in_commands()
 	register_command(std::make_unique<GameCmdWhisper>());
 	register_command(std::make_unique<GameCmdBlock>());
 	register_command(std::make_unique<GameCmdUnblock>());
+	register_command(std::make_unique<GameCmdRepUp>());
+	register_command(std::make_unique<GameCmdRepDown>());
 	register_command(std::make_unique<GameCmdGM>());
 	register_command(std::make_unique<GameCmdRegen>());
 	register_command(std::make_unique<GameCmdCreateItem>());

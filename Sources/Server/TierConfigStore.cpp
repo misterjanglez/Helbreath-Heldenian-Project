@@ -213,11 +213,11 @@ bool load_loot_grades(sqlite3* db, tier_config& config)
 	});
 }
 
-// The four generosity layers (#73). Every row defaults to 1.0 and an absent
-// table leaves the whole stack neutral, so a world that has never tuned its
-// drops behaves exactly as authored. An unrecognised scope/key is recorded
-// rather than ignored: a multiplier nobody applies is a tuning knob that
-// silently does nothing.
+// The generosity layers (#73, plus the reputation layer's shape from #88).
+// Every multiplier row defaults to 1.0 and an absent table leaves the whole
+// stack neutral, so a world that has never tuned its drops behaves exactly as
+// authored. An unrecognised scope/key is recorded rather than ignored: a
+// multiplier nobody applies is a tuning knob that silently does nothing.
 bool load_drop_multipliers(sqlite3* db, tier_config& config)
 {
 	return for_each_row(db,
@@ -260,6 +260,14 @@ bool load_drop_multipliers(sqlite3* db, tier_config& config)
 		{
 			for (uint8_t c = 0; c < drop_category::count; c++)
 				if (key == drop_category_name(c)) { m.category[c] = value; return; }
+		}
+		else if (scope == "reputation")
+		{
+			// Not a multiplier row like the four above — these three shape the
+			// per-player layer (#88). `modifier` 0 disables it outright.
+			if (key == "modifier") { m.reputation_modifier = value; return; }
+			if (key == "floor")    { m.reputation_floor    = value; return; }
+			if (key == "cap")      { m.reputation_cap      = value; return; }
 		}
 		config.load_anomalies.push_back(
 			"drop_multipliers: unknown scope/key '" + scope + "'/'" + key + "'");

@@ -189,9 +189,9 @@ struct tier_config
 	std::vector<tier_curve_override_config> curve_overrides;
 	std::vector<loot_grade_config> loot_grades;
 
-	// The four generosity layers (#73), all defaulting to 1.0. They live here
-	// so `reload tiers` moves them live for free - there is no restart-only
-	// term left anywhere in the drop chain.
+	// The generosity layers (#73) plus the reputation layer's shape (#88). They
+	// live here so `reload tiers` moves them live for free - there is no
+	// restart-only term left anywhere in the drop chain.
 	drop_multipliers generosity;
 	std::vector<enchant_category_config> enchant_categories;
 	std::vector<enchant_step_config> enchant_steps;

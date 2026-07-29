@@ -377,7 +377,7 @@ public:
 	void response_save_player_data_reply_handler(char * data, size_t msg_size);
 	void notice_handler();
 	bool read_notify_msg_list_file(const char * fn);
-	void set_player_reputation(int client_h, char * pMsg, char value, size_t msg_size);
+	void set_player_reputation(int client_h, const char * target_name, char value);
 	void check_day_or_night_mode();
 	int get_player_number_on_spot(short dX, short dY, char map_index, char range);
 	void restore_player_characteristics(int client_h);

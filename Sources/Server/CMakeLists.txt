@@ -61,6 +61,7 @@ set(SERVER_SOURCES
     GameCmdGoto.cpp
     GameCmdInvis.cpp
     GameCmdRegen.cpp
+    GameCmdRep.cpp
     GameCmdSaveAll.cpp
     GameCmdSpawn.cpp
     GameCmdThunder.cpp

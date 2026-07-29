@@ -10434,61 +10434,74 @@ void CGame::check_day_or_night_mode()
 	}
 }
 
-void CGame::set_player_reputation(int client_h, char* pMsg, char value, size_t msg_size)
+// The player-to-player reputation vote — `/rep+ <name>` and `/rep- <name>`.
+//
+// The handler itself was always a faithful port; what was missing until #88 is
+// that NOTHING CALLED IT. The original dispatched here from its `/rep+ `/`/rep- `
+// memcmp chain, which our port replaced with GameChatCommandManager without
+// carrying the two commands over. With no way in, rating could only ever ratchet
+// DOWN through the combat penalties (EntityManager -5, LootManager -10), so
+// positive reputation was unreachable.
+//
+// `target_name` is the BARE character name: the dispatcher has already stripped
+// the command word and any leading whitespace. The original took the second
+// strtok token because it was handed the whole "/rep+ Name" string; keeping that
+// here would read past the name and silently no-op on every vote.
+//
+// `value` is 1 to rate up, 0 to rate down, as the original encoded it.
+void CGame::set_player_reputation(int client_h, const char* target_name, char value)
 {
-	char   seps[] = "= \t\r\n";
-	char* token, name[hb::shared::limits::CharNameLen], buff[256];
-	
-
-	if (m_client_list[client_h] == 0) return;
-	if ((msg_size) <= 0) return;
+	if (m_client_list[client_h] == nullptr) return;
+	if (target_name == nullptr) return;
 	if (m_client_list[client_h]->m_level < 40) return;
 
+	// A voter still on cooldown, or one carrying player kills of their own, has
+	// no standing to rate anybody.
 	if ((m_client_list[client_h]->m_time_left_rating != 0) || (m_client_list[client_h]->m_player_kill_count != 0)) {
 		send_notify_msg(0, client_h, Notify::CannotRating, m_client_list[client_h]->m_time_left_rating, 0, 0, 0);
 		return;
 	}
-	else if (memcmp(m_client_list[client_h]->m_location, "NONE", 4) == 0) {
+	if (memcmp(m_client_list[client_h]->m_location, "NONE", 4) == 0) {
+		// No town affiliation, no vote.
 		send_notify_msg(0, client_h, Notify::CannotRating, 0, 0, 0, 0);
 		return;
 	}
 
-	std::memset(name, 0, sizeof(name));
-	std::memset(buff, 0, sizeof(buff));
-	memcpy(buff, pMsg, msg_size);
-
-	token = strtok(buff, seps);
-	token = strtok(NULL, seps);
-
-	if (token != 0) {
-		// token
-		if (strlen(token) > hb::shared::limits::CharNameLen - 1)
-			memcpy(name, token, hb::shared::limits::CharNameLen - 1);
-		else memcpy(name, token, strlen(token));
-
-		for(int i = 1; i < MaxClients; i++)
-			if ((m_client_list[i] != 0) && (hb_strnicmp(m_client_list[i]->m_char_name, name, hb::shared::limits::CharNameLen - 1) == 0)) {
-
-				if (i != client_h) {
-					if (value == 0)
-						m_client_list[i]->m_rating--;
-					else if (value == 1)
-						m_client_list[i]->m_rating++;
-
-					if (m_client_list[i]->m_rating > 500)  m_client_list[i]->m_rating = 500;
-					if (m_client_list[i]->m_rating < -500) m_client_list[i]->m_rating = -500;
-					m_client_list[client_h]->m_time_left_rating = 20 * 60;
-
-					send_notify_msg(0, i, Notify::RatingPlayer, value, 0, 0, name);
-					send_notify_msg(0, client_h, Notify::RatingPlayer, value, 0, 0, name);
-
-					return;
-				}
-			}
-		send_notify_msg(0, client_h, Notify::PlayerNotOnGame, 0, 0, 0, name);
+	// First word only, truncated to the wire's name width exactly as before.
+	// The terminator set matches the strtok separators this replaced, so a name
+	// arriving with a trailing newline still resolves rather than missing.
+	char name[hb::shared::limits::CharNameLen] = {};
+	for (size_t i = 0; i < hb::shared::limits::CharNameLen - 1; i++) {
+		const char c = target_name[i];
+		if (c == '\0' || c == ' ' || c == '\t' || c == '\r' || c == '\n') break;
+		name[i] = c;
 	}
+	if (name[0] == '\0') return;
 
-	return;
+	for(int i = 1; i < MaxClients; i++)
+		if ((m_client_list[i] != nullptr) && (hb_strnicmp(m_client_list[i]->m_char_name, name, hb::shared::limits::CharNameLen - 1) == 0)) {
+
+			// Nobody rates themselves. Character names are unique, so the
+			// original's "keep looking" fell through to PlayerNotOnGame — the
+			// same answer this break produces.
+			if (i == client_h) break;
+
+			if (value == 0)
+				m_client_list[i]->m_rating--;
+			else if (value == 1)
+				m_client_list[i]->m_rating++;
+
+			if (m_client_list[i]->m_rating > 500)  m_client_list[i]->m_rating = 500;
+			if (m_client_list[i]->m_rating < -500) m_client_list[i]->m_rating = -500;
+			// Seconds; check_client_response_time ticks it down at 1 Hz.
+			m_client_list[client_h]->m_time_left_rating = 20 * 60;
+
+			send_notify_msg(0, i, Notify::RatingPlayer, value, 0, 0, name);
+			send_notify_msg(0, client_h, Notify::RatingPlayer, value, 0, 0, name);
+			return;
+		}
+
+	send_notify_msg(0, client_h, Notify::PlayerNotOnGame, 0, 0, 0, name);
 }
 
 bool CGame::read_notify_msg_list_file(const char* fn)

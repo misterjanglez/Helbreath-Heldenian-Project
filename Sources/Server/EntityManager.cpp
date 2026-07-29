@@ -2632,8 +2632,13 @@ void CEntityManager::npc_dead_item_generator(int npc_h, short attacker_h, char a
 
 // One table, rolled roll_count times, its winnings placed where and when the
 // table says. Stage 2's old machinery — the flat 5% gate, guaranteed_secondary,
-// scatter_count, the rating modifier — is all gone: what survives is the table
-// properties any table may carry.
+// scatter_count — is all gone: what survives is the table properties any table
+// may carry.
+//
+// The rating modifier went with them in #73, having been wired to gate the
+// stage-2 drop outright. #88 brings it back where the original had it and where
+// ADR 0005 said it belonged: a layer of the generosity stack, scoped to the
+// categories a player farms for rather than to a stage.
 void CEntityManager::roll_drop_slot(int npc_h, short attacker_h, int stage_slot, int table_id)
 {
 	const hb::server::drop_table* table = m_game->m_item_manager->get_drop_table(table_id);
@@ -2641,11 +2646,22 @@ void CEntityManager::roll_drop_slot(int npc_h, short attacker_h, int stage_slot,
 	CNpc* npc = m_npc_list[npc_h];
 	if (npc == nullptr) return;
 
+	const hb::server::tier_config& tier_config = m_game->get_tier_config();
+
+	// The killer's reputation is the one per-player layer of the stack (#88):
+	// well-regarded players farm gear and uniques faster, outcasts slower, and
+	// everyone else — rating 0 — rolls exactly as authored. A kill with no live
+	// attacker record reads as neutral rather than as a penalty.
+	const int attacker_rating = (m_game->m_client_list[attacker_h] != nullptr)
+		? m_game->m_client_list[attacker_h]->m_rating : 0;
+	const double rep_factor =
+		tier_config.generosity.reputation_factor(attacker_rating);
+
 	// The generosity stack and proportional saturation, resolved through the
 	// same function the dropodds report calls, so the two cannot disagree.
 	std::vector<uint32_t> chances;
-	hb::server::resolve_drop_chances(*table, m_game->get_tier_config().generosity,
-		stage_slot, static_cast<uint8_t>(npc->m_loot_grade),
+	hb::server::resolve_drop_chances(*table, tier_config.generosity,
+		stage_slot, static_cast<uint8_t>(npc->m_loot_grade), rep_factor,
 		m_game->m_item_config_list, hb::server::config::MaxItemTypes, chances);
 
 	// How many times the table is rolled is an AUTHORED property, never touched

@@ -312,6 +312,15 @@ bool EnsureGameConfigDatabase(sqlite3** outDb, std::string& outPath, bool* outCr
         " multiplier REAL NOT NULL DEFAULT 1.0,"
         " PRIMARY KEY (scope, key)"
         ");"
+        // The reputation layer's shape (#88). Seeded rather than left implicit
+        // because these three do not default to 1.0 like every other row here,
+        // and the owner hand-edits this file — a knob nobody can see is a knob
+        // nobody turns. OR IGNORE preserves an operator's tuning.
+        // modifier 0 disables the layer; floor/cap bound the per-player factor.
+        "INSERT OR IGNORE INTO drop_multipliers(scope, key, multiplier) VALUES"
+        " ('reputation','modifier',5.0),"
+        " ('reputation','floor',0.25),"
+        " ('reputation','cap',2.0);"
         // Rarity is authored and reasoned about as "1 in N"; the column is ppb
         // so the guaranteed-table rule can be an exact integer equality. This
         // view is the readable half, for hand-editing gamedata.db.

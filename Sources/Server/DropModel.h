@@ -15,11 +15,16 @@
 // order. Readability is delivered as presentation instead: the
 // `drop_entries_readable` view and the dropodds report both print "1 in N".
 //
-// On top sit four GENEROSITY multipliers. Larger ppb is more likely, so they
+// On top sit five GENEROSITY multipliers. Larger ppb is more likely, so they
 // MULTIPLY — the superseded "1 in N" form divided, and inverting that is the
 // easiest mistake in this file:
 //
-//     effective_ppb = drop_chance_ppb x (global x stage x category x grade)
+//     effective_ppb = drop_chance_ppb x (global x stage x category x grade x rep)
+//
+// The first four are stored tuning knobs. `rep` is the odd one out: it is
+// per-player, computed from the killer's reputation, and applies only to the
+// gear and unique categories (#88). It is 1.0 for a neutral player, which is
+// everyone until they are voted on.
 //
 // They scale row rarity only, which shrinks a table's "nothing" remainder.
 // They never touch roll_count, so turning stage 2 up cannot make a scatter
@@ -144,10 +149,38 @@ struct drop_multipliers
 	double category[drop_category::count] = { 1.0, 1.0, 1.0, 1.0 };
 	double grade[max_grade + 1] = { 1.0, 1.0, 1.0, 1.0, 1.0, 1.0 };  // indexed 1..5
 
+	// The fifth layer is PER-PLAYER, so unlike the four above it is not a
+	// stored number but one computed per kill from the killer's reputation
+	// (#88). These three describe its shape and live in data like the rest.
+	//
+	// The original scaled its consumable/equipment split by
+	// `rating x m_cRepDropModifier`, clamped to +/-1000 against a 1000-wide
+	// window — which on the equipment side is exactly a 0.0..2.0 factor sitting
+	// at 1.0 for a neutral player. That curve is reproduced here and then
+	// floored: a pariah farms gear slowly rather than never, because a penalty
+	// players inflict on each other by vote must not be able to lock someone
+	// out of the reward loop outright (owner decision, #88).
+	//
+	// `reputation_modifier = 0` disables the layer entirely — the same escape
+	// hatch the original had, which 0-floored the config token.
+	double reputation_modifier = 5.0;    // the original's m_cRepDropModifier
+	double reputation_floor    = 0.25;
+	double reputation_cap      = 2.0;
+
+	// Exactly 1.0 at rating 0, so a world whose players have never voted rolls
+	// precisely as authored and this layer costs nothing until it is used.
+	double reputation_factor(int rating) const;
+
+	// Reputation moves what a player farms FOR and nothing else: gear and the
+	// named uniques. Gold and consumables drop at the ordinary rate no matter
+	// who lands the kill, so an outcast is slowed, never starved.
+	static bool reputation_applies(uint8_t category_id);
+
 	// The product for one row. Out-of-range stage/grade contribute 1.0 rather
 	// than reading off the end — a bad grade is the validator's error to
 	// report, not a crash here.
-	double product(int stage_slot, uint8_t category_id, uint8_t loot_grade) const;
+	double product(int stage_slot, uint8_t category_id, uint8_t loot_grade,
+		double rep_factor = 1.0) const;
 };
 
 // The generosity category of one drop row. `item_config` may be null (an
@@ -163,12 +196,18 @@ uint8_t drop_category_of(const CItem* item_config, int item_id);
 // share. A report that disagreed with the roller would be worse than no
 // report, so neither restates it.
 //
+// `rep_factor` is the killer's reputation layer, from
+// `drop_multipliers::reputation_factor`. It is deliberately NOT defaulted: it
+// silently changes rates, so every call site has to say whose reputation it
+// means, and `1.0` — the neutral player, and what the report shows unless
+// asked otherwise — has to be written down rather than inherited.
+//
 // `saturated` reports that the stack pushed the table past 1.0 and it was
 // scaled proportionally back — ratios intact, "nothing" at zero. Past that
 // point a multiplier increase is a no-op rather than a silent distortion.
 void resolve_drop_chances(const drop_table& table,
 	const drop_multipliers& multipliers,
-	int stage_slot, uint8_t loot_grade,
+	int stage_slot, uint8_t loot_grade, double rep_factor,
 	const CItem* const* item_configs, int item_config_count,
 	std::vector<uint32_t>& out_chances, bool* saturated = nullptr);
 

@@ -276,6 +276,36 @@ void check_loot_grades(const tier_config& config, validation_state& v)
 	}
 }
 
+// The per-player reputation layer (#88). Its three knobs are the one part of
+// the generosity stack where the neutral value is not 1.0, so a typo here
+// silently retunes every player in the world rather than just one lever.
+void check_reputation_layer(const tier_config& config, validation_state& v)
+{
+	// A negative modifier is not checked here: load_drop_multipliers rejects a
+	// negative value on ANY multiplier row before it reaches the struct, so the
+	// field can never hold one and a check here would be a dead branch.
+	const hb::server::drop_multipliers& m = config.generosity;
+
+	// A neutral player must roll exactly as authored. If the window excludes
+	// 1.0, rating 0 is silently scaled and every published drop rate is wrong.
+	if (m.reputation_floor > 1.0)
+		v.add("drop_multipliers reputation/floor: {} > 1.0 (a neutral player would get MORE than the authored rate)",
+			m.reputation_floor);
+	if (m.reputation_cap < 1.0)
+		v.add("drop_multipliers reputation/cap: {} < 1.0 (a neutral player would get LESS than the authored rate)",
+			m.reputation_cap);
+	if (m.reputation_floor > m.reputation_cap)
+		v.add("drop_multipliers reputation: floor {} exceeds cap {}",
+			m.reputation_floor, m.reputation_cap);
+
+	if (m.reputation_modifier == 0.0)
+		v.add_note("drop_multipliers reputation/modifier is 0 - the reputation layer is disabled and every player rolls at the authored rate");
+	else
+		v.add_note("drop_multipliers reputation: gear and unique rows scale x{:.2f}..x{:.2f} with the killer's rating, saturating at rating +/-{:.0f}",
+			m.reputation_factor(-500), m.reputation_factor(500),
+			1000.0 / m.reputation_modifier);
+}
+
 // Both modes: since cycle 3-F the enchant handler reads caps, per-step
 // success and destroy flags from these tables in legacy mode too, so an
 // unseeded world would silently stop enchanting. Fail the boot instead.
@@ -695,6 +725,7 @@ std::vector<std::string> validate_tier_config(const tier_config& config,
 	check_bucket_rules(config, v);
 	check_curves(config, v);
 	check_loot_grades(config, v);
+	check_reputation_layer(config, v);
 	check_enchant_tables(config, v);
 	check_attribute_pools(config, v);
 	check_legacy_item_coverage(config, context, v);

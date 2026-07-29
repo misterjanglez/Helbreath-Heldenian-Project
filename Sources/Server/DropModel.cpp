@@ -43,13 +43,43 @@ bool parse_drop_delay(const std::string& value, uint8_t& out)
 	return false;
 }
 
+// The original's arithmetic, read as a factor instead of a branch threshold:
+//
+//     dTmp1 = rating x m_cRepDropModifier, clamped to +/-1000
+//     equipment share = (1000 + dTmp1) / 10000, against a 1000-wide baseline
+//
+// so the equipment side moves 0.0 .. 2.0 around 1.0 at rating 0. Verified in
+// both archives (HB382_CENTUU Game.cpp:47347, HelbreathServer Game.cpp:48279).
+// The clamp is on the PRODUCT, not the rating, which is why it bites at
+// rating +/-200 when the modifier is 5 even though rating itself runs to +/-500.
+double drop_multipliers::reputation_factor(int rating) const
+{
+	double term = static_cast<double>(rating) * reputation_modifier;
+	if (term >  1000.0) term =  1000.0;
+	if (term < -1000.0) term = -1000.0;
+
+	double factor = 1.0 + term / 1000.0;
+
+	// Ours, not the original's: it let the equipment side reach exactly zero.
+	if (factor < reputation_floor) factor = reputation_floor;
+	if (factor > reputation_cap)   factor = reputation_cap;
+	return factor;
+}
+
+bool drop_multipliers::reputation_applies(uint8_t category_id)
+{
+	return category_id == drop_category::gear
+		|| category_id == drop_category::unique;
+}
+
 double drop_multipliers::product(int stage_slot, uint8_t category_id,
-	uint8_t loot_grade) const
+	uint8_t loot_grade, double rep_factor) const
 {
 	double result = global;
 	if (stage_slot >= 1 && stage_slot <= max_stage) result *= stage[stage_slot];
 	if (category_id < drop_category::count)         result *= category[category_id];
 	if (loot_grade >= 1 && loot_grade <= max_grade) result *= grade[loot_grade];
+	if (reputation_applies(category_id))            result *= rep_factor;
 	return result;
 }
 
@@ -76,7 +106,7 @@ uint8_t drop_category_of(const CItem* item_config, int item_id)
 
 void resolve_drop_chances(const drop_table& table,
 	const drop_multipliers& multipliers,
-	int stage_slot, uint8_t loot_grade,
+	int stage_slot, uint8_t loot_grade, double rep_factor,
 	const CItem* const* item_configs, int item_config_count,
 	std::vector<uint32_t>& out_chances, bool* saturated)
 {
@@ -93,7 +123,7 @@ void resolve_drop_chances(const drop_table& table,
 			? item_configs[entry.item_id] : nullptr;
 		const double scaled = static_cast<double>(entry.chance_ppb) *
 			multipliers.product(stage_slot,
-				drop_category_of(config, entry.item_id), loot_grade);
+				drop_category_of(config, entry.item_id), loot_grade, rep_factor);
 
 		// A single row can be pushed past the whole denominator on its own;
 		// clamping here keeps the sum below the uint64 range and lets the

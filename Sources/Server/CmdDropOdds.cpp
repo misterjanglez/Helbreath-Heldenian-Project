@@ -63,7 +63,7 @@ struct slot_odds
 
 // Resolve one slot through the roller's own arithmetic.
 slot_odds odds_of(const CGame& game, const tier_validation_context& context,
-	int table_id, int stage_slot, uint8_t loot_grade)
+	int table_id, int stage_slot, uint8_t loot_grade, double rep_factor)
 {
 	slot_odds odds;
 	if (context.drop_tables == nullptr) return odds;
@@ -73,7 +73,8 @@ slot_odds odds_of(const CGame& game, const tier_validation_context& context,
 
 	std::vector<uint32_t> chances;
 	hb::server::resolve_drop_chances(table, game.get_tier_config().generosity,
-		stage_slot, loot_grade, context.item_configs, context.item_config_count,
+		stage_slot, loot_grade, rep_factor,
+		context.item_configs, context.item_config_count,
 		chances, &odds.saturated);
 
 	for (size_t i = 0; i < chances.size(); i++)
@@ -173,7 +174,7 @@ std::string grade_label(const hb::server::tier_config& config, int grade)
 
 // The generosity stack, printed once so every number below is readable
 // against it. A stack of all 1.0 means "exactly as authored".
-void write_multiplier_stack(const hb::server::drop_multipliers& m)
+void write_multiplier_stack(const hb::server::drop_multipliers& m, int rating)
 {
 	hb::console::write(std::format(
 		"  generosity: global x{:.2f} | stage 1 x{:.2f}, stage 2 x{:.2f}",
@@ -187,16 +188,53 @@ void write_multiplier_stack(const hb::server::drop_multipliers& m)
 	for (int g = 1; g <= hb::server::drop_multipliers::max_grade; g++)
 		grades += std::format("{}{} x{:.2f}", grades.empty() ? "" : ", ", g, m.grade[g]);
 	hb::console::write("    grade: " + grades);
+
+	// The per-player layer. Spelled out even at the neutral default, because a
+	// reader who cannot see it has no way to know the figures below are for
+	// rating 0 rather than for everybody.
+	hb::console::write(std::format(
+		"    reputation: rating {} -> x{:.2f} on gear and unique rows{}",
+		rating, m.reputation_factor(rating),
+		rating == 0 ? " (neutral - the authored rate)" : ""));
+
 	hb::console::write(
-		"  effective_ppb = drop_chance_ppb x (global x stage x category x grade)"
+		"  effective_ppb = drop_chance_ppb x (global x stage x category x grade x rep)"
 		" - larger is MORE likely");
+}
+
+// `rating <n>` may trail any form of the command. Reputation is the one
+// per-player term in the stack, so the report has to be told whose kill it is
+// pricing; with no argument it prices a neutral player, which is what every
+// published figure in this project has always meant.
+//
+// Clamped to the vote system's own +/-500 so the report can never quote a
+// rating the game cannot produce.
+int parse_rating_suffix(const char* args, std::string& head)
+{
+	head = (args != nullptr) ? args : "";
+
+	// Last occurrence, and only on a word boundary — `dropodds npc Grating`
+	// must not be read as a rating argument.
+	const size_t at = head.rfind("rating");
+	if (at == std::string::npos) return 0;
+	if (at != 0 && head[at - 1] != ' ' && head[at - 1] != '\t') return 0;
+
+	int rating = 0;
+	std::sscanf(head.c_str() + at + 6, "%d", &rating);
+	head.erase(at);
+	while (!head.empty() && (head.back() == ' ' || head.back() == '\t'))
+		head.pop_back();
+
+	if (rating >  500) rating =  500;
+	if (rating < -500) rating = -500;
+	return rating;
 }
 
 // The per-monster per-item listing: every row of both slots as "1 in N", with
 // what is left over for "nothing". This is the view the owner asked for and
 // that no tool produced under the old model.
 void write_monster_rows(const CGame& game, const tier_validation_context& context,
-	int npc_id, const CNpc& npc)
+	int npc_id, const CNpc& npc, double rep_factor)
 {
 	hb::console::write("");
 	hb::console::write(std::format("{} '{}' - loot grade {}", npc_id,
@@ -218,7 +256,7 @@ void write_monster_rows(const CGame& game, const tier_validation_context& contex
 		std::vector<uint32_t> chances;
 		bool saturated = false;
 		hb::server::resolve_drop_chances(table, game.get_tier_config().generosity,
-			slot + 1, static_cast<uint8_t>(npc.m_loot_grade),
+			slot + 1, static_cast<uint8_t>(npc.m_loot_grade), rep_factor,
 			context.item_configs, context.item_config_count, chances, &saturated);
 
 		std::string header = std::format("  stage {}: table {} '{}'", slot + 1,
@@ -280,14 +318,21 @@ void CmdDropOdds::execute(CGame* game, const char* args)
 	const hb::server::tier_config& config = game->get_tier_config();
 	const bool tiered = config.item_system == item_system_mode::tiered;
 
+	// Strip the optional trailing `rating <n>` before anything else parses args,
+	// so it composes with every form of the command.
+	std::string head;
+	const int rating = parse_rating_suffix(args, head);
+	const double rep_factor = config.generosity.reputation_factor(rating);
+	args = head.c_str();
+
 	// ---- dropodds npc <id|name>: the per-item rarity listing ---------------
-	if (args != nullptr && std::strncmp(args, "npc", 3) == 0)
+	if (std::strncmp(args, "npc", 3) == 0)
 	{
 		const char* which = args + 3;
 		while (*which == ' ') which++;
 		if (*which == '\0')
 		{
-			hb::console::error("Usage: dropodds npc <npc_id|name>");
+			hb::console::error("Usage: dropodds npc <npc_id|name> [rating <n>]");
 			return;
 		}
 		int wanted = -1;
@@ -295,7 +340,7 @@ void CmdDropOdds::execute(CGame* game, const char* args)
 
 		hb::console::write(std::format("dropodds: item_system = {}",
 			item_system_mode_name(config.item_system)), console_color::bright);
-		write_multiplier_stack(config.generosity);
+		write_multiplier_stack(config.generosity, rating);
 
 		int listed = 0;
 		for (int id = 0; id < context.npc_config_count; id++)
@@ -303,7 +348,7 @@ void CmdDropOdds::execute(CGame* game, const char* args)
 			const CNpc* npc = context.npc_configs[id];
 			if (npc == nullptr) continue;
 			if (id != wanted && hb_stricmp(npc->m_npc_name, which) != 0) continue;
-			write_monster_rows(*game, context, id, *npc);
+			write_monster_rows(*game, context, id, *npc, rep_factor);
 			listed++;
 		}
 		if (listed == 0)
@@ -312,11 +357,11 @@ void CmdDropOdds::execute(CGame* game, const char* args)
 	}
 
 	int grade_filter = 0;
-	if (args != nullptr && args[0] != '\0' &&
+	if (args[0] != '\0' &&
 		(std::sscanf(args, "%d", &grade_filter) != 1 ||
 			grade_filter < 1 || grade_filter > loot_grade_count))
 	{
-		hb::console::error("Usage: dropodds [grade 1-{}] | dropodds npc <id|name>",
+		hb::console::error("Usage: dropodds [grade 1-{}] [rating <n>] | dropodds npc <id|name> [rating <n>]",
 			static_cast<int>(loot_grade_count));
 		return;
 	}
@@ -352,7 +397,7 @@ void CmdDropOdds::execute(CGame* game, const char* args)
 		if (npc->m_stage1_table_id == 0) { r.npcs_without_table++; continue; }
 
 		const slot_odds odds = odds_of(*game, context, npc->m_stage1_table_id, 1,
-			static_cast<uint8_t>(grade));
+			static_cast<uint8_t>(grade), rep_factor);
 		r.anything_sum += odds.anything;
 		r.any_item_sum += odds.any_item;
 		r.gear_sum += odds.gear;
@@ -367,7 +412,7 @@ void CmdDropOdds::execute(CGame* game, const char* args)
 	hb::console::write(std::format("dropodds: item_system = {} ({} roll strategy in force)",
 		item_system_mode_name(config.item_system),
 		tiered ? "the tiered" : "the legacy"), console_color::bright);
-	write_multiplier_stack(config.generosity);
+	write_multiplier_stack(config.generosity, rating);
 	hb::console::write(
 		"  every figure below is an ABSOLUTE per-kill chance read off the drop");
 	hb::console::write(
@@ -513,7 +558,7 @@ void CmdDropOdds::execute(CGame* game, const char* args)
 			if (hb::server::npc_type_never_drops(npc->m_type)) continue;
 
 			const slot_odds s = odds_of(*game, context, npc->m_stage1_table_id, 1,
-				static_cast<uint8_t>(grade_filter));
+				static_cast<uint8_t>(grade_filter), rep_factor);
 			hb::console::write(std::format("  {:>5}  {:<26}{:>8}{:>8}{:>12}{:>12}{:>10}",
 				id, npc->m_npc_name, npc->m_stage1_table_id, npc->m_stage2_table_id,
 				pct(s.anything), pct(s.gear), one_in(s.gear)));
@@ -522,8 +567,13 @@ void CmdDropOdds::execute(CGame* game, const char* args)
 
 	// ---- machine-readable -------------------------------------------------
 	const hb::server::drop_multipliers& m = config.generosity;
-	hb::console::write(std::format("DROPODDS MODE {} {:.2f} {:.2f} {:.2f}",
-		item_system_mode_name(config.item_system), m.global, m.stage[1], m.stage[2]));
+	// The rating and its resolved factor ride the MODE line so a diff of two
+	// runs shows which player the figures below were priced for. #73's baseline
+	// had no such fields; the gate this feeds is Windows-vs-Linux agreement on
+	// the same invocation, not agreement with an older format.
+	hb::console::write(std::format("DROPODDS MODE {} {:.2f} {:.2f} {:.2f} {} {:.2f}",
+		item_system_mode_name(config.item_system), m.global, m.stage[1], m.stage[2],
+		rating, rep_factor));
 	for (int grade = first_grade; grade <= last_grade; grade++)
 	{
 		std::string line = std::format("DROPODDS GRADE {} {} {} {}", grade,

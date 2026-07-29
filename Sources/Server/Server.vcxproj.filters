@@ -172,6 +172,9 @@
     <ClInclude Include="GameCmdRegen.h">
       <Filter>Game Chat\Commands</Filter>
     </ClInclude>
+    <ClInclude Include="GameCmdRep.h">
+      <Filter>Game Chat\Commands</Filter>
+    </ClInclude>
     <ClInclude Include="GameCmdSpawn.h">
       <Filter>Game Chat\Commands</Filter>
     </ClInclude>
@@ -602,6 +605,9 @@
       <Filter>Game Chat\Commands</Filter>
     </ClCompile>
     <ClCompile Include="GameCmdRegen.cpp">
+      <Filter>Game Chat\Commands</Filter>
+    </ClCompile>
+    <ClCompile Include="GameCmdRep.cpp">
       <Filter>Game Chat\Commands</Filter>
     </ClCompile>
     <ClCompile Include="GameCmdSpawn.cpp">

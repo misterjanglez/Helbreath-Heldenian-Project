@@ -234,6 +234,7 @@
     <ClInclude Include="GameCmdUnblock.h" />
     <ClInclude Include="GameCmdGM.h" />
     <ClInclude Include="GameCmdRegen.h" />
+    <ClInclude Include="GameCmdRep.h" />
     <ClInclude Include="GameCmdCreateItem.h" />
     <ClInclude Include="GameCmdGiveItem.h" />
     <ClInclude Include="GameCmdSpawn.h" />
@@ -379,6 +380,7 @@
     <ClCompile Include="GameCmdUnblock.cpp" />
     <ClCompile Include="GameCmdGM.cpp" />
     <ClCompile Include="GameCmdRegen.cpp" />
+    <ClCompile Include="GameCmdRep.cpp" />
     <ClCompile Include="GameCmdCreateItem.cpp" />
     <ClCompile Include="GameCmdGiveItem.cpp" />
     <ClCompile Include="GameCmdSpawn.cpp" />
