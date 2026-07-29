@@ -35,6 +35,16 @@ inline bool npc_type_never_drops(short npc_type)
 	return npc_type == 21 || npc_type == 34 || npc_type == 64;
 }
 
+// Whether a hit on the gold roll actually places gold. The preempt above is
+// conditional on this: a monster with no gold dice spends its gold roll on
+// nothing and falls through to the stage-1 item roll at full rate. The pipeline
+// guards its gold spawn with this and the report prices the preempt with it, so
+// the two cannot disagree about which monsters are preempted at all.
+inline bool npc_places_gold(const CNpc& npc)
+{
+	return npc.m_gold_dice_min > 0 || npc.m_gold_dice_max > 0;
+}
+
 // A base chance out of 10000 scaled by its server_config.json drop-rate
 // multiplier and clamped back into 0..10000. Shared with the report for the
 // same reason as the constants above.

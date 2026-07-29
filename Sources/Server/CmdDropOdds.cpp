@@ -1,12 +1,13 @@
 // CmdDropOdds.cpp: effective drop-odds report (Item Tiers #66)
 //
 // "How often does a player see tiered gear" was not a number anywhere in
-// the system: it is the product of a base gold chance, two server_config
-// multipliers, a per-grade first_drop_chance, the gear share of whichever
-// stage-1 drop table the monster uses, and a per-grade tier weight — spread
-// across a C++ constant, server_config.json and two database tables. This
-// command multiplies the chain out from the RUNNING config and prints it,
-// so tuning is arithmetic instead of a few hundred kills of guesswork.
+// the system: it is the product of a base gold chance that preempts only the
+// monsters carrying gold dice, two server_config multipliers, a per-grade
+// first_drop_chance, the gear share of whichever stage-1 drop table the
+// monster uses, and a per-grade tier weight — spread across a C++ constant,
+// server_config.json and two database tables. This command multiplies the
+// chain out from the RUNNING config and prints it, so tuning is arithmetic
+// instead of a few hundred kills of guesswork.
 //
 // Every term is read live (loot_grades, npc_configs, drop tables, the
 // server multipliers), so `reload tiers` / `reload npcs` / `reload config`
@@ -82,6 +83,10 @@ struct grade_rollup
 {
 	int npcs = 0;
 	int npcs_without_table = 0;
+	int npcs_without_gold = 0;
+	// Each addend is one monster's table share already scaled by ITS OWN gold
+	// preempt, because the preempt is conditional on the monster having gold
+	// dice (#72) — a term that cannot be factored back out of the sum.
 	double any_item_sum = 0.0;
 	double gear_sum = 0.0;
 	std::set<int> tables;
@@ -173,11 +178,18 @@ void CmdDropOdds::execute(CGame* game, const char* args)
 	const bool tiered = config.item_system == item_system_mode::tiered;
 
 	// Term 1: the gold preempt. A gold drop skips the stage-1 item roll
-	// entirely (npc_dead_item_generator), so every figure below is scaled
-	// by the chance gold misses.
+	// entirely (npc_dead_item_generator) — but only when gold is actually
+	// placed, so this is a per-monster term rather than a constant scaling
+	// everything below: a monster with no gold dice spends the roll on nothing
+	// and reaches the item roll at full rate. The chance is global; which
+	// monsters pay it is not.
 	const double gold = hb::server::apply_drop_multiplier(
 		hb::server::base_gold_drop_chance, game->m_gold_drop_rate) / 10000.0;
 	const double no_gold = 1.0 - gold;
+	const auto reaches_item_roll = [no_gold](bool places_gold)
+	{
+		return places_gold ? no_gold : 1.0;
+	};
 
 	// Term 2: the strategy's own base chance for a grade, times the server
 	// multiplier — asked of the strategy, so legacy's flat base and tiered's
@@ -214,6 +226,8 @@ void CmdDropOdds::execute(CGame* game, const char* args)
 
 		grade_rollup& r = rollup[grade];
 		r.npcs++;
+		const bool places_gold = hb::server::npc_places_gold(*npc);
+		if (!places_gold) r.npcs_without_gold++;
 
 		const auto table = context.drop_tables->find(npc->m_drop_table_id);
 		if (table == context.drop_tables->end()) { r.npcs_without_table++; continue; }
@@ -221,10 +235,19 @@ void CmdDropOdds::execute(CGame* game, const char* args)
 		auto [entry, inserted] = shares.try_emplace(table->first);
 		if (inserted) entry->second = shares_of(table->second, context);
 
-		r.any_item_sum += entry->second.any_item;
-		r.gear_sum += entry->second.gear;
+		const double reaches = reaches_item_roll(places_gold);
+		r.any_item_sum += reaches * entry->second.any_item;
+		r.gear_sum += reaches * entry->second.gear;
 		r.tables.insert(table->first);
 		table_grades[table->first].insert(grade);
+	}
+
+	int priced_npcs = 0;
+	int npcs_without_gold = 0;
+	for (int grade = 1; grade <= loot_grade_count; grade++)
+	{
+		priced_npcs += rollup[grade].npcs;
+		npcs_without_gold += rollup[grade].npcs_without_gold;
 	}
 
 	// ---- header ---------------------------------------------------------
@@ -235,14 +258,19 @@ void CmdDropOdds::execute(CGame* game, const char* args)
 		"  server_config.json drop_rates: primary x{:.2f}, gold x{:.2f}",
 		game->m_primary_drop_rate, game->m_gold_drop_rate));
 	hb::console::write(std::format(
-		"  gold preempt {} - a gold drop skips the stage-1 item roll", pct(gold)));
+		"  gold preempt {} - a gold drop skips the stage-1 item roll, but ONLY for the",
+		pct(gold)));
+	hb::console::write(std::format(
+		"  {} monsters that carry gold dice; the other {} spend the roll on nothing and",
+		priced_npcs - npcs_without_gold, npcs_without_gold));
+	hb::console::write("  reach the item roll at full rate, so the preempt is priced per monster");
 	hb::console::write(
 		"  stage 1 (on death) is the only venue that tier-rolls; stage-2 corpse-decay");
 	hb::console::write(
 		"  drops never do (spec S8), so nothing below counts them");
 	hb::console::write(std::format(
 		"  per-grade figures average over the {} npc_configs that can drop, one vote each -",
-		rollup[1].npcs + rollup[2].npcs + rollup[3].npcs + rollup[4].npcs + rollup[5].npcs));
+		priced_npcs));
 	hb::console::write(std::format(
 		"  NOT weighted by spawn counts or kill rates ({} guard/dummy/crop configs never",
 		never_drop_configs));
@@ -280,9 +308,9 @@ void CmdDropOdds::execute(CGame* game, const char* args)
 		const tier_split split(config.find_loot_grade(static_cast<uint8_t>(grade)));
 
 		const double first = first_roll(grade);
-		const double roll = no_gold * first;
-		const double any_item = r.npcs > 0 ? roll * r.any_item_sum / r.npcs : 0.0;
-		const double gear = r.npcs > 0 ? roll * r.gear_sum / r.npcs : 0.0;
+		// The gold preempt is already inside the sums, one monster at a time.
+		const double any_item = r.npcs > 0 ? first * r.any_item_sum / r.npcs : 0.0;
+		const double gear = r.npcs > 0 ? first * r.gear_sum / r.npcs : 0.0;
 		any_odds[grade] = any_item;
 		gear_odds[grade] = gear;
 
@@ -299,6 +327,10 @@ void CmdDropOdds::execute(CGame* game, const char* args)
 			hb::console::write(std::format(
 				"      ({} of them have no drop table and never drop anything)",
 				r.npcs_without_table), console_color::muted);
+		if (r.npcs_without_gold > 0)
+			hb::console::write(std::format(
+				"      ({} of them have no gold dice, so nothing preempts their item roll)",
+				r.npcs_without_gold), console_color::muted);
 	}
 
 	hb::console::write("");
@@ -369,11 +401,12 @@ void CmdDropOdds::execute(CGame* game, const char* args)
 		hb::console::write("");
 		hb::console::write(std::format("Monsters at grade {} (exact, per monster):",
 			grade_label(config, grade_filter)), console_color::info);
-		hb::console::write(std::format("  {:>5}  {:<26}{:>7}{:>13}{:>13}{:>10}",
-			"npc", "name", "table", "gear share", "gear/kill", "1 in N"),
+		hb::console::write(std::format("  {:>5}  {:<26}{:>7}{:>10}{:>13}{:>13}{:>10}",
+			"npc", "name", "table", "preempt", "gear share", "gear/kill", "1 in N"),
 			console_color::muted);
 
 		const double first = first_roll(grade_filter);
+		const std::string gold_text = pct(gold);
 
 		for (int id = 0; id < context.npc_config_count; id++)
 		{
@@ -384,10 +417,14 @@ void CmdDropOdds::execute(CGame* game, const char* args)
 			const auto table = context.drop_tables->find(npc->m_drop_table_id);
 			const double share = table != context.drop_tables->end()
 				? shares[table->first].gear : 0.0;
-			const double gear = no_gold * first * share;
+			// A dash in the preempt column is the whole defect, per monster:
+			// no gold dice, so the gold roll costs this monster nothing.
+			const bool places_gold = hb::server::npc_places_gold(*npc);
+			const double gear = reaches_item_roll(places_gold) * first * share;
 
-			hb::console::write(std::format("  {:>5}  {:<26}{:>7}{:>13}{:>13}{:>10}",
+			hb::console::write(std::format("  {:>5}  {:<26}{:>7}{:>10}{:>13}{:>13}{:>10}",
 				id, npc->m_npc_name, npc->m_drop_table_id,
+				places_gold ? gold_text : std::string("-"),
 				pct(share), pct(gear), one_in(gear)));
 		}
 	}
@@ -402,6 +439,10 @@ void CmdDropOdds::execute(CGame* game, const char* args)
 			rollup[grade].npcs, raw(any_odds[grade]), raw(gear_odds[grade]));
 		for (int tier = 0; tier < tier_count; tier++)
 			line += " " + raw(tier_odds[grade][tier]);
+		// Trailing count: the monsters at this grade the gold preempt does not
+		// apply to. Without it the odds above cannot be rederived from the
+		// DROPODDS MODE gold chance and the per-table shares.
+		line += " " + std::to_string(rollup[grade].npcs_without_gold);
 		hb::console::write(line);
 
 		const tier_split split(config.find_loot_grade(static_cast<uint8_t>(grade)));

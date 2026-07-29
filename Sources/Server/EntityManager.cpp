@@ -2636,7 +2636,10 @@ void CEntityManager::npc_dead_item_generator(int npc_h, short attacker_h, char a
 		int maxGold = static_cast<int>(m_npc_list[npc_h]->m_gold_dice_max);
 		if (minGold < 0) minGold = 0;
 		if (maxGold < minGold) maxGold = minGold;
-		if (maxGold > 0) {
+		// Only a monster with gold dice places anything here, and only a placed
+		// gold drop preempts the item roll below - so this is the predicate the
+		// dropodds report has to price the preempt with (EntityManager.h).
+		if (hb::server::npc_places_gold(*m_npc_list[npc_h])) {
 			int amount = minGold;
 			if (maxGold > minGold) {
 				amount = m_game->dice(1, (maxGold - minGold)) + minGold;

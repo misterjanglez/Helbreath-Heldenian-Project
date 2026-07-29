@@ -7,8 +7,9 @@ the shipped gamedata.db so options can be costed against real numbers on a
 workstation. It deliberately mirrors, term for term:
 
   Server/EntityManager.h        base_gold_drop_chance, apply_drop_multiplier,
-                                npc_type_never_drops
-  Server/EntityManager.cpp      npc_dead_item_generator (gold preempt ordering)
+                                npc_type_never_drops, npc_places_gold
+  Server/EntityManager.cpp      npc_dead_item_generator (gold preempt ordering,
+                                and that it fires only when gold is placed)
   Shared/Item/ModifierIds.h     derive_tier_item_class
   Shared/Item/ItemEnums.h       is_special_item
   Server/CmdDropOdds.cpp        shares_of, the per-grade rollup, the chain
@@ -152,8 +153,8 @@ def main():
 
 	shares = {tid: shares_of(rows, gear) for tid, rows in entries.items()}
 
-	rollup = {g: dict(npcs=0, no_table=0, any_sum=0.0, gear_sum=0.0, gold_sum=0.0,
-		cons_sum=0.0, tables=set(), gear_shares=[]) for g in grades}
+	rollup = {g: dict(npcs=0, no_table=0, no_gold=0, any_sum=0.0, gear_sum=0.0,
+		gold_sum=0.0, cons_sum=0.0, tables=set(), gear_shares=[]) for g in grades}
 	never, ungraded = 0, []
 	table_grades = {}
 
@@ -167,15 +168,22 @@ def main():
 			continue
 		r = rollup[g]
 		r["npcs"] += 1
+		# The gold preempt is conditional on the monster having gold dice: without
+		# them the gold roll places nothing and the item roll runs at full rate
+		# (npc_places_gold, EntityManager.h — issue #72).
+		places_gold = npc["gold_min"] > 0 or npc["gold_max"] > 0
+		if not places_gold:
+			r["no_gold"] += 1
+		reaches = no_gold if places_gold else 1.0
 		tid = npc["drop_table_id"]
 		if tid not in shares:
 			r["no_table"] += 1
 			continue
 		s = shares[tid]
-		r["any_sum"] += s["any_item"]
-		r["gear_sum"] += s["gear"]
-		r["gold_sum"] += s["gold"]
-		r["cons_sum"] += s["consumable"]
+		r["any_sum"] += reaches * s["any_item"]
+		r["gear_sum"] += reaches * s["gear"]
+		r["gold_sum"] += reaches * s["gold"]
+		r["cons_sum"] += reaches * s["consumable"]
 		r["tables"].add(tid)
 		r["gear_shares"].append(s["gear"])
 		table_grades.setdefault(tid, set()).add(g)
@@ -186,9 +194,14 @@ def main():
 	def one_in(p):
 		return "-" if p <= 0 else f"{1 / p:,.0f}"
 
+	priced = sum(r["npcs"] for r in rollup.values())
+	without_gold = sum(r["no_gold"] for r in rollup.values())
+
 	print(f"dropodds (offline replica) - db {DB.relative_to(ROOT)}")
 	print(f"  drop_rates: primary x{args.primary:.2f}, gold x{args.gold:.2f}")
-	print(f"  gold preempt {pct(gold_chance)} - a gold drop skips the stage-1 item roll")
+	print(f"  gold preempt {pct(gold_chance)} - a gold drop skips the stage-1 item roll,")
+	print(f"  but only for the {priced - without_gold} monsters with gold dice; "
+		f"the other {without_gold} reach it at full rate")
 	print(f"  {never} guard/dummy/crop configs never drop and are excluded")
 	for npc in ungraded:
 		print(f"  NOT PRICED - npc {npc['npc_id']} '{npc['name']}' grade {npc['loot_grade']}")
@@ -203,12 +216,12 @@ def main():
 	for g in sorted(grades):
 		r, cfg = rollup[g], grades[g]
 		first = apply_drop_multiplier(cfg["first_drop_chance"], args.primary) / 10000.0
-		roll = no_gold * first
+		# The gold preempt is already inside the sums, one monster at a time.
 		n = max(r["npcs"], 1)
-		any_item = roll * r["any_sum"] / n
-		gear_odds = roll * r["gear_sum"] / n
-		gold_row = roll * r["gold_sum"] / n
-		cons = roll * r["cons_sum"] / n
+		any_item = first * r["any_sum"] / n
+		gear_odds = first * r["gear_sum"] / n
+		gold_row = first * r["gold_sum"] / n
+		cons = first * r["cons_sum"] / n
 		weights = [cfg["weight_common"], cfg["weight_rare"], cfg["weight_epic"],
 			cfg["weight_legendary"]]
 		total_w = sum(weights)
@@ -220,7 +233,7 @@ def main():
 			first_drop_chance=cfg["first_drop_chance"], any_item=any_item,
 			gold_row=gold_row, consumable=cons, gear=gear_odds,
 			common=tiers[0], rare=tiers[1], epic=tiers[2], legendary=tiers[3],
-			tables=len(r["tables"])))
+			tables=len(r["tables"]), npcs_without_gold=r["no_gold"]))
 
 	print()
 	print("Same odds as kills per outcome (1 in N):")
