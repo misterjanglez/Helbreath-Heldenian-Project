@@ -123,8 +123,20 @@ void inventory_manager::erase_item(int item_id)
 		}
 	// ItemList
 	m_game->m_player->m_item_list[item_id].reset();
-	m_game->m_is_item_equipped[item_id] = false;
+	// The slot is gone, so no equip position may still name it — a leftover
+	// entry would be dereferenced as a live item the next time that slot is
+	// unequipped.
+	release_equipment_slots(item_id);
 	unlock_item(item_id);
+}
+
+void inventory_manager::release_equipment_slots(int item_id)
+{
+	if (item_id < 0 || item_id >= hb::shared::limits::MaxItems) return;
+	for (int pos = 0; pos < hb::shared::item::DEF_MAXITEMEQUIPPOS; pos++)
+		if (m_game->m_item_equipment_status[pos] == item_id)
+			m_game->m_item_equipment_status[pos] = -1;
+	m_game->m_is_item_equipped[item_id] = false;
 }
 
 bool inventory_manager::check_item_operation_enabled(int item_id)
@@ -159,27 +171,37 @@ void inventory_manager::unequip_slot(int equip_pos)
 {
 	if (equip_pos < 0 || equip_pos >= hb::shared::item::DEF_MAXITEMEQUIPPOS) return;
 	std::string G_cTxt;
-	if (m_game->m_item_equipment_status[equip_pos] < 0) return;
+	const short item_id = m_game->m_item_equipment_status[equip_pos];
+	if (item_id < 0) return;
+	// A slot can outlive the item it names — the item is erased (dropped, given
+	// away, depleted) while the equip status still points at it. Drop the stale
+	// entry rather than dereferencing an empty inventory slot.
+	if (item_id >= hb::shared::limits::MaxItems || m_game->m_player->m_item_list[item_id] == nullptr)
+	{
+		m_game->m_item_equipment_status[equip_pos] = -1;
+		return;
+	}
+
+	CItem* item = m_game->m_player->m_item_list[item_id].get();
 	// Remove Angelic Stats
-	CItem* cfg_eq = m_game->get_item_config(m_game->m_player->m_item_list[m_game->m_item_equipment_status[equip_pos]]->m_id_num);
-	if ((equip_pos >= 11)
+	CItem* cfg_eq = m_game->get_item_config(item->m_id_num);
+	if ((equip_pos >= to_int(EquipPos::LeftFinger))
 		&& (cfg_eq && cfg_eq->get_item_type() == hb::shared::item::item_type::equipment))
 	{
-		short item_id = m_game->m_item_equipment_status[equip_pos];
-		if (m_game->m_player->m_item_list[item_id]->m_id_num == hb::shared::item::ItemId::AngelicPendantSTR)
+		if (item->m_id_num == hb::shared::item::ItemId::AngelicPendantSTR)
 			m_game->m_player->m_angelic_str = 0;
-		else if (m_game->m_player->m_item_list[item_id]->m_id_num == hb::shared::item::ItemId::AngelicPendantDEX)
+		else if (item->m_id_num == hb::shared::item::ItemId::AngelicPendantDEX)
 			m_game->m_player->m_angelic_dex = 0;
-		else if (m_game->m_player->m_item_list[item_id]->m_id_num == hb::shared::item::ItemId::AngelicPendantINT)
+		else if (item->m_id_num == hb::shared::item::ItemId::AngelicPendantINT)
 			m_game->m_player->m_angelic_int = 0;
-		else if (m_game->m_player->m_item_list[item_id]->m_id_num == hb::shared::item::ItemId::AngelicPendantMAG)
+		else if (item->m_id_num == hb::shared::item::ItemId::AngelicPendantMAG)
 			m_game->m_player->m_angelic_mag = 0;
 	}
 
-	auto itemInfo2 = item_name_formatter::get().format(m_game->m_player->m_item_list[m_game->m_item_equipment_status[equip_pos]].get());
+	auto itemInfo2 = item_name_formatter::get().format(item);
 	G_cTxt = std::format(ITEM_EQUIPMENT_RELEASED, itemInfo2.name.c_str());
 	m_game->add_event_list(G_cTxt.c_str(), 10);
-	m_game->m_is_item_equipped[m_game->m_item_equipment_status[equip_pos]] = false;
+	m_game->m_is_item_equipped[item_id] = false;
 	m_game->m_item_equipment_status[equip_pos] = -1;
 }
 
@@ -191,7 +213,9 @@ void inventory_manager::equip_item(int item_id)
 	if (m_game->m_is_item_equipped[item_id] == true) return;
 	CItem* cfg = m_game->get_item_config(m_game->m_player->m_item_list[item_id]->m_id_num);
 	if (!cfg) return;
-	if (cfg->get_equip_pos() == EquipPos::None)
+	// The equip position indexes m_item_equipment_status, so a config carrying a
+	// position outside the slot table must not reach the write below.
+	if (cfg->m_equip_pos <= to_int(EquipPos::None) || cfg->m_equip_pos >= hb::shared::item::DEF_MAXITEMEQUIPPOS)
 	{
 		m_game->add_event_list(BITEMDROP_CHARACTER3, 10);
 		return;

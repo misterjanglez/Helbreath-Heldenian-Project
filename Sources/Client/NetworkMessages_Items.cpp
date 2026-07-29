@@ -349,8 +349,7 @@ namespace NetworkMessageHandlers {
 		auto itemInfo = item_name_formatter::get().format(game->m_player->m_item_list[item_index].get());
 		txt = std::format(NOTIFYMSG_ITEM_DURABILITY_END1, itemInfo.name.c_str());
 		game->add_event_list(txt.c_str(), 10);
-		game->m_item_equipment_status[game->m_player->m_item_list[item_index]->m_equip_pos] = -1;
-		game->m_is_item_equipped[item_index] = false;
+		inventory_manager::get().release_equipment_slots(item_index);
 		game->m_player->m_item_list[item_index]->m_instance.cur_durability = 0;
 
 		audio_manager::get().play_game_sound(sound_type::effect, 10, 0);
@@ -372,8 +371,7 @@ namespace NetworkMessageHandlers {
 		auto itemInfo2 = item_name_formatter::get().format(game->m_player->m_item_list[item_index].get());
 		txt = std::format(ITEM_EQUIPMENT_RELEASED, itemInfo2.name.c_str());
 		game->add_event_list(txt.c_str(), 10);
-		game->m_is_item_equipped[item_index] = false;
-		game->m_item_equipment_status[game->m_player->m_item_list[item_index]->m_equip_pos] = -1;
+		inventory_manager::get().release_equipment_slots(item_index);
 
 		{
 			short id = game->m_player->m_item_list[item_index]->m_id_num;
@@ -426,8 +424,7 @@ namespace NetworkMessageHandlers {
 			txt = std::format(ITEM_EQUIPMENT_RELEASED, itemInfo3.name.c_str());
 			game->add_event_list(txt.c_str(), 10);
 
-			if (cfg) game->m_item_equipment_status[cfg->m_equip_pos] = -1;
-			game->m_is_item_equipped[item_index] = false;
+			inventory_manager::get().release_equipment_slots(item_index);
 		}
 
 		if (cfg && (cfg->is_stackable())) {
@@ -485,8 +482,7 @@ namespace NetworkMessageHandlers {
 		{
 			txt = std::format(ITEM_EQUIPMENT_RELEASED, itemInfo4.name.c_str());
 			game->add_event_list(txt.c_str(), 10);
-			game->m_item_equipment_status[game->m_player->m_item_list[item_index]->m_equip_pos] = -1;
-			game->m_is_item_equipped[item_index] = false;
+			inventory_manager::get().release_equipment_slots(item_index);
 		}
 		if (game->m_player->m_hp > 0)
 		{
@@ -531,8 +527,7 @@ namespace NetworkMessageHandlers {
 			txt = std::format(ITEM_EQUIPMENT_RELEASED, item_name);
 			game->add_event_list(txt.c_str(), 10);
 
-			if (cfg) game->m_item_equipment_status[cfg->m_equip_pos] = -1;
-			game->m_is_item_equipped[item_index] = false;
+			inventory_manager::get().release_equipment_slots(item_index);
 		}
 		if (name[0] == 0) txt = std::format(NOTIFYMSG_GIVEITEMFIN_ERASEITEM2, amount, item_name);
 		else {

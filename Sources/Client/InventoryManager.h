@@ -33,6 +33,11 @@ public:
 	void unequip_slot(int equip_pos);
 	void equip_item(int item_id);
 
+	// Clears every equip slot that points at item_id and marks it unequipped.
+	// Sweeping by item id is authoritative — callers do not have to work out
+	// which slot the item occupied.
+	void release_equipment_slots(int item_id);
+
 private:
 	inventory_manager() = default;
 	CGame* m_game = nullptr;
