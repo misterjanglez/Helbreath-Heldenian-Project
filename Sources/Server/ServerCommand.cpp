@@ -5,6 +5,7 @@
 #include "CmdBroadcast.h"
 #include "CmdDropOdds.h"
 #include "CmdGiveItem.h"
+#include "CmdLedgerCheck.h"
 #include "CmdMintCheck.h"
 #include "CmdSerialCheck.h"
 #include "CmdReload.h"
@@ -88,6 +89,7 @@ void ServerCommandManager::register_built_in_commands()
 	register_command(std::make_unique<CmdBroadcast>());
 	register_command(std::make_unique<CmdDropOdds>());
 	register_command(std::make_unique<CmdGiveItem>());
+	register_command(std::make_unique<CmdLedgerCheck>());
 	register_command(std::make_unique<CmdMintCheck>());
 	register_command(std::make_unique<CmdSerialCheck>());
 	register_command(std::make_unique<CmdReload>());

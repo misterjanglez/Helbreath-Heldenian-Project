@@ -24,7 +24,9 @@ set(SERVER_SOURCES
     CmdBroadcast.cpp
     CmdDropOdds.cpp
     CmdGiveItem.cpp
+    CheckTally.cpp
     CmdHelp.cpp
+    CmdLedgerCheck.cpp
     CmdMintCheck.cpp
     CmdSerialCheck.cpp
     CmdReload.cpp
@@ -72,6 +74,7 @@ set(SERVER_SOURCES
     GameConfigSqliteStore.cpp
     ServerConfig.cpp
     GuildManager.cpp
+    ItemLedgerStore.cpp
     ItemManager.cpp
     LegacyRollStrategy.cpp
     LoginServer.cpp

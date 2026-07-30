@@ -126,6 +126,15 @@ void PollAllSockets()
 // paths that never reach the socket/main-loop stage.
 static int early_exit(int rc)
 {
+	// The headless one-shots below reach this path, and some of them mint Serials.
+	// ~item_ledger_store would flush the buffer anyway, but only CGame knows where
+	// the allocator finished — and a durable mark left below a Serial already
+	// handed out is how the next boot re-issues one. Ahead of logger::shutdown so
+	// a failure here is still reportable.
+	if (G_pGame != nullptr) {
+		G_pGame->flush_item_ledger();
+	}
+
 	hb::logger::shutdown();
 	delete G_pGame;
 	delete G_pIOPool;

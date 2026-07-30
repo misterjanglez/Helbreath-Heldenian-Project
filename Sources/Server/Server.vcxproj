@@ -175,6 +175,7 @@
     <ClInclude Include="DynamicObjectManager.h" />
     <ClInclude Include="LootManager.h" />
     <ClInclude Include="CombatManager.h" />
+    <ClInclude Include="ItemLedgerStore.h" />
     <ClInclude Include="ItemManager.h" />
     <ClInclude Include="MagicManager.h" />
     <ClInclude Include="SkillManager.h" />
@@ -224,6 +225,8 @@
     <ClInclude Include="DropModel.h" />
     <ClInclude Include="CmdShowChat.h" />
     <ClInclude Include="CmdGiveItem.h" />
+    <ClInclude Include="CheckTally.h" />
+    <ClInclude Include="CmdLedgerCheck.h" />
     <ClInclude Include="CmdMintCheck.h" />
     <ClInclude Include="CmdSerialCheck.h" />
     <ClInclude Include="CmdReload.h" />
@@ -341,6 +344,7 @@
     <ClCompile Include="DynamicObjectManager.cpp" />
     <ClCompile Include="LootManager.cpp" />
     <ClCompile Include="CombatManager.cpp" />
+    <ClCompile Include="ItemLedgerStore.cpp" />
     <ClCompile Include="ItemManager.cpp" />
     <ClCompile Include="MagicManager.cpp" />
     <ClCompile Include="SkillManager.cpp" />
@@ -372,6 +376,8 @@
     <ClCompile Include="CmdDropOdds.cpp" />
     <ClCompile Include="CmdShowChat.cpp" />
     <ClCompile Include="CmdGiveItem.cpp" />
+    <ClCompile Include="CheckTally.cpp" />
+    <ClCompile Include="CmdLedgerCheck.cpp" />
     <ClCompile Include="CmdMintCheck.cpp" />
     <ClCompile Include="CmdSerialCheck.cpp" />
     <ClCompile Include="CmdReload.cpp" />

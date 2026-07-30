@@ -18,6 +18,7 @@
 #include "TieredRollStrategy.h"
 #include "TradingPostStore.h"
 #include "TradingPostManager.h"
+#include "ItemLedgerStore.h"
 #include "MapInfoSqliteStore.h"
 #include "sqlite3.h"
 #include "Packet/SharedPackets.h"
@@ -318,6 +319,7 @@ CGame::CGame()
 	m_trading_post_store->set_game(this);
 	m_trading_post_manager = std::make_unique<hb::server::trading_post_manager>();
 	m_trading_post_manager->set_game(this);
+	m_item_ledger_store = std::make_unique<hb::server::item_ledger_store>();
 	m_regen_manager->set_game(this);
 
 	for(int i = 0; i < hb::shared::limits::MaxMagicType; i++)
@@ -1306,6 +1308,20 @@ bool CGame::init()
 		hb::logger::error("Cannot start server: tradingpost.db unavailable");
 		return false;
 	}
+
+	// Open the Provenance Ledger (itemledger.db, #76) and lift the Serial
+	// allocator above the recovered high-water mark. This must happen before any
+	// item exists — a mint that ran first would hand out a Serial the ledger
+	// already assigned, which is the one failure Reconciliation cannot tell apart
+	// from a real dupe. A ledger the server cannot open is fatal for the same
+	// reason: running with a broken audit trail silently produces items whose
+	// history has a hole nobody will know to look for.
+	hb::logger::log("Opening Provenance Ledger (itemledger.db)");
+	if (!m_item_ledger_store->open("itemledger.db")) {
+		hb::logger::error("Cannot start server: itemledger.db unavailable");
+		return false;
+	}
+	m_item_manager->resume_serials_from(m_item_ledger_store->recovered_high_water());
 
 	// Load map configurations (display names, no-attack areas, static NPCs) from mapinfo.db
 	// Must be after NPC configs are loaded from gamedata.db (spawn_map_npcs needs m_npc_config_list)
@@ -4993,6 +5009,23 @@ void CGame::game_process()
 	if (m_trading_post_manager != nullptr) {
 		m_trading_post_manager->process_expiry(GameClock::GetTimeMS());
 	}
+
+	// Provenance Ledger flush (#76). Recording an item transition is a RAM append;
+	// this is the only place the game loop pays for disk, once per cadence window
+	// and in one transaction — which is why an item event never sits on the
+	// critical path of the action that caused it.
+	if (m_item_ledger_store != nullptr && m_item_manager != nullptr) {
+		m_item_ledger_store->process_flush(GameClock::GetTimeMS(),
+			m_item_manager->serial_high_water());
+	}
+}
+
+void CGame::flush_item_ledger()
+{
+	if (m_item_ledger_store == nullptr || m_item_manager == nullptr) {
+		return;
+	}
+	m_item_ledger_store->flush(m_item_manager->serial_high_water());
 }
 
 // Helper function to normalize item name for comparison (removes spaces and underscores)
@@ -9304,9 +9337,15 @@ void CGame::release_follow_mode(short owner_h, char owner_type)
 
 void CGame::quit()
 {
-	
-
-
+	// The ledger closes here rather than leaving it to ~item_ledger_store because
+	// only CGame can tell it where the Serial allocator finished. Its own
+	// destructor would still flush the buffer, but with no final mark — and a
+	// durable mark below a Serial already handed out is how a restart re-issues
+	// one. (It also runs after ~CGame has deleted ItemManager, so by then there is
+	// nothing left to ask.)
+	if (m_item_ledger_store != nullptr && m_item_manager != nullptr) {
+		m_item_ledger_store->close(m_item_manager->serial_high_water());
+	}
 
 	if (_lsock != 0) delete _lsock;
 
@@ -10788,6 +10827,12 @@ int CGame::save_all_players()
 			count++;
 		}
 	}
+
+	// The ledger rides every mass save (#76). The snapshots and the events
+	// describe the same moment, so making one durable without the other widens
+	// the window in which Reconciliation would report a disagreement that only
+	// ever existed on disk.
+	flush_item_ledger();
 	return count;
 }
 
@@ -14267,6 +14312,15 @@ void CGame::apply_server_config(const server_config& cfg)
 	m_summon_creature_duration = cfg.timing.summon_duration_ms;
 	m_autosave_interval = cfg.timing.autosave_ms;
 	m_lag_protection_interval = cfg.timing.lag_protection_ms;
+
+	// The ledger's flush cadence is data, not code (#76), and applying it here
+	// rather than at open() means `reload config` moves it live. At boot this runs
+	// before the store opens, which is harmless — open() does not touch the
+	// cadence, so the values are already in place by the time the first tick runs.
+	if (m_item_ledger_store != nullptr) {
+		m_item_ledger_store->set_flush_cadence(cfg.timing.ledger_flush_ms,
+			cfg.timing.ledger_flush_events);
+	}
 
 	// Combat
 	m_enemy_kill_mode = (cfg.combat.enemy_kill_mode == "deathmatch");

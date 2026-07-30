@@ -80,6 +80,8 @@ bool load_server_config(const std::string& path, server_config& cfg)
 		read_value(t, "summon_duration_ms", cfg.timing.summon_duration_ms);
 		read_value(t, "autosave_ms", cfg.timing.autosave_ms);
 		read_value(t, "lag_protection_ms", cfg.timing.lag_protection_ms);
+		read_value(t, "ledger_flush_ms", cfg.timing.ledger_flush_ms);
+		read_value(t, "ledger_flush_events", cfg.timing.ledger_flush_events);
 	}
 
 	// Combat
@@ -165,6 +167,8 @@ bool save_server_config(const std::string& path, const server_config& cfg)
 	root["timing"]["summon_duration_ms"] = cfg.timing.summon_duration_ms;
 	root["timing"]["autosave_ms"] = cfg.timing.autosave_ms;
 	root["timing"]["lag_protection_ms"] = cfg.timing.lag_protection_ms;
+	root["timing"]["ledger_flush_ms"] = cfg.timing.ledger_flush_ms;
+	root["timing"]["ledger_flush_events"] = cfg.timing.ledger_flush_events;
 
 	// Combat
 	root["combat"]["enemy_kill_mode"] = cfg.combat.enemy_kill_mode;

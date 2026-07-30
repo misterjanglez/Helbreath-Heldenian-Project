@@ -20,6 +20,19 @@ struct server_config
 		int summon_duration_ms = 300000;
 		int autosave_ms = 600000;
 		int lag_protection_ms = 7000;
+
+		// Provenance Ledger flush cadence (#76). Not folded into autosave_ms
+		// because the two protect different windows: autosave is per-character
+		// and staggered across ten minutes, while the ledger buffer is one global
+		// batch whose loss on a crash is measured from the last flush. The design
+		// contract promises that loss is "the final seconds", so this is short.
+		// 0 disables the timer, leaving only the size trigger and the explicit
+		// flushes on save-all and shutdown.
+		int ledger_flush_ms = 30000;
+
+		// Buffered-row count that forces an early flush, so a busy world does not
+		// hold an unbounded buffer between cadence windows. 0 disables it.
+		int ledger_flush_events = 512;
 	} timing;
 
 	// Combat tuning

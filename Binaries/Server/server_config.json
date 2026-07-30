@@ -14,7 +14,9 @@
 		"hunger_consume_ms": 60000,
 		"summon_duration_ms": 300000,
 		"autosave_ms": 600000,
-		"lag_protection_ms": 7000
+		"lag_protection_ms": 7000,
+		"ledger_flush_ms": 30000,
+		"ledger_flush_events": 512
 	},
 	"combat": {
 		"enemy_kill_mode": "deathmatch",

@@ -73,6 +73,22 @@ public:
 	// as one named question rather than three conditions repeated per caller.
 	bool is_valid_item_id(int item_id) const;
 
+	//----------------------------------------------------------------------
+	// Serial durability (#76)
+	//
+	// The allocator mints in RAM; itemledger.db is where the sequence survives
+	// a restart. These two calls are the whole seam — boot lifts the counter
+	// above the recovered mark, and each ledger flush persists where it got to.
+	//----------------------------------------------------------------------
+
+	// Highest Serial handed out so far. What the ledger writes to
+	// meta.serial_high_water on every flush.
+	int64_t serial_high_water() const { return m_serial_allocator.high_water(); }
+
+	// Boot recovery: never lowers the counter, so a stale durable mark cannot
+	// re-issue a Serial that a loaded item already holds.
+	void resume_serials_from(int64_t high_water) { m_serial_allocator.resume_from(high_water); }
+
 	// Item config / init
 	bool send_client_item_configs(int client_h);
 	const hb::server::drop_table* get_drop_table(int id) const;

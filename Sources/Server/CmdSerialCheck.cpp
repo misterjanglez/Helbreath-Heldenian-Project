@@ -20,6 +20,7 @@
 //////////////////////////////////////////////////////////////////////
 
 #include "CmdSerialCheck.h"
+#include "CheckTally.h"
 #include "ServerConsole.h"
 #include "Game.h"
 #include "GmMintSpec.h"          // split_args
@@ -27,47 +28,20 @@
 #include "ItemProvenance.h"
 #include "Item.h"
 #include <cstdio>
+#include <format>
 #include <memory>
 #include <string>
 #include <vector>
 
 namespace item_origin = hb::server::item_origin;
+using hb::server::check_tally;
+using hb::server::find_probe_item;
 
 namespace
 {
 	// A Serial well above anything a fresh allocator would hand out, so
 	// "restore lifted the high-water mark" is unambiguous rather than lucky.
 	constexpr int64_t stored_serial_probe = 5000000;
-
-	struct check_tally
-	{
-		int passed = 0;
-		int total = 0;
-
-		void record(const char* name, bool ok, const std::string& detail = {})
-		{
-			++total;
-			if (ok) ++passed;
-			if (detail.empty())
-				hb::console::write("SERIALCHECK {} {}", name, ok ? "PASS" : "FAIL");
-			else
-				hb::console::write("SERIALCHECK {} {} {}", name, ok ? "PASS" : "FAIL", detail);
-		}
-	};
-
-	// Scans the loaded item config for a row matching the wanted stackability.
-	// Deriving the probes from data beats hard-coded ids that a content edit
-	// could quietly turn into the wrong kind of item.
-	int find_item(CGame* game, bool want_stackable)
-	{
-		for (int i = 0; i < hb::server::config::MaxItemTypes; i++)
-		{
-			CItem* config = game->m_item_config_list[i];
-			if (config == nullptr) continue;
-			if (config->is_stackable() == want_stackable) return i;
-		}
-		return -1;
-	}
 }
 
 void CmdSerialCheck::execute(CGame* game, const char* args)
@@ -79,8 +53,8 @@ void CmdSerialCheck::execute(CGame* game, const char* args)
 	if (tokens.size() >= 1) std::sscanf(tokens[0].c_str(), "%d", &instanced_id);
 	if (tokens.size() >= 2) std::sscanf(tokens[1].c_str(), "%d", &counted_id);
 
-	if (instanced_id < 0) instanced_id = find_item(game, false);
-	if (counted_id < 0) counted_id = find_item(game, true);
+	if (instanced_id < 0) instanced_id = find_probe_item(game, false);
+	if (counted_id < 0) counted_id = find_probe_item(game, true);
 
 	if (game->m_item_manager->is_valid_item_id(instanced_id) == false)
 	{
@@ -104,7 +78,7 @@ void CmdSerialCheck::execute(CGame* game, const char* args)
 	}
 
 	ItemManager& items = *game->m_item_manager;
-	check_tally tally;
+	check_tally tally("SERIALCHECK", "serialcheck");
 
 	// unique_ptr because every probe below is a world-less item that must be
 	// released on every exit path, including the early returns.
@@ -187,16 +161,5 @@ void CmdSerialCheck::execute(CGame* game, const char* args)
 	tally.record("transform_carries_serial", transformed->m_serial == first->m_serial);
 	tally.record("transform_carries_origin", transformed->m_origin == first->m_origin);
 
-	hb::console::write("SERIALCHECK RESULT {} {}", tally.passed, tally.total);
-
-	if (tally.passed == tally.total)
-	{
-		hb::console::success("serialcheck: {}/{} checks passed (instanced item {}, counted item {}).",
-			tally.passed, tally.total, instanced_id, counted_id);
-	}
-	else
-	{
-		hb::console::error("serialcheck: {}/{} checks passed - the Serial contract is broken.",
-			tally.passed, tally.total);
-	}
+	tally.report(std::format("instanced item {}, counted item {}", instanced_id, counted_id));
 }

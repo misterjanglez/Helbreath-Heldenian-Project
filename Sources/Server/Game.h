@@ -19,6 +19,7 @@
 namespace hb::shared::net { class IOServicePool; }
 namespace hb::server { class trading_post_store; }
 namespace hb::server { class trading_post_manager; }
+namespace hb::server { class item_ledger_store; }
 extern hb::shared::net::IOServicePool* G_pIOPool;
 extern bool G_bRunning;
 
@@ -368,6 +369,12 @@ public:
 	
 	int force_player_disconnect(int num);
 	int save_all_players();
+
+	// Push the Provenance Ledger's buffer to disk now, carrying the allocator's
+	// current position with it (#76). Called wherever the world is already being
+	// made durable — the periodic tick, save-all, shutdown — so the ledger's
+	// crash window never outlives the snapshot's.
+	void flush_item_ledger();
 	int get_map_index(char * map_name);
 	void weather_processor();
 	int calc_player_num(char map_index, short dX, short dY, char radius);
@@ -534,6 +541,7 @@ public:
 	class StatusEffectManager * m_status_effect_manager; // Status effect flags
 	std::unique_ptr<hb::server::trading_post_store> m_trading_post_store; // Trading Post escrow (tradingpost.db)
 	std::unique_ptr<hb::server::trading_post_manager> m_trading_post_manager; // Trading Post request handlers
+	std::unique_ptr<hb::server::item_ledger_store> m_item_ledger_store; // Provenance Ledger (itemledger.db)
 	class RegenManager * m_regen_manager; // Player HP/MP/SP regen, hunger, poison
 
 	hb::shared::net::ConcurrentMsgQueue m_msgQueue;
