@@ -3293,5 +3293,17 @@
     "id": 321,
     "inventory_frame_index": 370,
     "ground_frame_index": 370
+  },
+  {
+    "pak_file": null,
+    "id": 322,
+    "inventory_frame_index": 371,
+    "ground_frame_index": 371
+  },
+  {
+    "pak_file": null,
+    "id": 323,
+    "inventory_frame_index": 372,
+    "ground_frame_index": 372
   }
 ]
