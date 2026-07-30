@@ -82,6 +82,8 @@ bool load_server_config(const std::string& path, server_config& cfg)
 		read_value(t, "lag_protection_ms", cfg.timing.lag_protection_ms);
 		read_value(t, "ledger_flush_ms", cfg.timing.ledger_flush_ms);
 		read_value(t, "ledger_flush_events", cfg.timing.ledger_flush_events);
+		read_value(t, "ground_item_lifetime_ms", cfg.timing.ground_item_lifetime_ms);
+		read_value(t, "ground_item_sweep_budget", cfg.timing.ground_item_sweep_budget);
 	}
 
 	// Combat
@@ -169,6 +171,8 @@ bool save_server_config(const std::string& path, const server_config& cfg)
 	root["timing"]["lag_protection_ms"] = cfg.timing.lag_protection_ms;
 	root["timing"]["ledger_flush_ms"] = cfg.timing.ledger_flush_ms;
 	root["timing"]["ledger_flush_events"] = cfg.timing.ledger_flush_events;
+	root["timing"]["ground_item_lifetime_ms"] = cfg.timing.ground_item_lifetime_ms;
+	root["timing"]["ground_item_sweep_budget"] = cfg.timing.ground_item_sweep_budget;
 
 	// Combat
 	root["combat"]["enemy_kill_mode"] = cfg.combat.enemy_kill_mode;

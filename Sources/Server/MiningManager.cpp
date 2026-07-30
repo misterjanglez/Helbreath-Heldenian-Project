@@ -352,7 +352,8 @@ void MiningManager::check_mining_action(int client_h, int dX, int dY)
 
 			}
 
-			item = m_game->m_item_manager->create_item(item_id, hb::server::item_origin::mining);
+			item = m_game->m_item_manager->create_item(item_id, hb::server::item_origin::mining,
+				m_game->m_item_manager->birth_at(client_h));
 			if (item != nullptr) {
 				m_game->m_map_list[m_game->m_client_list[client_h]->m_map_index]->set_item(m_game->m_client_list[client_h]->m_x,
 					m_game->m_client_list[client_h]->m_y, item);

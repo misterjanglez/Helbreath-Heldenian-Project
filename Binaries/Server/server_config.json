@@ -16,7 +16,9 @@
 		"autosave_ms": 600000,
 		"lag_protection_ms": 7000,
 		"ledger_flush_ms": 30000,
-		"ledger_flush_events": 512
+		"ledger_flush_events": 512,
+		"ground_item_lifetime_ms": 300000,
+		"ground_item_sweep_budget": 64
 	},
 	"combat": {
 		"enemy_kill_mode": "deathmatch",

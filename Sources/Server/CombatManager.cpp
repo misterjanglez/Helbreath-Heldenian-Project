@@ -2019,7 +2019,11 @@ void CombatManager::check_fire_bluring(char map_index, int sX, int sY)
 			{
 				CItem* remain = nullptr;
 				CItem* item = m_game->m_map_list[map_index]->get_item(ix, iy, &remain);
-				if (item != nullptr) delete item;
+				// Burned where it lay. A destruction rather than a despawn: the
+				// world consumed it, which is a different fact from nobody
+				// wanting it, and the attrition telemetry must not count it.
+				m_game->m_item_manager->destroy_item(item,
+					hb::server::destroy_reason::ground_burn, 0);
 				m_game->m_dynamic_object_manager->add_dynamic_object_list(0, 0, dynamic_object::Fire, map_index, ix, iy, 6000);
 
 				m_game->send_ground_item_event(CommonType::SetItem, map_index, ix, iy, remain);

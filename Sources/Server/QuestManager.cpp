@@ -103,7 +103,8 @@ int QuestManager::talk_to_npc_result_cityhall(int client_h, int* quest_type, int
 			if (m_game->m_client_list[client_h]->m_is_quest_completed) {
 				if ((m_game->m_client_list[client_h]->m_quest_reward_type > 0) &&
 					(m_game->m_item_config_list[m_game->m_client_list[client_h]->m_quest_reward_type] != 0)) {
-					item = m_game->m_item_manager->create_item(m_game->m_item_config_list[m_game->m_client_list[client_h]->m_quest_reward_type]->m_name, hb::server::item_origin::quest);
+					item = m_game->m_item_manager->create_item(m_game->m_item_config_list[m_game->m_client_list[client_h]->m_quest_reward_type]->m_name, hb::server::item_origin::quest,
+						m_game->m_item_manager->birth_at(client_h));
 					// Unreachable in practice — the config row was just checked
 					// above. -5 is this function's "quest resolved" code, matching
 					// the can't-carry branch below rather than inventing one.
@@ -112,7 +113,9 @@ int QuestManager::talk_to_npc_result_cityhall(int client_h, int* quest_type, int
 					if (m_game->m_item_manager->check_item_receive_condition(client_h, item)) {
 						m_game->m_item_manager->add_client_item_list(client_h, item, &erase_req);
 						m_game->m_item_manager->send_item_notify_msg(client_h, Notify::ItemObtained, item, 0);
-						if (erase_req == 1) delete item;
+						if (erase_req == 1)
+							m_game->m_item_manager->destroy_item(item,
+								hb::server::destroy_reason::merged, client_h);
 
 						m_game->m_client_list[client_h]->m_contribution += m_quest_config_list[m_game->m_client_list[client_h]->m_quest]->m_contribution;
 
@@ -123,7 +126,8 @@ int QuestManager::talk_to_npc_result_cityhall(int client_h, int* quest_type, int
 						return -5;
 					}
 					else {
-						delete item;
+						m_game->m_item_manager->destroy_item(item,
+							hb::server::destroy_reason::discarded, client_h);
 						m_game->m_item_manager->send_item_notify_msg(client_h, Notify::CannotCarryMoreItem, 0, 0);
 
 						m_game->send_notify_msg(0, client_h, Notify::QuestReward, 4, 0, m_game->m_client_list[client_h]->m_quest_reward_amount,

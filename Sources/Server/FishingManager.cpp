@@ -330,8 +330,12 @@ void FishingManager::fish_generator()
 			last_time = (60000 * 10) + (m_game->dice(1, 3) - 1) * (60000 * 10);
 
 			// The fish waits on the hook as a real item, so it is minted here
-			// rather than when the player reels it in.
-			item = m_game->m_item_manager->create_item(item_name, hb::server::item_origin::fishing);
+			// rather than when the player reels it in. No actor either: the
+			// generator stocks fishing spots on its own schedule, so the birth
+			// location is the spot, and nobody is standing at it yet.
+			item = m_game->m_item_manager->create_item(item_name, hb::server::item_origin::fishing,
+				hb::server::birth_context{
+					.map = m_game->m_map_list[i]->m_name, .x = tX, .y = tY });
 			if (item != nullptr) {
 				ret = create_fish(i, tX, tY, 1, item, difficulty, last_time);
 			}

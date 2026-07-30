@@ -5016,6 +5016,10 @@ void CGame::game_process()
 		m_trading_post_manager->process_expiry(GameClock::GetTimeMS());
 	}
 
+	// Ground-item lifetime (#79). Runs before the ledger flush so the despawns
+	// it produces join the same batch rather than waiting a whole window.
+	process_ground_item_expiry(GameClock::GetTimeMS());
+
 	// Provenance Ledger flush (#76). Recording an item transition is a RAM append;
 	// this is the only place the game loop pays for disk, once per cadence window
 	// and in one transaction — which is why an item event never sits on the
@@ -5032,6 +5036,97 @@ void CGame::flush_item_ledger()
 		return;
 	}
 	m_item_ledger_store->flush(m_item_manager->serial_high_water());
+}
+
+void CGame::note_ground_item(int map_index, short x, short y, uint32_t at)
+{
+	// Nothing to sweep for if the sweep is off, and no note to leave: with the
+	// lifetime disabled the deque would grow for the life of the process.
+	if (m_server_config.timing.ground_item_lifetime_ms <= 0) return;
+	if (map_index < 0 || map_index >= MaxMaps) return;
+
+	m_ground_item_notes.push_back(ground_item_note{ at,
+		static_cast<int16_t>(map_index), x, y });
+}
+
+void CGame::despawn_ground_item(CItem*& item, hb::server::despawn_reason::despawn_reason reason,
+	const char* map_name, short x, short y)
+{
+	if (item == nullptr) return;
+
+	// Before the item manager exists — or after it is gone, which is the case
+	// during shutdown teardown — there is nobody to record with. Free it anyway:
+	// a leak would be a worse answer than an unrecorded exit at a point where
+	// the ledger is already closed.
+	if (m_item_manager == nullptr)
+	{
+		delete item;
+		item = nullptr;
+		return;
+	}
+
+	m_item_manager->despawn_item(item, reason, map_name, x, y);
+}
+
+void CGame::despawn_all_ground_items()
+{
+	// The one place in this feature that walks map area rather than the note
+	// queue. The queue only remembers placements inside the current lifetime
+	// window — and with the sweep disabled it is not kept at all — so it cannot
+	// answer "everything still on the ground". Once, at shutdown, that trade is
+	// the right way round.
+	m_ground_item_notes.clear();
+
+	int despawned = 0;
+	for (int i = 0; i < MaxMaps; i++)
+	{
+		if (m_map_list[i] == nullptr) continue;
+		despawned += m_map_list[i]->despawn_all_ground_items();
+	}
+
+	if (despawned > 0)
+		hb::logger::log("[LEDGER] {} ground item(s) despawned at shutdown", despawned);
+}
+
+void CGame::process_ground_item_expiry(uint32_t now_ms)
+{
+	const int lifetime = m_server_config.timing.ground_item_lifetime_ms;
+	if (lifetime <= 0) return;
+
+	int budget = m_server_config.timing.ground_item_sweep_budget;
+	if (budget <= 0) budget = 1;   // a non-positive budget would stall the sweep
+
+	std::vector<CItem*> expired;
+	while (!m_ground_item_notes.empty() && budget > 0)
+	{
+		const ground_item_note note = m_ground_item_notes.front();
+
+		// Notes are appended in placement order, so the first one that is not
+		// due yet means none behind it are either. This is what keeps the sweep
+		// proportional to what actually expired.
+		if ((now_ms - note.at) < static_cast<uint32_t>(lifetime)) break;
+
+		m_ground_item_notes.pop_front();
+		budget--;
+
+		CMap* map = (note.map_index >= 0 && note.map_index < MaxMaps)
+			? m_map_list[note.map_index] : nullptr;
+		if (map == nullptr) continue;
+
+		expired.clear();
+		map->expire_ground_items(note.x, note.y, now_ms, lifetime, expired);
+		if (expired.empty()) continue;   // already taken, or newer than this note
+
+		for (CItem* item : expired)
+			despawn_ground_item(item, hb::server::despawn_reason::expired,
+				map->m_name, note.x, note.y);
+
+		// Tell everyone who can see the tile what is on it now. One message per
+		// tile rather than per item: the packet describes the tile's top item,
+		// so repeating it for each removal would say the same thing N times.
+		send_ground_item_event(CommonType::SetItem, static_cast<char>(note.map_index),
+			note.x, note.y, map->peek_item(note.x, note.y));
+	}
 }
 
 // Helper function to normalize item name for comparison (removes spaces and underscores)
@@ -6481,13 +6576,15 @@ void CGame::client_common_handler(int client_h, char* data)
 				}
 				else
 				{
-					delete gold_item;
+					m_item_manager->destroy_item(gold_item,
+						hb::server::destroy_reason::discarded, client_h);
 					send_notify_msg(0, client_h, Notify::CannotCarryMoreItem, 0, 0, 0, 0);
 				}
 			}
 			else
 			{
-				delete gold_item;
+				m_item_manager->destroy_item(gold_item,
+					hb::server::destroy_reason::discarded, client_h);
 			}
 			hb::logger::log<log_channel::commands>("[TesterMenu] '{}' added 1m gold",
 				m_client_list[client_h]->m_char_name);
@@ -9343,6 +9440,16 @@ void CGame::release_follow_mode(short owner_h, char owner_type)
 
 void CGame::quit()
 {
+	// Ground items live only in RAM, so stopping the world ends every one of
+	// them (#79). Recording that closes their books: a Serial with a birth row,
+	// no holder in the Game DB and no exit event is exactly the shape
+	// Reconciliation reads as a duplication anomaly, and every restart would
+	// otherwise manufacture one per item lying on the floor.
+	//
+	// Must run before the ledger closes below, and before the maps are deleted
+	// further down — after either, there is nothing left to record with.
+	despawn_all_ground_items();
+
 	// The ledger closes here rather than leaving it to ~item_ledger_store because
 	// only CGame can tell it where the Serial allocator finished. Its own
 	// destructor would still flush the buffer, but with no final mark — and a
@@ -11168,7 +11275,8 @@ void CGame::check_special_event(int client_h)
 		std::memset(item_name, 0, sizeof(item_name));
 		strcpy(item_name, "MemorialRing");
 
-		item = m_item_manager->create_item(item_name, hb::server::item_origin::event_reward);
+		item = m_item_manager->create_item(item_name, hb::server::item_origin::event_reward,
+			m_item_manager->birth_at(client_h));
 		if (item != nullptr) {
 			if (m_item_manager->add_client_item_list(client_h, item, &erase_req)) {
 				if (m_client_list[client_h]->m_cur_weight_load < 0) m_client_list[client_h]->m_cur_weight_load = 0;
@@ -12812,6 +12920,9 @@ bool CGame::register_map(char* name)
 	for(int i = 0; i < MaxMaps; i++)
 		if (m_map_list[i] == 0) {
 			m_map_list[i] = new class CMap(this);
+			// A tile cannot say which map it is on, and the ground sweep has to
+			// name one when it tells clients a tile changed (#79).
+			m_map_list[i]->m_index = i;
 			if (m_map_list[i]->init(name) == false) {
 				hb::logger::error("Map data load failed: {}", name);
 				return false;
@@ -14082,7 +14193,8 @@ void CGame::lotery_handler(int client_h)
 	if (dice(1, 120) <= 3) item_id = 650;//ZemstoneOfSacrifice
 	//chance
 
-	item = m_item_manager->create_item(item_id, hb::server::item_origin::lottery);
+	item = m_item_manager->create_item(item_id, hb::server::item_origin::lottery,
+		m_item_manager->birth_at(client_h));
 	if (item != nullptr) {
 		m_map_list[m_client_list[client_h]->m_map_index]->set_item(m_client_list[client_h]->m_x,
 			m_client_list[client_h]->m_y, item);
@@ -14150,7 +14262,8 @@ void CGame::lotery_handler(int client_h)
 
 		   ret = m_item_manager->send_item_notify_msg(client_h, Notify::ItemObtained, item, 0);
 
-		   if (erase_req == 1) delete item;
+		   if (erase_req == 1)
+			   m_item_manager->destroy_item(item, hb::server::destroy_reason::merged, client_h);
 
 		   calc_total_weight(client_h);
 
@@ -14167,7 +14280,7 @@ void CGame::lotery_handler(int client_h)
 		}
 		else
 		{
-		   delete item;
+		   m_item_manager->destroy_item(item, hb::server::destroy_reason::discarded, client_h);
 
 		   calc_total_weight(client_h);
 
@@ -14261,7 +14374,8 @@ void CGame::get_angel_handler(int client_h, char* data, size_t msg_size)
 
 	hb::logger::log("PC({}) requesting Angel ({}, ItemID:{}). {}({} {})", m_client_list[client_h]->m_char_name, angel, item_id, m_client_list[client_h]->m_map_name, m_client_list[client_h]->m_x, m_client_list[client_h]->m_y);
 
-	item = m_item_manager->create_item(item_id, hb::server::item_origin::angel_claim);
+	item = m_item_manager->create_item(item_id, hb::server::item_origin::angel_claim,
+		m_item_manager->birth_at(client_h));
 	if (item != nullptr)
 	{
 		m_client_list[client_h]->m_gizon_item_upgrade_left -= 5;
@@ -14293,7 +14407,7 @@ void CGame::get_angel_handler(int client_h, char* data, size_t msg_size)
 		}
 		else
 		{
-			delete item;
+			m_item_manager->destroy_item(item, hb::server::destroy_reason::discarded, client_h);
 
 			calc_total_weight(client_h);
 
@@ -14312,7 +14426,7 @@ void CGame::get_angel_handler(int client_h, char* data, size_t msg_size)
 	else
 	{
 		hb::logger::log("get_angel_handler: init_item_attr failed for ItemID {}. Item not found in config.", item_id);
-		delete item;
+		m_item_manager->destroy_item(item, hb::server::destroy_reason::discarded, client_h);
 	}
 }
 

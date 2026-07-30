@@ -33,6 +33,25 @@ struct server_config
 		// Buffered-row count that forces an early flush, so a busy world does not
 		// hold an unbounded buffer between cadence windows. 0 disables it.
 		int ledger_flush_events = 512;
+
+		// How long an item lies on the ground before it despawns (#79).
+		//
+		// Original Helbreath has no such timer — ground items there survive
+		// until the tile they are on overflows, which on a busy world means the
+		// map accumulates litter for as long as the server is up, and every
+		// player entering a sector pays to be told about all of it. This is a
+		// deliberate deviation, added for that cost.
+		//
+		// 0 restores the original behaviour exactly: no sweep runs, and the only
+		// ground exits are tile overflow and shutdown.
+		int ground_item_lifetime_ms = 300000;   // 5 minutes
+
+		// Ceiling on how many ground tiles one tick may expire. The sweep is
+		// already proportional to what actually expired rather than to map area,
+		// but a burst — a raid ending, or the first tick after the timer is
+		// enabled on a world full of litter — would otherwise land on one frame.
+		// Whatever is left simply waits for the next tick.
+		int ground_item_sweep_budget = 64;
 	} timing;
 
 	// Combat tuning

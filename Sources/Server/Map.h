@@ -3,6 +3,9 @@
 #pragma once
 
 
+#include <cstdint>
+#include <vector>
+
 #include "CommonTypes.h"
 #include "NetConstants.h"
 #include "OccupyFlag.h"
@@ -88,6 +91,34 @@ public:
 	bool is_valid_loc(short sX, short sY);
 	CItem* get_item(short sX, short sY, CItem** remain = nullptr);
 	bool set_item(short sX, short sY, CItem * item);
+
+	// The item a tile currently shows, or null for an empty tile. What
+	// send_ground_item_event needs after something is taken off the tile.
+	CItem* peek_item(short sX, short sY) const;
+
+	// Detach every item on this tile that has outlived `lifetime_ms`, appending
+	// them to `expired` for the caller to record and free (#79).
+	//
+	// Only a suffix of the tile's stack can be expired, because set_item pushes
+	// the newest arrival to slot 0 — so ages increase towards the end and this
+	// stops at the first item still in date rather than scanning the whole tile.
+	//
+	// The items are detached, not destroyed: this class owns tiles, not the
+	// ledger, and CGame is what knows how to record a despawn and who to tell.
+	void expire_ground_items(short sX, short sY, uint32_t now_ms, int lifetime_ms,
+		std::vector<CItem*>& expired);
+
+	// Despawn everything lying on this map, for shutdown. Returns how many.
+	//
+	// The one walk of map area in the whole feature. It is affordable only
+	// because it happens once, on a server that is stopping: the per-tile test
+	// is a single count check and the overwhelming majority of tiles fail it.
+	int despawn_all_ground_items();
+
+	// This map's index in CGame::m_map_list. A tile alone cannot say which map
+	// it belongs to, and the ground sweep has to name one to tell clients what
+	// changed. Assigned once at load.
+	int m_index = 0;
 	void clear_dead_owner(short sX, short sY);
 	void clear_owner(int debug_code, short owner_h, char owner_type, short sX, short sY);
 	bool get_moveable(short dX, short dY, short * d_otype = 0, short * top_item = 0);

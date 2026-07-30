@@ -47,6 +47,145 @@ namespace hb::server
 		};
 	}
 
+	// Why an item left the population for good (plan P3.1).
+	//
+	// Recorded in the destroyed event's `detail` as a string rather than a
+	// number, because that column is the half of the ledger a human reads
+	// directly. The names are therefore **permanent world fact the moment real
+	// players exist**: add new ones freely, never rename an existing one, or
+	// every forensic query written against the old name silently stops matching.
+	//
+	// Destruction and despawn are different exits and stay different event types
+	// (ItemLedgerStore.h): this enum answers "why was it destroyed", and a ground
+	// item that simply timed out is a despawn, not a destruction.
+	namespace destroy_reason
+	{
+		enum destroy_reason : int32_t
+		{
+			// A slot emptied without the caller saying more. The default, so a
+			// destruction can never be *missing* just because nobody chose a
+			// reason — an unspecified exit still beats a silent one.
+			unspecified,
+
+			// Used up by the action that consumed it: a potion drunk, an arrow
+			// fired, a material spent on a craft.
+			consumed,
+
+			// Sold to a shop. The item leaves the player economy entirely, which
+			// is what separates this from a trade.
+			sold,
+
+			// Broken by a failed upgrade.
+			upgrade_break,
+
+			// Minted but never delivered: the buyer could not pay, the inventory
+			// was full, the request was rejected after the item existed. Its
+			// Serial was spent, so the ledger has a birth row that would
+			// otherwise have no matching exit.
+			discarded,
+
+			// Destroyed in place on the ground by something in the world, rather
+			// than timing out — today, burned by a fire spell.
+			ground_burn,
+
+			// Handed to a player who had nowhere to put it, and lost rather than
+			// returned. A delivery failure, not a player choice.
+			delivery_lost,
+
+			// A stackable that merged into a stack the holder already had: the
+			// husk is freed, but its contents live on in the slot it merged into,
+			// so nothing left the world.
+			//
+			// Only stackables merge, so this reason should never reach a row —
+			// Counted items carry no Serial and the funnel records nothing for
+			// them. It exists so that if that invariant ever breaks, the ledger
+			// says something true instead of calling a merge a consumption.
+			merged,
+		};
+
+		// The stable wire/storage name of a reason. Kept beside the enum so the
+		// two cannot drift, and switch-based so adding a value without naming it
+		// is a compiler warning rather than a row reading "unspecified".
+		inline const char* name(destroy_reason reason)
+		{
+			switch (reason)
+			{
+			case consumed:      return "consumed";
+			case sold:          return "sold";
+			case upgrade_break: return "upgrade_break";
+			case discarded:     return "discarded";
+			case ground_burn:   return "ground_burn";
+			case delivery_lost: return "delivery_lost";
+			case merged:        return "merged";
+			case unspecified:   break;
+			}
+			return "unspecified";
+		}
+	}
+
+	// Why an item left the ground without anyone taking it (plan P3.1).
+	//
+	// Deliberately a separate enum from destroy_reason rather than one shared
+	// "exit" taxonomy: the two are recorded as different event types, and a
+	// shared enum would let a despawn be filed as "sold". Both are permanent
+	// world fact under the same rule — append, never rename.
+	namespace despawn_reason
+	{
+		enum despawn_reason : int32_t
+		{
+			// Its time on the ground ran out. This is the attrition signal Loot
+			// 2.0 tuning wants: items players walked past and did not want.
+			expired,
+
+			// Pushed off a full tile. A tile holds a fixed number of items and
+			// the oldest falls off the end when a new one lands on it, so this
+			// is attrition too — just crowd-driven rather than clock-driven.
+			tile_overflow,
+
+			// The world stopped while it was lying there. Ground items live only
+			// in RAM, so a shutdown ends every one of them.
+			//
+			// **Exclude this reason from attrition queries.** It says something
+			// about the operator, not about whether players valued the item, and
+			// counting it would make every restart look like a wave of rejected
+			// loot.
+			world_shutdown,
+		};
+
+		inline const char* name(despawn_reason reason)
+		{
+			switch (reason)
+			{
+			case tile_overflow:  return "tile_overflow";
+			case world_shutdown: return "world_shutdown";
+			case expired:        break;
+			}
+			return "expired";
+		}
+	}
+
+	// What a creation venue knows about a birth that the item itself cannot say
+	// (plan P3.1). The ledger's item_instances row has columns for all of it —
+	// origin_detail, map, x, y — and #78 left them empty because the minting
+	// funnel is the one place in the server that does not know any of it.
+	//
+	// So the venue supplies it. Every field is optional: a venue that genuinely
+	// has no location (a boot-time grant, a tool) passes nothing and the columns
+	// stay NULL, which is the honest answer rather than a 0,0 a query would
+	// mistake for the top-left corner of a map.
+	//
+	// The pointers are borrowed for the duration of the mint only — record_mint
+	// copies what it needs into the buffered row before returning — so a caller
+	// can point them straight at a client's map name or an NPC's name without
+	// owning a copy.
+	struct birth_context
+	{
+		const char* detail = nullptr;   // npc name, crafter, GM name
+		const char* map    = nullptr;
+		int         x      = 0;
+		int         y      = 0;
+	};
+
 	// Monotonic Serial source. One per server; never hands out a value twice.
 	//
 	// In-RAM only in P1.1. The durable high-water home in itemledger.db's `meta`

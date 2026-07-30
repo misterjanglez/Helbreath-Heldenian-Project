@@ -701,7 +701,8 @@ namespace hb::server
 			if (!m_game->m_item_manager->set_item_to_bank_item(client_h, item)) {
 				hb::logger::error("[TP] deliver(online): Warehouse full for {} - lost {}",
 					m_game->m_client_list[client_h]->m_char_name, describe(e));
-				delete item;
+				m_game->m_item_manager->destroy_item(item,
+					hb::server::destroy_reason::delivery_lost, client_h);
 				all_ok = false;
 			}
 			// On success the Warehouse now owns `item`.

@@ -95,7 +95,8 @@ void CmdGiveItem::execute(CGame* game, const char* args)
 	if (true_stack)
 	{
 		// True stacks: single item with count = amount (arrows, materials, gold)
-		CItem* item = game->m_item_manager->create_item(item_id, hb::server::item_origin::gm_mint);
+		CItem* item = game->m_item_manager->create_item(item_id, hb::server::item_origin::gm_mint,
+			game->m_item_manager->birth_at(client_h));
 		if (item == nullptr)
 		{
 			hb::console::error("Failed to initialize item ID: {}.", item_id);

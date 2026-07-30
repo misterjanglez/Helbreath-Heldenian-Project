@@ -4,11 +4,13 @@
 
 #include "CommonTypes.h"
 #include "DropModel.h"
+#include "ItemProvenance.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
 #include <memory.h>
+#include <deque>
 #include <vector>
 #include <map>
 #include <unordered_map>
@@ -375,6 +377,52 @@ public:
 	// made durable — the periodic tick, save-all, shutdown — so the ledger's
 	// crash window never outlives the snapshot's.
 	void flush_item_ledger();
+
+	//----------------------------------------------------------------------
+	// Ground-item lifetime (#79)
+	//
+	// Original Helbreath never removes an item from the ground: it lies there
+	// until the tile overflows or the server stops, so a busy world accumulates
+	// litter for its whole uptime and every player walking into a sector is told
+	// about all of it. This sweep is a deliberate deviation from that, added to
+	// bound the cost; server_config.timing.ground_item_lifetime_ms = 0 turns it
+	// off and restores the original behaviour exactly.
+	//
+	// The design constraint is that the sweep must never cost map *area*. Maps
+	// are hundreds of tiles square and almost all of them are empty, so a scan
+	// would burn far more than the litter it removes. Instead every placement
+	// leaves a note here, and the sweep reads notes.
+	//----------------------------------------------------------------------
+
+	// One "there is something on this tile" note, left by CMap::set_item.
+	//
+	// It names a tile, not an item. A tile holds several items and a pointer to
+	// one of them could be freed and its address reused before the note came up
+	// — the sweep would then match the wrong item. Naming the tile means the
+	// sweep re-reads what is actually on it and asks each item its own age.
+	struct ground_item_note
+	{
+		uint32_t at;          // when the placement happened
+		int16_t  map_index;
+		int16_t  x, y;
+	};
+
+	// Record that a tile received an item. Called for every ground placement in
+	// the server, so it does no work beyond appending.
+	void note_ground_item(int map_index, short x, short y, uint32_t at);
+
+	// Record a ground item's exit and free it. The one place a ground item stops
+	// existing without a player having taken it — overflow, expiry, shutdown.
+	void despawn_ground_item(CItem*& item, hb::server::despawn_reason::despawn_reason reason,
+		const char* map_name, short x, short y);
+
+	// The cadence hook. Notes are appended in time order, so the ones due are a
+	// prefix and this stops at the first one that is not — no scan, no sort.
+	void process_ground_item_expiry(uint32_t now_ms);
+
+	// Despawn every ground item in the world, for shutdown.
+	void despawn_all_ground_items();
+
 	int get_map_index(char * map_name);
 	void weather_processor();
 	int calc_player_num(char map_index, short dX, short dY, char radius);
@@ -542,6 +590,16 @@ public:
 	std::unique_ptr<hb::server::trading_post_store> m_trading_post_store; // Trading Post escrow (tradingpost.db)
 	std::unique_ptr<hb::server::trading_post_manager> m_trading_post_manager; // Trading Post request handlers
 	std::unique_ptr<hb::server::item_ledger_store> m_item_ledger_store; // Provenance Ledger (itemledger.db)
+
+	// Pending ground-item notes, oldest first (#79). A deque because the sweep
+	// only ever drains the front while placements only ever append to the back,
+	// and because it must not reallocate the whole run of notes to grow — a
+	// world with a lot of litter is exactly when this matters.
+	//
+	// Bounded by how many items are placed within one lifetime window, not by
+	// how many are on the ground: a note is discarded once its tile has been
+	// looked at, whether or not anything was there to remove.
+	std::deque<ground_item_note> m_ground_item_notes;
 	class RegenManager * m_regen_manager; // Player HP/MP/SP regen, hunger, poison
 
 	hb::shared::net::ConcurrentMsgQueue m_msgQueue;

@@ -369,8 +369,20 @@ bool CMap::set_item(short sX, short sY, CItem* item)
 
 	tile = (class CTile*)(m_tile + sX + sY * m_size_x);
 
+	// The one door onto a map tile, so it is where an item's time on the ground
+	// starts counting (#79) and where the world registers that this tile now has
+	// something on it worth sweeping later.
+	if (item != nullptr) item->m_ground_at = GameClock::GetTimeMS();
+
 	if (tile->m_item[TilePerItems - 1] != 0)
-		delete tile->m_item[TilePerItems - 1];
+	{
+		// The tile is full and the oldest item falls off the end. That is an exit
+		// from the world with nobody having taken it — attrition, the same kind
+		// as timing out — so it is recorded rather than quietly deleted.
+		m_game->despawn_ground_item(tile->m_item[TilePerItems - 1],
+			hb::server::despawn_reason::tile_overflow, m_name, sX, sY);
+		tile->m_item[TilePerItems - 1] = nullptr;
+	}
 	else tile->m_total_item++;
 
 	for(int i = TilePerItems - 2; i >= 0; i--)
@@ -378,7 +390,68 @@ bool CMap::set_item(short sX, short sY, CItem* item)
 
 	tile->m_item[0] = item;
 	//tile->m_total_item++;
+
+	if (item != nullptr) m_game->note_ground_item(m_index, sX, sY, item->m_ground_at);
 	return true;
+}
+
+CItem* CMap::peek_item(short sX, short sY) const
+{
+	if ((sX < 0) || (sX >= m_size_x) || (sY < 0) || (sY >= m_size_y)) return nullptr;
+
+	const CTile* tile = (m_tile + sX + sY * m_size_x);
+	if (tile->m_total_item == 0) return nullptr;
+	return tile->m_item[0];
+}
+
+void CMap::expire_ground_items(short sX, short sY, uint32_t now_ms, int lifetime_ms,
+	std::vector<CItem*>& expired)
+{
+	if (lifetime_ms <= 0) return;
+	if ((sX < 0) || (sX >= m_size_x) || (sY < 0) || (sY >= m_size_y)) return;
+
+	CTile* tile = (m_tile + sX + sY * m_size_x);
+
+	// Newest first, so the oldest sit at the end and the first item still in date
+	// ends the walk. The unsigned subtraction is deliberate: GameClock wraps, and
+	// the difference stays correct across the wrap as long as the interval is
+	// shorter than half the counter's range — which a ground lifetime always is.
+	for (int i = tile->m_total_item - 1; i >= 0; i--)
+	{
+		CItem* item = tile->m_item[i];
+		if (item == nullptr) continue;
+		if ((now_ms - item->m_ground_at) < static_cast<uint32_t>(lifetime_ms)) break;
+
+		expired.push_back(item);
+		tile->m_item[i] = nullptr;
+		tile->m_total_item--;
+	}
+}
+
+int CMap::despawn_all_ground_items()
+{
+	if (m_tile == nullptr) return 0;
+
+	int despawned = 0;
+	const int total_tiles = static_cast<int>(m_size_x) * static_cast<int>(m_size_y);
+	for (int i = 0; i < total_tiles; i++)
+	{
+		CTile& tile = m_tile[i];
+		if (tile.m_total_item == 0) continue;
+
+		const short x = static_cast<short>(i % m_size_x);
+		const short y = static_cast<short>(i / m_size_x);
+		for (int slot = 0; slot < TilePerItems; slot++)
+		{
+			if (tile.m_item[slot] == nullptr) continue;
+			m_game->despawn_ground_item(tile.m_item[slot],
+				hb::server::despawn_reason::world_shutdown, m_name, x, y);
+			tile.m_item[slot] = nullptr;
+			despawned++;
+		}
+		tile.m_total_item = 0;
+	}
+	return despawned;
 }
 
 CItem* CMap::get_item(short sX, short sY, CItem** remain)

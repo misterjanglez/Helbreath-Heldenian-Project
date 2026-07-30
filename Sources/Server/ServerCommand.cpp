@@ -8,6 +8,7 @@
 #include "CmdGiveItem.h"
 #include "CmdItemLogCheck.h"
 #include "CmdLedgerCheck.h"
+#include "CmdLifecycleCheck.h"
 #include "CmdMintCheck.h"
 #include "CmdSerialCheck.h"
 #include "CmdReload.h"
@@ -94,6 +95,7 @@ void ServerCommandManager::register_built_in_commands()
 	register_command(std::make_unique<CmdGiveItem>());
 	register_command(std::make_unique<CmdItemLogCheck>());
 	register_command(std::make_unique<CmdLedgerCheck>());
+	register_command(std::make_unique<CmdLifecycleCheck>());
 	register_command(std::make_unique<CmdMintCheck>());
 	register_command(std::make_unique<CmdSerialCheck>());
 	register_command(std::make_unique<CmdReload>());

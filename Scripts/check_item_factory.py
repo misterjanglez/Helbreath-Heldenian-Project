@@ -39,6 +39,11 @@ FACTORY_FILE = "Sources/Server/ItemManager.cpp"
 FACTORY_ENTRY_POINTS = {
     "create_item(int item_id, ...)",
     "create_item(const char* item_name, ...)",
+    # #79: loot is the one venue whose birth is not finished when the item is
+    # constructed — an NPC drop rolls its Item Tiers attributes onto the fresh
+    # instance. This entry point rolls first and mints second, so the birth row
+    # records the tier the player actually receives instead of Tier 0.
+    "create_loot_item",
     "restore_item",
     "transform_item",
     "create_template",
@@ -113,7 +118,10 @@ def main() -> int:
               "no origin, so it is invisible to the Provenance Ledger and will "
               "surface later as an unexplainable Reconciliation anomaly.")
         print("\nUse instead (Sources/Server/ItemManager.h):")
-        print("  create_item(id|name, origin)  - a new item entering the world")
+        print("  create_item(id|name, origin[, birth])")
+        print("                                - a new item entering the world")
+        print("  create_loot_item(id, rolls, birth)")
+        print("                                - an NPC drop: rolls, then mints")
         print("  restore_item(id, serial)      - rehydrating a persisted item")
         print("  transform_item(new_id, from)  - in-place evolution, carries identity")
         print("  create_template()             - an item-config type template")

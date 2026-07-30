@@ -29,6 +29,7 @@ set(SERVER_SOURCES
     CmdHelp.cpp
     CmdItemLogCheck.cpp
     CmdLedgerCheck.cpp
+    CmdLifecycleCheck.cpp
     CmdMintCheck.cpp
     CmdSerialCheck.cpp
     CmdReload.cpp

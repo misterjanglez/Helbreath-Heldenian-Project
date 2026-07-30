@@ -2797,15 +2797,17 @@ bool CEntityManager::spawn_npc_drop_item(int npc_h, int item_id, int min_count, 
 		return false;
 	}
 
-	CItem* item = m_game->m_item_manager->create_item(item_id, hb::server::item_origin::npc_drop);
-	if (item == nullptr) return false;
+	// Everything that can still refuse this drop happens before the item exists.
+	// create_loot_item mints at the end of a finished birth (P3.1), so a Serial
+	// handed out above here and thrown away below would leave a birth row for an
+	// item no player ever saw — a hole a Reconciliation run would have to explain.
+	// The config check is what create_item used to answer by returning nullptr;
+	// asking it directly costs nothing and lets the count dice stay where they are.
+	if (m_game->m_item_manager->is_valid_item_id(item_id) == false) return false;
 
 	uint32_t count = 1;
 	if (item_id == 90) {
-		if (max_count == 0) {
-			delete item;
-			return false;
-		}
+		if (max_count == 0) return false;
 		count = static_cast<uint32_t>(max_count);
 		if (max_count > min_count) {
 			count = static_cast<uint32_t>(m_game->dice(1, (max_count - min_count)) + min_count);
@@ -2817,15 +2819,24 @@ bool CEntityManager::spawn_npc_drop_item(int npc_h, int item_id, int min_count, 
 			count = static_cast<uint32_t>(m_game->dice(1, (max_count - min_count)) + min_count);
 		}
 	}
-	if (count == 0) {
-		delete item;
-		return false;
-	}
-	item->m_instance.count = count;
+	if (count == 0) return false;
+
 	hb::server::roll_context roll_context;
 	roll_context.loot_grade = static_cast<uint8_t>(m_npc_list[npc_h]->m_loot_grade);
 	roll_context.tier_rolls = tier_rolls;
-	m_game->get_roll_strategy().roll(*item, roll_context);
+
+	// What the ledger could not know until now: which NPC dropped it and onto
+	// which tile. The NPC name is the birth row's origin_detail — its schema home
+	// — rather than a JSON field on the drop event, where #78 had to park it for
+	// want of anywhere better.
+	CItem* item = m_game->m_item_manager->create_loot_item(item_id, roll_context,
+		hb::server::birth_context{
+			.detail = m_npc_list[npc_h]->m_npc_name,
+			.map = m_map_list[m_npc_list[npc_h]->m_map_index]->m_name,
+			.x = drop_x, .y = drop_y });
+	if (item == nullptr) return false;
+
+	item->m_instance.count = count;
 	item->set_touch_effect_type(TouchEffectType::ID);
 	item->m_instance.touch_effect_value1 = static_cast<short>(m_game->dice(1, 100000));
 	item->m_instance.touch_effect_value2 = static_cast<short>(m_game->dice(1, 100000));

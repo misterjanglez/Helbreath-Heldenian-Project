@@ -43,6 +43,9 @@ using namespace hb::server::config;
 using namespace hb::shared::item;
 namespace sock = hb::shared::net::socket;
 namespace item_origin = hb::server::item_origin;
+namespace destroy_reason = hb::server::destroy_reason;
+namespace despawn_reason = hb::server::despawn_reason;
+namespace ledger_event = hb::server::ledger_event;
 namespace dynamic_object = hb::shared::dynamic_object;
 namespace smap = hb::server::map;
 namespace sdelay = hb::server::delay_event;
@@ -263,6 +266,20 @@ bool ItemManager::is_valid_item_id(int item_id) const
 		&& m_game->m_item_config_list[item_id] != nullptr;
 }
 
+// Where a player stood when an item they caused came into the world (P3.1).
+hb::server::birth_context ItemManager::birth_at(int client_h, const char* detail) const
+{
+	hb::server::birth_context birth;
+	birth.detail = detail;
+	if (const CClient* actor = client_at(client_h))
+	{
+		birth.map = actor->m_map_name;
+		birth.x = actor->m_x;
+		birth.y = actor->m_y;
+	}
+	return birth;
+}
+
 // Instanced iff non-stackable (D2). A stack has no identity worth tracking
 // because merge and split dissolve it, so stackables stay unserialed and the
 // Counted flow counters account for them in aggregate instead.
@@ -271,7 +288,8 @@ bool ItemManager::is_valid_item_id(int item_id) const
 // act every creation venue has in common, so emitting the birth record from the
 // same three lines that assign the Serial is what makes creation coverage a
 // property of the code's shape rather than of 45 call sites remembering.
-void ItemManager::stamp_provenance(CItem* item, item_origin::item_origin origin)
+void ItemManager::stamp_provenance(CItem* item, item_origin::item_origin origin,
+	const hb::server::birth_context& birth)
 {
 	item->m_origin = origin;
 	if (item->is_stackable())
@@ -279,21 +297,18 @@ void ItemManager::stamp_provenance(CItem* item, item_origin::item_origin origin)
 
 	item->m_serial = m_serial_allocator.mint();
 
-	// No location and no origin detail: a mint does not know where the item will
-	// end up — the caller places it immediately afterwards — and the schema makes
-	// map/x/y nullable for exactly that reason. The tier byte is read as of now,
-	// which is right for every venue that finishes an item before it exists and
-	// wrong for the one that does not: an NPC drop rolls its attributes onto the
-	// freshly created instance, so loot lands a birth row reading tier 0. Both
-	// halves of that birth context — where it dropped and what it rolled — are
-	// #79's, which already owns the NPC-drop location gap. Rolling before the
-	// mint instead would reorder the drop path's dice draws, which is a balance
-	// change wearing an audit change's clothes.
+	// The birth row is a snapshot of the item as it stands right now, which is
+	// why this runs at the end of a creation rather than the start of one: the
+	// tier byte it reads is only true if the venue has finished rolling, and the
+	// location is only true if the venue said where. Both come from `birth`
+	// (P3.1) — a mint on its own still cannot know either, so the funnel asks
+	// instead of guessing, and a venue with nothing to say leaves them NULL.
 	if (hb::server::item_ledger_store* store = ledger())
-		store->record_mint(*item);
+		store->record_mint(*item, birth.detail, birth.map, birth.x, birth.y);
 }
 
-CItem* ItemManager::create_item(int item_id, item_origin::item_origin origin)
+CItem* ItemManager::create_item(int item_id, item_origin::item_origin origin,
+	const hb::server::birth_context& birth)
 {
 	CItem* item = new CItem();
 	if (init_item_attr(item, item_id) == false)
@@ -302,11 +317,12 @@ CItem* ItemManager::create_item(int item_id, item_origin::item_origin origin)
 		return nullptr;
 	}
 
-	stamp_provenance(item, origin);
+	stamp_provenance(item, origin, birth);
 	return item;
 }
 
-CItem* ItemManager::create_item(const char* item_name, item_origin::item_origin origin)
+CItem* ItemManager::create_item(const char* item_name, item_origin::item_origin origin,
+	const hb::server::birth_context& birth)
 {
 	CItem* item = new CItem();
 	if (init_item_attr(item, item_name) == false)
@@ -315,8 +331,73 @@ CItem* ItemManager::create_item(const char* item_name, item_origin::item_origin 
 		return nullptr;
 	}
 
-	stamp_provenance(item, origin);
+	stamp_provenance(item, origin, birth);
 	return item;
+}
+
+CItem* ItemManager::create_loot_item(int item_id, const hb::server::roll_context& rolls,
+	const hb::server::birth_context& birth)
+{
+	CItem* item = new CItem();
+	if (init_item_attr(item, item_id) == false)
+	{
+		delete item;
+		return nullptr;
+	}
+
+	// Roll, then mint. The order is the entire reason this entry point exists:
+	// the tier the ledger records has to be the tier the player receives.
+	//
+	// It costs the drop path nothing, because the roll has not moved relative to
+	// any other draw — minting and recording touch a counter and a vector, never
+	// the RNG. What did move is the *count* draw, which the caller now takes
+	// before asking for the item at all, so the sequence a kill consumes is
+	// still count, then attributes, then touch effects.
+	m_game->get_roll_strategy().roll(*item, rolls);
+
+	stamp_provenance(item, item_origin::npc_drop, birth);
+	return item;
+}
+
+void ItemManager::destroy_item(CItem*& item, destroy_reason::destroy_reason reason, int actor_h)
+{
+	if (item == nullptr) return;
+
+	// begin_ledger_event answers false for a Counted item and when no ledger is
+	// open, which is the same door every other emitter goes through — so a
+	// stackable being freed costs one comparison and writes nothing.
+	if (hb::server::ledger_event_record event;
+		begin_ledger_event(ledger_event::destroyed, item, actor_h, event))
+	{
+		event.detail = hb::server::detail_json("reason", destroy_reason::name(reason));
+		ledger()->record_event(std::move(event));
+	}
+
+	delete item;
+	item = nullptr;
+}
+
+void ItemManager::despawn_item(CItem*& item, despawn_reason::despawn_reason reason,
+	const char* map, int x, int y)
+{
+	if (item == nullptr) return;
+
+	// Actor 0: nobody did this. begin_ledger_event then leaves the actor columns
+	// NULL, and the location is filled in here from the tile instead — a despawn
+	// is the one event whose "where" is a property of the world rather than of
+	// whoever caused it.
+	if (hb::server::ledger_event_record event;
+		begin_ledger_event(ledger_event::despawned, item, 0, event))
+	{
+		if (map != nullptr) event.map = map;
+		event.x = x;
+		event.y = y;
+		event.detail = hb::server::detail_json("reason", despawn_reason::name(reason));
+		ledger()->record_event(std::move(event));
+	}
+
+	delete item;
+	item = nullptr;
 }
 
 CItem* ItemManager::restore_item(int item_id, int64_t serial)
@@ -490,13 +571,13 @@ void ItemManager::drop_item_handler(int client_h, short item_index, int amount, 
 		if (item == nullptr) return;
 
 		if (amount <= 0) {
-			delete item;
+			destroy_item(item, destroy_reason::discarded, client_h);
 			return;
 		}
 		item->m_instance.count = amount;
 
 		if (static_cast<uint64_t>(amount) > m_game->m_client_list[client_h]->m_item_list[item_index]->m_instance.count) {
-			delete item;
+			destroy_item(item, destroy_reason::discarded, client_h);
 			return;
 		}
 
@@ -531,8 +612,10 @@ void ItemManager::drop_item_handler(int client_h, short item_index, int amount, 
 		// v1.432
 		if ((m_game->m_client_list[client_h]->m_item_list[item_index]->get_item_effect_type() == ItemEffectType::AlterItemDrop) &&
 			(m_game->m_client_list[client_h]->m_item_list[item_index]->m_instance.cur_durability == 0)) {
-			delete m_game->m_client_list[client_h]->m_item_list[item_index];
-			m_game->m_client_list[client_h]->m_item_list[item_index] = 0;
+			// A worn-out alter-drop item breaks instead of landing on the ground:
+			// it never reaches the tile, so this is an exit, not a drop.
+			destroy_item(m_game->m_client_list[client_h]->m_item_list[item_index],
+				destroy_reason::consumed, client_h);
 		}
 		else {
 			m_game->m_map_list[m_game->m_client_list[client_h]->m_map_index]->set_item(m_game->m_client_list[client_h]->m_x,
@@ -706,13 +789,15 @@ int ItemManager::add_client_bulk_item_list(int client_h, const char* item_name, 
 
 	for (int i = 0; i < amount; i++)
 	{
-		CItem* item = create_item(item_name, item_origin::gm_mint);
+		// The recipient's position. The GM who issued the command is recorded on
+		// the GmMint event's actor columns, so the birth row does not repeat it.
+		CItem* item = create_item(item_name, item_origin::gm_mint, birth_at(client_h));
 		if (item == nullptr) break;
 
 		// Weight check
 		if ((m_game->m_client_list[client_h]->m_cur_weight_load + get_item_weight(item, 1)) > m_game->calc_max_load(client_h))
 		{
-			delete item;
+			destroy_item(item, destroy_reason::discarded, client_h);
 			break;
 		}
 
@@ -735,7 +820,7 @@ int ItemManager::add_client_bulk_item_list(int client_h, const char* item_name, 
 
 		if (!added)
 		{
-			delete item;
+			destroy_item(item, destroy_reason::discarded, client_h);
 			break;
 		}
 	}
@@ -792,7 +877,7 @@ int ItemManager::mint_gm_items(int client_h, int item_id, int count,
 	bool minted_is_ours = false;
 	for (int i = 0; i < count; i++)
 	{
-		CItem* item = create_item(item_id, item_origin::gm_mint);
+		CItem* item = create_item(item_id, item_origin::gm_mint, birth_at(client_h));
 		if (item == nullptr)
 		{
 			error = "item config init failed";
@@ -804,20 +889,23 @@ int ItemManager::mint_gm_items(int client_h, int item_id, int count,
 		error = m_game->get_roll_strategy().mint(*item, requested);
 		if (!error.empty())
 		{
-			delete item;
+			destroy_item(item, destroy_reason::discarded, client_h);
 			break;
 		}
 
 		int erase_req = 0;
 		if (add_client_item_list(client_h, item, &erase_req) == false)
 		{
-			delete item;
+			destroy_item(item, destroy_reason::discarded, client_h);
 			error = "no room to carry it";
 			break;
 		}
 
 		send_item_notify_msg(client_h, Notify::ItemObtained, item, 0);
-		if (minted_is_ours) delete minted;
+		// The previous copy, if it was a stack merge and therefore ours. Freeing
+		// it is not an exit — the stack it merged into is carrying its contents —
+		// and it is Counted anyway, so the funnel records nothing and only frees.
+		if (minted_is_ours) destroy_item(minted, destroy_reason::merged, client_h);
 		minted = item;
 		minted_is_ours = (erase_req == 1);   // merged into an existing stack
 		created++;
@@ -827,7 +915,7 @@ int ItemManager::mint_gm_items(int client_h, int item_id, int count,
 	// the only thing that varies across them.
 	if (created > 0 && minted != nullptr)
 		item_log(ItemLogAction::GmMint, client_h, created, minted);
-	if (minted_is_ours) delete minted;
+	if (minted_is_ours) destroy_item(minted, destroy_reason::merged, client_h);
 
 	return created;
 }
@@ -1174,11 +1262,11 @@ void ItemManager::request_purchase_item_handler(int client_h, const char* item_n
 
 	for(int i = 1; i <= num; i++) {
 
-		item = create_item(resolved_item_id, item_origin::shop_buy);
+		item = create_item(resolved_item_id, item_origin::shop_buy, birth_at(client_h));
 		if (item == nullptr) continue;
 
 		if (item->m_sell_price == 0) {
-			delete item;
+			destroy_item(item, destroy_reason::discarded, client_h);
 			return;
 		}
 
@@ -1205,7 +1293,7 @@ void ItemManager::request_purchase_item_handler(int client_h, const char* item_n
 		if (discount_cost < 0) discount_cost = 0;
 
 		if (gold_count < static_cast<uint64_t>(cost - discount_cost)) {
-			delete item;
+			destroy_item(item, destroy_reason::discarded, client_h);
 
 			{
 				hb::net::PacketNotifyNotEnoughGold pkt{};
@@ -1230,7 +1318,16 @@ void ItemManager::request_purchase_item_handler(int client_h, const char* item_n
 
 			temp_price = (cost - discount_cost);
 			ret = send_item_notify_msg(client_h, Notify::ItemPurchased, item, temp_price);
-			if (erase_req == 1) delete item;
+
+			// The purchase itself (P3.1). ItemLogAction::Buy has had a text-log
+			// case since long before the ledger and nothing has ever called it,
+			// so shop purchases were the one entry into the economy with a birth
+			// row and no transition. Logged before the merge below frees `item`,
+			// and the price rides the detail because what a thing cost is half of
+			// what a shop-buy is worth knowing.
+			item_log(ItemLogAction::Buy, client_h, (int)-1, item);
+
+			if (erase_req == 1) destroy_item(item, destroy_reason::merged, client_h);
 
 			// Gold  .      .
 			gold_weight = set_item_count_by_id(client_h, hb::shared::item::ItemId::Gold, gold_count - temp_price);
@@ -1249,7 +1346,7 @@ void ItemManager::request_purchase_item_handler(int client_h, const char* item_n
 		}
 		else
 		{
-			delete item;
+			destroy_item(item, destroy_reason::discarded, client_h);
 
 			m_game->calc_total_weight(client_h);
 
@@ -1332,7 +1429,7 @@ void ItemManager::give_item_handler(int client_h, short item_index, int amount, 
 				memcpy(char_name, m_game->m_client_list[owner_h]->m_char_name, hb::shared::limits::CharNameLen - 1);
 
 				if (owner_h == client_h) {
-					delete item;
+					destroy_item(item, destroy_reason::discarded, client_h);
 					return;
 				}
 
@@ -1401,7 +1498,7 @@ void ItemManager::give_item_handler(int client_h, short item_index, int amount, 
 					m_game->m_client_list[client_h]->m_item_list[item_index]->m_instance.count += amount;
 					set_item_count(client_h, item_index, m_game->m_client_list[client_h]->m_item_list[item_index]->m_instance.count);
 					m_game->send_notify_msg(0, client_h, Notify::CannotGiveItem, item_index, amount, 0, char_name);
-					delete item;
+					destroy_item(item, destroy_reason::discarded, client_h);
 					m_game->calc_total_weight(client_h);
 					return;
 				}
@@ -1754,8 +1851,11 @@ void ItemManager::request_retrieve_item_handler(int client_h, char* data)
 					// v1.41 !!! 
 					set_item_count(client_h, i, m_game->m_client_list[client_h]->m_item_list[i]->m_instance.count + m_game->m_client_list[client_h]->m_item_in_bank_list[bank_item_index]->m_instance.count);
 
-					delete m_game->m_client_list[client_h]->m_item_in_bank_list[bank_item_index];
-					m_game->m_client_list[client_h]->m_item_in_bank_list[bank_item_index] = 0;
+					// The withdrawn stack merged into one the character already
+					// had, so its contents are now in the inventory and only the
+					// husk is freed. Counted, so the funnel records nothing.
+					destroy_item(m_game->m_client_list[client_h]->m_item_in_bank_list[bank_item_index],
+						destroy_reason::merged, client_h);
 
 					for (j = 0; j <= hb::shared::limits::MaxBankItems - 2; j++) {
 						if ((m_game->m_client_list[client_h]->m_item_in_bank_list[j + 1] != 0) && (m_game->m_client_list[client_h]->m_item_in_bank_list[j] == 0)) {
@@ -2048,7 +2148,8 @@ int ItemManager::get_arrow_item_index(int client_h)
 	return -1;
 }
 
-void ItemManager::item_deplete_handler(int client_h, short item_index, bool is_use_item_result)
+void ItemManager::item_deplete_handler(int client_h, short item_index, bool is_use_item_result,
+	destroy_reason::destroy_reason reason)
 {
 
 	if (m_game->m_client_list[client_h] == 0) return;
@@ -2062,8 +2163,11 @@ void ItemManager::item_deplete_handler(int client_h, short item_index, bool is_u
 
 	m_game->send_notify_msg(0, client_h, Notify::ItemDepletedEraseItem, item_index, (int)is_use_item_result, 0, 0);
 
-	delete m_game->m_client_list[client_h]->m_item_list[item_index];
-	m_game->m_client_list[client_h]->m_item_list[item_index] = 0;
+	// Deplete says the slot emptied; destroyed says the item left the world.
+	// They coincide here, but only here — a drop empties a slot too — so the
+	// exit gets its own event rather than being inferred from the action that
+	// happened to cause it.
+	destroy_item(m_game->m_client_list[client_h]->m_item_list[item_index], reason, client_h);
 
 	m_game->m_client_list[client_h]->m_is_item_equipped[item_index] = false;
 
@@ -2762,7 +2866,14 @@ int ItemManager::calculate_use_skill_item_effect(int owner_h, char owner_type, c
 
 			// Butchered meat, or a caught fish. The old form leaked the item when
 			// init_item_attr failed; the factory owns that failure now.
-			item = create_item(item_name, item_origin::harvest);
+			//
+			// The birth location is the tile it lands on, taken from the same
+			// three values used to place it below — this venue is reached by an
+			// NPC owner as well as a player, so an actor lookup would come back
+			// empty exactly where the drop is most interesting.
+			item = create_item(item_name, item_origin::harvest,
+				hb::server::birth_context{
+					.map = m_game->m_map_list[map_index]->m_name, .x = lX, .y = lY });
 			if (item != nullptr) {
 				m_game->m_map_list[map_index]->set_item(lX, lY, item);
 
@@ -3102,7 +3213,7 @@ void ItemManager::req_sell_item_confirm_handler(int client_h, char item_id, int 
 				// v1.41 !!!
 				set_item_count(client_h, item_id, m_game->m_client_list[client_h]->m_item_list[item_id]->m_instance.count - num);
 			}
-			else item_deplete_handler(client_h, item_id, false);
+			else item_deplete_handler(client_h, item_id, false, destroy_reason::sold);
 		}
 	}
 	else {
@@ -3121,7 +3232,7 @@ void ItemManager::req_sell_item_confirm_handler(int client_h, char item_id, int 
 		if (m_game->m_client_list[client_h]->m_item_list[item_id]->is_stackable()) {
 			set_item_count(client_h, item_id, m_game->m_client_list[client_h]->m_item_list[item_id]->m_instance.count - num);
 		}
-		else item_deplete_handler(client_h, item_id, false);
+		else item_deplete_handler(client_h, item_id, false, destroy_reason::sold);
 	}
 
 	// Gold .    0     .
@@ -4267,7 +4378,7 @@ void ItemManager::get_hero_mantle_handler(int client_h, int item_id, const char*
 	for(int i = 1; i <= num; i++)
 	{
 		// Hero mantle / cape, earned with EK and contribution.
-		item = create_item(item_id, item_origin::hero_reward);
+		item = create_item(item_id, item_origin::hero_reward, birth_at(client_h));
 		if (item == nullptr) continue;
 
 		if (add_client_item_list(client_h, item, &erase_req)) {
@@ -4298,7 +4409,7 @@ void ItemManager::get_hero_mantle_handler(int client_h, int item_id, const char*
 		}
 		else
 		{
-			delete item;
+			destroy_item(item, destroy_reason::discarded, client_h);
 
 			m_game->calc_total_weight(client_h);
 
@@ -4359,7 +4470,7 @@ void ItemManager::get_dark_item_handler(int client_h, int item_id)
 	if (resolved_id == 0) return;
 	if (m_game->m_item_config_list[resolved_id] == 0) return;
 
-	item = create_item(resolved_id, item_origin::dark_claim);
+	item = create_item(resolved_id, item_origin::dark_claim, birth_at(client_h));
 	if (item == nullptr) return;
 
 	if (add_client_item_list(client_h, item, &erase_req))
@@ -4379,7 +4490,7 @@ void ItemManager::get_dark_item_handler(int client_h, int item_id)
 	}
 	else
 	{
-		delete item;
+		destroy_item(item, destroy_reason::discarded, client_h);
 		ret = send_item_notify_msg(client_h, Notify::CannotCarryMoreItem, 0, 0);
 	}
 
@@ -5035,7 +5146,8 @@ void ItemManager::build_item_handler(int client_h, char* data)
 
 				total_value = (int)v1;
 
-				item = create_item(m_game->m_build_item_list[i]->m_name, item_origin::craft);
+				item = create_item(m_game->m_build_item_list[i]->m_name, item_origin::craft,
+					birth_at(client_h));
 				if (item == nullptr) return;
 
 				// Custom-Made
@@ -5729,7 +5841,7 @@ void ItemManager::req_create_slate_handler(int client_h, char* data)
 
 	// Create slates
 	// 867 is the slate item; the roll above only chose which flavour it reads as.
-	item = create_item(867, item_origin::craft);
+	item = create_item(867, item_origin::craft, birth_at(client_h));
 	if (item == nullptr) return;
 
 	item->set_touch_effect_type(TouchEffectType::ID);
@@ -6061,7 +6173,8 @@ void ItemManager::attempt_stone_enchant(int client_h, int item_index, uint8_t ca
 	if (roll_stone_enchant_success(client_h, item_index, category, step->success_pct) == false)
 	{
 		m_game->send_item_attribute_change(client_h, item_index, item);
-		if (step->destroy_on_fail) item_deplete_handler(client_h, item_index, false);
+		if (step->destroy_on_fail) item_deplete_handler(client_h, item_index, false,
+			destroy_reason::upgrade_break);
 		item_deplete_handler(client_h, stone_h, false);
 		return;
 	}

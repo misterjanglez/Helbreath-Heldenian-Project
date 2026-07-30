@@ -83,7 +83,8 @@ bool GameCmdCreateItem::execute(CGame* game, int client_h, const char* args)
 	if (true_stack)
 	{
 		// True stacks: single item with count = amount (arrows, materials, gold)
-		CItem* item = game->m_item_manager->create_item(item_name, hb::server::item_origin::gm_mint);
+		CItem* item = game->m_item_manager->create_item(item_name, hb::server::item_origin::gm_mint,
+			game->m_item_manager->birth_at(client_h));
 		if (item != nullptr)
 		{
 			item->m_instance.count = amount;
@@ -94,11 +95,16 @@ bool GameCmdCreateItem::execute(CGame* game, int client_h, const char* args)
 				created = amount;
 				game->m_item_manager->item_log(hb::server::net::ItemLogAction::GmMint,
 					client_h, created, item);
-				if (erase_req == 1) delete item;   // merged into an existing stack
+				// Merged into an existing stack: the contents live on in the slot
+				// it merged into, so this frees a Counted husk and records nothing.
+				if (erase_req == 1)
+					game->m_item_manager->destroy_item(item,
+						hb::server::destroy_reason::merged, client_h);
 			}
 			else
 			{
-				delete item;
+				game->m_item_manager->destroy_item(item,
+					hb::server::destroy_reason::discarded, client_h);
 				game->send_notify_msg(0, client_h, Notify::NoticeMsg, 0, 0, 0, "Inventory full.");
 				return true;
 			}

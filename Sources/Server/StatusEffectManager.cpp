@@ -324,7 +324,12 @@ void StatusEffectManager::check_farming_action(short attacker_h, short target_h,
 	// Harvested crop. The old form deleted the item when init_item_attr failed
 	// and then went on to use it in both branches below — a use-after-free that
 	// the factory's nullptr contract removes.
-	item = m_game->m_item_manager->create_item(item_id, hb::server::item_origin::harvest);
+	// The harvester's tile. Butchering drops onto the corpse's tile in the
+	// type == 1 branch below, but that branch is chosen after the item exists and
+	// the two tiles are a step apart — the actor's position is the honest answer
+	// to "where did this enter the world", and it is the one this venue knows.
+	item = m_game->m_item_manager->create_item(item_id, hb::server::item_origin::harvest,
+		m_game->m_item_manager->birth_at(attacker_h));
 	if (item == nullptr) return;
 
 	if (type == 0) {

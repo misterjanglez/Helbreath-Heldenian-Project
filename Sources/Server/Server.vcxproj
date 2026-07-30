@@ -230,6 +230,8 @@
     <ClInclude Include="CheckTally.h" />
     <ClInclude Include="CmdItemLogCheck.h" />
     <ClInclude Include="CmdLedgerCheck.h" />
+
+    <ClInclude Include="CmdLifecycleCheck.h" />
     <ClInclude Include="CmdMintCheck.h" />
     <ClInclude Include="CmdSerialCheck.h" />
     <ClInclude Include="CmdReload.h" />
@@ -383,7 +385,8 @@
     <ClCompile Include="CmdGiveItem.cpp" />
     <ClCompile Include="CheckTally.cpp" />
     <ClCompile Include="CmdItemLogCheck.cpp" />
-    <ClCompile Include="CmdLedgerCheck.cpp" />
+    <ClCompile Include="CmdLedgerCheck.cpp" />
+    <ClCompile Include="CmdLifecycleCheck.cpp" />
     <ClCompile Include="CmdMintCheck.cpp" />
     <ClCompile Include="CmdSerialCheck.cpp" />
     <ClCompile Include="CmdReload.cpp" />

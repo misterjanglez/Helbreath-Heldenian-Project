@@ -184,7 +184,8 @@ void CraftingManager::req_create_portion_handler(int client_h, char* data)
 		m_game->send_notify_msg(0, client_h, Notify::PortionSuccess, 0, 0, 0, portion_name);
 		m_game->m_client_list[client_h]->m_exp_stock += m_game->dice(1, (difficulty / 3));
 
-		item = m_game->m_item_manager->create_item(portion_name, hb::server::item_origin::craft);
+		item = m_game->m_item_manager->create_item(portion_name, hb::server::item_origin::craft,
+			m_game->m_item_manager->birth_at(client_h));
 		if (item != nullptr) {
 			if (m_game->m_item_manager->add_client_item_list(client_h, item, &erase_req)) {
 				ret = m_game->m_item_manager->send_item_notify_msg(client_h, Notify::ItemObtained, item, 0);
@@ -463,7 +464,8 @@ void CraftingManager::req_create_crafting_handler(int client_h, char* data)
 
 		m_game->m_client_list[client_h]->m_exp_stock += m_game->dice(2, 100);
 
-		item = m_game->m_item_manager->create_item(crafting_name, hb::server::item_origin::craft);
+		item = m_game->m_item_manager->create_item(crafting_name, hb::server::item_origin::craft,
+			m_game->m_item_manager->birth_at(client_h));
 		if (item != nullptr)
 		{	// // Snoopy: Added Purity to Oils/Elixirs
 			if (purity != 0)

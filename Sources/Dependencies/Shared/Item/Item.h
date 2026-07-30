@@ -206,6 +206,16 @@ public:
     // event cannot be fully formed until after this point.
     int32_t m_origin = 0;
 
+    // When this item was last placed on the ground, in GameClock milliseconds
+    // (#79). Meaningless while the item is in an inventory, a bank or an escrow
+    // — CMap::set_item is the only writer, because that is the only way an item
+    // reaches a map tile.
+    //
+    // Ground items are RAM-only (they are never persisted), so this never has
+    // to survive a restart: a server that comes back up has no ground items to
+    // date. Server-side only, like m_serial, and equally never on the wire.
+    uint32_t m_ground_at = 0;
+
     //------------------------------------------------------------------------
     // Display Name Helpers
     //------------------------------------------------------------------------

@@ -9,7 +9,7 @@
 #include "ItemProvenance.h"
 using hb::shared::direction::direction;
 
-namespace hb::server { struct drop_table; struct ledger_event_record; class item_ledger_store; }
+namespace hb::server { struct drop_table; struct ledger_event_record; struct roll_context; class item_ledger_store; }
 class CClient;
 class CGame;
 class CItem;
@@ -35,8 +35,28 @@ public:
 	// Instanced (non-stackable, per D2) and records how it entered the world.
 	// Returns nullptr when the config lookup fails — callers get the
 	// create / init / delete-on-failure dance for free rather than repeating it.
-	CItem* create_item(int item_id, hb::server::item_origin::item_origin origin);
-	CItem* create_item(const char* item_name, hb::server::item_origin::item_origin origin);
+	//
+	// `birth` is what the venue knows and the funnel cannot (P3.1): where the
+	// item came into the world and, where it means anything, who or what made
+	// it. Defaulted, so a venue with nothing to add reads exactly as it did
+	// before and the ledger records NULLs instead of an invented location.
+	CItem* create_item(int item_id, hb::server::item_origin::item_origin origin,
+		const hb::server::birth_context& birth = {});
+	CItem* create_item(const char* item_name, hb::server::item_origin::item_origin origin,
+		const hb::server::birth_context& birth = {});
+
+	// The loot venue, which is the one creation whose birth is not finished when
+	// the item is constructed: an NPC drop rolls its Item Tiers attributes onto
+	// the fresh instance, so a mint taken before the roll writes a birth row
+	// reading Tier 0 for what may be a Tier 3 sword — and tier-by-source is
+	// precisely what the drop-rate telemetry exists to answer.
+	//
+	// Rolling inside the entry point puts the mint after the roll without moving
+	// the roll relative to any other draw the drop path makes. The alternative —
+	// patching the birth row after the fact — would have the ledger rewriting
+	// rows it promises are append-only.
+	CItem* create_loot_item(int item_id, const hb::server::roll_context& rolls,
+		const hb::server::birth_context& birth);
 
 	// Rehydrates a persisted item. A save/load round trip is not a birth, so
 	// this carries the stored Serial rather than minting a new one — minting
@@ -68,6 +88,48 @@ public:
 	// is deleted as soon as that line is written. It shares the source's Serial
 	// because it *describes* that item rather than duplicating it.
 	CItem* create_snapshot(CItem* source);
+
+	//----------------------------------------------------------------------
+	// Item destruction — the other half of the coverage law (#79, plan P3.1)
+	//
+	// Creation funnels through the factory above so no item is born without a
+	// Serial. Destruction funnels through here so no item dies without saying
+	// so: a Serial with a birth row, no exit event and no holder is exactly the
+	// shape of a duplication anomaly, and Reconciliation cannot tell that
+	// signal apart from an item somebody quietly `delete`d.
+	//
+	// Scripts/check_item_destroy.py enforces it, with an allowlist for the
+	// deletes that are genuinely not destructions — a snapshot being freed, a
+	// logged-out character's inventory being released from RAM while the rows
+	// stay in the Game DB, a config template at shutdown.
+	//----------------------------------------------------------------------
+
+	// Records the exit and frees the item. Takes the pointer by reference and
+	// nulls it, so the funnel visibly takes ownership and no caller is left
+	// holding a dangling pointer it could log from a line later.
+	//
+	// Safe for a Counted item: those carry no Serial, so there is no instance
+	// for an event to point at and this is then only a delete. Callers do not
+	// have to know which kind they hold — that is the point of a funnel.
+	//
+	// `actor_h` is whoever caused it, or 0 for the world itself. It supplies the
+	// event's actor and location the same way every other ledger event gets
+	// them, which is why a destruction knows where it happened without the
+	// caller assembling anything.
+	void destroy_item(CItem*& item, hb::server::destroy_reason::destroy_reason reason,
+		int actor_h = 0);
+
+	// The same funnel for an item that left the ground with nobody taking it.
+	//
+	// Separate from destroy_item because it is a different event type and a
+	// different question: destroyed says something was used up or broken,
+	// despawned says nobody wanted it — which is the attrition half of the
+	// drop-tuning telemetry the ledger exists to produce.
+	//
+	// There is no actor by definition, so the location cannot come from one:
+	// the tile supplies it, which is also the only place it was ever true.
+	void despawn_item(CItem*& item, hb::server::despawn_reason::despawn_reason reason,
+		const char* map, int x, int y);
 
 	// True when `item_id` indexes a loaded item-config row. The bounds and the
 	// null-row check travel together everywhere they appear, so they live here
@@ -141,7 +203,17 @@ public:
 
 	// Item use / effects
 	void use_item_handler(int client_h, short item_index, short dX, short dY, short dest_item_id);
-	void item_deplete_handler(int client_h, short item_index, bool is_use_item_result);
+	// Empties an inventory slot and destroys what was in it — the one path every
+	// consuming action already shares (potions, arrows, craft materials, a sale,
+	// a broken upgrade), which is why the population-exit event is emitted from
+	// here instead of from twenty callers.
+	//
+	// `reason` defaults to consumed because that is what most of those callers
+	// are; the two that are not — selling to a shop, and an upgrade destroying
+	// the item — say so, and nothing else has to change.
+	void item_deplete_handler(int client_h, short item_index, bool is_use_item_result,
+		hb::server::destroy_reason::destroy_reason reason
+			= hb::server::destroy_reason::consumed);
 	bool deplete_dest_type_item_use_effect(int client_h, int dX, int dY, short item_index, short dest_item_id);
 	int calculate_use_skill_item_effect(int owner_h, char owner_type, char owner_skill, int skill_num, char map_index, int dX, int dY);
 	bool plant_seed_bag(int map_index, int dX, int dY, int item_effect_value1, int item_effect_value2, int client_h);
@@ -236,7 +308,25 @@ private:
 	// Serial only when the item is Instanced (non-stackable, per D2). Minting is
 	// also where the ledger's birth record is emitted, so every creation venue
 	// lands one without knowing the ledger exists.
-	void stamp_provenance(CItem* item, hb::server::item_origin::item_origin origin);
+	//
+	// Call it when the item is finished, not merely constructed — the birth row
+	// snapshots the item as it is at this instant, so a venue that still has
+	// attributes to roll (loot) must roll them first or record a lie.
+	void stamp_provenance(CItem* item, hb::server::item_origin::item_origin origin,
+		const hb::server::birth_context& birth = {});
+
+public:
+	// A birth_context standing where a player is. Most creation venues are
+	// something a character did — bought, crafted, fished, mined, turned in a
+	// quest — so "where did this item enter the world" is answered by the actor's
+	// position, and having one helper say so keeps twenty call sites from each
+	// reaching into m_client_list to spell out the same three fields.
+	//
+	// An unresolvable handle yields an empty context rather than a fabricated
+	// one, which is the same promise begin_ledger_event makes for events.
+	hb::server::birth_context birth_at(int client_h, const char* detail = nullptr) const;
+
+private:
 
 	// The Provenance Ledger, or null when there is nothing to record into —
 	// which is every call before boot has opened the store, and every call in a
@@ -253,7 +343,12 @@ private:
 	// all. False for a Counted item (no identity to key on, D2) and when no
 	// ledger is open, which is also the callers' cue not to build a detail
 	// string for a row that is not going to exist.
-	bool begin_ledger_event(int action, const CItem* item, int actor_h,
+	//
+	// `event_type` takes either band (ItemLedgerStore.h): an ItemLogAction from
+	// the dual sink, or a ledger-only value like destroyed from #79's exits. The
+	// bands are disjoint by static_assert, so one parameter can carry both
+	// without the two ever having to be told apart here.
+	bool begin_ledger_event(int event_type, const CItem* item, int actor_h,
 		hb::server::ledger_event_record& event) const;
 
 	// Field-by-field copy. `to` is the destination — private because

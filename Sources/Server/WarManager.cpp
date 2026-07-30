@@ -2370,7 +2370,8 @@ void WarManager::get_occupy_flag_handler(int client_h)
 	num = 1;
 	for(int i = 1; i <= num; i++) {
 
-		item = m_game->m_item_manager->create_item(item_name, hb::server::item_origin::war_reward);
+		item = m_game->m_item_manager->create_item(item_name, hb::server::item_origin::war_reward,
+			m_game->m_item_manager->birth_at(client_h));
 		if (item != nullptr) {
 
 			if (m_game->m_item_manager->add_client_item_list(client_h, item, &erase_req)) {
@@ -2408,7 +2409,8 @@ void WarManager::get_occupy_flag_handler(int client_h)
 			}
 			else
 			{
-				delete item;
+				m_game->m_item_manager->destroy_item(item,
+					hb::server::destroy_reason::discarded, client_h);
 
 				m_game->calc_total_weight(client_h);
 
