@@ -296,7 +296,12 @@ bool EnsureGameConfigDatabase(sqlite3** outDb, std::string& outPath, bool* outCr
         " roll_count_min INTEGER NOT NULL DEFAULT 1,"
         " roll_count_max INTEGER NOT NULL DEFAULT 1,"
         " placement TEXT NOT NULL DEFAULT 'single',"
-        " delay TEXT NOT NULL DEFAULT 'death'"
+        " delay TEXT NOT NULL DEFAULT 'death',"
+        // The guaranteed head and the tail penalty (#89). Defaults reproduce the
+        // pre-#89 behaviour exactly: no guarantee, no tail discount.
+        " guaranteed_rolls INTEGER NOT NULL DEFAULT 0,"
+        " guarantee_item_id INTEGER NOT NULL DEFAULT 0,"
+        " tail_rarity_divisor INTEGER NOT NULL DEFAULT 1"
         ");"
         "CREATE TABLE IF NOT EXISTS drop_entries ("
         " drop_table_id INTEGER NOT NULL,"
@@ -304,6 +309,9 @@ bool EnsureGameConfigDatabase(sqlite3** outDb, std::string& outPath, bool* outCr
         " drop_chance_ppb INTEGER NOT NULL,"
         " min_count INTEGER NOT NULL,"
         " max_count INTEGER NOT NULL,"
+        // Rolls of min..max, summed. 1 for every row except a gold pile that
+        // reproduces the original's iDice(10, 15000).
+        " count_throws INTEGER NOT NULL DEFAULT 1,"
         " PRIMARY KEY (drop_table_id, item_id)"
         ");"
         "CREATE TABLE IF NOT EXISTS drop_multipliers ("
@@ -324,10 +332,14 @@ bool EnsureGameConfigDatabase(sqlite3** outDb, std::string& outPath, bool* outCr
         // Rarity is authored and reasoned about as "1 in N"; the column is ppb
         // so the guaranteed-table rule can be an exact integer equality. This
         // view is the readable half, for hand-editing gamedata.db.
+        // NULLIF because a guarantee-payload row carries 0 ppb — it is not
+        // winnable, so it has no "1 in N" to print.
         "CREATE VIEW IF NOT EXISTS drop_entries_readable AS"
         " SELECT e.drop_table_id, t.name AS table_name, t.stage, e.item_id,"
-        " e.drop_chance_ppb, 1000000000.0 / e.drop_chance_ppb AS one_in,"
-        " e.min_count, e.max_count"
+        " e.drop_chance_ppb,"
+        " 1000000000.0 / NULLIF(e.drop_chance_ppb, 0) AS one_in,"
+        " e.min_count, e.max_count, e.count_throws,"
+        " CASE WHEN e.item_id = t.guarantee_item_id THEN 'guarantee' END AS role"
         " FROM drop_entries e JOIN drop_tables t USING (drop_table_id)"
         " ORDER BY e.drop_table_id, e.drop_chance_ppb DESC;"
         "CREATE TABLE IF NOT EXISTS magic_configs ("
@@ -1595,12 +1607,15 @@ bool LoadDropTables(sqlite3* db, CGame* game)
 
     const char* tableSql =
         "SELECT drop_table_id, name, description, stage, roll_count_min,"
-        " roll_count_max, placement, delay FROM drop_tables ORDER BY drop_table_id;";
+        " roll_count_max, placement, delay, guaranteed_rolls, guarantee_item_id,"
+        " tail_rarity_divisor FROM drop_tables ORDER BY drop_table_id;";
     sqlite3_stmt* stmt = nullptr;
     if (sqlite3_prepare_v2(db, tableSql, -1, &stmt, nullptr) != SQLITE_OK) {
         hb::logger::error("LoadDropTables: drop_tables is missing the #73 columns"
-            " (stage/roll_count_min/roll_count_max/placement/delay). Run"
-            " Scripts/migrate_drop_chances.py against this database.");
+            " (stage/roll_count_min/roll_count_max/placement/delay) or the #89"
+            " ones (guaranteed_rolls/guarantee_item_id/tail_rarity_divisor). Run"
+            " Scripts/migrate_drop_chances.py and then"
+            " Scripts/migrate_scatter_guarantee.py against this database.");
         return false;
     }
 
@@ -1625,16 +1640,21 @@ bool LoadDropTables(sqlite3* db, CGame* game)
             game->m_drop_table_anomalies.push_back(std::format(
                 "drop_tables {} '{}': delay '{}' is not 'death' or 'decay'",
                 table.id, table.name, delay));
+        table.guaranteed_rolls = sqlite3_column_int(stmt, 8);
+        table.guarantee_item_id = sqlite3_column_int(stmt, 9);
+        table.tail_rarity_divisor = sqlite3_column_int(stmt, 10);
         game->m_drop_tables[table.id] = std::move(table);
     }
     sqlite3_finalize(stmt);
 
     const char* entrySql =
-        "SELECT drop_table_id, item_id, drop_chance_ppb, min_count, max_count"
-        " FROM drop_entries ORDER BY drop_table_id, drop_chance_ppb DESC, item_id;";
+        "SELECT drop_table_id, item_id, drop_chance_ppb, min_count, max_count,"
+        " count_throws FROM drop_entries"
+        " ORDER BY drop_table_id, drop_chance_ppb DESC, item_id;";
     if (sqlite3_prepare_v2(db, entrySql, -1, &stmt, nullptr) != SQLITE_OK) {
-        hb::logger::error("LoadDropTables: drop_entries is missing drop_chance_ppb."
-            " Run Scripts/migrate_drop_chances.py against this database.");
+        hb::logger::error("LoadDropTables: drop_entries is missing drop_chance_ppb"
+            " or count_throws. Run Scripts/migrate_drop_chances.py and then"
+            " Scripts/migrate_scatter_guarantee.py against this database.");
         return false;
     }
 
@@ -1653,22 +1673,34 @@ bool LoadDropTables(sqlite3* db, CGame* game)
         const sqlite3_int64 ppb = sqlite3_column_int64(stmt, 2);
         entry.min_count = sqlite3_column_int(stmt, 3);
         entry.max_count = sqlite3_column_int(stmt, 4);
+        entry.count_throws = sqlite3_column_int(stmt, 5);
 
         // "Nothing" is the remainder, never a row, and a row that cannot come
         // up is data nobody meant to write. Both are validator errors rather
         // than quiet skips: a dropped row changes no other row's odds under
         // this model, so it would vanish without a trace.
-        if (entry.item_id == 0 || ppb <= 0 ||
+        //
+        // The lone exception is 0 ppb on the table's own guarantee item (#89):
+        // that row is not a competitor, it is where the guaranteed head's
+        // payout says how much it pays. The validator checks the correspondence
+        // in both directions, so a stray 0 elsewhere is still reported.
+        const bool is_guarantee = entry.item_id != 0 &&
+            entry.item_id == it->second.guarantee_item_id;
+        const sqlite3_int64 floor_ppb = is_guarantee ? 0 : 1;
+        if (entry.item_id == 0 || ppb < floor_ppb ||
             ppb > hb::server::drop_chance_denominator) {
             game->m_drop_table_anomalies.push_back(std::format(
                 "drop_entries table {} '{}' item {}: drop_chance_ppb {} is"
-                " outside 1..{}", tableId, it->second.name, entry.item_id, ppb,
-                hb::server::drop_chance_denominator));
+                " outside {}..{}", tableId, it->second.name, entry.item_id, ppb,
+                floor_ppb, hb::server::drop_chance_denominator));
             continue;
         }
 
         entry.chance_ppb = static_cast<uint32_t>(ppb);
         it->second.total_ppb += entry.chance_ppb;
+        if (is_guarantee)
+            it->second.guarantee_entry_index =
+                static_cast<int>(it->second.entries.size());
         it->second.entries.push_back(entry);
     }
     sqlite3_finalize(stmt);

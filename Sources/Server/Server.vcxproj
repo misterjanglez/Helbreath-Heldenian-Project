@@ -227,6 +227,7 @@
     <ClInclude Include="CmdMintCheck.h" />
     <ClInclude Include="CmdReload.h" />
     <ClInclude Include="CmdRollSmoke.h" />
+    <ClInclude Include="CmdScatterSmoke.h" />
     <ClInclude Include="GmMintSpec.h" />
     <ClInclude Include="GameChatCommand.h" />
     <ClInclude Include="GameCmdWhisper.h" />
@@ -373,6 +374,7 @@
     <ClCompile Include="CmdMintCheck.cpp" />
     <ClCompile Include="CmdReload.cpp" />
     <ClCompile Include="CmdRollSmoke.cpp" />
+    <ClCompile Include="CmdScatterSmoke.cpp" />
     <ClCompile Include="GmMintSpec.cpp" />
     <ClCompile Include="GameChatCommand.cpp" />
     <ClCompile Include="GameCmdWhisper.cpp" />

@@ -31,6 +31,7 @@
 #include "ServerConsole.h"
 #include "TierConfigStore.h"
 #include "TierConfigValidator.h"    // ordinary_tier_gear
+#include <algorithm>
 #include <cstdio>
 #include <cstring>
 #include <format>
@@ -259,6 +260,11 @@ void write_monster_rows(const CGame& game, const tier_validation_context& contex
 			slot + 1, static_cast<uint8_t>(npc.m_loot_grade), rep_factor,
 			context.item_configs, context.item_config_count, chances, &saturated);
 
+		// The tail's chances come off the head's, exactly as the roller derives
+		// them, so this report cannot disagree with what actually drops.
+		std::vector<uint32_t> tail_chances;
+		hb::server::resolve_tail_chances(table, chances, tail_chances);
+
 		std::string header = std::format("  stage {}: table {} '{}'", slot + 1,
 			table.id, table.name);
 		if (table.roll_count_min != 1 || table.roll_count_max != 1)
@@ -269,38 +275,98 @@ void write_monster_rows(const CGame& game, const tier_validation_context& contex
 			hb::server::drop_delay_name(table.delay));
 		if (slot == 0) header += ", tier-rolls";
 		hb::console::write(header, console_color::info);
+		if (table.guaranteed_rolls > 0)
+			hb::console::write(std::format(
+				"    guaranteed head: the first {} of {} rolls cannot come up empty -"
+				" the remainder pays out item {} instead. Rolls past it are {}x rarer.",
+				table.guaranteed_rolls, table.roll_count_min,
+				table.guarantee_item_id, table.tail_rarity_divisor),
+				console_color::info);
 		if (saturated)
 			hb::console::write(
 				"    SATURATED - rows were scaled back to 1.0; a bigger multiplier"
 				" is a no-op here", console_color::warning);
 
-		hb::console::write(std::format("    {:>5}  {:<30}{:>12}{:>14}  {}",
-			"item", "name", "per kill", "1 in N", "category"), console_color::muted);
+		// A kill is `head` rolls at the authored rarity plus `tail` rolls at the
+		// divided one, so a row's per-kill expectation is not its per-roll chance
+		// times the roll count. Both are printed: the chance is what the data
+		// says, the expectation is what a player sees.
+		const int head_rolls = std::min(table.guaranteed_rolls, table.roll_count_min);
+		auto expected_at = [&](double p_head, double p_tail, int rolls) {
+			const int head = std::min(head_rolls, rolls);
+			return head * p_head + (rolls - head) * p_tail;
+		};
 
-		double total = 0.0;
+		// Summed first, because the guarantee item's own per-kill figure IS the
+		// head's leftover — printing it as 0 next to a 2.43 two lines below would
+		// read as a bug in the report.
+		const double total = static_cast<double>(hb::server::total_chance(chances))
+			/ drop_chance_denominator;
+		const double tail_total =
+			static_cast<double>(hb::server::total_chance(tail_chances))
+			/ drop_chance_denominator;
+		const double guarantee_per_kill = head_rolls * (1.0 - total);
+
+		hb::console::write(std::format("    {:>5}  {:<30}{:>12}{:>14}{:>11}  {}",
+			"item", "name", "per roll", "1 in N", "per kill", "category"),
+			console_color::muted);
+
 		for (size_t i = 0; i < chances.size(); i++)
 		{
 			const int item_id = table.entries[i].item_id;
 			const double p = static_cast<double>(chances[i]) / drop_chance_denominator;
-			total += p;
+			const double p_tail =
+				static_cast<double>(tail_chances[i]) / drop_chance_denominator;
 			const CItem* config = (item_id >= 0 && item_id < context.item_config_count)
 				? context.item_configs[item_id] : nullptr;
 			const uint8_t category = hb::server::drop_category_of(config, item_id);
-			hb::console::write(std::format("    {:>5}  {:<30}{:>12}{:>14}  {}{}",
+			const bool is_guarantee = item_id == table.guarantee_item_id;
+			hb::console::write(std::format("    {:>5}  {:<30}{:>12}{:>14}{:>11.4f}  {}{}{}",
 				item_id, config != nullptr ? config->m_name : "?",
-				pct(p), one_in(p), hb::server::drop_category_name(category),
+				is_guarantee ? std::string("guarantee") : pct(p),
+				is_guarantee ? std::string("-") : one_in(p),
+				is_guarantee ? guarantee_per_kill
+					: expected_at(p, p_tail, table.roll_count_min),
+				hb::server::drop_category_name(category),
 				hb::server::ordinary_tier_gear(context, item_id) != nullptr
-					? " (tier-rolls)" : ""));
+					? " (tier-rolls)" : "",
+				is_guarantee ? " (paid on an empty head roll)" : ""));
 		}
-		hb::console::write(std::format("    {:>5}  {:<30}{:>12}{:>14}",
-			"", "nothing", pct(1.0 - total), one_in(1.0 - total)),
-			console_color::muted);
+
+		// What an empty roll yields differs by phase, which is the whole point of
+		// the head, so "nothing" is reported per phase rather than once.
+		const double head_empty = 1.0 - total;
+		if (head_rolls > 0)
+		{
+			hb::console::write(std::format("    {:>5}  {:<30}{:>12}{:>14}{:>11.4f}",
+				"", "head empty -> the guarantee", pct(head_empty),
+				one_in(head_empty), guarantee_per_kill), console_color::muted);
+			hb::console::write(std::format("    {:>5}  {:<30}{:>12}{:>14}{:>11.4f}",
+				"", "tail empty -> nothing", pct(1.0 - tail_total),
+				one_in(1.0 - tail_total),
+				(table.roll_count_min - head_rolls) * (1.0 - tail_total)),
+				console_color::muted);
+		}
+		else
+		{
+			hb::console::write(std::format("    {:>5}  {:<30}{:>12}{:>14}",
+				"", "nothing", pct(head_empty), one_in(head_empty)),
+				console_color::muted);
+		}
+
 		if (table.roll_count_max > 1)
+		{
+			// The head always yields, so it contributes its own count outright.
+			const double lo = expected_at(total, tail_total, table.roll_count_min)
+				+ guarantee_per_kill;
+			const double hi = expected_at(total, tail_total, table.roll_count_max)
+				+ guarantee_per_kill;
 			hb::console::write(std::format(
-				"    expected items per kill: {:.2f}-{:.2f} (the table is rolled {}-{}x;"
-				" roll count is never touched by a multiplier)",
-				total * table.roll_count_min, total * table.roll_count_max,
-				table.roll_count_min, table.roll_count_max), console_color::muted);
+				"    expected items per kill: {:.2f}-{:.2f}, floor {} (the table is"
+				" rolled {}-{}x; roll count is never touched by a multiplier)",
+				lo, hi, head_rolls, table.roll_count_min, table.roll_count_max),
+				console_color::muted);
+		}
 	}
 }
 

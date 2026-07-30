@@ -303,6 +303,8 @@ private:
     // stage multiplier and decides whether the result tier-rolls, and nothing
     // else in here branches on it.
     void roll_drop_slot(int npc_h, short attacker_h, int stage_slot, int table_id);
+    // A won row's stack size: count_throws rolls of min..max, summed.
+    int roll_entry_count(const hb::server::drop_entry& entry, int min_count, int max_count);
     bool spawn_npc_drop_item(int npc_h, int item_id, int min_count, int max_count, short dx = 0, short dy = 0, bool tier_rolls = false);
     // Queue a stage-2 drop rolled at death to be placed when the corpse decays.
     void queue_pending_drop(int npc_h, int item_id, int min_count, int max_count, short dx, short dy, bool tier_rolls);

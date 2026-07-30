@@ -147,6 +147,40 @@ void resolve_drop_chances(const drop_table& table,
 			static_cast<uint64_t>(chance) * drop_chance_denominator / total);
 }
 
+void resolve_tail_chances(const drop_table& table,
+	const std::vector<uint32_t>& head_chances,
+	std::vector<uint32_t>& out_chances)
+{
+	out_chances = head_chances;
+	if (table.tail_rarity_divisor <= 1) return;
+
+	const uint32_t divisor = static_cast<uint32_t>(table.tail_rarity_divisor);
+	for (uint32_t& chance : out_chances)
+		chance /= divisor;
+}
+
+void resolve_entry_counts(const drop_entry& entry, int gold_dice_min,
+	int gold_dice_max, int& min_count, int& max_count)
+{
+	min_count = entry.min_count;
+	max_count = entry.max_count;
+	if (entry.item_id == ItemId::Gold && max_count <= 0)
+	{
+		min_count = gold_dice_min;
+		max_count = gold_dice_max;
+	}
+	if (min_count < 0) min_count = 0;
+	if (max_count < min_count) max_count = min_count;
+}
+
+uint64_t total_chance(const std::vector<uint32_t>& chances)
+{
+	uint64_t total = 0;
+	for (const uint32_t chance : chances)
+		total += chance;
+	return total;
+}
+
 int roll_drop_row(const std::vector<uint32_t>& chances, uint32_t draw)
 {
 	uint64_t cumulative = 0;

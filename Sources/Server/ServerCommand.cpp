@@ -8,6 +8,7 @@
 #include "CmdMintCheck.h"
 #include "CmdReload.h"
 #include "CmdRollSmoke.h"
+#include "CmdScatterSmoke.h"
 #include "CmdSetAdmin.h"
 #include "CmdSetCmdLevel.h"
 #include "CmdSaveAll.h"
@@ -89,6 +90,7 @@ void ServerCommandManager::register_built_in_commands()
 	register_command(std::make_unique<CmdMintCheck>());
 	register_command(std::make_unique<CmdReload>());
 	register_command(std::make_unique<CmdRollSmoke>());
+	register_command(std::make_unique<CmdScatterSmoke>());
 	register_command(std::make_unique<CmdSetAdmin>());
 	register_command(std::make_unique<CmdSetCmdLevel>());
 	register_command(std::make_unique<CmdSaveAll>());

@@ -2630,10 +2630,36 @@ void CEntityManager::npc_dead_item_generator(int npc_h, short attacker_h, char a
 	roll_drop_slot(npc_h, attacker_h, 2, m_npc_list[npc_h]->m_stage2_table_id);
 }
 
+// A row's stack size: `count_throws` rolls of min..max, summed. One throw is
+// the ordinary case and reduces to the roll every row used to get; ten throws of
+// 1..15000 is the original's `iDice(10, 15000)` scatter gold pile, which sits
+// near 75,005 rather than spreading flat across the whole span.
+//
+// min/max come in as parameters rather than off the entry because a gold row may
+// have substituted the monster's dice for an unauthored count.
+int CEntityManager::roll_entry_count(const hb::server::drop_entry& entry,
+	int min_count, int max_count)
+{
+	if (max_count < min_count) max_count = min_count;
+	const int throws = entry.count_throws > 1 ? entry.count_throws : 1;
+
+	int total = 0;
+	for (int i = 0; i < throws; i++)
+		total += (max_count > min_count)
+			? m_game->dice(1, (max_count - min_count)) + min_count
+			: min_count;
+	return total;
+}
+
 // One table, rolled roll_count times, its winnings placed where and when the
 // table says. Stage 2's old machinery — the flat 5% gate, guaranteed_secondary,
 // scatter_count — is all gone: what survives is the table properties any table
 // may carry.
+//
+// #89 adds two properties to that list: a guaranteed head, whose remainder pays
+// out the table's guarantee item instead of nothing, and a rarity divisor for
+// the rolls past it. Together they are the original's scatter — a floor of
+// `guaranteed_rolls` items with a thinning tail above it.
 //
 // The rating modifier went with them in #73, having been wired to gate the
 // stage-2 drop outright. #88 brings it back where the original had it and where
@@ -2664,6 +2690,21 @@ void CEntityManager::roll_drop_slot(int npc_h, short attacker_h, int stage_slot,
 		stage_slot, static_cast<uint8_t>(npc->m_loot_grade), rep_factor,
 		m_game->m_item_config_list, hb::server::config::MaxItemTypes, chances);
 
+	// Rolls past the guaranteed head run at a fraction of that rarity (#89),
+	// derived from the head's chances rather than resolved again so the
+	// generosity stack is applied exactly once. Only a table that actually
+	// discounts its tail pays for the second vector — this runs on every monster
+	// death, and all but three tables leave the divisor at 1.
+	const bool discounts_tail = table->tail_rarity_divisor > 1;
+	std::vector<uint32_t> tail_chances;
+	if (discounts_tail)
+		hb::server::resolve_tail_chances(*table, chances, tail_chances);
+
+	// The guaranteed head's payout carries its count on a 0-ppb row, so a gold
+	// pile's size is authored beside the gold rather than hidden in the engine.
+	// The row was located once at load; per-kill is no place to scan for it.
+	const hb::server::drop_entry* guarantee = table->guarantee_entry();
+
 	// How many times the table is rolled is an AUTHORED property, never touched
 	// by a multiplier: turning stage 2 up must not make a scatter boss spread
 	// more items.
@@ -2681,29 +2722,37 @@ void CEntityManager::roll_drop_slot(int npc_h, short attacker_h, int stage_slot,
 
 	int placed = 0;
 	for (int k = 0; k < rolls; k++) {
-		const int index = hb::server::roll_drop_row(chances, draw(m_drop_rng));
-		if (index < 0) continue;                       // the remainder: nothing
-		const hb::server::drop_entry& entry = table->entries[index];
+		// The head cannot come up empty; the tail can, and rolls rarer.
+		const bool guaranteed = (k < table->guaranteed_rolls);
+		const std::vector<uint32_t>& roll_chances =
+			(guaranteed || !discounts_tail) ? chances : tail_chances;
 
-		int min_count = entry.min_count;
-		int max_count = entry.max_count;
+		const int index = hb::server::roll_drop_row(roll_chances, draw(m_drop_rng));
+		const hb::server::drop_entry* won = (index >= 0)
+			? &table->entries[index]
+			: (guaranteed ? guarantee : nullptr);   // the head's remainder pays out
+		if (won == nullptr) continue;                  // the remainder: nothing
+		const hb::server::drop_entry& entry = *won;
+
+		int min_count = 0, max_count = 0;
+		hb::server::resolve_entry_counts(entry,
+			static_cast<int>(npc->m_gold_dice_min),
+			static_cast<int>(npc->m_gold_dice_max), min_count, max_count);
+
 		if (entry.item_id == hb::shared::item::ItemId::Gold) {
-			// Gold's amount comes from the monster's dice rather than the row,
-			// and the killer's add-gold bonus applies to it, exactly as before.
-			min_count = static_cast<int>(npc->m_gold_dice_min);
-			max_count = static_cast<int>(npc->m_gold_dice_max);
-			if (min_count < 0) min_count = 0;
-			if (max_count < min_count) max_count = min_count;
-			int amount = min_count;
-			if (max_count > min_count)
-				amount = m_game->dice(1, (max_count - min_count)) + min_count;
+			int amount = roll_entry_count(entry, min_count, max_count);
 			if (amount <= 0) continue;
+			// The killer's add-gold bonus applies to every gold row, as before.
 			if ((m_game->m_client_list[attacker_h] != nullptr) &&
 				(m_game->m_client_list[attacker_h]->m_add_gold != 0)) {
 				const double bonus = (double)m_game->m_client_list[attacker_h]->m_add_gold;
 				amount += static_cast<int>((bonus / 100.0) * static_cast<double>(amount));
 			}
 			min_count = max_count = amount;
+		}
+		else if (entry.count_throws > 1) {
+			// Resolved here so the throws never have to travel to the decay path.
+			min_count = max_count = roll_entry_count(entry, min_count, max_count);
 		}
 
 		// Spiral placement fills the 5x5 centre-out square in the order items

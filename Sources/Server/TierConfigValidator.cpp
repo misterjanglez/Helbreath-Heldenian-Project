@@ -553,6 +553,60 @@ void check_stage2_gear(const tier_validation_context& context, validation_state&
 	}
 }
 
+// The guaranteed head and the tail penalty (#89). The head is what puts a floor
+// under a scatter boss's yield, so every way of writing it wrong silently costs
+// items — a guarantee naming an item with no row would substitute nothing at
+// all, and a head longer than the roll count would promise rolls that never run.
+void check_drop_guarantee(const tier_validation_context& context,
+	int table_id, const drop_table& table, validation_state& v)
+{
+	// The guarantee's payload row: 0 ppb, present for its count spec alone.
+	const drop_entry* payload = nullptr;
+	for (const auto& entry : table.entries)
+		if (entry.item_id == table.guarantee_item_id) payload = &entry;
+
+	if (table.guaranteed_rolls < 0)
+		v.add("drop_tables {} '{}': guaranteed_rolls {} is negative",
+			table_id, table.name, table.guaranteed_rolls);
+	else if (table.guaranteed_rolls > table.roll_count_min)
+		v.add("drop_tables {} '{}': guaranteed_rolls {} exceeds roll_count_min {} - the guarantee would cover rolls that never happen",
+			table_id, table.name, table.guaranteed_rolls, table.roll_count_min);
+
+	// The two halves must agree, both ways round: a head with nothing to pay out
+	// silently yields nothing, and an item nominated with no head never pays.
+	if (table.guaranteed_rolls > 0 && table.guarantee_item_id == 0)
+		v.add("drop_tables {} '{}': guaranteed_rolls {} with no guarantee_item_id - the head has nothing to pay out",
+			table_id, table.name, table.guaranteed_rolls);
+	if (table.guarantee_item_id != 0)
+	{
+		if (table.guaranteed_rolls == 0)
+			v.add("drop_tables {} '{}': guarantee_item_id {} with guaranteed_rolls 0 - the item can never be paid out",
+				table_id, table.name, table.guarantee_item_id);
+		if (item_config(context, table.guarantee_item_id) == nullptr)
+			v.add("drop_tables {} '{}': guarantee_item_id {} is not in item_configs",
+				table_id, table.name, table.guarantee_item_id);
+		if (payload == nullptr)
+			v.add("drop_tables {} '{}': guarantee_item_id {} has no drop_entries row - the row is where its count is authored, so the head would pay out a single unit",
+				table_id, table.name, table.guarantee_item_id);
+		else if (payload->chance_ppb != 0)
+			v.add("drop_entries table {} '{}' item {}: the guarantee item carries {} ppb - it must be 0, or it competes on the tail rolls too, where the guarantee does not apply",
+				table_id, table.name, table.guarantee_item_id, payload->chance_ppb);
+	}
+
+	// A 0-ppb row anywhere else is a row that can never be won.
+	for (const auto& entry : table.entries)
+		if (entry.chance_ppb == 0 && entry.item_id != table.guarantee_item_id)
+			v.add("drop_entries table {} '{}' item {}: 0 ppb but not this table's guarantee item - the row can never be won",
+				table_id, table.name, entry.item_id);
+
+	if (table.tail_rarity_divisor < 1)
+		v.add("drop_tables {} '{}': tail_rarity_divisor {} is under 1 - a divisor cannot make the tail more likely than the head",
+			table_id, table.name, table.tail_rarity_divisor);
+	else if (table.tail_rarity_divisor > 1 && table.guaranteed_rolls == 0)
+		v.add("drop_tables {} '{}': tail_rarity_divisor {} with guaranteed_rolls 0 - every roll is a tail roll, so the divisor quietly divides the whole table",
+			table_id, table.name, table.tail_rarity_divisor);
+}
+
 // The #73 drop-table rules, both modes. Structure is an error; a table a live
 // multiplier cannot move is reported by name but is NOT an error — it is
 // deliberate for the five bosses' guaranteed stage-2 tables, and a defect at
@@ -591,6 +645,8 @@ void check_drop_tables(const tier_validation_context& context,
 			v.add_note("drop_tables {} '{}' (stage {}): rows sum to exactly 1.0 - something drops on every roll, so a generosity multiplier is a no-op here",
 				table_id, table.name, table.stage);
 
+		check_drop_guarantee(context, table_id, table, v);
+
 		std::set<int> seen;
 		for (const auto& entry : table.entries)
 		{
@@ -603,6 +659,9 @@ void check_drop_tables(const tier_validation_context& context,
 			if (entry.min_count < 0 || entry.max_count < entry.min_count)
 				v.add("drop_entries table {} '{}' item {}: count {}..{} is not a valid range",
 					table_id, table.name, entry.item_id, entry.min_count, entry.max_count);
+			if (entry.count_throws < 1)
+				v.add("drop_entries table {} '{}' item {}: count_throws {} is under 1 - a row that can never produce a stack",
+					table_id, table.name, entry.item_id, entry.count_throws);
 		}
 	}
 }

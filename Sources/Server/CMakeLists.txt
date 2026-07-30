@@ -28,6 +28,7 @@ set(SERVER_SOURCES
     CmdMintCheck.cpp
     CmdReload.cpp
     CmdRollSmoke.cpp
+    CmdScatterSmoke.cpp
     CmdSetAdmin.cpp
     CmdSaveAll.cpp
     CmdSetCmdLevel.cpp

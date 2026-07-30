@@ -109,6 +109,13 @@ struct drop_entry
 	uint32_t chance_ppb = 0;     // as authored, before any multiplier
 	int      min_count = 0;
 	int      max_count = 0;
+
+	// How many times min..max is rolled and summed, so a row can express the
+	// original's `iDice(throws, range)` rather than only `iDice(1, range)`.
+	// The scatter's gold pile is `iDice(10, 15000)` — ten rolls of 1..15000,
+	// clustered near 75,005 — where a single uniform roll over the same span
+	// has the right mean and three times the spread. 1 is every other row.
+	int      count_throws = 1;
 };
 
 struct drop_table
@@ -128,6 +135,52 @@ struct drop_table
 	int      roll_count_max = 1;
 	uint8_t  placement = drop_placement::single;
 	uint8_t  delay = drop_delay::death;
+
+	// The guaranteed head (#89). The first `guaranteed_rolls` rolls cannot come
+	// up empty: when the draw lands in the table's "nothing" remainder they pay
+	// out `guarantee_item_id` instead. That substitution IS the floor under a
+	// scatter boss's yield — the original wrote it as
+	//
+	//     if (iItemID == 0 && iProb == 100) iItemID = 90;   // Gold
+	//
+	// and it is why a Wyvern always dropped at least six items. Modelling it as
+	// a guaranteed row instead would be wrong twice over: the item would also
+	// become winnable on the tail rolls, where the original could yield nothing.
+	//
+	// The guarantee item is NOT a competing row. It carries a 0-ppb row for its
+	// count spec alone (drop_entry::is_guarantee_payload), so how much gold a
+	// pile holds is authored next to the gold, and the validator ties the two
+	// together in both directions.
+	int      guaranteed_rolls = 0;
+	int      guarantee_item_id = 0;
+
+	// Where that row sits in `entries`, found once by the loader. -1 when the
+	// table has no guarantee. An index rather than a pointer because `entries`
+	// is still growing while the loader fills it.
+	int      guarantee_entry_index = -1;
+
+	// The guarantee's payload row, or null. Every caller wants the row, not the
+	// index, and none of them should be scanning for it per kill.
+	const drop_entry* guarantee_entry() const
+	{
+		return (guarantee_entry_index >= 0 &&
+			guarantee_entry_index < static_cast<int>(entries.size()))
+			? &entries[guarantee_entry_index] : nullptr;
+	}
+
+	// Rolls past the head divide every row's resolved chance by this. The
+	// original multiplied each block's rarity bound by `fProb`, which is 1.0 for
+	// the head and 5.0 for the tail — the same factor in all three of its blocks,
+	// so one integer divisor reproduces it exactly. Integer division, like the
+	// rest of the ppb chain, so the report and the roll agree byte for byte on
+	// every platform. 1 means the tail rolls at full rarity.
+	int      tail_rarity_divisor = 1;
+
+	// Rolls at index >= guaranteed_rolls, given a drawn roll count.
+	int tail_rolls(int rolls) const
+	{
+		return rolls > guaranteed_rolls ? rolls - guaranteed_rolls : 0;
+	}
 
 	std::vector<drop_entry> entries;
 
@@ -211,8 +264,29 @@ void resolve_drop_chances(const drop_table& table,
 	const CItem* const* item_configs, int item_config_count,
 	std::vector<uint32_t>& out_chances, bool* saturated = nullptr);
 
+// The same table's chances for a roll past the guaranteed head: every head
+// chance divided by `tail_rarity_divisor`. Positionally matching, like
+// resolve_drop_chances, and derived from its output rather than recomputed — the
+// generosity stack must not be applied twice, and the report and the roll have
+// to price the tail identically.
+void resolve_tail_chances(const drop_table& table,
+	const std::vector<uint32_t>& head_chances,
+	std::vector<uint32_t>& out_chances);
+
+// The count range one won row pays out, clamped to a usable range. Every row
+// states its own, with a single exception: a gold row that authors none takes
+// the monster's own dice, which is where all gold but the boss scatter's comes
+// from. Shared so the roller and the scattersmoke harness cannot disagree about
+// how much a pile holds.
+void resolve_entry_counts(const drop_entry& entry, int gold_dice_min,
+	int gold_dice_max, int& min_count, int& max_count);
+
 // Index into `chances` the draw selects, or -1 for "nothing". `draw` must be
 // uniform over [0, drop_chance_denominator).
 int roll_drop_row(const std::vector<uint32_t>& chances, uint32_t draw);
+
+// Summed chances, for the expected-yield arithmetic the report needs. Returns a
+// uint64 because a saturated table sums to exactly the denominator.
+uint64_t total_chance(const std::vector<uint32_t>& chances);
 
 } // namespace hb::server
