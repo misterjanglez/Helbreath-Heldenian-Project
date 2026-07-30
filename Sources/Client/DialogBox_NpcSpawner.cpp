@@ -15,6 +15,7 @@
 #include <cstring>
 #include "IInput.h"
 #include "AudioManager.h"
+#include "lan_eng.h"
 
 using namespace hb::shared::net;
 using namespace hb::client::sprite_id;
@@ -150,13 +151,13 @@ void DialogBox_NpcSpawner::on_draw()
 	{
 		int sy = sY + layout::status_y;
 		auto count_str = std::format("{} found", m_result_count);
-		put_string(sX + layout::content_x1 + 4, sy, count_str.c_str(), GameColors::UIBlack);
+		put_string(sX + layout::content_x1 + 4, sy, count_str.c_str(), GameColors::UILabel);
 
 		if (m_result_count > layout::list_rows)
 		{
 			int max_scroll = m_result_count - layout::list_rows;
 			auto scroll_str = std::format("[{}/{}]", m_scroll_offset + 1, max_scroll + 1);
-			put_string(sX + 100, sy, scroll_str.c_str(), GameColors::UIBlack);
+			put_string(sX + 100, sy, scroll_str.c_str(), GameColors::UILabel);
 		}
 	}
 
@@ -192,7 +193,7 @@ void DialogBox_NpcSpawner::on_draw()
 	bool spawn_hover = has_sel && (mouse_x >= spawn_x && mouse_x <= spawn_x + layout::spawn_btn_w
 		&& mouse_y >= spawn_y && mouse_y <= spawn_y + 18);
 	auto spawn_label = (m_amount > 1) ? std::format("[Spawn x{}]", m_amount) : std::string("[Spawn]");
-	auto spawn_color = !has_sel ? GameColors::UIBlack
+	auto spawn_color = !has_sel ? GameColors::UIDisabled
 		: (spawn_hover ? GameColors::UIWhite : GameColors::UIMagicBlue);
 	hb::shared::text::draw_text_aligned(GameFont::Default,
 		spawn_x, spawn_y, layout::spawn_btn_w, 15,
@@ -200,12 +201,7 @@ void DialogBox_NpcSpawner::on_draw()
 		hb::shared::text::TextStyle::from_color(spawn_color),
 		hb::shared::text::Align::TopCenter);
 
-	// Close button (sprite)
-	if ((mouse_x >= sX + ui_layout::right_btn_x) && (mouse_x <= sX + ui_layout::right_btn_x + ui_layout::btn_size_x) &&
-		(mouse_y >= sY + ui_layout::btn_y) && (mouse_y <= sY + ui_layout::btn_y + ui_layout::btn_size_y))
-		draw_new_dialog_box(InterfaceNdButton, sX + ui_layout::right_btn_x, sY + ui_layout::btn_y, 1);
-	else
-		draw_new_dialog_box(InterfaceNdButton, sX + ui_layout::right_btn_x, sY + ui_layout::btn_y, 0);
+	draw_button(sX, sY, ui_layout::btn_right, UI_BTN_OK);
 }
 
 bool DialogBox_NpcSpawner::on_click()
@@ -266,8 +262,7 @@ bool DialogBox_NpcSpawner::on_click()
 	}
 
 	// Close button
-	if ((mouse_x >= sX + ui_layout::right_btn_x) && (mouse_x <= sX + ui_layout::right_btn_x + ui_layout::btn_size_x) &&
-		(mouse_y >= sY + ui_layout::btn_y) && (mouse_y <= sY + ui_layout::btn_y + ui_layout::btn_size_y))
+	if (mouse_in(ui_layout::btn_right))
 	{
 		disable_this_dialog();
 		audio_manager::get().play_game_sound(sound_type::effect, 14, 5);

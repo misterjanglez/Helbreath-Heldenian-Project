@@ -1,5 +1,6 @@
 #pragma once
 #include "IDialogBox.h"
+#include "UITheme.h"
 
 class DialogBox_Bank : public IDialogBox
 {
@@ -31,5 +32,6 @@ private:
 	void draw_item_details(short sX, short sY, short size_x, int item_index, int yPos);
 	void draw_scrollbar(short sX, short sY, int total_lines);
 
-	static constexpr ui_rect area_scroll{240, 40, 21, 281};
+	static constexpr ui_rect area_scroll = hb::client::ui_theme::grab_area(
+		hb::client::ui_theme::list_gutter);
 };

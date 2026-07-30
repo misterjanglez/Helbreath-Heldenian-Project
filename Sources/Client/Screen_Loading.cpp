@@ -117,6 +117,8 @@ void Screen_Loading::LoadStage_Interface()
         m_game->m_sprite[InterfaceFont2] = loader.get_sprite(1, false);
         m_game->m_sprite[InterfaceSprFonts] = loader.get_sprite(2, false);
         m_game->m_sprite[InterfaceSprFonts3] = loader.get_sprite(3, false);
+        if (loader.get_sprite_count() > 4)
+            m_game->m_sprite[InterfaceUISerifFont] = loader.get_sprite(4, false);
     });
 
     // Create and register bitmap fonts with TextLib
@@ -131,6 +133,14 @@ void Screen_Loading::LoadStage_Interface()
     if (m_game->m_sprite[InterfaceFont2])
     {
         hb::shared::text::load_bitmap_font_dynamic(GameFont::Bitmap2, m_game->m_sprite[InterfaceFont2].get(), ' ', '~', 0);
+    }
+
+    // Serif UI face: same contiguous ' '..'~' run, one glyph per frame with the
+    // advance carried in the frame width. Guarded because the sheet only exists
+    // in paks built after the font was packed.
+    if (m_game->m_sprite[InterfaceUISerifFont])
+    {
+        hb::shared::text::load_bitmap_font_dynamic(GameFont::UISerif, m_game->m_sprite[InterfaceUISerifFont].get(), ' ', '~', 0);
     }
 
     // Number font: Digits '0' to '9', frame offset 30 in InterfaceSprFonts

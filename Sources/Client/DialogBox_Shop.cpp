@@ -13,6 +13,7 @@
 #include "TextLibExt.h"
 #include "AudioManager.h"
 #include "BalanceConstants.h"
+#include "UITheme.h"
 
 using namespace hb::shared::net;
 using namespace hb::shared::item;
@@ -34,7 +35,7 @@ void DialogBox_Shop::on_draw()
     short sY = m_y;
 
     m_game->draw_new_dialog_box(InterfaceNdGame2, sX, sY, 2);
-    m_game->draw_new_dialog_box(InterfaceNdText, sX, sY, 11);
+    hb::client::ui_theme::header(sX, sY, m_size_x, UI_TITLE_ITEM_FOR_SALE);
 
     switch (m_mode) {
     case 0:
@@ -67,14 +68,13 @@ void DialogBox_Shop::draw_item_list(short sX, short sY)
         d2 = static_cast<double>(total_lines - 13);
         d3 = (274.0f * d1) / d2;
         pointer_loc = static_cast<int>(d3);
-        m_game->draw_new_dialog_box(InterfaceNdGame2, sX, sY, 3);
-        m_game->draw_new_dialog_box(InterfaceNdGame2, sX + 242, sY + pointer_loc + 35, 7);
+        hb::client::ui_theme::list_scrollbar(sX, sY, pointer_loc);
     }
     else pointer_loc = 0;
 
     if (lb != 0 && total_lines > 13) {
         if ((m_game->get_dialog_box_manager().get_top_id() == DialogBoxId::SaleMenu)) {
-            if ((mouse_x >= sX + 235) && (mouse_x <= sX + 260) && (mouse_y >= sY + 10) && (mouse_y <= sY + 330)) {
+            if (mouse_in(area_scroll)) {
                 d1 = static_cast<double>(mouse_y - (sY + 35));
                 d2 = static_cast<double>(total_lines - 13);
                 d3 = (d1 * d2) / 274.0f;
@@ -94,10 +94,10 @@ void DialogBox_Shop::draw_item_list(short sX, short sY)
     if (m_scroll_offset < 0 || total_lines < 13)
         m_scroll_offset = 0;
 
-    hb::shared::text::draw_text_aligned(GameFont::Default, sX + 22, sY + 45, (sX + 165) - (sX + 22), 15, DRAW_DIALOGBOX_SHOP1, hb::shared::text::TextStyle::from_color(GameColors::UIBlack), hb::shared::text::Align::TopCenter); // "ITEM"
-    hb::shared::text::draw_text_aligned(GameFont::Default, sX + 23, sY + 45, (sX + 166) - (sX + 23), 15, DRAW_DIALOGBOX_SHOP1, hb::shared::text::TextStyle::from_color(GameColors::UIBlack), hb::shared::text::Align::TopCenter);
-    hb::shared::text::draw_text_aligned(GameFont::Default, sX + 153, sY + 45, (sX + 250) - (sX + 153), 15, DRAW_DIALOGBOX_SHOP3, hb::shared::text::TextStyle::from_color(GameColors::UIBlack), hb::shared::text::Align::TopCenter);
-    hb::shared::text::draw_text_aligned(GameFont::Default, sX + 154, sY + 45, (sX + 251) - (sX + 154), 15, DRAW_DIALOGBOX_SHOP3, hb::shared::text::TextStyle::from_color(GameColors::UIBlack), hb::shared::text::Align::TopCenter);
+    hb::shared::text::draw_text_aligned(GameFont::Default, sX + 22, sY + 45, (sX + 165) - (sX + 22), 15, DRAW_DIALOGBOX_SHOP1, hb::shared::text::TextStyle::from_color(GameColors::UILabel), hb::shared::text::Align::TopCenter); // "ITEM"
+    hb::shared::text::draw_text_aligned(GameFont::Default, sX + 23, sY + 45, (sX + 166) - (sX + 23), 15, DRAW_DIALOGBOX_SHOP1, hb::shared::text::TextStyle::from_color(GameColors::UILabel), hb::shared::text::Align::TopCenter);
+    hb::shared::text::draw_text_aligned(GameFont::Default, sX + 153, sY + 45, (sX + 250) - (sX + 153), 15, DRAW_DIALOGBOX_SHOP3, hb::shared::text::TextStyle::from_color(GameColors::UILabel), hb::shared::text::Align::TopCenter);
+    hb::shared::text::draw_text_aligned(GameFont::Default, sX + 154, sY + 45, (sX + 251) - (sX + 154), 15, DRAW_DIALOGBOX_SHOP3, hb::shared::text::TextStyle::from_color(GameColors::UILabel), hb::shared::text::Align::TopCenter);
 
     // draw item names
     for (int i = 0; i < 13; i++)
@@ -221,14 +221,8 @@ void DialogBox_Shop::draw_item_details(short sX, short sY, short mouse_x, short 
     draw_level_requirement(sX, sY, item_index, flag_red_shown);
     draw_quantity_selector(sX, sY, mouse_x, mouse_y, z);
 
-    // draw buttons
-    if (mouse_in(btn_buy))
-        m_game->draw_new_dialog_box(InterfaceNdButton, sX + ui_layout::left_btn_x, sY + ui_layout::btn_y, 31);
-    else m_game->draw_new_dialog_box(InterfaceNdButton, sX + ui_layout::left_btn_x, sY + ui_layout::btn_y, 30);
-
-    if (mouse_in(btn_cancel))
-        m_game->draw_new_dialog_box(InterfaceNdButton, sX + ui_layout::right_btn_x, sY + ui_layout::btn_y, 17);
-    else m_game->draw_new_dialog_box(InterfaceNdButton, sX + ui_layout::right_btn_x, sY + ui_layout::btn_y, 16);
+    draw_button(sX, sY, btn_buy, UI_BTN_PURCHASE);
+    draw_button(sX, sY, btn_cancel, UI_BTN_CANCEL);
 }
 
 void DialogBox_Shop::draw_weapon_stats(short sX, short sY, int item_index, bool& flag_red_shown)
@@ -429,11 +423,16 @@ void DialogBox_Shop::draw_quantity_selector(short sX, short sY, short mouse_x, s
     char temp[16];
     int max_qty = get_max_quantity();
 
-    // 4 up buttons
-    m_game->m_sprite[InterfaceNdGame2]->draw(sX + 128, sY + 219, 19);
-    m_game->m_sprite[InterfaceNdGame2]->draw(sX + 142, sY + 219, 19);
-    m_game->m_sprite[InterfaceNdGame2]->draw(sX + 156, sY + 219, 19);
-    m_game->m_sprite[InterfaceNdGame2]->draw(sX + 170, sY + 219, 19);
+    // One themed pair per digit. These were the same orange pak plates the
+    // level-up dialog used, drawn by their own pivot at coordinates that had
+    // nothing to do with the rects on_click tests — the button and its click
+    // target were separate hand-measured numbers. They share a rect now.
+    static constexpr const ui_rect* up[]   = { &btn_qty_up_1000, &btn_qty_up_100,
+                                               &btn_qty_up_10, &btn_qty_up_1 };
+    static constexpr const ui_rect* down[] = { &btn_qty_down_1000, &btn_qty_down_100,
+                                               &btn_qty_down_10, &btn_qty_down_1 };
+    for (const ui_rect* r : up)
+        draw_button(sX, sY, *r, "+");
 
     // "Quantity:" label
     hb::shared::text::draw_text(GameFont::Default, sX + 80, sY + 227, DRAW_DIALOGBOX_SHOP27, hb::shared::text::TextStyle::from_color(GameColors::UILabel));
@@ -459,17 +458,12 @@ void DialogBox_Shop::draw_quantity_selector(short sX, short sY, short mouse_x, s
         hb::shared::text::draw_text(GameFont::Default, sX + digit_x[i] + 1, sY + 227, digit, hb::shared::text::TextStyle::from_color(GameColors::UILabel));
     }
 
-    // 4 down buttons
-    m_game->m_sprite[InterfaceNdGame2]->draw(sX + 128, sY + 244, 20);
-    m_game->m_sprite[InterfaceNdGame2]->draw(sX + 142, sY + 244, 20);
-    m_game->m_sprite[InterfaceNdGame2]->draw(sX + 156, sY + 244, 20);
-    m_game->m_sprite[InterfaceNdGame2]->draw(sX + 170, sY + 244, 20);
+    for (const ui_rect* r : down)
+        draw_button(sX, sY, *r, "-");
 }
 
 bool DialogBox_Shop::on_click()
 {
-	short mouse_x = static_cast<short>(hb::shared::input::get_mouse_x());
-	short mouse_y = static_cast<short>(hb::shared::input::get_mouse_y());
     short sX = m_x;
     short sY = m_y;
 

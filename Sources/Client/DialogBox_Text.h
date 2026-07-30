@@ -1,6 +1,7 @@
 #pragma once
 
 #include "IDialogBox.h"
+#include "UITheme.h"
 
 class DialogBox_Text : public IDialogBox
 {
@@ -20,6 +21,7 @@ public:
 private:
 	int get_total_lines() const;
 
-	static constexpr ui_rect btn_close{155, 293, 73, 19};
-	static constexpr ui_rect area_scroll{240, 40, 21, 281};
+	static constexpr ui_rect btn_close = ui_layout::btn_right;
+	static constexpr ui_rect area_scroll = hb::client::ui_theme::grab_area(
+		hb::client::ui_theme::list_gutter);
 };

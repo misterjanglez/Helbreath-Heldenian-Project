@@ -21,6 +21,7 @@
 #include <memory>
 #include <optional>
 #include "Item/ItemInstanceData.h"
+#include "ItemTooltip.h"
 #include "Render/PrimitiveTypes.h"
 #include "ChatMsg.h"
 #include "GameConstants.h"
@@ -28,6 +29,7 @@
 #include "NetConstants.h"
 
 class CPlayer;
+class CItem;
 
 class Screen_OnGame : public IGameScreen
 {
@@ -114,6 +116,15 @@ private:
     void draw_tier_beam(int center_x, int base_y, uint8_t tier, uint32_t time) const;
 
     void render_item_tooltip();
+
+    // Fill a tooltip from a config row plus one instance POD — which is all a
+    // ground tile carries, so the floor and the inventory can render the same
+    // tooltip instead of the floor getting only a name.
+    //
+    // in_inventory adds the "total carried" line, which only means something for
+    // an item the player is holding.
+    void build_item_tooltip(item_tooltip& tooltip, short id_num, const CItem* cfg,
+        const hb::shared::item::item_instance_data& instance, bool in_inventory) const;
     void draw_tile_grid();           // Simple dark grid lines
     void draw_patching_grid();       // Debug grid with zone colors
     void draw_spell_target_overlay(); // Spell AoE targeting overlay (debug only)

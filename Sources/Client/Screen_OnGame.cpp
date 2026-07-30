@@ -855,27 +855,33 @@ std::optional<hb::shared::render::Color> Screen_OnGame::name_dye_tint(
 
 void Screen_OnGame::render_item_tooltip()
 {
-	std::string G_cTxt;
 	short target_id = CursorTarget::get_selected_id();
     CItem* item = m_game->m_player->m_item_list[target_id].get();
     if (!item) return;
     CItem* cfg = m_game->get_item_config(item->m_id_num);
     if (!cfg) return;
 
-    char item_color = item->m_instance.item_color;
-    auto tooltip_draw = m_game->get_item_draw(cfg->m_display_id, item_atlas::pack, cfg->sprite_is_female());
-    bool is_equippable = cfg->is_armor() || cfg->is_weapon() || cfg->is_accessory();
-
     // drag-preview icon follows the cursor
-    m_game->draw_item_sprite(tooltip_draw, m_sMsX - CursorTarget::get_drag_dist_x(), m_sMsY - CursorTarget::get_drag_dist_y(), item_color, cfg);
-
-    auto itemInfo = item_name_formatter::get().format(item);
+    auto tooltip_draw = m_game->get_item_draw(cfg->m_display_id, item_atlas::pack, cfg->sprite_is_female());
+    m_game->draw_item_sprite(tooltip_draw, m_sMsX - CursorTarget::get_drag_dist_x(),
+        m_sMsY - CursorTarget::get_drag_dist_y(), item->m_instance.item_color, cfg);
 
     item_tooltip tooltip;
+    build_item_tooltip(tooltip, item->m_id_num, cfg, item->m_instance, /*in_inventory=*/true);
+    tooltip.draw(m_sMsX, m_sMsY + 25, m_game->m_Renderer);
+}
+
+void Screen_OnGame::build_item_tooltip(item_tooltip& tooltip, short id_num, const CItem* cfg,
+    const hb::shared::item::item_instance_data& instance, bool in_inventory) const
+{
+    std::string G_cTxt;
+    const bool is_equippable = cfg->is_armor() || cfg->is_weapon() || cfg->is_accessory();
+
+    auto itemInfo = item_name_formatter::get().format(id_num, instance);
 
     // 1. Name — tier color, else the dye tint of a prefixed item, else special, else white
     tooltip.add_line(itemInfo.name,
-        item_name_color(itemInfo, GameColors::UIWhite, name_dye_tint(item->m_instance)));
+        item_name_color(itemInfo, GameColors::UIWhite, name_dye_tint(instance)));
 
     // 2. Classification
     if (cfg->m_armor_class == armor_class::clothing)
@@ -1017,13 +1023,15 @@ void Screen_OnGame::render_item_tooltip()
         tooltip.add_line(G_cTxt, GameColors::InfoGrayLight);
     }
 
-    int eff_weight = m_game->effective_item_weight(cfg->m_weight, item);
+    int eff_weight = m_game->effective_item_weight(cfg->m_weight, instance);
     if (is_equippable && eff_weight >= hb::shared::balance::equip_str_threshold)
     {
         int req_str = static_cast<int>(std::ceil(eff_weight / static_cast<float>(hb::shared::balance::weight_units_per_stone)));
         if (cfg->get_equip_pos() == EquipPos::RightHand || cfg->get_equip_pos() == EquipPos::TwoHand)
         {
-            int full_speed_str = item->get_effective_swing_speed() * hb::shared::balance::swing_str_divisor;
+            int full_speed_str = CItem::apply_agile(cfg->m_swing_speed,
+                instance.attributes.has_modifier(hb::shared::item::modifier_id::agile))
+                * hb::shared::balance::swing_str_divisor;
             G_cTxt = std::format("Required Str: {} ({} full speed)", req_str, full_speed_str);
         }
         else
@@ -1037,9 +1045,9 @@ void Screen_OnGame::render_item_tooltip()
     if (cfg->m_weight > 0)
     {
         float unit_stones = CItem::weight_to_stones(eff_weight);
-        if (cfg->is_stackable() && item->m_instance.count > 1)
+        if (cfg->is_stackable() && instance.count > 1)
         {
-            int stack_raw = CItem::calc_item_stack_weight(eff_weight, static_cast<int>(item->m_instance.count));
+            int stack_raw = CItem::calc_item_stack_weight(eff_weight, static_cast<int>(instance.count));
             float total_stones = CItem::weight_to_stones(stack_raw);
             G_cTxt = std::format(TOOLTIP_WEIGHT_STACK, total_stones, unit_stones);
         }
@@ -1062,38 +1070,43 @@ void Screen_OnGame::render_item_tooltip()
             int boost_pct = 0;
             try { boost_pct = std::stoi(durability_mod_str.substr(1)); } catch (...) {}
             int boosted_max = cfg->m_durability * (100 + boost_pct) / 100;
-            G_cTxt = std::format("Durability: {}/{}", item->m_instance.cur_durability, boosted_max);
+            G_cTxt = std::format("Durability: {}/{}", instance.cur_durability, boosted_max);
             std::string boost_str = std::format(" ({})", durability_mod_str);
             tooltip.add_dual_line(G_cTxt, GameColors::UIItemName_Special, boost_str, GameColors::UIItemName_Special);
         }
         else
         {
-            G_cTxt = std::format(UPDATE_SCREEN_ONGAME10, item->m_instance.cur_durability, cfg->m_durability);
+            G_cTxt = std::format(UPDATE_SCREEN_ONGAME10, instance.cur_durability, cfg->m_durability);
             tooltip.add_line(G_cTxt, GameColors::InfoGrayLight);
         }
     }
     else if (effectType == ItemEffectType::AlterItemDrop && cfg->m_durability > 0)
     {
-        G_cTxt = std::format(TOOLTIP_USAGES, item->m_instance.cur_durability, cfg->m_durability);
+        G_cTxt = std::format(TOOLTIP_USAGES, instance.cur_durability, cfg->m_durability);
         tooltip.add_line(G_cTxt, GameColors::InfoGrayLight);
     }
 
-    // 9. Stack count
+    // 9. Stack count. Carried, this is how many of the item the player holds
+    // across the whole pack; on the ground there is nothing to total up, so the
+    // pile's own count stands in.
     if (cfg->is_stackable())
     {
-        auto count = std::count_if(m_game->m_player->m_item_list.begin(), m_game->m_player->m_item_list.end(),
-            [item](const std::unique_ptr<CItem>& otherItem) {
-                return otherItem != nullptr && otherItem->m_id_num == item->m_id_num;
-            });
+        int count = static_cast<int>(instance.count);
+        if (in_inventory)
+        {
+            count = static_cast<int>(std::count_if(
+                m_game->m_player->m_item_list.begin(), m_game->m_player->m_item_list.end(),
+                [id_num](const std::unique_ptr<CItem>& other) {
+                    return other != nullptr && other->m_id_num == id_num;
+                }));
+        }
 
         if (count > 1)
         {
-            G_cTxt = std::format(DEF_MSG_TOTAL_NUMBER, static_cast<int>(count));
+            G_cTxt = std::format(DEF_MSG_TOTAL_NUMBER, count);
             tooltip.add_line(G_cTxt, GameColors::UIDescription);
         }
     }
-
-    tooltip.draw(m_sMsX, m_sMsY + 25, m_game->m_Renderer);
 }
 
 //=============================================================================

@@ -24,6 +24,11 @@ namespace GameFont
 		SprFont3_0 = 4,     // SPRFONTS2 variant 0 (small)
 		SprFont3_1 = 5,     // SPRFONTS2 variant 1 (medium)
 		SprFont3_2 = 6,     // SPRFONTS2 variant 2 (large)
+
+		// Serif UI face packed from the dialog art, full ASCII 32-126, dynamic
+		// spacing. White glyphs tinted at draw time like every other bitmap
+		// font, so one sheet serves any colour the caller wants.
+		UISerif = 7,        // sprite_fonts sheet 4
 	};
 
 	// Font spacing data for Bitmap1 ('!' to 'z')

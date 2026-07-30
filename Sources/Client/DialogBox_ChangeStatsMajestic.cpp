@@ -1,4 +1,5 @@
 #include "DialogBox_ChangeStatsMajestic.h"
+#include "DialogBox_LevelUpSetting.h"   // stat_grid � this dialog is its sibling
 #include "Game.h"
 #include "lan_eng.h"
 #include "GlobalDef.h"
@@ -10,6 +11,7 @@
 #include "Packet/SharedPackets.h"
 #include "Screen_OnGame.h"
 #include "AudioManager.h"
+#include "UITheme.h"
 
 using namespace hb::shared::net;
 using namespace hb::client::sprite_id;
@@ -36,7 +38,12 @@ void DialogBox_ChangeStatsMajestic::draw_stat_row(short sX, short sY, int y_offs
 {
 	std::string txt;
 
-	put_string(sX + 24, sY + y_offset, (char*)label, GameColors::UIBlack);
+	hb::client::ui_theme::content_frame(sX + stat_grid::current_x, sY + y_offset,
+		stat_grid::current_w, stat_grid::well_h);
+	hb::client::ui_theme::content_frame(sX + stat_grid::pending_x, sY + y_offset,
+		stat_grid::pending_w, stat_grid::well_h);
+
+	put_string(sX + 24, sY + y_offset, (char*)label, GameColors::UILabel);
 
 	txt = std::format("{}", current_stat);
 	put_string(sX + 109, sY + y_offset, txt.c_str(), GameColors::UILabel);
@@ -48,13 +55,8 @@ void DialogBox_ChangeStatsMajestic::draw_stat_row(short sX, short sY, int y_offs
 	else
 		put_string(sX + 162, sY + y_offset, txt.c_str(), GameColors::UILabel);
 
-	// UP arrow highlight (undo reduction)
-	if ((mouse_x >= sX + 195) && (mouse_x <= sX + 205) && (mouse_y >= sY + arrow_y_offset) && (mouse_y <= sY + arrow_y_offset + 6) && can_undo)
-		m_game->m_sprite[InterfaceNdGame4]->draw(sX + 195, sY + arrow_y_offset, 5);
-
-	// DOWN arrow highlight (reduce stat)
-	if ((mouse_x >= sX + 210) && (mouse_x <= sX + 220) && (mouse_y >= sY + arrow_y_offset) && (mouse_y <= sY + arrow_y_offset + 6) && can_reduce)
-		m_game->m_sprite[InterfaceNdGame4]->draw(sX + 210, sY + arrow_y_offset, 6);
+	draw_button(sX, sY, stat_grid::increase(arrow_y_offset), "+", can_undo);
+	draw_button(sX, sY, stat_grid::decrease(arrow_y_offset), "-", can_reduce);
 }
 
 void DialogBox_ChangeStatsMajestic::on_draw()
@@ -67,8 +69,9 @@ void DialogBox_ChangeStatsMajestic::on_draw()
 	std::string txt;
 
 	draw_new_dialog_box(InterfaceNdGame2, sX, sY, 0);
-	draw_new_dialog_box(InterfaceNdText, sX, sY, 2);
-	draw_new_dialog_box(InterfaceNdGame4, sX + 16, sY + 100, 4);
+	hb::client::ui_theme::header(sX, sY, m_size_x, UI_TITLE_LEVEL_UP_SETTING);
+	hb::client::ui_theme::content_frame(sX + stat_grid::points_x, sY + stat_grid::points_y,
+		stat_grid::points_w, stat_grid::points_h);
 
 	put_aligned_string(sX, sX + size_x, sY + 50, DRAW_DIALOGBOX_LEVELUP_SETTING14);
 	put_aligned_string(sX, sX + size_x, sY + 65, DRAW_DIALOGBOX_LEVELUP_SETTING15);
@@ -77,12 +80,12 @@ void DialogBox_ChangeStatsMajestic::on_draw()
 	int pending_cost = GetPendingMajesticCost(m_game);
 	int remaining = m_game->on_game()->m_gizon_item_upgrade_left - pending_cost;
 
-	put_string(sX + 20, sY + 85, DRAW_DIALOGBOX_LEVELUP_SETTING16, GameColors::UIBlack);
+	put_string(sX + 20, sY + 85, DRAW_DIALOGBOX_LEVELUP_SETTING16, GameColors::UILabel);
 	txt = std::format("{}", remaining);
 	if (remaining > 0)
 		put_string(sX + 73, sY + 102, txt.c_str(), GameColors::UIGreen);
 	else
-		put_string(sX + 73, sY + 102, txt.c_str(), GameColors::UIBlack);
+		put_string(sX + 73, sY + 102, txt.c_str(), GameColors::UILabel);
 
 	bool can_afford = (remaining > 0);
 
@@ -116,19 +119,13 @@ void DialogBox_ChangeStatsMajestic::on_draw()
 		(player().m_lu_char < 0),
 		can_afford && (player().m_charisma + player().m_lu_char - POINTS_PER_MAJESTIC >= m_game->m_base_stat_value));
 
-	// Cancel button (left)
-	if (mouse_in(btn_cancel))
-		draw_new_dialog_box(InterfaceNdButton, sX + ui_layout::left_btn_x, sY + ui_layout::btn_y, 17);
-	else draw_new_dialog_box(InterfaceNdButton, sX + ui_layout::left_btn_x, sY + ui_layout::btn_y, 16);
+	draw_button(sX, sY, btn_cancel, UI_BTN_CANCEL);
 
-	// Confirm button (right) — show as active only when there are pending changes
-	if (pending_cost > 0)
-	{
-		if (mouse_in(btn_confirm))
-			draw_new_dialog_box(InterfaceNdButton, sX + ui_layout::right_btn_x, sY + ui_layout::btn_y, 1);
-		else
-			draw_new_dialog_box(InterfaceNdButton, sX + ui_layout::right_btn_x, sY + ui_layout::btn_y, 0);
-	}
+	// Confirm is live only when there are pending changes, which is what
+	// on_click already tests. The art had no disabled face, so this button used
+	// to vanish entirely until you had spent a point; a greyed face says the same
+	// thing without the button appearing out of nowhere.
+	draw_button(sX, sY, btn_confirm, UI_BTN_OK, pending_cost > 0);
 }
 
 bool DialogBox_ChangeStatsMajestic::on_click()
@@ -159,7 +156,7 @@ bool DialogBox_ChangeStatsMajestic::on_click()
 	for (auto& s : stats)
 	{
 		// UP arrow — undo a pending reduction (restore 3 points)
-		if ((mouse_x >= sX + 195) && (mouse_x <= sX + 205) && (mouse_y >= sY + s.arrow_y) && (mouse_y <= sY + s.arrow_y + 6))
+		if (mouse_in(stat_grid::increase(s.arrow_y)))
 		{
 			if (*s.pending < 0)
 			{
@@ -169,7 +166,7 @@ bool DialogBox_ChangeStatsMajestic::on_click()
 		}
 
 		// DOWN arrow — reduce stat by 3 (costs 1 majestic point)
-		if ((mouse_x >= sX + 210) && (mouse_x <= sX + 220) && (mouse_y >= sY + s.arrow_y) && (mouse_y <= sY + s.arrow_y + 6))
+		if (mouse_in(stat_grid::decrease(s.arrow_y)))
 		{
 			if (remaining > 0 && (s.current_stat + *s.pending - POINTS_PER_MAJESTIC >= m_game->m_base_stat_value))
 			{

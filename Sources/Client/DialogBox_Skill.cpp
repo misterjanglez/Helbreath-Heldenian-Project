@@ -9,6 +9,7 @@
 #include <string>
 #include "Screen_OnGame.h"
 #include "AudioManager.h"
+#include "UITheme.h"
 
 using namespace hb::shared::net;
 using namespace hb::client::sprite_id;
@@ -36,7 +37,7 @@ void DialogBox_Skill::on_draw()
 	sY = m_y;
 
 	draw_new_dialog_box(InterfaceNdGame2, sX, sY, 0); // Normal Dialog
-	draw_new_dialog_box(InterfaceNdText, sX, sY, 1); // Skill Dialog Title Bar
+	hb::client::ui_theme::header(sX, sY, m_size_x, UI_TITLE_SKILLS); // Skill Dialog Title Bar
 
 	switch (m_mode) {
 	case 0:
@@ -56,8 +57,8 @@ void DialogBox_Skill::on_draw()
 					}
 					else
 					{
-						put_string(sX + 30, sY + 45 + i * 15, temp, GameColors::UIBlack);
-						put_string(sX + 183, sY + 45 + i * 15, temp2.c_str(), GameColors::UIBlack);
+						put_string(sX + 30, sY + 45 + i * 15, temp, GameColors::UIDisabled);
+						put_string(sX + 183, sY + 45 + i * 15, temp2.c_str(), GameColors::UIDisabled);
 					}
 				}
 				else
@@ -70,8 +71,8 @@ void DialogBox_Skill::on_draw()
 					}
 					else
 					{
-						put_string(sX + 30, sY + 45 + i * 15, temp, GameColors::UIBlack);
-						put_string(sX + 183, sY + 45 + i * 15, temp2.c_str(), GameColors::UIBlack);
+						put_string(sX + 30, sY + 45 + i * 15, temp, GameColors::UIDisabled);
+						put_string(sX + 183, sY + 45 + i * 15, temp2.c_str(), GameColors::UIDisabled);
 					}
 				}
 
@@ -93,16 +94,13 @@ void DialogBox_Skill::on_draw()
 		}
 		else pointer_loc = 0;
 		if (total_lines > 17)
-		{
-			draw_new_dialog_box(InterfaceNdGame2, sX, sY, 1);
-			draw_new_dialog_box(InterfaceNdGame2, sX + 242, sY + pointer_loc + 35, 7);
-		}
+			hb::client::ui_theme::list_scrollbar(sX, sY, pointer_loc);
 
 		if (lb != 0 && total_lines > 17)
 		{
 			if ((m_game->get_dialog_box_manager().get_top_id() == DialogBoxId::Skill))
 			{
-				if ((mouse_x >= sX + 240) && (mouse_x <= sX + 260) && (mouse_y >= sY + 30) && (mouse_y <= sY + 320))
+				if (mouse_in(area_scroll))
 				{
 					d1 = static_cast<double>(mouse_y - (sY + 35));
 					d2 = static_cast<double>(total_lines - 17);

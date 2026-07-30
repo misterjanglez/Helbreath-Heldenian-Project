@@ -21,6 +21,6 @@ private:
 		int current_stat, int16_t pending_change, short mouse_x, short mouse_y,
 		int arrow_y_offset, bool can_undo, bool can_reduce);
 
-	static constexpr ui_rect btn_cancel{30, 293, 75, 19};
-	static constexpr ui_rect btn_confirm{154, 293, 75, 19};
+	static constexpr ui_rect btn_cancel = ui_layout::btn_left;
+	static constexpr ui_rect btn_confirm = ui_layout::btn_right;
 };

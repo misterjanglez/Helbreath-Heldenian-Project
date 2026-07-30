@@ -13,6 +13,7 @@
 #include "GameFonts.h"
 #include "Packet/SharedPackets.h"
 #include "AudioManager.h"
+#include "UITheme.h"
 
 using namespace hb::shared::net;
 using namespace hb::client::sprite_id;
@@ -56,10 +57,9 @@ void Overlay_QueryDeleteCharacter::on_initialize()
         std::snprintf(m_game->m_msg, sizeof(m_game->m_msg), "%s", "33");
         m_game->change_game_mode(GameMode::Connecting);
     });
-    btn_yes->set_render_handler([this](const cc::control& c) {
+    btn_yes->set_render_handler([](const cc::control& c) {
         auto sb = c.screen_bounds();
-        int frame = c.is_highlighted() ? 19 : 18;
-        m_game->m_sprite[InterfaceNdButton]->draw(sb.x, sb.y, frame);
+        hb::client::ui_theme::button(sb.x, sb.y, sb.w, sb.h, UI_BTN_YES, c.is_highlighted());
     });
 
     // No button — cancel
@@ -68,10 +68,9 @@ void Overlay_QueryDeleteCharacter::on_initialize()
     btn_no->set_on_click([this](int) {
         clear_overlay();
     });
-    btn_no->set_render_handler([this](const cc::control& c) {
+    btn_no->set_render_handler([](const cc::control& c) {
         auto sb = c.screen_bounds();
-        int frame = c.is_highlighted() ? 3 : 2;
-        m_game->m_sprite[InterfaceNdButton]->draw(sb.x, sb.y, frame);
+        hb::client::ui_theme::button(sb.x, sb.y, sb.w, sb.h, UI_BTN_NO, c.is_highlighted());
     });
 
     m_controls.set_focus_order({BTN_YES, BTN_NO});
@@ -105,8 +104,8 @@ void Overlay_QueryDeleteCharacter::on_render()
     hb::shared::text::draw_text(GameFont::Bitmap1, dlgX + 96, dlgY + 35, "Delete Character", hb::shared::text::TextStyle::with_highlight(GameColors::UIDarkRed));
 
     // Character name display
-    put_string(dlgX + 53, dlgY + 70, UPDATE_SCREEN_ON_QUERY_DELETE_CHARACTER1, GameColors::UIBlack);
-    put_string(dlgX + 173, dlgY + 74, "__________", GameColors::UIBlack);
+    put_string(dlgX + 53, dlgY + 70, UPDATE_SCREEN_ON_QUERY_DELETE_CHARACTER1, GameColors::UILabel);
+    put_string(dlgX + 173, dlgY + 74, "__________", GameColors::UILabel);
 
     // get character name from the selected character slot
     if (m_game->m_enter_game_type > 0 && m_game->m_char_list[m_game->m_enter_game_type - 1] != nullptr)

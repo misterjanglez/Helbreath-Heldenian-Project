@@ -61,12 +61,12 @@ private:
 	void DrawMode14_DarkItemConfirm(short sX, short sY, short size_x);
 
 	bool on_click_mode0(short sX, short sY);
-	bool on_click_mode1(short sX, short sY);
-	bool OnClickMode3_4(short sX, short sY);
-	bool on_click_mode5(short sX, short sY);
+	bool on_click_mode1();
+	bool OnClickMode3_4();
+	bool on_click_mode5();
 	bool on_click_mode7(short sX, short sY);
-	bool on_click_mode8(short sX, short sY);
-	bool on_click_mode9(short sX, short sY);
+	bool on_click_mode8();
+	bool on_click_mode9();
 	bool on_click_mode10(short sX, short sY);
 	bool on_click_mode11(short sX, short sY);
 	bool on_click_mode12(short sX, short sY);

@@ -1,5 +1,7 @@
 #include "DialogBox_GuildMenu.h"
 #include "Game.h"
+#include "UITheme.h"
+#include "lan_eng.h"
 
 using namespace hb::client::sprite_id;
 
@@ -16,7 +18,7 @@ void DialogBox_GuildMenu::on_draw()
 	short sY = m_y;
 
 	m_game->draw_new_dialog_box(InterfaceNdGame2, sX, sY, 2);
-	m_game->draw_new_dialog_box(InterfaceNdText, sX, sY, 19);
+	hb::client::ui_theme::header(sX, sY, m_size_x, UI_TITLE_GUILD_MENU);
 }
 
 bool DialogBox_GuildMenu::on_click()

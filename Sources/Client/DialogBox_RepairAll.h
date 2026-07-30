@@ -19,6 +19,6 @@ public:
 	std::array<bool, hb::shared::limits::MaxItems> m_locked_by_us{};
 
 private:
-	static constexpr ui_rect btn_repair{30, 292, 75, 21};
-	static constexpr ui_rect btn_cancel{154, 292, 75, 21};
+	static constexpr ui_rect btn_repair = ui_layout::btn_left;
+	static constexpr ui_rect btn_cancel = ui_layout::btn_right;
 };

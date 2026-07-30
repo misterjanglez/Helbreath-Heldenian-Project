@@ -7,6 +7,7 @@
 #include "GameModeManager.h"
 #include "CommonTypes.h"
 #include "lan_eng.h"
+#include "UITheme.h"
 #include "IInput.h"
 #include "ASIOSocket.h"
 #include "Misc.h"
@@ -96,8 +97,10 @@ void Overlay_ChangePassword::on_initialize()
                       && tb_new && tb_new->is_valid()
                       && tb_conf && tb_conf->is_valid()
                       && tb_old->text() != tb_new->text();
-        int frame = (all_valid && c.is_highlighted()) ? 21 : 20;
-        m_game->m_sprite[InterfaceNdButton]->draw(sb.x, sb.y, frame);
+        // The art had no disabled face, so "not ready yet" could only be said by
+        // withholding the hover frame. A themed button can grey the caption.
+        hb::client::ui_theme::button(sb.x, sb.y, sb.w, sb.h, UI_BTN_CHANGE,
+            all_valid && c.is_highlighted(), all_valid);
     });
 
     auto* btn_cancel = m_controls.add<cc::button>(BTN_CANCEL, cc::rect{dlgX + 217, dlgY + 208, ui_layout::btn_size_x, ui_layout::btn_size_y});
@@ -105,10 +108,9 @@ void Overlay_ChangePassword::on_initialize()
     btn_cancel->set_on_click([this](int) {
         clear_overlay();
     });
-    btn_cancel->set_render_handler([this](const cc::control& c) {
+    btn_cancel->set_render_handler([](const cc::control& c) {
         auto sb = c.screen_bounds();
-        int frame = c.is_highlighted() ? 17 : 16;
-        m_game->m_sprite[InterfaceNdButton]->draw(sb.x, sb.y, frame);
+        hb::client::ui_theme::button(sb.x, sb.y, sb.w, sb.h, UI_BTN_CANCEL, c.is_highlighted());
     });
 
     m_controls.set_focus_order({TXT_OLD_PW, TXT_NEW_PW, TXT_CONFIRM_PW, BTN_OK, BTN_CANCEL});
@@ -205,8 +207,19 @@ void Overlay_ChangePassword::on_render()
 {
     int dlgX, dlgY;
     draw_centered_dialog_box(InterfaceNdGame4, 0, dlgX, dlgY);
-    draw_new_dialog_box(InterfaceNdText, dlgX, dlgY, 13);
-    draw_new_dialog_box(InterfaceNdGame4, dlgX + 157, dlgY + 109, 7);
+
+    // Width is the panel's own: InterfaceNdGame4 frame 0 is 334x256, and the
+    // title strip this replaces was cut to match it. This overlay is not an
+    // IDialogBox, so there is no m_size_x to read it from.
+    constexpr int panel_w = 334;
+    hb::client::ui_theme::header(dlgX, dlgY, panel_w, UI_TITLE_CHANGE_PASSWORD);
+
+    // Two of the three field wells were painted into the panel and the third was
+    // this one loose frame, so flattening the panel left one parchment strip
+    // floating behind one of three otherwise unmarked fields. All three now come
+    // from the same place, sized to the textbox rects declared in on_initialize.
+    for (int field_y : { 67, 91, 115 })
+        hb::client::ui_theme::content_frame(dlgX + 158, dlgY + field_y - 1, 131, 19);
 
     // draw labels
     put_string(dlgX + 53, dlgY + 43, UPDATE_SCREEN_ON_CHANGE_PASSWORD1, GameColors::UILabel);

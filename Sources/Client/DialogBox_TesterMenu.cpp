@@ -14,6 +14,7 @@
 #include <cstring>
 #include "IInput.h"
 #include "AudioManager.h"
+#include "lan_eng.h"
 
 using namespace hb::shared::net;
 using namespace hb::client::sprite_id;
@@ -77,12 +78,7 @@ void DialogBox_TesterMenu::draw_main_menu(short sX, short sY, short size_x)
 			hb::shared::text::Align::TopCenter);
 	}
 
-	// Close button
-	if ((mouse_x >= sX + ui_layout::right_btn_x) && (mouse_x <= sX + ui_layout::right_btn_x + ui_layout::btn_size_x) &&
-		(mouse_y >= sY + ui_layout::btn_y) && (mouse_y <= sY + ui_layout::btn_y + ui_layout::btn_size_y))
-		draw_new_dialog_box(InterfaceNdButton, sX + ui_layout::right_btn_x, sY + ui_layout::btn_y, 1);
-	else
-		draw_new_dialog_box(InterfaceNdButton, sX + ui_layout::right_btn_x, sY + ui_layout::btn_y, 0);
+	draw_button(sX, sY, ui_layout::btn_right, UI_BTN_OK);
 }
 
 void DialogBox_TesterMenu::draw_level_picker(short sX, short sY, short size_x)
@@ -161,12 +157,12 @@ void DialogBox_TesterMenu::draw_teleport_page(short sX, short sY, short size_x)
 
 	if (m_map_count == 0)
 	{
-		put_aligned_string(sX, sX + size_x, sY + 40, "Loading maps...", GameColors::UIBlack);
+		put_aligned_string(sX, sX + size_x, sY + 40, "Loading maps...", GameColors::UILabel);
 	}
 	else
 	{
 		auto status = std::format("{} maps - click to teleport", m_map_count);
-		put_aligned_string(sX, sX + size_x, sY + 35, status.c_str(), GameColors::UIBlack);
+		put_aligned_string(sX, sX + size_x, sY + 35, status.c_str(), GameColors::UILabel);
 
 		if (m_map_count > visible_map_rows)
 		{
@@ -174,7 +170,7 @@ void DialogBox_TesterMenu::draw_teleport_page(short sX, short sY, short size_x)
 				m_map_scroll + 1,
 				std::min(m_map_scroll + visible_map_rows, m_map_count),
 				m_map_count);
-			put_aligned_string(sX, sX + size_x, sY + 48, scroll_info.c_str(), GameColors::UIBlack);
+			put_aligned_string(sX, sX + size_x, sY + 48, scroll_info.c_str(), GameColors::UILabel);
 		}
 
 		// Map list rows
@@ -211,8 +207,6 @@ void DialogBox_TesterMenu::draw_teleport_page(short sX, short sY, short size_x)
 
 void DialogBox_TesterMenu::on_draw()
 {
-	short mouse_x = static_cast<short>(hb::shared::input::get_mouse_x());
-	short mouse_y = static_cast<short>(hb::shared::input::get_mouse_y());
 	short z = static_cast<short>(hb::shared::input::get_mouse_wheel_delta());
 	short sX = m_x;
 	short sY = m_y;
@@ -283,8 +277,7 @@ bool DialogBox_TesterMenu::on_click_main_menu(short sX, short sY)
 	}
 
 	// Close button
-	if ((mouse_x >= sX + ui_layout::right_btn_x) && (mouse_x <= sX + ui_layout::right_btn_x + ui_layout::btn_size_x) &&
-		(mouse_y >= sY + ui_layout::btn_y) && (mouse_y <= sY + ui_layout::btn_y + ui_layout::btn_size_y))
+	if (mouse_in(ui_layout::btn_right))
 	{
 		disable_this_dialog();
 		audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
@@ -383,8 +376,6 @@ bool DialogBox_TesterMenu::on_click_teleport(short sX, short sY)
 
 bool DialogBox_TesterMenu::on_click()
 {
-	short mouse_x = static_cast<short>(hb::shared::input::get_mouse_x());
-	short mouse_y = static_cast<short>(hb::shared::input::get_mouse_y());
 	short sX = m_x;
 	short sY = m_y;
 

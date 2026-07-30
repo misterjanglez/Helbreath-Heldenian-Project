@@ -56,10 +56,15 @@ void DialogBox_Slates::on_draw()
 			draw_new_dialog_box(InterfaceNdInventory, sX + 70, sY + 97, 8);
 		}
 
+		// This dialog is drawn on the carved stone plate, not on a flat panel —
+		// the plate is a depicted object the slates are laid on, so it kept its
+		// art and stayed light. It therefore keeps dark link colours of its own
+		// rather than following the palette that was inverted for dark panels.
 		if ((m_slot_ul != -1) && (m_slot_ll != -1) && (m_slot_ur != -1) && (m_slot_lr != -1)) {
-			if (mouse_in(link_cast))
-				hb::shared::text::draw_text(GameFont::Bitmap1, sX + 120, sY + 150, "Casting", hb::shared::text::TextStyle::with_highlight(GameColors::UIMagicBlue));
-			else hb::shared::text::draw_text(GameFont::Bitmap1, sX + 120, sY + 150, "Casting", hb::shared::text::TextStyle::with_highlight(GameColors::BmpBtnNormal));
+			constexpr auto cast_hover  = hb::shared::render::Color(30, 20, 90);
+			constexpr auto cast_normal = hb::shared::render::Color(20, 18, 16);
+			hb::shared::text::draw_text(GameFont::Bitmap1, sX + 120, sY + 150, "Casting",
+				hb::shared::text::TextStyle::with_highlight(mouse_in(link_cast) ? cast_hover : cast_normal));
 		}
 		break;
 

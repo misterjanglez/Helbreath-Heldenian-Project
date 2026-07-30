@@ -1,5 +1,6 @@
 ﻿#pragma once
 #include <cstdint>
+#include "CommonTypes.h"   // ui_rect
 
 namespace game_limits {
     constexpr int max_sprites          = 25000;
@@ -27,6 +28,15 @@ namespace ui_layout {
     constexpr int left_btn_x    = 30;
     constexpr int right_btn_x   = 154;
     constexpr int btn_y         = 292;
+
+    // The two footer button slots nearly every dialog uses. The loose numbers
+    // above are what the pak-sprite era needed — a draw took an x and a y, so
+    // the size lived only in whatever rect the click handler happened to carry,
+    // and a dozen dialogs re-measured it inline or declared a private copy that
+    // was a pixel off. A themed button takes the whole rect, so the slot can be
+    // stated once and every dialog's footer lands in the same place.
+    constexpr ui_rect btn_left { left_btn_x,  btn_y, btn_size_x, btn_size_y };
+    constexpr ui_rect btn_right{ right_btn_x, btn_y, btn_size_x, btn_size_y };
 }
 
 namespace input_config {

@@ -1,5 +1,6 @@
 #pragma once
 #include "IDialogBox.h"
+#include "UITheme.h"
 
 class DialogBox_Skill : public IDialogBox
 {
@@ -16,5 +17,6 @@ public:
 	bool m_is_down_skill_pending{};
 
 private:
-	static constexpr ui_rect area_scroll{240, 30, 21, 291};
+	static constexpr ui_rect area_scroll = hb::client::ui_theme::grab_area(
+		hb::client::ui_theme::list_gutter);
 };

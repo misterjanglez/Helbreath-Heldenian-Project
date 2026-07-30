@@ -465,8 +465,17 @@ std::array<bool, hb::shared::limits::MaxItems> m_is_item_equipped{};
 	int effective_item_weight(int base_weight, const CItem* item) const
 	{
 		if (item == nullptr) return base_weight;
-		return CItem::apply_light_reduction(base_weight,
-			item->get_light_percent(modifier_multiplier(hb::shared::item::modifier_id::light)));
+		return effective_item_weight(base_weight, item->m_instance);
+	}
+
+	// Instance-taking form, for callers holding a config row and an instance POD
+	// separately — a ground item has no CItem of its own.
+	int effective_item_weight(int base_weight,
+		const hb::shared::item::item_instance_data& instance) const
+	{
+		return CItem::apply_light_reduction(base_weight, CItem::light_percent(
+			instance.attributes.modifier_value(hb::shared::item::modifier_id::light),
+			modifier_multiplier(hb::shared::item::modifier_id::light)));
 	}
 
 	tier_presentation_entry m_tier_presentation[hb::shared::item::tier_count];

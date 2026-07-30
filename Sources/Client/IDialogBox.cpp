@@ -5,6 +5,7 @@
 #include "GameFonts.h"
 #include "TextLibExt.h"
 #include "IInput.h"
+#include "UITheme.h"
 
 IDialogBox::IDialogBox(DialogBoxId::Type id, CGame* game)
 	: m_game(game)
@@ -23,6 +24,12 @@ bool IDialogBox::mouse_in(const ui_rect& r) const
 void IDialogBox::draw_new_dialog_box(char type, int sX, int sY, int frame, bool is_no_color_key, bool is_trans)
 {
 	m_game->draw_new_dialog_box(type, sX, sY, frame, is_no_color_key, is_trans);
+}
+
+void IDialogBox::draw_button(int sX, int sY, const ui_rect& r, const char* caption, bool enabled)
+{
+	hb::client::ui_theme::button(sX + r.x, sY + r.y, r.w, r.h, caption,
+	                             enabled && mouse_in(r), enabled);
 }
 
 void IDialogBox::put_string(int iX, int iY, const char* string, const hb::shared::render::Color& color)

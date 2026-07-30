@@ -930,13 +930,16 @@ void Screen_OnGame::draw_objects(short pivot_x, short pivot_y, short div_x, shor
 		}
 	}
 
+	// Shift-hover on a pile on the floor. The tile carries the item's whole
+	// instance POD, not just its id, so this can be the same tooltip the pack
+	// shows rather than a bare name — nothing new has to come over the wire.
 	if (item_selected_id != 0) {
-		auto itemInfo = item_name_formatter::get().format(item_selected_id, item_selected);
-
-		item_tooltip tooltip;
-		tooltip.add_line(itemInfo.name,
-			item_name_color(itemInfo, GameColors::UIWhite, name_dye_tint(item_selected)));
-		tooltip.draw(mouse_x, mouse_y + 25, m_game->m_Renderer);
+		if (CItem* cfg = m_game->get_item_config(item_selected_id))
+		{
+			item_tooltip tooltip;
+			build_item_tooltip(tooltip, item_selected_id, cfg, item_selected, /*in_inventory=*/false);
+			tooltip.draw(mouse_x, mouse_y + 25, m_game->m_Renderer);
+		}
 	}
 }
 

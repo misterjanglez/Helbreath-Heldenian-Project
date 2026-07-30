@@ -4,6 +4,7 @@
 #include "CommonTypes.h"
 #include "RenderHelpers.h"
 #include "GameFonts.h"
+#include "UITheme.h"
 #include "TextFieldRenderer.h"
 #include "TextLibExt.h"
 #include "Benchmark.h"
@@ -2844,9 +2845,65 @@ void CGame::add_map_status_info(const char* data, bool is_last_data)
 	}
 }
 
+// Dialog bodies whose pak art is replaced by a flat themed panel.
+//
+// Only the in-game dialog backgrounds are listed. Full-screen art (loading,
+// main menu, login, character select) is deliberately excluded — those are
+// illustrations, not chrome. So is the HUD bar (InterfaceNdIconPanel), which
+// keeps its brass treatment.
+//
+// Buttons are NOT here even though InterfaceNdButton is dialog chrome: a button
+// frame has its caption painted into the art, so replacing it with a flat face
+// at this seam would silently erase the lettering. Buttons convert per dialog,
+// where the caption string is available to pass to ui_theme::button.
+//
+// TRANSITIONAL. This whole path is scaffolding: it strips the brass panels out
+// of every dialog at once so none is left half-converted, and each dialog drops
+// out of it as it is rewritten to call ui_theme::panel directly. Delete it once
+// no dialog draws its background through a sprite.
+//
+// Which frames are panels is stated per frame, not inferred from size. The size
+// gate this replaces flattened any frame of at least 150x60, which is true of
+// every parchment panel — and also true of the Slates stone plate, the alchemy
+// bowl and cauldron, and the crusade world map, all of which share these sheets
+// with the panels and were being replaced by empty rectangles.
+//
+// The question is not "is this big" but "is this chrome": a panel, a well, a
+// button. An illustration a dialog puts things ON — the stone plate, a crafting
+// vessel, the crusade map — stays art. The inventory chest is the awkward case
+// and it is chrome: it is drawn as a chest, but it is the bag dialog's panel and
+// every item slot is measured against it.
+static bool is_flat_panel_frame(int type, int frame)
+{
+	using namespace hb::client::sprite_id;
+	switch (type)
+	{
+		case InterfaceNdGame1:       return frame <= 2;
+		case InterfaceNdGame2:       return frame == 0 || frame == 2 || (frame >= 4 && frame <= 6);
+		case InterfaceNdGame3:       return frame <= 1;   // 2 is a plaque, 3 the item well
+		case InterfaceNdGame4:       return frame <= 3;   // 4 is the stat grid, drawn by its dialogs
+		case InterfaceNdText:        return frame == 0;
+		case InterfaceNdNewExchange: return frame == 0;
+		case InterfaceNdCrusade:     return frame == 0;   // 21 is the crusade world map
+		case InterfaceNdInventory:   return frame == 0;   // 4, 9, 10 are depicted objects
+		default:                     return false;
+	}
+}
+
 void CGame::draw_new_dialog_box(char type, int sX, int sY, int frame, bool is_no_color_key, bool is_trans)
 {
 	if (m_sprite[type] == 0) return;
+
+	// The frame rect still supplies the geometry, so a themed panel lands on
+	// exactly the footprint the art occupied and every caller's hand-measured
+	// child offset stays valid without being touched.
+	if (is_flat_panel_frame(type, frame))
+	{
+		const auto rect = m_sprite[type]->GetFrameRect(frame);
+		hb::client::ui_theme::panel(sX, sY, rect.width, rect.height);
+		return;
+	}
+
 	if (is_no_color_key == false)
 	{
 		if (is_trans == true)

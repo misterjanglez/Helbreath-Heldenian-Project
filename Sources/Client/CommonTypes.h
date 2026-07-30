@@ -30,6 +30,17 @@
 #include "PrimitiveTypes.h"
 
 // ============================================================================
+// UI Geometry
+// ============================================================================
+
+// Dialog-relative rect, used for both hit-testing and chrome placement.
+//
+// It lives here rather than in IDialogBox.h so that UITheme can state the
+// geometry of the chrome it draws: a widget's face and its clickable area then
+// come from one rect instead of two sets of hand-measured numbers that drift.
+struct ui_rect { int x, y, w, h; };
+
+// ============================================================================
 // Memory Operations
 // ============================================================================
 
@@ -132,14 +143,25 @@ namespace GameColors
 	inline constexpr hb::shared::render::Color UISlatesPink{ 220, 140, 160 };   // Slates effect text (DialogBox_Slates)
 	inline constexpr hb::shared::render::Color UISlatesCyan{ 90, 220, 200 };    // Slates effect text (DialogBox_Slates)
 
-	// Bitmap font button colors
-	// hb::shared::text::TextStyle::with_highlight (various dialog boxes)
-	inline constexpr hb::shared::render::Color BmpBtnNormal{ 0, 0, 7 };         // Normal bitmap button (DialogBox_NpcTalk, DialogBox_Exchange, DialogBox_Manufacture, DialogBox_Slates)
-	inline constexpr hb::shared::render::Color BmpBtnHover{ 15, 15, 15 };       // Hover bitmap button (DialogBox_Exchange)
-	inline constexpr hb::shared::render::Color BmpBtnActive{ 10, 10, 10 };      // Active bitmap button (Game.cpp, DialogBox_Manufacture)
-	inline constexpr hb::shared::render::Color BmpBtnBlue{ 16, 16, 30 };        // Blue bitmap button (DialogBox_Manufacture)
-	inline constexpr hb::shared::render::Color BmpBtnRed{ 20, 6, 6 };           // Red bitmap button (DialogBox_Manufacture)
-	inline constexpr hb::shared::render::Color BmpBtnFishRed{ 10, 0, 0 };       // Fishing button (DialogBox_Fishing)
+	// Bitmap font text-link colors, used with TextStyle::with_highlight.
+	//
+	// These were all near-black, and on a light parchment panel that read as
+	// "dark text with a lit edge" — with_highlight draws a first pass at
+	// colour + (90,55,50) and the body on top, so the *edge* was doing the work
+	// and the body was almost the same black in every state. On the flat dark
+	// panels the body vanishes and only the muddy edge is left, which is why the
+	// NPC dialog's "Next" and the exchange links went unreadable.
+	//
+	// Inverted in place for the same reason as the text colours below: the roles
+	// are unchanged, only the surface they are read against. Hue is kept, and the
+	// states are pulled apart so the resting one is dimmer than the hover one —
+	// which the originals only expressed through the highlight edge.
+	inline constexpr hb::shared::render::Color BmpBtnNormal{ 160, 160, 175 };   // resting link (NpcTalk, Exchange, Manufacture)
+	inline constexpr hb::shared::render::Color BmpBtnHover{ 235, 235, 235 };    // hovered link (Exchange)
+	inline constexpr hb::shared::render::Color BmpBtnActive{ 150, 150, 150 };   // active/secondary (Game.cpp, Manufacture, HudPanel)
+	inline constexpr hb::shared::render::Color BmpBtnBlue{ 150, 150, 215 };     // blue state (Manufacture)
+	inline constexpr hb::shared::render::Color BmpBtnRed{ 230, 120, 110 };      // red state (Manufacture)
+	inline constexpr hb::shared::render::Color BmpBtnFishRed{ 235, 110, 100 };  // Fishing button
 
 	// Minimap night colors (Game.cpp CMisc::ColorTransfer)
 	inline constexpr hb::shared::render::Color NightBlueMid{ 50, 50, 100 };     // Night sky mid
@@ -149,23 +171,34 @@ namespace GameColors
 
 
 	// Completed
-	inline constexpr hb::shared::render::Color UIMagicBlue{ 4,0,50 };
-	inline constexpr hb::shared::render::Color UIMagicPurple{ 60, 10, 60 };
-	inline constexpr hb::shared::render::Color UIMagicDisabled{ 50, 15, 15 };  // INT requirement not met
+	//
+	// The dialog text colours below were chosen for a light parchment panel and
+	// are all near-black; on the flat near-black panels the dialogs now draw
+	// (see UITheme.h) they were unreadable. They are inverted in place rather
+	// than replaced per call site, because they are the same semantic roles —
+	// "body text", "disabled", "a magic entry" — just read against a dark
+	// surface instead of a light one. That keeps one edit here doing the work of
+	// 550-odd call sites, and keeps the names meaning what they always meant.
+	//
+	// Hue is preserved where it carried meaning: the magic colours stay blue and
+	// purple, UIDarkRed stays red. Only lightness moved.
+	inline constexpr hb::shared::render::Color UIMagicBlue{ 140, 180, 255 };
+	inline constexpr hb::shared::render::Color UIMagicPurple{ 205, 150, 235 };
+	inline constexpr hb::shared::render::Color UIMagicDisabled{ 152, 112, 112 };  // INT requirement not met
 	inline constexpr hb::shared::render::Color UIGuildGreen{ 130, 200, 130 };
 	inline constexpr hb::shared::render::Color UIWorldChat{ 255, 130, 130 };
 	inline constexpr hb::shared::render::Color UIFactionChat{ 130, 130, 255 };
 	inline constexpr hb::shared::render::Color UIPartyChat{ 230, 230, 130 };
 	inline constexpr hb::shared::render::Color UINormalChat{ 150, 150, 170 };
 	inline constexpr hb::shared::render::Color UIGameMasterChat{ 180, 255, 180 };
-	inline constexpr hb::shared::render::Color UILabel{ 25, 25, 25 };
-	inline constexpr hb::shared::render::Color UIDisabled{ 65, 65, 65 };
+	inline constexpr hb::shared::render::Color UILabel{ 228, 226, 220 };
+	inline constexpr hb::shared::render::Color UIDisabled{ 132, 128, 120 };
 	inline constexpr hb::shared::render::Color MonsterStatusEffect{ 240, 240, 70 };
 	inline constexpr hb::shared::render::Color UIItemName_Special{ 0, 255, 50 };
 	inline constexpr hb::shared::render::Color NeutralNamePlate{ 50, 50, 255 };
 	inline constexpr hb::shared::render::Color EnemyNamePlate{ 255, 0, 0 };
 	inline constexpr hb::shared::render::Color FriendlyNamePlate{ 30, 255, 30 };
-	inline constexpr hb::shared::render::Color UIModifiedStat{ 0, 0, 192 };
+	inline constexpr hb::shared::render::Color UIModifiedStat{ 120, 170, 255 };
 
 	inline constexpr hb::shared::render::Color InputValid{ 100, 200, 100 };
 	inline constexpr hb::shared::render::Color InputInvalid{ 200, 100, 100 };
@@ -174,12 +207,15 @@ namespace GameColors
 	inline constexpr hb::shared::render::Color UIBlack{ 0, 0, 0 };
 	inline constexpr hb::shared::render::Color UIWhite{ 255, 255, 255 };
 	inline constexpr hb::shared::render::Color UINearWhite{ 232, 232, 232 };
-	inline constexpr hb::shared::render::Color UIDescription{ 150, 150, 150 };  // Item tooltips, stats, descriptions
+	inline constexpr hb::shared::render::Color UIDescription{ 186, 183, 176 };  // Item tooltips, stats, descriptions
 	inline constexpr hb::shared::render::Color UIGreen{ 0, 255, 0 };
-	inline constexpr hb::shared::render::Color UIDarkGreen{ 0, 55, 0 };
+	inline constexpr hb::shared::render::Color UIDarkGreen{ 110, 225, 110 };
 	inline constexpr hb::shared::render::Color UIRed{ 255, 0, 0 };
-	inline constexpr hb::shared::render::Color UIDarkRed{ 58, 0, 0 };
-	inline constexpr hb::shared::render::Color UIWarningRed{ 195, 25, 25 };
+	inline constexpr hb::shared::render::Color UIDarkRed{ 235, 92, 82 };
+	// Brightened with the rest: at (195,25,25) this cleared 3.2:1 against the
+	// panel, which is under the small-text minimum for the one colour whose whole
+	// job is to be noticed.
+	inline constexpr hb::shared::render::Color UIWarningRed{ 255, 95, 85 };
 	inline constexpr hb::shared::render::Color UIOrange{ 220, 130, 45 };
 	inline constexpr hb::shared::render::Color UIYellow{ 200, 200, 25 };
 	inline constexpr hb::shared::render::Color UIPaleYellow{ 200, 200, 120 };

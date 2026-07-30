@@ -214,6 +214,7 @@
     <ClInclude Include="performance_monitor.h" />
     <ClInclude Include="BuildItem.h" />
     <ClInclude Include="CharInfo.h" />
+    <ClInclude Include="CombatSummary.h" />
     <ClInclude Include="CommonTypes.h" />
     <ClInclude Include="PacketSendHelpers.h" />
     <ClInclude Include="Effect.h" />
@@ -304,6 +305,7 @@
     <ClInclude Include="TeleportManager.h" />
     <ClInclude Include="TextInputManager.h" />
     <ClInclude Include="TextFieldRenderer.h" />
+    <ClInclude Include="UITheme.h" />
     <ClInclude Include="InputStateHelper.h" />
     <ClInclude Include="EventListManager.h" />
     <ClInclude Include="WeatherManager.h" />
@@ -421,6 +423,7 @@
     <ClInclude Include="GameEvents.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="CombatSummary.cpp" />
     <ClCompile Include="CommonTypes.cpp" />
     <ClCompile Include="ConfigManager.cpp" />
     <ClCompile Include="LocalCacheManager.cpp" />
@@ -555,6 +558,7 @@
     <ClCompile Include="TeleportManager.cpp" />
     <ClCompile Include="TextInputManager.cpp" />
     <ClCompile Include="TextFieldRenderer.cpp" />
+    <ClCompile Include="UITheme.cpp" />
     <ClCompile Include="InputStateHelper.cpp" />
     <ClCompile Include="EventListManager.cpp" />
     <ClCompile Include="ChatManager.cpp" />

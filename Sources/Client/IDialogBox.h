@@ -2,10 +2,10 @@
 
 #include "DialogBoxIDs.h"
 #include "CommonTypes.h"
+#include "GameConstants.h"   // ui_layout button slots, shared by every dialog
 #include <cstdint>
 
-// Simple rect for dialog-relative hit-testing
-struct ui_rect { int x, y, w, h; };
+// ui_rect (dialog-relative hit-test rect) comes in with CommonTypes.h.
 
 class CGame;
 class CPlayer;
@@ -62,10 +62,16 @@ protected:
 	// Returns true if mouse cursor is inside the rect (relative to dialog position)
 	bool mouse_in(const ui_rect& r) const;
 
+	// Themed flat button. The rect supplies both the face and the hover test, so
+	// a button's chrome and its click target cannot disagree — the frame-pair
+	// version they replace drew a fixed 74x20 sprite wherever it was told and
+	// hit-tested a rect that only happened to line up with it.
+	void draw_button(int sX, int sY, const ui_rect& r, const char* caption, bool enabled = true);
+
 	// Helper methods - delegate to CGame
 	void draw_new_dialog_box(char type, int sX, int sY, int frame, bool is_no_color_key = false, bool is_trans = false);
 	void put_string(int iX, int iY, const char* string, const hb::shared::render::Color& color);
-	void put_aligned_string(int x1, int x2, int iY, const char* string, const hb::shared::render::Color& color = GameColors::UIBlack);
+	void put_aligned_string(int x1, int x2, int iY, const char* string, const hb::shared::render::Color& color = GameColors::UILabel);
 	void add_event_list(const char* txt, char color = 0, bool dup_allow = true);
 	bool send_game_packet_impl(const hb::net::packet_base& pkt, size_t size, bool encrypt = true);
 

@@ -48,6 +48,7 @@ private:
     void DrawMode10_NoPoints(int sX, int sY);
 
     // Shared drawing helper
+    void draw_item_well(int sX, int sY);
     void draw_item_preview(int sX, int sY, int item_index);
     int calculate_upgrade_cost(int item_index);
 

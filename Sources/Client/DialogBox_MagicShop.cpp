@@ -10,6 +10,7 @@
 #include "AudioManager.h"
 #include <format>
 #include <string>
+#include "UITheme.h"
 
 using namespace hb::shared::net;
 using namespace hb::client::sprite_id;
@@ -27,7 +28,7 @@ void DialogBox_MagicShop::on_draw()
 	short sY = m_y;
 
 	m_game->draw_new_dialog_box(InterfaceNdGame4, sX, sY, 1);
-	m_game->draw_new_dialog_box(InterfaceNdText, sX, sY, 14);
+	hb::client::ui_theme::header(sX, sY, m_size_x, UI_TITLE_SPELLS);
 
 	// Mouse wheel scrolling - read and consume input directly
 	if (m_game->get_dialog_box_manager().get_top_id() == DialogBoxId::MagicShop)

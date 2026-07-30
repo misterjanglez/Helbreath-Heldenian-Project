@@ -24,12 +24,12 @@ private:
 	static constexpr int COUNT_OFFSET_Y = 51;  // 41 + 10
 
 	// Button regions
-	static constexpr int BTN_UPGRADE_X1 = 23;
-	static constexpr int BTN_UPGRADE_X2 = 76;
-	static constexpr int BTN_MANUFACTURE_X1 = 140;
-	static constexpr int BTN_MANUFACTURE_X2 = 212;
-	static constexpr int BTN_Y1 = 172;
-	static constexpr int BTN_Y2 = 184;
+	// The two captions were painted into the chest, so they were only ever drawn
+	// on hover — the idle state was the panel. A flat panel has no lettering, so
+	// both are real buttons now, sitting a few pixels higher than the plates did
+	// to give a TTF caption room the art did not need.
+	static constexpr ui_rect btn_upgrade{ 23, 167, 53, 16 };
+	static constexpr ui_rect btn_manufacture{ 140, 167, 72, 16 };
 
 	// Helper: draw a single inventory item with proper coloring and state
 	void draw_inventory_item(CItem* item, int itemIdx, int baseX, int baseY);

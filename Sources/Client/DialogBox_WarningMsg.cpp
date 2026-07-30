@@ -26,11 +26,7 @@ void DialogBox_WarningMsg::on_draw()
 	put_string(sX + 30, sY + 92, DEF_MSG_WARNING4, GameColors::UIOrange);
 	put_string(sX + 30, sY + 110, DEF_MSG_WARNING5, GameColors::UIOrange);
 
-	// OK button
-	if (mouse_in(btn_ok))
-		draw_new_dialog_box(InterfaceNdButton, sX + 122, sY + 127, 1);
-	else
-		draw_new_dialog_box(InterfaceNdButton, sX + 122, sY + 127, 0);
+	draw_button(sX, sY, btn_ok, UI_BTN_OK);
 }
 
 bool DialogBox_WarningMsg::on_click()

@@ -722,6 +722,119 @@
 #define	DRAW_DIALOGBOX_CHARACTER8	"Citizen of Aresden"
 #define	DRAW_DIALOGBOX_CHARACTER9	"Citizen of Elvine"
 
+// Captions for the flat-panel character dialog. These were painted into the pak
+// atlas until the dialogs moved to renderer primitives, so they are new strings
+// here rather than relocated ones — which also makes them translatable for the
+// first time.
+#define	UI_CHARACTER_TITLE	"Character Info."
+#define	UI_CHARACTER_LEVEL	"Level"
+#define	UI_CHARACTER_EXP	"EXP"
+#define	UI_CHARACTER_NEXT_EXP	"Next EXP"
+#define	UI_CHARACTER_HEALTH	"Health"
+#define	UI_CHARACTER_MANA	"Mana"
+#define	UI_CHARACTER_STAMINA	"Stamina"
+#define	UI_CHARACTER_MAX_LOAD	"Max.Load"
+#define	UI_CHARACTER_EK_COUNT	"EK.Count"
+#define	UI_CHARACTER_STR	"Str"
+#define	UI_CHARACTER_DEX	"Dex"
+#define	UI_CHARACTER_INT	"Int"
+#define	UI_CHARACTER_MAG	"Mag"
+#define	UI_CHARACTER_VIT	"Vit"
+#define	UI_CHARACTER_CHR	"Chr"
+// The Quest and Party buttons take UI_BTN_QUEST / UI_BTN_PARTY below � same two
+// words, transcribed from the same two button frames, so there is no second copy
+// to keep in step. Level Up deliberately does NOT: its frame says "Level Set.",
+// which is what the 2001 art had room for rather than what the button does.
+#define	UI_CHARACTER_BTN_LEVELUP	"Level Up"
+
+// The combat pane. These are new strings with no art behind them — the pane did
+// not exist until a flat panel made the dialog free to widen.
+#define	UI_COMBAT_TAB_COMBAT	"Combat"
+#define	UI_COMBAT_TAB_GEAR	"Gear"
+#define	UI_COMBAT_HEAD_ATTACK	"Attack"
+#define	UI_COMBAT_HEAD_DEFENCE	"Defence"
+#define	UI_COMBAT_HEAD_GEAR	"From Equipment"
+#define	UI_COMBAT_DAMAGE_SMALL	"Damage"
+#define	UI_COMBAT_DAMAGE_LARGE	"vs. Large"
+#define	UI_COMBAT_ATTACK_DELAY	"Swing Delay"
+#define	UI_COMBAT_HIT_BONUS	"Hit Bonus"
+#define	UI_COMBAT_DEFENCE_RATIO	"Defence Ratio"
+#define	UI_COMBAT_ARMOUR	"Armour"
+#define	UI_COMBAT_PHYS_ABSORB	"Phys. Absorb"
+#define	UI_COMBAT_MAGIC_RESIST	"Magic Resist"
+#define	UI_COMBAT_MAGIC_ABSORB	"Magic Absorb"
+#define	UI_COMBAT_POISON_RESIST	"Poison Resist"
+#define	UI_COMBAT_NO_WEAPON	"Unarmed"
+#define	UI_COMBAT_NO_GEAR	"Nothing you are wearing rolls a modifier."
+#define	UI_COMBAT_GEAR_ONLY	"Absorb and resist rows are what your gear adds, not your total."
+
+// Panel titles. These were the pak "title strip" frames on sheet 9 — a separate
+// small sprite per dialog with the lettering painted in — so like the captions
+// above they are new strings rather than relocated ones. The wording is
+// transcribed from the art frame each one replaces, including its casing, so
+// nothing reads differently to a returning player.
+#define	UI_TITLE_SKILLS	"Skills"                        // frame 1
+#define	UI_TITLE_LEVEL_UP_SETTING	"Level up Setting"  // frame 2
+#define	UI_TITLE_PARTY_MENU	"Party Menu"                // frame 3
+#define	UI_TITLE_QUEST	"Quest"                         // frame 4
+#define	UI_TITLE_ITEM_UPGRADE	"Item Upgrade"          // frame 5
+#define	UI_TITLE_SYSTEM_MENU	"System Menu"           // frame 6
+#define	UI_TITLE_MAGIC_LIST	"Magic List"                // frame 7
+#define	UI_TITLE_TINKERING	"Tinkering"                 // frame 8
+#define	UI_TITLE_EXCHANGE_ITEM	"Exchange Item"         // frame 9
+#define	UI_TITLE_REPAIR_ITEM	"Repair Item"           // frame 10
+#define	UI_TITLE_ITEM_FOR_SALE	"Item for Sale"         // frame 11
+#define	UI_TITLE_USER_AGREEMENT	"User Agreement"        // frame 12
+#define	UI_TITLE_CHANGE_PASSWORD	"Change Password"   // frame 13
+#define	UI_TITLE_SPELLS	"Spells"                        // frame 14
+#define	UI_TITLE_COMMANDER_MENU	"Commander Menu"        // frame 15
+#define	UI_TITLE_CONSTRUCTOR_MENU	"Constructor Menu"  // frame 16
+#define	UI_TITLE_SOLDIER_MENU	"Soldier Menu"          // frame 17
+#define	UI_TITLE_CITYHALL_MENU	"Cityhall Menu"         // frame 18
+#define	UI_TITLE_GUILD_MENU	"Guild Menu"                // frame 19
+#define	UI_TITLE_NOTICE	"Notice"                        // frame 20
+#define	UI_TITLE_ITEMS_IN_STORAGE	"Items In Storage"  // frame 21
+#define	UI_TITLE_CHAT_HISTORY	"History"               // frame 22
+
+// Button captions. Sheet 10 held 83 frames that were the same two brass faces
+// with 32 different words painted on, in idle/hover pairs — which is why every
+// call site had to name a pair of frame numbers instead of saying what the
+// button does. Transcribed from the art frame each one replaces, including its
+// casing and the abbreviating full stop on "Level Set.".
+#define	UI_BTN_OK	"Ok"                                // frames 0/1
+#define	UI_BTN_NO	"No"                                // frames 2/3
+#define	UI_BTN_QUEST	"Quest"                         // frames 4/5
+#define	UI_BTN_CONTINUE	"Continue"                      // frames 6/7
+#define	UI_BTN_LOG_OUT	"Log Out"                       // frames 8/9
+#define	UI_BTN_LEVEL_SET	"Level Set."                // frames 10/11
+#define	UI_BTN_I_AGREE	"I Agree"                       // frames 12/13
+#define	UI_BTN_DISAGREE	"Disagree"                      // frames 14/15
+#define	UI_BTN_CANCEL	"Cancel"                        // frames 16/17
+#define	UI_BTN_YES	"Yes"                               // frames 18/19
+#define	UI_BTN_CHANGE	"Change"                        // frames 20/21
+#define	UI_BTN_CONNECT	"Connect"                       // frames 22/23
+#define	UI_BTN_CREATE	"Create"                        // frames 24/25
+#define	UI_BTN_CLEAR	"Clear"                         // frames 26/27
+#define	UI_BTN_RESET	"Reset"                         // frames 28/29
+#define	UI_BTN_PURCHASE	"Purchase"                      // frames 30/31
+#define	UI_BTN_ACCEPT	"Accept"                        // frames 32/33
+#define	UI_BTN_REJECT	"Reject"                        // frames 34/35
+#define	UI_BTN_RESTART	"Restart"                       // frames 36/37
+#define	UI_BTN_SELL	"Sell"                              // frames 38/39
+#define	UI_BTN_DECLINE	"Decline"                       // frames 40/41
+#define	UI_BTN_REPAIR	"Repair"                        // frames 42/43
+#define	UI_BTN_PARTY	"Party"                         // frames 44/45
+#define	UI_BTN_UPGRADE	"Upgrade"                       // frames 46/47
+#define	UI_BTN_MANUFACTURE	"Manufacture"               // inventory sheet, frames 1/2
+#define	UI_BTN_ALCHEMY	"Alchemy"                       // frames 48/49
+#define	UI_BTN_MASTER	"Master"                        // frames 63/64
+#define	UI_BTN_MAGICIAN	"Magician"                      // frames 65/66
+#define	UI_BTN_WARRIOR	"Warrior"                       // frames 67/68
+#define	UI_BTN_GENERAL	"General"                       // frames 70/71
+#define	UI_BTN_GRAPHICS	"Graphics"                      // frames 72/73
+#define	UI_BTN_AUDIO	"Audio"                         // frames 74/76
+#define	UI_BTN_SYSTEM	"System"                        // frames 75/77
+
 
 #define	DRAW_DIALOGBOX_LEVELUP_SETTING1	"When level up, your specific stats"
 #define	DRAW_DIALOGBOX_LEVELUP_SETTING2	"will be increased by setting."

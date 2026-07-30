@@ -23,7 +23,6 @@ public:
 	DialogBox_SysMenu(CGame* game);
 	~DialogBox_SysMenu() override = default;
 
-	void on_update() override;
 	void on_draw() override;
 	bool on_click() override;
 	PressResult on_press() override;
@@ -48,7 +47,7 @@ private:
 	void draw_system_tab(short sX, short sY);
 
 	// Click handlers for each tab
-	bool on_click_general(short sX, short sY);
+	bool on_click_general();
 	bool on_click_graphics(short sX, short sY);
 	bool on_click_audio(short sX, short sY);
 	bool on_click_system(short sX, short sY);
@@ -57,15 +56,17 @@ private:
 	void draw_toggle(int x, int y, bool enabled);
 	bool is_in_toggle_area(int x, int y);
 
+	// One selectable segment of a value box. The box is drawn once for the whole
+	// row, so a segment paints no face of its own — only its caption, lit when it
+	// is the current value or the cursor is over it.
+	void draw_option(int x, int y, int w, const char* text,
+		bool selected, bool enabled = true);
+
+	// One "Label: [On/Off] ---o------" row of the audio tab. All five were the
+	// same nine lines with a different volume accessor.
+	void draw_volume_row(int label_x, int toggle_x, int slider_x, int y,
+		const char* caption, bool available, bool enabled, int volume);
+
 	int m_iActiveTab;
 	int m_graphics_scroll_offset = 0;
-
-	// Cached frame dimensions (initialized on first update)
-	bool m_bFrameSizesInitialized;
-	int m_iWideBoxWidth;    // Frame 78 width
-	int m_iWideBoxHeight;   // Frame 78 height
-	int m_iSmallBoxWidth;   // Frame 79 width
-	int m_iSmallBoxHeight;  // Frame 79 height
-	int m_iLargeBoxWidth;   // Frame 81 width
-	int m_iLargeBoxHeight;  // Frame 81 height
 };

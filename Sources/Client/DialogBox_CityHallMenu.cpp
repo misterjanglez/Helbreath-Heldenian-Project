@@ -12,6 +12,7 @@
 #include "PacketSendHelpers.h"
 #include "Screen_OnGame.h"
 #include "AudioManager.h"
+#include "UITheme.h"
 
 
 using namespace hb::shared::net;
@@ -30,7 +31,7 @@ void DialogBox_CityHallMenu::on_draw()
 	short size_x = m_size_x;
 
 	m_game->draw_new_dialog_box(InterfaceNdGame2, sX, sY, 2);
-	m_game->draw_new_dialog_box(InterfaceNdText, sX, sY, 18);
+	hb::client::ui_theme::header(sX, sY, m_size_x, UI_TITLE_CITYHALL_MENU);
 
 	switch (m_mode)
 	{
@@ -199,13 +200,11 @@ void DialogBox_CityHallMenu::DrawMode0_MainMenu(short sX, short sY, short size_x
 	else
 		hb::shared::text::draw_text_aligned(GameFont::Default, sX, sY + 245, (sX + size_x) - (sX), 15, DRAW_DIALOGBOX_CITYHALL_DARKITEM1, hb::shared::text::TextStyle::from_color(GameColors::UIDisabled), hb::shared::text::Align::TopCenter);
 
-	hb::shared::text::draw_text_aligned(GameFont::Default, sX, sY + 270, (sX + size_x) - (sX), 15, DRAW_DIALOGBOX_CITYHALL_MENU17, hb::shared::text::TextStyle::from_color(GameColors::UIBlack), hb::shared::text::Align::TopCenter);
+	hb::shared::text::draw_text_aligned(GameFont::Default, sX, sY + 270, (sX + size_x) - (sX), 15, DRAW_DIALOGBOX_CITYHALL_MENU17, hb::shared::text::TextStyle::from_color(GameColors::UILabel), hb::shared::text::Align::TopCenter);
 }
 
 void DialogBox_CityHallMenu::DrawMode1_CitizenshipWarning(short sX, short sY, short size_x)
 {
-	short mouse_x = static_cast<short>(hb::shared::input::get_mouse_x());
-	short mouse_y = static_cast<short>(hb::shared::input::get_mouse_y());
 	hb::shared::text::draw_text_aligned(GameFont::Default, sX, sY + 80, (sX + size_x) - (sX), 15, DRAW_DIALOGBOX_CITYHALL_MENU18, hb::shared::text::TextStyle::from_color(GameColors::UILabel), hb::shared::text::Align::TopCenter);
 	hb::shared::text::draw_text_aligned(GameFont::Default, sX, sY + 95, (sX + size_x) - (sX), 15, DRAW_DIALOGBOX_CITYHALL_MENU19, hb::shared::text::TextStyle::from_color(GameColors::UILabel), hb::shared::text::Align::TopCenter);
 	hb::shared::text::draw_text_aligned(GameFont::Default, sX, sY + 110, (sX + size_x) - (sX), 15, DRAW_DIALOGBOX_CITYHALL_MENU20, hb::shared::text::TextStyle::from_color(GameColors::UILabel), hb::shared::text::Align::TopCenter);
@@ -217,15 +216,9 @@ void DialogBox_CityHallMenu::DrawMode1_CitizenshipWarning(short sX, short sY, sh
 	hb::shared::text::draw_text_aligned(GameFont::Default, sX, sY + 215, (sX + size_x) - (sX), 15, DRAW_DIALOGBOX_CITYHALL_MENU26, hb::shared::text::TextStyle::from_color(GameColors::UILabel), hb::shared::text::Align::TopCenter);
 	hb::shared::text::draw_text_aligned(GameFont::Default, sX, sY + 230, (sX + size_x) - (sX), 15, DRAW_DIALOGBOX_CITYHALL_MENU27, hb::shared::text::TextStyle::from_color(GameColors::UILabel), hb::shared::text::Align::TopCenter);
 
-	if ((mouse_x >= sX + ui_layout::left_btn_x) && (mouse_x <= sX + ui_layout::left_btn_x + ui_layout::btn_size_x) && (mouse_y >= sY + ui_layout::btn_y) && (mouse_y <= sY + ui_layout::btn_y + ui_layout::btn_size_y))
-		m_game->draw_new_dialog_box(InterfaceNdButton, sX + ui_layout::left_btn_x, sY + ui_layout::btn_y, 19);
-	else
-		m_game->draw_new_dialog_box(InterfaceNdButton, sX + ui_layout::left_btn_x, sY + ui_layout::btn_y, 18);
+	draw_button(sX, sY, ui_layout::btn_left, UI_BTN_YES);
 
-	if ((mouse_x >= sX + ui_layout::right_btn_x) && (mouse_x <= sX + ui_layout::right_btn_x + ui_layout::btn_size_x) && (mouse_y >= sY + ui_layout::btn_y) && (mouse_y <= sY + ui_layout::btn_y + ui_layout::btn_size_y))
-		m_game->draw_new_dialog_box(InterfaceNdButton, sX + ui_layout::right_btn_x, sY + ui_layout::btn_y, 3);
-	else
-		m_game->draw_new_dialog_box(InterfaceNdButton, sX + ui_layout::right_btn_x, sY + ui_layout::btn_y, 2);
+	draw_button(sX, sY, ui_layout::btn_right, UI_BTN_NO);
 }
 
 void DialogBox_CityHallMenu::DrawMode2_OfferingCitizenship(short sX, short sY, short size_x)
@@ -235,34 +228,22 @@ void DialogBox_CityHallMenu::DrawMode2_OfferingCitizenship(short sX, short sY, s
 
 void DialogBox_CityHallMenu::DrawMode3_CitizenshipSuccess(short sX, short sY, short size_x)
 {
-	short mouse_x = static_cast<short>(hb::shared::input::get_mouse_x());
-	short mouse_y = static_cast<short>(hb::shared::input::get_mouse_y());
 	hb::shared::text::draw_text_aligned(GameFont::Default, sX, sY + 140, (sX + size_x) - (sX), 15, DRAW_DIALOGBOX_CITYHALL_MENU29, hb::shared::text::TextStyle::from_color(GameColors::UILabel), hb::shared::text::Align::TopCenter);
 
-	if ((mouse_x >= sX + ui_layout::right_btn_x) && (mouse_x <= sX + ui_layout::right_btn_x + ui_layout::btn_size_x) && (mouse_y > sY + ui_layout::btn_y) && (mouse_y < sY + ui_layout::btn_y + ui_layout::btn_size_y))
-		m_game->draw_new_dialog_box(InterfaceNdButton, sX + ui_layout::right_btn_x, sY + ui_layout::btn_y, 1);
-	else
-		m_game->draw_new_dialog_box(InterfaceNdButton, sX + ui_layout::right_btn_x, sY + ui_layout::btn_y, 0);
+	draw_button(sX, sY, ui_layout::btn_right, UI_BTN_OK);
 }
 
 void DialogBox_CityHallMenu::DrawMode4_CitizenshipFailed(short sX, short sY, short size_x)
 {
-	short mouse_x = static_cast<short>(hb::shared::input::get_mouse_x());
-	short mouse_y = static_cast<short>(hb::shared::input::get_mouse_y());
 	hb::shared::text::draw_text_aligned(GameFont::Default, sX, sY + 80, (sX + size_x) - (sX), 15, DRAW_DIALOGBOX_CITYHALL_MENU30, hb::shared::text::TextStyle::from_color(GameColors::UILabel), hb::shared::text::Align::TopCenter);
 	hb::shared::text::draw_text_aligned(GameFont::Default, sX, sY + 100, (sX + size_x) - (sX), 15, DRAW_DIALOGBOX_CITYHALL_MENU31, hb::shared::text::TextStyle::from_color(GameColors::UILabel), hb::shared::text::Align::TopCenter);
 	hb::shared::text::draw_text_aligned(GameFont::Default, sX, sY + 115, (sX + size_x) - (sX), 15, DRAW_DIALOGBOX_CITYHALL_MENU32, hb::shared::text::TextStyle::from_color(GameColors::UILabel), hb::shared::text::Align::TopCenter);
 
-	if ((mouse_x >= sX + ui_layout::right_btn_x) && (mouse_x <= sX + ui_layout::right_btn_x + ui_layout::btn_size_x) && (mouse_y > sY + ui_layout::btn_y) && (mouse_y < sY + ui_layout::btn_y + ui_layout::btn_size_y))
-		m_game->draw_new_dialog_box(InterfaceNdButton, sX + ui_layout::right_btn_x, sY + ui_layout::btn_y, 1);
-	else
-		m_game->draw_new_dialog_box(InterfaceNdButton, sX + ui_layout::right_btn_x, sY + ui_layout::btn_y, 0);
+	draw_button(sX, sY, ui_layout::btn_right, UI_BTN_OK);
 }
 
 void DialogBox_CityHallMenu::DrawMode5_RewardGold(short sX, short sY, short size_x)
 {
-	short mouse_x = static_cast<short>(hb::shared::input::get_mouse_x());
-	short mouse_y = static_cast<short>(hb::shared::input::get_mouse_y());
 	std::string txt;
 
 	hb::shared::text::draw_text_aligned(GameFont::Default, sX, sY + 125, (sX + size_x) - (sX), 15, DRAW_DIALOGBOX_CITYHALL_MENU33, hb::shared::text::TextStyle::from_color(GameColors::UILabel), hb::shared::text::Align::TopCenter);
@@ -270,15 +251,9 @@ void DialogBox_CityHallMenu::DrawMode5_RewardGold(short sX, short sY, short size
 	hb::shared::text::draw_text_aligned(GameFont::Default, sX, sY + 140, (sX + size_x) - (sX), 15, txt.c_str(), hb::shared::text::TextStyle::from_color(GameColors::UILabel), hb::shared::text::Align::TopCenter);
 	hb::shared::text::draw_text_aligned(GameFont::Default, sX, sY + 155, (sX + size_x) - (sX), 15, DRAW_DIALOGBOX_CITYHALL_MENU35, hb::shared::text::TextStyle::from_color(GameColors::UILabel), hb::shared::text::Align::TopCenter);
 
-	if ((mouse_x >= sX + ui_layout::left_btn_x) && (mouse_x <= sX + ui_layout::left_btn_x + ui_layout::btn_size_x) && (mouse_y >= sY + ui_layout::btn_y) && (mouse_y <= sY + ui_layout::btn_y + ui_layout::btn_size_y))
-		m_game->draw_new_dialog_box(InterfaceNdButton, sX + ui_layout::left_btn_x, sY + ui_layout::btn_y, 19);
-	else
-		m_game->draw_new_dialog_box(InterfaceNdButton, sX + ui_layout::left_btn_x, sY + ui_layout::btn_y, 18);
+	draw_button(sX, sY, ui_layout::btn_left, UI_BTN_YES);
 
-	if ((mouse_x >= sX + ui_layout::right_btn_x) && (mouse_x <= sX + ui_layout::right_btn_x + ui_layout::btn_size_x) && (mouse_y >= sY + ui_layout::btn_y) && (mouse_y <= sY + ui_layout::btn_y + ui_layout::btn_size_y))
-		m_game->draw_new_dialog_box(InterfaceNdButton, sX + ui_layout::right_btn_x, sY + ui_layout::btn_y, 3);
-	else
-		m_game->draw_new_dialog_box(InterfaceNdButton, sX + ui_layout::right_btn_x, sY + ui_layout::btn_y, 2);
+	draw_button(sX, sY, ui_layout::btn_right, UI_BTN_NO);
 }
 
 void DialogBox_CityHallMenu::DrawMode7_HeroItems(short sX, short sY, short size_x)
@@ -367,26 +342,16 @@ void DialogBox_CityHallMenu::DrawMode7_HeroItems(short sX, short sY, short size_
 
 void DialogBox_CityHallMenu::DrawMode8_CancelQuest(short sX, short sY, short size_x)
 {
-	short mouse_x = static_cast<short>(hb::shared::input::get_mouse_x());
-	short mouse_y = static_cast<short>(hb::shared::input::get_mouse_y());
 	hb::shared::text::draw_text_aligned(GameFont::Default, sX, sY + 125, (sX + size_x) - (sX), 15, DRAW_DIALOGBOX_CITYHALL_MENU54, hb::shared::text::TextStyle::from_color(GameColors::UILabel), hb::shared::text::Align::TopCenter);
 	hb::shared::text::draw_text_aligned(GameFont::Default, sX, sY + 140, (sX + size_x) - (sX), 15, DRAW_DIALOGBOX_CITYHALL_MENU55, hb::shared::text::TextStyle::from_color(GameColors::UILabel), hb::shared::text::Align::TopCenter);
 
-	if ((mouse_x >= sX + ui_layout::left_btn_x) && (mouse_x <= sX + ui_layout::left_btn_x + ui_layout::btn_size_x) && (mouse_y >= sY + ui_layout::btn_y) && (mouse_y <= sY + ui_layout::btn_y + ui_layout::btn_size_y))
-		m_game->draw_new_dialog_box(InterfaceNdButton, sX + ui_layout::left_btn_x, sY + ui_layout::btn_y, 19);
-	else
-		m_game->draw_new_dialog_box(InterfaceNdButton, sX + ui_layout::left_btn_x, sY + ui_layout::btn_y, 18);
+	draw_button(sX, sY, ui_layout::btn_left, UI_BTN_YES);
 
-	if ((mouse_x >= sX + ui_layout::right_btn_x) && (mouse_x <= sX + ui_layout::right_btn_x + ui_layout::btn_size_x) && (mouse_y >= sY + ui_layout::btn_y) && (mouse_y <= sY + ui_layout::btn_y + ui_layout::btn_size_y))
-		m_game->draw_new_dialog_box(InterfaceNdButton, sX + ui_layout::right_btn_x, sY + ui_layout::btn_y, 3);
-	else
-		m_game->draw_new_dialog_box(InterfaceNdButton, sX + ui_layout::right_btn_x, sY + ui_layout::btn_y, 2);
+	draw_button(sX, sY, ui_layout::btn_right, UI_BTN_NO);
 }
 
 void DialogBox_CityHallMenu::DrawMode9_ChangePlayMode(short sX, short sY, short size_x)
 {
-	short mouse_x = static_cast<short>(hb::shared::input::get_mouse_x());
-	short mouse_y = static_cast<short>(hb::shared::input::get_mouse_y());
 	if (player().m_hunter)
 		hb::shared::text::draw_text_aligned(GameFont::Default, sX, sY + 53, (sX + size_x) - (sX), 15, DRAW_DIALOGBOX_CITYHALL_MENU57, hb::shared::text::TextStyle::from_color(GameColors::UIYellow), hb::shared::text::Align::TopCenter);
 	else
@@ -403,15 +368,9 @@ void DialogBox_CityHallMenu::DrawMode9_ChangePlayMode(short sX, short sY, short 
 	hb::shared::text::draw_text_aligned(GameFont::Default, sX, sY + 224, (sX + size_x) - (sX), 15, DRAW_DIALOGBOX_CITYHALL_MENU67, hb::shared::text::TextStyle::from_color(GameColors::UILabel), hb::shared::text::Align::TopCenter);
 	hb::shared::text::draw_text_aligned(GameFont::Default, sX, sY + 252, (sX + size_x) - (sX), 15, DRAW_DIALOGBOX_CITYHALL_MENU68, hb::shared::text::TextStyle::from_color(GameColors::UILabel), hb::shared::text::Align::TopCenter);
 
-	if ((mouse_x >= sX + ui_layout::left_btn_x) && (mouse_x <= sX + ui_layout::left_btn_x + ui_layout::btn_size_x) && (mouse_y >= sY + ui_layout::btn_y) && (mouse_y <= sY + ui_layout::btn_y + ui_layout::btn_size_y))
-		m_game->draw_new_dialog_box(InterfaceNdButton, sX + ui_layout::left_btn_x, sY + ui_layout::btn_y, 19);
-	else
-		m_game->draw_new_dialog_box(InterfaceNdButton, sX + ui_layout::left_btn_x, sY + ui_layout::btn_y, 18);
+	draw_button(sX, sY, ui_layout::btn_left, UI_BTN_YES);
 
-	if ((mouse_x >= sX + ui_layout::right_btn_x) && (mouse_x <= sX + ui_layout::right_btn_x + ui_layout::btn_size_x) && (mouse_y >= sY + ui_layout::btn_y) && (mouse_y <= sY + ui_layout::btn_y + ui_layout::btn_size_y))
-		m_game->draw_new_dialog_box(InterfaceNdButton, sX + ui_layout::right_btn_x, sY + ui_layout::btn_y, 3);
-	else
-		m_game->draw_new_dialog_box(InterfaceNdButton, sX + ui_layout::right_btn_x, sY + ui_layout::btn_y, 2);
+	draw_button(sX, sY, ui_layout::btn_right, UI_BTN_NO);
 }
 
 void DialogBox_CityHallMenu::DrawMode10_TeleportMenu(short sX, short sY, short size_x)
@@ -460,21 +419,13 @@ void DialogBox_CityHallMenu::DrawMode11_HeroItemConfirm(short sX, short sY, shor
 
 void DialogBox_CityHallMenu::draw_item_confirm(short sX, short sY, short size_x, const char* item_name)
 {
-	short mouse_x = static_cast<short>(hb::shared::input::get_mouse_x());
-	short mouse_y = static_cast<short>(hb::shared::input::get_mouse_y());
 	hb::shared::text::draw_text_aligned(GameFont::Default, sX, sY + 125, (sX + size_x - 1) - (sX), 15, item_name, hb::shared::text::TextStyle::from_color(GameColors::UILabel), hb::shared::text::Align::TopCenter);
 	hb::shared::text::draw_text_aligned(GameFont::Default, sX + 1, sY + 125, (sX + size_x) - (sX + 1), 15, item_name, hb::shared::text::TextStyle::from_color(GameColors::UILabel), hb::shared::text::Align::TopCenter);
 	hb::shared::text::draw_text_aligned(GameFont::Default, sX, sY + 260, (sX + size_x) - (sX), 15, DRAW_DIALOGBOX_CITYHALL_MENU46A, hb::shared::text::TextStyle::from_color(GameColors::UILabel), hb::shared::text::Align::TopCenter);
 
-	if ((mouse_x >= sX + ui_layout::left_btn_x) && (mouse_x <= sX + ui_layout::left_btn_x + ui_layout::btn_size_x) && (mouse_y >= sY + ui_layout::btn_y) && (mouse_y <= sY + ui_layout::btn_y + ui_layout::btn_size_y))
-		m_game->draw_new_dialog_box(InterfaceNdButton, sX + ui_layout::left_btn_x, sY + ui_layout::btn_y, 19);
-	else
-		m_game->draw_new_dialog_box(InterfaceNdButton, sX + ui_layout::left_btn_x, sY + ui_layout::btn_y, 18);
+	draw_button(sX, sY, ui_layout::btn_left, UI_BTN_YES);
 
-	if ((mouse_x >= sX + ui_layout::right_btn_x) && (mouse_x <= sX + ui_layout::right_btn_x + ui_layout::btn_size_x) && (mouse_y >= sY + ui_layout::btn_y) && (mouse_y <= sY + ui_layout::btn_y + ui_layout::btn_size_y))
-		m_game->draw_new_dialog_box(InterfaceNdButton, sX + ui_layout::right_btn_x, sY + ui_layout::btn_y, 3);
-	else
-		m_game->draw_new_dialog_box(InterfaceNdButton, sX + ui_layout::right_btn_x, sY + ui_layout::btn_y, 2);
+	draw_button(sX, sY, ui_layout::btn_right, UI_BTN_NO);
 }
 
 void DialogBox_CityHallMenu::DrawMode12_DarkItemClass(short sX, short sY, short size_x)
@@ -521,13 +472,13 @@ bool DialogBox_CityHallMenu::on_click()
 	switch (m_mode)
 	{
 	case mode::main_menu:            return on_click_mode0(sX, sY);
-	case mode::citizenship_warning:  return on_click_mode1(sX, sY);
+	case mode::citizenship_warning:  return on_click_mode1();
 	case mode::citizenship_success:
-	case mode::citizenship_failed:   return OnClickMode3_4(sX, sY);
-	case mode::reward_gold:          return on_click_mode5(sX, sY);
+	case mode::citizenship_failed:   return OnClickMode3_4();
+	case mode::reward_gold:          return on_click_mode5();
 	case mode::hero_items:           return on_click_mode7(sX, sY);
-	case mode::cancel_quest:         return on_click_mode8(sX, sY);
-	case mode::change_play_mode:     return on_click_mode9(sX, sY);
+	case mode::cancel_quest:         return on_click_mode8();
+	case mode::change_play_mode:     return on_click_mode9();
 	case mode::teleport_menu:        return on_click_mode10(sX, sY);
 	case mode::hero_item_confirm:    return on_click_mode11(sX, sY);
 	case mode::dark_item_class:      return on_click_mode12(sX, sY);
@@ -624,12 +575,10 @@ bool DialogBox_CityHallMenu::on_click_mode0(short sX, short sY)
 	return false;
 }
 
-bool DialogBox_CityHallMenu::on_click_mode1(short sX, short sY)
+bool DialogBox_CityHallMenu::on_click_mode1()
 {
-	short mouse_x = static_cast<short>(hb::shared::input::get_mouse_x());
-	short mouse_y = static_cast<short>(hb::shared::input::get_mouse_y());
 	// Yes button
-	if ((mouse_x >= sX + ui_layout::left_btn_x) && (mouse_x <= sX + ui_layout::left_btn_x + ui_layout::btn_size_x) && (mouse_y >= sY + ui_layout::btn_y) && (mouse_y <= sY + ui_layout::btn_y + ui_layout::btn_size_y))
+	if (mouse_in(ui_layout::btn_left))
 	{
 		{
 			hb::net::PacketRequestHeaderOnly req{};
@@ -643,7 +592,7 @@ bool DialogBox_CityHallMenu::on_click_mode1(short sX, short sY)
 	}
 
 	// No button
-	if ((mouse_x >= sX + ui_layout::right_btn_x) && (mouse_x <= sX + ui_layout::right_btn_x + ui_layout::btn_size_x) && (mouse_y >= sY + ui_layout::btn_y) && (mouse_y <= sY + ui_layout::btn_y + ui_layout::btn_size_y))
+	if (mouse_in(ui_layout::btn_right))
 	{
 		m_mode = mode::main_menu;
 		audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
@@ -653,12 +602,10 @@ bool DialogBox_CityHallMenu::on_click_mode1(short sX, short sY)
 	return false;
 }
 
-bool DialogBox_CityHallMenu::OnClickMode3_4(short sX, short sY)
+bool DialogBox_CityHallMenu::OnClickMode3_4()
 {
-	short mouse_x = static_cast<short>(hb::shared::input::get_mouse_x());
-	short mouse_y = static_cast<short>(hb::shared::input::get_mouse_y());
 	// OK button
-	if ((mouse_x >= sX + ui_layout::right_btn_x) && (mouse_x <= sX + ui_layout::right_btn_x + ui_layout::btn_size_x) && (mouse_y > sY + ui_layout::btn_y) && (mouse_y < sY + ui_layout::btn_y + ui_layout::btn_size_y))
+	if (mouse_in(ui_layout::btn_right))
 	{
 		m_mode = mode::main_menu;
 		audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
@@ -667,12 +614,10 @@ bool DialogBox_CityHallMenu::OnClickMode3_4(short sX, short sY)
 	return false;
 }
 
-bool DialogBox_CityHallMenu::on_click_mode5(short sX, short sY)
+bool DialogBox_CityHallMenu::on_click_mode5()
 {
-	short mouse_x = static_cast<short>(hb::shared::input::get_mouse_x());
-	short mouse_y = static_cast<short>(hb::shared::input::get_mouse_y());
 	// Yes button
-	if ((mouse_x >= sX + ui_layout::left_btn_x) && (mouse_x <= sX + ui_layout::left_btn_x + ui_layout::btn_size_x) && (mouse_y >= sY + ui_layout::btn_y) && (mouse_y <= sY + ui_layout::btn_y + ui_layout::btn_size_y))
+	if (mouse_in(ui_layout::btn_left))
 	{
 		m_game->send_game_packet(hb::net::make_common_command(CommonType::ReqGetRewardMoney, m_game->m_player->m_player_x, m_game->m_player->m_player_y));
 		m_mode = mode::main_menu;
@@ -681,7 +626,7 @@ bool DialogBox_CityHallMenu::on_click_mode5(short sX, short sY)
 	}
 
 	// No button
-	if ((mouse_x >= sX + ui_layout::right_btn_x) && (mouse_x <= sX + ui_layout::right_btn_x + ui_layout::btn_size_x) && (mouse_y >= sY + ui_layout::btn_y) && (mouse_y <= sY + ui_layout::btn_y + ui_layout::btn_size_y))
+	if (mouse_in(ui_layout::btn_right))
 	{
 		m_mode = mode::main_menu;
 		audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
@@ -799,12 +744,10 @@ bool DialogBox_CityHallMenu::on_click_mode7(short sX, short sY)
 	return false;
 }
 
-bool DialogBox_CityHallMenu::on_click_mode8(short sX, short sY)
+bool DialogBox_CityHallMenu::on_click_mode8()
 {
-	short mouse_x = static_cast<short>(hb::shared::input::get_mouse_x());
-	short mouse_y = static_cast<short>(hb::shared::input::get_mouse_y());
 	// Yes button
-	if ((mouse_x >= sX + ui_layout::left_btn_x) && (mouse_x <= sX + ui_layout::left_btn_x + ui_layout::btn_size_x) && (mouse_y >= sY + ui_layout::btn_y) && (mouse_y <= sY + ui_layout::btn_y + ui_layout::btn_size_y))
+	if (mouse_in(ui_layout::btn_left))
 	{
 		m_game->send_game_packet(hb::net::make_common_command(CommonType::RequestCancelQuest, m_game->m_player->m_player_x, m_game->m_player->m_player_y));
 		m_mode = mode::main_menu;
@@ -813,7 +756,7 @@ bool DialogBox_CityHallMenu::on_click_mode8(short sX, short sY)
 	}
 
 	// No button
-	if ((mouse_x >= sX + ui_layout::right_btn_x) && (mouse_x <= sX + ui_layout::right_btn_x + ui_layout::btn_size_x) && (mouse_y >= sY + ui_layout::btn_y) && (mouse_y <= sY + ui_layout::btn_y + ui_layout::btn_size_y))
+	if (mouse_in(ui_layout::btn_right))
 	{
 		m_mode = mode::main_menu;
 		audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
@@ -823,12 +766,10 @@ bool DialogBox_CityHallMenu::on_click_mode8(short sX, short sY)
 	return false;
 }
 
-bool DialogBox_CityHallMenu::on_click_mode9(short sX, short sY)
+bool DialogBox_CityHallMenu::on_click_mode9()
 {
-	short mouse_x = static_cast<short>(hb::shared::input::get_mouse_x());
-	short mouse_y = static_cast<short>(hb::shared::input::get_mouse_y());
 	// Yes button
-	if ((mouse_x >= sX + ui_layout::left_btn_x) && (mouse_x <= sX + ui_layout::left_btn_x + ui_layout::btn_size_x) && (mouse_y >= sY + ui_layout::btn_y) && (mouse_y <= sY + ui_layout::btn_y + ui_layout::btn_size_y))
+	if (mouse_in(ui_layout::btn_left))
 	{
 		m_game->send_game_packet(hb::net::make_common_command(CommonType::RequestHuntMode, m_game->m_player->m_player_x, m_game->m_player->m_player_y));
 		m_mode = mode::main_menu;
@@ -837,7 +778,7 @@ bool DialogBox_CityHallMenu::on_click_mode9(short sX, short sY)
 	}
 
 	// No button
-	if ((mouse_x >= sX + ui_layout::right_btn_x) && (mouse_x <= sX + ui_layout::right_btn_x + ui_layout::btn_size_x) && (mouse_y >= sY + ui_layout::btn_y) && (mouse_y <= sY + ui_layout::btn_y + ui_layout::btn_size_y))
+	if (mouse_in(ui_layout::btn_right))
 	{
 		m_mode = mode::main_menu;
 		audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
@@ -879,10 +820,8 @@ bool DialogBox_CityHallMenu::on_click_mode11(short sX, short sY)
 
 bool DialogBox_CityHallMenu::click_item_confirm(short sX, short sY, uint16_t common_type, int item_id, mode cancel_mode)
 {
-	short mouse_x = static_cast<short>(hb::shared::input::get_mouse_x());
-	short mouse_y = static_cast<short>(hb::shared::input::get_mouse_y());
 	// Yes button
-	if ((mouse_x >= sX + ui_layout::left_btn_x) && (mouse_x <= sX + ui_layout::left_btn_x + ui_layout::btn_size_x) && (mouse_y >= sY + ui_layout::btn_y) && (mouse_y <= sY + ui_layout::btn_y + ui_layout::btn_size_y))
+	if (mouse_in(ui_layout::btn_left))
 	{
 		{
 			auto pkt = hb::net::make_common_command(common_type, m_game->m_player->m_player_x, m_game->m_player->m_player_y);
@@ -895,7 +834,7 @@ bool DialogBox_CityHallMenu::click_item_confirm(short sX, short sY, uint16_t com
 	}
 
 	// No button
-	if ((mouse_x >= sX + ui_layout::right_btn_x) && (mouse_x <= sX + ui_layout::right_btn_x + ui_layout::btn_size_x) && (mouse_y >= sY + ui_layout::btn_y) && (mouse_y <= sY + ui_layout::btn_y + ui_layout::btn_size_y))
+	if (mouse_in(ui_layout::btn_right))
 	{
 		m_mode = cancel_mode;
 		audio_manager::get().play_game_sound(sound_type::effect, 14, 5);

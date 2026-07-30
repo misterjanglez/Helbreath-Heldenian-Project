@@ -6,6 +6,8 @@
 #include "IInput.h"
 #include <format>
 #include <string>
+#include "UITheme.h"
+#include "lan_eng.h"
 
 using namespace hb::shared::net;
 using namespace hb::client::sprite_id;
@@ -27,7 +29,7 @@ void DialogBox_RepairAll::on_draw()
 	double d1, d2, d3;
 
 	draw_new_dialog_box(InterfaceNdGame2, sX, sY, 2);
-	draw_new_dialog_box(InterfaceNdText, sX, sY, 10);
+	hb::client::ui_theme::header(sX, sY, m_size_x, UI_TITLE_REPAIR_ITEM);
 
 	for (int i = 0; i < 15; i++)
 	{
@@ -39,7 +41,7 @@ void DialogBox_RepairAll::on_draw()
 			CItem* cfg = m_game->get_item_config(item->m_id_num);
 			txt = std::format("{} - Cost: {}", cfg ? cfg->m_name : "Unknown", m_game->m_repair_all[i + m_scroll_offset].price);
 
-			put_string(sX + 30, sY + 45 + i * 15, txt.c_str(), GameColors::UIBlack);
+			put_string(sX + 30, sY + 45 + i * 15, txt.c_str(), GameColors::UILabel);
 		}
 	}
 
@@ -57,10 +59,7 @@ void DialogBox_RepairAll::on_draw()
 	}
 
 	if (total_lines > 15)
-	{
-		draw_new_dialog_box(InterfaceNdGame2, sX, sY, 1);
-		draw_new_dialog_box(InterfaceNdGame2, sX + 242, sY + pointer_loc + 35, 7);
-	}
+		hb::client::ui_theme::list_scrollbar(sX, sY, pointer_loc);
 
 	// Mouse wheel scrolling
 	if (total_lines > 15)
@@ -80,32 +79,19 @@ void DialogBox_RepairAll::on_draw()
 
 	if (m_game->totalItemRepair > 0)
 	{
-		// Repair button
-		if (mouse_in(btn_repair))
-			draw_new_dialog_box(InterfaceNdButton, sX + ui_layout::left_btn_x, sY + ui_layout::btn_y, 43);
-		else
-			draw_new_dialog_box(InterfaceNdButton, sX + ui_layout::left_btn_x, sY + ui_layout::btn_y, 42);
-
-		// Cancel button
-		if (mouse_in(btn_cancel))
-			draw_new_dialog_box(InterfaceNdButton, sX + ui_layout::right_btn_x, sY + ui_layout::btn_y, 17);
-		else
-			draw_new_dialog_box(InterfaceNdButton, sX + ui_layout::right_btn_x, sY + ui_layout::btn_y, 16);
+		draw_button(sX, sY, btn_repair, UI_BTN_REPAIR);
+		draw_button(sX, sY, btn_cancel, UI_BTN_CANCEL);
 
 		// Total cost
 		txt = std::format("Total cost : {}", m_game->totalPrice);
-		put_string(sX + 30, sY + 270, txt.c_str(), GameColors::UIBlack);
+		put_string(sX + 30, sY + 270, txt.c_str(), GameColors::UILabel);
 	}
 	else
 	{
 		// No items to repair
-		put_aligned_string(sX, sX + size_x, sY + 140, "There are no items to repair.", GameColors::UIBlack);
+		put_aligned_string(sX, sX + size_x, sY + 140, "There are no items to repair.", GameColors::UILabel);
 
-		// Cancel button only
-		if (mouse_in(btn_cancel))
-			draw_new_dialog_box(InterfaceNdButton, sX + ui_layout::right_btn_x, sY + ui_layout::btn_y, 17);
-		else
-			draw_new_dialog_box(InterfaceNdButton, sX + ui_layout::right_btn_x, sY + ui_layout::btn_y, 16);
+		draw_button(sX, sY, btn_cancel, UI_BTN_CANCEL);
 	}
 }
 

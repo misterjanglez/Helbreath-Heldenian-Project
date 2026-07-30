@@ -5,6 +5,8 @@
 #include "IInput.h"
 #include "GameFonts.h"
 #include "TextLibExt.h"
+#include "UITheme.h"
+#include "lan_eng.h"
 using namespace hb::client::sprite_id;
 
 #define DEF_CHAT_VISIBLE_LINES 8
@@ -27,7 +29,7 @@ void DialogBox_ChatHistory::on_draw()
 
 	const bool dialogTrans = config_manager::get().is_dialog_transparency_enabled();
 	m_game->draw_new_dialog_box(InterfaceNdGame2, sX, sY, 4, false, dialogTrans);
-	m_game->draw_new_dialog_box(InterfaceNdText, sX, sY, 22, false, dialogTrans);
+	hb::client::ui_theme::header(sX, sY, m_size_x, UI_TITLE_CHAT_HISTORY);
 
 	handle_scroll_input(sX, sY);
 	draw_scroll_bar(sX, sY);
@@ -87,7 +89,14 @@ void DialogBox_ChatHistory::draw_scroll_bar(short sX, short sY)
 	double d3 = (d1 * d2) / (game_limits::max_chat_scroll_msgs - DEF_CHAT_VISIBLE_LINES);
 	int pointer_loc = static_cast<int>(d3);
 	pointer_loc = DEF_CHAT_SCROLLBAR_HEIGHT - pointer_loc;
-	m_game->draw_new_dialog_box(InterfaceNdGame2, sX + 346, sY + 33 + pointer_loc, 7);
+
+	// The pak thumb was a 15x15 frame with a (-6,-5) pivot drawn at
+	// (346, 33 + pointer_loc), so its top-left landed at (340, 28 + pointer_loc).
+	// The themed track is anchored there and spans the full travel plus the
+	// thumb's own height, which leaves the scroll maths above untouched.
+	constexpr int thumb_size = 15;
+	hb::client::ui_theme::scrollbar(sX + 340, sY + 28, thumb_size,
+		DEF_CHAT_SCROLLBAR_HEIGHT + thumb_size, pointer_loc, thumb_size);
 }
 
 void DialogBox_ChatHistory::draw_chat_messages(short sX, short sY)

@@ -46,8 +46,8 @@ private:
 	struct PartyName { std::string name; };
 	PartyName m_name_list[hb::shared::limits::MaxPartyMembers + 1]{};
 
-	static constexpr ui_rect btn_left{30, 292, 75, 21};
-	static constexpr ui_rect btn_right{154, 292, 75, 21};
+	static constexpr ui_rect btn_left = ui_layout::btn_left;
+	static constexpr ui_rect btn_right = ui_layout::btn_right;
 	static constexpr ui_rect link_create{81, 81, 114, 19};
 	static constexpr ui_rect link_leave{81, 101, 114, 19};
 	static constexpr ui_rect link_members{81, 121, 114, 19};

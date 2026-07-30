@@ -3,6 +3,7 @@
 #include "IInput.h"
 #include "Packet/SharedPackets.h"
 #include "Screen_OnGame.h"
+#include "lan_eng.h"
 
 using namespace hb::shared::net;
 using namespace hb::client::sprite_id;
@@ -22,17 +23,8 @@ void DialogBox_Resurrect::on_draw()
 	put_string(sX + 50, sY + 20, "Someone intend to resurrect you.", GameColors::UIMagicBlue);
 	put_string(sX + 80, sY + 35, "Will you revive here?", GameColors::UIMagicBlue);
 
-	// Yes button
-	if (mouse_in(btn_yes))
-		draw_new_dialog_box(InterfaceNdButton, sX + 30, sY + 55, 19);
-	else
-		draw_new_dialog_box(InterfaceNdButton, sX + 30, sY + 55, 18);
-
-	// No button
-	if (mouse_in(btn_no))
-		draw_new_dialog_box(InterfaceNdButton, sX + 170, sY + 55, 3);
-	else
-		draw_new_dialog_box(InterfaceNdButton, sX + 170, sY + 55, 2);
+	draw_button(sX, sY, btn_yes, UI_BTN_YES);
+	draw_button(sX, sY, btn_no, UI_BTN_NO);
 }
 
 bool DialogBox_Resurrect::on_click()

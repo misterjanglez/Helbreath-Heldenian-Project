@@ -36,6 +36,7 @@ public:
 	int find_empty_slot(int start, int end) const;
 
 private:
+	void draw_slot_wells(short sX, short sY);
 	void draw_items(short sX, short sY, short mouse_x, short mouse_y, int start_index, int end_index);
 	void draw_item_info(short sX, short sY, short size_x, short mouse_x, short mouse_y, int item_index, short xadd);
 

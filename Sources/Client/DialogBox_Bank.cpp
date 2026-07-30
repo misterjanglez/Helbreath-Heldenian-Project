@@ -14,6 +14,7 @@
 #include "PacketSendHelpers.h"
 #include "AudioManager.h"
 #include "BalanceConstants.h"
+#include "UITheme.h"
 
 
 using namespace hb::shared::net;
@@ -29,8 +30,6 @@ DialogBox_Bank::DialogBox_Bank(CGame* game)
 
 void DialogBox_Bank::on_draw()
 {
-	short mouse_x = static_cast<short>(hb::shared::input::get_mouse_x());
-	short mouse_y = static_cast<short>(hb::shared::input::get_mouse_y());
 	short z = static_cast<short>(hb::shared::input::get_mouse_wheel_delta());
 	char lb = hb::shared::input::is_mouse_button_down(hb::shared::input::MouseButton::Left) ? 1 : 0;
 	if (!m_game->ensure_item_configs_loaded()) return;
@@ -39,12 +38,12 @@ void DialogBox_Bank::on_draw()
 	short size_x = m_size_x - 5;
 
 	m_game->draw_new_dialog_box(InterfaceNdGame2, sX, sY, 2);
-	m_game->draw_new_dialog_box(InterfaceNdText, sX, sY, 21);
+	hb::client::ui_theme::header(sX, sY, m_size_x, UI_TITLE_ITEMS_IN_STORAGE);
 
 	switch (m_mode) {
 	case mode::waiting:
-		put_string(sX + 30 + 15, sY + 70, DRAW_DIALOGBOX_BANK1, GameColors::UIBlack);
-		put_string(sX + 30 + 15, sY + 85, DRAW_DIALOGBOX_BANK2, GameColors::UIBlack);
+		put_string(sX + 30 + 15, sY + 70, DRAW_DIALOGBOX_BANK1, GameColors::UILabel);
+		put_string(sX + 30 + 15, sY + 85, DRAW_DIALOGBOX_BANK2, GameColors::UILabel);
 		break;
 
 	case mode::list:
@@ -73,7 +72,7 @@ void DialogBox_Bank::draw_item_list(short sX, short sY, short size_x)
 			}
 			else {
 				put_aligned_string(sX, sX + size_x, sY + 110 + i * 15, itemInfo.name.c_str(),
-					item_name_color(itemInfo, GameColors::UIBlack));
+					item_name_color(itemInfo, GameColors::UILabel));
 			}
 		}
 	}
@@ -153,21 +152,22 @@ void DialogBox_Bank::draw_scrollbar(short sX, short sY, int total_lines)
 		d2 = static_cast<double>(total_lines - m_item_count);
 		d3 = (274.0f * d1) / d2;
 		pointer_loc = static_cast<int>(d3);
-		m_game->draw_new_dialog_box(InterfaceNdGame2, sX, sY, 3);
-		m_game->draw_new_dialog_box(InterfaceNdGame2, sX + 242, sY + pointer_loc + 35, 7);
+		hb::client::ui_theme::list_scrollbar(sX, sY, pointer_loc);
 	}
 	else {
 		pointer_loc = 0;
 	}
 
 	if (lb != 0 && (m_game->get_dialog_box_manager().get_top_id() == DialogBoxId::Bank) && total_lines > m_item_count) {
-		if ((mouse_x >= sX + 230) && (mouse_x <= sX + 260) && (mouse_y >= sY + 40) && (mouse_y <= sY + 320)) {
+		if (mouse_in(area_scroll)) {
 			d1 = static_cast<double>(mouse_y - (sY + 35));
 			d2 = static_cast<double>(total_lines - m_item_count);
 			d3 = (d1 * d2) / 274.0f;
 			m_scroll_offset = static_cast<int>(d3 + 0.5);
 		}
-		else if ((mouse_x >= sX + 230) && (mouse_x <= sX + 260) && (mouse_y > sY + 10) && (mouse_y < sY + 40)) {
+		// Above the track still means "jump to the top", as it always has — the
+		// same gutter column, the strip between the panel edge and the track.
+		else if (mouse_in(ui_rect{ area_scroll.x, 10, area_scroll.w, area_scroll.y - 10 })) {
 			m_scroll_offset = 0;
 		}
 	}
@@ -233,8 +233,6 @@ bool DialogBox_Bank::on_click()
 
 bool DialogBox_Bank::on_double_click()
 {
-	short mouse_x = static_cast<short>(hb::shared::input::get_mouse_x());
-	short mouse_y = static_cast<short>(hb::shared::input::get_mouse_y());
 	if (CursorTarget::GetSelectedType() == SelectedObjectType::Item)
 		return on_item_drop();
 

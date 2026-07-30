@@ -6,6 +6,8 @@
 #include "TextLibExt.h"
 #include "Screen_OnGame.h"
 #include "AudioManager.h"
+#include "UITheme.h"
+#include "lan_eng.h"
 using namespace hb::client::sprite_id;
 // game_limits::max_text_dlg_lines is in GameConstants.h (via Game.h)
 
@@ -28,7 +30,6 @@ int DialogBox_Text::get_total_lines() const
 
 void DialogBox_Text::on_draw()
 {
-	short mouse_x = static_cast<short>(hb::shared::input::get_mouse_x());
 	short mouse_y = static_cast<short>(hb::shared::input::get_mouse_y());
 	short z = static_cast<short>(hb::shared::input::get_mouse_wheel_delta());
 	char lb = hb::shared::input::is_mouse_button_down(hb::shared::input::MouseButton::Left) ? 1 : 0;
@@ -38,9 +39,6 @@ void DialogBox_Text::on_draw()
 	m_game->draw_new_dialog_box(InterfaceNdGame2, sX, sY, 0);
 
 	int total_lines = get_total_lines();
-
-	if (total_lines > 17)
-		m_game->draw_new_dialog_box(InterfaceNdGame2, sX, sY, 1);
 
 	// Mouse wheel scrolling
 	if (m_game->get_dialog_box_manager().get_top_id() == DialogBoxId::Text && z != 0)
@@ -63,8 +61,7 @@ void DialogBox_Text::on_draw()
 		double d2 = static_cast<double>(total_lines - 17);
 		double d3 = (274.0 * d1) / d2;
 		pointer_loc = static_cast<int>(d3 + 0.5);
-		m_game->draw_new_dialog_box(InterfaceNdGame2, sX, sY, 1);
-		m_game->draw_new_dialog_box(InterfaceNdGame2, sX + 242, sY + 35 + pointer_loc, 7);
+		hb::client::ui_theme::list_scrollbar(sX, sY, pointer_loc);
 	}
 
 	// draw text lines
@@ -91,7 +88,7 @@ void DialogBox_Text::on_draw()
 			}
 			else
 			{
-				hb::shared::text::draw_text_aligned(GameFont::Default, sX + 24, sY + 50 + i * 13, sX + 236 - (sX + 24), 15, pMsg, hb::shared::text::TextStyle::from_color(GameColors::UIBlack), hb::shared::text::Align::TopCenter);
+				hb::shared::text::draw_text_aligned(GameFont::Default, sX + 24, sY + 50 + i * 13, sX + 236 - (sX + 24), 15, pMsg, hb::shared::text::TextStyle::from_color(GameColors::UILabel), hb::shared::text::Align::TopCenter);
 			}
 		}
 	}
@@ -118,11 +115,7 @@ void DialogBox_Text::on_draw()
 		m_is_scroll_selected = false;
 	}
 
-	// Close button hover highlight
-	if (mouse_in(btn_close))
-		m_game->draw_new_dialog_box(InterfaceNdButton, sX + ui_layout::right_btn_x, sY + ui_layout::btn_y, 1);
-	else
-		m_game->draw_new_dialog_box(InterfaceNdButton, sX + ui_layout::right_btn_x, sY + ui_layout::btn_y, 0);
+	draw_button(sX, sY, btn_close, UI_BTN_OK);
 }
 
 bool DialogBox_Text::on_click()

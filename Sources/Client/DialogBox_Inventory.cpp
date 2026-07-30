@@ -111,19 +111,8 @@ void DialogBox_Inventory::on_draw()
 		}
 	}
 
-	// Item Upgrade button hover
-	if ((mouse_x >= sX + BTN_UPGRADE_X1) && (mouse_x <= sX + BTN_UPGRADE_X2) &&
-	    (mouse_y >= sY + BTN_Y1) && (mouse_y <= sY + BTN_Y2))
-	{
-		draw_new_dialog_box(InterfaceNdInventory, sX + BTN_UPGRADE_X1, sY + BTN_Y1, 1);
-	}
-
-	// Manufacture button hover
-	if ((mouse_x >= sX + BTN_MANUFACTURE_X1) && (mouse_x <= sX + BTN_MANUFACTURE_X2) &&
-	    (mouse_y >= sY + BTN_Y1) && (mouse_y <= sY + BTN_Y2))
-	{
-		draw_new_dialog_box(InterfaceNdInventory, sX + BTN_MANUFACTURE_X1, sY + BTN_Y1, 2);
-	}
+	draw_button(sX, sY, btn_upgrade, UI_BTN_UPGRADE);
+	draw_button(sX, sY, btn_manufacture, UI_BTN_MANUFACTURE);
 }
 
 bool DialogBox_Inventory::on_click()
@@ -134,8 +123,7 @@ bool DialogBox_Inventory::on_click()
 	short sY = m_y;
 
 	// Item Upgrade button
-	if ((mouse_x >= sX + BTN_UPGRADE_X1) && (mouse_x <= sX + BTN_UPGRADE_X2) &&
-	    (mouse_y >= sY + BTN_Y1) && (mouse_y <= sY + BTN_Y2))
+	if (mouse_in(btn_upgrade))
 	{
 		enable_dialog_box(DialogBoxId::ItemUpgrade, 5, 0, 0);
 		audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
@@ -143,8 +131,7 @@ bool DialogBox_Inventory::on_click()
 	}
 
 	// Manufacture button
-	if ((mouse_x >= sX + BTN_MANUFACTURE_X1) && (mouse_x <= sX + BTN_MANUFACTURE_X2) &&
-	    (mouse_y >= sY + BTN_Y1) && (mouse_y <= sY + BTN_Y2))
+	if (mouse_in(btn_manufacture))
 	{
 		if (player().m_skill_mastery[13] == 0)
 		{

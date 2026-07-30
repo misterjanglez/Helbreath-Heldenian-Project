@@ -35,6 +35,7 @@ constexpr int InterfaceNdInventory          = 67;
 constexpr int InterfaceNdText               = 70;
 constexpr int InterfaceNdButton             = 71;
 constexpr int InterfaceNdCrusade            = 72;
+constexpr int InterfaceUISerifFont          = 73;
 constexpr int InterfaceGuideMap             = 420;
 
 // Item pivot points

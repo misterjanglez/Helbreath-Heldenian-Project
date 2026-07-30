@@ -13,6 +13,7 @@
 #include "GameFonts.h"
 #include <format>
 #include <string>
+#include "UITheme.h"
 using namespace hb::client::sprite_id;
 
 Overlay_LogResMsg::Overlay_LogResMsg(CGame* game)
@@ -43,10 +44,9 @@ void Overlay_LogResMsg::on_initialize()
     btn_ok->set_on_click([this](int) {
         handle_dismiss();
     });
-    btn_ok->set_render_handler([this](const cc::control& c) {
+    btn_ok->set_render_handler([](const cc::control& c) {
         auto sb = c.screen_bounds();
-        int frame = c.is_highlighted() ? 1 : 0;
-        m_game->m_sprite[InterfaceNdButton]->draw(sb.x, sb.y, frame);
+        hb::client::ui_theme::button(sb.x, sb.y, sb.w, sb.h, UI_BTN_OK, c.is_highlighted());
     });
 
     m_controls.set_focus_order({BTN_OK});

@@ -67,17 +67,8 @@ void DialogBox_ItemDrop::on_draw()
 		}
 	}
 
-	// Yes button
-	if (mouse_in(btn_yes))
-		draw_new_dialog_box(InterfaceNdButton, sX + 30, sY + 55, 19);
-	else
-		draw_new_dialog_box(InterfaceNdButton, sX + 30, sY + 55, 18);
-
-	// No button
-	if (mouse_in(btn_no))
-		draw_new_dialog_box(InterfaceNdButton, sX + 170, sY + 55, 3);
-	else
-		draw_new_dialog_box(InterfaceNdButton, sX + 170, sY + 55, 2);
+	draw_button(sX, sY, btn_yes, UI_BTN_YES);
+	draw_button(sX, sY, btn_no, UI_BTN_NO);
 }
 
 bool DialogBox_ItemDrop::on_click()

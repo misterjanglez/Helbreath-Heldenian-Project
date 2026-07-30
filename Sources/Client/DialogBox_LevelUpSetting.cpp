@@ -8,6 +8,7 @@
 #include "Packet/SharedPackets.h"
 #include "Screen_OnGame.h"
 #include "AudioManager.h"
+#include "UITheme.h"
 
 using namespace hb::shared::net;
 using namespace hb::client::sprite_id;
@@ -25,8 +26,13 @@ void DialogBox_LevelUpSetting::draw_stat_row(short sX, short sY, int y_offset, c
 	std::string txt;
 	uint32_t time = m_game->m_cur_time;
 
+	hb::client::ui_theme::content_frame(sX + stat_grid::current_x, sY + y_offset,
+		stat_grid::current_w, stat_grid::well_h);
+	hb::client::ui_theme::content_frame(sX + stat_grid::pending_x, sY + y_offset,
+		stat_grid::pending_w, stat_grid::well_h);
+
 	// Stat label
-	put_string(sX + 24, sY + y_offset, (char*)label, GameColors::UIBlack);
+	put_string(sX + 24, sY + y_offset, (char*)label, GameColors::UILabel);
 
 	// Current value
 	txt = std::format("{}", current_stat);
@@ -40,13 +46,8 @@ void DialogBox_LevelUpSetting::draw_stat_row(short sX, short sY, int y_offset, c
 	else
 		put_string(sX + 162, sY + y_offset, txt.c_str(), GameColors::UILabel);
 
-	// + arrow highlight
-	if ((mouse_x >= sX + 195) && (mouse_x <= sX + 205) && (mouse_y >= sY + arrow_y_offset) && (mouse_y <= sY + arrow_y_offset + 6) && can_increase)
-		m_game->m_sprite[InterfaceNdGame4]->draw(sX + 195, sY + arrow_y_offset, 5);
-
-	// - arrow highlight
-	if ((mouse_x >= sX + 210) && (mouse_x <= sX + 220) && (mouse_y >= sY + arrow_y_offset) && (mouse_y <= sY + arrow_y_offset + 6) && can_decrease)
-		m_game->m_sprite[InterfaceNdGame4]->draw(sX + 210, sY + arrow_y_offset, 6);
+	draw_button(sX, sY, stat_grid::increase(arrow_y_offset), "+", can_increase);
+	draw_button(sX, sY, stat_grid::decrease(arrow_y_offset), "-", can_decrease);
 }
 
 void DialogBox_LevelUpSetting::on_draw()
@@ -60,20 +61,21 @@ void DialogBox_LevelUpSetting::on_draw()
 	std::string txt;
 
 	draw_new_dialog_box(InterfaceNdGame2, sX, sY, 0);
-	draw_new_dialog_box(InterfaceNdText, sX, sY, 2);
-	draw_new_dialog_box(InterfaceNdGame4, sX + 16, sY + 100, 4);
+	hb::client::ui_theme::header(sX, sY, m_size_x, UI_TITLE_LEVEL_UP_SETTING);
+	hb::client::ui_theme::content_frame(sX + stat_grid::points_x, sY + stat_grid::points_y,
+		stat_grid::points_w, stat_grid::points_h);
 
 	// Header text
 	put_aligned_string(sX, sX + size_x, sY + 50, DRAW_DIALOGBOX_LEVELUP_SETTING1);
 	put_aligned_string(sX, sX + size_x, sY + 65, DRAW_DIALOGBOX_LEVELUP_SETTING2);
 
 	// Points Left
-	put_string(sX + 20, sY + 85, DRAW_DIALOGBOX_LEVELUP_SETTING3, GameColors::UIBlack);
+	put_string(sX + 20, sY + 85, DRAW_DIALOGBOX_LEVELUP_SETTING3, GameColors::UILabel);
 	txt = std::format("{}", player().m_lu_point);
 	if (player().m_lu_point > 0)
 		put_string(sX + 73, sY + 102, txt.c_str(), GameColors::UIGreen);
 	else
-		put_string(sX + 73, sY + 102, txt.c_str(), GameColors::UIBlack);
+		put_string(sX + 73, sY + 102, txt.c_str(), GameColors::UILabel);
 
 	// draw stat rows — can_increase checks base + pending against max
 	draw_stat_row(sX, sY, 125, DRAW_DIALOGBOX_LEVELUP_SETTING4, player().m_str, player().m_lu_str,
@@ -94,28 +96,14 @@ void DialogBox_LevelUpSetting::on_draw()
 	draw_stat_row(sX, sY, 220, DRAW_DIALOGBOX_LEVELUP_SETTING9, player().m_charisma, player().m_lu_char,
 	            mouse_x, mouse_y, 222, ((player().m_charisma + player().m_lu_char) < m_game->m_max_stats), (player().m_lu_char > 0));
 
-	// Close button
-	if ((mouse_x >= sX + ui_layout::right_btn_x) && (mouse_x <= sX + ui_layout::right_btn_x + ui_layout::btn_size_x) &&
-	    (mouse_y > sY + ui_layout::btn_y) && (mouse_y < sY + ui_layout::btn_y + ui_layout::btn_size_y))
-		draw_new_dialog_box(InterfaceNdButton, sX + ui_layout::right_btn_x, sY + ui_layout::btn_y, 1);
-	else
-		draw_new_dialog_box(InterfaceNdButton, sX + ui_layout::right_btn_x, sY + ui_layout::btn_y, 0);
+	draw_button(sX, sY, ui_layout::btn_right, UI_BTN_OK);
 
 	// Majestic button (only if no pending changes and no points left)
 	if ((player().m_lu_str == 0) && (player().m_lu_vit == 0) && (player().m_lu_dex == 0) &&
-	    (player().m_lu_int == 0) && (player().m_lu_mag == 0) && (player().m_lu_char == 0))
+	    (player().m_lu_int == 0) && (player().m_lu_mag == 0) && (player().m_lu_char == 0) &&
+	    (player().m_lu_point <= 0))
 	{
-		if ((mouse_x >= sX + ui_layout::left_btn_x) && (mouse_x <= sX + ui_layout::left_btn_x + ui_layout::btn_size_x) &&
-		    (mouse_y > sY + ui_layout::btn_y) && (mouse_y < sY + ui_layout::btn_y + ui_layout::btn_size_y))
-		{
-			if (player().m_lu_point <= 0)
-				draw_new_dialog_box(InterfaceNdButton, sX + ui_layout::left_btn_x, sY + ui_layout::btn_y, 21);
-		}
-		else
-		{
-			if (player().m_lu_point <= 0)
-				draw_new_dialog_box(InterfaceNdButton, sX + ui_layout::left_btn_x, sY + ui_layout::btn_y, 20);
-		}
+		draw_button(sX, sY, ui_layout::btn_left, UI_BTN_CHANGE);
 	}
 }
 
@@ -125,7 +113,7 @@ bool DialogBox_LevelUpSetting::handle_stat_click(short mouse_x, short mouse_y, s
 	bool majestic_open = m_game->get_dialog_box_manager().is_enabled(DialogBoxId::ChangeStatsMajestic);
 
 	// + button
-	if ((mouse_x >= sX + 195) && (mouse_x <= sX + 205) && (mouse_y >= sY + y_offset) && (mouse_y <= sY + y_offset + 6) &&
+	if (mouse_in(stat_grid::increase(y_offset)) &&
 	    ((current_stat + pending_change) < m_game->m_max_stats) && (player().m_lu_point > 0))
 	{
 		int room = m_game->m_max_stats - (current_stat + pending_change);
@@ -169,8 +157,7 @@ bool DialogBox_LevelUpSetting::handle_stat_click(short mouse_x, short mouse_y, s
 	}
 
 	// - button
-	if ((mouse_x >= sX + 210) && (mouse_x <= sX + 220) && (mouse_y >= sY + y_offset) && (mouse_y <= sY + y_offset + 6) &&
-	    (pending_change > 0))
+	if (mouse_in(stat_grid::decrease(y_offset)) && (pending_change > 0))
 	{
 		if (hb::shared::input::is_ctrl_down() && hb::shared::input::is_shift_down())
 		{
@@ -244,8 +231,7 @@ bool DialogBox_LevelUpSetting::on_click()
 		return true;
 
 	// Close/OK button
-	if ((mouse_x >= sX + ui_layout::right_btn_x) && (mouse_x <= sX + ui_layout::right_btn_x + ui_layout::btn_size_x) &&
-	    (mouse_y > sY + ui_layout::btn_y) && (mouse_y < sY + ui_layout::btn_y + ui_layout::btn_size_y))
+	if (mouse_in(ui_layout::btn_right))
 	{
 		if (m_initial_lu_points != player().m_lu_point)
 			{
@@ -266,8 +252,7 @@ bool DialogBox_LevelUpSetting::on_click()
 	}
 
 	// Majestic button
-	if ((mouse_x >= sX + ui_layout::left_btn_x) && (mouse_x <= sX + ui_layout::left_btn_x + ui_layout::btn_size_x) &&
-	    (mouse_y > sY + ui_layout::btn_y) && (mouse_y < sY + ui_layout::btn_y + ui_layout::btn_size_y))
+	if (mouse_in(ui_layout::btn_left))
 	{
 		if ((m_game->on_game()->m_gizon_item_upgrade_left > 0) && (player().m_lu_point <= 0) &&
 		    (player().m_lu_str == 0) && (player().m_lu_vit == 0) && (player().m_lu_dex == 0) &&

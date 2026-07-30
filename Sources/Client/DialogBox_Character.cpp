@@ -5,6 +5,7 @@
 #include "GameFonts.h"
 #include "PacketSendHelpers.h"
 #include "TextLibExt.h"
+#include "UITheme.h"
 
 #include "InventoryManager.h"
 #include "ItemNameFormatter.h"
@@ -22,6 +23,20 @@ using namespace hb::shared::item;
 
 using hb::shared::item::EquipPos;
 using namespace hb::client::sprite_id;
+
+// Caption for one value row, right-aligned to end just left of x_right.
+//
+// Drawn with the same box height and top alignment put_aligned_string uses for
+// the values themselves, so a caption and its value share a baseline exactly
+// rather than approximately. The captions used to be painted into the panel
+// art; the flat panel has no lettering, so they are drawn here.
+static void put_row_caption(int x_right, int y, const char* caption)
+{
+	constexpr int caption_box = 90;
+	hb::shared::text::draw_text_aligned(GameFont::Default, x_right - caption_box, y, caption_box, 15,
+		caption, hb::shared::text::TextStyle::from_color(hb::client::ui_theme::palette::label),
+		hb::shared::text::Align::TopRight);
+}
 
 // Margin (in pixels) added around item sprites to make small items easier to click.
 // Checks if any opaque pixel exists within this distance of the cursor.
@@ -86,7 +101,24 @@ static constexpr EquipSlotLayout FemaleEquipSlots[] = {
 DialogBox_Character::DialogBox_Character(CGame* game)
 	: IDialogBox(DialogBoxId::CharacterInfo, game)
 {
-	set_default_rect(30 , 30 , 270, 376);
+	set_default_rect(30 , 30 , column_w + pane_w, panel_h);
+}
+
+// The panel is as wide as the column plus whatever pane is unfolded. m_size_x is
+// what drags, right-click-closes and the panel draw all read, so changing it here
+// is the whole of "the dialog widens".
+void DialogBox_Character::set_pane(pane which)
+{
+	m_pane = which;
+	m_size_x = static_cast<short>(column_w + (which == pane::none ? 0 : pane_w));
+}
+
+// Show `which`, or fold the pane away when it is already the one showing.
+bool DialogBox_Character::toggle_pane(pane which)
+{
+	set_pane(m_pane == which ? pane::none : which);
+	audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
+	return true;
 }
 
 // Helper: Display stat with optional angelic bonus (blue if boosted)
@@ -153,17 +185,6 @@ void DialogBox_Character::draw_equipped_item(hb::shared::item::EquipPos equipPos
 		equip_draw.sprite->draw(drawX, drawY, equip_draw.frame, hb::shared::sprite::DrawParams::additive(0.35f));
 }
 
-// Helper: draw hover button
-void DialogBox_Character::draw_hover_button(int sX, int sY, int btnX, int btnY,
-	short mouse_x, short mouse_y, int hoverFrame, int normalFrame)
-{
-	bool hover = (mouse_x >= sX + btnX) && (mouse_x <= sX + btnX + ui_layout::btn_size_x) &&
-	              (mouse_y >= sY + btnY) && (mouse_y <= sY + btnY + ui_layout::btn_size_y);
-	const bool dialogTrans = config_manager::get().is_dialog_transparency_enabled();
-	draw_new_dialog_box(InterfaceNdButton, sX + btnX, sY + btnY,
-		hover ? hoverFrame : normalFrame, false, dialogTrans);
-}
-
 void DialogBox_Character::build_equip_status_array(char (&equip_poi_status)[DEF_MAXITEMEQUIPPOS]) const
 {
 	std::memset(equip_poi_status, -1, sizeof(equip_poi_status));
@@ -219,6 +240,157 @@ char DialogBox_Character::find_equip_item_at_point(short mouse_x, short mouse_y,
 	return -1;
 }
 
+int DialogBox_Character::pane_row(int x, int y, int w, const char* caption,
+	const std::string& value, bool notable) const
+{
+	namespace theme = hb::client::ui_theme;
+	return theme::label_value(x, x, w, y, caption, value.c_str(),
+		notable ? theme::palette::value_hi : theme::palette::value);
+}
+
+void DialogBox_Character::draw_combat_pane(int x, int y, int w,
+	const hb::client::combat_summary& summary)
+{
+	namespace theme = hb::client::ui_theme;
+	namespace mod = hb::shared::item::modifier_id;
+
+	int row = y;
+	theme::label(x, row, UI_COMBAT_HEAD_ATTACK, theme::palette::tab_active);
+	row += theme::metrics::row_pitch;
+
+	if (summary.has_weapon)
+	{
+		row = pane_row(x, row, w, UI_COMBAT_DAMAGE_SMALL,
+			std::format("{}-{}", summary.damage_small.min, summary.damage_small.max), true);
+		// Large-target dice only differ on weapons configured for it; a weapon
+		// with the same numbers on both sides would just print the row twice.
+		if (summary.damage_large.max != summary.damage_small.max
+			|| summary.damage_large.min != summary.damage_small.min)
+		{
+			row = pane_row(x, row, w, UI_COMBAT_DAMAGE_LARGE,
+				std::format("{}-{}", summary.damage_large.min, summary.damage_large.max));
+		}
+	}
+	else
+	{
+		row = pane_row(x, row, w, UI_COMBAT_DAMAGE_SMALL, UI_COMBAT_NO_WEAPON);
+	}
+
+	row = pane_row(x, row, w, UI_COMBAT_ATTACK_DELAY,
+		std::format("{} ms", summary.attack_delay));
+
+	if (const int hit = summary.rolled(mod::hitting_probability); hit != 0)
+		row = pane_row(x, row, w, UI_COMBAT_HIT_BONUS, std::format("+{}%", hit));
+
+	row += theme::metrics::row_pitch / 2;
+	theme::separator(x, row, w);
+	row += theme::metrics::row_pitch / 2;
+
+	theme::label(x, row, UI_COMBAT_HEAD_DEFENCE, theme::palette::tab_active);
+	row += theme::metrics::row_pitch;
+
+	row = pane_row(x, row, w, UI_COMBAT_DEFENCE_RATIO,
+		std::format("{}", summary.defense_ratio), true);
+	row = pane_row(x, row, w, UI_COMBAT_ARMOUR, std::format("+{}%", summary.armour_defence));
+
+	// These four are the rows the server owns the totals for, so they carry the
+	// gear contribution and say as much at the foot of the pane.
+	struct { uint8_t id; const char* caption; } const rolled_defence[] = {
+		{ mod::physical_absorb, UI_COMBAT_PHYS_ABSORB },
+		{ mod::magic_resist,    UI_COMBAT_MAGIC_RESIST },
+		{ mod::magic_absorb,    UI_COMBAT_MAGIC_ABSORB },
+		{ mod::poison_resist,   UI_COMBAT_POISON_RESIST },
+	};
+	for (const auto& line : rolled_defence)
+		row = pane_row(x, row, w, line.caption, std::format("+{}%", summary.rolled(line.id)));
+
+	// Wrapped, because the pane is 180px of usable width and this sentence is the
+	// one thing in it that must not be clipped.
+	hb::shared::text::draw_text_wrapped(GameFont::Default, x, y + panel_h - 90, w, 54,
+		UI_COMBAT_GEAR_ONLY, hb::shared::text::TextStyle::from_color(theme::palette::dim),
+		hb::shared::text::Align::TopLeft);
+}
+
+void DialogBox_Character::draw_gear_pane(int x, int y, int w,
+	const hb::client::combat_summary& summary)
+{
+	namespace theme = hb::client::ui_theme;
+
+	int row = y;
+	theme::label(x, row, UI_COMBAT_HEAD_GEAR, theme::palette::tab_active);
+	row += theme::metrics::row_pitch;
+
+	if (!summary.has_any_rolled())
+	{
+		hb::shared::text::draw_text_wrapped(GameFont::Default, x, row, w, 40,
+			UI_COMBAT_NO_GEAR, hb::shared::text::TextStyle::from_color(theme::palette::dim),
+			hb::shared::text::Align::TopLeft);
+		return;
+	}
+
+	// Every rolled line the set carries, labelled from the replicated catalog so
+	// the wording matches the item's own tooltip. Walking the catalog in id order
+	// groups the buckets the way the id blocks are laid out.
+	//
+	// A fully Legendary set can roll more lines than the pane is tall, so the
+	// overflow is counted and stated rather than dropped — a list that silently
+	// stops reads as "that is all of it".
+	const int bottom = y + panel_h - 80;
+	int dropped = 0;
+	for (uint8_t id = 1; id < summary.gear.size(); id++)
+	{
+		const int total = summary.gear[id];
+		if (total == 0) continue;
+
+		const auto& entry = m_game->m_modifier_catalog[id];
+		if (!entry.present) continue;
+
+		if (row > bottom) { dropped++; continue; }
+
+		// The prefix word when the row has one, else its tooltip label. A label
+		// can be a whole-line format with a "{}" in it, which has no value to
+		// substitute here — the total goes in the value column instead.
+		std::string caption = entry.display_name.empty() ? entry.effect_label : entry.display_name;
+		if (const auto brace = caption.find("{}"); brace != std::string::npos)
+			caption.erase(brace, 2);
+		while (!caption.empty() && caption.back() == ' ') caption.pop_back();
+		if (caption.empty()) caption = std::format("Modifier {}", static_cast<int>(id));
+
+		row = pane_row(x, row, w, caption.c_str(), std::format("+{}", total));
+	}
+
+	if (dropped > 0)
+		theme::label(x, row, std::format("+{} more", dropped).c_str(), theme::palette::dim);
+}
+
+void DialogBox_Character::draw_pane(int sX, int sY)
+{
+	namespace theme = hb::client::ui_theme;
+
+	// Folded away: only the handle that opens it again shows, on the column edge.
+	if (m_pane == pane::none)
+	{
+		theme::tab_bar(sX + tab_open.x, sY + tab_open.y, tab_open.w, tab_open.h);
+		theme::tab(sX + tab_open.x, sY + tab_open.y, tab_open.w, tab_open.h, ">", false);
+		return;
+	}
+
+	theme::panel(sX + column_w, sY, pane_w, panel_h);
+	theme::tab_bar(sX + column_w, sY, pane_w, theme::metrics::tab_height);
+	theme::tab(sX + tab_combat.x, sY + tab_combat.y, tab_combat.w, tab_combat.h,
+		UI_COMBAT_TAB_COMBAT, m_pane == pane::combat);
+	theme::tab(sX + tab_gear.x, sY + tab_gear.y, tab_gear.w, tab_gear.h,
+		UI_COMBAT_TAB_GEAR, m_pane == pane::gear);
+
+	const int x = sX + column_w + theme::metrics::margin;
+	const int w = pane_w - theme::metrics::margin * 2;
+	const int y = sY + theme::metrics::tab_height + theme::metrics::margin;
+
+	const auto summary = hb::client::build_combat_summary(*m_game);
+	if (m_pane == pane::combat) draw_combat_pane(x, y, w, summary);
+	else                        draw_gear_pane(x, y, w, summary);
+}
+
 void DialogBox_Character::on_draw()
 {
 	short mouse_x = static_cast<short>(hb::shared::input::get_mouse_x());
@@ -229,7 +401,34 @@ void DialogBox_Character::on_draw()
 	char collison = -1;
 	const bool dialogTrans = config_manager::get().is_dialog_transparency_enabled();
 
+	// The panel sprite is only 270 wide, so it paints the column; the pane draws
+	// its own surface beside it.
 	draw_new_dialog_box(InterfaceNdText, sX, sY, 0, false, dialogTrans);
+	draw_pane(sX, sY);
+
+	// Chrome the panel art used to carry. The value column starts at sX + 180,
+	// so captions are right-aligned to sX + 176 — the gap the original art left
+	// between its label column and its value boxes.
+	namespace theme = hb::client::ui_theme;
+	constexpr int caption_right = 176;
+	theme::title(sX, sY + 4, column_w, UI_CHARACTER_TITLE);
+	theme::separator(sX + 12, sY + 96, column_w - 24);
+	theme::separator(sX + 12, sY + 277, column_w - 24);
+
+	// The caption and the value of a row share one y. They used to be two lists
+	// of the same eight numbers ninety lines apart, which is exactly the drift
+	// the flat panel exists to end. The pitch is irregular because the art's was.
+	for (int i = 0; i < row_count; i++)
+		put_row_caption(sX + caption_right, sY + row_y[i], row_caption[i]);
+
+	// Stat block: three columns of two. Each caption sits immediately left of
+	// its value's own aligned box (lefts at 44, 131, 214).
+	put_row_caption(sX + 42, sY + stat_row_y[0], UI_CHARACTER_STR);
+	put_row_caption(sX + 42, sY + stat_row_y[1], UI_CHARACTER_DEX);
+	put_row_caption(sX + 129, sY + stat_row_y[0], UI_CHARACTER_INT);
+	put_row_caption(sX + 129, sY + stat_row_y[1], UI_CHARACTER_MAG);
+	put_row_caption(sX + 212, sY + stat_row_y[0], UI_CHARACTER_VIT);
+	put_row_caption(sX + 212, sY + stat_row_y[1], UI_CHARACTER_CHR);
 
 	// Player name and PK/contribution
 	std::string txt2;
@@ -260,13 +459,13 @@ void DialogBox_Character::on_draw()
 	// Level, Exp, Next Exp
 	std::string statBuf;
 	statBuf = std::format("{}", player().m_level);
-	put_aligned_string(sX + 180, sX + 250, sY + 106, statBuf.c_str(), GameColors::UILabel);
+	put_aligned_string(sX + 180, sX + 250, sY + row_y[row_level], statBuf.c_str(), GameColors::UILabel);
 
 	statBuf = m_game->format_comma_number(player().m_exp);
-	put_aligned_string(sX + 180, sX + 250, sY + 125, statBuf.c_str(), GameColors::UILabel);
+	put_aligned_string(sX + 180, sX + 250, sY + row_y[row_exp], statBuf.c_str(), GameColors::UILabel);
 
 	statBuf = m_game->format_comma_number(m_game->get_level_exp(player().m_level + 1));
-	put_aligned_string(sX + 180, sX + 250, sY + 142, statBuf.c_str(), GameColors::UILabel);
+	put_aligned_string(sX + 180, sX + 250, sY + row_y[row_next_exp], statBuf.c_str(), GameColors::UILabel);
 
 	// Calculate max stats. Gear attributes feed these exactly as they do in
 	// CGame::get_max_hp / get_max_mp / get_max_sp / calc_max_load — the client
@@ -289,40 +488,40 @@ void DialogBox_Character::on_draw()
 	// HP, MP, SP
 	std::string valueBuf;
 	valueBuf = std::format("{}/{}", player().m_hp, max_hp);
-	put_aligned_string(sX + 180, sX + 250, sY + 173, valueBuf.c_str(), GameColors::UILabel);
+	put_aligned_string(sX + 180, sX + 250, sY + row_y[row_health], valueBuf.c_str(), GameColors::UILabel);
 
 	valueBuf = std::format("{}/{}", player().m_mp, max_mp);
-	put_aligned_string(sX + 180, sX + 250, sY + 191, valueBuf.c_str(), GameColors::UILabel);
+	put_aligned_string(sX + 180, sX + 250, sY + row_y[row_mana], valueBuf.c_str(), GameColors::UILabel);
 
 	valueBuf = std::format("{}/{}", player().m_sp, max_sp);
-	put_aligned_string(sX + 180, sX + 250, sY + 208, valueBuf.c_str(), GameColors::UILabel);
+	put_aligned_string(sX + 180, sX + 250, sY + row_y[row_stamina], valueBuf.c_str(), GameColors::UILabel);
 
 	// Max load
 	int total_weight = inventory_manager::get().calc_total_weight();
 	valueBuf = std::format("{:.2f}/{:.2f}", CItem::weight_to_stones(total_weight), CItem::weight_to_stones(max_load));
-	put_aligned_string(sX + 180, sX + 250, sY + 240, valueBuf.c_str(), GameColors::UILabel);
+	put_aligned_string(sX + 180, sX + 250, sY + row_y[row_max_load], valueBuf.c_str(), GameColors::UILabel);
 
 	// Enemy Kills
 	valueBuf = std::format("{}", player().m_enemy_kill_count);
-	put_aligned_string(sX + 180, sX + 250, sY + 257, valueBuf.c_str(), GameColors::UILabel);
+	put_aligned_string(sX + 180, sX + 250, sY + row_y[row_ek_count], valueBuf.c_str(), GameColors::UILabel);
 
 	// Stats with angelic and gear bonuses
 	namespace tier_attribute = hb::shared::item::tier_attribute;
-	draw_stat(sX + 44, sX + 86, sY + 285, player().m_str, player().m_angelic_str,
+	draw_stat(sX + 44, sX + 86, sY + stat_row_y[0], player().m_str, player().m_angelic_str,
 		player().m_gear_attribute[tier_attribute::strength]);       // Str
-	draw_stat(sX + 48, sX + 86, sY + 304, player().m_dex, player().m_angelic_dex,
+	draw_stat(sX + 48, sX + 86, sY + stat_row_y[1], player().m_dex, player().m_angelic_dex,
 		player().m_gear_attribute[tier_attribute::dexterity]);      // Dex
-	draw_stat(sX + 131, sX + 171, sY + 285, player().m_int, player().m_angelic_int,
+	draw_stat(sX + 131, sX + 171, sY + stat_row_y[0], player().m_int, player().m_angelic_int,
 		player().m_gear_attribute[tier_attribute::intelligence]);   // Int
-	draw_stat(sX + 131, sX + 171, sY + 304, player().m_mag, player().m_angelic_mag,
+	draw_stat(sX + 131, sX + 171, sY + stat_row_y[1], player().m_mag, player().m_angelic_mag,
 		player().m_gear_attribute[tier_attribute::magic]);          // Mag
 
 	// Vit and Chr have no angelic pendant, but gear rolls both, so they route
 	// through the same drawer instead of the two hand-rolled lines that were
 	// here — otherwise a +VIT roll would be the one bonus that stayed invisible.
-	draw_stat(sX + 214, sX + 255, sY + 285, player().m_vit, 0,
+	draw_stat(sX + 214, sX + 255, sY + stat_row_y[0], player().m_vit, 0,
 		player().m_gear_attribute[tier_attribute::vitality]);       // Vit
-	draw_stat(sX + 214, sX + 255, sY + 304, player().m_charisma, 0,
+	draw_stat(sX + 214, sX + 255, sY + stat_row_y[1], player().m_charisma, 0,
 		player().m_gear_attribute[tier_attribute::charisma]);       // Chr
 
 	// Build equipment status array
@@ -340,9 +539,9 @@ void DialogBox_Character::on_draw()
 	}
 
 	// draw buttons (Quest, Party, LevelUp)
-	draw_hover_button(sX, sY, 15, 340, mouse_x, mouse_y, 5, 4);   // Quest
-	draw_hover_button(sX, sY, 98, 340, mouse_x, mouse_y, 45, 44); // Party
-	draw_hover_button(sX, sY, 180, 340, mouse_x, mouse_y, 11, 10); // LevelUp
+	draw_button(sX, sY, btn_quest, UI_BTN_QUEST);
+	draw_button(sX, sY, btn_party, UI_BTN_PARTY);
+	draw_button(sX, sY, btn_levelup, UI_CHARACTER_BTN_LEVELUP);
 }
 
 void DialogBox_Character::draw_male_character(short sX, short sY, short mouse_x, short mouse_y,
@@ -423,6 +622,12 @@ void DialogBox_Character::draw_female_character(short sX, short sY, short mouse_
 
 bool DialogBox_Character::on_click()
 {
+	// Side pane tabs. Picking the tab that is already showing folds the pane away,
+	// which is what makes it a slide-out rather than a second column.
+	if (m_pane == pane::none && mouse_in(tab_open)) return toggle_pane(pane::combat);
+	if (m_pane != pane::none && mouse_in(tab_combat)) return toggle_pane(pane::combat);
+	if (m_pane != pane::none && mouse_in(tab_gear)) return toggle_pane(pane::gear);
+
 	// Quest button
 	if (mouse_in(btn_quest)) {
 		enable_dialog_box(DialogBoxId::Quest, 1, 0, 0);

@@ -72,19 +72,15 @@ void DialogBox_Noticement::on_draw()
 	if (!m_custom_message.empty())
 	{
 		draw_text_wrapped(GameFont::Default, sX + pad_left, msg_y, text_width, msg_height,
-			m_custom_message.c_str(), TextStyle::from_color(GameColors::UIBlack), Align::TopCenter);
+			m_custom_message.c_str(), TextStyle::from_color(GameColors::UILabel), Align::TopCenter);
 	}
 	else
 	{
 		draw_text_wrapped(GameFont::Default, sX + pad_left, msg_y, text_width, msg_height,
-			DRAW_DIALOGBOX_NOTICEMSG1, TextStyle::from_color(GameColors::UIBlack), Align::TopCenter);
+			DRAW_DIALOGBOX_NOTICEMSG1, TextStyle::from_color(GameColors::UILabel), Align::TopCenter);
 	}
 
-	// OK button
-	if (mouse_in(btn_ok))
-		draw_new_dialog_box(InterfaceNdButton, sX + 210, sY + 127, 1);
-	else
-		draw_new_dialog_box(InterfaceNdButton, sX + 210, sY + 127, 0);
+	draw_button(sX, sY, btn_ok, UI_BTN_OK);
 }
 
 bool DialogBox_Noticement::on_click()

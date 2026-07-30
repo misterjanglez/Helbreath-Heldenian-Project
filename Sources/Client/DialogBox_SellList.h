@@ -25,5 +25,5 @@ private:
 
 	void draw_item_list(short sX, short sY, short size_x, short mouse_x, short mouse_y, int& empty_count);
 	void draw_empty_list_message(short sX, short sY, short size_x);
-	void draw_buttons(short sX, short sY, short mouse_x, short mouse_y, bool has_items);
+	void draw_buttons(short sX, short sY, bool has_items);
 };

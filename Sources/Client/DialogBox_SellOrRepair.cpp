@@ -12,6 +12,7 @@
 #include <format>
 #include <string>
 #include "IInput.h"
+#include "UITheme.h"
 
 using namespace hb::shared::net;
 using namespace hb::client::sprite_id;
@@ -38,7 +39,7 @@ void DialogBox_SellOrRepair::on_draw()
 	case mode::sell:
 	{
 		draw_new_dialog_box(InterfaceNdGame2, sX, sY, 2);
-		draw_new_dialog_box(InterfaceNdText, sX, sY, 11);
+		hb::client::ui_theme::header(sX, sY, m_size_x, UI_TITLE_ITEM_FOR_SALE);
 
 		item_id = m_item_index;
 
@@ -61,20 +62,15 @@ void DialogBox_SellOrRepair::on_draw()
 		put_string(sX + 95 + 15, sY + 53 + 75, txt.c_str(), GameColors::UILabel);
 		put_string(sX + 55, sY + 190, DRAW_DIALOGBOX_SELLOR_REPAIR_ITEM4, GameColors::UILabel);
 
-		if (mouse_in(btn_confirm))
-			draw_new_dialog_box(InterfaceNdButton, sX + ui_layout::left_btn_x, sY + ui_layout::btn_y, 39);
-		else draw_new_dialog_box(InterfaceNdButton, sX + ui_layout::left_btn_x, sY + ui_layout::btn_y, 38);
-
-		if (mouse_in(btn_cancel))
-			draw_new_dialog_box(InterfaceNdButton, sX + ui_layout::right_btn_x, sY + ui_layout::btn_y, 17);
-		else draw_new_dialog_box(InterfaceNdButton, sX + ui_layout::right_btn_x, sY + ui_layout::btn_y, 16);
+		draw_button(sX, sY, btn_confirm, UI_BTN_SELL);
+		draw_button(sX, sY, btn_cancel, UI_BTN_CANCEL);
 		break;
 	}
 
 	case mode::repair:
 	{
 		draw_new_dialog_box(InterfaceNdGame2, sX, sY, 2);
-		draw_new_dialog_box(InterfaceNdText, sX, sY, 10);
+		hb::client::ui_theme::header(sX, sY, m_size_x, UI_TITLE_REPAIR_ITEM);
 		item_id = m_item_index;
 		{
 			CItem* rep_cfg = m_game->get_item_config(player().m_item_list[item_id]->m_id_num);
@@ -92,19 +88,14 @@ void DialogBox_SellOrRepair::on_draw()
 		put_string(sX + 95 + 15, sY + 53 + 75, txt.c_str(), GameColors::UILabel);
 		put_string(sX + 55, sY + 190, DRAW_DIALOGBOX_SELLOR_REPAIR_ITEM7, GameColors::UILabel);
 
-		if (mouse_in(btn_confirm))
-			draw_new_dialog_box(InterfaceNdButton, sX + ui_layout::left_btn_x, sY + ui_layout::btn_y, 43);
-		else draw_new_dialog_box(InterfaceNdButton, sX + ui_layout::left_btn_x, sY + ui_layout::btn_y, 42);
-
-		if (mouse_in(btn_cancel))
-			draw_new_dialog_box(InterfaceNdButton, sX + ui_layout::right_btn_x, sY + ui_layout::btn_y, 17);
-		else draw_new_dialog_box(InterfaceNdButton, sX + ui_layout::right_btn_x, sY + ui_layout::btn_y, 16);
+		draw_button(sX, sY, btn_confirm, UI_BTN_REPAIR);
+		draw_button(sX, sY, btn_cancel, UI_BTN_CANCEL);
 		break;
 	}
 
 	case mode::sell_pending:
 		draw_new_dialog_box(InterfaceNdGame2, sX, sY, 2);
-		draw_new_dialog_box(InterfaceNdText, sX, sY, 11);
+		hb::client::ui_theme::header(sX, sY, m_size_x, UI_TITLE_ITEM_FOR_SALE);
 
 		put_string(sX + 55, sY + 100, DRAW_DIALOGBOX_SELLOR_REPAIR_ITEM8, GameColors::UILabel);
 		put_string(sX + 55, sY + 120, DRAW_DIALOGBOX_SELLOR_REPAIR_ITEM9, GameColors::UILabel);
@@ -113,7 +104,7 @@ void DialogBox_SellOrRepair::on_draw()
 
 	case mode::repair_pending:
 		draw_new_dialog_box(InterfaceNdGame2, sX, sY, 2);
-		draw_new_dialog_box(InterfaceNdText, sX, sY, 10);
+		hb::client::ui_theme::header(sX, sY, m_size_x, UI_TITLE_REPAIR_ITEM);
 
 		put_string(sX + 55, sY + 100, DRAW_DIALOGBOX_SELLOR_REPAIR_ITEM11, GameColors::UILabel);
 		put_string(sX + 55, sY + 120, DRAW_DIALOGBOX_SELLOR_REPAIR_ITEM9, GameColors::UILabel);

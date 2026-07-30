@@ -19,5 +19,5 @@ public:
 	mode m_mode{mode::details};
 
 private:
-	static constexpr ui_rect btn_ok{154, 293, 75, 19};
+	static constexpr ui_rect btn_ok = ui_layout::btn_right;
 };

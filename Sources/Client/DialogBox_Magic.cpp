@@ -11,6 +11,7 @@
 #include "AudioManager.h"
 #include <format>
 #include <string>
+#include "UITheme.h"
 
 using namespace hb::shared::item;
 using namespace hb::client::sprite_id;
@@ -51,7 +52,7 @@ void DialogBox_Magic::on_draw()
 	sY = m_y;
 
 	draw_new_dialog_box(InterfaceNdGame1, sX, sY, 1, false, dialogTrans);
-	draw_new_dialog_box(InterfaceNdText, sX, sY, 7, false, dialogTrans);
+	hb::client::ui_theme::header(sX, sY, m_size_x, UI_TITLE_MAGIC_LIST);
 
 	// Handle scroll wheel input
 	if (m_game->get_dialog_box_manager().get_top_id() == DialogBoxId::Magic && z != 0)
@@ -217,11 +218,7 @@ void DialogBox_Magic::on_draw()
 	put_aligned_string(sX, sX + 256, sY + 267, cTxt_str.c_str());
 	put_aligned_string(sX + 1, sX + 257, sY + 267, cTxt_str.c_str());
 
-	// Alchemy button
-	if (mouse_in(btn_alchemy))
-		draw_new_dialog_box(InterfaceNdButton, sX + ui_layout::right_btn_x, sY + 285, 49, false, dialogTrans);
-	else
-		draw_new_dialog_box(InterfaceNdButton, sX + ui_layout::right_btn_x, sY + 285, 48, false, dialogTrans);
+	draw_button(sX, sY, btn_alchemy, UI_BTN_ALCHEMY);
 }
 
 bool DialogBox_Magic::on_click()

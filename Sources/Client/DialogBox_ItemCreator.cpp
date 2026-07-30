@@ -18,6 +18,7 @@
 #include <cstring>
 #include "IInput.h"
 #include "AudioManager.h"
+#include "lan_eng.h"
 
 using namespace hb::shared::net;
 using namespace hb::client::sprite_id;
@@ -636,22 +637,17 @@ void DialogBox_ItemCreator::draw_search_page(short sX, short sY, short size_x, s
 	{
 		int sy = sY + layout::status_y;
 		auto count_str = std::format("{} found", m_result_count);
-		put_string(sX + layout::content_x1 + 4, sy, count_str.c_str(), GameColors::UIBlack);
+		put_string(sX + layout::content_x1 + 4, sy, count_str.c_str(), GameColors::UILabel);
 
 		if (m_result_count > layout::list_rows)
 		{
 			int max_scroll = m_result_count - layout::list_rows;
 			auto scroll_str = std::format("[{}/{}]", m_scroll_offset + 1, max_scroll + 1);
-			put_string(sX + 100, sy, scroll_str.c_str(), GameColors::UIBlack);
+			put_string(sX + 100, sy, scroll_str.c_str(), GameColors::UILabel);
 		}
 	}
 
-	// Close button (sprite)
-	if ((mouse_x >= sX + ui_layout::right_btn_x) && (mouse_x <= sX + ui_layout::right_btn_x + ui_layout::btn_size_x) &&
-		(mouse_y >= sY + ui_layout::btn_y) && (mouse_y <= sY + ui_layout::btn_y + ui_layout::btn_size_y))
-		draw_new_dialog_box(InterfaceNdButton, sX + ui_layout::right_btn_x, sY + ui_layout::btn_y, 1);
-	else
-		draw_new_dialog_box(InterfaceNdButton, sX + ui_layout::right_btn_x, sY + ui_layout::btn_y, 0);
+	draw_button(sX, sY, ui_layout::btn_right, UI_BTN_OK);
 }
 
 // ---------------------------------------------------------------------------
@@ -941,12 +937,7 @@ void DialogBox_ItemCreator::draw_configure_page(short sX, short sY, short size_x
 		hb::shared::text::TextStyle::from_color(back_hover ? GameColors::UIWhite : GameColors::UIMagicBlue),
 		hb::shared::text::Align::TopCenter);
 
-	// Close button (sprite)
-	if ((mouse_x >= sX + ui_layout::right_btn_x) && (mouse_x <= sX + ui_layout::right_btn_x + ui_layout::btn_size_x) &&
-		(mouse_y >= sY + ui_layout::btn_y) && (mouse_y <= sY + ui_layout::btn_y + ui_layout::btn_size_y))
-		draw_new_dialog_box(InterfaceNdButton, sX + ui_layout::right_btn_x, sY + ui_layout::btn_y, 1);
-	else
-		draw_new_dialog_box(InterfaceNdButton, sX + ui_layout::right_btn_x, sY + ui_layout::btn_y, 0);
+	draw_button(sX, sY, ui_layout::btn_right, UI_BTN_OK);
 
 	// --- DROPDOWN OVERLAY (drawn last, on top of everything) ---
 	if (m_open_dropdown != dropdown_id::none)
@@ -1060,8 +1051,7 @@ bool DialogBox_ItemCreator::on_click_search(short sX, short sY, short size_x)
 	}
 
 	// Close button
-	if ((mouse_x >= sX + ui_layout::right_btn_x) && (mouse_x <= sX + ui_layout::right_btn_x + ui_layout::btn_size_x) &&
-		(mouse_y >= sY + ui_layout::btn_y) && (mouse_y <= sY + ui_layout::btn_y + ui_layout::btn_size_y))
+	if (mouse_in(ui_layout::btn_right))
 	{
 		disable_this_dialog();
 		audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
@@ -1295,8 +1285,7 @@ bool DialogBox_ItemCreator::on_click_configure(short sX, short sY, short size_x)
 	}
 
 	// Close button
-	if ((mouse_x >= sX + ui_layout::right_btn_x) && (mouse_x <= sX + ui_layout::right_btn_x + ui_layout::btn_size_x) &&
-		(mouse_y >= sY + ui_layout::btn_y) && (mouse_y <= sY + ui_layout::btn_y + ui_layout::btn_size_y))
+	if (mouse_in(ui_layout::btn_right))
 	{
 		disable_this_dialog();
 		audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
@@ -1308,8 +1297,6 @@ bool DialogBox_ItemCreator::on_click_configure(short sX, short sY, short size_x)
 
 bool DialogBox_ItemCreator::on_click()
 {
-	short mouse_x = static_cast<short>(hb::shared::input::get_mouse_x());
-	short mouse_y = static_cast<short>(hb::shared::input::get_mouse_y());
 	short sX = m_x;
 	short sY = m_y;
 	short size_x = m_size_x;

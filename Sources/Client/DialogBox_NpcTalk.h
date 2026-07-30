@@ -1,5 +1,6 @@
 #pragma once
 #include "IDialogBox.h"
+#include "UITheme.h"
 
 class DialogBox_NpcTalk : public IDialogBox
 {
@@ -33,8 +34,9 @@ private:
 	void draw_scroll_bar(short sX, short sY, int total_lines);
 	void handle_scroll_bar_drag(short sX, short sY, short mouse_x, short mouse_y, int total_lines, char lb);
 
-	static constexpr ui_rect btn_left{30, 292, 75, 21};
-	static constexpr ui_rect btn_right{154, 292, 75, 21};
+	static constexpr ui_rect btn_left = ui_layout::btn_left;
+	static constexpr ui_rect btn_right = ui_layout::btn_right;
 	static constexpr ui_rect link_next{190, 296, 89, 21};
-	static constexpr ui_rect area_scroll{240, 40, 21, 281};
+	static constexpr ui_rect area_scroll = hb::client::ui_theme::grab_area(
+		hb::client::ui_theme::list_gutter);
 };

@@ -15,6 +15,7 @@
 #include "IInput.h"
 #include "Screen_OnGame.h"
 #include "AudioManager.h"
+#include "UITheme.h"
 
 using namespace hb::shared::net;
 using namespace hb::client::sprite_id;
@@ -48,7 +49,7 @@ void DialogBox_Soldier::on_draw()
 
 	draw_new_dialog_box(InterfaceNdCrusade, sX, sY - 5, 0, false, config_manager::get().is_dialog_transparency_enabled());
 	draw_new_dialog_box(InterfaceNdCrusade, sX, sY, 21, false, config_manager::get().is_dialog_transparency_enabled());
-	draw_new_dialog_box(InterfaceNdText, sX, sY, 17, false, config_manager::get().is_dialog_transparency_enabled());
+	hb::client::ui_theme::header(sX, sY, m_size_x, UI_TITLE_SOLDIER_MENU);
 
 	switch (m_mode) {
 	case mode::overview:

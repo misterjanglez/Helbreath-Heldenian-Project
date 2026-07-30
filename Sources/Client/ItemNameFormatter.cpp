@@ -186,32 +186,7 @@ CItem* item_name_formatter::get_config(int item_id) const
 
 ItemNameInfo item_name_formatter::format(CItem* item)
 {
-	auto result = format(item->m_id_num, item->to_instance_data());
-
-	// Mana save effect comes from item config, not instance data
-	CItem* cfg = get_config(item->m_id_num);
-	if (cfg)
-	{
-		auto effectType = cfg->get_item_effect_type();
-		int mana_save_value = 0;
-		if (effectType == hb::shared::item::ItemEffectType::AttackManaSave)
-		{
-			mana_save_value = cfg->m_item_effect_value4;
-		}
-		else if (effectType == hb::shared::item::ItemEffectType::add_effect &&
-		         cfg->m_item_effect_value1 == hb::shared::item::to_int(hb::shared::item::AddEffectType::ManaSave))
-		{
-			mana_save_value = cfg->m_item_effect_value2;
-		}
-
-		if (mana_save_value > 0)
-		{
-			result.is_special = true;
-			result.effects.push_back({"Mana save ", std::format("+{}%", mana_save_value)});
-		}
-	}
-
-	return result;
+	return format(item->m_id_num, item->to_instance_data());
 }
 
 ItemNameInfo item_name_formatter::format(short item_id)
@@ -316,6 +291,26 @@ ItemNameInfo item_name_formatter::format(short item_id, const hb::shared::item::
 
 		for (size_t i = 0; i < line_count; i++)
 			append_modifier_effect(result.effects, lines[i].type, lines[i].value, lines[i].value2);
+	}
+
+	// Mana save is a property of the item config, not of the instance, so it is
+	// added here rather than alongside the rolled modifiers. It used to live in
+	// the CItem* overload, which meant every caller holding an id and an instance
+	// POD — a shop row, a ground pile — silently lost the line.
+	{
+		const auto effect_type = cfg->get_item_effect_type();
+		int mana_save = 0;
+		if (effect_type == hb::shared::item::ItemEffectType::AttackManaSave)
+			mana_save = cfg->m_item_effect_value4;
+		else if (effect_type == hb::shared::item::ItemEffectType::add_effect &&
+		         cfg->m_item_effect_value1 == hb::shared::item::to_int(hb::shared::item::AddEffectType::ManaSave))
+			mana_save = cfg->m_item_effect_value2;
+
+		if (mana_save > 0)
+		{
+			result.is_special = true;
+			result.effects.push_back({"Mana save ", std::format("+{}%", mana_save)});
+		}
 	}
 
 	apply_tier_presentation(result, data.get_tier());

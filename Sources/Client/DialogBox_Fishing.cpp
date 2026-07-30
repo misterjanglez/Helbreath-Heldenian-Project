@@ -47,9 +47,9 @@ void DialogBox_Fishing::on_draw()
 		put_string(sX + 98, sY + 14, txt.c_str(), GameColors::UIWhite);
 
 		txt = std::format(DRAW_DIALOGBOX_FISHING1, m_fish_count);
-		put_string(sX + 98, sY + 28, txt.c_str(), GameColors::UIBlack);
+		put_string(sX + 98, sY + 28, txt.c_str(), GameColors::UILabel);
 
-		put_string(sX + 97, sY + 43, DRAW_DIALOGBOX_FISHING2, GameColors::UIBlack);
+		put_string(sX + 97, sY + 43, DRAW_DIALOGBOX_FISHING2, GameColors::UILabel);
 
 		txt = std::format("{} %", m_catch_chance);
 		hb::shared::text::draw_text(GameFont::Bitmap1, sX + 157, sY + 40, txt.c_str(), hb::shared::text::TextStyle::with_highlight(GameColors::BmpBtnFishRed));

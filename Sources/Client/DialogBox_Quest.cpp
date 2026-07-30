@@ -6,6 +6,7 @@
 #include "IInput.h"
 #include "Screen_OnGame.h"
 #include "AudioManager.h"
+#include "UITheme.h"
 using namespace hb::client::sprite_id;
 
 DialogBox_Quest::DialogBox_Quest(CGame* game)
@@ -24,7 +25,7 @@ void DialogBox_Quest::on_draw()
 	char temp[21];
 
 	m_game->draw_new_dialog_box(InterfaceNdGame2, sX, sY, 2);
-	m_game->draw_new_dialog_box(InterfaceNdText, sX, sY, 4);
+	hb::client::ui_theme::header(sX, sY, m_size_x, UI_TITLE_QUEST);
 
 	switch (m_mode) {
 	case mode::details:
@@ -127,10 +128,7 @@ void DialogBox_Quest::on_draw()
 		break;
 	}
 
-	if (mouse_in(btn_ok))
-		m_game->draw_new_dialog_box(InterfaceNdButton, sX + ui_layout::right_btn_x, sY + ui_layout::btn_y, 1);
-	else
-		m_game->draw_new_dialog_box(InterfaceNdButton, sX + ui_layout::right_btn_x, sY + ui_layout::btn_y, 0);
+	draw_button(sX, sY, btn_ok, UI_BTN_OK);
 }
 
 bool DialogBox_Quest::on_click()

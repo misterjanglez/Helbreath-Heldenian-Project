@@ -1,5 +1,6 @@
 #pragma once
 #include "IDialogBox.h"
+#include "UITheme.h"
 
 class DialogBox_Shop : public IDialogBox
 {
@@ -34,8 +35,8 @@ private:
     bool on_click_item_list(short sX, short sY);
     bool on_click_item_details(short sX, short sY);
 
-	static constexpr ui_rect btn_buy{30, 292, 75, 21};
-	static constexpr ui_rect btn_cancel{154, 292, 75, 21};
+	static constexpr ui_rect btn_buy = ui_layout::btn_left;
+	static constexpr ui_rect btn_cancel = ui_layout::btn_right;
 	static constexpr ui_rect btn_qty_up_1000{117, 209, 18, 22};
 	static constexpr ui_rect btn_qty_down_1000{117, 234, 18, 18};
 	static constexpr ui_rect btn_qty_up_100{131, 209, 18, 22};
@@ -44,7 +45,8 @@ private:
 	static constexpr ui_rect btn_qty_down_10{145, 234, 18, 18};
 	static constexpr ui_rect btn_qty_up_1{159, 209, 18, 22};
 	static constexpr ui_rect btn_qty_down_1{159, 234, 18, 18};
-	static constexpr ui_rect area_scroll{240, 20, 21, 311};
+	static constexpr ui_rect area_scroll = hb::client::ui_theme::grab_area(
+		hb::client::ui_theme::list_gutter);
 
 	int get_max_quantity() const;
 };

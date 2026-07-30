@@ -27,6 +27,6 @@ public:
 	int m_item_count{};
 
 private:
-	static constexpr ui_rect btn_confirm{30, 292, 75, 21};
-	static constexpr ui_rect btn_cancel{154, 292, 75, 21};
+	static constexpr ui_rect btn_confirm = ui_layout::btn_left;
+	static constexpr ui_rect btn_cancel = ui_layout::btn_right;
 };

@@ -18,6 +18,7 @@
 #include <string>
 #include "Screen_OnGame.h"
 #include "AudioManager.h"
+#include "UITheme.h"
 
 using namespace hb::shared::net;
 using namespace hb::shared::item;
@@ -262,9 +263,9 @@ void DialogBox_Manufacture::draw_manufacture_list(short sX, short sY)
 	int loc;
 
 	draw_new_dialog_box(InterfaceNdGame3, sX, sY, 0);
-	draw_new_dialog_box(InterfaceNdText, sX, sY, 8);
-	put_string(sX + adj_x + 44, sY + adj_y + 38, "Name", GameColors::UIBlack);
-	put_string(sX + adj_x + 171, sY + adj_y + 38, "Max.Skill", GameColors::UIBlack);
+	hb::client::ui_theme::header(sX, sY, m_size_x, UI_TITLE_TINKERING);
+	put_string(sX + adj_x + 44, sY + adj_y + 38, "Name", GameColors::UILabel);
+	put_string(sX + adj_x + 171, sY + adj_y + 38, "Max.Skill", GameColors::UILabel);
 
 	loc = 0;
 	for (int i = 0; i < 13; i++)
@@ -345,7 +346,7 @@ void DialogBox_Manufacture::draw_manufacture_waiting(short sX, short sY)
 	int loc;
 
 	draw_new_dialog_box(InterfaceNdGame3, sX, sY, 0);
-	draw_new_dialog_box(InterfaceNdText, sX, sY, 8);
+	hb::client::ui_theme::header(sX, sY, m_size_x, UI_TITLE_TINKERING);
 	{
 		int recipe_cfg_id = m_game->find_item_id_by_name(build_item_manager::get().get_display_list()[m_progress]->m_name.c_str());
 		CItem* recipe_cfg = m_game->get_item_config(recipe_cfg_id);
@@ -467,7 +468,7 @@ void DialogBox_Manufacture::draw_manufacture_in_progress(short sX, short sY)
 	int loc;
 
 	draw_new_dialog_box(InterfaceNdGame3, sX, sY, 0);
-	draw_new_dialog_box(InterfaceNdText, sX, sY, 8);
+	hb::client::ui_theme::header(sX, sY, m_size_x, UI_TITLE_TINKERING);
 	{
 		int recipe_cfg_id = m_game->find_item_id_by_name(build_item_manager::get().get_display_list()[m_progress]->m_name.c_str());
 		CItem* recipe_cfg = m_game->get_item_config(recipe_cfg_id);
@@ -590,7 +591,7 @@ void DialogBox_Manufacture::draw_manufacture_done(short sX, short sY)
 	std::string temp;
 
 	draw_new_dialog_box(InterfaceNdGame3, sX, sY, 0);
-	draw_new_dialog_box(InterfaceNdText, sX, sY, 8);
+	hb::client::ui_theme::header(sX, sY, m_size_x, UI_TITLE_TINKERING);
 	{
 		int recipe_cfg_id = m_game->find_item_id_by_name(build_item_manager::get().get_display_list()[m_progress]->m_name.c_str());
 		CItem* recipe_cfg = m_game->get_item_config(recipe_cfg_id);

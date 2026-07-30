@@ -154,7 +154,7 @@ void DialogBox_CommandHallMenu::on_draw()
 		put_aligned_string(sX, sX + size_x, sY + 80, "upon receiving the Pendant of Tutelary Angel.", GameColors::UIMagicBlue);
 		put_aligned_string(sX, sX + size_x, sY + 105, "Would you like to receive the Tutelary Angel?", GameColors::UIMagicBlue);
 		auto angelBuf = std::format(DRAW_DIALOGBOX_ITEMUPGRADE11, m_game->on_game()->m_gizon_item_upgrade_left);
-		put_aligned_string(sX, sX + size_x, sY + 140, angelBuf.c_str(), GameColors::UIBlack);
+		put_aligned_string(sX, sX + size_x, sY + 140, angelBuf.c_str(), GameColors::UILabel);
 
 		if (mouse_in(link_angel_str) && (m_game->on_game()->m_gizon_item_upgrade_left > 4))
 			put_aligned_string(sX, sX + size_x, sY + 175, "Tutelary Angel (STR) will be handed out.", GameColors::UIWhite);

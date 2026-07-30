@@ -160,6 +160,29 @@ inline int swing_time(int atk_delay_value)
 }
 
 // ============================================================================
+// Defence Ratio
+//
+// Not a DB formula — arithmetic hardcoded in the item-equip pass (the server's
+// ItemManager) that the client also has to reproduce to put a defence number on
+// the character panel. Stated here so the two sides cannot drift; the server's
+// equip pass should adopt these in place of its inline copies.
+// ============================================================================
+
+// Unarmoured base, before anything worn is added.
+inline int defense_ratio_base(int player_dex)
+{
+	return player_dex * 2;
+}
+
+// What one equipped defence piece adds: its own defence value, plus half of the
+// refinement percentage a custom-made piece carries (0 for an ordinary one).
+inline int defense_ratio_from_item(int item_defense, int custom_refine_percent)
+{
+	const double refine = (static_cast<double>(custom_refine_percent) / 100.0) * item_defense;
+	return item_defense + static_cast<int>(refine / 2.0);
+}
+
+// ============================================================================
 // Marquee speed scaling (Item Tiers spec §5)
 // ============================================================================
 

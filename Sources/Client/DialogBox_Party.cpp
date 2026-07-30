@@ -8,6 +8,7 @@
 #include "IInput.h"
 #include "Screen_OnGame.h"
 #include "AudioManager.h"
+#include "UITheme.h"
 
 using namespace hb::shared::net;
 using namespace hb::client::sprite_id;
@@ -25,7 +26,7 @@ void DialogBox_Party::on_draw()
 	short size_x = m_size_x;
 
 	m_game->draw_new_dialog_box(InterfaceNdGame2, sX, sY, 0);
-	m_game->draw_new_dialog_box(InterfaceNdText, sX, sY, 3);
+	hb::client::ui_theme::header(sX, sY, m_size_x, UI_TITLE_PARTY_MENU);
 
 	switch (m_mode) {
 	case mode::main_menu:
@@ -73,10 +74,7 @@ void DialogBox_Party::on_draw()
 			break;
 		}
 
-		if (mouse_in(btn_right))
-			m_game->draw_new_dialog_box(InterfaceNdButton, sX + ui_layout::right_btn_x, sY + ui_layout::btn_y, 1);
-		else
-			m_game->draw_new_dialog_box(InterfaceNdButton, sX + ui_layout::right_btn_x, sY + ui_layout::btn_y, 0);
+		draw_button(sX, sY, btn_right, UI_BTN_OK);
 		break;
 
 	case mode::invited: {
@@ -89,15 +87,9 @@ void DialogBox_Party::on_draw()
 		put_aligned_string(sX, sX + size_x, sY + 155, DRAW_DIALOGBOX_PARTY20);
 		put_aligned_string(sX, sX + size_x, sY + 175, DRAW_DIALOGBOX_PARTY21);
 
-		if (mouse_in(btn_left))
-			m_game->draw_new_dialog_box(InterfaceNdButton, sX + ui_layout::left_btn_x, sY + ui_layout::btn_y, 19);
-		else
-			m_game->draw_new_dialog_box(InterfaceNdButton, sX + ui_layout::left_btn_x, sY + ui_layout::btn_y, 18);
+		draw_button(sX, sY, btn_left, UI_BTN_YES);
 
-		if (mouse_in(btn_right))
-			m_game->draw_new_dialog_box(InterfaceNdButton, sX + ui_layout::right_btn_x, sY + ui_layout::btn_y, 3);
-		else
-			m_game->draw_new_dialog_box(InterfaceNdButton, sX + ui_layout::right_btn_x, sY + ui_layout::btn_y, 2);
+		draw_button(sX, sY, btn_right, UI_BTN_NO);
 		break;
 	}
 
@@ -107,10 +99,7 @@ void DialogBox_Party::on_draw()
 		put_aligned_string(sX, sX + size_x, sY + 125, DRAW_DIALOGBOX_PARTY24);
 		put_aligned_string(sX, sX + size_x, sY + 140, DRAW_DIALOGBOX_PARTY25);
 
-		if (mouse_in(btn_right))
-			m_game->draw_new_dialog_box(InterfaceNdButton, sX + ui_layout::right_btn_x, sY + ui_layout::btn_y, 17);
-		else
-			m_game->draw_new_dialog_box(InterfaceNdButton, sX + ui_layout::right_btn_x, sY + ui_layout::btn_y, 16);
+		draw_button(sX, sY, btn_right, UI_BTN_CANCEL);
 		break;
 
 	case mode::join_requested: {
@@ -122,10 +111,7 @@ void DialogBox_Party::on_draw()
 		put_aligned_string(sX, sX + size_x, sY + 140, DRAW_DIALOGBOX_PARTY29);
 		put_aligned_string(sX, sX + size_x, sY + 155, DRAW_DIALOGBOX_PARTY30);
 
-		if (mouse_in(btn_right))
-			m_game->draw_new_dialog_box(InterfaceNdButton, sX + ui_layout::right_btn_x, sY + ui_layout::btn_y, 17);
-		else
-			m_game->draw_new_dialog_box(InterfaceNdButton, sX + ui_layout::right_btn_x, sY + ui_layout::btn_y, 16);
+		draw_button(sX, sY, btn_right, UI_BTN_CANCEL);
 		break;
 	}
 
@@ -141,10 +127,7 @@ void DialogBox_Party::on_draw()
 			}
 		}
 
-		if (mouse_in(btn_right))
-			m_game->draw_new_dialog_box(InterfaceNdButton, sX + ui_layout::right_btn_x, sY + ui_layout::btn_y, 1);
-		else
-			m_game->draw_new_dialog_box(InterfaceNdButton, sX + ui_layout::right_btn_x, sY + ui_layout::btn_y, 0);
+		draw_button(sX, sY, btn_right, UI_BTN_OK);
 		break;
 	}
 
@@ -155,10 +138,7 @@ void DialogBox_Party::on_draw()
 
 	case mode::withdrawn:
 		put_aligned_string(sX, sX + size_x, sY + 95, DRAW_DIALOGBOX_PARTY35);
-		if (mouse_in(btn_right))
-			m_game->draw_new_dialog_box(InterfaceNdButton, sX + ui_layout::right_btn_x, sY + ui_layout::btn_y, 1);
-		else
-			m_game->draw_new_dialog_box(InterfaceNdButton, sX + ui_layout::right_btn_x, sY + ui_layout::btn_y, 0);
+		draw_button(sX, sY, btn_right, UI_BTN_OK);
 		break;
 
 	case mode::party_full:
@@ -166,10 +146,7 @@ void DialogBox_Party::on_draw()
 		put_aligned_string(sX, sX + size_x, sY + 110, DRAW_DIALOGBOX_PARTY37);
 		put_aligned_string(sX, sX + size_x, sY + 125, DRAW_DIALOGBOX_PARTY38);
 		put_aligned_string(sX, sX + size_x, sY + 140, DRAW_DIALOGBOX_PARTY39);
-		if (mouse_in(btn_right))
-			m_game->draw_new_dialog_box(InterfaceNdButton, sX + ui_layout::right_btn_x, sY + ui_layout::btn_y, 1);
-		else
-			m_game->draw_new_dialog_box(InterfaceNdButton, sX + ui_layout::right_btn_x, sY + ui_layout::btn_y, 0);
+		draw_button(sX, sY, btn_right, UI_BTN_OK);
 		break;
 
 	case mode::failed:
@@ -180,10 +157,7 @@ void DialogBox_Party::on_draw()
 		put_aligned_string(sX, sX + size_x, sY + 155, DRAW_DIALOGBOX_PARTY44);
 		put_aligned_string(sX, sX + size_x, sY + 170, DRAW_DIALOGBOX_PARTY45);
 
-		if (mouse_in(btn_right))
-			m_game->draw_new_dialog_box(InterfaceNdButton, sX + ui_layout::right_btn_x, sY + ui_layout::btn_y, 1);
-		else
-			m_game->draw_new_dialog_box(InterfaceNdButton, sX + ui_layout::right_btn_x, sY + ui_layout::btn_y, 0);
+		draw_button(sX, sY, btn_right, UI_BTN_OK);
 		break;
 
 	case mode::already_in_party:
@@ -194,33 +168,21 @@ void DialogBox_Party::on_draw()
 		put_aligned_string(sX, sX + size_x, sY + 155, DRAW_DIALOGBOX_PARTY50);
 		put_aligned_string(sX, sX + size_x, sY + 170, DRAW_DIALOGBOX_PARTY51);
 
-		if (mouse_in(btn_right))
-			m_game->draw_new_dialog_box(InterfaceNdButton, sX + ui_layout::right_btn_x, sY + ui_layout::btn_y, 1);
-		else
-			m_game->draw_new_dialog_box(InterfaceNdButton, sX + ui_layout::right_btn_x, sY + ui_layout::btn_y, 0);
+		draw_button(sX, sY, btn_right, UI_BTN_OK);
 		break;
 
 	case mode::disbanded:
 		put_aligned_string(sX, sX + size_x, sY + 95, DRAW_DIALOGBOX_PARTY52);
 		put_aligned_string(sX, sX + size_x, sY + 110, DRAW_DIALOGBOX_PARTY53);
 		put_aligned_string(sX, sX + size_x, sY + 125, DRAW_DIALOGBOX_PARTY54);
-		if (mouse_in(btn_right))
-			m_game->draw_new_dialog_box(InterfaceNdButton, sX + ui_layout::right_btn_x, sY + ui_layout::btn_y, 1);
-		else
-			m_game->draw_new_dialog_box(InterfaceNdButton, sX + ui_layout::right_btn_x, sY + ui_layout::btn_y, 0);
+		draw_button(sX, sY, btn_right, UI_BTN_OK);
 		break;
 
 	case mode::confirm_leave:
 		put_aligned_string(sX, sX + size_x, sY + 95, DRAW_DIALOGBOX_PARTY55);
-		if (mouse_in(btn_left))
-			m_game->draw_new_dialog_box(InterfaceNdButton, sX + ui_layout::left_btn_x, sY + ui_layout::btn_y, 19);
-		else
-			m_game->draw_new_dialog_box(InterfaceNdButton, sX + ui_layout::left_btn_x, sY + ui_layout::btn_y, 18);
+		draw_button(sX, sY, btn_left, UI_BTN_YES);
 
-		if (mouse_in(btn_right))
-			m_game->draw_new_dialog_box(InterfaceNdButton, sX + ui_layout::right_btn_x, sY + ui_layout::btn_y, 3);
-		else
-			m_game->draw_new_dialog_box(InterfaceNdButton, sX + ui_layout::right_btn_x, sY + ui_layout::btn_y, 2);
+		draw_button(sX, sY, btn_right, UI_BTN_NO);
 		break;
 	}
 }

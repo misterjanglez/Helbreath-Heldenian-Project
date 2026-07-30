@@ -379,9 +379,17 @@ public:
     }
 
     // Base damage range from dice values (throw D range + bonus)
+    // vs small targets — players and most NPCs
     dice_range get_damage_range() const
     {
         return parse_dice(m_item_effect_value1, m_item_effect_value2, m_item_effect_value3);
+    }
+
+    // vs large targets. The second dice triple, which the equip pass reads into
+    // its own _l fields; only weapons configured for it differ from the above.
+    dice_range get_damage_range_large() const
+    {
+        return parse_dice(m_item_effect_value4, m_item_effect_value5, m_item_effect_value6);
     }
 
     //------------------------------------------------------------------------
@@ -414,10 +422,19 @@ public:
 
     // Light weight reduction in percent, capped at 100 so a data edit can
     // never invert the weight.
+    //
+    // The static form is for callers that hold a config row and an instance
+    // separately, which is how a ground item and a shop row arrive.
+    static inline constexpr int light_percent(int rolled_value, int light_multiplier)
+    {
+        const int percent = rolled_value * light_multiplier;
+        return percent < 100 ? percent : 100;
+    }
+
     int get_light_percent(int light_multiplier) const
     {
-        int percent = get_modifier_value(hb::shared::item::modifier_id::light) * light_multiplier;
-        return percent < 100 ? percent : 100;
+        return light_percent(get_modifier_value(hb::shared::item::modifier_id::light),
+                             light_multiplier);
     }
 
     // The one Light reduction formula. Callers that already hold a base weight
@@ -438,12 +455,18 @@ public:
 
     // Swing speed after Agile. Agile is a value-less flag (catalog multiplier
     // 0, band 0..0) worth a flat -1, retail-faithful per spec §6.
+    //
+    // The static form is for callers that hold a config row and an instance
+    // separately, which is how a ground item arrives.
+    static inline constexpr int apply_agile(int swing_speed, bool agile)
+    {
+        const int speed = agile ? swing_speed - 1 : swing_speed;
+        return speed > 0 ? speed : 0;
+    }
+
     int get_effective_swing_speed() const
     {
-        int speed = m_swing_speed;
-        if (has_modifier(hb::shared::item::modifier_id::agile))
-            --speed;
-        return speed > 0 ? speed : 0;
+        return apply_agile(m_swing_speed, has_modifier(hb::shared::item::modifier_id::agile));
     }
 
     // Total weight for a stack of items (effective_weight * count), 0 for zero-weight items

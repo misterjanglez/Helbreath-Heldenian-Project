@@ -15,6 +15,7 @@
 #include <string>
 #include "IInput.h"
 #include "AudioManager.h"
+#include "UITheme.h"
 
 using namespace hb::shared::net;
 using namespace hb::shared::item;
@@ -38,6 +39,8 @@ void DialogBox_Exchange::on_draw()
 	short size_x = m_size_x;
 
 	m_game->draw_new_dialog_box(InterfaceNdNewExchange, sX, sY, 0);
+	hb::client::ui_theme::header(sX, sY, size_x, UI_TITLE_EXCHANGE_ITEM);
+	draw_slot_wells(sX, sY);
 
 	switch (m_mode) {
 	case mode::pending:
@@ -101,6 +104,25 @@ void DialogBox_Exchange::on_draw()
 	}
 }
 
+// The two four-slot wells, one per side of the trade.
+//
+// They were painted into the panel frame, which is why the 58px slot pitch in
+// draw_items has no rectangle anywhere in code to go with it. Measured off the
+// frame this replaces: each side is four 58px cells starting at x 15 and x 268,
+// spanning y 55 to 206.
+void DialogBox_Exchange::draw_slot_wells(short sX, short sY)
+{
+	constexpr int cell_w = 58;
+	constexpr int well_y = 55;
+	constexpr int well_h = 151;
+	constexpr int side_x[2] = { 15, 268 };
+
+	for (int side = 0; side < 2; side++)
+		for (int cell = 0; cell < 4; cell++)
+			hb::client::ui_theme::content_frame(sX + side_x[side] + cell * cell_w, sY + well_y,
+				cell_w, well_h);
+}
+
 void DialogBox_Exchange::draw_items(short sX, short sY, short mouse_x, short mouse_y, int start_index, int end_index)
 {
 	short xadd;
@@ -136,11 +158,11 @@ void DialogBox_Exchange::draw_item_info(short sX, short sY, short size_x, short 
 		auto effect = itemInfo.effect_text();
 		auto extra = itemInfo.extra_text();
 		if (!effect.empty()) {
-			put_aligned_string(sX + 16, sX + 155, sY + 235 + loc, effect.c_str(), GameColors::UIBlack);
+			put_aligned_string(sX + 16, sX + 155, sY + 235 + loc, effect.c_str(), GameColors::UILabel);
 			loc += 15;
 		}
 		if (!extra.empty()) {
-			put_aligned_string(sX + 16, sX + 155, sY + 235 + loc, extra.c_str(), GameColors::UIBlack);
+			put_aligned_string(sX + 16, sX + 155, sY + 235 + loc, extra.c_str(), GameColors::UILabel);
 			loc += 15;
 		}
 

@@ -28,5 +28,5 @@ private:
 	static constexpr ui_rect link_job_2{25, 176, 220, 13};
 	static constexpr ui_rect btn_help{211, 296, 49, 21};
 	static constexpr ui_rect link_details{25, 161, 220, 13};
-	static constexpr ui_rect btn_ok{154, 293, 75, 19};
+	static constexpr ui_rect btn_ok = ui_layout::btn_right;
 };

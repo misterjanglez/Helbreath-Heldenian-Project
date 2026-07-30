@@ -181,8 +181,14 @@ namespace
 		}
 	}
 
-	// A parchment-toned button; returns true when hovered (only if enabled).
-	bool draw_button(CGame* game, int x, int y, int w, int h, const char* label,
+	// Returns true when hovered (only if enabled).
+	//
+	// Named apart from IDialogBox::draw_button because it is a different thing:
+	// it reports hover back to the caller, and it paints from tp_col rather than
+	// ui_theme::palette. The two palettes are near-identical warm near-blacks —
+	// this dialog was drawn from primitives before ui_theme existed — but folding
+	// them together is a Trading Post design change, not a side effect of this one.
+	bool draw_tp_button(CGame* game, int x, int y, int w, int h, const char* label,
 		int mx, int my, bool enabled = true)
 	{
 		bool hover = enabled && hit(mx, my, x, y, w, h);
@@ -677,8 +683,8 @@ void DialogBox_TradingPost::draw_board(int mx, int my)
 	int px = m_x + tp::inner_x;
 	bool has_prev = m_page > 0;
 	bool has_next = (m_page + 1) < m_board.page_count;
-	draw_button(m_game, px, py, tp::page_btn_w, 16, "< Prev", mx, my, has_prev);
-	draw_button(m_game, px + tp::inner_w - tp::page_btn_w, py, tp::page_btn_w, 16, "Next >", mx, my, has_next);
+	draw_tp_button(m_game, px, py, tp::page_btn_w, 16, "< Prev", mx, my, has_prev);
+	draw_tp_button(m_game, px + tp::inner_w - tp::page_btn_w, py, tp::page_btn_w, 16, "Next >", mx, my, has_next);
 	int shown_page = (m_board.page_count == 0) ? 1 : m_page + 1;
 	int total_page = (m_board.page_count == 0) ? 1 : m_board.page_count;
 	auto pageinfo = std::format("Page {} / {}", shown_page, total_page);
@@ -813,18 +819,18 @@ void DialogBox_TradingPost::draw_detail(int mx, int my)
 
 		// Contextual per-offer button: Finalize (seller) or Rescind (my Offer).
 		if (i_am_seller)
-			draw_button(m_game, x + tp::inner_w - 66, y + 1, 62, tp::det_offer_row_h - 4, "Finalize", mx, my);
+			draw_tp_button(m_game, x + tp::inner_w - 66, y + 1, 62, tp::det_offer_row_h - 4, "Finalize", mx, my);
 		else if (mine)
-			draw_button(m_game, x + tp::inner_w - 66, y + 1, 62, tp::det_offer_row_h - 4, "Rescind", mx, my);
+			draw_tp_button(m_game, x + tp::inner_w - 66, y + 1, 62, tp::det_offer_row_h - 4, "Rescind", mx, my);
 	}
 
 	// Bottom actions.
 	int ay = m_y + tp::det_actions_y;
-	draw_button(m_game, m_x + tp::inner_x, ay, 70, tp::det_btn_h, "< Back", mx, my);
+	draw_tp_button(m_game, m_x + tp::inner_x, ay, 70, tp::det_btn_h, "< Back", mx, my);
 	if (i_am_seller)
-		draw_button(m_game, m_x + tp::inner_x + tp::inner_w - 100, ay, 100, tp::det_btn_h, "Delist", mx, my);
+		draw_tp_button(m_game, m_x + tp::inner_x + tp::inner_w - 100, ay, 100, tp::det_btn_h, "Delist", mx, my);
 	else if (!has_own_offer())
-		draw_button(m_game, m_x + tp::inner_x + tp::inner_w - 100, ay, 100, tp::det_btn_h, "Place Offer", mx, my);
+		draw_tp_button(m_game, m_x + tp::inner_x + tp::inner_w - 100, ay, 100, tp::det_btn_h, "Place Offer", mx, my);
 }
 
 void DialogBox_TradingPost::draw_create(int mx, int my)
@@ -922,9 +928,9 @@ void DialogBox_TradingPost::draw_create(int mx, int my)
 	// Confirm + Cancel.
 	bool can_send = staged_count() >= 1;
 	int by = m_y + tp::cr_buttons_y;
-	draw_button(m_game, m_x + tp::inner_x + 4, by, 130, tp::cr_btn_h,
+	draw_tp_button(m_game, m_x + tp::inner_x + 4, by, 130, tp::cr_btn_h,
 		is_listing ? "Post Listing" : "Place Offer", mx, my, can_send);
-	draw_button(m_game, m_x + tp::inner_x + tp::inner_w - 90, by, 86, tp::cr_btn_h, "Cancel", mx, my);
+	draw_tp_button(m_game, m_x + tp::inner_x + tp::inner_w - 90, by, 86, tp::cr_btn_h, "Cancel", mx, my);
 }
 
 // ============================================================================

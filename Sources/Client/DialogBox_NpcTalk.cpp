@@ -7,6 +7,8 @@
 #include "PacketSendHelpers.h"
 #include "Screen_OnGame.h"
 #include "AudioManager.h"
+#include "UITheme.h"
+#include "lan_eng.h"
 
 
 
@@ -52,22 +54,12 @@ void DialogBox_NpcTalk::draw_buttons(short sX, short sY)
 	switch (m_mode)
 	{
 	case mode::ok_only:
-		if (mouse_in(btn_right))
-			m_game->draw_new_dialog_box(InterfaceNdButton, sX + ui_layout::right_btn_x, sY + ui_layout::btn_y, 1);
-		else
-			m_game->draw_new_dialog_box(InterfaceNdButton, sX + ui_layout::right_btn_x, sY + ui_layout::btn_y, 0);
+		draw_button(sX, sY, btn_right, UI_BTN_OK);
 		break;
 
 	case mode::accept_decline:
-		if (mouse_in(btn_left))
-			m_game->draw_new_dialog_box(InterfaceNdButton, sX + ui_layout::left_btn_x, sY + ui_layout::btn_y, 33);
-		else
-			m_game->draw_new_dialog_box(InterfaceNdButton, sX + ui_layout::left_btn_x, sY + ui_layout::btn_y, 32);
-
-		if (mouse_in(btn_right))
-			m_game->draw_new_dialog_box(InterfaceNdButton, sX + ui_layout::right_btn_x, sY + ui_layout::btn_y, 41);
-		else
-			m_game->draw_new_dialog_box(InterfaceNdButton, sX + ui_layout::right_btn_x, sY + ui_layout::btn_y, 40);
+		draw_button(sX, sY, btn_left, UI_BTN_ACCEPT);
+		draw_button(sX, sY, btn_right, UI_BTN_DECLINE);
 		break;
 
 	case mode::next:
@@ -102,7 +94,9 @@ void DialogBox_NpcTalk::draw_scroll_bar(short sX, short sY, int total_lines)
 		double d2 = static_cast<double>(total_lines - 17);
 		double d3 = (274.0 * d1) / d2;
 		int pointer_loc = static_cast<int>(d3);
-		m_game->draw_new_dialog_box(InterfaceNdGame2, sX, sY, 3);
+		// This dialog computed pointer_loc and then only drew the rail, never a
+		// thumb — the drag worked but nothing showed where you were.
+		hb::client::ui_theme::list_scrollbar(sX, sY, pointer_loc);
 	}
 }
 

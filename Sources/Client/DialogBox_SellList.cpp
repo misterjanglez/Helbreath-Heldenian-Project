@@ -11,6 +11,7 @@
 #include "IInput.h"
 #include "Packet/SharedPackets.h"
 #include "AudioManager.h"
+#include "UITheme.h"
 
 using namespace hb::shared::net;
 using namespace hb::shared::item;
@@ -32,7 +33,7 @@ void DialogBox_SellList::on_draw()
 	short size_x = m_size_x;
 
 	draw_new_dialog_box(InterfaceNdGame2, sX, sY, 2);
-	draw_new_dialog_box(InterfaceNdText, sX, sY, 11);
+	hb::client::ui_theme::header(sX, sY, m_size_x, UI_TITLE_ITEM_FOR_SALE);
 
 	int empty_count = 0;
 	draw_item_list(sX, sY, size_x, mouse_x, mouse_y, empty_count);
@@ -42,7 +43,7 @@ void DialogBox_SellList::on_draw()
 	}
 
 	bool has_items = (empty_count < game_limits::max_sell_list);
-	draw_buttons(sX, sY, mouse_x, mouse_y, has_items);
+	draw_buttons(sX, sY, has_items);
 }
 
 void DialogBox_SellList::draw_item_list(short sX, short sY, short size_x, short mouse_x, short mouse_y, int& empty_count)
@@ -147,21 +148,13 @@ void DialogBox_SellList::draw_empty_list_message(short sX, short sY, short size_
 	put_aligned_string(sX, sX + size_x, sY + 55 + 155 + 282 - 117 - 170, DRAW_DIALOGBOX_SELL_LIST9);
 }
 
-void DialogBox_SellList::draw_buttons(short sX, short sY, short mouse_x, short mouse_y, bool has_items)
+void DialogBox_SellList::draw_buttons(short sX, short sY, bool has_items)
 {
-	// Sell button (only enabled when there are items)
-	if ((mouse_x >= sX + ui_layout::left_btn_x) && (mouse_x <= sX + ui_layout::left_btn_x + ui_layout::btn_size_x) &&
-		(mouse_y >= sY + ui_layout::btn_y) && (mouse_y <= sY + ui_layout::btn_y + ui_layout::btn_size_y) && has_items)
-		draw_new_dialog_box(InterfaceNdButton, sX + ui_layout::left_btn_x, sY + ui_layout::btn_y, 39);
-	else
-		draw_new_dialog_box(InterfaceNdButton, sX + ui_layout::left_btn_x, sY + ui_layout::btn_y, 38);
-
-	// Cancel button
-	if ((mouse_x >= sX + ui_layout::right_btn_x) && (mouse_x <= sX + ui_layout::right_btn_x + ui_layout::btn_size_x) &&
-		(mouse_y >= sY + ui_layout::btn_y) && (mouse_y <= sY + ui_layout::btn_y + ui_layout::btn_size_y))
-		draw_new_dialog_box(InterfaceNdButton, sX + ui_layout::right_btn_x, sY + ui_layout::btn_y, 17);
-	else
-		draw_new_dialog_box(InterfaceNdButton, sX + ui_layout::right_btn_x, sY + ui_layout::btn_y, 16);
+	// Sell only lights up when there is something in the list, which is the rule
+	// the frame-pair version encoded by suppressing its hover frame; a themed
+	// button can say it outright by greying the caption too.
+	draw_button(sX, sY, ui_layout::btn_left, UI_BTN_SELL, has_items);
+	draw_button(sX, sY, ui_layout::btn_right, UI_BTN_CANCEL);
 }
 
 bool DialogBox_SellList::on_click()

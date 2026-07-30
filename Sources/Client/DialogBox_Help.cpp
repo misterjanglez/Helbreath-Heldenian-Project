@@ -52,12 +52,7 @@ void DialogBox_Help::on_draw()
 	draw_help_item(sX, size_x, sY, 12, "F.A.Q.", is_mouse_over_item(mouse_x, mouse_y, sX, sY, 12));
 	draw_help_item(sX, size_x, sY, 13, DRAW_DIALOGBOX_HELP13, is_mouse_over_item(mouse_x, mouse_y, sX, sY, 13));
 
-	// Close button
-	if ((mouse_x >= sX + ui_layout::right_btn_x) && (mouse_x <= sX + ui_layout::right_btn_x + ui_layout::btn_size_x) &&
-	    (mouse_y > sY + ui_layout::btn_y) && (mouse_y < sY + ui_layout::btn_y + ui_layout::btn_size_y))
-		draw_new_dialog_box(InterfaceNdButton, sX + ui_layout::right_btn_x, sY + ui_layout::btn_y, 1);
-	else
-		draw_new_dialog_box(InterfaceNdButton, sX + ui_layout::right_btn_x, sY + ui_layout::btn_y, 0);
+	draw_button(sX, sY, ui_layout::btn_right, UI_BTN_OK);
 }
 
 bool DialogBox_Help::on_click()
@@ -154,8 +149,7 @@ bool DialogBox_Help::on_click()
 	}
 
 	// Close button
-	if ((mouse_x >= sX + ui_layout::right_btn_x) && (mouse_x <= sX + ui_layout::right_btn_x + ui_layout::btn_size_x) &&
-	    (mouse_y > sY + ui_layout::btn_y) && (mouse_y < sY + ui_layout::btn_y + ui_layout::btn_size_y)) {
+	if (mouse_in(ui_layout::btn_right)) {
 		audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 		disable_this_dialog();
 		return true;
