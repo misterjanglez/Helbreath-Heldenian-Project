@@ -485,6 +485,13 @@ inline bool is_special_item(short i_dnum)
     case ItemId::DarkExecutor:
     case ItemId::TheDevastator:
     case ItemId::LightingBlade:
+    // The original's second drop hands these two out from Stone-Golem,
+    // Clay-Golem, Frost and Barlog (Game.cpp:54018-54035, 54109-54131), so they
+    // are named uniques by the same reasoning that put 290/292/762 here in #49:
+    // the §8 rule keeps tier-eligible gear out of stage-2 tables, and without
+    // this the validator blocks boot on those rows (#90).
+    case ItemId::DarkMageMagicStaffW:
+    case ItemId::DarkMageMagicWand:
     case ItemId::MagicNecklaceDFp15:
     case ItemId::MagicNecklaceRM30:
     case ItemId::AngelicPendantSTR:
