@@ -1083,7 +1083,9 @@ bool LoadItemConfigs(sqlite3* db, CItem** itemList, int maxItems)
             itemList[item_id] = nullptr;
         }
 
-        CItem* item = new CItem();
+        // A type template for the item-config catalog, not a world instance:
+        // no Serial, no origin, never in the ledger.
+        CItem* item = ItemManager::create_template();
         item->m_id_num = (short)item_id;
         CopyColumnText(stmt, col++, item->m_name, sizeof(item->m_name));
         item->m_item_type = (char)sqlite3_column_int(stmt, col++);

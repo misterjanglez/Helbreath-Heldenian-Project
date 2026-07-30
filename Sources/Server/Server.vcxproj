@@ -225,6 +225,7 @@
     <ClInclude Include="CmdShowChat.h" />
     <ClInclude Include="CmdGiveItem.h" />
     <ClInclude Include="CmdMintCheck.h" />
+    <ClInclude Include="CmdSerialCheck.h" />
     <ClInclude Include="CmdReload.h" />
     <ClInclude Include="CmdRollSmoke.h" />
     <ClInclude Include="CmdScatterSmoke.h" />
@@ -372,6 +373,7 @@
     <ClCompile Include="CmdShowChat.cpp" />
     <ClCompile Include="CmdGiveItem.cpp" />
     <ClCompile Include="CmdMintCheck.cpp" />
+    <ClCompile Include="CmdSerialCheck.cpp" />
     <ClCompile Include="CmdReload.cpp" />
     <ClCompile Include="CmdRollSmoke.cpp" />
     <ClCompile Include="CmdScatterSmoke.cpp" />

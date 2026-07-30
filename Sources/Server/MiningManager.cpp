@@ -352,11 +352,8 @@ void MiningManager::check_mining_action(int client_h, int dX, int dY)
 
 			}
 
-			item = new CItem;
-			if (m_game->m_item_manager->init_item_attr(item, item_id) == false) {
-				delete item;
-			}
-			else {
+			item = m_game->m_item_manager->create_item(item_id, hb::server::item_origin::mining);
+			if (item != nullptr) {
 				m_game->m_map_list[m_game->m_client_list[client_h]->m_map_index]->set_item(m_game->m_client_list[client_h]->m_x,
 					m_game->m_client_list[client_h]->m_y, item);
 				m_game->send_ground_item_event(CommonType::ItemDrop, m_game->m_client_list[client_h]->m_map_index,

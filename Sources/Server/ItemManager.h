@@ -6,6 +6,7 @@
 
 #include "Item/ItemAttributeData.h"
 #include "DirectionHelpers.h"
+#include "ItemProvenance.h"
 using hb::shared::direction::direction;
 
 namespace hb::server { struct drop_table; }
@@ -20,6 +21,57 @@ public:
 	~ItemManager() = default;
 
 	void set_game(CGame* game) { m_game = game; }
+
+	//----------------------------------------------------------------------
+	// Item creation — the only legal path (ADR 0003 coverage law)
+	//
+	// A raw `new CItem` in game code is a review defect: an audit log with gaps
+	// is worse than none, so every item that enters the world is born here.
+	// Scripts/check_item_factory.py enforces it mechanically.
+	//----------------------------------------------------------------------
+
+	// Creates an item instance from its config, mints a Serial when the item is
+	// Instanced (non-stackable, per D2) and records how it entered the world.
+	// Returns nullptr when the config lookup fails — callers get the
+	// create / init / delete-on-failure dance for free rather than repeating it.
+	CItem* create_item(int item_id, hb::server::item_origin::item_origin origin);
+	CItem* create_item(const char* item_name, hb::server::item_origin::item_origin origin);
+
+	// Rehydrates a persisted item. A save/load round trip is not a birth, so
+	// this carries the stored Serial rather than minting a new one — minting
+	// here would make one item read as a fresh instance after every restart.
+	//
+	// `serial` is 0 until #77 adds the persisted column; an Instanced item that
+	// arrives unserialed is minted one, so the world never holds an unserialed
+	// instance. Allocator reset across restarts is tolerated under D6.
+	CItem* restore_item(int item_id, int64_t serial = 0);
+
+	// Rebuilds an item as the next stage of an evolution chain (majestic items,
+	// hero capes), carrying `from`'s identity onto the replacement instead of
+	// minting. The physical item survives the change, so a fresh Serial would
+	// split one item's Biography into two instances that never met — upgrading
+	// is an event in a life, not a new one.
+	//
+	// Call it before destroying the original: the replacement has to exist
+	// before the item it replaces stops existing.
+	CItem* transform_item(int new_item_id, const CItem& from);
+
+	// The two deliberate non-instances, named so the coverage law's exceptions
+	// read as intentional in review instead of looking like stray allocations.
+	// Neither is a world item, so neither carries a Serial.
+
+	// A type template for the item-config catalog.
+	static CItem* create_template();
+
+	// A throwaway copy that exists only to describe an item in a log line, and
+	// is deleted as soon as that line is written. It shares the source's Serial
+	// because it *describes* that item rather than duplicating it.
+	CItem* create_snapshot(CItem* source);
+
+	// True when `item_id` indexes a loaded item-config row. The bounds and the
+	// null-row check travel together everywhere they appear, so they live here
+	// as one named question rather than three conditions repeated per caller.
+	bool is_valid_item_id(int item_id) const;
 
 	// Item config / init
 	bool send_client_item_configs(int client_h);
@@ -67,7 +119,6 @@ public:
 	int get_item_space_left(int client_h);
 	void set_item_pos(int client_h, char* data);
 	int get_item_weight(CItem* item, int count);
-	bool copy_item_contents(CItem* original, CItem* copy);
 	bool check_item_receive_condition(int client_h, CItem* item);
 	int send_item_notify_msg(int client_h, uint16_t msg_type, CItem* item, int v1);
 
@@ -151,5 +202,18 @@ private:
 
 	int find_inventory_item(int client_h, short item_id) const;
 
+	// Assigns identity to a freshly created item: the origin always, and a
+	// Serial only when the item is Instanced (non-stackable, per D2).
+	void stamp_provenance(CItem* item, hb::server::item_origin::item_origin origin);
+
+	// Field-by-field copy. `to` is the destination — private because
+	// create_snapshot is the only sanctioned reason to copy an item: a copy that
+	// outlives the log line it was made for is a Serial handed to two objects,
+	// which is the exact anomaly Reconciliation exists to catch.
+	bool copy_item_contents(CItem* to, CItem* from);
+
 	CGame* m_game = nullptr;
+
+	// Serial source for this server. In-RAM until #76 gives it a durable home.
+	hb::server::serial_allocator m_serial_allocator;
 };

@@ -38,6 +38,7 @@ using namespace hb::server::net;
 using namespace hb::server::config;
 using namespace hb::shared::item;
 namespace sock = hb::shared::net::socket;
+namespace item_origin = hb::server::item_origin;
 namespace dynamic_object = hb::shared::dynamic_object;
 namespace smap = hb::server::map;
 namespace sdelay = hb::server::delay_event;
@@ -242,9 +243,137 @@ void ItemManager::clear_item_config_list()
 	}
 }
 
+//////////////////////////////////////////////////////////////////////
+// Item creation (ADR 0003, plan P1.1) — the only legal way to make a CItem.
+//
+// Every item that enters the world is born in one of these, which makes the
+// ledger's creation coverage a property of the code's shape rather than of
+// anybody remembering to log at 45 separate call sites. init_item_attr stays
+// the config-copy step underneath; what these add is identity and provenance.
+//////////////////////////////////////////////////////////////////////
+
+bool ItemManager::is_valid_item_id(int item_id) const
+{
+	return item_id >= 0
+		&& item_id < MaxItemTypes
+		&& m_game->m_item_config_list[item_id] != nullptr;
+}
+
+// Instanced iff non-stackable (D2). A stack has no identity worth tracking
+// because merge and split dissolve it, so stackables stay unserialed and the
+// Counted flow counters account for them in aggregate instead.
+void ItemManager::stamp_provenance(CItem* item, item_origin::item_origin origin)
+{
+	item->m_origin = origin;
+	if (item->is_stackable() == false)
+		item->m_serial = m_serial_allocator.mint();
+}
+
+CItem* ItemManager::create_item(int item_id, item_origin::item_origin origin)
+{
+	CItem* item = new CItem();
+	if (init_item_attr(item, item_id) == false)
+	{
+		delete item;
+		return nullptr;
+	}
+
+	stamp_provenance(item, origin);
+	return item;
+}
+
+CItem* ItemManager::create_item(const char* item_name, item_origin::item_origin origin)
+{
+	CItem* item = new CItem();
+	if (init_item_attr(item, item_name) == false)
+	{
+		delete item;
+		return nullptr;
+	}
+
+	stamp_provenance(item, origin);
+	return item;
+}
+
+CItem* ItemManager::restore_item(int item_id, int64_t serial)
+{
+	CItem* item = new CItem();
+	if (init_item_attr(item, item_id) == false)
+	{
+		delete item;
+		return nullptr;
+	}
+
+	if (serial != 0)
+	{
+		// A restored item keeps the identity it was saved with, and the
+		// allocator has to be told about it — otherwise a fresh in-RAM counter
+		// would hand the same Serial to a newly minted item.
+		item->m_serial = serial;
+		m_serial_allocator.resume_from(serial);
+	}
+	else
+	{
+		// Until #77 persists the column every load arrives unserialed, and an
+		// Instanced item must not sit in the world without identity. Mint one
+		// and let the per-restart renumbering ride on D6 wipe-freedom.
+		stamp_provenance(item, item_origin::restored);
+	}
+
+	return item;
+}
+
+CItem* ItemManager::transform_item(int new_item_id, const CItem& from)
+{
+	CItem* item = new CItem();
+	if (init_item_attr(item, new_item_id) == false)
+	{
+		delete item;
+		return nullptr;
+	}
+
+	// No mint. The item that comes out of an evolution chain is the same
+	// physical item that went in, so it keeps the Serial and the origin it was
+	// born with, and the allocator's sequence stays gap-free.
+	item->m_serial = from.m_serial;
+	item->m_origin = from.m_origin;
+	return item;
+}
+
+CItem* ItemManager::create_template()
+{
+	// A config template describes a type rather than an instance: no Serial, no
+	// origin, and it never appears in the ledger.
+	return new CItem();
+}
+
+CItem* ItemManager::create_snapshot(CItem* source)
+{
+	if (source == nullptr) return nullptr;
+
+	// By id, not by name: the name overload rescans every item config and
+	// normalises both sides of each comparison, and this runs per item on every
+	// Exchange. m_id_num is the same lookup key without the search.
+	CItem* snapshot = new CItem();
+	if (init_item_attr(snapshot, source->m_id_num) == false)
+	{
+		delete snapshot;
+		return nullptr;
+	}
+
+	// The init above is load-bearing, not redundant: copy_item_contents copies
+	// every field except m_name, so without it the log line has no item name.
+	//
+	// It carries the Serial across, which is correct here and only here — the
+	// snapshot describes `source` for the duration of one log line and is
+	// deleted immediately, so the two never coexist as world items.
+	copy_item_contents(snapshot, source);
+	return snapshot;
+}
+
 bool ItemManager::init_item_attr(CItem* item, const char* item_name)
 {
-	
+
 	char tmp_name[hb::shared::limits::NpcNameLen];
 	char normalized_input[21];
 	char normalized_config[21];
@@ -328,18 +457,17 @@ void ItemManager::drop_item_handler(int client_h, short item_index, int amount, 
 
 	if ((m_game->m_client_list[client_h]->m_item_list[item_index]->is_stackable()) &&
 		(m_game->m_client_list[client_h]->m_item_list[item_index]->m_instance.count > static_cast<uint64_t>(amount))) {
-		item = new CItem;
-		if (init_item_attr(item, m_game->m_client_list[client_h]->m_item_list[item_index]->m_name) == false) {
+		// Splitting a stack is not a birth — the same Counted stuff now sits in
+		// two places. Stackables carry no Serial, so there is no identity to
+		// divide and no origin to inherit.
+		item = create_item(m_game->m_client_list[client_h]->m_item_list[item_index]->m_name, item_origin::none);
+		if (item == nullptr) return;
+
+		if (amount <= 0) {
 			delete item;
 			return;
 		}
-		else {
-			if (amount <= 0) {
-				delete item;
-				return;
-			}
-			item->m_instance.count = amount;
-		}
+		item->m_instance.count = amount;
 
 		if (static_cast<uint64_t>(amount) > m_game->m_client_list[client_h]->m_item_list[item_index]->m_instance.count) {
 			delete item;
@@ -552,12 +680,8 @@ int ItemManager::add_client_bulk_item_list(int client_h, const char* item_name, 
 
 	for (int i = 0; i < amount; i++)
 	{
-		CItem* item = new CItem();
-		if (!init_item_attr(item, item_name))
-		{
-			delete item;
-			break;
-		}
+		CItem* item = create_item(item_name, item_origin::gm_mint);
+		if (item == nullptr) break;
 
 		// Weight check
 		if ((m_game->m_client_list[client_h]->m_cur_weight_load + get_item_weight(item, 1)) > m_game->calc_max_load(client_h))
@@ -626,7 +750,7 @@ int ItemManager::mint_gm_items(int client_h, int item_id, int count,
 {
 	error.clear();
 	if (m_game->m_client_list[client_h] == nullptr) return 0;
-	if (item_id < 0 || item_id >= MaxItemTypes || m_game->m_item_config_list[item_id] == nullptr)
+	if (is_valid_item_id(item_id) == false)
 	{
 		error = "invalid item id";
 		return 0;
@@ -642,10 +766,9 @@ int ItemManager::mint_gm_items(int client_h, int item_id, int count,
 	bool minted_is_ours = false;
 	for (int i = 0; i < count; i++)
 	{
-		CItem* item = new CItem();
-		if (init_item_attr(item, item_id) == false)
+		CItem* item = create_item(item_id, item_origin::gm_mint);
+		if (item == nullptr)
 		{
-			delete item;
 			error = "item config init failed";
 			break;
 		}
@@ -1025,99 +1148,94 @@ void ItemManager::request_purchase_item_handler(int client_h, const char* item_n
 
 	for(int i = 1; i <= num; i++) {
 
-		item = new CItem;
-		bool init_ok = init_item_attr(item, resolved_item_id);
-		if (init_ok == false) {
+		item = create_item(resolved_item_id, item_origin::shop_buy);
+		if (item == nullptr) continue;
+
+		if (item->m_sell_price == 0) {
 			delete item;
+			return;
 		}
-		else {
 
-			if (item->m_sell_price == 0) {
-				delete item;
-				return;
-			}
+		item->m_instance.count = item_count;
 
-			item->m_instance.count = item_count;
+		cost = static_cast<int>(item->m_sell_price * item->m_instance.count);
 
-			cost = static_cast<int>(item->m_sell_price * item->m_instance.count);
+		gold_count = get_item_count_by_id(client_h, hb::shared::item::ItemId::Gold);
 
-			gold_count = get_item_count_by_id(client_h, hb::shared::item::ItemId::Gold);
+		discount_ratio = ((m_game->m_client_list[client_h]->m_charisma - 10) / 4);
 
-			discount_ratio = ((m_game->m_client_list[client_h]->m_charisma - 10) / 4);
+		// 2.03 Discount Method
+		// Charisma
+		// discount_ratio = (m_game->m_client_list[client_h]->m_charisma / 4) -1;
+		// if (discount_ratio == 0) discount_ratio = 1;
 
-			// 2.03 Discount Method
-			// Charisma
-			// discount_ratio = (m_game->m_client_list[client_h]->m_charisma / 4) -1;
-			// if (discount_ratio == 0) discount_ratio = 1;
+		tmp1 = (double)(discount_ratio);
+		tmp2 = tmp1 / 100.0f;
+		tmp1 = (double)cost;
+		tmp3 = tmp1 * tmp2;
+		discount_cost = (int)tmp3;
 
-			tmp1 = (double)(discount_ratio);
-			tmp2 = tmp1 / 100.0f;
-			tmp1 = (double)cost;
-			tmp3 = tmp1 * tmp2;
-			discount_cost = (int)tmp3;
+		if (discount_cost >= (cost / 2)) discount_cost = (cost / 2) - 1;
+		if (discount_cost < 0) discount_cost = 0;
 
-			if (discount_cost >= (cost / 2)) discount_cost = (cost / 2) - 1;
-			if (discount_cost < 0) discount_cost = 0;
+		if (gold_count < static_cast<uint64_t>(cost - discount_cost)) {
+			delete item;
 
-			if (gold_count < static_cast<uint64_t>(cost - discount_cost)) {
-				delete item;
-
-				{
-					hb::net::PacketNotifyNotEnoughGold pkt{};
-					pkt.header.msg_id = MsgId::Notify;
-					pkt.header.msg_type = Notify::NotEnoughGold;
-					pkt.item_index = -1;
-					ret = m_game->m_client_list[client_h]->m_socket->send_msg(reinterpret_cast<char*>(&pkt), sizeof(pkt));
-				}
-				switch (ret) {
-				case sock::Event::QueueFull:
-				case sock::Event::SocketError:
-				case sock::Event::CriticalError:
-				case sock::Event::SocketClosed:
-					m_game->delete_client(client_h, true, true);
-					return;
-				}
-				return;
-			}
-
-			if (add_client_item_list(client_h, item, &erase_req)) {
-				if (m_game->m_client_list[client_h]->m_cur_weight_load < 0) m_game->m_client_list[client_h]->m_cur_weight_load = 0;
-
-				temp_price = (cost - discount_cost);
-				ret = send_item_notify_msg(client_h, Notify::ItemPurchased, item, temp_price);
-				if (erase_req == 1) delete item;
-
-				// Gold  .      .
-				gold_weight = set_item_count_by_id(client_h, hb::shared::item::ItemId::Gold, gold_count - temp_price);
-				m_game->calc_total_weight(client_h);
-
-				m_game->m_city_status[m_game->m_client_list[client_h]->m_side].funds += temp_price;
-
-				switch (ret) {
-				case sock::Event::QueueFull:
-				case sock::Event::SocketError:
-				case sock::Event::CriticalError:
-				case sock::Event::SocketClosed:
-					m_game->delete_client(client_h, true, true);
-					return;
-				}
-			}
-			else
 			{
-				delete item;
+				hb::net::PacketNotifyNotEnoughGold pkt{};
+				pkt.header.msg_id = MsgId::Notify;
+				pkt.header.msg_type = Notify::NotEnoughGold;
+				pkt.item_index = -1;
+				ret = m_game->m_client_list[client_h]->m_socket->send_msg(reinterpret_cast<char*>(&pkt), sizeof(pkt));
+			}
+			switch (ret) {
+			case sock::Event::QueueFull:
+			case sock::Event::SocketError:
+			case sock::Event::CriticalError:
+			case sock::Event::SocketClosed:
+				m_game->delete_client(client_h, true, true);
+				return;
+			}
+			return;
+		}
 
-				m_game->calc_total_weight(client_h);
+		if (add_client_item_list(client_h, item, &erase_req)) {
+			if (m_game->m_client_list[client_h]->m_cur_weight_load < 0) m_game->m_client_list[client_h]->m_cur_weight_load = 0;
 
-				ret = send_item_notify_msg(client_h, Notify::CannotCarryMoreItem, 0, 0);
+			temp_price = (cost - discount_cost);
+			ret = send_item_notify_msg(client_h, Notify::ItemPurchased, item, temp_price);
+			if (erase_req == 1) delete item;
 
-				switch (ret) {
-				case sock::Event::QueueFull:
-				case sock::Event::SocketError:
-				case sock::Event::CriticalError:
-				case sock::Event::SocketClosed:
-					m_game->delete_client(client_h, true, true);
-					return;
-				}
+			// Gold  .      .
+			gold_weight = set_item_count_by_id(client_h, hb::shared::item::ItemId::Gold, gold_count - temp_price);
+			m_game->calc_total_weight(client_h);
+
+			m_game->m_city_status[m_game->m_client_list[client_h]->m_side].funds += temp_price;
+
+			switch (ret) {
+			case sock::Event::QueueFull:
+			case sock::Event::SocketError:
+			case sock::Event::CriticalError:
+			case sock::Event::SocketClosed:
+				m_game->delete_client(client_h, true, true);
+				return;
+			}
+		}
+		else
+		{
+			delete item;
+
+			m_game->calc_total_weight(client_h);
+
+			ret = send_item_notify_msg(client_h, Notify::CannotCarryMoreItem, 0, 0);
+
+			switch (ret) {
+			case sock::Event::QueueFull:
+			case sock::Event::SocketError:
+			case sock::Event::CriticalError:
+			case sock::Event::SocketClosed:
+				m_game->delete_client(client_h, true, true);
+				return;
 			}
 		}
 	}
@@ -1142,14 +1260,11 @@ void ItemManager::give_item_handler(int client_h, short item_index, int amount, 
 	if ((m_game->m_client_list[client_h]->m_item_list[item_index]->is_stackable()) &&
 		(m_game->m_client_list[client_h]->m_item_list[item_index]->m_instance.count > static_cast<uint64_t>(amount))) {
 
-		item = new CItem;
-		if (init_item_attr(item, m_game->m_client_list[client_h]->m_item_list[item_index]->m_name) == false) {
-			delete item;
-			return;
-		}
-		else {
-			item->m_instance.count = amount;
-		}
+		// Split stack piece, as in drop_item_handler: Counted, so no identity
+		// is created or divided here.
+		item = create_item(m_game->m_client_list[client_h]->m_item_list[item_index]->m_name, item_origin::none);
+		if (item == nullptr) return;
+		item->m_instance.count = amount;
 
 		m_game->m_client_list[client_h]->m_item_list[item_index]->m_instance.count -= amount;
 
@@ -2619,9 +2734,10 @@ int ItemManager::calculate_use_skill_item_effect(int owner_h, char owner_type, c
 				m_game->m_client_list[owner_h]->m_exp_stock += m_game->dice(1, 2);
 			}
 
-			item = new CItem;
-			if (item == 0) return 0;
-			if (init_item_attr(item, item_name)) {
+			// Butchered meat, or a caught fish. The old form leaked the item when
+			// init_item_attr failed; the factory owns that failure now.
+			item = create_item(item_name, item_origin::harvest);
+			if (item != nullptr) {
 				m_game->m_map_list[map_index]->set_item(lX, lY, item);
 
 				m_game->send_ground_item_event(CommonType::ItemDrop, map_index, lX, lY, item);
@@ -2640,7 +2756,6 @@ void ItemManager::req_sell_item_handler(int client_h, char item_id, char sell_to
 	double d1, d2, d3;
 	bool   neutral;
 	uint32_t  swe_type, swe_value, add_price1, add_price2, mul1, mul2;
-	CItem* m_pGold;
 
 	if (m_game->m_client_list[client_h] == 0) return;
 	if (m_game->m_client_list[client_h]->m_is_init_complete == false) return;
@@ -2658,8 +2773,12 @@ void ItemManager::req_sell_item_handler(int client_h, char item_id, char sell_to
 
 	m_game->calc_total_weight(client_h);
 
-	m_pGold = new CItem;
-	init_item_attr(m_pGold, hb::shared::item::ItemId::Gold);
+	// Gold's per-unit weight comes straight off its config row. This used to
+	// allocate a throwaway CItem purely to measure it — harmless before, but
+	// under the ledger a created item is an event, and a measuring stick is not
+	// one. Nothing here enters the world, so nothing here should look like it.
+	CItem* gold_config = m_game->m_item_config_list[hb::shared::item::ItemId::Gold];
+	if (gold_config == nullptr) return;
 
 	// v1.42
 	neutral = false;
@@ -2782,7 +2901,7 @@ void ItemManager::req_sell_item_handler(int client_h, char item_id, char sell_to
 			if (price <= 0) price = 1;
 			if (price > 1000000) price = 1000000;
 
-			if (m_game->m_client_list[client_h]->m_cur_weight_load + get_item_weight(m_pGold, price) > m_game->calc_max_load(client_h)) {
+			if (m_game->m_client_list[client_h]->m_cur_weight_load + get_item_weight(gold_config, price) > m_game->calc_max_load(client_h)) {
 				m_game->send_notify_msg(0, client_h, Notify::CannotSellItem, item_id, 4, 0, m_game->m_client_list[client_h]->m_item_list[item_id]->m_name);
 			}
 			else m_game->send_notify_msg(0, client_h, Notify::SellItemPrice, item_id, remain_life, price, m_game->m_client_list[client_h]->m_item_list[item_id]->m_name, num);
@@ -2796,7 +2915,7 @@ void ItemManager::req_sell_item_handler(int client_h, char item_id, char sell_to
 			if (price <= 0) price = 1;
 			if (price > 1000000) price = 1000000;
 
-			if (m_game->m_client_list[client_h]->m_cur_weight_load + get_item_weight(m_pGold, price) > m_game->calc_max_load(client_h)) {
+			if (m_game->m_client_list[client_h]->m_cur_weight_load + get_item_weight(gold_config, price) > m_game->calc_max_load(client_h)) {
 				m_game->send_notify_msg(0, client_h, Notify::CannotSellItem, item_id, 4, 0, m_game->m_client_list[client_h]->m_item_list[item_id]->m_name);
 			}
 			else m_game->send_notify_msg(0, client_h, Notify::SellItemPrice, item_id, 0, price, m_game->m_client_list[client_h]->m_item_list[item_id]->m_name, num);
@@ -2806,7 +2925,6 @@ void ItemManager::req_sell_item_handler(int client_h, char item_id, char sell_to
 	default:
 		break;
 	}
-	if (m_pGold != 0) delete m_pGold;
 }
 
 void ItemManager::req_sell_item_confirm_handler(int client_h, char item_id, int num, const char* string)
@@ -2983,8 +3101,11 @@ void ItemManager::req_sell_item_confirm_handler(int client_h, char item_id, int 
 	// Gold .    0     .
 	if (price <= 0) return;
 
-	item_gold = new CItem;
-	init_item_attr(item_gold, hb::shared::item::ItemId::Gold);
+	// Sale proceeds. Gold is Counted: no Serial, and no origin either — an
+	// origin is an item_instances column, and Counted items get flow rows keyed
+	// by event instead of an instance row. The venue lives on the event.
+	item_gold = create_item(hb::shared::item::ItemId::Gold, item_origin::none);
+	if (item_gold == nullptr) return;
 	item_gold->m_instance.count = price;
 
 	if (add_client_item_list(client_h, item_gold, &erase_req)) {
@@ -4119,56 +4240,52 @@ void ItemManager::get_hero_mantle_handler(int client_h, int item_id, const char*
 	num = 1;
 	for(int i = 1; i <= num; i++)
 	{
-		item = new CItem;
-		if (init_item_attr(item, item_id) == false)
+		// Hero mantle / cape, earned with EK and contribution.
+		item = create_item(item_id, item_origin::hero_reward);
+		if (item == nullptr) continue;
+
+		if (add_client_item_list(client_h, item, &erase_req)) {
+			if (m_game->m_client_list[client_h]->m_cur_weight_load < 0) m_game->m_client_list[client_h]->m_cur_weight_load = 0;
+
+			hb::logger::log<log_channel::events>("get HeroItem : Char({}) Player-EK({}) Player-Contr({}) Hero Obtained({})", m_game->m_client_list[client_h]->m_char_name, m_game->m_client_list[client_h]->m_enemy_kill_count, m_game->m_client_list[client_h]->m_contribution, item->m_name);
+
+			item->set_touch_effect_type(TouchEffectType::UniqueOwner);
+			item->m_instance.touch_effect_value1 = m_game->m_client_list[client_h]->m_char_id_num1;
+			item->m_instance.touch_effect_value2 = m_game->m_client_list[client_h]->m_char_id_num2;
+			item->m_instance.touch_effect_value3 = m_game->m_client_list[client_h]->m_char_id_num3;
+
+			ret = send_item_notify_msg(client_h, Notify::ItemObtained, item, 0);
+
+			m_game->calc_total_weight(client_h);
+
+			switch (ret) {
+			case sock::Event::QueueFull:
+			case sock::Event::SocketError:
+			case sock::Event::CriticalError:
+			case sock::Event::SocketClosed:
+				m_game->delete_client(client_h, true, true);
+				return;
+			}
+
+			m_game->send_notify_msg(0, client_h, Notify::EnemyKills, m_game->m_client_list[client_h]->m_enemy_kill_count, 0, 0, 0);
+			m_game->send_notify_msg(0, client_h, Notify::Contribution, m_game->m_client_list[client_h]->m_contribution, 0, 0, 0);
+		}
+		else
 		{
 			delete item;
-		}
-		else {
 
-			if (add_client_item_list(client_h, item, &erase_req)) {
-				if (m_game->m_client_list[client_h]->m_cur_weight_load < 0) m_game->m_client_list[client_h]->m_cur_weight_load = 0;
+			m_game->calc_total_weight(client_h);
 
-				hb::logger::log<log_channel::events>("get HeroItem : Char({}) Player-EK({}) Player-Contr({}) Hero Obtained({})", m_game->m_client_list[client_h]->m_char_name, m_game->m_client_list[client_h]->m_enemy_kill_count, m_game->m_client_list[client_h]->m_contribution, item->m_name);
+			ret = send_item_notify_msg(client_h, Notify::CannotCarryMoreItem, 0, 0);
 
-				item->set_touch_effect_type(TouchEffectType::UniqueOwner);
-				item->m_instance.touch_effect_value1 = m_game->m_client_list[client_h]->m_char_id_num1;
-				item->m_instance.touch_effect_value2 = m_game->m_client_list[client_h]->m_char_id_num2;
-				item->m_instance.touch_effect_value3 = m_game->m_client_list[client_h]->m_char_id_num3;
+			switch (ret) {
+			case sock::Event::QueueFull:
+			case sock::Event::SocketError:
+			case sock::Event::CriticalError:
+			case sock::Event::SocketClosed:
 
-				ret = send_item_notify_msg(client_h, Notify::ItemObtained, item, 0);
-
-				m_game->calc_total_weight(client_h);
-
-				switch (ret) {
-				case sock::Event::QueueFull:
-				case sock::Event::SocketError:
-				case sock::Event::CriticalError:
-				case sock::Event::SocketClosed:
-					m_game->delete_client(client_h, true, true);
-					return;
-				}
-
-				m_game->send_notify_msg(0, client_h, Notify::EnemyKills, m_game->m_client_list[client_h]->m_enemy_kill_count, 0, 0, 0);
-				m_game->send_notify_msg(0, client_h, Notify::Contribution, m_game->m_client_list[client_h]->m_contribution, 0, 0, 0);
-			}
-			else
-			{
-				delete item;
-
-				m_game->calc_total_weight(client_h);
-
-				ret = send_item_notify_msg(client_h, Notify::CannotCarryMoreItem, 0, 0);
-
-				switch (ret) {
-				case sock::Event::QueueFull:
-				case sock::Event::SocketError:
-				case sock::Event::CriticalError:
-				case sock::Event::SocketClosed:
-
-					m_game->delete_client(client_h, true, true);
-					return;
-				}
+				m_game->delete_client(client_h, true, true);
+				return;
 			}
 		}
 	}
@@ -4216,12 +4333,8 @@ void ItemManager::get_dark_item_handler(int client_h, int item_id)
 	if (resolved_id == 0) return;
 	if (m_game->m_item_config_list[resolved_id] == 0) return;
 
-	item = new CItem;
-	if (init_item_attr(item, resolved_id) == false)
-	{
-		delete item;
-		return;
-	}
+	item = create_item(resolved_id, item_origin::dark_claim);
+	if (item == nullptr) return;
 
 	if (add_client_item_list(client_h, item, &erase_req))
 	{
@@ -4259,20 +4372,23 @@ void ItemManager::get_dark_item_handler(int client_h, int item_id)
 // sets the instance color (9 drives the client's Templar glare).
 bool ItemManager::transform_majestic_item(int client_h, int item_index, int new_item_id, int new_value, int glow_color)
 {
+	CItem* old_item = m_game->m_client_list[client_h]->m_item_list[item_index];
+	if (old_item == nullptr) return false;
+
+	// Built before the original is destroyed. The old order deleted first and
+	// left a blank CItem in the slot when the next stage had no config row —
+	// an item vanishing with nothing to explain it, which is precisely what the
+	// ledger exists to make impossible.
+	CItem* item = transform_item(new_item_id, *old_item);
+	if (item == nullptr) return false;
+
 	int item_x = m_game->m_client_list[client_h]->m_item_pos_list[item_index].x;
 	int item_y = m_game->m_client_list[client_h]->m_item_pos_list[item_index].y;
 
-	delete m_game->m_client_list[client_h]->m_item_list[item_index];
-	m_game->m_client_list[client_h]->m_item_list[item_index] = new CItem;
+	delete old_item;
+	m_game->m_client_list[client_h]->m_item_list[item_index] = item;
 	m_game->m_client_list[client_h]->m_item_pos_list[item_index].x = item_x;
 	m_game->m_client_list[client_h]->m_item_pos_list[item_index].y = item_y;
-
-	CItem* item = m_game->m_client_list[client_h]->m_item_list[item_index];
-	if (init_item_attr(item, new_item_id) == false)
-	{
-		m_game->send_item_attribute_change(client_h, item_index, item);
-		return false;
-	}
 
 	item->set_touch_effect_type(TouchEffectType::UniqueOwner);
 	item->m_instance.touch_effect_value1 = m_game->m_client_list[client_h]->m_char_id_num1;
@@ -4537,23 +4653,25 @@ void ItemManager::confirm_exchange_item(int client_h)
 								clear_exchange_status(ex_h);
 								return;
 							}
-							item_a[i] = new CItem;
-							init_item_attr(item_a[i], m_game->m_client_list[client_h]->m_item_list[m_game->m_client_list[client_h]->m_exchange_item_index[i]]->m_name);
+							// Only the traded portion moves; the stack it came from stays
+							// put. Counted, so there is no identity to divide.
+							item_a[i] = create_item(m_game->m_client_list[client_h]->m_item_list[m_game->m_client_list[client_h]->m_exchange_item_index[i]]->m_name, item_origin::none);
+							if (item_a[i] == nullptr) {
+								clear_exchange_status(client_h);
+								clear_exchange_status(ex_h);
+								return;
+							}
 							item_a[i]->m_instance.count = m_game->m_client_list[client_h]->m_exchange_item_amount[i];
 
-							item_acopy[i] = new CItem;
-							init_item_attr(item_acopy[i], m_game->m_client_list[client_h]->m_item_list[m_game->m_client_list[client_h]->m_exchange_item_index[i]]->m_name);
-							copy_item_contents(item_acopy[i], item_a[i]);
-							item_acopy[i]->m_instance.count = m_game->m_client_list[client_h]->m_exchange_item_amount[i];
+							item_acopy[i] = create_snapshot(item_a[i]);
 						}
 						else {
-							item_a[i] = (CItem*)m_game->m_client_list[client_h]->m_item_list[m_game->m_client_list[client_h]->m_exchange_item_index[i]];
+							// The item object itself changes hands, Serial and all: the
+							// giver's slot is nulled below rather than deleted.
+							item_a[i] = m_game->m_client_list[client_h]->m_item_list[m_game->m_client_list[client_h]->m_exchange_item_index[i]];
 							item_a[i]->m_instance.count = m_game->m_client_list[client_h]->m_exchange_item_amount[i];
 
-							item_acopy[i] = new CItem;
-							init_item_attr(item_acopy[i], m_game->m_client_list[client_h]->m_item_list[m_game->m_client_list[client_h]->m_exchange_item_index[i]]->m_name);
-							copy_item_contents(item_acopy[i], item_a[i]);
-							item_acopy[i]->m_instance.count = m_game->m_client_list[client_h]->m_exchange_item_amount[i];
+							item_acopy[i] = create_snapshot(item_a[i]);
 						}
 					}
 
@@ -4566,23 +4684,22 @@ void ItemManager::confirm_exchange_item(int client_h)
 								clear_exchange_status(ex_h);
 								return;
 							}
-							item_b[i] = new CItem;
-							init_item_attr(item_b[i], m_game->m_client_list[ex_h]->m_item_list[m_game->m_client_list[ex_h]->m_exchange_item_index[i]]->m_name);
+							// Mirror of the client_h side above.
+							item_b[i] = create_item(m_game->m_client_list[ex_h]->m_item_list[m_game->m_client_list[ex_h]->m_exchange_item_index[i]]->m_name, item_origin::none);
+							if (item_b[i] == nullptr) {
+								clear_exchange_status(client_h);
+								clear_exchange_status(ex_h);
+								return;
+							}
 							item_b[i]->m_instance.count = m_game->m_client_list[ex_h]->m_exchange_item_amount[i];
 
-							item_bcopy[i] = new CItem;
-							init_item_attr(item_bcopy[i], m_game->m_client_list[ex_h]->m_item_list[m_game->m_client_list[ex_h]->m_exchange_item_index[i]]->m_name);
-							copy_item_contents(item_bcopy[i], item_b[i]);
-							item_bcopy[i]->m_instance.count = m_game->m_client_list[ex_h]->m_exchange_item_amount[i];
+							item_bcopy[i] = create_snapshot(item_b[i]);
 						}
 						else {
-							item_b[i] = (CItem*)m_game->m_client_list[ex_h]->m_item_list[m_game->m_client_list[ex_h]->m_exchange_item_index[i]];
+							item_b[i] = m_game->m_client_list[ex_h]->m_item_list[m_game->m_client_list[ex_h]->m_exchange_item_index[i]];
 							item_b[i]->m_instance.count = m_game->m_client_list[ex_h]->m_exchange_item_amount[i];
 
-							item_bcopy[i] = new CItem;
-							init_item_attr(item_bcopy[i], m_game->m_client_list[ex_h]->m_item_list[m_game->m_client_list[ex_h]->m_exchange_item_index[i]]->m_name);
-							copy_item_contents(item_bcopy[i], item_b[i]);
-							item_bcopy[i]->m_instance.count = m_game->m_client_list[ex_h]->m_exchange_item_amount[i];
+							item_bcopy[i] = create_snapshot(item_b[i]);
 						}
 					}
 
@@ -4892,11 +5009,8 @@ void ItemManager::build_item_handler(int client_h, char* data)
 
 				total_value = (int)v1;
 
-				item = new CItem;
-				if (init_item_attr(item, m_game->m_build_item_list[i]->m_name) == false) {
-					delete item;
-					return;
-				}
+				item = create_item(m_game->m_build_item_list[i]->m_name, item_origin::craft);
+				if (item == nullptr) return;
 
 				// Custom-Made
 				item->set_custom_made(true);
@@ -5065,6 +5179,12 @@ bool ItemManager::copy_item_contents(CItem* copy, CItem* original)
 {
 	if (original == 0) return false;
 	if (copy == 0) return false;
+
+	// Provenance travels with the contents. The only caller is create_snapshot,
+	// whose copy describes the original rather than duplicating it — see the
+	// note there for why sharing a Serial is safe in that one case.
+	copy->m_serial = original->m_serial;
+	copy->m_origin = original->m_origin;
 
 	copy->m_id_num = original->m_id_num;
 	copy->m_item_type = original->m_item_type;
@@ -5475,8 +5595,6 @@ void ItemManager::req_create_slate_handler(int client_h, char* data)
 		}
 	}
 
-	item = new CItem;
-
 	int i = m_game->dice(1, 1000);
 
 	if (i < 50) { // Hp slate
@@ -5504,45 +5622,43 @@ void ItemManager::req_create_slate_handler(int client_h, char* data)
 	m_game->send_notify_msg(0, client_h, Notify::SlateCreateSuccess, slate_type, 0, 0, 0);
 
 	// Create slates
-	if (init_item_attr(item, 867) == false) {
-		delete item;
-		return;
+	// 867 is the slate item; the roll above only chose which flavour it reads as.
+	item = create_item(867, item_origin::craft);
+	if (item == nullptr) return;
+
+	item->set_touch_effect_type(TouchEffectType::ID);
+	item->m_instance.touch_effect_value1 = static_cast<short>(m_game->dice(1, 100000));
+	item->m_instance.touch_effect_value2 = static_cast<short>(m_game->dice(1, 100000));
+	item->m_instance.touch_effect_value3 = (short)GameClock::GetTimeMS();
+
+	item_log(ItemLogAction::get, client_h, -1, item);
+
+	item->m_instance.special_effect_value2 = slate_type;
+	item->m_instance.item_color = slate_colour;
+	if (add_client_item_list(client_h, item, &erase_req)) {
+		ret = send_item_notify_msg(client_h, Notify::ItemObtained, item, 0);
+		switch (ret) {
+		case sock::Event::QueueFull:
+		case sock::Event::SocketError:
+		case sock::Event::CriticalError:
+		case sock::Event::SocketClosed:
+			m_game->delete_client(client_h, true, true);
+			return;
+		}
 	}
 	else {
-		item->set_touch_effect_type(TouchEffectType::ID);
-		item->m_instance.touch_effect_value1 = static_cast<short>(m_game->dice(1, 100000));
-		item->m_instance.touch_effect_value2 = static_cast<short>(m_game->dice(1, 100000));
-		item->m_instance.touch_effect_value3 = (short)GameClock::GetTimeMS();
+		m_game->m_map_list[m_game->m_client_list[client_h]->m_map_index]->set_item(m_game->m_client_list[client_h]->m_x, m_game->m_client_list[client_h]->m_y, item);
+		m_game->send_ground_item_event(CommonType::ItemDrop, m_game->m_client_list[client_h]->m_map_index,
+			m_game->m_client_list[client_h]->m_x, m_game->m_client_list[client_h]->m_y, item);
+		ret = send_item_notify_msg(client_h, Notify::CannotCarryMoreItem, 0, 0);
 
-		item_log(ItemLogAction::get, client_h, -1, item);
-
-		item->m_instance.special_effect_value2 = slate_type;
-		item->m_instance.item_color = slate_colour;
-		if (add_client_item_list(client_h, item, &erase_req)) {
-			ret = send_item_notify_msg(client_h, Notify::ItemObtained, item, 0);
-			switch (ret) {
-			case sock::Event::QueueFull:
-			case sock::Event::SocketError:
-			case sock::Event::CriticalError:
-			case sock::Event::SocketClosed:
-				m_game->delete_client(client_h, true, true);
-				return;
-			}
-		}
-		else {
-			m_game->m_map_list[m_game->m_client_list[client_h]->m_map_index]->set_item(m_game->m_client_list[client_h]->m_x, m_game->m_client_list[client_h]->m_y, item);
-			m_game->send_ground_item_event(CommonType::ItemDrop, m_game->m_client_list[client_h]->m_map_index,
-				m_game->m_client_list[client_h]->m_x, m_game->m_client_list[client_h]->m_y, item);
-			ret = send_item_notify_msg(client_h, Notify::CannotCarryMoreItem, 0, 0);
-
-			switch (ret) {
-			case sock::Event::QueueFull:
-			case sock::Event::SocketError:
-			case sock::Event::CriticalError:
-			case sock::Event::SocketClosed:
-				m_game->delete_client(client_h, true, true);
-				break;
-			}
+		switch (ret) {
+		case sock::Event::QueueFull:
+		case sock::Event::SocketError:
+		case sock::Event::CriticalError:
+		case sock::Event::SocketClosed:
+			m_game->delete_client(client_h, true, true);
+			break;
 		}
 	}
 	return;
@@ -6045,6 +6161,19 @@ void ItemManager::upgrade_hero_cape(int client_h, int item_index)
 		return;
 	}
 
+	CItem* old_cape = client->m_item_list[item_index];
+	if (old_cape == nullptr) return;
+
+	const short upgraded_id = (cape_id == ItemId::AresdenHeroCape)
+		? ItemId::AresdenHeroCapePlus1 : ItemId::ElvineHeroCapePlus1;
+
+	// Built before anything is spent or destroyed. The old order deducted the
+	// contribution, deleted the cape, and only then discovered the upgraded id
+	// had no config row — leaving the player short 50 EK and holding a blank
+	// item. Nothing is committed until the replacement exists.
+	CItem* upgraded = transform_item(upgraded_id, *old_cape);
+	if (upgraded == nullptr) return;
+
 	client->m_contribution -= 50;
 	client->m_enemy_kill_count -= 50;
 	m_game->send_notify_msg(0, client_h, Notify::EnemyKills, client->m_enemy_kill_count, 0, 0, 0);
@@ -6052,29 +6181,21 @@ void ItemManager::upgrade_hero_cape(int client_h, int item_index)
 	const int item_x = client->m_item_pos_list[item_index].x;
 	const int item_y = client->m_item_pos_list[item_index].y;
 
-	delete client->m_item_list[item_index];
-	client->m_item_list[item_index] = new CItem;
+	delete old_cape;
+	client->m_item_list[item_index] = upgraded;
 
 	client->m_item_pos_list[item_index].x = item_x;
 	client->m_item_pos_list[item_index].y = item_y;
 
-	const short upgraded_id = (cape_id == ItemId::AresdenHeroCape)
-		? ItemId::AresdenHeroCapePlus1 : ItemId::ElvineHeroCapePlus1;
-	if (init_item_attr(client->m_item_list[item_index], upgraded_id) == false)
-	{
-		m_game->send_item_attribute_change(client_h, item_index, client->m_item_list[item_index]);
-		return;
-	}
-
-	client->m_item_list[item_index]->set_touch_effect_type(TouchEffectType::UniqueOwner);
-	client->m_item_list[item_index]->m_instance.touch_effect_value1 = client->m_char_id_num1;
-	client->m_item_list[item_index]->m_instance.touch_effect_value2 = client->m_char_id_num2;
-	client->m_item_list[item_index]->m_instance.touch_effect_value3 = client->m_char_id_num3;
+	upgraded->set_touch_effect_type(TouchEffectType::UniqueOwner);
+	upgraded->m_instance.touch_effect_value1 = client->m_char_id_num1;
+	upgraded->m_instance.touch_effect_value2 = client->m_char_id_num2;
+	upgraded->m_instance.touch_effect_value3 = client->m_char_id_num3;
 
 	item_deplete_handler(client_h, stone_h, false);
 
-	m_game->send_gizon_item_change(client_h, item_index, client->m_item_list[item_index]);
-	item_log(ItemLogAction::UpgradeSuccess, client_h, (int)-1, client->m_item_list[item_index]);
+	m_game->send_gizon_item_change(client_h, item_index, upgraded);
+	item_log(ItemLogAction::UpgradeSuccess, client_h, (int)-1, upgraded);
 }
 
 void ItemManager::request_item_upgrade_handler(int client_h, int item_index)

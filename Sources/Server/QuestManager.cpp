@@ -103,8 +103,11 @@ int QuestManager::talk_to_npc_result_cityhall(int client_h, int* quest_type, int
 			if (m_game->m_client_list[client_h]->m_is_quest_completed) {
 				if ((m_game->m_client_list[client_h]->m_quest_reward_type > 0) &&
 					(m_game->m_item_config_list[m_game->m_client_list[client_h]->m_quest_reward_type] != 0)) {
-					item = new CItem;
-					m_game->m_item_manager->init_item_attr(item, m_game->m_item_config_list[m_game->m_client_list[client_h]->m_quest_reward_type]->m_name);
+					item = m_game->m_item_manager->create_item(m_game->m_item_config_list[m_game->m_client_list[client_h]->m_quest_reward_type]->m_name, hb::server::item_origin::quest);
+					// Unreachable in practice — the config row was just checked
+					// above. -5 is this function's "quest resolved" code, matching
+					// the can't-carry branch below rather than inventing one.
+					if (item == nullptr) return -5;
 					item->m_instance.count = m_game->m_client_list[client_h]->m_quest_reward_amount;
 					if (m_game->m_item_manager->check_item_receive_condition(client_h, item)) {
 						m_game->m_item_manager->add_client_item_list(client_h, item, &erase_req);

@@ -202,11 +202,11 @@ namespace hb::server
 		// Mirror the bank-row -> CItem deserialization in CGame's character
 		// load: config template via init_item_attr, then overlay the stored
 		// instance columns.
-		CItem* item = new CItem();
-		if (!m_game->m_item_manager->init_item_attr(item, static_cast<int>(e.item_id))) {
-			delete item;
-			return nullptr;
-		}
+		// A listing in escrow is an item that already exists, so this restores
+		// its identity rather than minting a new one. #77 will carry the stored
+		// Serial through the listing row into this call.
+		CItem* item = m_game->m_item_manager->restore_item(static_cast<int>(e.item_id));
+		if (item == nullptr) return nullptr;
 		item->m_instance.count = e.count;
 		item->m_instance.touch_effect_type = e.touch_effect_type;
 		item->m_instance.touch_effect_value1 = e.touch_effect_value1;

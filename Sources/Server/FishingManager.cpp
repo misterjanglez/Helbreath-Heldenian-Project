@@ -260,9 +260,6 @@ void FishingManager::fish_generator()
 			tX = m_game->m_map_list[i]->m_fish_point_list[iP].x + (m_game->dice(1, 3) - 2);
 			tY = m_game->m_map_list[i]->m_fish_point_list[iP].y + (m_game->dice(1, 3) - 2);
 
-			item = new CItem;
-			if (item == 0) break;
-
 			std::memset(item_name, 0, sizeof(item_name));
 			switch (m_game->dice(1, 9)) {
 			case 1:   strcpy(item_name, "RedCarp"); difficulty = m_game->dice(1, 10) + 20; break;
@@ -332,12 +329,11 @@ void FishingManager::fish_generator()
 			}
 			last_time = (60000 * 10) + (m_game->dice(1, 3) - 1) * (60000 * 10);
 
-			if (m_game->m_item_manager->init_item_attr(item, item_name)) {
+			// The fish waits on the hook as a real item, so it is minted here
+			// rather than when the player reels it in.
+			item = m_game->m_item_manager->create_item(item_name, hb::server::item_origin::fishing);
+			if (item != nullptr) {
 				ret = create_fish(i, tX, tY, 1, item, difficulty, last_time);
-			}
-			else {
-				delete item;
-				item = 0;
 			}
 		}
 	}

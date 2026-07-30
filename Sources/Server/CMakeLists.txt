@@ -26,6 +26,7 @@ set(SERVER_SOURCES
     CmdGiveItem.cpp
     CmdHelp.cpp
     CmdMintCheck.cpp
+    CmdSerialCheck.cpp
     CmdReload.cpp
     CmdRollSmoke.cpp
     CmdScatterSmoke.cpp

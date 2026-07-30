@@ -173,10 +173,6 @@ void CraftingManager::req_create_portion_handler(int client_h, char* data)
 	m_game->m_skill_manager->calculate_ssn_skill_index(client_h, 12, 1);
 
 	if (strlen(portion_name) != 0) {
-		item = 0;
-		item = new CItem;
-		if (item == 0) return;
-
 		for(int i = 0; i < 6; i++)
 			if (item_index[i] != -1) {
 				if (m_game->m_client_list[client_h]->m_item_list[item_index[i]]->is_stackable())
@@ -188,7 +184,8 @@ void CraftingManager::req_create_portion_handler(int client_h, char* data)
 		m_game->send_notify_msg(0, client_h, Notify::PortionSuccess, 0, 0, 0, portion_name);
 		m_game->m_client_list[client_h]->m_exp_stock += m_game->dice(1, (difficulty / 3));
 
-		if ((m_game->m_item_manager->init_item_attr(item, portion_name))) {
+		item = m_game->m_item_manager->create_item(portion_name, hb::server::item_origin::craft);
+		if (item != nullptr) {
 			if (m_game->m_item_manager->add_client_item_list(client_h, item, &erase_req)) {
 				ret = m_game->m_item_manager->send_item_notify_msg(client_h, Notify::ItemObtained, item, 0);
 				switch (ret) {
@@ -222,10 +219,8 @@ void CraftingManager::req_create_portion_handler(int client_h, char* data)
 				}
 			}
 		}
-		else {
-			delete item;
-			item = 0;
-		}
+		// No else: when the config lookup fails the factory has already
+		// released the item and there is nothing left to hand out.
 	}
 }
 
@@ -385,10 +380,8 @@ void CraftingManager::req_create_crafting_handler(int client_h, char* data)
 	if (m_game->dice(1, 100) > static_cast<uint32_t>(difficulty))
 	{
 		m_game->send_notify_msg(0, client_h, Notify::CraftingFail, 3, 0, 0, 0); // "Crafting failed"
-		// Remove parts...
-		item = 0;
-		item = new CItem;
-		if (item == 0) return;
+		// Remove parts... (this path produces no item; it used to allocate one
+		// anyway and never free or use it, leaking on every failed craft)
 		for(int i = 0; i < 6; i++)
 			if (item_index[i] != -1)
 			{	// Deplete any Merien Stone
@@ -445,9 +438,6 @@ void CraftingManager::req_create_crafting_handler(int client_h, char* data)
 
 	if (strlen(crafting_name) != 0)
 	{
-		item = 0;
-		item = new CItem;
-		if (item == 0) return;
 		for(int i = 0; i < 6; i++)
 		{
 			if (item_index[i] != -1)
@@ -473,7 +463,8 @@ void CraftingManager::req_create_crafting_handler(int client_h, char* data)
 
 		m_game->m_client_list[client_h]->m_exp_stock += m_game->dice(2, 100);
 
-		if ((m_game->m_item_manager->init_item_attr(item, crafting_name)))
+		item = m_game->m_item_manager->create_item(crafting_name, hb::server::item_origin::craft);
+		if (item != nullptr)
 		{	// // Snoopy: Added Purity to Oils/Elixirs
 			if (purity != 0)
 			{
@@ -529,10 +520,7 @@ void CraftingManager::req_create_crafting_handler(int client_h, char* data)
 				}
 			}
 		}
-		else
-		{
-			delete item;
-			item = 0;
-		}
+		// No else: when the config lookup fails the factory has already
+		// released the item and there is nothing left to hand out.
 	}
 }

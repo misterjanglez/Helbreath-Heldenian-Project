@@ -4617,12 +4617,12 @@ bool CGame::load_player_data_from_db(int client_h)
 		if (m_client_list[client_h]->m_item_list[item.slot] != 0) {
 			delete m_client_list[client_h]->m_item_list[item.slot];
 		}
-		m_client_list[client_h]->m_item_list[item.slot] = new CItem;
-		if (m_item_manager->init_item_attr(m_client_list[client_h]->m_item_list[item.slot], item.item_id) == false) {
-			delete m_client_list[client_h]->m_item_list[item.slot];
-			m_client_list[client_h]->m_item_list[item.slot] = 0;
-			continue;
-		}
+		// Loading a character's inventory is not item creation: restore_item
+		// carries the saved Serial rather than minting a new one, so a save/load
+		// round trip does not read as the item being born again. #77 will pass
+		// the persisted serial column here.
+		m_client_list[client_h]->m_item_list[item.slot] = m_item_manager->restore_item(item.item_id);
+		if (m_client_list[client_h]->m_item_list[item.slot] == nullptr) continue;
 		m_client_list[client_h]->m_item_list[item.slot]->m_instance.count = item.count;
 		m_client_list[client_h]->m_item_list[item.slot]->m_instance.touch_effect_type = item.touch_effect_type;
 		m_client_list[client_h]->m_item_list[item.slot]->m_instance.touch_effect_value1 = item.touch_effect_value1;
@@ -4658,12 +4658,10 @@ bool CGame::load_player_data_from_db(int client_h)
 		if (m_client_list[client_h]->m_item_in_bank_list[item.slot] != 0) {
 			delete m_client_list[client_h]->m_item_in_bank_list[item.slot];
 		}
-		m_client_list[client_h]->m_item_in_bank_list[item.slot] = new CItem;
-		if (m_item_manager->init_item_attr(m_client_list[client_h]->m_item_in_bank_list[item.slot], item.item_id) == false) {
-			delete m_client_list[client_h]->m_item_in_bank_list[item.slot];
-			m_client_list[client_h]->m_item_in_bank_list[item.slot] = 0;
-			continue;
-		}
+		// Warehouse contents are restored, not created — same reasoning as the
+		// inventory load above.
+		m_client_list[client_h]->m_item_in_bank_list[item.slot] = m_item_manager->restore_item(item.item_id);
+		if (m_client_list[client_h]->m_item_in_bank_list[item.slot] == nullptr) continue;
 		m_client_list[client_h]->m_item_in_bank_list[item.slot]->m_instance.count = item.count;
 		m_client_list[client_h]->m_item_in_bank_list[item.slot]->m_instance.touch_effect_type = item.touch_effect_type;
 		m_client_list[client_h]->m_item_in_bank_list[item.slot]->m_instance.touch_effect_value1 = item.touch_effect_value1;
@@ -6431,8 +6429,10 @@ void CGame::client_common_handler(int client_h, char* data)
 		}
 		case 4: // Add 1m gold
 		{
-			CItem* gold_item = new CItem();
-			if (m_item_manager->init_item_attr(gold_item, hb::shared::item::ItemId::Gold))
+			// Gold is Counted, so no Serial and no origin — the venue belongs on
+			// the flow event, not on an instance row.
+			CItem* gold_item = m_item_manager->create_item(hb::shared::item::ItemId::Gold, hb::server::item_origin::none);
+			if (gold_item != nullptr)
 			{
 				gold_item->m_instance.count = 1000000;
 				int erase_req = 0;
@@ -10637,23 +10637,19 @@ void CGame::calc_exp_stock(int client_h)
 
 	if ((is_level_up) && (m_client_list[client_h]->m_level <= 5)) {
 		// Gold .  1~5 100 Gold .
-		item = new CItem;
-		if (m_item_manager->init_item_attr(item, hb::shared::item::ItemId::Gold) == false) {
-			delete item;
-			return;
-		}
-		else item->m_instance.count = (uint32_t)100000;
+		// Counted: gold carries no Serial and no origin.
+		item = m_item_manager->create_item(hb::shared::item::ItemId::Gold, hb::server::item_origin::none);
+		if (item == nullptr) return;
+		item->m_instance.count = (uint32_t)100000;
 		m_item_manager->add_item(client_h, item, 0);
 	}
 
 	if ((is_level_up) && (m_client_list[client_h]->m_level > 5) && (m_client_list[client_h]->m_level <= 20)) {
 		// Gold .  5~20 300 Gold .
-		item = new CItem;
-		if (m_item_manager->init_item_attr(item, hb::shared::item::ItemId::Gold) == false) {
-			delete item;
-			return;
-		}
-		else item->m_instance.count = (uint32_t)100000;
+		// Counted: gold carries no Serial and no origin.
+		item = m_item_manager->create_item(hb::shared::item::ItemId::Gold, hb::server::item_origin::none);
+		if (item == nullptr) return;
+		item->m_instance.count = (uint32_t)100000;
 		m_item_manager->add_item(client_h, item, 0);
 	}
 }
@@ -11105,11 +11101,8 @@ void CGame::check_special_event(int client_h)
 		std::memset(item_name, 0, sizeof(item_name));
 		strcpy(item_name, "MemorialRing");
 
-		item = new CItem;
-		if (m_item_manager->init_item_attr(item, item_name) == false) {
-			delete item;
-		}
-		else {
+		item = m_item_manager->create_item(item_name, hb::server::item_origin::event_reward);
+		if (item != nullptr) {
 			if (m_item_manager->add_client_item_list(client_h, item, &erase_req)) {
 				if (m_client_list[client_h]->m_cur_weight_load < 0) m_client_list[client_h]->m_cur_weight_load = 0;
 
@@ -14022,11 +14015,8 @@ void CGame::lotery_handler(int client_h)
 	if (dice(1, 120) <= 3) item_id = 650;//ZemstoneOfSacrifice
 	//chance
 
-	item = new CItem;
-	if (m_item_manager->init_item_attr(item, item_id) == false) {
-		delete item;
-	}
-	else {
+	item = m_item_manager->create_item(item_id, hb::server::item_origin::lottery);
+	if (item != nullptr) {
 		m_map_list[m_client_list[client_h]->m_map_index]->set_item(m_client_list[client_h]->m_x,
 			m_client_list[client_h]->m_y, item);
 		send_ground_item_event(CommonType::ItemDrop, m_client_list[client_h]->m_map_index,
@@ -14077,12 +14067,8 @@ void CGame::lotery_handler(int client_h)
   num = 1;
   for(int i = 1; i <= num; i++)
   {
-	 item = new CItem;
-	 if (m_item_manager->init_item_attr(item, item_name) == false)
-	 {
-		delete item;
-	 }
-	 else {
+	 item = m_item_manager->create_item(item_name, hb::server::item_origin::angel_claim);
+	 if (item != nullptr) {
 
 		if (m_item_manager->add_client_item_list(client_h, item, &erase_req) ) {
 		   if (m_client_list[client_h]->m_cur_weight_load < 0) m_client_list[client_h]->m_cur_weight_load = 0;
@@ -14208,8 +14194,8 @@ void CGame::get_angel_handler(int client_h, char* data, size_t msg_size)
 
 	hb::logger::log("PC({}) requesting Angel ({}, ItemID:{}). {}({} {})", m_client_list[client_h]->m_char_name, angel, item_id, m_client_list[client_h]->m_map_name, m_client_list[client_h]->m_x, m_client_list[client_h]->m_y);
 
-	item = new CItem;
-	if ((m_item_manager->init_item_attr(item, item_id)))
+	item = m_item_manager->create_item(item_id, hb::server::item_origin::angel_claim);
+	if (item != nullptr)
 	{
 		m_client_list[client_h]->m_gizon_item_upgrade_left -= 5;
 

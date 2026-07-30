@@ -1859,8 +1859,6 @@ void MagicManager::player_magic_handler(int client_h, int dX, int dY, short type
 			if (m_game->m_map_list[m_game->m_client_list[client_h]->m_map_index]->get_is_move_allowed_tile(dX, dY) == false)
 				{ magic_noeffect(); return; }
 
-			item = new CItem;
-
 			switch (m_game->m_magic_config_list[type]->m_value_4) {
 			case 1:
 				// Food
@@ -1870,7 +1868,10 @@ void MagicManager::player_magic_handler(int client_h, int dX, int dY, short type
 				break;
 			}
 
-			m_game->m_item_manager->init_item_attr(item, item_name);
+			// Conjured out of nothing, so the ledger wants it: the old code
+			// ignored the init result and would have used a blank item.
+			item = m_game->m_item_manager->create_item(item_name, hb::server::item_origin::magic);
+			if (item == nullptr) { magic_noeffect(); return; }
 
 			item->set_touch_effect_type(TouchEffectType::ID);
 			item->m_instance.touch_effect_value1 = static_cast<short>(m_game->dice(1, 100000));

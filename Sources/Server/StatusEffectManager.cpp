@@ -321,10 +321,12 @@ void StatusEffectManager::check_farming_action(short attacker_h, short target_h,
 
 	}
 
-	item = new CItem;
-	if (m_game->m_item_manager->init_item_attr(item, item_id) == false) {
-		delete item;
-	}
+	// Harvested crop. The old form deleted the item when init_item_attr failed
+	// and then went on to use it in both branches below — a use-after-free that
+	// the factory's nullptr contract removes.
+	item = m_game->m_item_manager->create_item(item_id, hb::server::item_origin::harvest);
+	if (item == nullptr) return;
+
 	if (type == 0) {
 		m_game->m_map_list[m_game->m_client_list[attacker_h]->m_map_index]->set_item(m_game->m_client_list[attacker_h]->m_x, m_game->m_client_list[attacker_h]->m_y, item);
 		m_game->send_ground_item_event(CommonType::ItemDrop, m_game->m_client_list[attacker_h]->m_map_index,

@@ -2797,11 +2797,8 @@ bool CEntityManager::spawn_npc_drop_item(int npc_h, int item_id, int min_count, 
 		return false;
 	}
 
-	CItem* item = new CItem;
-	if (m_game->m_item_manager->init_item_attr(item, item_id) == false) {
-		delete item;
-		return false;
-	}
+	CItem* item = m_game->m_item_manager->create_item(item_id, hb::server::item_origin::npc_drop);
+	if (item == nullptr) return false;
 
 	uint32_t count = 1;
 	if (item_id == 90) {

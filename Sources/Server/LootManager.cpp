@@ -366,8 +366,10 @@ void LootManager::get_reward_money_handler(int client_h)
 	weight_left = weight_left / 2;
 	if (weight_left <= 0) return;
 
-	item = new CItem;
-	m_game->m_item_manager->init_item_attr(item, hb::shared::item::ItemId::Gold);
+	// Gold is Counted: no Serial, and no origin either — the venue lives on the
+	// flow event rather than on an instance row.
+	item = m_game->m_item_manager->create_item(hb::shared::item::ItemId::Gold, hb::server::item_origin::none);
+	if (item == nullptr) return;
 	//item->m_instance.count = m_game->m_client_list[client_h]->m_reward_gold;
 
 	// (weight_left / item->m_weight)     Gold.   .

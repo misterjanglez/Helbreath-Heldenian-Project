@@ -63,8 +63,8 @@ bool GameCmdGiveItem::execute(CGame* game, int client_h, const char* args)
 	if (true_stack)
 	{
 		// True stacks: single item with count = amount (arrows, materials, gold)
-		CItem* item = new CItem();
-		if (game->m_item_manager->init_item_attr(item, item_name))
+		CItem* item = game->m_item_manager->create_item(item_name, hb::server::item_origin::gm_mint);
+		if (item != nullptr)
 		{
 			item->m_instance.count = amount;
 			int erase_req = 0;
@@ -87,7 +87,7 @@ bool GameCmdGiveItem::execute(CGame* game, int client_h, const char* args)
 		}
 		else
 		{
-			delete item;
+			// The factory already released the partially built item.
 			game->send_notify_msg(0, client_h, Notify::NoticeMsg, 0, 0, 0, "Failed to create item.");
 			return true;
 		}

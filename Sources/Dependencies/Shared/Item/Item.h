@@ -179,6 +179,34 @@ public:
     hb::shared::item::item_instance_data m_instance;
 
     //------------------------------------------------------------------------
+    // Provenance identity (server-only)
+    //------------------------------------------------------------------------
+
+    // Permanent server-global identity of this item instance (ADR 0003).
+    // 0 = unserialed: every Counted (stackable) item, and the item-config
+    // templates that describe a type rather than an instance.
+    //
+    // Deliberately NOT a member of m_instance. That POD is embedded verbatim in
+    // every item-carrying packet, so a Serial inside it would be handed to the
+    // client — and never-on-the-wire is the whole reason a tampered client
+    // cannot observe the tracking. Keeping it out here also means Serials cost
+    // no wire bytes and no Compatibility bump.
+    //
+    // Only the server ever populates this; the field exists on the shared class
+    // because CItem is shared, and stays 0 client-side.
+    int64_t m_serial = 0;
+
+    // How this item entered the world — a hb::server::item_origin value, held
+    // as a plain int because that enum is a server concept and Shared must not
+    // depend on Server headers. 0 = none.
+    //
+    // The ledger's item_instances.origin_type is its permanent home (#76); it
+    // lives on the item because a mint does not yet know the item's map or
+    // position — the caller places it immediately afterwards — so the creation
+    // event cannot be fully formed until after this point.
+    int32_t m_origin = 0;
+
+    //------------------------------------------------------------------------
     // Display Name Helpers
     //------------------------------------------------------------------------
 
