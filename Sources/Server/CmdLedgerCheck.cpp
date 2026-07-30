@@ -45,6 +45,8 @@ namespace item_origin = hb::server::item_origin;
 namespace ledger_event = hb::server::ledger_event;
 using hb::server::check_tally;
 using hb::server::find_probe_item;
+using hb::server::probe_scalar;
+using hb::server::probe_text;
 using hb::server::item_ledger_store;
 using hb::server::ledger_event_record;
 
@@ -62,39 +64,6 @@ namespace
 	constexpr int64_t probe_meta_above = 999999;
 	constexpr int32_t probe_flow_item = 90001;
 	constexpr int32_t probe_flow_type = 1;
-
-	// First column of the first row as an integer; -1 when the query fails or
-	// yields nothing, which no expected value below ever is.
-	int64_t scalar(sqlite3* db, const char* sql)
-	{
-		if (db == nullptr) return -1;
-
-		sqlite3_stmt* stmt = nullptr;
-		if (sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) != SQLITE_OK) return -1;
-
-		int64_t value = -1;
-		if (sqlite3_step(stmt) == SQLITE_ROW && sqlite3_column_type(stmt, 0) != SQLITE_NULL) {
-			value = sqlite3_column_int64(stmt, 0);
-		}
-		sqlite3_finalize(stmt);
-		return value;
-	}
-
-	std::string text_scalar(sqlite3* db, const char* sql)
-	{
-		if (db == nullptr) return {};
-
-		sqlite3_stmt* stmt = nullptr;
-		if (sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) != SQLITE_OK) return {};
-
-		std::string value;
-		if (sqlite3_step(stmt) == SQLITE_ROW) {
-			const unsigned char* raw = sqlite3_column_text(stmt, 0);
-			if (raw != nullptr) value = reinterpret_cast<const char*>(raw);
-		}
-		sqlite3_finalize(stmt);
-		return value;
-	}
 
 	// Reaches into the closed scratch file to reproduce an on-disk state a crash
 	// leaves behind. Going through raw SQL rather than the store's API is the
@@ -151,7 +120,7 @@ void CmdLedgerCheck::execute(CGame* game, const char* args)
 		return;
 	}
 
-	tally.record("live_wal", text_scalar(live->handle(), "PRAGMA journal_mode;") == "wal");
+	tally.record("live_wal", probe_text(live->handle(), "PRAGMA journal_mode;") == "wal");
 
 	// Boot must have lifted the allocator above whatever was on disk. Without
 	// this the first mint of the run re-issues a Serial a stored item already
@@ -199,7 +168,7 @@ void CmdLedgerCheck::execute(CGame* game, const char* args)
 	// rather than a literal 103 that only greps as a number.
 	auto newest_boundary_says = [&](const char* word)
 	{
-		return text_scalar(scratch->handle(),
+		return probe_text(scratch->handle(),
 			std::format("SELECT detail FROM item_events WHERE event_type={}"
 				" ORDER BY event_id DESC LIMIT 1;", static_cast<int>(ledger_event::boundary)).c_str())
 			.find(word) != std::string::npos;
@@ -210,7 +179,7 @@ void CmdLedgerCheck::execute(CGame* game, const char* args)
 		return;
 	}
 
-	tally.record("scratch_wal", text_scalar(scratch->handle(), "PRAGMA journal_mode;") == "wal");
+	tally.record("scratch_wal", probe_text(scratch->handle(), "PRAGMA journal_mode;") == "wal");
 
 	// Recording is a RAM append and nothing else. If a transition ever reached
 	// disk synchronously, an item action would be paying for I/O — which is the
@@ -228,8 +197,8 @@ void CmdLedgerCheck::execute(CGame* game, const char* args)
 
 	tally.record("record_buffers",
 		scratch->pending_count() == before_record + 3
-		&& scalar(scratch->handle(), "SELECT COUNT(*) FROM item_events;") == 0
-		&& scalar(scratch->handle(), "SELECT COUNT(*) FROM item_instances;") == 0);
+		&& probe_scalar(scratch->handle(), "SELECT COUNT(*) FROM item_events;") == 0
+		&& probe_scalar(scratch->handle(), "SELECT COUNT(*) FROM item_instances;") == 0);
 
 	// One flush, one transaction, whole window on disk. The event count is
 	// three because open() buffered the run-boundary marker alongside the mint's
@@ -238,11 +207,11 @@ void CmdLedgerCheck::execute(CGame* game, const char* args)
 	tally.record("flush_persists",
 		flushed
 		&& scratch->pending_count() == 0
-		&& scalar(scratch->handle(), "SELECT COUNT(*) FROM item_instances;") == 1
-		&& scalar(scratch->handle(), "SELECT COUNT(*) FROM item_events;") == 3);
+		&& probe_scalar(scratch->handle(), "SELECT COUNT(*) FROM item_instances;") == 1
+		&& probe_scalar(scratch->handle(), "SELECT COUNT(*) FROM item_events;") == 3);
 
 	tally.record("high_water_durable",
-		scalar(scratch->handle(), "SELECT CAST(value AS INTEGER) FROM meta WHERE key='serial_high_water';")
+		probe_scalar(scratch->handle(), "SELECT CAST(value AS INTEGER) FROM meta WHERE key='serial_high_water';")
 			== probe_high_water);
 
 	// A Counted item has no identity to be born with, and an event with no Serial
@@ -266,11 +235,11 @@ void CmdLedgerCheck::execute(CGame* game, const char* args)
 	scratch->record_flow(probe_flow_item, probe_flow_type, 3);
 	scratch->record_flow(probe_flow_item, probe_flow_type, 3);
 	const bool flow_first = scratch->flush(0)
-		&& scalar(scratch->handle(), "SELECT qty FROM item_flows;") == 6;
+		&& probe_scalar(scratch->handle(), "SELECT qty FROM item_flows;") == 6;
 	scratch->record_flow(probe_flow_item, probe_flow_type, 4);
 	const bool flow_second = scratch->flush(0)
-		&& scalar(scratch->handle(), "SELECT qty FROM item_flows;") == 10
-		&& scalar(scratch->handle(), "SELECT COUNT(*) FROM item_flows;") == 1;
+		&& probe_scalar(scratch->handle(), "SELECT qty FROM item_flows;") == 10
+		&& probe_scalar(scratch->handle(), "SELECT COUNT(*) FROM item_flows;") == 1;
 	tally.record("flow_accumulates", flow_first && flow_second);
 
 	// The Done-when clause, literally: a separate read-only connection queries the
@@ -281,8 +250,8 @@ void CmdLedgerCheck::execute(CGame* game, const char* args)
 		sqlite3* reader = nullptr;
 		bool reader_ok = false;
 		if (sqlite3_open_v2(probe_db, &reader, SQLITE_OPEN_READONLY, nullptr) == SQLITE_OK) {
-			reader_ok = scalar(reader, "SELECT COUNT(*) FROM item_events;")
-				== scalar(scratch->handle(), "SELECT COUNT(*) FROM item_events;");
+			reader_ok = probe_scalar(reader, "SELECT COUNT(*) FROM item_events;")
+				== probe_scalar(scratch->handle(), "SELECT COUNT(*) FROM item_events;");
 		}
 		if (reader != nullptr) sqlite3_close(reader);
 		tally.record("external_reader", reader_ok);
@@ -301,7 +270,7 @@ void CmdLedgerCheck::execute(CGame* game, const char* args)
 		failed_as_expected
 		&& held == 2
 		&& scratch->pending_count() == held
-		&& scalar(scratch->handle(), "SELECT COUNT(*) FROM item_instances;") == 1);
+		&& probe_scalar(scratch->handle(), "SELECT COUNT(*) FROM item_instances;") == 1);
 
 	// ...and the retry lands once the obstruction is gone. Held-for-later is only
 	// a real promise if something eventually collects.
@@ -309,7 +278,7 @@ void CmdLedgerCheck::execute(CGame* game, const char* args)
 	tally.record("flush_retry_succeeds",
 		scratch->flush(0)
 		&& scratch->pending_count() == 0
-		&& scalar(scratch->handle(), "SELECT COUNT(*) FROM item_instances;") == 1);
+		&& probe_scalar(scratch->handle(), "SELECT COUNT(*) FROM item_instances;") == 1);
 
 	//----------------------------------------------------------------------
 	// Restart safety. Each block closes the store, optionally reproduces an

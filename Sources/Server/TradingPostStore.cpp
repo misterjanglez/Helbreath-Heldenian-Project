@@ -6,6 +6,7 @@
 #include "ItemManager.h"
 #include "LoginServer.h"
 #include "AccountSqliteStore.h"
+#include "GameDatabase.h"
 #include "Packet/PacketTradingPost.h"
 #include "sqlite3.h"
 #include "Log.h"
@@ -13,7 +14,7 @@
 // Single source of truth for the tradingpost.db schema version: spliced into
 // the DDL stamp and passed to the VerifySqliteSchemaVersion gate. Bump on any
 // escrow schema change (fresh start - stale dev DBs are refused).
-#define TRADING_POST_SCHEMA_VERSION "2"
+#define TRADING_POST_SCHEMA_VERSION "3"
 #include "ServerLogChannels.h"
 
 #include <chrono>
@@ -144,6 +145,10 @@ namespace hb::server
 			" listing_id  INTEGER NOT NULL REFERENCES listings(listing_id) ON DELETE CASCADE,"
 			" slot        INTEGER NOT NULL,"
 			" item_id INTEGER NOT NULL,"
+			// The escrowed item's Serial (ADR 0003). Escrow is a custody move,
+			// not a destruction and re-creation, so what comes back out of a
+			// Listing has to be the same instance that went in.
+			" serial INTEGER NOT NULL DEFAULT 0,"
 			" count INTEGER NOT NULL,"
 			" touch_effect_type INTEGER NOT NULL,"
 			" touch_effect_value1 INTEGER NOT NULL,"
@@ -169,6 +174,7 @@ namespace hb::server
 			" offer_id  INTEGER NOT NULL REFERENCES offers(offer_id) ON DELETE CASCADE,"
 			" slot      INTEGER NOT NULL,"
 			" item_id INTEGER NOT NULL,"
+			" serial INTEGER NOT NULL DEFAULT 0,"
 			" count INTEGER NOT NULL,"
 			" touch_effect_type INTEGER NOT NULL,"
 			" touch_effect_value1 INTEGER NOT NULL,"
@@ -203,9 +209,9 @@ namespace hb::server
 		// load: config template via init_item_attr, then overlay the stored
 		// instance columns.
 		// A listing in escrow is an item that already exists, so this restores
-		// its identity rather than minting a new one. #77 will carry the stored
-		// Serial through the listing row into this call.
-		CItem* item = m_game->m_item_manager->restore_item(static_cast<int>(e.item_id));
+		// its identity rather than minting a new one: the Serial stored on the
+		// escrow row is the one the item goes back into the world with.
+		CItem* item = m_game->m_item_manager->restore_item(static_cast<int>(e.item_id), e.serial);
 		if (item == nullptr) return nullptr;
 		item->m_instance.count = e.count;
 		item->m_instance.touch_effect_type = e.touch_effect_type;
@@ -304,6 +310,11 @@ namespace hb::server
 
 			escrow_item e;
 			e.item_id = it->m_id_num;
+			// A partial stack split leaves its Serial behind with the remainder,
+			// which for a stackable is 0 either way — merge and split dissolve
+			// identity, so there is nothing to divide (D2). A non-stackable
+			// always moves whole and carries its Serial into escrow.
+			e.serial = it->m_serial;
 			e.count = static_cast<uint64_t>(amount);
 			e.touch_effect_type = it->m_instance.touch_effect_type;
 			e.touch_effect_value1 = it->m_instance.touch_effect_value1;
@@ -367,11 +378,11 @@ namespace hb::server
 	{
 		char sql[1024];
 		std::snprintf(sql, sizeof(sql),
-			"INSERT INTO %s(%s, slot, item_id, count, touch_effect_type,"
+			"INSERT INTO %s(%s, slot, item_id, serial, count, touch_effect_type,"
 			" touch_effect_value1, touch_effect_value2, touch_effect_value3, item_color,"
 			" spec_effect_value1, spec_effect_value2, spec_effect_value3, cur_durability,"
 			HB_ITEM_ATTR_COLUMNS_SQL ")"
-			" VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?," HB_ITEM_ATTR_PLACEHOLDERS_SQL ");",
+			" VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?," HB_ITEM_ATTR_PLACEHOLDERS_SQL ");",
 			table, id_column);
 
 		sqlite3_stmt* stmt = nullptr;
@@ -388,6 +399,7 @@ namespace hb::server
 			ok &= (sqlite3_bind_int64(stmt, c++, owner_id) == SQLITE_OK);
 			ok &= (sqlite3_bind_int(stmt, c++, slot) == SQLITE_OK);
 			ok &= (sqlite3_bind_int(stmt, c++, e.item_id) == SQLITE_OK);
+			ok &= (sqlite3_bind_int64(stmt, c++, e.serial) == SQLITE_OK);
 			ok &= (sqlite3_bind_int64(stmt, c++, static_cast<sqlite3_int64>(e.count)) == SQLITE_OK);
 			ok &= (sqlite3_bind_int(stmt, c++, e.touch_effect_type) == SQLITE_OK);
 			ok &= (sqlite3_bind_int(stmt, c++, e.touch_effect_value1) == SQLITE_OK);
@@ -621,7 +633,7 @@ namespace hb::server
 		}
 
 		if (sqlite3_prepare_v2(m_db,
-			"SELECT item_id, count, touch_effect_type, touch_effect_value1,"
+			"SELECT item_id, serial, count, touch_effect_type, touch_effect_value1,"
 			" touch_effect_value2, touch_effect_value3, item_color, spec_effect_value1,"
 			" spec_effect_value2, spec_effect_value3, cur_durability,"
 			HB_ITEM_ATTR_COLUMNS_SQL
@@ -634,6 +646,7 @@ namespace hb::server
 			escrow_item e;
 			int c = 0;
 			e.item_id = static_cast<int16_t>(sqlite3_column_int(stmt, c++));
+			e.serial = sqlite3_column_int64(stmt, c++);
 			e.count = static_cast<uint64_t>(sqlite3_column_int64(stmt, c++));
 			e.touch_effect_type = static_cast<int16_t>(sqlite3_column_int(stmt, c++));
 			e.touch_effect_value1 = static_cast<int16_t>(sqlite3_column_int(stmt, c++));
@@ -715,10 +728,9 @@ namespace hb::server
 			return false;
 		}
 
-		sqlite3* db = nullptr;
-		std::string path;
-		if (!EnsureAccountDatabase(account_name, &db, path)) {
-			hb::logger::error("[TP] deliver(offline): cannot open account DB {} - {} item(s) lost",
+		sqlite3* db = hb::server::game_db_handle();
+		if (db == nullptr) {
+			hb::logger::error("[TP] deliver(offline): Game DB not open (account {}) - {} item(s) lost",
 				account_name, static_cast<int>(items.size()));
 			for (const auto& e : items) {
 				hb::logger::error("[TP]   lost {}", describe(e));
@@ -763,20 +775,16 @@ namespace hb::server
 			r.spec_effect_value2 = e.spec_effect_value2;
 			r.spec_effect_value3 = e.spec_effect_value3;
 			r.cur_durability = e.cur_durability;
+			r.serial = e.serial;
 			r.attributes = e.attributes;
 			rows.push_back(r);
 		}
 
 		if (!rows.empty()) {
-			bool inserted = false;
-			if (exec_sql(db, "BEGIN;")) {
-				if (InsertCharacterBankItems(db, character_name, rows) && exec_sql(db, "COMMIT;")) {
-					inserted = true;
-				}
-				else {
-					exec_sql(db, "ROLLBACK;");
-				}
-			}
+			hb::server::txn_scope txn(db);
+			const bool inserted = txn.active()
+				&& InsertCharacterBankItems(db, character_name, rows)
+				&& txn.commit();
 			if (!inserted) {
 				hb::logger::error("[TP] deliver(offline): bank insert failed for {} - {} item(s) lost",
 					character_name, static_cast<int>(rows.size()));
@@ -787,7 +795,6 @@ namespace hb::server
 			}
 		}
 
-		CloseAccountDatabase(db);
 		return all_ok;
 	}
 
@@ -969,7 +976,7 @@ namespace hb::server
 		}
 		sqlite3_stmt* stmt = nullptr;
 		if (sqlite3_prepare_v2(m_db,
-			"SELECT item_id, count, touch_effect_type, touch_effect_value1,"
+			"SELECT item_id, serial, count, touch_effect_type, touch_effect_value1,"
 			" touch_effect_value2, touch_effect_value3, item_color, spec_effect_value1,"
 			" spec_effect_value2, spec_effect_value3, cur_durability,"
 			HB_ITEM_ATTR_COLUMNS_SQL
@@ -982,6 +989,7 @@ namespace hb::server
 			escrow_item e;
 			int c = 0;
 			e.item_id = static_cast<int16_t>(sqlite3_column_int(stmt, c++));
+			e.serial = sqlite3_column_int64(stmt, c++);
 			e.count = static_cast<uint64_t>(sqlite3_column_int64(stmt, c++));
 			e.touch_effect_type = static_cast<int16_t>(sqlite3_column_int(stmt, c++));
 			e.touch_effect_value1 = static_cast<int16_t>(sqlite3_column_int(stmt, c++));

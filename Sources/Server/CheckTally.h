@@ -11,10 +11,12 @@
 
 #pragma once
 
+#include <cstdint>
 #include <string>
 
 #include "ServerConsole.h"
 
+struct sqlite3;
 class CGame;
 class CItem;
 
@@ -76,4 +78,15 @@ namespace hb::server
 	// could quietly turn into the wrong kind of item — and both provers must pick
 	// the same way, or their outputs stop being evidence about the same thing.
 	int find_probe_item(CGame* game, bool want_stackable);
+
+	// First column of the first row. `probe_scalar` returns -1 when the query
+	// fails or yields nothing (no expected value in any prover is -1);
+	// `probe_text` returns empty.
+	//
+	// Here rather than in each prover because a check is only evidence if it
+	// reads the database the same way the other provers do — a per-prover copy
+	// that treated a NULL or a failed prepare differently would make two
+	// commands disagree about the same file for a reason nobody would look for.
+	int64_t probe_scalar(sqlite3* db, const char* sql);
+	std::string probe_text(sqlite3* db, const char* sql);
 }

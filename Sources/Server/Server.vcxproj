@@ -185,6 +185,8 @@
     <ClInclude Include="RegenManager.h" />
     <ClInclude Include="Fish.h" />
     <ClInclude Include="Game.h" />
+    <ClInclude Include="GameDatabase.h" />
+    <ClInclude Include="CmdGameDbCheck.h" />
     <ClInclude Include="GameConfigSqliteStore.h" />
     <ClInclude Include="TradingPostManager.h" />
     <ClInclude Include="TierConfigStore.h" />
@@ -352,6 +354,8 @@
     <ClCompile Include="StatusEffectManager.cpp" />
     <ClCompile Include="RegenManager.cpp" />
     <ClCompile Include="Game.cpp" />
+    <ClCompile Include="GameDatabase.cpp" />
+    <ClCompile Include="CmdGameDbCheck.cpp" />
     <ClCompile Include="GameConfigSqliteStore.cpp" />
     <ClCompile Include="TradingPostManager.cpp" />
     <ClCompile Include="TierConfigStore.cpp" />

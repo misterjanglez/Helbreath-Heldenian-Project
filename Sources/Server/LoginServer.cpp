@@ -12,6 +12,7 @@ using namespace std;
 
 #include "SharedCalculations.h"
 #include "AccountSqliteStore.h"
+#include "GameDatabase.h"
 #include "sqlite3.h"
 #include "PasswordHash.h"
 #include "../../Dependencies/Shared/Packet/SharedPackets.h"
@@ -68,23 +69,21 @@ bool IsValidName(char* str)
 	}
 	return true;
 }
-bool AccountDbExists(const char* account_name)
+// The connection an account's rows live on: the one Game DB (ADR 0004), and
+// only if that account exists — every caller below treats a false here as
+// "no such account", so the existence check is load-bearing rather than a
+// convenience.
+//
+// Before v8 this was "is there a file named after it", which was a weaker
+// question than it looked: the file could exist with no `accounts` row in it,
+// and an interrupted account creation left exactly that.
+bool AccountDatabaseIfExists(const char* account_name, sqlite3** outDb)
 {
-	char lower[hb::shared::limits::AccountNameLen] = {};
-	std::strncpy(lower, account_name, hb::shared::limits::AccountNameLen - 1);
-	LowercaseInPlace(lower, sizeof(lower));
-	char dbPath[256] = {};
-	std::snprintf(dbPath, sizeof(dbPath), "accounts/%s.db", lower);
-	return std::filesystem::exists(dbPath);
-}
-
-bool OpenAccountDatabaseIfExists(const char* account_name, sqlite3** outDb)
-{
-	if (!AccountDbExists(account_name)) {
+	if (outDb == nullptr || !AccountNameExists(account_name)) {
 		return false;
 	}
-	std::string dbPath;
-	return EnsureAccountDatabase(account_name, outDb, dbPath);
+	*outDb = hb::server::game_db_handle();
+	return *outDb != nullptr;
 }
 
 void LoginServer::activated()
@@ -185,24 +184,21 @@ LogIn LoginServer::AccountLogIn(string acc, string pass, std::vector<AccountDbCh
 		return LogIn::NoPass;
 
 	sqlite3* db = nullptr;
-	if (!OpenAccountDatabaseIfExists(acc.c_str(), &db)) {
+	if (!AccountDatabaseIfExists(acc.c_str(), &db)) {
 		return LogIn::NoAcc;
 	}
 
 	AccountDbAccountData account = {};
 	if (!LoadAccountRecord(db, acc.c_str(), account)) {
-		CloseAccountDatabase(db);
 		return LogIn::NoAcc;
 	}
 
 	if (!PasswordHash::VerifyPassword(pass.c_str(), account.password_salt, account.password_hash)) {
-		CloseAccountDatabase(db);
 		return LogIn::NoPass;
 	}
 
 	chars.clear();
 	if (!ListCharacterSummaries(db, acc.c_str(), chars)) {
-		CloseAccountDatabase(db);
 		return LogIn::NoAcc;
 	}
 
@@ -272,7 +268,6 @@ LogIn LoginServer::AccountLogIn(string acc, string pass, std::vector<AccountDbCh
 		}
 	}
 
-	CloseAccountDatabase(db);
 	hb::logger::log("Account login");
 	return LogIn::Ok;
 }
@@ -360,9 +355,8 @@ void LoginServer::response_character(int h, char* data)
 		}
 	}
 
-	sqlite3* db = nullptr;
-	std::string dbPath;
-	if (!EnsureAccountDatabase(acc, &db, dbPath)) {
+	sqlite3* db = hb::server::game_db_handle();
+	if (db == nullptr) {
 		send_login_msg(LogResMsg::NewCharacterFailed, LogResMsg::NewCharacterFailed, 0, 0, h);
 		return;
 	}
@@ -371,7 +365,6 @@ void LoginServer::response_character(int h, char* data)
 	// acc was lowercased (line 210) but the accounts table may store original case.
 	AccountDbAccountData storedAccount = {};
 	if (!LoadAccountRecord(db, acc, storedAccount)) {
-		CloseAccountDatabase(db);
 		send_login_msg(LogResMsg::NewCharacterFailed, LogResMsg::NewCharacterFailed, 0, 0, h);
 		return;
 	}
@@ -457,7 +450,6 @@ void LoginServer::response_character(int h, char* data)
 	{
 		hb::logger::warn<hb::log_channel::security>(
 			"Invalid class_type {} from account '{}'", player_class, acc);
-		CloseAccountDatabase(db);
 		send_login_msg(LogResMsg::NewCharacterFailed, LogResMsg::NewCharacterFailed, 0, 0, h);
 		return;
 	}
@@ -573,7 +565,6 @@ void LoginServer::response_character(int h, char* data)
 		ok &= InsertCharacterSkillSSN(db, name, skillSsn);
 	}
 
-	CloseAccountDatabase(db);
 
 	if (!ok) {
 		send_login_msg(LogResMsg::NewCharacterFailed, LogResMsg::NewCharacterFailed, 0, 0, h);
@@ -625,16 +616,14 @@ void LoginServer::delete_character(int h, char* data)
 		return;
 
 	sqlite3* db = nullptr;
-	if (!OpenAccountDatabaseIfExists(acc, &db)) {
+	if (!AccountDatabaseIfExists(acc, &db)) {
 		return;
 	}
 
 	if (!DeleteCharacterData(db, name)) {
-		CloseAccountDatabase(db);
 		return;
 	}
 
-	CloseAccountDatabase(db);
 
 	// Trading Post void: the account DB's ON DELETE CASCADE cannot reach
 	// tradingpost.db, so explicitly refund counterparties' Offers on this
@@ -690,7 +679,7 @@ void LoginServer::change_password(int h, char* data)
 	}
 
 	sqlite3* db = nullptr;
-	if (!OpenAccountDatabaseIfExists(acc, &db)) {
+	if (!AccountDatabaseIfExists(acc, &db)) {
 		send_login_msg(LogResMsg::PasswordChangeFail, LogResMsg::PasswordChangeFail, 0, 0, h);
 		return;
 	}
@@ -700,7 +689,6 @@ void LoginServer::change_password(int h, char* data)
 	if (!PasswordHash::GenerateSalt(newSalt, sizeof(newSalt)) ||
 		!PasswordHash::HashPassword(new_pw, newSalt, newHash, sizeof(newHash))) {
 		send_login_msg(LogResMsg::PasswordChangeFail, LogResMsg::PasswordChangeFail, 0, 0, h);
-		CloseAccountDatabase(db);
 		return;
 	}
 
@@ -711,7 +699,6 @@ void LoginServer::change_password(int h, char* data)
 		send_login_msg(LogResMsg::PasswordChangeFail, LogResMsg::PasswordChangeFail, 0, 0, h);
 	}
 
-	CloseAccountDatabase(db);
 }
 
 void LoginServer::create_new_account(int h, char* data)
@@ -740,15 +727,14 @@ void LoginServer::create_new_account(int h, char* data)
 	if (!IsValidName(name) || !IsValidName(password))
 		return;
 
-	if (AccountDbExists(name)) {
+	if (AccountNameExists(name)) {
 		hb::logger::log("Account creation failed: '{}' already exists", name);
 		send_login_msg(LogResMsg::NewAccountFailed, LogResMsg::NewAccountFailed, 0, 0, h);
 		return;
 	}
 
-	sqlite3* db = nullptr;
-	std::string dbPath;
-	if (!EnsureAccountDatabase(name, &db, dbPath)) {
+	sqlite3* db = hb::server::game_db_handle();
+	if (db == nullptr) {
 		send_login_msg(LogResMsg::NewAccountFailed, LogResMsg::NewAccountFailed, 0, 0, h);
 		return;
 	}
@@ -760,7 +746,6 @@ void LoginServer::create_new_account(int h, char* data)
 	char hash[PasswordHash::HashHexLen] = {};
 	if (!PasswordHash::GenerateSalt(salt, sizeof(salt)) ||
 		!PasswordHash::HashPassword(password, salt, hash, sizeof(hash))) {
-		CloseAccountDatabase(db);
 		send_login_msg(LogResMsg::NewAccountFailed, LogResMsg::NewAccountFailed, 0, 0, h);
 		return;
 	}
@@ -775,12 +760,10 @@ void LoginServer::create_new_account(int h, char* data)
 	std::snprintf(acct_data.last_ip, sizeof(acct_data.last_ip), "%s", G_pGame->_lclients[h]->ip);
 
 	if (!InsertAccountRecord(db, acct_data)) {
-		CloseAccountDatabase(db);
 		send_login_msg(LogResMsg::NewAccountFailed, LogResMsg::NewAccountFailed, 0, 0, h);
 		return;
 	}
 
-	CloseAccountDatabase(db);
 	send_login_msg(LogResMsg::NewAccountCreated, LogResMsg::NewAccountCreated, 0, 0, h);
 }
 
@@ -937,21 +920,18 @@ void LoginServer::local_save_player_data(int h)
 {
 	if (G_pGame->m_client_list[h] == 0) return;
 
-	sqlite3* db = nullptr;
-	std::string dbPath;
-	if (EnsureAccountDatabase(G_pGame->m_client_list[h]->m_account_name, &db, dbPath)) {
-		if (!SaveCharacterSnapshot(db, G_pGame->m_client_list[h])) {
-			char logMsg[256] = {};
-			hb::logger::error("SaveCharacterSnapshot failed: Account({}) Char({}) Error({})", G_pGame->m_client_list[h]->m_account_name, G_pGame->m_client_list[h]->m_char_name, sqlite3_errmsg(db));
+	sqlite3* db = hb::server::game_db_handle();
+	if (db == nullptr) {
+		hb::logger::error("Game DB not open, cannot save: Account({})", G_pGame->m_client_list[h]->m_account_name);
+		return;
+	}
+
+	if (!SaveCharacterSnapshot(db, G_pGame->m_client_list[h])) {
+		hb::logger::error("SaveCharacterSnapshot failed: Account({}) Char({}) Error({})", G_pGame->m_client_list[h]->m_account_name, G_pGame->m_client_list[h]->m_char_name, sqlite3_errmsg(db));
+	}
+	if (G_pGame->m_client_list[h]->m_block_list_dirty) {
+		if (SaveBlockList(db, G_pGame->m_client_list[h]->m_account_name, G_pGame->m_client_list[h]->m_blocked_accounts_list)) {
+			G_pGame->m_client_list[h]->m_block_list_dirty = false;
 		}
-		if (G_pGame->m_client_list[h]->m_block_list_dirty) {
-			if (SaveBlockList(db, G_pGame->m_client_list[h]->m_blocked_accounts_list)) {
-				G_pGame->m_client_list[h]->m_block_list_dirty = false;
-			}
-		}
-		CloseAccountDatabase(db);
-	} else {
-		char logMsg[256] = {};
-		hb::logger::error("EnsureAccountDatabase failed: Account({})", G_pGame->m_client_list[h]->m_account_name);
 	}
 }

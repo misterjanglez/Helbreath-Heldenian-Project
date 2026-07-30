@@ -12,6 +12,7 @@
 #include "FishingManager.h"
 #include "MiningManager.h"
 #include "AccountSqliteStore.h"
+#include "GameDatabase.h"
 #include "GameConfigSqliteStore.h"
 #include "TierConfigValidator.h"
 #include "LegacyRollStrategy.h"
@@ -1300,6 +1301,17 @@ bool CGame::init()
 	}
 
 	CloseGameConfigDatabase(configDb);
+
+	// Open the one Game DB (game.db, ADR 0004) before anything can read an
+	// account. This is also where a pre-v8 world is refused: a surviving
+	// accounts/ directory or a schema stamped below 8 stops the boot with an
+	// explanation, because there is no migration and starting anyway would mean
+	// silently presenting an empty world as the real one.
+	hb::logger::log("Opening Game DB (game.db)");
+	if (!EnsureGameDatabase()) {
+		hb::logger::error("Cannot start server: game.db unavailable");
+		return false;
+	}
 
 	// Open the Trading Post escrow store (tradingpost.db). Single persistent
 	// connection owned by CGame; created with its schema on first run.
@@ -4502,15 +4514,14 @@ bool CGame::load_player_data_from_db(int client_h)
 {
 	if (m_client_list[client_h] == 0) return false;
 
-	sqlite3* db = nullptr;
-	std::string dbPath;
-	if (!EnsureAccountDatabase(m_client_list[client_h]->m_account_name, &db, dbPath)) {
+	sqlite3* db = hb::server::game_db_handle();
+	if (db == nullptr) {
+		hb::logger::error("Game DB is not open - cannot load '{}'", m_client_list[client_h]->m_char_name);
 		return false;
 	}
 
 	AccountDbCharacterState state = {};
 	if (!LoadCharacterState(db, m_client_list[client_h]->m_char_name, state)) {
-		CloseAccountDatabase(db);
 		return false;
 	}
 
@@ -4531,7 +4542,6 @@ bool CGame::load_player_data_from_db(int client_h)
 	}
 	if (m_client_list[client_h]->m_map_index == -1) {
 		hb::logger::log("Player '{}' tried to enter unknown map: {}", m_client_list[client_h]->m_char_name, m_client_list[client_h]->m_map_name);
-		CloseAccountDatabase(db);
 		return false;
 	}
 
@@ -4623,7 +4633,6 @@ bool CGame::load_player_data_from_db(int client_h)
 	std::vector<AccountDbItemRow> items;
 	if (!LoadCharacterItems(db, m_client_list[client_h]->m_char_name, items)) {
 		hb::logger::error("Player '{}': character item load failed - login rejected", m_client_list[client_h]->m_char_name);
-		CloseAccountDatabase(db);
 		return false;
 	}
 	for (const auto& item : items) {
@@ -4635,9 +4644,8 @@ bool CGame::load_player_data_from_db(int client_h)
 		}
 		// Loading a character's inventory is not item creation: restore_item
 		// carries the saved Serial rather than minting a new one, so a save/load
-		// round trip does not read as the item being born again. #77 will pass
-		// the persisted serial column here.
-		m_client_list[client_h]->m_item_list[item.slot] = m_item_manager->restore_item(item.item_id);
+		// round trip does not read as the item being born again.
+		m_client_list[client_h]->m_item_list[item.slot] = m_item_manager->restore_item(item.item_id, item.serial);
 		if (m_client_list[client_h]->m_item_list[item.slot] == nullptr) continue;
 		m_client_list[client_h]->m_item_list[item.slot]->m_instance.count = item.count;
 		m_client_list[client_h]->m_item_list[item.slot]->m_instance.touch_effect_type = item.touch_effect_type;
@@ -4664,7 +4672,6 @@ bool CGame::load_player_data_from_db(int client_h)
 	std::vector<AccountDbBankItemRow> bankItems;
 	if (!LoadCharacterBankItems(db, m_client_list[client_h]->m_char_name, bankItems)) {
 		hb::logger::error("Player '{}': bank item load failed - login rejected", m_client_list[client_h]->m_char_name);
-		CloseAccountDatabase(db);
 		return false;
 	}
 	for (const auto& item : bankItems) {
@@ -4676,7 +4683,7 @@ bool CGame::load_player_data_from_db(int client_h)
 		}
 		// Warehouse contents are restored, not created — same reasoning as the
 		// inventory load above.
-		m_client_list[client_h]->m_item_in_bank_list[item.slot] = m_item_manager->restore_item(item.item_id);
+		m_client_list[client_h]->m_item_in_bank_list[item.slot] = m_item_manager->restore_item(item.item_id, item.serial);
 		if (m_client_list[client_h]->m_item_in_bank_list[item.slot] == nullptr) continue;
 		m_client_list[client_h]->m_item_in_bank_list[item.slot]->m_instance.count = item.count;
 		m_client_list[client_h]->m_item_in_bank_list[item.slot]->m_instance.touch_effect_type = item.touch_effect_type;
@@ -4832,14 +4839,13 @@ bool CGame::load_player_data_from_db(int client_h)
 	m_client_list[client_h]->m_blocked_accounts_list.clear();
 	m_client_list[client_h]->m_block_list_dirty = false;
 	std::vector<std::pair<std::string, std::string>> blocks;
-	if (LoadBlockList(db, blocks)) {
+	if (LoadBlockList(db, m_client_list[client_h]->m_account_name, blocks)) {
 		for (const auto& entry : blocks) {
 			m_client_list[client_h]->m_blocked_accounts.insert(entry.first);
 			m_client_list[client_h]->m_blocked_accounts_list.push_back(entry);
 		}
 	}
 
-	CloseAccountDatabase(db);
 	return true;
 }
 
@@ -9382,6 +9388,10 @@ void CGame::quit()
 
 	if (m_notice_data != 0) delete m_notice_data;
 
+	// Last, and after every client is gone: the Game DB holds the cached
+	// statements those saves were running through, and closing it while one is
+	// still live would leave the connection open with a SQLITE_BUSY nobody reads.
+	CloseGameDatabase();
 }
 
 uint32_t CGame::get_level_exp(int level)
@@ -10818,6 +10828,13 @@ int CGame::force_player_disconnect(int num)
 
 int CGame::save_all_players()
 {
+	// One transaction for the whole sweep (ADR 0004). Every character's own save
+	// still opens its own scope, but inside this one those become SAVEPOINTs —
+	// so the sweep is one commit and one fsync rather than one per player, while
+	// a single character that fails to save is still rolled back alone instead
+	// of taking everyone else's snapshot with it.
+	hb::server::game_database::transaction sweep(hb::server::game_db());
+
 	int count = 0;
 	for (int i = 1; i < MaxClients; i++)
 	{
@@ -10826,6 +10843,11 @@ int CGame::save_all_players()
 			g_login->local_save_player_data(i);
 			count++;
 		}
+	}
+
+	if (!sweep.commit()) {
+		hb::logger::error("save_all_players: sweep commit failed - {} snapshot(s) rolled back", count);
+		count = 0;
 	}
 
 	// The ledger rides every mass save (#76). The snapshots and the events

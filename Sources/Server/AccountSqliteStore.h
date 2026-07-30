@@ -126,6 +126,10 @@ struct AccountDbItemRow
 {
     int slot;
     int item_id;
+    // The item's permanent Serial (ADR 0003). 0 for a Counted (stackable) item,
+    // which has no identity to persist; restore_item mints one for a
+    // non-stackable row that somehow arrives at 0.
+    int64_t serial;
     int64_t count;
     int touch_effect_type;
     int touch_effect_value1;
@@ -148,6 +152,7 @@ struct AccountDbBankItemRow
 {
     int slot;
     int item_id;
+    int64_t serial;   // see AccountDbItemRow::serial
     int64_t count;
     int touch_effect_type;
     int touch_effect_value1;
@@ -227,7 +232,26 @@ enum class sqlite_schema_state
 };
 sqlite_schema_state VerifySqliteSchemaVersion(sqlite3* db, const char* db_label, const char* expected_version);
 
-bool EnsureAccountDatabase(const char* account_name, sqlite3** outDb, std::string& outPath);
+// Open the one Game DB (ADR 0004) and put the v8 schema on it, creating the
+// file on a fresh world. Call once at boot, before anything reads an account.
+//
+// Two refusals live here, and neither has a migration behind it (D6): a
+// surviving `accounts/` directory of per-account files, and a game.db stamped
+// at any version but 8. Both mean "this world predates v8" and the answer to
+// both is a wipe.
+bool EnsureGameDatabase();
+void CloseGameDatabase();
+
+// The two halves of EnsureGameDatabase, separately callable so `gamedbcheck`
+// can prove them against a scratch file instead of the live world.
+//
+// LegacyAccountLayoutPresent reports the pre-v8 `<dir>/<account>.db` files it
+// found (outExample names the first, outCount how many). EnsureGameSchema runs
+// the version gate on an already-open connection and lays down the v8 DDL when
+// the database is fresh; db_label only names the file in the refusal message.
+bool LegacyAccountLayoutPresent(const char* directory, std::string& outExample, int& outCount);
+bool EnsureGameSchema(sqlite3* db, const char* db_label);
+
 bool LoadAccountRecord(sqlite3* db, const char* account_name, AccountDbAccountData& outData);
 bool UpdateAccountPassword(sqlite3* db, const char* account_name, const char* passwordHash, const char* passwordSalt);
 bool ListCharacterSummaries(sqlite3* db, const char* account_name, std::vector<AccountDbCharacterSummary>& outChars);
@@ -252,18 +276,24 @@ bool InsertAccountRecord(sqlite3* db, const AccountDbAccountData& data);
 bool InsertCharacterRecord(sqlite3* db, const AccountDbCharacterData& data);
 bool SaveCharacterSnapshot(sqlite3* db, const CClient* client);
 bool DeleteCharacterData(sqlite3* db, const char* character_name);
-void CloseAccountDatabase(sqlite3* db);
 
-// Block list
-bool LoadBlockList(sqlite3* db, std::vector<std::pair<std::string, std::string>>& outBlocks);
-bool SaveBlockList(sqlite3* db, const std::vector<std::pair<std::string, std::string>>& blocks);
+// Block list. Scoped by the owning account: the table was one file per account
+// before v8, so its rows carried no owner and every account's block list was
+// implicitly "all the rows in this file".
+bool LoadBlockList(sqlite3* db, const char* owner_account_name, std::vector<std::pair<std::string, std::string>>& outBlocks);
+bool SaveBlockList(sqlite3* db, const char* owner_account_name, const std::vector<std::pair<std::string, std::string>>& blocks);
+
+// The account that owns a character. One indexed lookup since v8 — it used to
+// open and query every file in accounts/ until it found a hit.
 bool ResolveCharacterToAccount(const char* character_name, char* outAccountName, size_t accountNameSize);
 
-// Global name checks - scan all account databases
+// Global name checks. Character names are `UNIQUE COLLATE NOCASE` in the
+// schema now, so these are a guard rail with a friendly message in front of a
+// constraint rather than the only thing enforcing uniqueness.
 bool CharacterNameExistsGlobally(const char* character_name);
 bool AccountNameExists(const char* account_name);
 
-// Global counts - scan all account databases
+// Global counts, one query each since v8.
 struct account_stats
 {
     int accounts;

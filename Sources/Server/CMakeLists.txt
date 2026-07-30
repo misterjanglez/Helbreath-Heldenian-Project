@@ -23,6 +23,7 @@ set(SERVER_SOURCES
     Client.cpp
     CmdBroadcast.cpp
     CmdDropOdds.cpp
+    CmdGameDbCheck.cpp
     CmdGiveItem.cpp
     CheckTally.cpp
     CmdHelp.cpp
@@ -48,6 +49,7 @@ set(SERVER_SOURCES
     EntityManager.cpp
     FishingManager.cpp
     Game.cpp
+    GameDatabase.cpp
     GmMintSpec.cpp
     GameChatCommand.cpp
     GameCmdBeginApocalypse.cpp

@@ -1,6 +1,7 @@
 #include "GameCmdGoto.h"
 #include "Game.h"
 #include "AccountSqliteStore.h"
+#include "GameDatabase.h"
 #include <cstring>
 #include <cstdio>
 
@@ -43,9 +44,8 @@ bool GameCmdGoto::execute(CGame* game, int client_h, const char* args)
 		return true;
 	}
 
-	sqlite3* db = nullptr;
-	std::string dbPath;
-	if (!EnsureAccountDatabase(account_name, &db, dbPath))
+	sqlite3* db = hb::server::game_db_handle();
+	if (db == nullptr)
 	{
 		game->send_notify_msg(0, client_h, Notify::NoticeMsg, 0, 0, 0, "Failed to open account database.");
 		return true;
@@ -53,7 +53,6 @@ bool GameCmdGoto::execute(CGame* game, int client_h, const char* args)
 
 	AccountDbCharacterState state{};
 	bool loaded = LoadCharacterState(db, args, state);
-	CloseAccountDatabase(db);
 
 	if (!loaded)
 	{

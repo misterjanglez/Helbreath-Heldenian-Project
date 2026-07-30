@@ -314,9 +314,11 @@ CItem* ItemManager::restore_item(int item_id, int64_t serial)
 	}
 	else
 	{
-		// Until #77 persists the column every load arrives unserialed, and an
-		// Instanced item must not sit in the world without identity. Mint one
-		// and let the per-restart renumbering ride on D6 wipe-freedom.
+		// No stored Serial. Since #77 that means a Counted row (stackables are
+		// saved with 0, which is what they are) or a row written before the
+		// column existed. stamp_provenance settles it the same way it settles
+		// every other creation: Instanced items get identity, Counted ones do
+		// not — so a non-stackable can never reach the world unserialed.
 		stamp_provenance(item, item_origin::restored);
 	}
 

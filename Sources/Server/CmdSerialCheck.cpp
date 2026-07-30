@@ -137,9 +137,9 @@ void CmdSerialCheck::execute(CGame* game, const char* args)
 	}
 	tally.record("restore_high_water", after_restore->m_serial > stored_serial_probe);
 
-	// 8. A restore with no stored Serial still mints one: until #77 persists the
-	//    column every load arrives at 0, and an Instanced item must never sit in
-	//    the world without identity.
+	// 8. A restore with no stored Serial still mints one. Since #77 persists the
+	//    column a 0 means the row is Counted or predates the column — either
+	//    way an Instanced item must never sit in the world without identity.
 	item_ptr restored_blank{ items.restore_item(instanced_id, 0) };
 	if (restored_blank == nullptr)
 	{

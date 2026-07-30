@@ -1,6 +1,7 @@
 #include "GameCmdCome.h"
 #include "Game.h"
 #include "AccountSqliteStore.h"
+#include "GameDatabase.h"
 #include <cstring>
 #include <cstdio>
 
@@ -48,9 +49,8 @@ bool GameCmdCome::execute(CGame* game, int client_h, const char* args)
 		return true;
 	}
 
-	sqlite3* db = nullptr;
-	std::string dbPath;
-	if (!EnsureAccountDatabase(account_name, &db, dbPath))
+	sqlite3* db = hb::server::game_db_handle();
+	if (db == nullptr)
 	{
 		game->send_notify_msg(0, client_h, Notify::NoticeMsg, 0, 0, 0, "Failed to open account database.");
 		return true;
@@ -60,7 +60,6 @@ bool GameCmdCome::execute(CGame* game, int client_h, const char* args)
 	bool loaded = LoadCharacterState(db, args, state);
 	if (!loaded)
 	{
-		CloseAccountDatabase(db);
 		game->send_notify_msg(0, client_h, Notify::NoticeMsg, 0, 0, 0, "Failed to load character data.");
 		return true;
 	}
@@ -72,7 +71,6 @@ bool GameCmdCome::execute(CGame* game, int client_h, const char* args)
 	state.map_y = gmY;
 
 	InsertCharacterState(db, state);
-	CloseAccountDatabase(db);
 
 	char buf[80];
 	std::snprintf(buf, sizeof(buf), "Updated %s's saved location (takes effect on next login).", state.character_name);

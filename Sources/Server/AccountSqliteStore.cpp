@@ -8,15 +8,31 @@
 #include <string>
 
 #include "Client.h"
+#include "GameDatabase.h"
 #include "NetConstants.h"
 #include "sqlite3.h"
 #include "Log.h"
 #include "TimeUtils.h"
 
-// Single source of truth for the account-DB schema version: spliced into the
-// DDL stamp and passed to the VerifySqliteSchemaVersion gate. Bump on any
-// account-DB schema change (fresh start - stale dev DBs are refused).
-#define ACCOUNT_DB_SCHEMA_VERSION "7"
+// Single source of truth for the Game DB schema version: spliced into the DDL
+// stamp and passed to the VerifySqliteSchemaVersion gate. Bump on any schema
+// change (fresh start - stale dev DBs are refused, never migrated).
+//
+// v8 is one epoch combining two breaks (ADR 0004 + ADR 0003, plan P1.2): the
+// per-account files collapse into this one database, and every item row grows a
+// Serial. They land together so the persistence layer churns once.
+#define ACCOUNT_DB_SCHEMA_VERSION "8"
+
+// The single database file. Sits beside gamedata.db / mapinfo.db / itemledger.db
+// in the server's working directory; lowercase because the Linux filesystem is
+// case-sensitive and the deployment copies this name verbatim.
+#define GAME_DB_FILENAME "game.db"
+
+// The pre-v8 layout, kept only so the gate can recognise and refuse it.
+#define LEGACY_ACCOUNTS_DIR "accounts"
+
+using hb::server::game_db;
+using hb::server::stmt_scope;
 
 namespace
 {
@@ -36,11 +52,6 @@ namespace
             return false;
         }
         return true;
-    }
-
-    bool PrepareAndBindText(sqlite3_stmt** stmt, int idx, const char* value)
-    {
-        return sqlite3_bind_text(*stmt, idx, value, -1, SQLITE_TRANSIENT) == SQLITE_OK;
     }
 
     bool PrepareAndBindText(sqlite3_stmt* stmt, int idx, const char* value)
@@ -102,28 +113,32 @@ bool ItemAttributesLoadOk(const hb::shared::item::item_attribute_data& attribute
 
 sqlite_schema_state VerifySqliteSchemaVersion(sqlite3* db, const char* db_label, const char* expected_version)
 {
+    // Prepared and finalized by hand rather than through stmt_scope: this runs
+    // against any store's connection (the ledger and Trading Post both call it),
+    // including one that is mid-open and not yet the cache's owner.
+    //
     // A database with no tables at all is fresh: the caller's DDL will build
     // it at the current version.
-    sqlite3_stmt* stmt = nullptr;
-    if (sqlite3_prepare_v2(db, "SELECT count(*) FROM sqlite_master WHERE type='table';", -1, &stmt, nullptr) != SQLITE_OK) {
+    sqlite3_stmt* probe = nullptr;
+    if (sqlite3_prepare_v2(db, "SELECT count(*) FROM sqlite_master WHERE type='table';", -1, &probe, nullptr) != SQLITE_OK) {
         hb::logger::error("SQLite [{}]: cannot inspect schema: {}", db_label, sqlite3_errmsg(db));
         return sqlite_schema_state::mismatch;
     }
     int tableCount = 0;
-    if (sqlite3_step(stmt) == SQLITE_ROW) {
-        tableCount = sqlite3_column_int(stmt, 0);
+    if (sqlite3_step(probe) == SQLITE_ROW) {
+        tableCount = sqlite3_column_int(probe, 0);
     }
-    sqlite3_finalize(stmt);
+    sqlite3_finalize(probe);
     if (tableCount == 0) {
         return sqlite_schema_state::fresh;
     }
 
     char found[32] = {};
-    if (sqlite3_prepare_v2(db, "SELECT value FROM meta WHERE key='schema_version';", -1, &stmt, nullptr) == SQLITE_OK) {
-        if (sqlite3_step(stmt) == SQLITE_ROW) {
-            CopyColumnText(stmt, 0, found, sizeof(found));
+    if (sqlite3_prepare_v2(db, "SELECT value FROM meta WHERE key='schema_version';", -1, &probe, nullptr) == SQLITE_OK) {
+        if (sqlite3_step(probe) == SQLITE_ROW) {
+            CopyColumnText(probe, 0, found, sizeof(found));
         }
-        sqlite3_finalize(stmt);
+        sqlite3_finalize(probe);
     }
 
     if (std::strcmp(found, expected_version) == 0) {
@@ -135,47 +150,77 @@ sqlite_schema_state VerifySqliteSchemaVersion(sqlite3* db, const char* db_label,
     return sqlite_schema_state::mismatch;
 }
 
-bool EnsureAccountDatabase(const char* account_name, sqlite3** outDb, std::string& outPath)
+// True when the pre-v8 per-account layout is still on disk. `accounts/` full of
+// `<name>.db` files is a world from before ADR 0004, and there is no migration
+// (D6) — so the only correct thing to do is stop and say so, rather than boot a
+// fresh empty game.db next to it and let an operator discover the wipe by
+// finding every character gone.
+bool LegacyAccountLayoutPresent(const char* directory, std::string& outExample, int& outCount)
 {
-    if (outDb == nullptr || account_name == nullptr || account_name[0] == 0) {
+    std::error_code ec;
+    outExample.clear();
+    outCount = 0;
+    if (directory == nullptr) {
+        return false;
+    }
+    for (const auto& entry : std::filesystem::directory_iterator(directory, ec)) {
+        if (!entry.is_regular_file() || entry.path().extension() != ".db") {
+            continue;
+        }
+        if (outCount == 0) {
+            outExample = entry.path().filename().string();
+        }
+        outCount++;
+    }
+    return outCount > 0;
+}
+
+bool EnsureGameDatabase()
+{
+    std::string example;
+    int legacyCount = 0;
+    if (LegacyAccountLayoutPresent(LEGACY_ACCOUNTS_DIR, example, legacyCount)) {
+        hb::logger::error("Pre-v8 account layout found: {} per-account database(s) in '{}/' "
+            "(e.g. {}). Persistence v8 consolidates these into a single '{}' and ships no "
+            "migration - the world is wiped. Move or delete '{}/' to start a fresh v8 world.",
+            legacyCount, LEGACY_ACCOUNTS_DIR, example, GAME_DB_FILENAME, LEGACY_ACCOUNTS_DIR);
         return false;
     }
 
-    std::filesystem::create_directories("accounts");
-
-    char lowerName[64] = {};
-    std::strncpy(lowerName, account_name, sizeof(lowerName) - 1);
-    LowercaseInPlace(lowerName, sizeof(lowerName));
-    char dbPath[260] = {};
-    std::snprintf(dbPath, sizeof(dbPath), "accounts/%s.db", lowerName);
-    outPath = dbPath;
-
-    sqlite3* db = nullptr;
-    int rc = sqlite3_open(dbPath, &db);
-    if (rc != SQLITE_OK) {
-        char logMsg[512] = {};
-        hb::logger::error("SQLite open failed: {}", sqlite3_errmsg(db));
-        sqlite3_close(db);
+    if (!game_db().open(GAME_DB_FILENAME)) {
         return false;
     }
 
-    sqlite3_busy_timeout(db, 1000);
-    if (!ExecSql(db, "PRAGMA foreign_keys = ON;")) {
-        sqlite3_close(db);
+    if (!EnsureGameSchema(game_db().handle(), GAME_DB_FILENAME)) {
+        CloseGameDatabase();
+        return false;
+    }
+    return true;
+}
+
+bool EnsureGameSchema(sqlite3* db, const char* db_label)
+{
+    if (db == nullptr) {
         return false;
     }
 
-    const sqlite_schema_state schemaState = VerifySqliteSchemaVersion(db, dbPath, ACCOUNT_DB_SCHEMA_VERSION);
+    const sqlite_schema_state schemaState =
+        VerifySqliteSchemaVersion(db, db_label, ACCOUNT_DB_SCHEMA_VERSION);
     if (schemaState == sqlite_schema_state::mismatch) {
-        sqlite3_close(db);
         return false;
     }
     if (schemaState == sqlite_schema_state::current) {
-        *outDb = db;
         return true;
     }
 
     // Fresh database: build the full schema at the current version.
+    //
+    // Every name column is COLLATE NOCASE. Before v8 the case-insensitivity was
+    // in the queries (`WHERE x = ? COLLATE NOCASE`) and uniqueness was a
+    // directory scan; putting the collation on the column instead is what makes
+    // the UNIQUE constraint mean what the scan used to mean, and it is also what
+    // lets those same queries use an index now that one table holds every
+    // account's rows rather than one account's.
     const char* schemaSql =
         "BEGIN;"
         "CREATE TABLE IF NOT EXISTS meta ("
@@ -184,7 +229,7 @@ bool EnsureAccountDatabase(const char* account_name, sqlite3** outDb, std::strin
         ");"
         "INSERT INTO meta(key, value) VALUES('schema_version','" ACCOUNT_DB_SCHEMA_VERSION "');"
         "CREATE TABLE IF NOT EXISTS accounts ("
-        " account_name TEXT PRIMARY KEY,"
+        " account_name TEXT PRIMARY KEY COLLATE NOCASE,"
         " password_hash TEXT NOT NULL,"
         " password_salt TEXT NOT NULL,"
         " email TEXT NOT NULL,"
@@ -193,8 +238,8 @@ bool EnsureAccountDatabase(const char* account_name, sqlite3** outDb, std::strin
         " last_ip TEXT NOT NULL"
         ");"
         "CREATE TABLE IF NOT EXISTS characters ("
-        " character_name TEXT PRIMARY KEY,"
-        " account_name TEXT NOT NULL,"
+        " character_name TEXT PRIMARY KEY COLLATE NOCASE,"
+        " account_name TEXT NOT NULL COLLATE NOCASE,"
         " created_at TEXT NOT NULL,"
         " underwear_type INTEGER NOT NULL DEFAULT 0,"
         " hair_color INTEGER NOT NULL DEFAULT 0,"
@@ -260,9 +305,14 @@ bool EnsureAccountDatabase(const char* account_name, sqlite3** outDb, std::strin
         " FOREIGN KEY(account_name) REFERENCES accounts(account_name) ON DELETE CASCADE"
         ");"
         "CREATE TABLE IF NOT EXISTS character_items ("
-        " character_name TEXT NOT NULL,"
+        " character_name TEXT NOT NULL COLLATE NOCASE,"
         " slot INTEGER NOT NULL,"
         " item_id INTEGER NOT NULL,"
+        // The Serial the item was minted with (ADR 0003). 0 means Counted:
+        // stackables have no identity to carry, and merge/split would dissolve
+        // it anyway. NOT NULL with a default so a row written by an older tool
+        // reads as Counted rather than as a null the load path has to guess at.
+        " serial INTEGER NOT NULL DEFAULT 0,"
         " count INTEGER NOT NULL,"
         " touch_effect_type INTEGER NOT NULL,"
         " touch_effect_value1 INTEGER NOT NULL,"
@@ -281,9 +331,10 @@ bool EnsureAccountDatabase(const char* account_name, sqlite3** outDb, std::strin
         " FOREIGN KEY(character_name) REFERENCES characters(character_name) ON DELETE CASCADE"
         ");"
         "CREATE TABLE IF NOT EXISTS character_bank_items ("
-        " character_name TEXT NOT NULL,"
+        " character_name TEXT NOT NULL COLLATE NOCASE,"
         " slot INTEGER NOT NULL,"
         " item_id INTEGER NOT NULL,"
+        " serial INTEGER NOT NULL DEFAULT 0,"
         " count INTEGER NOT NULL,"
         " touch_effect_type INTEGER NOT NULL,"
         " touch_effect_value1 INTEGER NOT NULL,"
@@ -299,7 +350,7 @@ bool EnsureAccountDatabase(const char* account_name, sqlite3** outDb, std::strin
         " FOREIGN KEY(character_name) REFERENCES characters(character_name) ON DELETE CASCADE"
         ");"
         "CREATE TABLE IF NOT EXISTS character_item_positions ("
-        " character_name TEXT NOT NULL,"
+        " character_name TEXT NOT NULL COLLATE NOCASE,"
         " slot INTEGER NOT NULL,"
         " pos_x INTEGER NOT NULL,"
         " pos_y INTEGER NOT NULL,"
@@ -307,48 +358,62 @@ bool EnsureAccountDatabase(const char* account_name, sqlite3** outDb, std::strin
         " FOREIGN KEY(character_name) REFERENCES characters(character_name) ON DELETE CASCADE"
         ");"
         "CREATE TABLE IF NOT EXISTS character_item_equips ("
-        " character_name TEXT NOT NULL,"
+        " character_name TEXT NOT NULL COLLATE NOCASE,"
         " slot INTEGER NOT NULL,"
         " is_equipped INTEGER NOT NULL,"
         " PRIMARY KEY(character_name, slot),"
         " FOREIGN KEY(character_name) REFERENCES characters(character_name) ON DELETE CASCADE"
         ");"
         "CREATE TABLE IF NOT EXISTS character_magic_mastery ("
-        " character_name TEXT NOT NULL,"
+        " character_name TEXT NOT NULL COLLATE NOCASE,"
         " magic_index INTEGER NOT NULL,"
         " mastery_value INTEGER NOT NULL,"
         " PRIMARY KEY(character_name, magic_index),"
         " FOREIGN KEY(character_name) REFERENCES characters(character_name) ON DELETE CASCADE"
         ");"
         "CREATE TABLE IF NOT EXISTS character_skill_mastery ("
-        " character_name TEXT NOT NULL,"
+        " character_name TEXT NOT NULL COLLATE NOCASE,"
         " skill_index INTEGER NOT NULL,"
         " mastery_value INTEGER NOT NULL,"
         " PRIMARY KEY(character_name, skill_index),"
         " FOREIGN KEY(character_name) REFERENCES characters(character_name) ON DELETE CASCADE"
         ");"
         "CREATE TABLE IF NOT EXISTS character_skill_ssn ("
-        " character_name TEXT NOT NULL,"
+        " character_name TEXT NOT NULL COLLATE NOCASE,"
         " skill_index INTEGER NOT NULL,"
         " ssn_value INTEGER NOT NULL,"
         " PRIMARY KEY(character_name, skill_index),"
         " FOREIGN KEY(character_name) REFERENCES characters(character_name) ON DELETE CASCADE"
         ");"
         "CREATE INDEX IF NOT EXISTS idx_characters_account ON characters(account_name);"
+        // Reconciliation (#83) joins the ledger's current holder against these
+        // two tables by Serial. Built now because adding an index later is a
+        // schema bump, and a schema bump is a world wipe.
+        "CREATE INDEX IF NOT EXISTS idx_character_items_serial ON character_items(serial);"
+        "CREATE INDEX IF NOT EXISTS idx_character_bank_items_serial ON character_bank_items(serial);"
+        // owner_account_name is new in v8. The table used to live in the owner's
+        // own file, so "whose block list is this" was the filename; in one
+        // database that has to be a column or every account inherits everyone's.
         "CREATE TABLE IF NOT EXISTS block_list ("
-        " blocked_account_name TEXT NOT NULL,"
+        " owner_account_name TEXT NOT NULL COLLATE NOCASE,"
+        " blocked_account_name TEXT NOT NULL COLLATE NOCASE,"
         " blocked_character_name TEXT NOT NULL,"
-        " PRIMARY KEY(blocked_account_name)"
+        " PRIMARY KEY(owner_account_name, blocked_account_name),"
+        " FOREIGN KEY(owner_account_name) REFERENCES accounts(account_name) ON DELETE CASCADE"
         ");"
         "COMMIT;";
 
     if (!ExecSql(db, schemaSql)) {
-        sqlite3_close(db);
         return false;
     }
 
-    *outDb = db;
+    hb::logger::log("Game DB schema v" ACCOUNT_DB_SCHEMA_VERSION " created ({})", db_label);
     return true;
+}
+
+void CloseGameDatabase()
+{
+    game_db().close();
 }
 
 bool LoadAccountRecord(sqlite3* db, const char* account_name, AccountDbAccountData& outData)
@@ -361,12 +426,12 @@ bool LoadAccountRecord(sqlite3* db, const char* account_name, AccountDbAccountDa
         "SELECT account_name, password_hash, password_salt, email, created_at, password_changed_at, last_ip "
         "FROM accounts WHERE account_name = ? COLLATE NOCASE;";
 
-    sqlite3_stmt* stmt = nullptr;
-    if (sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) != SQLITE_OK) {
+    stmt_scope stmt(db, sql);
+    if (!stmt) {
         return false;
     }
 
-    PrepareAndBindText(&stmt, 1, account_name);
+    PrepareAndBindText(stmt, 1, account_name);
     bool ok = false;
     if (sqlite3_step(stmt) == SQLITE_ROW) {
         std::memset(&outData, 0, sizeof(outData));
@@ -380,7 +445,6 @@ bool LoadAccountRecord(sqlite3* db, const char* account_name, AccountDbAccountDa
         ok = true;
     }
 
-    sqlite3_finalize(stmt);
     return ok;
 }
 
@@ -398,22 +462,21 @@ bool UpdateAccountPassword(sqlite3* db, const char* account_name, const char* pa
     const char* sql =
         "UPDATE accounts SET password_hash = ?, password_salt = ?, password_changed_at = ? WHERE account_name = ? COLLATE NOCASE;";
 
-    sqlite3_stmt* stmt = nullptr;
-    if (sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) != SQLITE_OK) {
+    stmt_scope stmt(db, sql);
+    if (!stmt) {
         return false;
     }
 
     bool ok = true;
-    ok &= PrepareAndBindText(&stmt, 1, passwordHash);
-    ok &= PrepareAndBindText(&stmt, 2, passwordSalt);
-    ok &= PrepareAndBindText(&stmt, 3, timestamp);
-    ok &= PrepareAndBindText(&stmt, 4, account_name);
+    ok &= PrepareAndBindText(stmt, 1, passwordHash);
+    ok &= PrepareAndBindText(stmt, 2, passwordSalt);
+    ok &= PrepareAndBindText(stmt, 3, timestamp);
+    ok &= PrepareAndBindText(stmt, 4, account_name);
 
     if (ok) {
         ok = sqlite3_step(stmt) == SQLITE_DONE;
     }
 
-    sqlite3_finalize(stmt);
     return ok;
 }
 
@@ -427,12 +490,12 @@ bool ListCharacterSummaries(sqlite3* db, const char* account_name, std::vector<A
         "SELECT character_name, underwear_type, hair_color, hair_style, skin_color, gender, skin, level, exp, map_name "
         "FROM characters WHERE account_name = ? COLLATE NOCASE ORDER BY character_name;";
 
-    sqlite3_stmt* stmt = nullptr;
-    if (sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) != SQLITE_OK) {
+    stmt_scope stmt(db, sql);
+    if (!stmt) {
         return false;
     }
 
-    PrepareAndBindText(&stmt, 1, account_name);
+    PrepareAndBindText(stmt, 1, account_name);
     outChars.clear();
     while (sqlite3_step(stmt) == SQLITE_ROW) {
         AccountDbCharacterSummary row = {};
@@ -449,7 +512,6 @@ bool ListCharacterSummaries(sqlite3* db, const char* account_name, std::vector<A
         outChars.push_back(row);
     }
 
-    sqlite3_finalize(stmt);
     return true;
 }
 
@@ -473,12 +535,12 @@ bool LoadCharacterState(sqlite3* db, const char* character_name, AccountDbCharac
         "underwear_type, hair_color, hair_style, skin_color "
         "FROM characters WHERE character_name = ? COLLATE NOCASE;";
 
-    sqlite3_stmt* stmt = nullptr;
-    if (sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) != SQLITE_OK) {
+    stmt_scope stmt(db, sql);
+    if (!stmt) {
         return false;
     }
 
-    PrepareAndBindText(&stmt, 1, character_name);
+    PrepareAndBindText(stmt, 1, character_name);
     bool ok = false;
     if (sqlite3_step(stmt) == SQLITE_ROW) {
         std::memset(&outState, 0, sizeof(outState));
@@ -549,7 +611,6 @@ bool LoadCharacterState(sqlite3* db, const char* character_name, AccountDbCharac
         ok = true;
     }
 
-    sqlite3_finalize(stmt);
     return ok;
 }
 
@@ -560,23 +621,24 @@ bool LoadCharacterItems(sqlite3* db, const char* character_name, std::vector<Acc
     }
 
     const char* sql =
-        "SELECT slot, item_id, count, touch_effect_type, touch_effect_value1, touch_effect_value2, "
+        "SELECT slot, item_id, serial, count, touch_effect_type, touch_effect_value1, touch_effect_value2, "
         "touch_effect_value3, item_color, spec_effect_value1, spec_effect_value2, spec_effect_value3, "
         "cur_durability," HB_ITEM_ATTR_COLUMNS_SQL ", pos_x, pos_y, is_equipped "
         "FROM character_items WHERE character_name = ? COLLATE NOCASE ORDER BY slot;";
 
-    sqlite3_stmt* stmt = nullptr;
-    if (sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) != SQLITE_OK) {
+    stmt_scope stmt(db, sql);
+    if (!stmt) {
         return false;
     }
 
-    PrepareAndBindText(&stmt, 1, character_name);
+    PrepareAndBindText(stmt, 1, character_name);
     outItems.clear();
     while (sqlite3_step(stmt) == SQLITE_ROW) {
         AccountDbItemRow row = {};
         int col = 0;
         row.slot = sqlite3_column_int(stmt, col++);
         row.item_id = sqlite3_column_int(stmt, col++);
+        row.serial = sqlite3_column_int64(stmt, col++);
         row.count = sqlite3_column_int64(stmt, col++);
         row.touch_effect_type = sqlite3_column_int(stmt, col++);
         row.touch_effect_value1 = sqlite3_column_int(stmt, col++);
@@ -594,13 +656,11 @@ bool LoadCharacterItems(sqlite3* db, const char* character_name, std::vector<Acc
 
         if (!ItemAttributesLoadOk(row.attributes,
             std::format("character_items '{}' slot {} item {}", character_name, row.slot, row.item_id))) {
-            sqlite3_finalize(stmt);
             return false;
         }
         outItems.push_back(row);
     }
 
-    sqlite3_finalize(stmt);
     return true;
 }
 
@@ -611,23 +671,24 @@ bool LoadCharacterBankItems(sqlite3* db, const char* character_name, std::vector
     }
 
     const char* sql =
-        "SELECT slot, item_id, count, touch_effect_type, touch_effect_value1, touch_effect_value2, "
+        "SELECT slot, item_id, serial, count, touch_effect_type, touch_effect_value1, touch_effect_value2, "
         "touch_effect_value3, item_color, spec_effect_value1, spec_effect_value2, spec_effect_value3, "
         "cur_durability," HB_ITEM_ATTR_COLUMNS_SQL " "
         "FROM character_bank_items WHERE character_name = ? COLLATE NOCASE ORDER BY slot;";
 
-    sqlite3_stmt* stmt = nullptr;
-    if (sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) != SQLITE_OK) {
+    stmt_scope stmt(db, sql);
+    if (!stmt) {
         return false;
     }
 
-    PrepareAndBindText(&stmt, 1, character_name);
+    PrepareAndBindText(stmt, 1, character_name);
     outItems.clear();
     while (sqlite3_step(stmt) == SQLITE_ROW) {
         AccountDbBankItemRow row = {};
         int col = 0;
         row.slot = sqlite3_column_int(stmt, col++);
         row.item_id = sqlite3_column_int(stmt, col++);
+        row.serial = sqlite3_column_int64(stmt, col++);
         row.count = sqlite3_column_int64(stmt, col++);
         row.touch_effect_type = sqlite3_column_int(stmt, col++);
         row.touch_effect_value1 = sqlite3_column_int(stmt, col++);
@@ -642,13 +703,11 @@ bool LoadCharacterBankItems(sqlite3* db, const char* character_name, std::vector
 
         if (!ItemAttributesLoadOk(row.attributes,
             std::format("character_bank_items '{}' slot {} item {}", character_name, row.slot, row.item_id))) {
-            sqlite3_finalize(stmt);
             return false;
         }
         outItems.push_back(row);
     }
 
-    sqlite3_finalize(stmt);
     return true;
 }
 
@@ -661,12 +720,12 @@ bool LoadCharacterItemPositions(sqlite3* db, const char* character_name, std::ve
     const char* sql =
         "SELECT slot, pos_x, pos_y FROM character_item_positions WHERE character_name = ? COLLATE NOCASE ORDER BY slot;";
 
-    sqlite3_stmt* stmt = nullptr;
-    if (sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) != SQLITE_OK) {
+    stmt_scope stmt(db, sql);
+    if (!stmt) {
         return false;
     }
 
-    PrepareAndBindText(&stmt, 1, character_name);
+    PrepareAndBindText(stmt, 1, character_name);
     outPositionsX.clear();
     outPositionsY.clear();
     while (sqlite3_step(stmt) == SQLITE_ROW) {
@@ -680,7 +739,6 @@ bool LoadCharacterItemPositions(sqlite3* db, const char* character_name, std::ve
         outPositionsY.push_back(pos_y);
     }
 
-    sqlite3_finalize(stmt);
     return true;
 }
 
@@ -693,12 +751,12 @@ bool LoadCharacterItemEquips(sqlite3* db, const char* character_name, std::vecto
     const char* sql =
         "SELECT slot, is_equipped FROM character_item_equips WHERE character_name = ? COLLATE NOCASE ORDER BY slot;";
 
-    sqlite3_stmt* stmt = nullptr;
-    if (sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) != SQLITE_OK) {
+    stmt_scope stmt(db, sql);
+    if (!stmt) {
         return false;
     }
 
-    PrepareAndBindText(&stmt, 1, character_name);
+    PrepareAndBindText(stmt, 1, character_name);
     outEquips.clear();
     while (sqlite3_step(stmt) == SQLITE_ROW) {
         AccountDbIndexedValue equip = {};
@@ -707,7 +765,6 @@ bool LoadCharacterItemEquips(sqlite3* db, const char* character_name, std::vecto
         outEquips.push_back(equip);
     }
 
-    sqlite3_finalize(stmt);
     return true;
 }
 
@@ -720,12 +777,12 @@ bool LoadCharacterMagicMastery(sqlite3* db, const char* character_name, std::vec
     const char* sql =
         "SELECT magic_index, mastery_value FROM character_magic_mastery WHERE character_name = ? COLLATE NOCASE ORDER BY magic_index;";
 
-    sqlite3_stmt* stmt = nullptr;
-    if (sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) != SQLITE_OK) {
+    stmt_scope stmt(db, sql);
+    if (!stmt) {
         return false;
     }
 
-    PrepareAndBindText(&stmt, 1, character_name);
+    PrepareAndBindText(stmt, 1, character_name);
     outMastery.clear();
     while (sqlite3_step(stmt) == SQLITE_ROW) {
         AccountDbIndexedValue row = {};
@@ -734,7 +791,6 @@ bool LoadCharacterMagicMastery(sqlite3* db, const char* character_name, std::vec
         outMastery.push_back(row);
     }
 
-    sqlite3_finalize(stmt);
     return true;
 }
 
@@ -747,12 +803,12 @@ bool LoadCharacterSkillMastery(sqlite3* db, const char* character_name, std::vec
     const char* sql =
         "SELECT skill_index, mastery_value FROM character_skill_mastery WHERE character_name = ? COLLATE NOCASE ORDER BY skill_index;";
 
-    sqlite3_stmt* stmt = nullptr;
-    if (sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) != SQLITE_OK) {
+    stmt_scope stmt(db, sql);
+    if (!stmt) {
         return false;
     }
 
-    PrepareAndBindText(&stmt, 1, character_name);
+    PrepareAndBindText(stmt, 1, character_name);
     outMastery.clear();
     while (sqlite3_step(stmt) == SQLITE_ROW) {
         AccountDbIndexedValue row = {};
@@ -761,7 +817,6 @@ bool LoadCharacterSkillMastery(sqlite3* db, const char* character_name, std::vec
         outMastery.push_back(row);
     }
 
-    sqlite3_finalize(stmt);
     return true;
 }
 
@@ -774,12 +829,12 @@ bool LoadCharacterSkillSSN(sqlite3* db, const char* character_name, std::vector<
     const char* sql =
         "SELECT skill_index, ssn_value FROM character_skill_ssn WHERE character_name = ? COLLATE NOCASE ORDER BY skill_index;";
 
-    sqlite3_stmt* stmt = nullptr;
-    if (sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) != SQLITE_OK) {
+    stmt_scope stmt(db, sql);
+    if (!stmt) {
         return false;
     }
 
-    PrepareAndBindText(&stmt, 1, character_name);
+    PrepareAndBindText(stmt, 1, character_name);
     outValues.clear();
     while (sqlite3_step(stmt) == SQLITE_ROW) {
         AccountDbIndexedValue row = {};
@@ -788,7 +843,6 @@ bool LoadCharacterSkillSSN(sqlite3* db, const char* character_name, std::vector<
         outValues.push_back(row);
     }
 
-    sqlite3_finalize(stmt);
     return true;
 }
 
@@ -799,12 +853,12 @@ bool LoadEquippedItemAppearances(sqlite3* db, const char* character_name, std::v
     }
 
     const char* sql = "SELECT item_id, item_color FROM character_items WHERE character_name = ? COLLATE NOCASE AND is_equipped = 1;";
-    sqlite3_stmt* stmt = nullptr;
-    if (sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) != SQLITE_OK) {
+    stmt_scope stmt(db, sql);
+    if (!stmt) {
         return false;
     }
 
-    PrepareAndBindText(&stmt, 1, character_name);
+    PrepareAndBindText(stmt, 1, character_name);
     outItems.clear();
     while (sqlite3_step(stmt) == SQLITE_ROW) {
         AccountDbEquippedItem item = {};
@@ -813,7 +867,6 @@ bool LoadEquippedItemAppearances(sqlite3* db, const char* character_name, std::v
         outItems.push_back(item);
     }
 
-    sqlite3_finalize(stmt);
     return true;
 }
 
@@ -843,8 +896,8 @@ bool InsertCharacterState(sqlite3* db, const AccountDbCharacterState& state)
         " underwear_type, hair_color, hair_style, skin_color"
         ") VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?);";
 
-    sqlite3_stmt* stmt = nullptr;
-    if (sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) != SQLITE_OK) {
+    stmt_scope stmt(db, sql);
+    if (!stmt) {
         return false;
     }
 
@@ -919,7 +972,6 @@ bool InsertCharacterState(sqlite3* db, const AccountDbCharacterState& state)
         ok = sqlite3_step(stmt) == SQLITE_DONE;
     }
 
-    sqlite3_finalize(stmt);
     return ok;
 }
 
@@ -931,13 +983,13 @@ bool InsertCharacterItems(sqlite3* db, const char* character_name, const std::ve
 
     const char* sql =
         "INSERT INTO character_items("
-        " character_name, slot, item_id, count, touch_effect_type, touch_effect_value1, touch_effect_value2,"
+        " character_name, slot, item_id, serial, count, touch_effect_type, touch_effect_value1, touch_effect_value2,"
         " touch_effect_value3, item_color, spec_effect_value1, spec_effect_value2, spec_effect_value3,"
         " cur_durability," HB_ITEM_ATTR_COLUMNS_SQL ", pos_x, pos_y, is_equipped"
-        ") VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?," HB_ITEM_ATTR_PLACEHOLDERS_SQL ",?,?,?);";
+        ") VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?," HB_ITEM_ATTR_PLACEHOLDERS_SQL ",?,?,?);";
 
-    sqlite3_stmt* stmt = nullptr;
-    if (sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) != SQLITE_OK) {
+    stmt_scope stmt(db, sql);
+    if (!stmt) {
         return false;
     }
 
@@ -949,6 +1001,7 @@ bool InsertCharacterItems(sqlite3* db, const char* character_name, const std::ve
         ok &= PrepareAndBindText(stmt, col++, character_name);
         ok &= (sqlite3_bind_int(stmt, col++, item.slot) == SQLITE_OK);
         ok &= (sqlite3_bind_int(stmt, col++, item.item_id) == SQLITE_OK);
+        ok &= (sqlite3_bind_int64(stmt, col++, item.serial) == SQLITE_OK);
         ok &= (sqlite3_bind_int64(stmt, col++, item.count) == SQLITE_OK);
         ok &= (sqlite3_bind_int(stmt, col++, item.touch_effect_type) == SQLITE_OK);
         ok &= (sqlite3_bind_int(stmt, col++, item.touch_effect_value1) == SQLITE_OK);
@@ -964,12 +1017,10 @@ bool InsertCharacterItems(sqlite3* db, const char* character_name, const std::ve
         ok &= (sqlite3_bind_int(stmt, col++, item.pos_y) == SQLITE_OK);
         ok &= (sqlite3_bind_int(stmt, col++, item.is_equipped) == SQLITE_OK);
         if (!ok || sqlite3_step(stmt) != SQLITE_DONE) {
-            sqlite3_finalize(stmt);
             return false;
         }
     }
 
-    sqlite3_finalize(stmt);
     return true;
 }
 
@@ -981,13 +1032,13 @@ bool InsertCharacterBankItems(sqlite3* db, const char* character_name, const std
 
     const char* sql =
         "INSERT INTO character_bank_items("
-        " character_name, slot, item_id, count, touch_effect_type, touch_effect_value1, touch_effect_value2,"
+        " character_name, slot, item_id, serial, count, touch_effect_type, touch_effect_value1, touch_effect_value2,"
         " touch_effect_value3, item_color, spec_effect_value1, spec_effect_value2, spec_effect_value3,"
         " cur_durability," HB_ITEM_ATTR_COLUMNS_SQL
-        ") VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?," HB_ITEM_ATTR_PLACEHOLDERS_SQL ");";
+        ") VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?," HB_ITEM_ATTR_PLACEHOLDERS_SQL ");";
 
-    sqlite3_stmt* stmt = nullptr;
-    if (sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) != SQLITE_OK) {
+    stmt_scope stmt(db, sql);
+    if (!stmt) {
         return false;
     }
 
@@ -999,6 +1050,7 @@ bool InsertCharacterBankItems(sqlite3* db, const char* character_name, const std
         ok &= PrepareAndBindText(stmt, col++, character_name);
         ok &= (sqlite3_bind_int(stmt, col++, item.slot) == SQLITE_OK);
         ok &= (sqlite3_bind_int(stmt, col++, item.item_id) == SQLITE_OK);
+        ok &= (sqlite3_bind_int64(stmt, col++, item.serial) == SQLITE_OK);
         ok &= (sqlite3_bind_int64(stmt, col++, item.count) == SQLITE_OK);
         ok &= (sqlite3_bind_int(stmt, col++, item.touch_effect_type) == SQLITE_OK);
         ok &= (sqlite3_bind_int(stmt, col++, item.touch_effect_value1) == SQLITE_OK);
@@ -1011,12 +1063,10 @@ bool InsertCharacterBankItems(sqlite3* db, const char* character_name, const std
         ok &= (sqlite3_bind_int(stmt, col++, item.cur_durability) == SQLITE_OK);
         ok &= BindItemAttributeColumns(stmt, col, item.attributes);
         if (!ok || sqlite3_step(stmt) != SQLITE_DONE) {
-            sqlite3_finalize(stmt);
             return false;
         }
     }
 
-    sqlite3_finalize(stmt);
     return true;
 }
 
@@ -1029,8 +1079,8 @@ bool InsertCharacterItemPositions(sqlite3* db, const char* character_name, const
     const char* sql =
         "INSERT INTO character_item_positions(character_name, slot, pos_x, pos_y) VALUES(?,?,?,?);";
 
-    sqlite3_stmt* stmt = nullptr;
-    if (sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) != SQLITE_OK) {
+    stmt_scope stmt(db, sql);
+    if (!stmt) {
         return false;
     }
 
@@ -1043,12 +1093,10 @@ bool InsertCharacterItemPositions(sqlite3* db, const char* character_name, const
         ok &= (sqlite3_bind_int(stmt, 3, positionsX[i].value) == SQLITE_OK);
         ok &= (sqlite3_bind_int(stmt, 4, positionsY[i].value) == SQLITE_OK);
         if (!ok || sqlite3_step(stmt) != SQLITE_DONE) {
-            sqlite3_finalize(stmt);
             return false;
         }
     }
 
-    sqlite3_finalize(stmt);
     return true;
 }
 
@@ -1061,8 +1109,8 @@ bool InsertCharacterItemEquips(sqlite3* db, const char* character_name, const st
     const char* sql =
         "INSERT INTO character_item_equips(character_name, slot, is_equipped) VALUES(?,?,?);";
 
-    sqlite3_stmt* stmt = nullptr;
-    if (sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) != SQLITE_OK) {
+    stmt_scope stmt(db, sql);
+    if (!stmt) {
         return false;
     }
 
@@ -1074,12 +1122,10 @@ bool InsertCharacterItemEquips(sqlite3* db, const char* character_name, const st
         ok &= (sqlite3_bind_int(stmt, 2, equip.index) == SQLITE_OK);
         ok &= (sqlite3_bind_int(stmt, 3, equip.value) == SQLITE_OK);
         if (!ok || sqlite3_step(stmt) != SQLITE_DONE) {
-            sqlite3_finalize(stmt);
             return false;
         }
     }
 
-    sqlite3_finalize(stmt);
     return true;
 }
 
@@ -1092,8 +1138,8 @@ bool InsertCharacterMagicMastery(sqlite3* db, const char* character_name, const 
     const char* sql =
         "INSERT INTO character_magic_mastery(character_name, magic_index, mastery_value) VALUES(?,?,?);";
 
-    sqlite3_stmt* stmt = nullptr;
-    if (sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) != SQLITE_OK) {
+    stmt_scope stmt(db, sql);
+    if (!stmt) {
         return false;
     }
 
@@ -1105,12 +1151,10 @@ bool InsertCharacterMagicMastery(sqlite3* db, const char* character_name, const 
         ok &= (sqlite3_bind_int(stmt, 2, entry.index) == SQLITE_OK);
         ok &= (sqlite3_bind_int(stmt, 3, entry.value) == SQLITE_OK);
         if (!ok || sqlite3_step(stmt) != SQLITE_DONE) {
-            sqlite3_finalize(stmt);
             return false;
         }
     }
 
-    sqlite3_finalize(stmt);
     return true;
 }
 
@@ -1123,8 +1167,8 @@ bool InsertCharacterSkillMastery(sqlite3* db, const char* character_name, const 
     const char* sql =
         "INSERT INTO character_skill_mastery(character_name, skill_index, mastery_value) VALUES(?,?,?);";
 
-    sqlite3_stmt* stmt = nullptr;
-    if (sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) != SQLITE_OK) {
+    stmt_scope stmt(db, sql);
+    if (!stmt) {
         return false;
     }
 
@@ -1136,12 +1180,10 @@ bool InsertCharacterSkillMastery(sqlite3* db, const char* character_name, const 
         ok &= (sqlite3_bind_int(stmt, 2, entry.index) == SQLITE_OK);
         ok &= (sqlite3_bind_int(stmt, 3, entry.value) == SQLITE_OK);
         if (!ok || sqlite3_step(stmt) != SQLITE_DONE) {
-            sqlite3_finalize(stmt);
             return false;
         }
     }
 
-    sqlite3_finalize(stmt);
     return true;
 }
 
@@ -1154,8 +1196,8 @@ bool InsertCharacterSkillSSN(sqlite3* db, const char* character_name, const std:
     const char* sql =
         "INSERT INTO character_skill_ssn(character_name, skill_index, ssn_value) VALUES(?,?,?);";
 
-    sqlite3_stmt* stmt = nullptr;
-    if (sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) != SQLITE_OK) {
+    stmt_scope stmt(db, sql);
+    if (!stmt) {
         return false;
     }
 
@@ -1167,12 +1209,10 @@ bool InsertCharacterSkillSSN(sqlite3* db, const char* character_name, const std:
         ok &= (sqlite3_bind_int(stmt, 2, entry.index) == SQLITE_OK);
         ok &= (sqlite3_bind_int(stmt, 3, entry.value) == SQLITE_OK);
         if (!ok || sqlite3_step(stmt) != SQLITE_DONE) {
-            sqlite3_finalize(stmt);
             return false;
         }
     }
 
-    sqlite3_finalize(stmt);
     return true;
 }
 
@@ -1187,21 +1227,21 @@ bool InsertAccountRecord(sqlite3* db, const AccountDbAccountData& data)
         " account_name, password_hash, password_salt, email, created_at, password_changed_at, last_ip"
         ") VALUES(?,?,?,?,?,?,?);";
 
-    sqlite3_stmt* stmt = nullptr;
-    if (sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) != SQLITE_OK) {
+    stmt_scope stmt(db, sql);
+    if (!stmt) {
         char logMsg[512] = {};
         hb::logger::error("SQLite: account insert prepare failed: {}", sqlite3_errmsg(db));
         return false;
     }
 
     bool ok =
-        PrepareAndBindText(&stmt, 1, data.name) &&
-        PrepareAndBindText(&stmt, 2, data.password_hash) &&
-        PrepareAndBindText(&stmt, 3, data.password_salt) &&
-        PrepareAndBindText(&stmt, 4, data.email) &&
-        PrepareAndBindText(&stmt, 5, data.created_at) &&
-        PrepareAndBindText(&stmt, 6, data.password_changed_at) &&
-        PrepareAndBindText(&stmt, 7, data.last_ip);
+        PrepareAndBindText(stmt, 1, data.name) &&
+        PrepareAndBindText(stmt, 2, data.password_hash) &&
+        PrepareAndBindText(stmt, 3, data.password_salt) &&
+        PrepareAndBindText(stmt, 4, data.email) &&
+        PrepareAndBindText(stmt, 5, data.created_at) &&
+        PrepareAndBindText(stmt, 6, data.password_changed_at) &&
+        PrepareAndBindText(stmt, 7, data.last_ip);
 
     if (ok) {
         ok = sqlite3_step(stmt) == SQLITE_DONE;
@@ -1212,7 +1252,6 @@ bool InsertAccountRecord(sqlite3* db, const AccountDbAccountData& data)
         hb::logger::error("SQLite: account insert failed: {}", sqlite3_errmsg(db));
     }
 
-    sqlite3_finalize(stmt);
     return ok;
 }
 
@@ -1230,8 +1269,8 @@ bool InsertCharacterRecord(sqlite3* db, const AccountDbCharacterData& data)
         " gender, skin, hairstyle, haircolor, underwear"
         ") VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?);";
 
-    sqlite3_stmt* stmt = nullptr;
-    if (sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) != SQLITE_OK) {
+    stmt_scope stmt(db, sql);
+    if (!stmt) {
         char logMsg[512] = {};
         hb::logger::error("SQLite: character insert prepare failed: {}", sqlite3_errmsg(db));
         return false;
@@ -1239,16 +1278,16 @@ bool InsertCharacterRecord(sqlite3* db, const AccountDbCharacterData& data)
 
     int idx = 1;
     bool ok = true;
-    ok &= PrepareAndBindText(&stmt, idx++, data.character_name);
-    ok &= PrepareAndBindText(&stmt, idx++, data.account_name);
-    ok &= PrepareAndBindText(&stmt, idx++, data.created_at);
+    ok &= PrepareAndBindText(stmt, idx++, data.character_name);
+    ok &= PrepareAndBindText(stmt, idx++, data.account_name);
+    ok &= PrepareAndBindText(stmt, idx++, data.created_at);
     ok &= (sqlite3_bind_int(stmt, idx++, data.appearance.underwear_type) == SQLITE_OK);
     ok &= (sqlite3_bind_int(stmt, idx++, data.appearance.hair_color) == SQLITE_OK);
     ok &= (sqlite3_bind_int(stmt, idx++, data.appearance.hair_style) == SQLITE_OK);
     ok &= (sqlite3_bind_int(stmt, idx++, data.appearance.skin_color) == SQLITE_OK);
     ok &= (sqlite3_bind_int(stmt, idx++, data.level) == SQLITE_OK);
     ok &= (sqlite3_bind_int(stmt, idx++, static_cast<int>(data.exp)) == SQLITE_OK);
-    ok &= PrepareAndBindText(&stmt, idx++, data.map_name);
+    ok &= PrepareAndBindText(stmt, idx++, data.map_name);
     ok &= (sqlite3_bind_int(stmt, idx++, data.map_x) == SQLITE_OK);
     ok &= (sqlite3_bind_int(stmt, idx++, data.map_y) == SQLITE_OK);
     ok &= (sqlite3_bind_int(stmt, idx++, data.hp) == SQLITE_OK);
@@ -1275,7 +1314,6 @@ bool InsertCharacterRecord(sqlite3* db, const AccountDbCharacterData& data)
         hb::logger::error("SQLite: character insert failed: {}", sqlite3_errmsg(db));
     }
 
-    sqlite3_finalize(stmt);
     return ok;
 }
 
@@ -1286,22 +1324,14 @@ bool DeleteCharacterData(sqlite3* db, const char* character_name)
     }
 
     const char* sql = "DELETE FROM characters WHERE character_name = ? COLLATE NOCASE;";
-    sqlite3_stmt* stmt = nullptr;
-    if (sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) != SQLITE_OK) {
+    stmt_scope stmt(db, sql);
+    if (!stmt) {
         return false;
     }
 
-    PrepareAndBindText(&stmt, 1, character_name);
+    PrepareAndBindText(stmt, 1, character_name);
     bool ok = sqlite3_step(stmt) == SQLITE_DONE;
-    sqlite3_finalize(stmt);
     return ok;
-}
-
-void CloseAccountDatabase(sqlite3* db)
-{
-    if (db != nullptr) {
-        sqlite3_close(db);
-    }
 }
 
 bool SaveCharacterSnapshot(sqlite3* db, const CClient* client)
@@ -1311,14 +1341,17 @@ bool SaveCharacterSnapshot(sqlite3* db, const CClient* client)
         return false;
     }
 
-    // Helper: capture the real SQLite error before ROLLBACK clears it
-    auto FailAndRollback = [&](const char* stage) {
-        char logMsg[512] = {};
+    // Capture the real SQLite error while it is still the last one. The rollback
+    // itself is the transaction scope's job now — every `return false` below
+    // undoes this character's work on the way out, and when a mass-save sweep is
+    // wrapping us that undo is a SAVEPOINT rewind, so one character failing to
+    // save no longer takes the whole sweep down with it.
+    auto FailStage = [&](const char* stage) {
         hb::logger::error("SQLite: save snapshot failed at [{}]: {}", stage, sqlite3_errmsg(db));
-        ExecSql(db, "ROLLBACK;");
     };
 
-    if (!ExecSql(db, "BEGIN;")) {
+    hb::server::txn_scope txn(db);
+    if (!txn.active()) {
         hb::logger::error("SQLite: save snapshot BEGIN failed");
         return false;
     }
@@ -1343,13 +1376,12 @@ bool SaveCharacterSnapshot(sqlite3* db, const CClient* client)
         " underwear_type, hair_color, hair_style, skin_color"
         ") VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?);";
 
-    sqlite3_stmt* stmt = nullptr;
-    if (sqlite3_prepare_v2(db, upsertSql, -1, &stmt, nullptr) != SQLITE_OK) {
-        char logMsg[512] = {};
-        hb::logger::error("SQLite: save snapshot upsert prepare failed: {}", sqlite3_errmsg(db));
-        ExecSql(db, "ROLLBACK;");
+    stmt_scope upsert(db, upsertSql);
+    if (!upsert) {
+        FailStage("characters upsert prepare");
         return false;
     }
+    sqlite3_stmt* stmt = upsert;
 
     int idx = 1;
     bool ok = true;
@@ -1419,22 +1451,15 @@ bool SaveCharacterSnapshot(sqlite3* db, const CClient* client)
     ok &= (sqlite3_bind_int(stmt, idx++, client->m_appearance.skin_color) == SQLITE_OK);
 
     if (!ok) {
-        char logMsg[512] = {};
         hb::logger::error("SQLite: save snapshot upsert bind failed at idx {}: {}", idx - 1, sqlite3_errmsg(db));
-        sqlite3_finalize(stmt);
-        ExecSql(db, "ROLLBACK;");
         return false;
     }
 
     int stepRc = sqlite3_step(stmt);
     if (stepRc != SQLITE_DONE) {
-        char logMsg[512] = {};
         hb::logger::error("SQLite: save snapshot upsert step failed (rc={}): {}", stepRc, sqlite3_errmsg(db));
-        sqlite3_finalize(stmt);
-        ExecSql(db, "ROLLBACK;");
         return false;
     }
-    sqlite3_finalize(stmt);
 
     const char* deleteItemsSql = "DELETE FROM character_items WHERE character_name = ? COLLATE NOCASE;";
     const char* deleteBankSql = "DELETE FROM character_bank_items WHERE character_name = ? COLLATE NOCASE;";
@@ -1449,350 +1474,265 @@ bool SaveCharacterSnapshot(sqlite3* db, const CClient* client)
     };
 
     for (const char* deleteSql : deleteStatements) {
-        if (sqlite3_prepare_v2(db, deleteSql, -1, &stmt, nullptr) != SQLITE_OK) {
-            char logMsg[512] = {};
+        stmt_scope purge(db, deleteSql);
+        if (!purge) {
             hb::logger::error("SQLite: save snapshot delete prepare failed: {} | SQL: {}", sqlite3_errmsg(db), deleteSql);
-            ExecSql(db, "ROLLBACK;");
             return false;
         }
-        PrepareAndBindText(stmt, 1, client->m_char_name);
-        int rc = sqlite3_step(stmt);
-        sqlite3_finalize(stmt);
+        PrepareAndBindText(purge, 1, client->m_char_name);
+        int rc = sqlite3_step(purge);
         if (rc != SQLITE_DONE) {
-            char logMsg[512] = {};
             hb::logger::error("SQLite: save snapshot delete step failed (rc={}): {} | SQL: {}", rc, sqlite3_errmsg(db), deleteSql);
-            ExecSql(db, "ROLLBACK;");
             return false;
         }
     }
 
     const char* insertItemSql =
         "INSERT INTO character_items("
-        " character_name, slot, item_id, count, touch_effect_type, touch_effect_value1, touch_effect_value2,"
+        " character_name, slot, item_id, serial, count, touch_effect_type, touch_effect_value1, touch_effect_value2,"
         " touch_effect_value3, item_color, spec_effect_value1, spec_effect_value2, spec_effect_value3,"
         " cur_durability," HB_ITEM_ATTR_COLUMNS_SQL ", pos_x, pos_y, is_equipped"
-        ") VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?," HB_ITEM_ATTR_PLACEHOLDERS_SQL ",?,?,?);";
+        ") VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?," HB_ITEM_ATTR_PLACEHOLDERS_SQL ",?,?,?);";
 
-    if (sqlite3_prepare_v2(db, insertItemSql, -1, &stmt, nullptr) != SQLITE_OK) {
-        char logMsg[512] = {};
-        hb::logger::error("SQLite: save snapshot item insert prepare failed: {}", sqlite3_errmsg(db));
-        ExecSql(db, "ROLLBACK;");
-        return false;
-    }
-
-    for(int i = 0; i < hb::shared::limits::MaxItems; i++) {
-        if (client->m_item_list[i] == nullptr) {
-            continue;
-        }
-        sqlite3_reset(stmt);
-        sqlite3_clear_bindings(stmt);
-        int col = 1;
-        ok = true;
-        ok &= PrepareAndBindText(stmt, col++, client->m_char_name);
-        ok &= (sqlite3_bind_int(stmt, col++, i) == SQLITE_OK);
-        ok &= (sqlite3_bind_int(stmt, col++, client->m_item_list[i]->m_id_num) == SQLITE_OK);
-        ok &= (sqlite3_bind_int64(stmt, col++, static_cast<int64_t>(client->m_item_list[i]->m_instance.count)) == SQLITE_OK);
-        ok &= (sqlite3_bind_int(stmt, col++, client->m_item_list[i]->m_instance.touch_effect_type) == SQLITE_OK);
-        ok &= (sqlite3_bind_int(stmt, col++, client->m_item_list[i]->m_instance.touch_effect_value1) == SQLITE_OK);
-        ok &= (sqlite3_bind_int(stmt, col++, client->m_item_list[i]->m_instance.touch_effect_value2) == SQLITE_OK);
-        ok &= (sqlite3_bind_int(stmt, col++, client->m_item_list[i]->m_instance.touch_effect_value3) == SQLITE_OK);
-        ok &= (sqlite3_bind_int(stmt, col++, client->m_item_list[i]->m_instance.item_color) == SQLITE_OK);
-        ok &= (sqlite3_bind_int(stmt, col++, client->m_item_list[i]->m_instance.special_effect_value1) == SQLITE_OK);
-        ok &= (sqlite3_bind_int(stmt, col++, client->m_item_list[i]->m_instance.special_effect_value2) == SQLITE_OK);
-        ok &= (sqlite3_bind_int(stmt, col++, client->m_item_list[i]->m_instance.special_effect_value3) == SQLITE_OK);
-        ok &= (sqlite3_bind_int(stmt, col++, client->m_item_list[i]->m_instance.cur_durability) == SQLITE_OK);
-        ok &= BindItemAttributeColumns(stmt, col, client->m_item_list[i]->get_attributes());
-        ok &= (sqlite3_bind_int(stmt, col++, client->m_item_pos_list[i].x) == SQLITE_OK);
-        ok &= (sqlite3_bind_int(stmt, col++, client->m_item_pos_list[i].y) == SQLITE_OK);
-        ok &= (sqlite3_bind_int(stmt, col++, client->m_is_item_equipped[i] ? 1 : 0) == SQLITE_OK);
-
-        if (ok) {
-            int rc = sqlite3_step(stmt);
-            ok = rc == SQLITE_DONE;
-            if (!ok) {
-                char logMsg[512] = {};
-                hb::logger::error("SQLite: save snapshot item[{}] step failed (rc={}): {}", i, rc, sqlite3_errmsg(db));
-            }
-        } else {
-            char logMsg[256] = {};
-            hb::logger::error("SQLite: save snapshot item[{}] bind failed", i);
-        }
-        if (!ok) {
-            sqlite3_finalize(stmt);
-            ExecSql(db, "ROLLBACK;");
+    {
+        stmt_scope insertItem(db, insertItemSql);
+        if (!insertItem) {
+            FailStage("character_items prepare");
             return false;
         }
+        stmt = insertItem;
+
+        for(int i = 0; i < hb::shared::limits::MaxItems; i++) {
+            if (client->m_item_list[i] == nullptr) {
+                continue;
+            }
+            sqlite3_reset(stmt);
+            sqlite3_clear_bindings(stmt);
+            int col = 1;
+            ok = true;
+            ok &= PrepareAndBindText(stmt, col++, client->m_char_name);
+            ok &= (sqlite3_bind_int(stmt, col++, i) == SQLITE_OK);
+            ok &= (sqlite3_bind_int(stmt, col++, client->m_item_list[i]->m_id_num) == SQLITE_OK);
+            // The Serial as minted (ADR 0003). Written unconditionally: 0 is the
+            // honest value for a Counted item, and writing it keeps "what is in the
+            // row" and "what is on the CItem" the same question.
+            ok &= (sqlite3_bind_int64(stmt, col++, client->m_item_list[i]->m_serial) == SQLITE_OK);
+            ok &= (sqlite3_bind_int64(stmt, col++, static_cast<int64_t>(client->m_item_list[i]->m_instance.count)) == SQLITE_OK);
+            ok &= (sqlite3_bind_int(stmt, col++, client->m_item_list[i]->m_instance.touch_effect_type) == SQLITE_OK);
+            ok &= (sqlite3_bind_int(stmt, col++, client->m_item_list[i]->m_instance.touch_effect_value1) == SQLITE_OK);
+            ok &= (sqlite3_bind_int(stmt, col++, client->m_item_list[i]->m_instance.touch_effect_value2) == SQLITE_OK);
+            ok &= (sqlite3_bind_int(stmt, col++, client->m_item_list[i]->m_instance.touch_effect_value3) == SQLITE_OK);
+            ok &= (sqlite3_bind_int(stmt, col++, client->m_item_list[i]->m_instance.item_color) == SQLITE_OK);
+            ok &= (sqlite3_bind_int(stmt, col++, client->m_item_list[i]->m_instance.special_effect_value1) == SQLITE_OK);
+            ok &= (sqlite3_bind_int(stmt, col++, client->m_item_list[i]->m_instance.special_effect_value2) == SQLITE_OK);
+            ok &= (sqlite3_bind_int(stmt, col++, client->m_item_list[i]->m_instance.special_effect_value3) == SQLITE_OK);
+            ok &= (sqlite3_bind_int(stmt, col++, client->m_item_list[i]->m_instance.cur_durability) == SQLITE_OK);
+            ok &= BindItemAttributeColumns(stmt, col, client->m_item_list[i]->get_attributes());
+            ok &= (sqlite3_bind_int(stmt, col++, client->m_item_pos_list[i].x) == SQLITE_OK);
+            ok &= (sqlite3_bind_int(stmt, col++, client->m_item_pos_list[i].y) == SQLITE_OK);
+            ok &= (sqlite3_bind_int(stmt, col++, client->m_is_item_equipped[i] ? 1 : 0) == SQLITE_OK);
+
+            if (ok) {
+                int rc = sqlite3_step(stmt);
+                ok = rc == SQLITE_DONE;
+                if (!ok) {
+                    hb::logger::error("SQLite: save snapshot item[{}] step failed (rc={}): {}", i, rc, sqlite3_errmsg(db));
+                }
+            } else {
+                hb::logger::error("SQLite: save snapshot item[{}] bind failed", i);
+            }
+            if (!ok) {
+                return false;
+            }
+        }
     }
-    sqlite3_finalize(stmt);
 
     const char* insertBankSql =
         "INSERT INTO character_bank_items("
-        " character_name, slot, item_id, count, touch_effect_type, touch_effect_value1, touch_effect_value2,"
+        " character_name, slot, item_id, serial, count, touch_effect_type, touch_effect_value1, touch_effect_value2,"
         " touch_effect_value3, item_color, spec_effect_value1, spec_effect_value2, spec_effect_value3,"
         " cur_durability," HB_ITEM_ATTR_COLUMNS_SQL
-        ") VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?," HB_ITEM_ATTR_PLACEHOLDERS_SQL ");";
+        ") VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?," HB_ITEM_ATTR_PLACEHOLDERS_SQL ");";
 
-    if (sqlite3_prepare_v2(db, insertBankSql, -1, &stmt, nullptr) != SQLITE_OK) {
-        FailAndRollback("bank_items prepare");
-        return false;
-    }
-
-    for(int i = 0; i < hb::shared::limits::MaxBankItems; i++) {
-        if (client->m_item_in_bank_list[i] == nullptr) {
-            continue;
-        }
-        sqlite3_reset(stmt);
-        sqlite3_clear_bindings(stmt);
-        int col = 1;
-        ok = true;
-        ok &= PrepareAndBindText(stmt, col++, client->m_char_name);
-        ok &= (sqlite3_bind_int(stmt, col++, i) == SQLITE_OK);
-        ok &= (sqlite3_bind_int(stmt, col++, client->m_item_in_bank_list[i]->m_id_num) == SQLITE_OK);
-        ok &= (sqlite3_bind_int64(stmt, col++, static_cast<int64_t>(client->m_item_in_bank_list[i]->m_instance.count)) == SQLITE_OK);
-        ok &= (sqlite3_bind_int(stmt, col++, client->m_item_in_bank_list[i]->m_instance.touch_effect_type) == SQLITE_OK);
-        ok &= (sqlite3_bind_int(stmt, col++, client->m_item_in_bank_list[i]->m_instance.touch_effect_value1) == SQLITE_OK);
-        ok &= (sqlite3_bind_int(stmt, col++, client->m_item_in_bank_list[i]->m_instance.touch_effect_value2) == SQLITE_OK);
-        ok &= (sqlite3_bind_int(stmt, col++, client->m_item_in_bank_list[i]->m_instance.touch_effect_value3) == SQLITE_OK);
-        ok &= (sqlite3_bind_int(stmt, col++, client->m_item_in_bank_list[i]->m_instance.item_color) == SQLITE_OK);
-        ok &= (sqlite3_bind_int(stmt, col++, client->m_item_in_bank_list[i]->m_instance.special_effect_value1) == SQLITE_OK);
-        ok &= (sqlite3_bind_int(stmt, col++, client->m_item_in_bank_list[i]->m_instance.special_effect_value2) == SQLITE_OK);
-        ok &= (sqlite3_bind_int(stmt, col++, client->m_item_in_bank_list[i]->m_instance.special_effect_value3) == SQLITE_OK);
-        ok &= (sqlite3_bind_int(stmt, col++, client->m_item_in_bank_list[i]->m_instance.cur_durability) == SQLITE_OK);
-        ok &= BindItemAttributeColumns(stmt, col, client->m_item_in_bank_list[i]->get_attributes());
-
-        if (ok) {
-            ok = sqlite3_step(stmt) == SQLITE_DONE;
-        }
-        if (!ok) {
-            sqlite3_finalize(stmt);
-            FailAndRollback("bank_items step/bind");
+    {
+        stmt_scope insertBank(db, insertBankSql);
+        if (!insertBank) {
+            FailStage("bank_items prepare");
             return false;
         }
-    }
-    sqlite3_finalize(stmt);
+        stmt = insertBank;
 
-    const char* insertPosSql =
-        "INSERT INTO character_item_positions(character_name, slot, pos_x, pos_y)"
-        " VALUES(?,?,?,?);";
-    if (sqlite3_prepare_v2(db, insertPosSql, -1, &stmt, nullptr) != SQLITE_OK) {
-        FailAndRollback("item_positions prepare");
-        return false;
-    }
-    for(int i = 0; i < hb::shared::limits::MaxItems; i++) {
-        sqlite3_reset(stmt);
-        sqlite3_clear_bindings(stmt);
-        ok = true;
-        ok &= PrepareAndBindText(stmt, 1, client->m_char_name);
-        ok &= (sqlite3_bind_int(stmt, 2, i) == SQLITE_OK);
-        ok &= (sqlite3_bind_int(stmt, 3, client->m_item_pos_list[i].x) == SQLITE_OK);
-        ok &= (sqlite3_bind_int(stmt, 4, client->m_item_pos_list[i].y) == SQLITE_OK);
-        if (ok) {
-            ok = sqlite3_step(stmt) == SQLITE_DONE;
+        for(int i = 0; i < hb::shared::limits::MaxBankItems; i++) {
+            if (client->m_item_in_bank_list[i] == nullptr) {
+                continue;
+            }
+            sqlite3_reset(stmt);
+            sqlite3_clear_bindings(stmt);
+            int col = 1;
+            ok = true;
+            ok &= PrepareAndBindText(stmt, col++, client->m_char_name);
+            ok &= (sqlite3_bind_int(stmt, col++, i) == SQLITE_OK);
+            ok &= (sqlite3_bind_int(stmt, col++, client->m_item_in_bank_list[i]->m_id_num) == SQLITE_OK);
+            ok &= (sqlite3_bind_int64(stmt, col++, client->m_item_in_bank_list[i]->m_serial) == SQLITE_OK);
+            ok &= (sqlite3_bind_int64(stmt, col++, static_cast<int64_t>(client->m_item_in_bank_list[i]->m_instance.count)) == SQLITE_OK);
+            ok &= (sqlite3_bind_int(stmt, col++, client->m_item_in_bank_list[i]->m_instance.touch_effect_type) == SQLITE_OK);
+            ok &= (sqlite3_bind_int(stmt, col++, client->m_item_in_bank_list[i]->m_instance.touch_effect_value1) == SQLITE_OK);
+            ok &= (sqlite3_bind_int(stmt, col++, client->m_item_in_bank_list[i]->m_instance.touch_effect_value2) == SQLITE_OK);
+            ok &= (sqlite3_bind_int(stmt, col++, client->m_item_in_bank_list[i]->m_instance.touch_effect_value3) == SQLITE_OK);
+            ok &= (sqlite3_bind_int(stmt, col++, client->m_item_in_bank_list[i]->m_instance.item_color) == SQLITE_OK);
+            ok &= (sqlite3_bind_int(stmt, col++, client->m_item_in_bank_list[i]->m_instance.special_effect_value1) == SQLITE_OK);
+            ok &= (sqlite3_bind_int(stmt, col++, client->m_item_in_bank_list[i]->m_instance.special_effect_value2) == SQLITE_OK);
+            ok &= (sqlite3_bind_int(stmt, col++, client->m_item_in_bank_list[i]->m_instance.special_effect_value3) == SQLITE_OK);
+            ok &= (sqlite3_bind_int(stmt, col++, client->m_item_in_bank_list[i]->m_instance.cur_durability) == SQLITE_OK);
+            ok &= BindItemAttributeColumns(stmt, col, client->m_item_in_bank_list[i]->get_attributes());
+
+            if (ok) {
+                ok = sqlite3_step(stmt) == SQLITE_DONE;
+            }
+            if (!ok) {
+                FailStage("bank_items step/bind");
+                return false;
+            }
         }
-        if (!ok) {
-            sqlite3_finalize(stmt);
-            FailAndRollback("item_positions step/bind");
+    }
+
+    // The four per-slot index tables. They differ only in their SQL and where
+    // the value comes from, so they are one loop over a small table rather than
+    // four copies of the same twenty lines — which is also how the fifth one
+    // (positions, the odd shape with two values) stays visibly the exception.
+    struct indexed_table
+    {
+        const char* stage;
+        const char* sql;
+        int count;
+        int (*value_at)(const CClient* client, int index);
+    };
+
+    const indexed_table indexed_tables[] = {
+        { "item_equips",
+          "INSERT INTO character_item_equips(character_name, slot, is_equipped) VALUES(?,?,?);",
+          hb::shared::limits::MaxItems,
+          [](const CClient* c, int i) { return c->m_is_item_equipped[i] ? 1 : 0; } },
+        { "magic_mastery",
+          "INSERT INTO character_magic_mastery(character_name, magic_index, mastery_value) VALUES(?,?,?);",
+          hb::shared::limits::MaxMagicType,
+          [](const CClient* c, int i) { return (int)c->m_magic_mastery[i]; } },
+        { "skill_mastery",
+          "INSERT INTO character_skill_mastery(character_name, skill_index, mastery_value) VALUES(?,?,?);",
+          hb::shared::limits::MaxSkillType,
+          [](const CClient* c, int i) { return (int)c->m_skill_mastery[i]; } },
+        { "skill_ssn",
+          "INSERT INTO character_skill_ssn(character_name, skill_index, ssn_value) VALUES(?,?,?);",
+          hb::shared::limits::MaxSkillType,
+          [](const CClient* c, int i) { return (int)c->m_skill_progress[i]; } },
+    };
+
+    {
+        const char* insertPosSql =
+            "INSERT INTO character_item_positions(character_name, slot, pos_x, pos_y)"
+            " VALUES(?,?,?,?);";
+        stmt_scope pos(db, insertPosSql);
+        if (!pos) {
+            FailStage("item_positions prepare");
             return false;
         }
-    }
-    sqlite3_finalize(stmt);
-
-    const char* insertEquipSql =
-        "INSERT INTO character_item_equips(character_name, slot, is_equipped)"
-        " VALUES(?,?,?);";
-    if (sqlite3_prepare_v2(db, insertEquipSql, -1, &stmt, nullptr) != SQLITE_OK) {
-        FailAndRollback("item_equips prepare");
-        return false;
-    }
-    for(int i = 0; i < hb::shared::limits::MaxItems; i++) {
-        sqlite3_reset(stmt);
-        sqlite3_clear_bindings(stmt);
-        ok = true;
-        ok &= PrepareAndBindText(stmt, 1, client->m_char_name);
-        ok &= (sqlite3_bind_int(stmt, 2, i) == SQLITE_OK);
-        ok &= (sqlite3_bind_int(stmt, 3, client->m_is_item_equipped[i] ? 1 : 0) == SQLITE_OK);
-        if (ok) {
-            ok = sqlite3_step(stmt) == SQLITE_DONE;
+        for(int i = 0; i < hb::shared::limits::MaxItems; i++) {
+            sqlite3_reset(pos);
+            sqlite3_clear_bindings(pos);
+            ok = true;
+            ok &= PrepareAndBindText(pos, 1, client->m_char_name);
+            ok &= (sqlite3_bind_int(pos, 2, i) == SQLITE_OK);
+            ok &= (sqlite3_bind_int(pos, 3, client->m_item_pos_list[i].x) == SQLITE_OK);
+            ok &= (sqlite3_bind_int(pos, 4, client->m_item_pos_list[i].y) == SQLITE_OK);
+            if (ok) {
+                ok = sqlite3_step(pos) == SQLITE_DONE;
+            }
+            if (!ok) {
+                FailStage("item_positions step/bind");
+                return false;
+            }
         }
-        if (!ok) {
-            sqlite3_finalize(stmt);
-            FailAndRollback("item_equips step/bind");
+    }
+
+    for (const auto& table : indexed_tables) {
+        stmt_scope rows(db, table.sql);
+        if (!rows) {
+            FailStage(table.stage);
             return false;
         }
+        for (int i = 0; i < table.count; i++) {
+            sqlite3_reset(rows);
+            sqlite3_clear_bindings(rows);
+            ok = true;
+            ok &= PrepareAndBindText(rows, 1, client->m_char_name);
+            ok &= (sqlite3_bind_int(rows, 2, i) == SQLITE_OK);
+            ok &= (sqlite3_bind_int(rows, 3, table.value_at(client, i)) == SQLITE_OK);
+            if (ok) {
+                ok = sqlite3_step(rows) == SQLITE_DONE;
+            }
+            if (!ok) {
+                FailStage(table.stage);
+                return false;
+            }
+        }
     }
-    sqlite3_finalize(stmt);
 
-    const char* insertMagicSql =
-        "INSERT INTO character_magic_mastery(character_name, magic_index, mastery_value)"
-        " VALUES(?,?,?);";
-    if (sqlite3_prepare_v2(db, insertMagicSql, -1, &stmt, nullptr) != SQLITE_OK) {
-        FailAndRollback("magic_mastery prepare");
-        return false;
-    }
-    for(int i = 0; i < hb::shared::limits::MaxMagicType; i++) {
-        sqlite3_reset(stmt);
-        sqlite3_clear_bindings(stmt);
-        ok = true;
-        ok &= PrepareAndBindText(stmt, 1, client->m_char_name);
-        ok &= (sqlite3_bind_int(stmt, 2, i) == SQLITE_OK);
-        ok &= (sqlite3_bind_int(stmt, 3, client->m_magic_mastery[i]) == SQLITE_OK);
-        if (ok) {
-            ok = sqlite3_step(stmt) == SQLITE_DONE;
-        }
-        if (!ok) {
-            sqlite3_finalize(stmt);
-            FailAndRollback("magic_mastery step/bind");
-            return false;
-        }
-    }
-    sqlite3_finalize(stmt);
-
-    const char* insertSkillSql =
-        "INSERT INTO character_skill_mastery(character_name, skill_index, mastery_value)"
-        " VALUES(?,?,?);";
-    if (sqlite3_prepare_v2(db, insertSkillSql, -1, &stmt, nullptr) != SQLITE_OK) {
-        FailAndRollback("skill_mastery prepare");
-        return false;
-    }
-    for(int i = 0; i < hb::shared::limits::MaxSkillType; i++) {
-        sqlite3_reset(stmt);
-        sqlite3_clear_bindings(stmt);
-        ok = true;
-        ok &= PrepareAndBindText(stmt, 1, client->m_char_name);
-        ok &= (sqlite3_bind_int(stmt, 2, i) == SQLITE_OK);
-        ok &= (sqlite3_bind_int(stmt, 3, client->m_skill_mastery[i]) == SQLITE_OK);
-        if (ok) {
-            ok = sqlite3_step(stmt) == SQLITE_DONE;
-        }
-        if (!ok) {
-            sqlite3_finalize(stmt);
-            FailAndRollback("skill_mastery step/bind");
-            return false;
-        }
-    }
-    sqlite3_finalize(stmt);
-
-    const char* insertSsnSql =
-        "INSERT INTO character_skill_ssn(character_name, skill_index, ssn_value)"
-        " VALUES(?,?,?);";
-    if (sqlite3_prepare_v2(db, insertSsnSql, -1, &stmt, nullptr) != SQLITE_OK) {
-        FailAndRollback("skill_ssn prepare");
-        return false;
-    }
-    for(int i = 0; i < hb::shared::limits::MaxSkillType; i++) {
-        sqlite3_reset(stmt);
-        sqlite3_clear_bindings(stmt);
-        ok = true;
-        ok &= PrepareAndBindText(stmt, 1, client->m_char_name);
-        ok &= (sqlite3_bind_int(stmt, 2, i) == SQLITE_OK);
-        ok &= (sqlite3_bind_int(stmt, 3, client->m_skill_progress[i]) == SQLITE_OK);
-        if (ok) {
-            ok = sqlite3_step(stmt) == SQLITE_DONE;
-        }
-        if (!ok) {
-            sqlite3_finalize(stmt);
-            FailAndRollback("skill_ssn step/bind");
-            return false;
-        }
-    }
-    sqlite3_finalize(stmt);
-
-    if (!ExecSql(db, "COMMIT;")) {
-        FailAndRollback("COMMIT");
+    if (!txn.commit()) {
+        FailStage("COMMIT");
         return false;
     }
     return true;
 }
 
+// The three lookups below, plus CountAccountStats, are what ADR 0004 meant by
+// "directory-walk helpers become single queries". Each of them used to open
+// every file in accounts/ and query it in turn — O(accounts) file opens to
+// answer a question an index answers in one seek, on the login path.
 bool CharacterNameExistsGlobally(const char* character_name)
 {
-    if (character_name == nullptr || character_name[0] == '\0') {
+    sqlite3* db = hb::server::game_db_handle();
+    if (db == nullptr || character_name == nullptr || character_name[0] == '\0') {
         return false;
     }
 
-    std::error_code ec;
-    bool found = false;
-
-    for (const auto& entry : std::filesystem::directory_iterator("accounts", ec)) {
-        if (!entry.is_regular_file() || entry.path().extension() != ".db")
-            continue;
-
-        std::string dbPath = entry.path().string();
-
-        sqlite3* db = nullptr;
-        if (sqlite3_open(dbPath.c_str(), &db) != SQLITE_OK) {
-            if (db) sqlite3_close(db);
-            continue;
-        }
-
-        const char* sql = "SELECT 1 FROM characters WHERE character_name = ? COLLATE NOCASE LIMIT 1";
-        sqlite3_stmt* stmt = nullptr;
-
-        if (sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) == SQLITE_OK) {
-            if (sqlite3_bind_text(stmt, 1, character_name, -1, SQLITE_TRANSIENT) == SQLITE_OK) {
-                if (sqlite3_step(stmt) == SQLITE_ROW) {
-                    found = true;
-                }
-            }
-            sqlite3_finalize(stmt);
-        }
-
-        sqlite3_close(db);
-        if (found) break;
+    stmt_scope stmt(db, "SELECT 1 FROM characters WHERE character_name = ? COLLATE NOCASE LIMIT 1;");
+    if (!stmt) {
+        return false;
     }
 
-    return found;
+    PrepareAndBindText(stmt, 1, character_name);
+    return sqlite3_step(stmt) == SQLITE_ROW;
 }
 
 bool AccountNameExists(const char* account_name)
 {
-    if (account_name == nullptr || account_name[0] == '\0') {
+    sqlite3* db = hb::server::game_db_handle();
+    if (db == nullptr || account_name == nullptr || account_name[0] == '\0') {
         return false;
     }
 
-    std::error_code ec;
-    bool found = false;
-
-    for (const auto& entry : std::filesystem::directory_iterator("accounts", ec)) {
-        if (!entry.is_regular_file() || entry.path().extension() != ".db")
-            continue;
-
-        std::string dbPath = entry.path().string();
-
-        sqlite3* db = nullptr;
-        if (sqlite3_open(dbPath.c_str(), &db) != SQLITE_OK) {
-            if (db) sqlite3_close(db);
-            continue;
-        }
-
-        const char* sql = "SELECT 1 FROM accounts WHERE account_name = ? COLLATE NOCASE LIMIT 1";
-        sqlite3_stmt* stmt = nullptr;
-
-        if (sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) == SQLITE_OK) {
-            if (sqlite3_bind_text(stmt, 1, account_name, -1, SQLITE_TRANSIENT) == SQLITE_OK) {
-                if (sqlite3_step(stmt) == SQLITE_ROW) {
-                    found = true;
-                }
-            }
-            sqlite3_finalize(stmt);
-        }
-
-        sqlite3_close(db);
-        if (found) break;
+    stmt_scope stmt(db, "SELECT 1 FROM accounts WHERE account_name = ? COLLATE NOCASE LIMIT 1;");
+    if (!stmt) {
+        return false;
     }
 
-    return found;
+    PrepareAndBindText(stmt, 1, account_name);
+    return sqlite3_step(stmt) == SQLITE_ROW;
 }
 
-bool LoadBlockList(sqlite3* db, std::vector<std::pair<std::string, std::string>>& outBlocks)
+bool LoadBlockList(sqlite3* db, const char* owner_account_name, std::vector<std::pair<std::string, std::string>>& outBlocks)
 {
     outBlocks.clear();
-    const char* sql = "SELECT blocked_account_name, blocked_character_name FROM block_list";
-    sqlite3_stmt* stmt = nullptr;
+    if (db == nullptr || owner_account_name == nullptr) {
+        return false;
+    }
 
-    if (sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) != SQLITE_OK)
+    stmt_scope stmt(db, "SELECT blocked_account_name, blocked_character_name FROM block_list"
+        " WHERE owner_account_name = ? COLLATE NOCASE;");
+    if (!stmt)
         return false;
 
+    PrepareAndBindText(stmt, 1, owner_account_name);
     while (sqlite3_step(stmt) == SQLITE_ROW)
     {
         const char* account_name = (const char*)sqlite3_column_text(stmt, 0);
@@ -1801,121 +1741,104 @@ bool LoadBlockList(sqlite3* db, std::vector<std::pair<std::string, std::string>>
             outBlocks.push_back(std::make_pair(std::string(account_name), std::string(charName)));
     }
 
-    sqlite3_finalize(stmt);
     return true;
 }
 
-bool SaveBlockList(sqlite3* db, const std::vector<std::pair<std::string, std::string>>& blocks)
+bool SaveBlockList(sqlite3* db, const char* owner_account_name, const std::vector<std::pair<std::string, std::string>>& blocks)
 {
-    if (!ExecSql(db, "DELETE FROM block_list"))
+    if (db == nullptr || owner_account_name == nullptr) {
         return false;
+    }
 
-    const char* sql = "INSERT INTO block_list (blocked_account_name, blocked_character_name) VALUES (?, ?)";
-    sqlite3_stmt* stmt = nullptr;
+    // Delete-then-insert, scoped to this owner. Before v8 the DELETE had no
+    // WHERE because the file held one account's rows; unscoped in one database
+    // it would clear every player's block list on any player's save.
+    {
+        stmt_scope purge(db, "DELETE FROM block_list WHERE owner_account_name = ? COLLATE NOCASE;");
+        if (!purge)
+            return false;
+        PrepareAndBindText(purge, 1, owner_account_name);
+        if (sqlite3_step(purge) != SQLITE_DONE)
+            return false;
+    }
 
-    if (sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) != SQLITE_OK)
+    stmt_scope stmt(db, "INSERT INTO block_list (owner_account_name, blocked_account_name,"
+        " blocked_character_name) VALUES (?, ?, ?);");
+    if (!stmt)
         return false;
 
     for (const auto& entry : blocks)
     {
         sqlite3_reset(stmt);
-        sqlite3_bind_text(stmt, 1, entry.first.c_str(), -1, SQLITE_TRANSIENT);
-        sqlite3_bind_text(stmt, 2, entry.second.c_str(), -1, SQLITE_TRANSIENT);
+        PrepareAndBindText(stmt, 1, owner_account_name);
+        sqlite3_bind_text(stmt, 2, entry.first.c_str(), -1, SQLITE_TRANSIENT);
+        sqlite3_bind_text(stmt, 3, entry.second.c_str(), -1, SQLITE_TRANSIENT);
         if (sqlite3_step(stmt) != SQLITE_DONE)
         {
-            sqlite3_finalize(stmt);
             return false;
         }
     }
 
-    sqlite3_finalize(stmt);
     return true;
 }
 
 bool ResolveCharacterToAccount(const char* character_name, char* outAccountName, size_t accountNameSize)
 {
-    if (character_name == nullptr || outAccountName == nullptr || accountNameSize == 0)
+    sqlite3* db = hb::server::game_db_handle();
+    if (db == nullptr || character_name == nullptr || outAccountName == nullptr || accountNameSize == 0)
         return false;
 
-    std::error_code ec;
-    bool found = false;
+    stmt_scope stmt(db, "SELECT account_name FROM characters WHERE character_name = ? COLLATE NOCASE LIMIT 1;");
+    if (!stmt)
+        return false;
 
-    for (const auto& entry : std::filesystem::directory_iterator("accounts", ec)) {
-        if (!entry.is_regular_file() || entry.path().extension() != ".db")
-            continue;
+    PrepareAndBindText(stmt, 1, character_name);
+    if (sqlite3_step(stmt) != SQLITE_ROW)
+        return false;
 
-        std::string dbPathStr = entry.path().string();
-        const char* dbPath = dbPathStr.c_str();
+    const char* acctName = (const char*)sqlite3_column_text(stmt, 0);
+    if (acctName == nullptr)
+        return false;
 
-        sqlite3* db = nullptr;
-        if (sqlite3_open(dbPath, &db) != SQLITE_OK)
-        {
-            if (db) sqlite3_close(db);
-            continue;
-        }
-
-        const char* sql = "SELECT account_name FROM characters WHERE character_name = ? COLLATE NOCASE LIMIT 1";
-        sqlite3_stmt* stmt = nullptr;
-
-        if (sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) == SQLITE_OK)
-        {
-            if (sqlite3_bind_text(stmt, 1, character_name, -1, SQLITE_TRANSIENT) == SQLITE_OK)
-            {
-                if (sqlite3_step(stmt) == SQLITE_ROW)
-                {
-                    const char* acctName = (const char*)sqlite3_column_text(stmt, 0);
-                    if (acctName)
-                    {
-                        std::strncpy(outAccountName, acctName, accountNameSize - 1);
-                        outAccountName[accountNameSize - 1] = '\0';
-                        found = true;
-                    }
-                }
-            }
-            sqlite3_finalize(stmt);
-        }
-
-        sqlite3_close(db);
-
-        if (found)
-            break;
-
-    }
-
-    return found;
+    std::strncpy(outAccountName, acctName, accountNameSize - 1);
+    outAccountName[accountNameSize - 1] = '\0';
+    return true;
 }
 
 account_stats CountAccountStats()
 {
     account_stats stats{0, 0};
-    std::error_code ec;
+    sqlite3* db = hb::server::game_db_handle();
+    if (db == nullptr) {
+        return stats;
+    }
 
-    for (const auto& entry : std::filesystem::directory_iterator("accounts", ec)) {
-        if (!entry.is_regular_file() || entry.path().extension() != ".db")
-            continue;
-
-        stats.accounts++;
-
-        sqlite3* db = nullptr;
-        if (sqlite3_open(entry.path().string().c_str(), &db) != SQLITE_OK) {
-            if (db) sqlite3_close(db);
-            continue;
+    {
+        stmt_scope stmt(db, "SELECT COUNT(*) FROM accounts;");
+        if (stmt && sqlite3_step(stmt) == SQLITE_ROW) {
+            stats.accounts = sqlite3_column_int(stmt, 0);
         }
+    }
+    {
+        stmt_scope stmt(db, "SELECT COUNT(*) FROM characters;");
+        if (stmt && sqlite3_step(stmt) == SQLITE_ROW) {
+            stats.characters = sqlite3_column_int(stmt, 0);
+        }
+    }
 
-        sqlite3_stmt* stmt = nullptr;
-        if (sqlite3_prepare_v2(db, "SELECT COUNT(*) FROM characters", -1, &stmt, nullptr) == SQLITE_OK) {
-            if (sqlite3_step(stmt) == SQLITE_ROW) {
-                int count = sqlite3_column_int(stmt, 0);
-                stats.characters += count;
-                if (count > hb::shared::limits::MaxCharactersPerAccount) {
-                    std::string name = entry.path().stem().string();
-                    stats.over_limit.emplace_back(name, count);
-                }
+    // Over-limit accounts, grouped rather than counted per file. This also
+    // reports the account's stored name instead of the lowercased filename the
+    // per-file walk had to use.
+    {
+        stmt_scope stmt(db, "SELECT account_name, COUNT(*) AS n FROM characters"
+            " GROUP BY account_name HAVING n > ? ORDER BY account_name;");
+        if (stmt) {
+            sqlite3_bind_int(stmt, 1, hb::shared::limits::MaxCharactersPerAccount);
+            while (sqlite3_step(stmt) == SQLITE_ROW) {
+                const char* name = (const char*)sqlite3_column_text(stmt, 0);
+                stats.over_limit.emplace_back(name ? name : "", sqlite3_column_int(stmt, 1));
             }
-            sqlite3_finalize(stmt);
         }
-
-        sqlite3_close(db);
     }
 
     return stats;

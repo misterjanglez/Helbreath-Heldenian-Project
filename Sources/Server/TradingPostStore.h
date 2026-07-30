@@ -25,6 +25,12 @@ namespace hb::server
 	struct escrow_item
 	{
 		int16_t  item_id             = 0;
+		// The Serial the escrowed item carries (ADR 0003). Escrow is a custody
+		// transfer, not a destruction and re-creation, so the item that comes
+		// back out of a Listing has to be the same instance that went in — a
+		// Serial dropped here would read to Reconciliation as one item vanishing
+		// and an unrelated one appearing. 0 for Counted (stackable) items.
+		int64_t  serial              = 0;
 		uint64_t count               = 0;
 		int16_t  touch_effect_type   = 0;
 		int16_t  touch_effect_value1 = 0;
