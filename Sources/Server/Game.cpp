@@ -3090,6 +3090,7 @@ std::vector<std::vector<char>> CGame::build_modifier_catalog_packets() const
 			entries[i].marquee = row.marquee ? 1 : 0;
 			entries[i].effect_placement = row.effect_placement;
 			entries[i].bucket_sort_order = row.bucket_sort_order;
+			std::snprintf(entries[i].bucket_name, sizeof(entries[i].bucket_name), "%s", row.bucket_name.c_str());
 			// Bands are display units and the widest seeded one tops out at 91,
 			// so a byte is honest data rather than a squeeze. Clamped rather
 			// than truncated so a future out-of-range band degrades to "the
@@ -4992,7 +4993,7 @@ void CGame::init_player_data(int client_h, char* data, uint32_t size)
 	// m_is_init_complete, which only became true on the line above. Sent
 	// unconditionally so a character who logs in already wearing attribute gear
 	// starts with the right numbers instead of waiting for the first re-equip.
-	send_notify_msg(0, client_h, Notify::GearStats, 0, 0, 0, 0);
+	send_notify_msg(0, client_h, Notify::DerivedStats, 0, 0, 0, 0);
 
 	// Trading Post login hook: deliver any notices queued while the character was
 	// offline as system chat lines, then clear them.
@@ -8658,18 +8659,55 @@ void CGame::send_notify_msg(int from_h, int to_h, uint16_t msg_type, uint32_t v1
 		break;
 	}
 
-	case Notify::GearStats:
+	case Notify::DerivedStats:
 	{
 		// The stats above stay the character's own — creation, level-up and
 		// persistence read those. This carries the gear contribution alongside
 		// so the client can render and re-derive with the same numbers the
-		// server's effective_*() already use.
-		hb::net::PacketNotifyGearStats pkt{};
+		// server's effective_*() already use, plus the derived combat totals it
+		// has no way to reach: they are accumulated across the equip pass into
+		// members that are read at damage resolution and never left this side.
+		const CClient* who = m_client_list[to_h];
+
+		hb::net::PacketNotifyDerivedStats pkt{};
 		pkt.header.msg_id = MsgId::Notify;
 		pkt.header.msg_type = msg_type;
 		for (std::size_t i = 0; i < std::size(pkt.add_attribute); i++)
-			pkt.add_attribute[i] = static_cast<int16_t>(m_client_list[to_h]->m_add_attribute[i]);
-		ret = m_client_list[to_h]->m_socket->send_msg(reinterpret_cast<char*>(&pkt), sizeof(pkt));
+			pkt.add_attribute[i] = static_cast<int16_t>(who->m_add_attribute[i]);
+
+		const auto narrow = [](int value) { return static_cast<int16_t>(value); };
+
+		pkt.defense_ratio = narrow(who->m_defense_ratio);
+
+		// Zone 2 is the leggings and the boots added together, which is how the
+		// hit_point switch reads them — sent pre-summed so the client is not
+		// left to rediscover that pairing.
+		pkt.absorb_body   = narrow(who->m_damage_absorption_armor[to_int(EquipPos::Body)]);
+		pkt.absorb_legs   = narrow(who->m_damage_absorption_armor[to_int(EquipPos::Leggings)]
+		                         + who->m_damage_absorption_armor[to_int(EquipPos::Boots)]);
+		pkt.absorb_arms   = narrow(who->m_damage_absorption_armor[to_int(EquipPos::Arms)]);
+		pkt.absorb_head   = narrow(who->m_damage_absorption_armor[to_int(EquipPos::Head)]);
+		pkt.absorb_shield = narrow(who->m_damage_absorption_shield);
+
+		pkt.magic_absorb = narrow(who->m_add_abs_magical_defense);
+		// Two separate gear terms feed this and the skill is the base, so the
+		// total is assembled here rather than leaving the client to guess which
+		// halves it was given.
+		pkt.magic_resistance = narrow(who->m_skill_mastery[3]
+		                            + who->m_add_magic_resistance
+		                            + who->m_add_resist_magic);
+		pkt.poison_resistance = narrow(who->m_add_poison_resistance);
+		pkt.hit_bonus = narrow(who->m_hit_ratio + who->m_add_attack_ratio);
+
+		pkt.absorb_air   = narrow(who->m_add_abs_air);
+		pkt.absorb_earth = narrow(who->m_add_abs_earth);
+		pkt.absorb_fire  = narrow(who->m_add_abs_fire);
+		pkt.absorb_water = narrow(who->m_add_abs_water);
+
+		pkt.physical_damage = narrow(who->m_add_physical_damage);
+		pkt.magical_damage  = narrow(who->m_add_magical_damage);
+
+		ret = who->m_socket->send_msg(reinterpret_cast<char*>(&pkt), sizeof(pkt));
 		break;
 	}
 
@@ -12519,7 +12557,17 @@ void CGame::on_timer(char type)
 	m_loot_manager = new LootManager();
 	m_loot_manager->set_game(this);
 	m_combat_manager = new CombatManager();
-	m_item_manager = new ItemManager();
+	// NOT m_item_manager. This block re-creates managers the constructor already
+	// built, and for every other one that is merely wasteful — but ItemManager
+	// carries the Serial allocator, and init() has already lifted it above the
+	// ledger's recovered high-water by this point. A fresh one here silently
+	// resets that to zero, so the world starts minting Serials the ledger has
+	// already issued: every restart re-issues the numbers the previous run minted
+	// above the highest *persisted* item, and the first flush afterwards dies on
+	// UNIQUE constraint failed: item_instances.serial.
+	//
+	// The allocator is the only state ItemManager owns, which is exactly why this
+	// was invisible — nothing else about the manager notices being replaced.
 	m_magic_manager = new MagicManager();
 	m_skill_manager = new SkillManager();
 	m_war_manager = new WarManager();

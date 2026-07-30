@@ -254,28 +254,61 @@ void CmdLedgerCheck::execute(CGame* game, const char* args)
 		tally.record("external_reader", reader_ok);
 	}
 
-	// A flush that cannot write must keep its buffer. Re-minting a Serial the
-	// instance table already holds is a deterministic way to make the transaction
-	// fail; what is being proven is that the events survive it, because an audit
-	// log that discards what it could not write has exactly the gap it exists to
-	// prevent.
+	// A row the schema refuses is dropped, not retried. Re-minting a Serial the
+	// instance table already holds is the deterministic way to produce one.
+	//
+	// This check used to assert the opposite — that such a flush fails and keeps
+	// its buffer — on the reasoning that an audit log must not discard what it
+	// could not write. That reasoning is right for a *transient* failure and
+	// exactly backwards for a permanent one, which is a distinction the old check
+	// did not draw: the buffer is only ever retried whole, so one row the schema
+	// will refuse forever stops every later event from ever reaching disk. The
+	// ledger goes silent, the buffer grows without bound, and the only symptom is
+	// one error line repeating on the flush interval. Seen in the wild.
+	//
+	// So the promise is now: the offending row is dropped and counted, everything
+	// beside it in the same batch still lands, and the writer keeps working.
 	probe_item->m_serial = probe_serial_a;
 	scratch->record_mint(*probe_item, "ledgercheck", "probemap", 10, 20);
 	const size_t held = scratch->pending_count();
-	const bool failed_as_expected = scratch->flush(0) == false;
-	tally.record("flush_failure_keeps_buffer",
-		failed_as_expected
+	const bool flush_survived = scratch->flush(0);
+	tally.record("rejected_row_dropped_not_retried",
+		flush_survived
 		&& held == 2
-		&& scratch->pending_count() == held
+		&& scratch->pending_count() == 0
+		&& scratch->dropped_rows() == 1
 		&& probe_scalar(scratch->handle(), "SELECT COUNT(*) FROM item_instances;") == 1);
 
-	// ...and the retry lands once the obstruction is gone. Held-for-later is only
-	// a real promise if something eventually collects.
-	sqlite3_exec(scratch->handle(), "DELETE FROM item_instances;", nullptr, nullptr, nullptr);
-	tally.record("flush_retry_succeeds",
+	// The duplicate instance was refused; the creation event that travelled with
+	// it has no such constraint and must still be there. This is the half that
+	// matters — the rest of the batch is what a stalled writer would have cost.
+	tally.record("rejected_row_spares_its_batch",
+		probe_scalar(scratch->handle(), std::format(
+			"SELECT COUNT(*) FROM item_events WHERE serial = {};", probe_serial_a).c_str()) >= 1);
+
+	// ...and the writer is still live afterwards, which is the whole point: a
+	// later event lands rather than queueing behind a row that can never go.
+	//
+	// Counted as a delta rather than an absolute, because an earlier probe in this
+	// run already recorded a despawn — asserting "exactly one" would have been
+	// measuring the wrong thing and would fail for a reason unrelated to the
+	// promise being made here.
+	auto despawn_rows = [&]
+	{
+		return probe_scalar(scratch->handle(), std::format(
+			"SELECT COUNT(*) FROM item_events WHERE event_type = {};",
+			static_cast<int>(ledger_event::despawned)).c_str());
+	};
+	const int64_t despawns_before = despawn_rows();
+
+	ledger_event_record after{};
+	after.serial = probe_serial_a;
+	after.event_type = ledger_event::despawned;
+	scratch->record_event(after);
+	tally.record("writer_survives_a_rejection",
 		scratch->flush(0)
 		&& scratch->pending_count() == 0
-		&& probe_scalar(scratch->handle(), "SELECT COUNT(*) FROM item_instances;") == 1);
+		&& despawn_rows() == despawns_before + 1);
 
 	//----------------------------------------------------------------------
 	// Restart safety. Each block closes the store, optionally reproduces an

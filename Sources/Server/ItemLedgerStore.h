@@ -257,12 +257,18 @@ namespace hb::server
 		int64_t read_meta_int(const char* key) const;
 		bool write_meta(const char* key, const std::string& value);
 
-		// The per-flush inserts. Each returns false on the first SQL error so
-		// flush() can roll the whole transaction back rather than commit a
-		// partial window.
-		bool write_instances();
-		bool write_events();
-		bool write_flows();
+		// The per-flush inserts. Each returns false on the first *transient* SQL
+		// error so flush() can roll the whole transaction back rather than commit
+		// a partial window.
+		//
+		// A row the schema rejects outright is a different case: it can never
+		// succeed, and because the buffer is retried whole it would stop every
+		// later event from ever reaching disk. Those rows are dropped and counted
+		// in `dropped` instead, so one bad row costs one row rather than the rest
+		// of the run's audit trail.
+		bool write_instances(int& dropped);
+		bool write_events(int& dropped);
+		bool write_flows(int& dropped);
 
 		// A yyyymmdd day number for the flow key, from local time — flow rows are
 		// read by humans tuning drop rates, so the day boundary that matters is
@@ -318,5 +324,15 @@ namespace hb::server
 		// synchronous error-log write. Backing off to the interval keeps the retry
 		// promise without turning one bad write into a busy loop.
 		bool     m_flush_failed = false;
+
+		// Rows the schema refused, for the life of the process. Non-zero means the
+		// ledger is knowingly incomplete — which is worth surviving (the
+		// alternative is a stalled writer and no events at all) but is never
+		// normal, so it is kept where an operator and the provers can both see it.
+		int64_t  m_dropped_rows = 0;
+
+	public:
+		// How many rows the schema has rejected since startup. 0 in a healthy run.
+		int64_t dropped_rows() const { return m_dropped_rows; }
 	};
 }

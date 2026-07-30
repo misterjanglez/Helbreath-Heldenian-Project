@@ -53,17 +53,29 @@ namespace
 	}
 
 	// One insert statement driven over one buffer. All three tables share this
-	// ritual — prepare, bind each row, step, stop at the first error so the
-	// caller can roll the whole window back — and only the SQL and the bind list
-	// differ, so those are what the callers supply. `describe` names the offending
-	// row in the error line; it is only called on the failure path.
+	// ritual and only the SQL and the bind list differ, so those are what the
+	// callers supply. `describe` names the offending row in the error line; it is
+	// only called on a failure path.
 	//
-	// Written once because the alternative is the same twenty lines in triplicate,
-	// where remembering sqlite3_reset or changing the error format is three edits
-	// with nothing to link them, and the next table is a fourth copy.
+	// It tells two kinds of failure apart.
+	//
+	// A transient failure — the file is locked, the disk hiccupped — is worth
+	// retrying, so it fails the whole transaction and the caller keeps the buffer.
+	//
+	// A constraint violation is not. It will fail identically on every future
+	// attempt, and the buffer is only ever retried as a whole, so one poisoned row
+	// stops **every** later event from reaching disk: the ledger goes silent, the
+	// buffer grows without bound, and the only sign is one error line repeating on
+	// the flush interval. That is a worse outcome than losing the offending row,
+	// because the rows behind it are the ones nobody has seen yet.
+	//
+	// So a rejected row is dropped and loudly named, and the batch carries on.
+	// `dropped` is counted rather than swallowed: a rejection means something
+	// upstream produced a row the schema says cannot exist — a re-issued Serial,
+	// say — and that is a defect report, not routine housekeeping.
 	template <typename Rows, typename Bind, typename Describe>
 	bool write_batch(sqlite3* db, const char* label, const char* sql,
-		const Rows& rows, Bind bind, Describe describe)
+		const Rows& rows, Bind bind, Describe describe, int& dropped)
 	{
 		if (rows.empty()) {
 			return true;
@@ -81,12 +93,24 @@ namespace
 			sqlite3_clear_bindings(stmt);
 			bind(stmt, row);
 
-			if (sqlite3_step(stmt) != SQLITE_DONE) {
-				hb::logger::error("[LEDGER] {} insert failed for {}: {}",
-					label, describe(row), sqlite3_errmsg(db));
-				ok = false;
-				break;
+			const int rc = sqlite3_step(stmt);
+			if (rc == SQLITE_DONE) {
+				continue;
 			}
+
+			if (rc == SQLITE_CONSTRAINT) {
+				hb::logger::error("[LEDGER] {} row REJECTED and dropped - {}: {}. "
+					"The schema says this row cannot exist, so retrying it would "
+					"stall every event behind it; something upstream produced it.",
+					label, describe(row), sqlite3_errmsg(db));
+				++dropped;
+				continue;
+			}
+
+			hb::logger::error("[LEDGER] {} insert failed for {}: {}",
+				label, describe(row), sqlite3_errmsg(db));
+			ok = false;
+			break;
 		}
 
 		sqlite3_finalize(stmt);
@@ -504,7 +528,8 @@ namespace hb::server
 			return false;
 		}
 
-		bool ok = write_instances() && write_events() && write_flows();
+		int dropped = 0;
+		bool ok = write_instances(dropped) && write_events(dropped) && write_flows(dropped);
 
 		// The high-water mark rides the same transaction as the rows it covers.
 		// Persisting it separately could leave a mark above instances that never
@@ -542,6 +567,16 @@ namespace hb::server
 			m_flush_failed = false;
 		}
 
+		// Counted for the life of the process, not just this window: a rejection
+		// is a defect signal, and one line per occurrence scrolls away while the
+		// running total is what an operator can still see an hour later.
+		if (dropped > 0) {
+			m_dropped_rows += dropped;
+			hb::logger::error("[LEDGER] {} row(s) rejected by the schema this flush "
+				"({} since start) - the ledger is now INCOMPLETE and the cause is "
+				"upstream of it", dropped, m_dropped_rows);
+		}
+
 		if (advance_high_water) {
 			m_written_high_water = high_water;
 		}
@@ -556,7 +591,7 @@ namespace hb::server
 		return true;
 	}
 
-	bool item_ledger_store::write_instances()
+	bool item_ledger_store::write_instances(int& dropped)
 	{
 		return write_batch(m_db, "instance",
 			"INSERT INTO item_instances"
@@ -579,10 +614,10 @@ namespace hb::server
 			[](const ledger_instance& row)
 			{
 				return std::format("serial {}", row.serial);
-			});
+			}, dropped);
 	}
 
-	bool item_ledger_store::write_events()
+	bool item_ledger_store::write_events(int& dropped)
 	{
 		return write_batch(m_db, "event",
 			"INSERT INTO item_events"
@@ -607,10 +642,10 @@ namespace hb::server
 			[](const ledger_event_record& row)
 			{
 				return std::format("serial {} type {}", row.serial, row.event_type);
-			});
+			}, dropped);
 	}
 
-	bool item_ledger_store::write_flows()
+	bool item_ledger_store::write_flows(int& dropped)
 	{
 		// Accumulate rather than replace: a day's row is the sum of every window
 		// that touched it, and the buffer only ever holds this window's delta.
@@ -629,7 +664,7 @@ namespace hb::server
 			{
 				return std::format("day {} item {} type {}",
 					row.first.day, row.first.item_id, row.first.flow_type);
-			});
+			}, dropped);
 	}
 
 	void item_ledger_store::set_flush_cadence(int interval_ms, int event_threshold)
