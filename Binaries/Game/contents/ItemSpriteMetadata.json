@@ -3245,5 +3245,53 @@
       "pack_frame_index": 362
     },
     "equip_type": "weapon"
+  },
+  {
+    "pak_file": null,
+    "id": 314,
+    "inventory_frame_index": 363,
+    "ground_frame_index": 363
+  },
+  {
+    "pak_file": null,
+    "id": 315,
+    "inventory_frame_index": 364,
+    "ground_frame_index": 364
+  },
+  {
+    "pak_file": null,
+    "id": 316,
+    "inventory_frame_index": 365,
+    "ground_frame_index": 365
+  },
+  {
+    "pak_file": null,
+    "id": 317,
+    "inventory_frame_index": 366,
+    "ground_frame_index": 366
+  },
+  {
+    "pak_file": null,
+    "id": 318,
+    "inventory_frame_index": 367,
+    "ground_frame_index": 367
+  },
+  {
+    "pak_file": null,
+    "id": 319,
+    "inventory_frame_index": 368,
+    "ground_frame_index": 368
+  },
+  {
+    "pak_file": null,
+    "id": 320,
+    "inventory_frame_index": 369,
+    "ground_frame_index": 369
+  },
+  {
+    "pak_file": null,
+    "id": 321,
+    "inventory_frame_index": 370,
+    "ground_frame_index": 370
   }
 ]
