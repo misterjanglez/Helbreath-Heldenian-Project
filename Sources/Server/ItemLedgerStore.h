@@ -95,6 +95,16 @@ namespace hb::server
 		"ItemLogAction has grown into the ledger-only event band; give the new "
 		"action a value below ledger_event::created or move the band up.");
 
+	// The `detail` column's encoder. That column is declared as event-specific
+	// JSON by the schema, so the rule for turning a value into it belongs beside
+	// the column rather than in whichever manager happened to need it first —
+	// every later emitter (upgrade level, sale price, despawn reason) hits the
+	// same rule. Hand-assembly is what these exist to prevent: one quote in an
+	// NPC name out of a content file makes a row no reader can parse, and the
+	// column is only worth having if every row in it parses.
+	std::string detail_json(const char* key, const std::string& value);
+	std::string detail_json(const char* key, int64_t value);
+
 	// One item_instances row: the birth record of an Instanced item.
 	struct ledger_instance
 	{
@@ -178,12 +188,23 @@ namespace hb::server
 		// with no location and let the following drop/pickup event supply it. The
 		// schema makes map/x/y nullable for exactly that reason, which is what
 		// keeps #78 wiring creation at one funnel instead of 45 placement sites.
-		void record_mint(const CItem& item, const char* origin_detail,
-			const char* map, int x, int y);
+		// Everything after the item therefore defaults to "not known here", which
+		// is what the minting funnel passes; #79 supplies them at the venues that
+		// do know.
+		void record_mint(const CItem& item, const char* origin_detail = nullptr,
+			const char* map = nullptr, int x = 0, int y = 0);
 
 		// One transition of an already-minted item. Ignored when serial == 0, so
 		// a caller that reaches this with a Counted item silently records nothing
 		// rather than writing an event pointing at no instance.
+		//
+		// An `at` left at 0 is stamped with the current time here. That is where
+		// the rule belongs: the dual sink (#78) records from inside the game
+		// action, so "when" is always the moment of the call, and a call site
+		// that forgot to say so would land at the epoch — ordering before every
+		// event ever recorded. Setting `at` explicitly still wins, which is both
+		// how record_mint keeps a birth row and its creation event on one
+		// timestamp and what a replay of known history would need.
 		//
 		// By value: the record holds six strings and goes straight into the
 		// buffer, so callers that build one on the spot move it in rather than

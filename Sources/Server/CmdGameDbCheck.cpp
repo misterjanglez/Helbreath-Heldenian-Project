@@ -80,9 +80,7 @@ namespace
 	void remove_probe_files()
 	{
 		std::error_code ec;
-		std::filesystem::remove(probe_db, ec);
-		std::filesystem::remove(std::string(probe_db) + "-wal", ec);
-		std::filesystem::remove(std::string(probe_db) + "-shm", ec);
+		hb::server::remove_probe_db(probe_db);
 		std::filesystem::remove_all(probe_accounts_dir, ec);
 	}
 

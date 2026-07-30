@@ -228,6 +228,7 @@
     <ClInclude Include="CmdShowChat.h" />
     <ClInclude Include="CmdGiveItem.h" />
     <ClInclude Include="CheckTally.h" />
+    <ClInclude Include="CmdItemLogCheck.h" />
     <ClInclude Include="CmdLedgerCheck.h" />
     <ClInclude Include="CmdMintCheck.h" />
     <ClInclude Include="CmdSerialCheck.h" />
@@ -381,6 +382,7 @@
     <ClCompile Include="CmdShowChat.cpp" />
     <ClCompile Include="CmdGiveItem.cpp" />
     <ClCompile Include="CheckTally.cpp" />
+    <ClCompile Include="CmdItemLogCheck.cpp" />
     <ClCompile Include="CmdLedgerCheck.cpp" />
     <ClCompile Include="CmdMintCheck.cpp" />
     <ClCompile Include="CmdSerialCheck.cpp" />

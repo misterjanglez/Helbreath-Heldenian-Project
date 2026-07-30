@@ -9,7 +9,8 @@
 #include "ItemProvenance.h"
 using hb::shared::direction::direction;
 
-namespace hb::server { struct drop_table; }
+namespace hb::server { struct drop_table; struct ledger_event_record; class item_ledger_store; }
+class CClient;
 class CGame;
 class CItem;
 struct ShopData;
@@ -200,9 +201,22 @@ public:
 	void req_create_slate_handler(int client_h, char* data);
 	void set_slate_flag(int client_h, short type, bool flag);
 
-	// Logging
+	//----------------------------------------------------------------------
+	// Logging — a dual sink (#78, plan P2.2, decision D5)
+	//
+	// Both overloads write the human text channels they always wrote AND append
+	// a structured Provenance Ledger event. The two sinks answer different
+	// questions: the channels are for an operator tailing a file, the ledger is
+	// for a query run months later, so what the channels leave out on purpose
+	// (uninteresting items, unknown actions) the ledger still has to carry.
+	//----------------------------------------------------------------------
 	bool item_log(int action, int client_h, char* name, CItem* item);
 	bool item_log(int action, int give_h, int recv_h, CItem* item, bool force_item_log = false);
+
+	// The text sink's noise filter: a whitelist of the item types worth a line in
+	// a channel a human reads. Deliberately NOT consulted by the ledger half —
+	// an audit log that only records the items somebody once thought interesting
+	// has a hole shaped exactly like the item a dispute will be about.
 	bool check_good_item(CItem* item);
 
 private:
@@ -219,8 +233,28 @@ private:
 	int find_inventory_item(int client_h, short item_id) const;
 
 	// Assigns identity to a freshly created item: the origin always, and a
-	// Serial only when the item is Instanced (non-stackable, per D2).
+	// Serial only when the item is Instanced (non-stackable, per D2). Minting is
+	// also where the ledger's birth record is emitted, so every creation venue
+	// lands one without knowing the ledger exists.
 	void stamp_provenance(CItem* item, hb::server::item_origin::item_origin origin);
+
+	// The Provenance Ledger, or null when there is nothing to record into —
+	// which is every call before boot has opened the store, and every call in a
+	// tool that runs without one.
+	hb::server::item_ledger_store* ledger() const;
+
+	// m_client_list index 0 is never a client, and the log calls pass 0 and -1
+	// as "nobody" — GmMint even passes a quantity where a handle goes. Null for
+	// anything that does not resolve, so the ledger path never indexes on trust.
+	CClient* client_at(int client_h) const;
+
+	// Fills what every ledger event shares — Serial, type, and the actor's name,
+	// account and position — and answers whether there is an event to record at
+	// all. False for a Counted item (no identity to key on, D2) and when no
+	// ledger is open, which is also the callers' cue not to build a detail
+	// string for a row that is not going to exist.
+	bool begin_ledger_event(int action, const CItem* item, int actor_h,
+		hb::server::ledger_event_record& event) const;
 
 	// Field-by-field copy. `to` is the destination — private because
 	// create_snapshot is the only sanctioned reason to copy an item: a copy that

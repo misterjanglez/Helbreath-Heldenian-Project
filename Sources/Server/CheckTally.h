@@ -79,6 +79,18 @@ namespace hb::server
 	// the same way, or their outputs stop being evidence about the same thing.
 	int find_probe_item(CGame* game, bool want_stackable);
 
+	// The first non-stackable item the text log's noise filter does NOT cover, or
+	// -1. What `itemlogcheck` needs to tell the two sinks apart: an item the
+	// channels are meant to skip and the ledger is meant to keep. Beside
+	// find_probe_item for the same reason it exists — probe selection is how one
+	// prover's evidence stays comparable with another's.
+	int find_unlogged_probe_item(CGame* game);
+
+	// Delete a scratch SQLite database and the two files WAL leaves beside it.
+	// Every prover that writes to a scratch file needs this on every exit path,
+	// and three copies of it is three places for one of them to forget the -shm.
+	void remove_probe_db(const char* path);
+
 	// First column of the first row. `probe_scalar` returns -1 when the query
 	// fails or yields nothing (no expected value in any prover is -1);
 	// `probe_text` returns empty.

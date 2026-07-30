@@ -5,6 +5,7 @@
 #include "Log.h"
 #include "ServerLogChannels.h"
 #include "TimeUtils.h"
+#include "json.hpp"               // the detail column's encoder
 #include "sqlite3.h"
 
 // Single source of truth for the itemledger.db schema version: spliced into the
@@ -95,6 +96,19 @@ namespace
 
 namespace hb::server
 {
+	// One-field detail objects, which is every detail the ledger writes today.
+	// nlohmann is already vendored and already used by the server (ServerConfig),
+	// so the escaping rule is the library's rather than a second hand-rolled one.
+	std::string detail_json(const char* key, const std::string& value)
+	{
+		return nlohmann::json::object({ { key, value } }).dump();
+	}
+
+	std::string detail_json(const char* key, int64_t value)
+	{
+		return nlohmann::json::object({ { key, value } }).dump();
+	}
+
 	item_ledger_store::~item_ledger_store()
 	{
 		close();
@@ -175,8 +189,9 @@ namespace hb::server
 		boundary.serial = 0;
 		boundary.at = now_unix();
 		boundary.event_type = ledger_event::boundary;
-		boundary.detail = std::string("{\"boot\":1,\"prev_shutdown\":\"") + previous_state + "\"}";
-		m_events.push_back(boundary);
+		boundary.detail = nlohmann::json::object({
+			{ "boot", 1 }, { "prev_shutdown", previous_state } }).dump();
+		record_event(std::move(boundary));
 
 		// Marked crashed for the duration of the run; close() sets it back. The
 		// write is immediate rather than buffered, because a value that only
@@ -400,6 +415,10 @@ namespace hb::server
 		// The birth row and the creation event are made together because they
 		// are one fact. A biography that starts with a custody transfer and no
 		// creation looks exactly like a duped item.
+		//
+		// Through record_event rather than straight into the buffer, so the
+		// guards that protect that buffer have one door instead of two: `at` is
+		// set here on purpose, to the same second the instance row carries.
 		ledger_event_record created;
 		created.serial = item.m_serial;
 		created.at = at;
@@ -407,7 +426,7 @@ namespace hb::server
 		if (map != nullptr) created.map = map;
 		created.x = x;
 		created.y = y;
-		m_events.push_back(std::move(created));
+		record_event(std::move(created));
 	}
 
 	void item_ledger_store::record_event(ledger_event_record event)
@@ -422,6 +441,15 @@ namespace hb::server
 		// instance, which reads as an orphan to Reconciliation.
 		if (event.serial == 0 && event.event_type != ledger_event::boundary) {
 			return;
+		}
+
+		// Unstamped means now. The dual sink (#78) records from inside the game
+		// action, so "when" is always the moment of the call, and leaving each
+		// call site to say so would put a clock read in the game loop and give a
+		// forgotten one the epoch. A caller that does set `at` keeps it: replaying
+		// a known time is the only reason to want that column not to be now.
+		if (event.at == 0) {
+			event.at = now_unix();
 		}
 
 		m_events.push_back(std::move(event));

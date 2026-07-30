@@ -2,7 +2,10 @@
 
 #include "Game.h"
 #include "Item.h"
+#include "ItemManager.h"
 #include "sqlite3.h"
+
+#include <filesystem>
 
 namespace hb::server
 {
@@ -15,6 +18,25 @@ namespace hb::server
 			if (config->is_stackable() == want_stackable) return i;
 		}
 		return -1;
+	}
+
+	int find_unlogged_probe_item(CGame* game)
+	{
+		for (int i = 0; i < hb::server::config::MaxItemTypes; i++)
+		{
+			CItem* config = game->m_item_config_list[i];
+			if (config == nullptr || config->is_stackable()) continue;
+			if (game->m_item_manager->check_good_item(config) == false) return i;
+		}
+		return -1;
+	}
+
+	void remove_probe_db(const char* path)
+	{
+		std::error_code ec;
+		std::filesystem::remove(path, ec);
+		std::filesystem::remove(std::string(path) + "-wal", ec);
+		std::filesystem::remove(std::string(path) + "-shm", ec);
 	}
 
 	int64_t probe_scalar(sqlite3* db, const char* sql)

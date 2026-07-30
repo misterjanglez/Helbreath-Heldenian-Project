@@ -20,6 +20,7 @@
 #include "GameConfigSqliteStore.h"
 #include "SharedCalculations.h"
 #include "BalanceConstants.h"
+#include "ItemLedgerStore.h"
 #include "Log.h"
 #include "ServerLogChannels.h"
 #include "StringCompat.h"
@@ -27,7 +28,10 @@
 
 #include <algorithm>
 #include <array>
+#include <format>
 #include <iterator>
+#include <string>
+#include <utility>
 
 using namespace hb::shared::net;
 using namespace hb::shared::direction;
@@ -262,11 +266,31 @@ bool ItemManager::is_valid_item_id(int item_id) const
 // Instanced iff non-stackable (D2). A stack has no identity worth tracking
 // because merge and split dissolve it, so stackables stay unserialed and the
 // Counted flow counters account for them in aggregate instead.
+//
+// This is also where the ledger learns an item exists (#78). Minting is the one
+// act every creation venue has in common, so emitting the birth record from the
+// same three lines that assign the Serial is what makes creation coverage a
+// property of the code's shape rather than of 45 call sites remembering.
 void ItemManager::stamp_provenance(CItem* item, item_origin::item_origin origin)
 {
 	item->m_origin = origin;
-	if (item->is_stackable() == false)
-		item->m_serial = m_serial_allocator.mint();
+	if (item->is_stackable())
+		return;
+
+	item->m_serial = m_serial_allocator.mint();
+
+	// No location and no origin detail: a mint does not know where the item will
+	// end up — the caller places it immediately afterwards — and the schema makes
+	// map/x/y nullable for exactly that reason. The tier byte is read as of now,
+	// which is right for every venue that finishes an item before it exists and
+	// wrong for the one that does not: an NPC drop rolls its attributes onto the
+	// freshly created instance, so loot lands a birth row reading tier 0. Both
+	// halves of that birth context — where it dropped and what it rolled — are
+	// #79's, which already owns the NPC-drop location gap. Rolling before the
+	// mint instead would reorder the drop path's dice draws, which is a balance
+	// change wearing an audit change's clothes.
+	if (hb::server::item_ledger_store* store = ledger())
+		store->record_mint(*item);
 }
 
 CItem* ItemManager::create_item(int item_id, item_origin::item_origin origin)
@@ -5229,8 +5253,76 @@ bool ItemManager::copy_item_contents(CItem* copy, CItem* original)
 	return true;
 }
 
+//////////////////////////////////////////////////////////////////////
+// item_log — the dual sink (#78, plan P2.2, decision D5)
+//
+// The text channels below are unchanged; what is new is that every call also
+// appends a structured ledger event. The ledger half runs FIRST in both
+// overloads, and that ordering is the whole point: each text sink drops what it
+// is not interested in — an action its switch does not name, a client handle
+// that no longer resolves, an item check_good_item() does not consider worth a
+// line — and every one of those is a hole in a log whose only value is not
+// having any. The filters stay exactly where they were; they just stop deciding
+// for both sinks at once.
+//////////////////////////////////////////////////////////////////////
+
+hb::server::item_ledger_store* ItemManager::ledger() const
+{
+	if (m_game == nullptr) return nullptr;
+	return m_game->m_item_ledger_store.get();
+}
+
+CClient* ItemManager::client_at(int client_h) const
+{
+	if (m_game == nullptr) return nullptr;
+	if (client_h <= 0 || client_h >= hb::server::config::MaxClients) return nullptr;
+	return m_game->m_client_list[client_h];
+}
+
+bool ItemManager::begin_ledger_event(int action, const CItem* item, int actor_h,
+	hb::server::ledger_event_record& event) const
+{
+	// A Counted item has no identity for an event to hang off (D2). record_event
+	// would drop it at the door anyway; answering here instead means the caller
+	// never builds a detail string for it, on a path every gold drop takes.
+	if (item == nullptr || item->m_serial == 0) return false;
+	if (ledger() == nullptr) return false;
+
+	event.serial = item->m_serial;
+	event.event_type = action;   // 1..99 is ItemLogAction verbatim (ItemLedgerStore.h)
+
+	// Where the event happened is where the actor was standing. An actorless
+	// event — an NPC drop, or a handle that has already gone — keeps those
+	// columns NULL rather than inventing a location for a query to trust.
+	if (const CClient* actor = client_at(actor_h))
+	{
+		event.actor_account = actor->m_account_name;
+		event.actor_char = actor->m_char_name;
+		event.map = actor->m_map_name;
+		event.x = actor->m_x;
+		event.y = actor->m_y;
+	}
+	return true;
+}
+
 bool ItemManager::item_log(int action, int give_h, int recv_h, CItem* item, bool force_item_log)
 {
+	if (hb::server::ledger_event_record event; begin_ledger_event(action, item, give_h, event))
+	{
+		// GmMint has no receiving player — recv_h carries the minted quantity —
+		// so it is the one action whose second handle must not be read as a
+		// counterparty. The two are exclusive, which is what this says. It also
+		// explains the shape of a GM batch in the ledger: every copy gets its own
+		// birth row from the factory, and one of them carries the GmMint event
+		// for the request.
+		if (action == ItemLogAction::GmMint)
+			event.detail = hb::server::detail_json("qty", recv_h);
+		else if (const CClient* recv = client_at(recv_h))
+			event.counterparty_char = recv->m_char_name;
+
+		ledger()->record_event(std::move(event));
+	}
+
 	if (item == 0) return false;
 	if (m_game->m_client_list[give_h] == 0) return false;
 
@@ -5299,6 +5391,18 @@ bool ItemManager::item_log(int action, int give_h, int recv_h, CItem* item, bool
 
 bool ItemManager::item_log(int action, int client_h, char* name, CItem* item)
 {
+	if (hb::server::ledger_event_record event; begin_ledger_event(action, item, client_h, event))
+	{
+		// `name` is the NPC that dropped it on the NewGenDrop path — the only
+		// birth context this overload carries, and the reason the drop's origin
+		// is answerable at all until #79 puts it on the birth row. The other
+		// actions pass a name none of them print.
+		if (action == ItemLogAction::NewGenDrop && name != nullptr)
+			event.detail = hb::server::detail_json("npc", name);
+
+		ledger()->record_event(std::move(event));
+	}
+
 	if (item == 0) return false;
 	if (check_good_item(item) == false) return false;
 	if (action != ItemLogAction::NewGenDrop)
