@@ -9,7 +9,7 @@ Monster-dropped gear rolls a **tier** — Common / Rare / Epic / Legendary — w
 ## 1. Scope
 
 - **Tier-rolls**: droppable melee weapons, **bows** (deliberate pivot — original bows never rolled), wands, body armors (incl. hauberks/robes), helms, leggings, shields, capes.
-- **Outside the tier system**: named uniques (Xelima/Kloness/Merien and kin), necklaces/rings, angels, Dark Items, reward capes (Hero's 400/401/427/428, Combatant 429), crafted items (untiered in both modes, recipe-fixed modifiers, exclusive +10 enchant ceiling).
+- **Outside the tier system**: named uniques (Xelima/Kloness/Merien and kin), necklaces/rings, **boots** (`EquipPos::Boots` — Shoes 450, Long Boots 451; decided explicitly 2026-07-30 via [#67](https://github.com/misterjanglez/Helbreath-Heldenian-Project/issues/67), which found them excluded only by omission from the tier-roll list above), angels, Dark Items, reward capes (Hero's 400/401/427/428, Combatant 429), crafted items (untiered in both modes, recipe-fixed modifiers, exclusive +10 enchant ceiling).
 - **Fresh start**: launches on a clean world; no migration of old rolled attributes.
 - Tier decides modifier *count*; the catalog decides *which*; the value model decides *values*; loot grades decide *tier odds*. Each is an independent dial.
 
@@ -196,6 +196,8 @@ Single-source and item-local lines (weapon/wand lines, Strong, Light) get `aggre
 ## 8. Drop economics ([Drop economics #26](https://github.com/misterjanglez/Helbreath-Heldenian-Project/issues/26))
 
 > **Amendment A1 (below) is IN FORCE** as of 2026-07-29 (ADR 0005, #68) and supersedes three statements in this section: the gold-preempt ordering, `first_drop_chance` replacing the hardcoded primary chance, and gear emerging from the stage-1 table’s weighted mix. Read the amendment before acting on this section.
+>
+> **Amendment A2 (below) is IN FORCE** as of 2026-07-30 (#67): the gear cadence is the original's flat 1.4% — **1 in 71 kills for every monster at grades 1–4** — ratified rather than retuned, and it supersedes the boss-rate note's two Legendary estimates. A2 also records why the `grade` multiplier cannot be used to change gear frequency.
 
 **The two-stage drop pipeline is retained, and the tier roll lives in stage 1 only.** Today's pipeline (`npc_dead_item_generator`, `EntityManager.cpp:2614`) is two stages: the **first drop** rolls at the moment of death; the **second drop** is rolled at death but queued and placed when the corpse decays — the venue for named uniques (Demon Slayer, Berserk/Kloness wands, SoIE, Xelima/Medusa jewelry) and the boss guaranteed/scatter machinery. The tier system touches only the first drop:
 
@@ -246,6 +248,40 @@ Unchanged by A1: the grade→tier weight table above, the staircase access rule,
 **Stage 1 and stage 2 split into separate tables.** `drop_tables` declares its `stage`, `drop_entries` loses the stage discriminator, and `npc_configs` references a stage-1 and a stage-2 table independently; `guaranteed_secondary` and `scatter_count` move onto the stage-2 table. Today 61 of 98 tables carry a dead stage-2 half, and stage 1 has 98 row-sets across only 23 distinct contents because the bundling forces every monster to copy the shared potion block. Both stages then run **one identical engine**: same rate model, same multipliers, same validator. Every former stage-2-only behaviour becomes an ordinary table property available to either slot — `base_secondary_drop_chance` retires like `first_drop_chance`, `guaranteed_secondary` becomes a validator-enforced "rows sum to 1.0", and `scatter_count` becomes `roll_count_min`/`roll_count_max` plus a `placement` and `delay` property (which also restores the original’s guaranteed 5–15 scattered items rather than our fixed 15 rolls that mostly miss). "Stage" then means only which slot a monster references. The single deliberate asymmetry is not part of the calculation: §8 keeps stage 2 out of the tier roll.
 
 Migration is mechanical and reproduces every current per-kill rate exactly before any retune, verified by `dropodds` agreeing per grade to four decimals and per row to within one part per billion. Baseline, encoding rationale and migration formula are in ADR 0005.
+
+### Amendment A2 — the gear cadence is the original's flat 1.4%, ratified (IN FORCE)
+
+Decided 2026-07-30 via [#67](https://github.com/misterjanglez/Helbreath-Heldenian-Project/issues/67). **No data changes.** This amendment records a number that was already true, so a later tuner knows it was *chosen* rather than inherited. It supersedes the two Legendary estimates in §8's boss-rate note above.
+
+**The original had exactly one equipment rate for every monster in the game — 1.4%, flat.** `m_iPrimaryDropRate` is a single `CGame` int (`Game.h:1009` / `Game.h:1120`), read once from a config token and consulted at exactly one site. The equipment branch states its own arithmetic: `// Valuable Drop Calculation: (35/100) * (40/100) * (10/100) = 1.4%` (`repos/HB382_CENTUU/HGServer/Game.cpp:47421`, byte-identical at `repos/HelbreathServer/HGServer/Game.cpp:48353`). The per-monster `iGenLevel` switch opens on the **next line**, *inside* that branch — reached only once the 1.4% has already been decided. **`iGenLevel` chose which item, never whether.** There was never a per-grade equipment frequency to port.
+
+So "grades 1–4 share one gear rate" is not the accident [#67](https://github.com/misterjanglez/Helbreath-Heldenian-Project/issues/67) was filed against. It is the original's structure, restored by [#73](https://github.com/misterjanglez/Helbreath-Heldenian-Project/issues/73)'s fidelity step. Grade differentiation lives exactly where [ADR 0002](../docs/adr/0002-tiered-item-modifiers.md) deliberately put it — in **quality and roster** — layered on faithful frequency. That is the designed divergence; frequency is not.
+
+**The ratified cadence.** Per gear-bearing monster, rating 0, all generosity multipliers 1.0:
+
+| grade | gear per kill | 1 in N | tier reach at that cadence |
+|---|---|---|---|
+| 1 vermin | 1.4000% | **71** | Common only — 1 in 71 |
+| 2 standard | 1.4000% | **71** | Rare 1 in 714 |
+| 3 veteran | 1.4000% | **71** | Rare 1 in 325, Epic 1 in 2,381 |
+| 4 elite | 1.4000% | **71** | Epic 1 in 952, Legendary 1 in 14,286 |
+| 5 boss | 1.5730–1.9031% | **53–64** | Legendary 1 in 1,752–2,119 |
+
+Grade 5 is [#87](https://github.com/misterjanglez/Helbreath-Heldenian-Project/issues/87)'s settled figure, reached inside #73's migration, not #67's to set. Its spread is per boss: Abaddon is the most generous end (gear 1 in 53, Legendary 1 in 1,752), Helclaw the least (1 in 64, Legendary 1 in 2,119); `dropodds`' averaged grade-5 row reports Legendary 1 in 1,878. **These supersede the boss-rate note's pre-A1 estimates of ≈1 boss Legendary per 590 kills and ≈1 elite Legendary per 35,000** — that arithmetic ran through `first_drop_chance`, which A1 retired.
+
+`dropodds`' per-grade rows are averaged over `npc_configs` one vote each, so they read lower than the per-monster figures above: grade 1 reports 1 in 821 because it holds 6 real vermin against 49 catapults and guard towers on gearless table 30023 plus 14 configs with no stage-1 table at all. **The averaged rows are a fleet statistic, not a cadence** — read per-monster figures when tuning.
+
+**Why not the alternatives** (all three considered and rejected):
+
+- **A per-grade staircase** costs splitting the four stage-1 tables shared across grades and needs a gear×grade multiplier term that does not exist — buying differentiation the tier curve already provides.
+- **A uniform lift** deviates above the original with no evidence behind it. The ratchet law says launch strict; [#85](https://github.com/misterjanglez/Helbreath-Heldenian-Project/issues/85)'s ledger analytics will eventually supply real evidence for a lift, and loosening is always permitted.
+- **Tightening vermin** is unnecessary: Common-only from a starter roster (Dagger, Short Sword, Wood Shield, Wand MS0) at 1 in 71 teaches the system early and cannot be farmed for anything an endgame player wants.
+
+**The revisit lever — read this before changing gear frequency per grade.** The `grade` multiplier is **not** a gear lever. `drop_multipliers::product` is `global × stage × category × grade × rep` (`Sources/Server/DropModel.cpp:75`) with **no gear×grade cross term**, so raising grade 4 raises its gold and potions along with its gear. A future per-grade gear change needs either that cross term added, or per-table row edits — and the latter first requires splitting the four stage-1 tables that serve two grades each: **30002** (grades 1&2), **30004** (2&3), **30007** (2&3), **30008** (3&4). Whoever revisits this will otherwise reach for the grade multiplier and get a surprise.
+
+**Two monsters sit below the cadence, and it is a roster artifact — accepted, not design.** Mountain Giant reads 1 in 82 and Gargoyle 1 in 79 because tables 30013 and 30012 are the only grade 1–4 tables carrying **Long Boots (451)**, which §1 excludes from tier scope (`EquipPos::Boots`; `derive_tier_item_class`, `ModifierIds.h:367`). Their total *gear* rate is the full 1.4%; one row of it lands untiered. Both tables are otherwise at cadence.
+
+Long Boots sits in exactly three stage-1 tables, and the third is **30010 `s1_Hellclaw`** at grade 5 — which is part of why Helclaw is the least generous boss (gear 1 in 64 against 1 in 56 for Tiger Worm and the two Wyverns). The rest of that gap is an ordinary roster difference: Helclaw's total gear is 1.6940% against Tiger Worm's 1.7995%, and 0.1210% of Helclaw's lands untiered on the boots row. **Shoes (450) is the only other boots-position item in the game and drops from nothing**, so §1's exclusion costs exactly these three rows.
 
 ## 9. Power ceiling ([Power ceiling #25](https://github.com/misterjanglez/Helbreath-Heldenian-Project/issues/25))
 
