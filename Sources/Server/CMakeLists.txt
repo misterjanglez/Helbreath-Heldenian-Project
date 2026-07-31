@@ -21,6 +21,7 @@ endif()
 set(SERVER_SOURCES
     AccountSqliteStore.cpp
     Client.cpp
+    CmdAtomicCheck.cpp
     CmdBroadcast.cpp
     CmdDropOdds.cpp
     CmdCoverageCheck.cpp

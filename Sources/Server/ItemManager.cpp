@@ -21,6 +21,7 @@
 #include "SharedCalculations.h"
 #include "BalanceConstants.h"
 #include "ItemLedgerStore.h"
+#include "LoginServer.h"   // g_login->save_players_atomic, for the two-party commits
 #include "Log.h"
 #include "ServerLogChannels.h"
 #include "StringCompat.h"
@@ -1400,6 +1401,15 @@ void ItemManager::give_item_handler(int client_h, short item_index, int amount, 
 	char owner_type, char_name[hb::shared::limits::NpcNameLen];
 	CItem* item;
 
+	// Set by whichever branch actually hands the item to another player, so the
+	// pair can be made durable together at the end (#82). A Give is the same
+	// multi-account shape as an Exchange — two characters, one item — and it had
+	// the same window: neither side was saved, so the transfer became durable at
+	// two unrelated later moments and a crash between them duplicated or lost it.
+	// Every other outcome here (the ground, an NPC, a rejection) touches one
+	// character and leaves this at 0.
+	int give_recipient_h = 0;
+
 	if (m_game->m_client_list[client_h] == 0) return;
 	if (m_game->m_client_list[client_h]->m_is_on_server_change) return;
 	if (m_game->m_client_list[client_h]->m_is_init_complete == false) return;
@@ -1468,6 +1478,7 @@ void ItemManager::give_item_handler(int client_h, short item_index, int amount, 
 					// player handing another 500 gold was invisible to both sinks
 					// and to any dispute the custody chain exists to settle.
 					item_log(ItemLogAction::Give, client_h, owner_h, item);
+					give_recipient_h = owner_h;
 
 					ret = send_item_notify_msg(owner_h, Notify::ItemObtained, item, 0);
 
@@ -1597,6 +1608,7 @@ void ItemManager::give_item_handler(int client_h, short item_index, int amount, 
 					if (add_client_item_list(owner_h, item, &erase_req)) {
 
 						item_log(ItemLogAction::Give, client_h, owner_h, item);
+						give_recipient_h = owner_h;
 
 						ret = send_item_notify_msg(owner_h, Notify::ItemObtained, item, 0);
 
@@ -1692,6 +1704,14 @@ void ItemManager::give_item_handler(int client_h, short item_index, int amount, 
 	}
 
 	m_game->calc_total_weight(client_h);
+
+	// Giver and recipient in one commit. Both handles are re-checked inside, so
+	// a recipient whose socket died in the notify above (delete_client) simply
+	// drops out of the batch instead of failing it.
+	if (give_recipient_h != 0 && g_login != nullptr) {
+		const int parties[2] = { client_h, give_recipient_h };
+		g_login->save_players_atomic(parties, 2);
+	}
 }
 
 int ItemManager::set_item_count(int client_h, int item_index, uint64_t count)
@@ -4996,6 +5016,19 @@ void ItemManager::confirm_exchange_item(int client_h)
 					for(int i = 0; i < 4; i++) {
 						m_game->m_client_list[client_h]->m_exchange_item_index[i] = -1;
 						m_game->m_client_list[ex_h]->m_exchange_item_index[i] = -1;
+					}
+
+					// Both halves of the trade become durable in ONE transaction
+					// (#82, plan P3.4). Until this, an Exchange wrote nothing at
+					// all: each side became durable whenever that character next
+					// happened to be saved, so a player who logged out straight
+					// after receiving an item — a single-character save — and a
+					// crash before their partner was saved left the item on both
+					// characters. That is the dupe window ADR 0004 consolidated
+					// the account files to close, and one commit is what closes it.
+					if (g_login != nullptr) {
+						const int traders[2] = { client_h, ex_h };
+						g_login->save_players_atomic(traders, 2);
 					}
 
 					m_game->send_notify_msg(0, client_h, Notify::ExchangeItemComplete, 0, 0, 0, 0);

@@ -1,9 +1,11 @@
 #pragma once
 
 #include <cstdint>
+#include <functional>
 #include <string>
 #include <vector>
 
+#include "GameDatabase.h"     // txn_scope, the boundary a custody move commits in
 #include "Item/ItemAttributeData.h"
 #include "ItemProvenance.h"   // destroy_reason, for the escrow-exit recorders
 
@@ -84,6 +86,63 @@ namespace hb::server
 		std::vector<escrow_item> items;
 	};
 
+	// One custody operation's atomic boundary (#82, plan P3.4).
+	//
+	// A Trading Post move is three things that have to agree: rows in game.db,
+	// objects in memory, and events in the Provenance Ledger. Only the first can
+	// be inside a SQLite transaction — memory has no rollback, and the ledger is
+	// a separate append-only database on purpose (ADR 0003) — so this scope is
+	// what keeps the other two honest about what the first one actually did:
+	//
+	//   * `on_rollback` collects the memory changes made along the way, unwound
+	//     in reverse if the transaction does not commit. Without it a rewound
+	//     escrow-out would leave the item in a Warehouse AND back on the board,
+	//     which is the duplication every ordering rule in ADR 0001 exists to
+	//     avoid.
+	//   * `on_commit` holds the ledger events and trade-log lines, written only
+	//     once the rows are durable. An append-only log cannot take a row back,
+	//     so a custody move recorded and then rolled back would name the wrong
+	//     holder for as long as the ledger exists.
+	//
+	// One scope per player-visible operation. A finalized Trade moves four
+	// bundles between three characters and is one scope, so it is one commit;
+	// the expiry sweep delists many Listings and gives each its own, because
+	// they are unrelated operations that happen to run in the same tick.
+	class custody_scope
+	{
+	public:
+		explicit custody_scope(sqlite3* db) : m_txn(db), m_ok(db != nullptr && m_txn.active()) {}
+
+		// Rolls back and unwinds unless finish() already ran, so an early return
+		// anywhere inside an operation cannot leave half of it standing.
+		~custody_scope() { finish(); }
+
+		custody_scope(const custody_scope&) = delete;
+		custody_scope& operator=(const custody_scope&) = delete;
+
+		// False when the transaction could not even begin, or once something has
+		// failed. Every step checks it, so a doomed operation stops doing work
+		// rather than piling more onto a rollback.
+		bool ok() const { return m_ok; }
+
+		// Give up on the operation. Idempotent, and deliberately one-way: an
+		// operation that failed halfway cannot be talked back into committing.
+		void fail() { m_ok = false; }
+
+		void on_rollback(std::function<void()> undo) { m_undo.push_back(std::move(undo)); }
+		void on_commit(std::function<void()> emit) { m_emit.push_back(std::move(emit)); }
+
+		// Commit and emit, or roll back and unwind. Returns whether it committed.
+		bool finish();
+
+	private:
+		hb::server::txn_scope m_txn;
+		bool m_ok;
+		bool m_finished = false;
+		std::vector<std::function<void()>> m_undo;
+		std::vector<std::function<void()>> m_emit;
+	};
+
 	// Full detail for one Listing: the escrowed bundle plus every active Offer.
 	struct listing_detail
 	{
@@ -98,19 +157,22 @@ namespace hb::server
 
 	// Server-owned escrow store for the Trading Post.
 	//
-	// Owns a single persistent SQLite connection to Binaries/Server/tradingpost.db,
-	// opened once at startup and held for the server's lifetime. Setup follows the
-	// GameConfigSqliteStore pattern (busy_timeout, PRAGMA foreign_keys=ON so the
-	// ON DELETE CASCADE relationships fire, an idempotent CREATE TABLE IF NOT
-	// EXISTS block, and a meta(key,value) schema_version row).
+	// Since v9 (#82, plan P3.4) this store does NOT own a database. Its five
+	// tables live in `game.db` beside the character tables, and it borrows that
+	// connection — because the thing an escrow move has to be atomic WITH is a
+	// character save, and two files cannot share a transaction under WAL.
 	//
-	// The Trading Post is the owner of record for escrowed items; character DBs
-	// never contain them (see docs/adr/0001-trading-post-physical-escrow.md).
-	// Because a transition crosses stores (inventory <-> tradingpost.db <->
-	// account DBs) it cannot be one SQLite transaction, so every operation is
-	// ordered to fail as loss, never duplication:
+	// The Trading Post is the owner of record for escrowed items; characters
+	// never hold them while listed (see docs/adr/0001-trading-post-physical-escrow.md).
+	// Until v9 a transition crossed two stores, so it could not be one SQLite
+	// transaction and every operation was instead ORDERED to fail as loss rather
+	// than duplication:
 	//   escrow-in : remove from inventory + forced save BEFORE the escrow insert
 	//   escrow-out: delete the escrow row + commit BEFORE delivery
+	// That ordering is now a fallback rather than the guarantee: each transition
+	// is one transaction, so a failure rewinds to before it started instead of
+	// resolving to a designed loss. The loss paths remain and remain recorded —
+	// they are what a transaction that cannot even begin still resolves to.
 	// Every transition is logged to the trade channel for manual GM recovery.
 	//
 	// Every transition ALSO appends a Provenance Ledger event (#80, plan P3.2).
@@ -131,9 +193,14 @@ namespace hb::server
 
 		void set_game(CGame* game) { m_game = game; }
 
-		// Open (creating if absent) tradingpost.db and ensure the schema. Call
-		// once at startup. Returns false on connection or schema failure.
-		bool open(const std::string& path);
+		// Borrow the connection the escrow tables live on. `db` is the live Game
+		// DB for the running server and a scratch file for the provers; either
+		// way the caller has already put the v9 schema on it. Call once at
+		// startup, after EnsureGameDatabase().
+		bool open(sqlite3* db);
+
+		// Drops the borrowed pointer. Does NOT close the connection — this store
+		// does not own it.
 		void close();
 		bool is_open() const { return m_db != nullptr; }
 		sqlite3* handle() const { return m_db; }
@@ -161,38 +228,13 @@ namespace hb::server
 			const hb::net::TpEscrowSlot* slots, int count,
 			int64_t& out_offer_id, uint16_t& out_result);
 
-		// --- Escrow-out -----------------------------------------------------
-		// The single door out of escrow. Deliver items to a character's
-		// Warehouse (bank): online recipients get an in-memory bank add plus a
-		// forced save; offline recipients get a direct insert into their account
-		// DB at max(slot)+1, bounded only by the hard MaxBankItems cap (the soft
-		// 200 cap is intentionally ignored). Callers MUST have already deleted
-		// the backing escrow rows and committed before calling this. Returns
-		// false if any item could not be placed; every such loss is logged for
-		// GM recovery.
-		//
-		// This is also where escrow-out reaches the Provenance Ledger (#80).
-		// `move` says which transition the delivery is, and the recording is
-		// this function's job rather than each caller's for the reason #78
-		// turned item_log() into a dual sink: coverage that depends on every
-		// call site remembering is coverage with a hole in it the day someone
-		// adds the eighth one. Recorded here, a transition cannot be delivered
-		// without being recorded, and an item that fails to land gets its exit
-		// event in the same place — so the pair can never come apart.
-		bool deliver_to_bank(const char* character_name,
-			const std::vector<escrow_item>& items, const escrow_move& move);
-
-		// --- Refunds (built on deliver_to_bank) -----------------------------
+		// --- Refunds --------------------------------------------------------
 		// Return a single Offer's items to its offerer: read the items, delete
-		// the offer row and commit, then deliver. log_action selects the trade
-		// log verb (TpRefund for an involuntary return, TpRescind when the
-		// offerer withdrew). Returns false if the Offer is gone or delivery
-		// failed.
+		// the offer row, and deliver — one transaction (#82). log_action selects
+		// the trade log verb (TpRefund for an involuntary return, TpRescind when
+		// the offerer withdrew). Returns false if the Offer is gone, the
+		// delivery failed, or the transaction rolled back.
 		bool refund_offer(int64_t offer_id, int log_action);
-
-		// Return every Offer on a Listing to its offerers (used by delist and
-		// the character-delete void). Returns the number of Offers refunded.
-		int refund_all_offers_on_listing(int64_t listing_id);
 
 		// --- Reads (for the request handlers) -------------------------------
 		// Number of active Listings owned by a character (the <=5 rule).
@@ -260,14 +302,65 @@ namespace hb::server
 		void flush_notices(int client_h);
 
 	private:
-		bool ensure_schema();
+		// --- Escrow-out -----------------------------------------------------
+		// The single door out of escrow. Deliver items to a character's
+		// Warehouse (bank): online recipients get an in-memory bank add plus a
+		// save; offline recipients get a direct insert at max(slot)+1, bounded
+		// only by the hard MaxBankItems cap (the soft 200 cap is intentionally
+		// ignored). Returns false if any item could not be placed; every such
+		// loss is logged for GM recovery.
+		//
+		// The caller deletes the backing escrow rows inside `scope`, and this
+		// delivers inside the same one, so the row leaving the board and the
+		// items arriving are one commit. Until v9 the caller had to have
+		// COMMITTED the deletion first, because the two lived in different files
+		// and a crash between them had to resolve to loss rather than a dupe.
+		//
+		// This is also where escrow-out reaches the Provenance Ledger (#80).
+		// `move` says which transition the delivery is, and the recording is
+		// this function's job rather than each caller's for the reason #78
+		// turned item_log() into a dual sink: coverage that depends on every
+		// call site remembering is coverage with a hole in it the day someone
+		// adds the eighth one. Recorded here, a transition cannot be delivered
+		// without being recorded, and an item that fails to land gets its exit
+		// event in the same place — so the pair can never come apart. Both go
+		// through `scope.on_commit`, because the ledger is append-only and a
+		// custody move it recorded for a transaction that rewound is a wrong
+		// holder it can never take back.
+		bool deliver_to_bank(const char* character_name,
+			const std::vector<escrow_item>& items, const escrow_move& move,
+			custody_scope& scope);
+
+		// The two composed refunds, inside a caller's operation: one Offer, or
+		// every Offer on a Listing (used by delist, finalize and the
+		// character-delete void). refund_all returns how many it refunded.
+		bool refund_offer(int64_t offer_id, int log_action, custody_scope& scope);
+		int refund_all_offers_on_listing(int64_t listing_id, custody_scope& scope);
 
 		// Validate + remove the requested inventory slots from an online
-		// character and snapshot them, then force a character save. On failure
-		// nothing is removed. max_items is the per-bundle cap (Listing/Offer).
+		// character and snapshot them. On failure nothing is removed. max_items
+		// is the per-bundle cap (Listing/Offer). The caller saves the character
+		// inside its transaction — see the note in the definition for why this
+		// no longer forces a save of its own.
 		bool pull_items_from_inventory(int client_h,
 			const hb::net::TpEscrowSlot* slots, int count, int max_items,
 			std::vector<escrow_item>& out_items, uint16_t& out_result);
+
+		// The undo half of pull_items_from_inventory: rebuild the bundle from its
+		// snapshots and hand it back. Registered on a custody_scope's rollback,
+		// so an escrow-in that could not commit leaves the character holding what
+		// they held before it — which is what turns ADR 0001's designed loss into
+		// nothing having happened.
+		void return_items_to_inventory(int client_h, const std::vector<escrow_item>& items);
+
+		// The undo half of an online delivery: take back out of the Warehouse
+		// exactly the objects this operation put in, by pointer identity.
+		void remove_from_bank(int client_h, const std::vector<CItem*>& items);
+
+		// Persist one online character on THIS store's connection, inside the
+		// enclosing transaction. Not g_login->local_save_player_data, which would
+		// use the live handle and open a scope of its own.
+		bool save_character(int client_h) const;
 
 		// Insert a bundle's item rows into listing_items or offer_items within
 		// an already-open transaction. id_column is "listing_id" or "offer_id".
@@ -340,7 +433,10 @@ namespace hb::server
 			std::vector<listing_brief>& out_rows, int& out_total_listings);
 
 		// Delete a Listing (cascades listing_items + offers + offer_items) or a
-		// single Offer (cascades offer_items), each in its own committed txn.
+		// single Offer (cascades offer_items). Each runs inside the caller's
+		// custody_scope — they had a committed transaction each before v9, which
+		// is what made every escrow-out at least two commits.
+		bool delete_escrow_row(const char* sql, int64_t id);
 		bool delete_listing_row(int64_t listing_id);
 		bool delete_offer_row(int64_t offer_id);
 
@@ -361,10 +457,18 @@ namespace hb::server
 		// destruction funnel every object exit in the server goes through
 		// (Scripts/check_item_destroy.py), so it is already recorded and is
 		// deliberately absent from `out_lost`.
+		//
+		// A per-item failure does NOT fail the scope: the item is gone and said
+		// so, and rewinding the operation around it would restore an escrow row
+		// for an object destroy_item has already ended. What fails the scope is
+		// the database refusing — a character that will not save, a bank insert
+		// that will not go in — because that is the case where rewinding leaves
+		// the items safely back on the board to be tried again.
 		bool deliver_to_online(int client_h, const std::vector<escrow_item>& items,
-			std::vector<int64_t>& out_lost);
+			std::vector<int64_t>& out_lost, custody_scope& scope);
 		bool deliver_to_offline(const char* character_name,
-			const std::vector<escrow_item>& items, std::vector<int64_t>& out_lost);
+			const std::vector<escrow_item>& items, std::vector<int64_t>& out_lost,
+			custody_scope& scope);
 
 		// Rebuild a heap CItem from an escrow_item (config attrs via
 		// init_item_attr, then the stored instance columns overlaid). Caller

@@ -232,24 +232,28 @@ enum class sqlite_schema_state
 };
 sqlite_schema_state VerifySqliteSchemaVersion(sqlite3* db, const char* db_label, const char* expected_version);
 
-// Open the one Game DB (ADR 0004) and put the v8 schema on it, creating the
+// Open the one Game DB (ADR 0004) and put the v9 schema on it, creating the
 // file on a fresh world. Call once at boot, before anything reads an account.
 //
-// Two refusals live here, and neither has a migration behind it (D6): a
-// surviving `accounts/` directory of per-account files, and a game.db stamped
-// at any version but 8. Both mean "this world predates v8" and the answer to
-// both is a wipe.
+// Three refusals live here, and none has a migration behind it (D6): a
+// surviving `accounts/` directory of per-account files, a surviving
+// `tradingpost.db`, and a game.db stamped at any version but 9. Each means
+// "this world predates v9" and the answer to all three is a wipe.
 bool EnsureGameDatabase();
 void CloseGameDatabase();
 
-// The two halves of EnsureGameDatabase, separately callable so `gamedbcheck`
-// can prove them against a scratch file instead of the live world.
+// The pieces of EnsureGameDatabase, separately callable so `gamedbcheck` and
+// `atomiccheck` can prove them against a scratch file instead of the live world.
 //
 // LegacyAccountLayoutPresent reports the pre-v8 `<dir>/<account>.db` files it
-// found (outExample names the first, outCount how many). EnsureGameSchema runs
-// the version gate on an already-open connection and lays down the v8 DDL when
-// the database is fresh; db_label only names the file in the refusal message.
+// found (outExample names the first, outCount how many).
+// LegacyTradingPostFilePresent is the pre-v9 equivalent for the escrow file.
+// EnsureGameSchema runs the version gate on an already-open connection and lays
+// down the v9 DDL when the database is fresh — including the Trading Post's
+// escrow tables, which is what lets a custody move and a character save share
+// one transaction; db_label only names the file in the refusal message.
 bool LegacyAccountLayoutPresent(const char* directory, std::string& outExample, int& outCount);
+bool LegacyTradingPostFilePresent(const char* path);
 bool EnsureGameSchema(sqlite3* db, const char* db_label);
 
 bool LoadAccountRecord(sqlite3* db, const char* account_name, AccountDbAccountData& outData);
@@ -285,7 +289,14 @@ bool SaveBlockList(sqlite3* db, const char* owner_account_name, const std::vecto
 
 // The account that owns a character. One indexed lookup since v8 — it used to
 // open and query every file in accounts/ until it found a hit.
+//
+// The overload naming a connection is for callers that are inside a transaction
+// on a particular database: since v9 the Trading Post's escrow rows sit beside
+// the character rows, so an escrow-out that resolved its recipient against the
+// live handle while writing to another one would be reading a different world
+// from the one it is changing.
 bool ResolveCharacterToAccount(const char* character_name, char* outAccountName, size_t accountNameSize);
+bool ResolveCharacterToAccount(sqlite3* db, const char* character_name, char* outAccountName, size_t accountNameSize);
 
 // Global name checks. Character names are `UNIQUE COLLATE NOCASE` in the
 // schema now, so these are a guard rail with a friendly message in front of a

@@ -2,6 +2,7 @@
 #include "ServerConsole.h"
 #include "CmdHelp.h"
 #include "CmdShowChat.h"
+#include "CmdAtomicCheck.h"
 #include "CmdBroadcast.h"
 #include "CmdCoverageCheck.h"
 #include "CmdDropOdds.h"
@@ -91,6 +92,7 @@ void ServerCommandManager::register_built_in_commands()
 {
 	register_command(std::make_unique<CmdHelp>(m_commands));
 	register_command(std::make_unique<CmdShowChat>());
+	register_command(std::make_unique<CmdAtomicCheck>());
 	register_command(std::make_unique<CmdBroadcast>());
 	register_command(std::make_unique<CmdCoverageCheck>());
 	register_command(std::make_unique<CmdDropOdds>());

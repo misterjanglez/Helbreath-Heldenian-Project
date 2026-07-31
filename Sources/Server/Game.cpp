@@ -1303,21 +1303,23 @@ bool CGame::init()
 	CloseGameConfigDatabase(configDb);
 
 	// Open the one Game DB (game.db, ADR 0004) before anything can read an
-	// account. This is also where a pre-v8 world is refused: a surviving
-	// accounts/ directory or a schema stamped below 8 stops the boot with an
-	// explanation, because there is no migration and starting anyway would mean
-	// silently presenting an empty world as the real one.
+	// account. This is also where a pre-v9 world is refused: a surviving
+	// accounts/ directory, a surviving tradingpost.db, or a schema stamped below
+	// 9 stops the boot with an explanation, because there is no migration and
+	// starting anyway would mean silently presenting an empty world as the real
+	// one.
 	hb::logger::log("Opening Game DB (game.db)");
 	if (!EnsureGameDatabase()) {
 		hb::logger::error("Cannot start server: game.db unavailable");
 		return false;
 	}
 
-	// Open the Trading Post escrow store (tradingpost.db). Single persistent
-	// connection owned by CGame; created with its schema on first run.
-	hb::logger::log("Opening Trading Post store (tradingpost.db)");
-	if (!m_trading_post_store->open("tradingpost.db")) {
-		hb::logger::error("Cannot start server: tradingpost.db unavailable");
+	// Point the Trading Post at that same connection. Its escrow tables are part
+	// of the v9 game.db schema (#82), which is what lets a custody move and the
+	// character save it pairs with be one transaction.
+	hb::logger::log("Opening Trading Post store (game.db escrow tables)");
+	if (!m_trading_post_store->open(hb::server::game_db_handle())) {
+		hb::logger::error("Cannot start server: Trading Post escrow store unavailable");
 		return false;
 	}
 

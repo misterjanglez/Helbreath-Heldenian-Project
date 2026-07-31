@@ -163,4 +163,15 @@ namespace hb::server
 			if (game->m_client_list[i] == nullptr) return i;
 		return -1;
 	}
+
+	bool seed_probe_account(sqlite3* db, const char* account_name)
+	{
+		if (db == nullptr || account_name == nullptr) return false;
+
+		const std::string sql = std::string(
+			"INSERT OR IGNORE INTO accounts(account_name, password_hash, password_salt,"
+			" email, created_at, password_changed_at, last_ip)"
+			" VALUES('") + account_name + "','h','s','e','t','t','ip');";
+		return sqlite3_exec(db, sql.c_str(), nullptr, nullptr, nullptr) == SQLITE_OK;
+	}
 }

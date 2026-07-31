@@ -4,9 +4,50 @@
 #include "sqlite3.h"
 
 #include <format>
+#include <unordered_map>
 
 namespace
 {
+	// Every open game_database, keyed by its connection.
+	//
+	// stmt_scope and txn_scope take a raw `sqlite3*` — that is what let ~35 call
+	// sites opt into the statement cache and the nested transactions without a
+	// signature change — so they need a way to get from a handle back to the
+	// object that owns it, because the cache and the SAVEPOINT depth both live
+	// on that object.
+	//
+	// This used to be a single comparison against the live singleton, and
+	// anything else fell back to a plain BEGIN. That made a prover's scratch
+	// database behave differently from the real one in exactly the way a prover
+	// exists to rule out: a nested scope on the live world became a SAVEPOINT
+	// and on the scratch world became a second BEGIN, which SQLite rejects. It
+	// went unnoticed while nothing nested on a scratch file; #82 puts a
+	// transaction around a character save, so the scratch world now has to
+	// exercise the same code the live world runs.
+	//
+	// Single-threaded by the same rule as the statement cache: every caller runs
+	// on the game thread.
+	// Deliberately leaked rather than a static object. game_db() is a
+	// function-local static too, and its destructor runs at process exit — after
+	// this map's would, since this one is constructed later (the first open()
+	// happens after game_db() has been reached). close() then erases from a map
+	// that no longer exists, which is undefined behaviour and in practice a
+	// segfault on every shutdown. Never destroying a handful of pointers at exit
+	// costs nothing; reaching a destroyed static costs the process.
+	std::unordered_map<sqlite3*, hb::server::game_database*>& database_registry()
+	{
+		static auto* instances = new std::unordered_map<sqlite3*, hb::server::game_database*>();
+		return *instances;
+	}
+
+	hb::server::game_database* owner_of(sqlite3* db)
+	{
+		if (db == nullptr) return nullptr;
+		auto& instances = database_registry();
+		auto found = instances.find(db);
+		return (found != instances.end()) ? found->second : nullptr;
+	}
+
 	bool exec_sql(sqlite3* db, const char* sql)
 	{
 		char* err = nullptr;
@@ -61,6 +102,7 @@ namespace hb::server
 		}
 
 		m_path = path;
+		database_registry()[m_db] = this;
 
 		if (!apply_pragmas()) {
 			close();
@@ -127,6 +169,11 @@ namespace hb::server
 			sqlite3_finalize(entry.second);
 		}
 		m_statements.clear();
+
+		// Deregistered before the close, because SQLite is free to hand the same
+		// address out again for the next connection — and a stale entry would
+		// route a fresh database's scopes at a destroyed object.
+		database_registry().erase(m_db);
 
 		if (sqlite3_close(m_db) != SQLITE_OK) {
 			hb::logger::error("[GAMEDB] sqlite3_close failed: {}", sqlite3_errmsg(m_db));
@@ -244,8 +291,8 @@ namespace hb::server
 			return;
 		}
 
-		if (db == game_db().handle()) {
-			m_stmt = game_db().cached(sql);
+		if (game_database* owner = owner_of(db)) {
+			m_stmt = owner->cached(sql);
 			return;
 		}
 
@@ -264,9 +311,9 @@ namespace hb::server
 			return;
 		}
 
-		if (db == game_db().handle()) {
-			m_nested = true;
-			m_active = game_db().begin();
+		if (game_database* owner = owner_of(db)) {
+			m_owner = owner;
+			m_active = owner->begin();
 			return;
 		}
 
@@ -284,7 +331,7 @@ namespace hb::server
 			return false;
 		}
 		m_active = false;
-		return m_nested ? game_db().commit() : exec_sql(m_db, "COMMIT;");
+		return (m_owner != nullptr) ? m_owner->commit() : exec_sql(m_db, "COMMIT;");
 	}
 
 	void txn_scope::rollback()
@@ -293,8 +340,8 @@ namespace hb::server
 			return;
 		}
 		m_active = false;
-		if (m_nested) {
-			game_db().rollback();
+		if (m_owner != nullptr) {
+			m_owner->rollback();
 		}
 		else {
 			exec_sql(m_db, "ROLLBACK;");

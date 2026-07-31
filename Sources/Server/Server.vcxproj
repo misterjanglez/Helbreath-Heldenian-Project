@@ -228,6 +228,7 @@
     <ClInclude Include="CmdShowChat.h" />
     <ClInclude Include="CmdGiveItem.h" />
     <ClInclude Include="CheckTally.h" />
+    <ClInclude Include="CmdAtomicCheck.h" />
     <ClInclude Include="CmdCoverageCheck.h" />
     <ClInclude Include="CmdItemLogCheck.h" />
     <ClInclude Include="CmdLedgerCheck.h" />
@@ -386,6 +387,7 @@
     <ClCompile Include="CmdShowChat.cpp" />
     <ClCompile Include="CmdGiveItem.cpp" />
     <ClCompile Include="CheckTally.cpp" />
+    <ClCompile Include="CmdAtomicCheck.cpp" />
     <ClCompile Include="CmdCoverageCheck.cpp" />
     <ClCompile Include="CmdItemLogCheck.cpp" />
     <ClCompile Include="CmdLedgerCheck.cpp" />

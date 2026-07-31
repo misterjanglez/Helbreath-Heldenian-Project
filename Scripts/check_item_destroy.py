@@ -95,6 +95,11 @@ ALLOWED: dict[tuple[str, str], str] = {
         "frees the inventory copy of something that still exists. The custody "
         "move itself is recorded by record_escrow_event (#80), and the Serial on "
         "the escrow row is what the rebuilt item comes back out with",
+    ("Sources/Server/TradingPostStore.cpp", "delete item;"):
+        "remove_from_bank, the in-memory undo of an escrow-out whose transaction "
+        "rolled back (#82). The item is going back INTO escrow, where the "
+        "restored row still describes it, so nothing left the world - an exit "
+        "event here would declare a Serial dead that the board still holds",
     # --- RAM release of something the Game DB still holds ---------------
     ("Sources/Server/Client.cpp", "delete m_item_list[i];"):
         "logout teardown: the character's rows stay in game.db, so this frees "

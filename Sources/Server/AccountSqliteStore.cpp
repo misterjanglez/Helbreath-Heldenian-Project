@@ -18,10 +18,14 @@
 // stamp and passed to the VerifySqliteSchemaVersion gate. Bump on any schema
 // change (fresh start - stale dev DBs are refused, never migrated).
 //
-// v8 is one epoch combining two breaks (ADR 0004 + ADR 0003, plan P1.2): the
-// per-account files collapse into this one database, and every item row grows a
-// Serial. They land together so the persistence layer churns once.
-#define ACCOUNT_DB_SCHEMA_VERSION "8"
+// v8 was one epoch combining two breaks (ADR 0004 + ADR 0003, plan P1.2): the
+// per-account files collapsed into this one database, and every item row grew a
+// Serial. They landed together so the persistence layer churned once.
+//
+// v9 finishes the job ADR 0004 started (#82, plan P3.4): the Trading Post's five
+// escrow tables move in from tradingpost.db, because a custody move that spans
+// two files cannot be one transaction under WAL no matter how it is ordered.
+#define ACCOUNT_DB_SCHEMA_VERSION "9"
 
 // The single database file. Sits beside gamedata.db / mapinfo.db / itemledger.db
 // in the server's working directory; lowercase because the Linux filesystem is
@@ -30,6 +34,11 @@
 
 // The pre-v8 layout, kept only so the gate can recognise and refuse it.
 #define LEGACY_ACCOUNTS_DIR "accounts"
+
+// The pre-v9 escrow file, same purpose. A world that still has one holds
+// listings this database knows nothing about, and there is no migration (D6) —
+// so booting next to it would silently strand every escrowed item.
+#define LEGACY_TRADING_POST_DB "tradingpost.db"
 
 using hb::server::game_db;
 using hb::server::stmt_scope;
@@ -175,6 +184,15 @@ bool LegacyAccountLayoutPresent(const char* directory, std::string& outExample, 
     return outCount > 0;
 }
 
+bool LegacyTradingPostFilePresent(const char* path)
+{
+    if (path == nullptr) {
+        return false;
+    }
+    std::error_code ec;
+    return std::filesystem::exists(path, ec) && std::filesystem::is_regular_file(path, ec);
+}
+
 bool EnsureGameDatabase()
 {
     std::string example;
@@ -184,6 +202,18 @@ bool EnsureGameDatabase()
             "(e.g. {}). Persistence v8 consolidates these into a single '{}' and ships no "
             "migration - the world is wiped. Move or delete '{}/' to start a fresh v8 world.",
             legacyCount, LEGACY_ACCOUNTS_DIR, example, GAME_DB_FILENAME, LEGACY_ACCOUNTS_DIR);
+        return false;
+    }
+
+    // Same refusal, one epoch later. The escrow tables are in game.db from v9,
+    // so a surviving tradingpost.db is a board full of items this server will
+    // never look at again - and every one of them was physically removed from a
+    // character (ADR 0001), so booting past it strands them silently.
+    if (LegacyTradingPostFilePresent(LEGACY_TRADING_POST_DB)) {
+        hb::logger::error("Pre-v9 Trading Post store found: '{}'. Persistence v9 moves the escrow "
+            "tables into '{}' so a custody move is one transaction, and ships no migration - the "
+            "world is wiped. Move or delete '{}' to start a fresh v9 world.",
+            LEGACY_TRADING_POST_DB, GAME_DB_FILENAME, LEGACY_TRADING_POST_DB);
         return false;
     }
 
@@ -401,6 +431,94 @@ bool EnsureGameSchema(sqlite3* db, const char* db_label)
         " PRIMARY KEY(owner_account_name, blocked_account_name),"
         " FOREIGN KEY(owner_account_name) REFERENCES accounts(account_name) ON DELETE CASCADE"
         ");"
+
+        // --- Trading Post escrow (v9; was its own tradingpost.db) -------------
+        //
+        // These five tables are here, next to the character tables, for the one
+        // reason ADR 0004 consolidated the account files in the first place: a
+        // SQLite transaction spanning two files is not atomic under WAL. Escrow
+        // is a custody move between an account's inventory and the board, so
+        // while the board lived in its own file every listing, offer, refund and
+        // finalized Trade was two commits with a crash window between them —
+        // which ADR 0001 could only mitigate by ordering every step to fail as
+        // loss rather than duplication. In one file the pair is one transaction
+        // and the window is gone (#82, plan P3.4).
+        //
+        // The queries stay in TradingPostStore.cpp. The DDL does not, because
+        // game.db has ONE schema version: a change to an escrow column is a
+        // change to this database, and splitting the definition across two files
+        // would let one of them be bumped without the other.
+        //
+        // ON DELETE CASCADE relies on foreign_keys=ON, which game_database::open
+        // sets: deleting a listings row removes its listing_items, offers and
+        // (transitively) offer_items; deleting an offers row removes its
+        // offer_items. Item columns mirror character_bank_items above, so the
+        // same record moves losslessly between a live CItem, escrow, and a
+        // Warehouse. `serial` is the escrowed item's identity while no CItem
+        // exists to carry it (ADR 0003); 0 for a Counted (stackable) item.
+        "CREATE TABLE IF NOT EXISTS listings ("
+        " listing_id      INTEGER PRIMARY KEY AUTOINCREMENT,"
+        " seller_name     TEXT NOT NULL COLLATE NOCASE,"
+        " seller_account  TEXT NOT NULL COLLATE NOCASE,"
+        " seller_nation   INTEGER NOT NULL,"
+        " seeking_note    TEXT NOT NULL DEFAULT '',"
+        " created_at      INTEGER NOT NULL,"
+        " expires_at      INTEGER NOT NULL"
+        ");"
+        "CREATE TABLE IF NOT EXISTS listing_items ("
+        " listing_id  INTEGER NOT NULL REFERENCES listings(listing_id) ON DELETE CASCADE,"
+        " slot        INTEGER NOT NULL,"
+        " item_id INTEGER NOT NULL,"
+        " serial INTEGER NOT NULL DEFAULT 0,"
+        " count INTEGER NOT NULL,"
+        " touch_effect_type INTEGER NOT NULL,"
+        " touch_effect_value1 INTEGER NOT NULL,"
+        " touch_effect_value2 INTEGER NOT NULL,"
+        " touch_effect_value3 INTEGER NOT NULL,"
+        " item_color INTEGER NOT NULL,"
+        " spec_effect_value1 INTEGER NOT NULL,"
+        " spec_effect_value2 INTEGER NOT NULL,"
+        " spec_effect_value3 INTEGER NOT NULL,"
+        " cur_durability INTEGER NOT NULL,"
+        HB_ITEM_ATTR_COLUMNS_DDL
+        " PRIMARY KEY (listing_id, slot)"
+        ");"
+        "CREATE TABLE IF NOT EXISTS offers ("
+        " offer_id        INTEGER PRIMARY KEY AUTOINCREMENT,"
+        " listing_id      INTEGER NOT NULL REFERENCES listings(listing_id) ON DELETE CASCADE,"
+        " offerer_name    TEXT NOT NULL COLLATE NOCASE,"
+        " offerer_account TEXT NOT NULL COLLATE NOCASE,"
+        " created_at      INTEGER NOT NULL,"
+        " UNIQUE (listing_id, offerer_name)"
+        ");"
+        "CREATE TABLE IF NOT EXISTS offer_items ("
+        " offer_id  INTEGER NOT NULL REFERENCES offers(offer_id) ON DELETE CASCADE,"
+        " slot      INTEGER NOT NULL,"
+        " item_id INTEGER NOT NULL,"
+        " serial INTEGER NOT NULL DEFAULT 0,"
+        " count INTEGER NOT NULL,"
+        " touch_effect_type INTEGER NOT NULL,"
+        " touch_effect_value1 INTEGER NOT NULL,"
+        " touch_effect_value2 INTEGER NOT NULL,"
+        " touch_effect_value3 INTEGER NOT NULL,"
+        " item_color INTEGER NOT NULL,"
+        " spec_effect_value1 INTEGER NOT NULL,"
+        " spec_effect_value2 INTEGER NOT NULL,"
+        " spec_effect_value3 INTEGER NOT NULL,"
+        " cur_durability INTEGER NOT NULL,"
+        HB_ITEM_ATTR_COLUMNS_DDL
+        " PRIMARY KEY (offer_id, slot)"
+        ");"
+        "CREATE TABLE IF NOT EXISTS notices ("
+        " notice_id       INTEGER PRIMARY KEY AUTOINCREMENT,"
+        " character_name  TEXT NOT NULL COLLATE NOCASE,"
+        " message         TEXT NOT NULL,"
+        " created_at      INTEGER NOT NULL"
+        ");"
+        // Reconciliation (#83) has to find an item that is in escrow rather than
+        // in an inventory, or it reports every listed item as missing.
+        "CREATE INDEX IF NOT EXISTS idx_listing_items_serial ON listing_items(serial);"
+        "CREATE INDEX IF NOT EXISTS idx_offer_items_serial ON offer_items(serial);"
         "COMMIT;";
 
     if (!ExecSql(db, schemaSql)) {
@@ -1784,7 +1902,11 @@ bool SaveBlockList(sqlite3* db, const char* owner_account_name, const std::vecto
 
 bool ResolveCharacterToAccount(const char* character_name, char* outAccountName, size_t accountNameSize)
 {
-    sqlite3* db = hb::server::game_db_handle();
+    return ResolveCharacterToAccount(hb::server::game_db_handle(), character_name, outAccountName, accountNameSize);
+}
+
+bool ResolveCharacterToAccount(sqlite3* db, const char* character_name, char* outAccountName, size_t accountNameSize)
+{
     if (db == nullptr || character_name == nullptr || outAccountName == nullptr || accountNameSize == 0)
         return false;
 

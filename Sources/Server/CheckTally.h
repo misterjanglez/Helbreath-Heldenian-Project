@@ -197,4 +197,15 @@ namespace hb::server
 	// The lowest free client handle at or above `from`, or -1 when the server is
 	// full. Provers that need several take them one after another.
 	int find_free_handle(CGame* game, int from = 1);
+
+	// The `accounts` row a probe character's save hangs on, in a scratch world.
+	// `characters` has a foreign key to `accounts`, so a probe saved without one
+	// is refused by the schema — and since v9 that refusal rolls back the whole
+	// Trading Post operation around it, which makes a prover report perfect
+	// atomicity while having exercised no escrow at all.
+	//
+	// Shared because two provers need the exact column list of a table that a
+	// later schema change will alter: two hand-typed copies is two places for one
+	// of them to be missed.
+	bool seed_probe_account(sqlite3* db, const char* account_name);
 }

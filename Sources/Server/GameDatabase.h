@@ -170,12 +170,13 @@ namespace hb::server
 
 	// A borrowed statement, for the store functions that still speak `sqlite3*`.
 	//
-	// On the live Game DB connection this comes from that connection's cache, so
-	// the save sweep stops re-compiling the same fifteen statements for every
-	// character; on any other handle (the prover's scratch file, or another
-	// store's database) it is prepared and finalized normally. The cache belongs
-	// to one connection by definition, so "is this that connection?" is the whole
-	// rule — which is what lets every call site opt in without a signature change.
+	// On any connection a game_database owns — the live one, or a prover's
+	// scratch file — this comes from that connection's cache, so the save sweep
+	// stops re-compiling the same fifteen statements for every character. On a
+	// handle nothing owns (another store's database) it is prepared and
+	// finalized normally. The cache belongs to one connection by definition, so
+	// "which object owns this handle?" is the whole rule — which is what lets
+	// every call site opt in without a signature change.
 	//
 	// It resets on destruction either way, and that is the part worth having even
 	// where nothing is cached: a SELECT abandoned after its first row keeps a read
@@ -201,11 +202,12 @@ namespace hb::server
 	};
 
 	// A transaction, for the store functions that still speak `sqlite3*`. Same
-	// rule as stmt_scope: on the live Game DB it is game_database::transaction —
-	// so an enclosing sweep turns this into a SAVEPOINT rather than a second
-	// BEGIN, which is what lets save_all_players wrap every character's own
-	// transaction in one commit. On any other handle it is a plain
-	// BEGIN/COMMIT/ROLLBACK, because a scratch database has no sweep around it.
+	// rule as stmt_scope: on a connection a game_database owns it is that
+	// object's nested transaction — so an enclosing scope turns this into a
+	// SAVEPOINT rather than a second BEGIN, which is what lets save_all_players
+	// wrap every character's own transaction in one commit, and what lets a
+	// Trading Post custody move wrap a character save (#82). On a handle nothing
+	// owns it is a plain BEGIN/COMMIT/ROLLBACK.
 	//
 	// Rolls back on destruction unless commit() ran, so every early return in a
 	// long save path undoes its own work without needing to remember to.
@@ -225,6 +227,8 @@ namespace hb::server
 	private:
 		sqlite3* m_db = nullptr;
 		bool m_active = false;
-		bool m_nested = false;   // driven through game_db(), not raw SQL
+		// The game_database that owns m_db, when one does: nesting and the
+		// savepoint names live on it. Null means a raw BEGIN/COMMIT.
+		game_database* m_owner = nullptr;
 	};
 }

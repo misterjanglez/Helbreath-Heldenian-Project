@@ -123,8 +123,8 @@ void CmdGameDbCheck::execute(CGame* game, const char* args)
 	// in the schema is decoration and DeleteCharacterData silently orphans rows.
 	tally.record("live_foreign_keys", probe_scalar(live, "PRAGMA foreign_keys;") == 1);
 
-	tally.record("live_schema_v8",
-		probe_text(live, "SELECT value FROM meta WHERE key='schema_version';") == "8");
+	tally.record("live_schema_v9",
+		probe_text(live, "SELECT value FROM meta WHERE key='schema_version';") == "9");
 
 	//----------------------------------------------------------------------
 	// The refusals. Neither has a migration behind it (D6), so both have to
@@ -158,17 +158,36 @@ void CmdGameDbCheck::execute(CGame* game, const char* args)
 	}
 
 	{
-		// A database stamped below 8 must be refused, not upgraded in place.
+		// A database stamped below 9 must be refused, not upgraded in place.
+		// Stamped 8 rather than something absurd: the immediately-previous epoch
+		// is the version a real stale world would carry, and it is the one a
+		// gate written as "less than" instead of "not equal" would let through.
 		sqlite3* stale = nullptr;
 		bool refused = false;
 		if (sqlite3_open(probe_db, &stale) == SQLITE_OK) {
 			if (exec(stale, "CREATE TABLE meta(key TEXT PRIMARY KEY, value TEXT NOT NULL);")
-				&& exec(stale, "INSERT INTO meta(key,value) VALUES('schema_version','7');")) {
+				&& exec(stale, "INSERT INTO meta(key,value) VALUES('schema_version','8');")) {
 				refused = !EnsureGameSchema(stale, "gamedbcheck(stale)");
 			}
 			sqlite3_close(stale);
 		}
 		tally.record("stale_schema_refused", refused);
+		remove_probe_files();
+	}
+
+	{
+		// The third refusal, new in v9: a surviving tradingpost.db. Every item on
+		// that board was physically removed from a character (ADR 0001), so a
+		// server that booted past it would present a world in which those items
+		// simply do not exist and never say why. Both directions again — a
+		// detector that fires on an absent file refuses every boot.
+		const bool absent_ok = !LegacyTradingPostFilePresent(probe_db);
+		sqlite3* legacy_board = nullptr;
+		if (sqlite3_open(probe_db, &legacy_board) == SQLITE_OK) {
+			sqlite3_close(legacy_board);
+		}
+		tally.record("legacy_tradingpost_absent_ok", absent_ok);
+		tally.record("legacy_tradingpost_refused", LegacyTradingPostFilePresent(probe_db));
 		remove_probe_files();
 	}
 
@@ -183,8 +202,16 @@ void CmdGameDbCheck::execute(CGame* game, const char* args)
 	}
 	sqlite3* db = scratch.handle();
 
-	tally.record("fresh_schema_v8",
-		probe_text(db, "SELECT value FROM meta WHERE key='schema_version';") == "8");
+	tally.record("fresh_schema_v9",
+		probe_text(db, "SELECT value FROM meta WHERE key='schema_version';") == "9");
+
+	// v9's whole point: the Trading Post's escrow tables are in THIS database,
+	// so a custody move and the character save it pairs with can be one
+	// transaction (#82). A schema that laid them down elsewhere would leave
+	// every listing two commits away from the inventory it came from.
+	tally.record("escrow_tables_present",
+		probe_scalar(db, "SELECT COUNT(*) FROM sqlite_master WHERE type='table'"
+			" AND name IN ('listings','listing_items','offers','offer_items','notices');") == 5);
 
 	if (!seed_character(db, "probeacct", "ProbeOne")) {
 		hb::console::error("gamedbcheck: could not seed the scratch world.");

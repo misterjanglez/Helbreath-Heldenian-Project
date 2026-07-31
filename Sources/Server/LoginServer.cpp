@@ -916,22 +916,103 @@ void LoginServer::request_enter_game(int h, char* data)
 	send_login_msg(EnterGameRes::Confirm, EnterGameRes::Confirm, resp_data, sizeof(enterResp), h);
 }
 
-void LoginServer::local_save_player_data(int h)
+bool LoginServer::local_save_player_data(int h)
 {
-	if (G_pGame->m_client_list[h] == 0) return;
+	if (G_pGame->m_client_list[h] == 0) return false;
 
 	sqlite3* db = hb::server::game_db_handle();
 	if (db == nullptr) {
 		hb::logger::error("Game DB not open, cannot save: Account({})", G_pGame->m_client_list[h]->m_account_name);
-		return;
+		return false;
 	}
 
-	if (!SaveCharacterSnapshot(db, G_pGame->m_client_list[h])) {
-		hb::logger::error("SaveCharacterSnapshot failed: Account({}) Char({}) Error({})", G_pGame->m_client_list[h]->m_account_name, G_pGame->m_client_list[h]->m_char_name, sqlite3_errmsg(db));
+	return save_one_player(db, h);
+}
+
+bool LoginServer::save_players_atomic(const int* handles, int count)
+{
+	if (handles == nullptr || count <= 0) return true;
+
+	sqlite3* db = hb::server::game_db_handle();
+	if (db == nullptr) {
+		hb::logger::error("Game DB not open, cannot save {} character(s) atomically", count);
+		return false;
 	}
-	if (G_pGame->m_client_list[h]->m_block_list_dirty) {
-		if (SaveBlockList(db, G_pGame->m_client_list[h]->m_account_name, G_pGame->m_client_list[h]->m_blocked_accounts_list)) {
-			G_pGame->m_client_list[h]->m_block_list_dirty = false;
+
+	// Collapse duplicates and drop handles whose client has gone. Saving one
+	// character twice in a batch is harmless but pointless; more to the point, a
+	// caller that passes the same handle twice (a player trading with themselves
+	// through a bug, a composed Trading Post operation whose seller and winner
+	// are the same character) should not have that decide whether the batch is
+	// two saves or one.
+	if (count > max_atomic_save_handles) {
+		hb::logger::error("Atomic save asked for {} characters, ceiling is {} - the rest are NOT saved",
+			count, max_atomic_save_handles);
+	}
+
+	int unique[max_atomic_save_handles];
+	int unique_count = 0;
+	for (int i = 0; i < count && unique_count < max_atomic_save_handles; i++) {
+		const int h = handles[i];
+		if (h <= 0 || h >= MaxClients || G_pGame->m_client_list[h] == 0) continue;
+		bool seen = false;
+		for (int j = 0; j < unique_count; j++) {
+			if (unique[j] == h) { seen = true; break; }
+		}
+		if (!seen) unique[unique_count++] = h;
+	}
+	if (unique_count == 0) return true;
+
+	// The dirty flags are captured because a rollback undoes the block list rows
+	// as well: clearing the flag inside a transaction that then rewinds would
+	// leave the change gone from memory's point of view and absent from disk.
+	bool was_block_list_dirty[max_atomic_save_handles];
+	for (int i = 0; i < unique_count; i++) {
+		was_block_list_dirty[i] = G_pGame->m_client_list[unique[i]]->m_block_list_dirty;
+	}
+
+	hb::server::txn_scope txn(db);
+	if (!txn.active()) {
+		hb::logger::error("Atomic save: BEGIN failed for {} character(s)", unique_count);
+		return false;
+	}
+
+	bool ok = true;
+	for (int i = 0; i < unique_count && ok; i++) {
+		ok = save_one_player(db, unique[i]);
+	}
+
+	if (ok && txn.commit()) {
+		return true;
+	}
+
+	// Either a character failed to save (its own SAVEPOINT has already rewound)
+	// or the commit did — and this scope's rollback is what undoes the ones that
+	// did succeed, so no half of a multi-account operation is left durable.
+	txn.rollback();
+	for (int i = 0; i < unique_count; i++) {
+		if (was_block_list_dirty[i]) {
+			G_pGame->m_client_list[unique[i]]->m_block_list_dirty = true;
 		}
 	}
+	hb::logger::error("Atomic save FAILED for {} character(s); none was written", unique_count);
+	return false;
+}
+
+bool LoginServer::save_one_player(sqlite3* db, int h)
+{
+	CClient* client = G_pGame->m_client_list[h];
+	if (client == nullptr) return false;
+
+	bool ok = true;
+	if (!SaveCharacterSnapshot(db, client)) {
+		hb::logger::error("SaveCharacterSnapshot failed: Account({}) Char({}) Error({})", client->m_account_name, client->m_char_name, sqlite3_errmsg(db));
+		ok = false;
+	}
+	if (client->m_block_list_dirty) {
+		if (SaveBlockList(db, client->m_account_name, client->m_blocked_accounts_list)) {
+			client->m_block_list_dirty = false;
+		}
+	}
+	return ok;
 }

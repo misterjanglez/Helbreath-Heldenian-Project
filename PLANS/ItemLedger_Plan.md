@@ -276,7 +276,14 @@ Blocking edges are genuine gates only; work the frontier (house rule from epic #
   leak closed and made mechanical by `check_item_merge.py`; `coveragecheck` 24/24.
 - P3.4 Atomic multi-account commits: Exchange saves both parties in one `game.db` transaction;
   Trading Post custody moves made atomic (implementation-time pick: listings table moves into
-  `game.db`, coordinated with that workstream). *Blocked by P1.2.*
+  `game.db`, coordinated with that workstream). *Blocked by P1.2.* **DONE 2026-07-31 (#82)** —
+  schema epoch **v9**; the pick was taken, all five escrow tables moved. `save_players_atomic`
+  is the primitive; Exchange and **Give** both use it (Give was the same shape and the same
+  window, and the plan's "no multi-account operation spans two commits" covers it). Custody
+  moves run inside a `custody_scope` — one transaction plus an in-memory undo stack plus
+  deferred ledger emission — so an escrow-in that cannot commit now returns the items instead
+  of taking ADR 0001's designed loss, and a finalized Trade is ONE commit instead of five.
+  `atomiccheck` 36/36, five negative controls.
 
 **P4 — Payoff tooling** *(all blocked by P3.3)*
 - P4.1 Reconciliation job: scan all inventories/Warehouse vs ledger current-holder; anomaly report

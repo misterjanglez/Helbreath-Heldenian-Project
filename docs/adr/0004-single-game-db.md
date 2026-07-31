@@ -38,6 +38,14 @@ migration tool against live player data.
   both parties' saves in one transaction (ledger plan P3.4), and the Trading Post's custody moves
   can join the same transaction boundary (implementation-time pick: its listings table moves into
   `game.db`, coordinated with that workstream).
+  **Delivered 2026-07-31 (#82), schema epoch v9.** The pick was taken as written: all five escrow
+  tables (`listings`, `listing_items`, `offers`, `offer_items`, `notices`) are part of the v9
+  `game.db` schema, and `trading_post_store` borrows that connection rather than owning one. Give
+  turned out to be the same two-account shape as Exchange and takes the same primitive. The
+  consequence worth recording is one ADR 0001 did not anticipate: with both halves in one
+  transaction, an escrow step that fails **rewinds** instead of resolving to the designed loss —
+  so "fail as loss rather than duplication" is now the fallback for a transaction that cannot
+  begin, not the guarantee. A surviving `tradingpost.db` joins `accounts/` as a boot refusal.
 - `character_name` gains a real `UNIQUE` constraint; scan-based name checks and directory-walk
   helpers (`CountAccountStats`) become single queries.
 - Backups become point-in-time consistent (one `.backup` of `game.db` is a true world snapshot).

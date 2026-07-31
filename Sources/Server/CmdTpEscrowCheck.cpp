@@ -53,6 +53,7 @@
 #include "CheckTally.h"
 #include "Client.h"
 #include "Game.h"
+#include "GameDatabase.h"
 #include "Item.h"
 #include "ItemLedgerStore.h"
 #include "ItemManager.h"
@@ -80,6 +81,7 @@ using hb::server::find_free_handle;
 using hb::server::find_probe_item;
 using hb::server::item_ledger_store;
 using hb::server::probe_client;
+using hb::server::seed_probe_account;
 using hb::server::probe_scalar;
 using hb::server::probe_text;
 using hb::server::trading_post_store;
@@ -129,9 +131,11 @@ namespace
 		"ledger_event::destroyed moved: every destruction row already written means something else now.");
 
 	// Removes the character-save path for the run and puts it back however this
-	// command returns. See the file header: escrow-in and online delivery both
-	// force a save, and a synthetic client saved that way lands in the live
-	// game.db. Both call sites already treat a null g_login as "do not save".
+	// command returns. Since v9 the escrow store saves through its OWN
+	// connection — the scratch one — so this no longer stands between a probe
+	// character and the live game.db. It stays because g_login is still reachable
+	// from anything else these flows touch, and a run that wrote one probe
+	// character into the real world would be worth more than the line it costs.
 	struct login_hold
 	{
 		LoginServer* live = g_login;
@@ -248,22 +252,43 @@ void CmdTpEscrowCheck::execute(CGame* game, const char* args)
 	}
 	item_ledger_store& ledger = swap.scratch();
 
-	// Its own store on its own file, rather than the game's: nothing inside
+	// Its own store on its own database, rather than the game's: nothing inside
 	// trading_post_store reaches for CGame's instance, so a local one is the
 	// whole isolation. Removed on the way in as well as out, so a run that died
 	// half way through cannot leave this one a board with rows already on it —
 	// which is also what keeps the ids below deterministic.
+	//
+	// Since v9 the board lives in game.db, so the scratch file is a whole scratch
+	// world: a game_database with the full schema on it, which is also what makes
+	// the escrow-in save land in the scratch character tables instead of the real
+	// ones. Opened through game_database rather than sqlite3_open so the store's
+	// transactions nest here exactly as they do live.
 	hb::server::remove_probe_db(probe_board_db);
 	struct board_cleanup
 	{
 		~board_cleanup() { hb::server::remove_probe_db(probe_board_db); }
 	} board_guard;
 
-	trading_post_store board;
-	board.set_game(game);
-	if (!board.open(probe_board_db))
+	hb::server::game_database scratch_world;
+	if (!scratch_world.open(probe_board_db)
+		|| !EnsureGameSchema(scratch_world.handle(), probe_board_db))
 	{
 		hb::console::error("tpescrowcheck: could not create the scratch board '{}'.", probe_board_db);
+		return;
+	}
+
+	if (!seed_probe_account(scratch_world.handle(), seller_account)
+		|| !seed_probe_account(scratch_world.handle(), offerer_account))
+	{
+		hb::console::error("tpescrowcheck: could not seed the scratch accounts.");
+		return;
+	}
+
+	trading_post_store board;
+	board.set_game(game);
+	if (!board.open(scratch_world.handle()))
+	{
+		hb::console::error("tpescrowcheck: could not open the scratch board '{}'.", probe_board_db);
 		return;
 	}
 
@@ -356,6 +381,22 @@ void CmdTpEscrowCheck::execute(CGame* game, const char* args)
 	// The Seller goes offline. The listing outlives them, which is the whole
 	// point of a board.
 	game->m_client_list[seller_h]->m_is_init_complete = false;
+
+	// ...and the account store forgets them, which is what makes the delivery
+	// unreachable rather than merely offline.
+	//
+	// Explicit since v9. Before it, the scratch board was a different FILE from
+	// the account store, so a probe character was unknown to the account store
+	// by construction and this check passed for a reason that had nothing to do
+	// with the behaviour it names. The scratch world is now a whole world — the
+	// listing above wrote a real characters row into it — so an offline delivery
+	// there succeeds, exactly as it should. Deleting the row is how the check
+	// keeps testing what it claims to.
+	{
+		const std::string sql = std::string(
+			"DELETE FROM characters WHERE character_name='") + seller_char + "';";
+		sqlite3_exec(scratch_world.handle(), sql.c_str(), nullptr, nullptr, nullptr);
+	}
 
 	board.delist(stranded_listing_id, result);
 
@@ -552,7 +593,12 @@ void CmdTpEscrowCheck::execute(CGame* game, const char* args)
 		&& game->m_item_ledger_store->is_open()
 		&& restored_file.find(probe_ledger_db) == std::string::npos);
 
+	// Both, and in this order: since v9 the store borrows its connection rather
+	// than owning one, so board.close() drops a pointer and nothing else — the
+	// scratch world is what still has the file open, and on Windows an open file
+	// cannot be deleted.
 	board.close();
+	scratch_world.close();
 	hb::server::remove_probe_db(probe_ledger_db);
 	hb::server::remove_probe_db(probe_board_db);
 	tally.record("scratch_removed",

@@ -12,10 +12,6 @@
 #include "sqlite3.h"
 #include "Log.h"
 
-// Single source of truth for the tradingpost.db schema version: spliced into
-// the DDL stamp and passed to the VerifySqliteSchemaVersion gate. Bump on any
-// escrow schema change (fresh start - stale dev DBs are refused).
-#define TRADING_POST_SCHEMA_VERSION "3"
 #include "ServerLogChannels.h"
 
 #include <chrono>
@@ -68,136 +64,56 @@ namespace
 
 namespace hb::server
 {
+	bool custody_scope::finish()
+	{
+		if (m_finished) {
+			return false;
+		}
+		m_finished = true;
+
+		if (m_ok && m_txn.commit()) {
+			// Durable. Only now can the ledger be told, because only now is the
+			// move a fact.
+			for (auto& emit : m_emit) {
+				emit();
+			}
+			return true;
+		}
+
+		m_txn.rollback();
+
+		// Reverse order, for the same reason any undo stack is: a later step may
+		// depend on an earlier one, and unwinding forwards would undo the
+		// foundation before the thing standing on it.
+		for (auto it = m_undo.rbegin(); it != m_undo.rend(); ++it) {
+			(*it)();
+		}
+		return false;
+	}
+
 	trading_post_store::~trading_post_store()
 	{
 		close();
 	}
 
-	bool trading_post_store::open(const std::string& path)
+	bool trading_post_store::open(sqlite3* db)
 	{
-		if (m_db != nullptr) {
-			return true;
-		}
-
-		if (sqlite3_open(path.c_str(), &m_db) != SQLITE_OK) {
-			hb::logger::error("[TP] sqlite3_open failed for {}: {}", path,
-				m_db ? sqlite3_errmsg(m_db) : "unknown");
-			if (m_db != nullptr) {
-				sqlite3_close(m_db);
-				m_db = nullptr;
-			}
+		if (db == nullptr) {
+			hb::logger::error("[TP] cannot open the escrow store: no Game DB connection");
 			return false;
 		}
-
-		sqlite3_busy_timeout(m_db, 1000);
-		if (!exec_sql(m_db, "PRAGMA foreign_keys = ON;")) {
-			close();
-			return false;
-		}
-		if (!ensure_schema()) {
-			close();
-			return false;
-		}
+		// The schema is already on the connection — EnsureGameSchema lays the
+		// escrow tables down with the character tables, because they share one
+		// version stamp now (see AccountSqliteStore.cpp).
+		m_db = db;
 		return true;
 	}
 
 	void trading_post_store::close()
 	{
-		if (m_db != nullptr) {
-			sqlite3_close(m_db);
-			m_db = nullptr;
-		}
-	}
-
-	bool trading_post_store::ensure_schema()
-	{
-		// Item columns mirror character_bank_items (AccountSqliteStore.cpp).
-		// ON DELETE CASCADE on the item/offer tables relies on foreign_keys=ON,
-		// set in open(): deleting a listings row removes its listing_items,
-		// offers, and (transitively) offer_items; deleting an offers row removes
-		// its offer_items.
-		const sqlite_schema_state schema_state =
-			VerifySqliteSchemaVersion(m_db, "tradingpost.db", TRADING_POST_SCHEMA_VERSION);
-		if (schema_state == sqlite_schema_state::mismatch) {
-			return false;
-		}
-		if (schema_state == sqlite_schema_state::current) {
-			return true;
-		}
-
-		// Fresh database: build the full schema at the current version.
-		const char* schema =
-			"BEGIN;"
-			"CREATE TABLE IF NOT EXISTS meta ("
-			" key TEXT PRIMARY KEY,"
-			" value TEXT NOT NULL"
-			");"
-			"INSERT INTO meta(key, value) VALUES('schema_version','" TRADING_POST_SCHEMA_VERSION "');"
-			"CREATE TABLE IF NOT EXISTS listings ("
-			" listing_id      INTEGER PRIMARY KEY AUTOINCREMENT,"
-			" seller_name     TEXT NOT NULL,"
-			" seller_account  TEXT NOT NULL,"
-			" seller_nation   INTEGER NOT NULL,"
-			" seeking_note    TEXT NOT NULL DEFAULT '',"
-			" created_at      INTEGER NOT NULL,"
-			" expires_at      INTEGER NOT NULL"
-			");"
-			"CREATE TABLE IF NOT EXISTS listing_items ("
-			" listing_id  INTEGER NOT NULL REFERENCES listings(listing_id) ON DELETE CASCADE,"
-			" slot        INTEGER NOT NULL,"
-			" item_id INTEGER NOT NULL,"
-			// The escrowed item's Serial (ADR 0003). Escrow is a custody move,
-			// not a destruction and re-creation, so what comes back out of a
-			// Listing has to be the same instance that went in.
-			" serial INTEGER NOT NULL DEFAULT 0,"
-			" count INTEGER NOT NULL,"
-			" touch_effect_type INTEGER NOT NULL,"
-			" touch_effect_value1 INTEGER NOT NULL,"
-			" touch_effect_value2 INTEGER NOT NULL,"
-			" touch_effect_value3 INTEGER NOT NULL,"
-			" item_color INTEGER NOT NULL,"
-			" spec_effect_value1 INTEGER NOT NULL,"
-			" spec_effect_value2 INTEGER NOT NULL,"
-			" spec_effect_value3 INTEGER NOT NULL,"
-			" cur_durability INTEGER NOT NULL,"
-			HB_ITEM_ATTR_COLUMNS_DDL
-			" PRIMARY KEY (listing_id, slot)"
-			");"
-			"CREATE TABLE IF NOT EXISTS offers ("
-			" offer_id        INTEGER PRIMARY KEY AUTOINCREMENT,"
-			" listing_id      INTEGER NOT NULL REFERENCES listings(listing_id) ON DELETE CASCADE,"
-			" offerer_name    TEXT NOT NULL,"
-			" offerer_account TEXT NOT NULL,"
-			" created_at      INTEGER NOT NULL,"
-			" UNIQUE (listing_id, offerer_name)"
-			");"
-			"CREATE TABLE IF NOT EXISTS offer_items ("
-			" offer_id  INTEGER NOT NULL REFERENCES offers(offer_id) ON DELETE CASCADE,"
-			" slot      INTEGER NOT NULL,"
-			" item_id INTEGER NOT NULL,"
-			" serial INTEGER NOT NULL DEFAULT 0,"
-			" count INTEGER NOT NULL,"
-			" touch_effect_type INTEGER NOT NULL,"
-			" touch_effect_value1 INTEGER NOT NULL,"
-			" touch_effect_value2 INTEGER NOT NULL,"
-			" touch_effect_value3 INTEGER NOT NULL,"
-			" item_color INTEGER NOT NULL,"
-			" spec_effect_value1 INTEGER NOT NULL,"
-			" spec_effect_value2 INTEGER NOT NULL,"
-			" spec_effect_value3 INTEGER NOT NULL,"
-			" cur_durability INTEGER NOT NULL,"
-			HB_ITEM_ATTR_COLUMNS_DDL
-			" PRIMARY KEY (offer_id, slot)"
-			");"
-			"CREATE TABLE IF NOT EXISTS notices ("
-			" notice_id       INTEGER PRIMARY KEY AUTOINCREMENT,"
-			" character_name  TEXT NOT NULL,"
-			" message         TEXT NOT NULL,"
-			" created_at      INTEGER NOT NULL"
-			");"
-			"COMMIT;";
-
-		return exec_sql(m_db, schema);
+		// Borrowed, never owned: the Game DB connection outlives this store and
+		// is closed by CloseGameDatabase().
+		m_db = nullptr;
 	}
 
 	CItem* trading_post_store::build_item(const escrow_item& e) const
@@ -362,16 +278,74 @@ namespace hb::server
 		}
 		m_game->calc_total_weight(client_h);
 
-		// Forced save so the reduced inventory is durable BEFORE any escrow row
-		// exists. A crash from here to the escrow insert loses the items (they
-		// are gone from the saved character); it can never dupe them.
-		if (g_login != nullptr) {
-			g_login->local_save_player_data(client_h);
-		}
-
+		// No save here. Until v9 this function forced one, so the reduced
+		// inventory was durable BEFORE any escrow row existed and a crash in
+		// between lost the items rather than duplicating them. The escrow tables
+		// are in game.db now, so the caller puts that save and the escrow insert
+		// in ONE transaction (#82) — and a failure rewinds to before the items
+		// left, instead of resolving to the lesser of two bad outcomes.
 		out_items = std::move(snap);
 		out_result = hb::net::TpResultCode::Ok;
 		return true;
+	}
+
+	void trading_post_store::return_items_to_inventory(int client_h,
+		const std::vector<escrow_item>& items)
+	{
+		// The undo half of pull_items_from_inventory: the transaction that was
+		// meant to make the escrow durable rolled back, so the items never left
+		// as far as the database is concerned and memory has to agree.
+		//
+		// Rebuilt through build_item rather than kept aside as live objects,
+		// because the pull destroys the CItem (a partial stack never had a
+		// separate one at all) — and rebuilding from the snapshot is what
+		// carries the Serial back, so the item that returns is the same instance
+		// that was about to be listed.
+		//
+		// The original slot and equipped state are not restored: add_item finds a
+		// slot and merges stackables back into the stack the pull decremented,
+		// which is what the player's client is told. A returned item being
+		// unequipped is a visible difference from nothing having happened, and it
+		// is the honest one — the alternative is re-equipping something the
+		// player watched come off.
+		if (m_game == nullptr || m_game->m_item_manager == nullptr) {
+			return;
+		}
+		if (m_game->m_client_list[client_h] == nullptr) {
+			// Logged out inside the failed operation. Nothing to hand back to,
+			// and the rollback already restored the saved inventory that still
+			// holds them, so the character logs back in with the items.
+			return;
+		}
+
+		for (const auto& e : items) {
+			CItem* item = build_item(e);
+			if (item == nullptr) {
+				hb::logger::error("[TP] rollback: cannot rebuild item id {} - lost",
+					static_cast<int>(e.item_id));
+				continue;
+			}
+			m_game->m_item_manager->add_item(client_h, item, 0);
+		}
+		m_game->calc_total_weight(client_h);
+	}
+
+	bool trading_post_store::save_character(int client_h) const
+	{
+		// Deliberately NOT g_login->local_save_player_data: that would take the
+		// live game.db handle, while this store may be pointed at a scratch file
+		// (the provers), and it is also where the block-list write lives, which
+		// has nothing to do with a custody move. SaveCharacterSnapshot on this
+		// store's own connection is what keeps the character half of the move
+		// inside the same transaction as the escrow half.
+		if (m_game == nullptr || m_db == nullptr) {
+			return false;
+		}
+		const CClient* client = m_game->m_client_list[client_h];
+		if (client == nullptr) {
+			return false;
+		}
+		return SaveCharacterSnapshot(m_db, client);
 	}
 
 	// ---- Provenance Ledger (#80) ---------------------------------------------
@@ -497,20 +471,36 @@ namespace hb::server
 			return false;
 		}
 
-		// Escrow-in: validate + remove from inventory + forced save.
+		// Escrow-in: validate + remove from the in-memory inventory. Nothing is
+		// durable yet — the transaction below is what makes the reduced inventory
+		// and the escrow rows true at the same instant.
 		std::vector<escrow_item> items;
 		if (!pull_items_from_inventory(client_h, slots, count,
 			hb::shared::limits::TpMaxListingItems, items, out_result)) {
 			return false;
 		}
 
-		// The items are now out of the character's saved inventory. From here a
-		// failed escrow insert is a loss, logged for GM recovery.
 		const int64_t created = now_unix();
 		const int64_t expires = created +
 			static_cast<int64_t>(hb::shared::limits::TpListingExpiryDays) * 86400;
 
-		bool ok = exec_sql(m_db, "BEGIN;");
+		custody_scope scope(m_db);
+
+		// Registered before anything can fail, so every exit below — including a
+		// transaction that could not even begin — hands the bundle back.
+		scope.on_rollback([this, client_h, items]()
+		{
+			return_items_to_inventory(client_h, items);
+		});
+
+		bool ok = scope.ok();
+		// The seller's save comes FIRST inside the transaction, so a failure to
+		// write the character costs nothing else. Order does not affect
+		// atomicity — that is the point of one transaction — but it does decide
+		// how much work a doomed operation does before it finds out.
+		if (ok) {
+			ok = save_character(client_h);
+		}
 		int64_t listing_id = 0;
 		if (ok) {
 			sqlite3_stmt* stmt = nullptr;
@@ -538,34 +528,35 @@ namespace hb::server
 			listing_id = sqlite3_last_insert_rowid(m_db);
 			ok = insert_item_rows("listing_items", "listing_id", listing_id, items);
 		}
-		if (ok) {
-			ok = exec_sql(m_db, "COMMIT;");
+		if (!ok) {
+			scope.fail();
 		}
 
-		if (!ok) {
-			exec_sql(m_db, "ROLLBACK;");
-			// The inventory was already reduced and saved, so this is the loss the
-			// ordering above chose over a dupe. It has to reach the ledger, or the
-			// items' last recorded holder stays a character who no longer has them.
-			record_escrow_exit(items, hb::server::destroy_reason::delivery_lost,
-				seller->m_char_name, seller);
-			hb::logger::error("[TP] LISTING INSERT FAILED for {} - {} item(s) lost:",
-				seller->m_char_name, static_cast<int>(items.size()));
+		const std::string seller_name(seller->m_char_name);
+		scope.on_commit([this, client_h, seller_name, listing_id, items]()
+		{
+			record_escrow_event({ ItemLogAction::TpList, nullptr, listing_id, 0 }, items,
+				seller_name.c_str(), m_game->m_client_list[client_h]);
 			for (const auto& e : items) {
-				hb::logger::error("[TP]   lost {}", describe(e));
+				hb::logger::log<log_channel::trade>("[TP] {} {} -> listing {} <- {}",
+					seller_name, tp_action_name(ItemLogAction::TpList), listing_id, describe(e));
 			}
+		});
+
+		if (!scope.finish()) {
+			// Nothing happened. The rollback puts the database back to before the
+			// listing, and the registered undo puts the items back in the seller's
+			// hands to match — so there is no exit event to write, because nothing
+			// left. Until v9 this branch was a designed LOSS: the reduced inventory
+			// was already committed by then and only the escrow half could be undone.
+			hb::logger::error("[TP] LISTING FAILED for {} - rolled back, {} item(s) returned",
+				seller_name, static_cast<int>(items.size()));
 			out_result = hb::net::TpResultCode::Failed;
 			return false;
 		}
 
 		out_listing_id = listing_id;
 		out_result = hb::net::TpResultCode::Ok;
-		record_escrow_event({ ItemLogAction::TpList, nullptr, listing_id, 0 }, items,
-			seller->m_char_name, seller);
-		for (const auto& e : items) {
-			hb::logger::log<log_channel::trade>("[TP] {} {} -> listing {} <- {}",
-				seller->m_char_name, tp_action_name(ItemLogAction::TpList), listing_id, describe(e));
-		}
 		return true;
 	}
 
@@ -619,7 +610,9 @@ namespace hb::server
 			}
 		}
 
-		// Escrow-in: validate + remove from inventory + forced save.
+		// Escrow-in: validate + remove from the in-memory inventory. See
+		// create_listing — the transaction below is what makes the reduced
+		// inventory and the escrow rows true at the same instant.
 		std::vector<escrow_item> items;
 		if (!pull_items_from_inventory(client_h, slots, count,
 			hb::shared::limits::TpMaxOfferItems, items, out_result)) {
@@ -628,7 +621,16 @@ namespace hb::server
 
 		const int64_t created = now_unix();
 
-		bool ok = exec_sql(m_db, "BEGIN;");
+		custody_scope scope(m_db);
+		scope.on_rollback([this, client_h, items]()
+		{
+			return_items_to_inventory(client_h, items);
+		});
+
+		bool ok = scope.ok();
+		if (ok) {
+			ok = save_character(client_h);
+		}
 		int64_t offer_id = 0;
 		if (ok) {
 			sqlite3_stmt* stmt = nullptr;
@@ -653,31 +655,35 @@ namespace hb::server
 			offer_id = sqlite3_last_insert_rowid(m_db);
 			ok = insert_item_rows("offer_items", "offer_id", offer_id, items);
 		}
-		if (ok) {
-			ok = exec_sql(m_db, "COMMIT;");
+		if (!ok) {
+			scope.fail();
 		}
 
-		if (!ok) {
-			exec_sql(m_db, "ROLLBACK;");
-			record_escrow_exit(items, hb::server::destroy_reason::delivery_lost,
-				offerer->m_char_name, offerer);
-			hb::logger::error("[TP] OFFER INSERT FAILED for {} on listing {} - {} item(s) lost:",
-				offerer->m_char_name, listing_id, static_cast<int>(items.size()));
+		const std::string offerer_name(offerer->m_char_name);
+		const int64_t parent_listing = listing_id;
+		scope.on_commit([this, client_h, offerer_name, parent_listing, offer_id, items]()
+		{
+			record_escrow_event({ ItemLogAction::TpOffer, nullptr, parent_listing, offer_id }, items,
+				offerer_name.c_str(), m_game->m_client_list[client_h]);
 			for (const auto& e : items) {
-				hb::logger::error("[TP]   lost {}", describe(e));
+				hb::logger::log<log_channel::trade>("[TP] {} {} -> offer {} on listing {} <- {}",
+					offerer_name, tp_action_name(ItemLogAction::TpOffer), offer_id, parent_listing, describe(e));
 			}
+		});
+
+		if (!scope.finish()) {
+			// Nothing happened — see create_listing. The two pre-checks above
+			// (vanished Listing, duplicate Offer) exist because they are the two
+			// ways this INSERT fails for a reason the player can be told about;
+			// reaching here means the database itself refused.
+			hb::logger::error("[TP] OFFER FAILED for {} on listing {} - rolled back, {} item(s) returned",
+				offerer_name, listing_id, static_cast<int>(items.size()));
 			out_result = hb::net::TpResultCode::Failed;
 			return false;
 		}
 
 		out_offer_id = offer_id;
 		out_result = hb::net::TpResultCode::Ok;
-		record_escrow_event({ ItemLogAction::TpOffer, nullptr, listing_id, offer_id }, items,
-			offerer->m_char_name, offerer);
-		for (const auto& e : items) {
-			hb::logger::log<log_channel::trade>("[TP] {} {} -> offer {} on listing {} <- {}",
-				offerer->m_char_name, tp_action_name(ItemLogAction::TpOffer), offer_id, listing_id, describe(e));
-		}
 		return true;
 	}
 
@@ -747,58 +753,86 @@ namespace hb::server
 	}
 
 	bool trading_post_store::deliver_to_bank(const char* character_name,
-		const std::vector<escrow_item>& items, const escrow_move& move)
+		const std::vector<escrow_item>& items, const escrow_move& move,
+		custody_scope& scope)
 	{
 		if (items.empty()) {
 			return true;
 		}
-		if (m_game == nullptr || character_name == nullptr) {
+		if (m_game == nullptr || character_name == nullptr || !scope.ok()) {
+			scope.fail();
 			return false;
 		}
 
 		const int h = m_game->find_client_by_name(character_name);
 		CClient* recipient = (h != 0) ? m_game->m_client_list[h] : nullptr;
 
-		// The custody move is recorded before the delivery is attempted, because
-		// it is true either way: the escrow row is already deleted and committed
-		// by the time anyone reaches here (the ADR ordering), so the item has left
-		// the board whatever happens next. A delivery that then fails adds its own
-		// exit below, and the pair reads as what actually happened rather than as
-		// a custody move that quietly never took place.
-		record_escrow_event(move, items, character_name, recipient);
-
 		// What did not arrive. Neither mechanic records anything itself, so a new
 		// failure branch in either one cannot forget to — it just does not report
 		// the Serial as landed — and two branches cannot both claim the same one.
 		std::vector<int64_t> lost;
 		const bool all_ok = (recipient != nullptr)
-			? deliver_to_online(h, items, lost)
-			: deliver_to_offline(character_name, items, lost);
+			? deliver_to_online(h, items, lost, scope)
+			: deliver_to_offline(character_name, items, lost, scope);
 
-		record_escrow_exit(lost, hb::server::destroy_reason::delivery_lost,
-			character_name, recipient);
+		// Both recordings are deferred to the commit. The custody move is true
+		// whatever the delivery does — the escrow row is deleted in this same
+		// transaction, so the item has left the board — but it is only true if
+		// the transaction commits, and the ledger cannot take a row back. Until
+		// v9 the escrow row was already committed by the time anyone reached
+		// here, which is why this used to be recorded up front.
+		//
+		// Everything the emission needs is copied, not referenced: it runs after
+		// this function has returned, and `move.counterparty_char` in particular
+		// points at a caller's local string.
+		const std::string recipient_name(character_name);
+		const int action = move.action;
+		const std::string counterparty(move.counterparty_char ? move.counterparty_char : "");
+		const bool has_counterparty = (move.counterparty_char != nullptr);
+		const int64_t listing_id = move.listing_id;
+		const int64_t offer_id = move.offer_id;
+		scope.on_commit([this, recipient_name, action, counterparty, has_counterparty,
+			listing_id, offer_id, moved = items, lost]()
+		{
+			// Re-resolved rather than captured: the recipient may have logged out
+			// between the delivery and the commit, and an event carrying a stale
+			// CClient* would read a freed object for its location.
+			const int now_h = m_game->find_client_by_name(recipient_name.c_str());
+			CClient* now = (now_h != 0) ? m_game->m_client_list[now_h] : nullptr;
+			const escrow_move recorded{ action,
+				has_counterparty ? counterparty.c_str() : nullptr, listing_id, offer_id };
+			record_escrow_event(recorded, moved, recipient_name.c_str(), now);
+			record_escrow_exit(lost, hb::server::destroy_reason::delivery_lost,
+				recipient_name.c_str(), now);
+		});
 		return all_ok;
 	}
 
 	bool trading_post_store::deliver_to_online(int client_h, const std::vector<escrow_item>& items,
-		std::vector<int64_t>& out_lost)
+		std::vector<int64_t>& out_lost, custody_scope& scope)
 	{
+		// Which objects this delivery put in the Warehouse, so a rollback can
+		// take them back out. Pointer identity, not slot indices: a later step in
+		// the same operation can deposit into a slot this one skipped, and the
+		// undo has to remove exactly what it added.
+		std::vector<CItem*> deposited;
+
 		bool all_ok = true;
 		for (const auto& e : items) {
 			CItem* item = build_item(e);
 			if (item == nullptr) {
 				// No object was built, so there is nothing for destroy_item to end
-				// — but the escrow row is already deleted and the item is just as
-				// gone as one that failed to fit in a Warehouse.
+				// — but the escrow row is deleted in this transaction and the item
+				// is just as gone as one that failed to fit in a Warehouse.
 				out_lost.push_back(e.serial);
 				hb::logger::error("[TP] deliver(online): unknown item id {} - lost",
 					static_cast<int>(e.item_id));
 				all_ok = false;
 				continue;
 			}
-			// already_recorded: deliver_to_bank emitted the custody move for this
-			// bundle (TpTradeIn / TpRefund / TpDelist) before calling here, so a
-			// Deposit as well would give one move two events (#81).
+			// already_recorded: deliver_to_bank emits the custody move for this
+			// bundle (TpTradeIn / TpRefund / TpDelist), so a Deposit as well would
+			// give one move two events (#81).
 			if (!m_game->m_item_manager->set_item_to_bank_item(client_h, item,
 				ItemManager::bank_deposit::already_recorded)) {
 				hb::logger::error("[TP] deliver(online): Warehouse full for {} - lost {}",
@@ -811,18 +845,61 @@ namespace hb::server
 					hb::server::destroy_reason::delivery_lost, client_h);
 				all_ok = false;
 			}
-			// On success the Warehouse now owns `item`.
+			else {
+				// On success the Warehouse now owns `item`.
+				deposited.push_back(item);
+			}
 		}
 
-		// Persist the bank additions immediately.
-		if (g_login != nullptr) {
-			g_login->local_save_player_data(client_h);
+		// The bank additions are part of the same transaction as the escrow row
+		// they came from. Not through g_login: this store may be pointed at a
+		// scratch database, and a second connection's save would be a second
+		// commit — the exact thing this ticket removes.
+		if (!save_character(client_h)) {
+			scope.fail();
+			all_ok = false;
+		}
+
+		if (!deposited.empty()) {
+			scope.on_rollback([this, client_h, deposited]()
+			{
+				remove_from_bank(client_h, deposited);
+			});
 		}
 		return all_ok;
 	}
 
+	void trading_post_store::remove_from_bank(int client_h, const std::vector<CItem*>& items)
+	{
+		// The undo half of an online delivery. Without it a rewound escrow-out
+		// leaves the item in the recipient's Warehouse in memory while the
+		// database has it back on the board — one item in two places, which is
+		// the duplication ADR 0001's ordering rules exist to prevent.
+		CClient* client = (m_game != nullptr) ? m_game->m_client_list[client_h] : nullptr;
+		if (client == nullptr) {
+			// Logged out inside the failed operation. Their in-memory Warehouse
+			// went with them and the rollback restored the saved one, which never
+			// held these.
+			return;
+		}
+		for (CItem* item : items) {
+			for (int i = 0; i < hb::shared::limits::MaxBankItems; i++) {
+				if (client->m_item_in_bank_list[i] == item) {
+					client->m_item_in_bank_list[i] = nullptr;
+					break;
+				}
+			}
+			// Deleted, not destroy_item'd: destruction is an economic event and
+			// this item is not leaving the world — it is going back into escrow,
+			// where the restored row still describes it. An exit event here would
+			// declare a Serial dead that the board still holds.
+			delete item;
+		}
+	}
+
 	bool trading_post_store::deliver_to_offline(const char* character_name,
-		const std::vector<escrow_item>& items, std::vector<int64_t>& out_lost)
+		const std::vector<escrow_item>& items, std::vector<int64_t>& out_lost,
+		custody_scope& scope)
 	{
 		// Nothing reached the account store, so the whole bundle is gone.
 		auto lose_everything = [&]()
@@ -835,14 +912,20 @@ namespace hb::server
 
 		char account_name[32];
 		std::memset(account_name, 0, sizeof(account_name));
-		if (!ResolveCharacterToAccount(character_name, account_name, sizeof(account_name))) {
+		if (!ResolveCharacterToAccount(m_db, character_name, account_name, sizeof(account_name))) {
 			hb::logger::error("[TP] deliver(offline): cannot resolve account for {} - {} item(s) lost",
 				character_name, static_cast<int>(items.size()));
 			lose_everything();
 			return false;
 		}
 
-		sqlite3* db = hb::server::game_db_handle();
+		// This store's own connection, not game_db_handle(): the escrow rows and
+		// the Warehouse rows are in the same database now, and using the handle
+		// the operation's transaction was opened on is what makes them one
+		// commit. On the live server the two are the same pointer; on a prover's
+		// scratch world they are not, and the difference used to leak probe
+		// characters into the real game.db.
+		sqlite3* db = m_db;
 		if (db == nullptr) {
 			hb::logger::error("[TP] deliver(offline): Game DB not open (account {}) - {} item(s) lost",
 				account_name, static_cast<int>(items.size()));
@@ -894,11 +977,11 @@ namespace hb::server
 		}
 
 		if (!rows.empty()) {
-			hb::server::txn_scope txn(db);
-			const bool inserted = txn.active()
-				&& InsertCharacterBankItems(db, character_name, rows)
-				&& txn.commit();
-			if (!inserted) {
+			// No transaction of its own any more: this insert belongs to the
+			// operation's transaction, which is what pairs it with the deletion
+			// of the escrow row it came from. A scope here would commit the
+			// Warehouse half on its own and put the two-commit window back.
+			if (!InsertCharacterBankItems(db, character_name, rows)) {
 				// Over `rows`, not `items`: anything already dropped above for a
 				// full Warehouse is in out_lost already, and a second entry for
 				// the same Serial is precisely the double-exit Reconciliation
@@ -911,6 +994,7 @@ namespace hb::server
 					out_lost.push_back(r.serial);
 					hb::logger::error("[TP]   lost item id {}", static_cast<int>(r.item_id));
 				}
+				scope.fail();
 				all_ok = false;
 			}
 		}
@@ -924,6 +1008,17 @@ namespace hb::server
 			return false;
 		}
 
+		custody_scope scope(m_db);
+		const bool refunded = refund_offer(offer_id, log_action, scope);
+		return scope.finish() && refunded;
+	}
+
+	bool trading_post_store::refund_offer(int64_t offer_id, int log_action, custody_scope& scope)
+	{
+		if (!scope.ok()) {
+			return false;
+		}
+
 		std::string offerer;
 		int64_t listing_id = 0;
 		std::vector<escrow_item> items;
@@ -931,43 +1026,37 @@ namespace hb::server
 			return false; // already gone (rescinded, finalized, or a race loser)
 		}
 
-		// Delete the escrow rows and commit BEFORE delivering (offer_items cascade
-		// off the offers row). A crash between the commit and delivery loses the
-		// items; it can never dupe them.
-		bool deleted = false;
-		if (exec_sql(m_db, "BEGIN;")) {
-			sqlite3_stmt* stmt = nullptr;
-			if (sqlite3_prepare_v2(m_db, "DELETE FROM offers WHERE offer_id=?;",
-				-1, &stmt, nullptr) == SQLITE_OK) {
-				sqlite3_bind_int64(stmt, 1, offer_id);
-				deleted = (sqlite3_step(stmt) == SQLITE_DONE);
-				sqlite3_finalize(stmt);
-			}
-			if (deleted && exec_sql(m_db, "COMMIT;")) {
-				// committed
-			}
-			else {
-				exec_sql(m_db, "ROLLBACK;");
-				deleted = false;
-			}
-		}
-		if (!deleted) {
+		// The escrow rows go and the items arrive in ONE transaction (offer_items
+		// cascade off the offers row). Until v9 the delete had to be committed
+		// BEFORE the delivery, on its own, so that a crash in between resolved to
+		// loss rather than duplication — the two halves lived in different files
+		// and no ordering could make them one commit.
+		if (!delete_offer_row(offer_id)) {
 			hb::logger::error("[TP] refund: failed to delete offer {}", offer_id);
+			scope.fail();
 			return false;
 		}
 
 		const bool delivered = deliver_to_bank(offerer.c_str(), items,
-			{ log_action, nullptr, listing_id, offer_id });
-		for (const auto& e : items) {
-			hb::logger::log<log_channel::trade>("[TP] {} offer {} -> {} <- {}",
-				tp_action_name(log_action), offer_id, offerer, describe(e));
-		}
+			{ log_action, nullptr, listing_id, offer_id }, scope);
+
+		// Deferred with the ledger events, and for the same reason: a trade-log
+		// line describing a refund that rolled back is a line an operator will
+		// chase for an hour.
+		const std::vector<escrow_item> refunded = items;
+		scope.on_commit([this, log_action, offer_id, offerer, refunded]()
+		{
+			for (const auto& e : refunded) {
+				hb::logger::log<log_channel::trade>("[TP] {} offer {} -> {} <- {}",
+					tp_action_name(log_action), offer_id, offerer, describe(e));
+			}
+		});
 		return delivered;
 	}
 
-	int trading_post_store::refund_all_offers_on_listing(int64_t listing_id)
+	int trading_post_store::refund_all_offers_on_listing(int64_t listing_id, custody_scope& scope)
 	{
-		if (!is_open()) {
+		if (!is_open() || !scope.ok()) {
 			return 0;
 		}
 
@@ -984,7 +1073,7 @@ namespace hb::server
 
 		int refunded = 0;
 		for (int64_t id : ids) {
-			if (refund_offer(id, ItemLogAction::TpRefund)) {
+			if (refund_offer(id, ItemLogAction::TpRefund, scope)) {
 				refunded++;
 			}
 		}
@@ -1300,48 +1389,30 @@ namespace hb::server
 
 	// ---- Row deletion (each its own committed txn) ---------------------------
 
-	bool trading_post_store::delete_listing_row(int64_t listing_id)
+	bool trading_post_store::delete_escrow_row(const char* sql, int64_t id)
 	{
+		// No transaction of its own: these run inside the operation's scope, so
+		// the row leaving the board and the items arriving somewhere else are one
+		// commit. Before v9 each was its own BEGIN/COMMIT, which is what made an
+		// escrow-out two commits no matter how the caller was written.
 		bool ok = false;
-		if (exec_sql(m_db, "BEGIN;")) {
-			sqlite3_stmt* stmt = nullptr;
-			if (sqlite3_prepare_v2(m_db, "DELETE FROM listings WHERE listing_id = ?;",
-				-1, &stmt, nullptr) == SQLITE_OK) {
-				sqlite3_bind_int64(stmt, 1, listing_id);
-				ok = (sqlite3_step(stmt) == SQLITE_DONE);
-				sqlite3_finalize(stmt);
-			}
-			if (ok && exec_sql(m_db, "COMMIT;")) {
-				// committed
-			}
-			else {
-				exec_sql(m_db, "ROLLBACK;");
-				ok = false;
-			}
+		sqlite3_stmt* stmt = nullptr;
+		if (sqlite3_prepare_v2(m_db, sql, -1, &stmt, nullptr) == SQLITE_OK) {
+			sqlite3_bind_int64(stmt, 1, id);
+			ok = (sqlite3_step(stmt) == SQLITE_DONE);
+			sqlite3_finalize(stmt);
 		}
 		return ok;
 	}
 
+	bool trading_post_store::delete_listing_row(int64_t listing_id)
+	{
+		return delete_escrow_row("DELETE FROM listings WHERE listing_id = ?;", listing_id);
+	}
+
 	bool trading_post_store::delete_offer_row(int64_t offer_id)
 	{
-		bool ok = false;
-		if (exec_sql(m_db, "BEGIN;")) {
-			sqlite3_stmt* stmt = nullptr;
-			if (sqlite3_prepare_v2(m_db, "DELETE FROM offers WHERE offer_id = ?;",
-				-1, &stmt, nullptr) == SQLITE_OK) {
-				sqlite3_bind_int64(stmt, 1, offer_id);
-				ok = (sqlite3_step(stmt) == SQLITE_DONE);
-				sqlite3_finalize(stmt);
-			}
-			if (ok && exec_sql(m_db, "COMMIT;")) {
-				// committed
-			}
-			else {
-				exec_sql(m_db, "ROLLBACK;");
-				ok = false;
-			}
-		}
-		return ok;
+		return delete_escrow_row("DELETE FROM offers WHERE offer_id = ?;", offer_id);
 	}
 
 	// ---- Composed operations -------------------------------------------------
@@ -1395,42 +1466,64 @@ namespace hb::server
 			}
 		}
 
-		// ADR ordering: every escrow row is deleted + committed BEFORE its items are
-		// delivered, so a crash in any window resolves to loss, never duplication.
+		// ONE transaction for the whole Trade (#82). A finalized Trade moves four
+		// bundles between three or more characters, and before v9 that was five
+		// or more commits across two database files: a crash between any pair
+		// left the Listing gone and one side of the trade undelivered. ADR 0001's
+		// ordering — delete and commit the escrow row BEFORE delivering — was the
+		// best a two-file layout allowed, and it bought loss instead of
+		// duplication. One file buys neither.
+		custody_scope scope(m_db);
+
 		// 1) Remove the winning Offer so refund_all leaves it alone.
-		if (!delete_offer_row(offer_id)) {
+		if (!scope.ok() || !delete_offer_row(offer_id)) {
+			scope.fail();
 			out_result = hb::net::TpResultCode::Failed;
 			return false;
 		}
-		// 2) Refund the losing Offers to their offerers (delete+commit+deliver each).
-		refund_all_offers_on_listing(listing_id);
+		// 2) Refund the losing Offers to their offerers.
+		refund_all_offers_on_listing(listing_id, scope);
 		// 3) Remove the Listing (cascades its items; all Offers are gone by now).
-		delete_listing_row(listing_id);
+		if (!delete_listing_row(listing_id)) {
+			scope.fail();
+		}
 
 		// 4) Deliver from the in-memory snapshots. These are the two events that
-		// carry a counterparty: a finalized Trade is the only escrow transition
-		// where an item genuinely passed from one character to another, so this is
-		// where "who did I get this from" becomes answerable months later.
-		// The two deliveries that carry a counterparty, and the only two: a
-		// finalized Trade is the one escrow transition where an item genuinely
-		// passed from one character to another, so this is where "who did I get
-		// this from" becomes answerable months later.
+		// carry a counterparty, and the only two: a finalized Trade is the one
+		// escrow transition where an item genuinely passed from one character to
+		// another, so this is where "who did I get this from" becomes answerable
+		// months later.
 		const bool to_seller = deliver_to_bank(seller_name.c_str(), winning_items,
-			{ ItemLogAction::TpTradeOut, winner_name.c_str(), listing_id, offer_id });
+			{ ItemLogAction::TpTradeOut, winner_name.c_str(), listing_id, offer_id }, scope);
 		const bool to_winner = deliver_to_bank(winner_name.c_str(), listing_items,
-			{ ItemLogAction::TpTradeIn, seller_name.c_str(), listing_id, offer_id });
+			{ ItemLogAction::TpTradeIn, seller_name.c_str(), listing_id, offer_id }, scope);
 
-		for (const auto& e : winning_items) {
-			hb::logger::log<log_channel::trade>("[TP] {} listing {} offer {} -> {} <- {}",
-				tp_action_name(ItemLogAction::TpTradeOut), listing_id, offer_id, seller_name, describe(e));
-		}
-		for (const auto& e : listing_items) {
-			hb::logger::log<log_channel::trade>("[TP] {} listing {} offer {} -> {} <- {}",
-				tp_action_name(ItemLogAction::TpTradeIn), listing_id, offer_id, winner_name, describe(e));
+		scope.on_commit([this, listing_id, offer_id, seller_name, winner_name,
+			winning_items, listing_items]()
+		{
+			for (const auto& e : winning_items) {
+				hb::logger::log<log_channel::trade>("[TP] {} listing {} offer {} -> {} <- {}",
+					tp_action_name(ItemLogAction::TpTradeOut), listing_id, offer_id, seller_name, describe(e));
+			}
+			for (const auto& e : listing_items) {
+				hb::logger::log<log_channel::trade>("[TP] {} listing {} offer {} -> {} <- {}",
+					tp_action_name(ItemLogAction::TpTradeIn), listing_id, offer_id, winner_name, describe(e));
+			}
+		});
+
+		if (!scope.finish()) {
+			// Nothing moved and the board is as it was, so the Listing is still
+			// there to try again — which is why this reports Failed rather than
+			// one of the "it is gone" codes.
+			hb::logger::error("[TP] FINALIZE FAILED for listing {} offer {} - rolled back",
+				listing_id, offer_id);
+			out_result = hb::net::TpResultCode::Failed;
+			return false;
 		}
 
-		// 5) Notices. The Seller is the online actor and gets the action result; the
-		// winner and losers are told out-of-band (chat now, or queued for login).
+		// 5) Notices, after the commit: telling a winner their items are waiting
+		// is only true once the rows say so, and notify_or_queue writes a row of
+		// its own for an offline recipient.
 		notify_or_queue(winner_name.c_str(),
 			"Your Trading Post Offer was accepted. The items are in your Warehouse.");
 		for (const auto& nm : losers) {
@@ -1476,16 +1569,28 @@ namespace hb::server
 			}
 		}
 
-		// ADR ordering: refund the Offers (each delete+commit before deliver), then
-		// remove the Listing and return its bundle to the Seller.
-		refund_all_offers_on_listing(listing_id);
-		delete_listing_row(listing_id);
+		// ONE transaction: every Offer returns to its offerer and the bundle
+		// returns to the Seller, or none of it does and the Listing stands.
+		custody_scope scope(m_db);
+		refund_all_offers_on_listing(listing_id, scope);
+		if (!delete_listing_row(listing_id)) {
+			scope.fail();
+		}
 		const bool returned = deliver_to_bank(seller_name.c_str(), listing_items,
-			{ ItemLogAction::TpDelist, nullptr, listing_id, 0 });
+			{ ItemLogAction::TpDelist, nullptr, listing_id, 0 }, scope);
 
-		for (const auto& e : listing_items) {
-			hb::logger::log<log_channel::trade>("[TP] {} listing {} -> {} <- {}",
-				tp_action_name(ItemLogAction::TpDelist), listing_id, seller_name, describe(e));
+		scope.on_commit([this, listing_id, seller_name, listing_items]()
+		{
+			for (const auto& e : listing_items) {
+				hb::logger::log<log_channel::trade>("[TP] {} listing {} -> {} <- {}",
+					tp_action_name(ItemLogAction::TpDelist), listing_id, seller_name, describe(e));
+			}
+		});
+
+		if (!scope.finish()) {
+			hb::logger::error("[TP] DELIST FAILED for listing {} - rolled back", listing_id);
+			out_result = hb::net::TpResultCode::Failed;
+			return false;
 		}
 
 		// Notices. On expiry the Seller is told too (they didn't initiate it); on a
@@ -1543,6 +1648,14 @@ namespace hb::server
 			return;
 		}
 
+		// ONE transaction for the whole void (#82). This touches every character
+		// who had an Offer on one of the deleted character's Listings, so it is
+		// the widest multi-account operation the Trading Post has — and half of
+		// it committing would refund some offerers and strand the rest against a
+		// Listing whose owner no longer exists.
+		custody_scope scope(m_db);
+		std::vector<std::string> to_notify;
+
 		// 1) The character's own Listings: refund counterparties' Offers to them,
 		// then destroy the character's escrowed bundle (never delivered — it shares
 		// the fate of the deleted character's inventory) and remove the Listing.
@@ -1574,25 +1687,29 @@ namespace hb::server
 					sqlite3_finalize(stmt);
 				}
 			}
-			refund_all_offers_on_listing(lid);
+			refund_all_offers_on_listing(lid, scope);
 
 			std::vector<escrow_item> listing_items;
 			load_listing_items(lid, listing_items);
-			delete_listing_row(lid);
+			if (!delete_listing_row(lid)) {
+				scope.fail();
+			}
 			// Never delivered and never returned — the escrowed bundle shares the
 			// fate of the inventory it was pulled from, so this is an exit, not a
 			// custody move, and it is the last thing the ledger will ever say
-			// about these Serials.
-			record_escrow_exit(listing_items,
-				hb::server::destroy_reason::character_deleted, character_name, nullptr);
-			for (const auto& e : listing_items) {
-				hb::logger::log<log_channel::trade>("[TP] void: destroyed {}'s listing {} item <- {}",
-					character_name, lid, describe(e));
-			}
-			for (const auto& nm : offerers) {
-				notify_or_queue(nm.c_str(),
-					"A Listing you had an Offer on was removed. Your items were returned to your Warehouse.");
-			}
+			// about these Serials. Deferred with everything else: a Serial
+			// declared dead by a rolled-back void is still on the board.
+			const std::string owner(character_name);
+			scope.on_commit([this, owner, lid, listing_items]()
+			{
+				record_escrow_exit(listing_items,
+					hb::server::destroy_reason::character_deleted, owner.c_str(), nullptr);
+				for (const auto& e : listing_items) {
+					hb::logger::log<log_channel::trade>("[TP] void: destroyed {}'s listing {} item <- {}",
+						owner, lid, describe(e));
+				}
+			});
+			to_notify.insert(to_notify.end(), offerers.begin(), offerers.end());
 		}
 
 		// 2) The character's own Offers on other Sellers' Listings: destroy the
@@ -1614,13 +1731,19 @@ namespace hb::server
 			std::string ignore;
 			std::vector<escrow_item> offer_items;
 			load_offer(oid, ignore, offer_items);
-			delete_offer_row(oid);
-			record_escrow_exit(offer_items,
-				hb::server::destroy_reason::character_deleted, character_name, nullptr);
-			for (const auto& e : offer_items) {
-				hb::logger::log<log_channel::trade>("[TP] void: destroyed {}'s offer {} item <- {}",
-					character_name, oid, describe(e));
+			if (!delete_offer_row(oid)) {
+				scope.fail();
 			}
+			const std::string owner(character_name);
+			scope.on_commit([this, owner, oid, offer_items]()
+			{
+				record_escrow_exit(offer_items,
+					hb::server::destroy_reason::character_deleted, owner.c_str(), nullptr);
+				for (const auto& e : offer_items) {
+					hb::logger::log<log_channel::trade>("[TP] void: destroyed {}'s offer {} item <- {}",
+						owner, oid, describe(e));
+				}
+			});
 		}
 
 		// 3) The character's queued notices.
@@ -1633,6 +1756,20 @@ namespace hb::server
 				sqlite3_step(stmt);
 				sqlite3_finalize(stmt);
 			}
+		}
+
+		if (!scope.finish()) {
+			hb::logger::error("[TP] void_character('{}') FAILED - rolled back; the character's "
+				"escrowed items are still on the board", character_name);
+			return;
+		}
+
+		// After the commit: an offline offerer's notice is a row of its own, and
+		// queueing it inside the transaction would have it rolled back with
+		// everything else while the refund it describes had not happened either.
+		for (const auto& nm : to_notify) {
+			notify_or_queue(nm.c_str(),
+				"A Listing you had an Offer on was removed. Your items were returned to your Warehouse.");
 		}
 
 		if (!my_listings.empty() || !my_offers.empty()) {
