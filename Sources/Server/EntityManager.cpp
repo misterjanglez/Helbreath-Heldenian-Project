@@ -7,6 +7,7 @@
 #include "WarManager.h"
 #include "MagicManager.h"
 #include "ItemManager.h"
+#include "ItemLedgerStore.h"   // record_kill: the drop analytics' denominator (#85)
 #include "CombatManager.h"
 #include "QuestManager.h"
 #include "DelayEventManager.h"
@@ -2617,6 +2618,27 @@ void CEntityManager::npc_dead_item_generator(int npc_h, short attacker_h, char a
 
 	if (hb::server::npc_type_never_drops(m_npc_list[npc_h]->m_type)) return;
 
+	// The killer's reputation is the one per-player layer of the generosity stack
+	// (#88). It is resolved HERE, once, rather than inside each slot, because the
+	// ledger has to record the very factor the rolls below used: a second call
+	// reading a rating that changed in between would leave the analytics dividing
+	// by a number no roll ever saw. A kill with no live attacker record reads as
+	// neutral rather than as a penalty.
+	const int attacker_rating = (m_game->m_client_list[attacker_h] != nullptr)
+		? m_game->m_client_list[attacker_h]->m_rating : 0;
+	const double rep_factor =
+		m_game->get_tier_config().generosity.reputation_factor(attacker_rating);
+
+	// The denominator (#85). Recorded after the guards above and before the rolls
+	// below, so the population counted here is exactly the population `dropodds`
+	// prices — summons, unsummons and the guard/dummy/crop types are out of both.
+	// A kill is booked whether or not anything drops: "1 in N kills" is a
+	// statement about kills, and counting only the productive ones would report
+	// every rate as 1 in 1.
+	if (hb::server::item_ledger_store* ledger = m_game->m_item_ledger_store.get())
+		ledger->record_kill(m_npc_list[npc_h]->m_npc_config_id,
+			m_npc_list[npc_h]->m_npc_name, rep_factor);
+
 	// One engine, run twice. The slot a table was reached through is the ONLY
 	// thing "stage" means: it picks the stage multiplier and decides whether
 	// the result tier-rolls (spec §8 keeps stage 2 out of the tier roll).
@@ -2626,8 +2648,8 @@ void CEntityManager::npc_dead_item_generator(int npc_h, short attacker_h, char a
 	// There is no gold preempt any more and no flat per-stage gate: gold is an
 	// ordinary row competing on its own absolute chance, and every other row
 	// states its own. The leftover probability is "nothing".
-	roll_drop_slot(npc_h, attacker_h, 1, m_npc_list[npc_h]->m_stage1_table_id);
-	roll_drop_slot(npc_h, attacker_h, 2, m_npc_list[npc_h]->m_stage2_table_id);
+	roll_drop_slot(npc_h, attacker_h, 1, m_npc_list[npc_h]->m_stage1_table_id, rep_factor);
+	roll_drop_slot(npc_h, attacker_h, 2, m_npc_list[npc_h]->m_stage2_table_id, rep_factor);
 }
 
 // A row's stack size: `count_throws` rolls of min..max, summed. One throw is
@@ -2665,7 +2687,8 @@ int CEntityManager::roll_entry_count(const hb::server::drop_entry& entry,
 // stage-2 drop outright. #88 brings it back where the original had it and where
 // ADR 0005 said it belonged: a layer of the generosity stack, scoped to the
 // categories a player farms for rather than to a stage.
-void CEntityManager::roll_drop_slot(int npc_h, short attacker_h, int stage_slot, int table_id)
+void CEntityManager::roll_drop_slot(int npc_h, short attacker_h, int stage_slot, int table_id,
+	double rep_factor)
 {
 	const hb::server::drop_table* table = m_game->m_item_manager->get_drop_table(table_id);
 	if (table == nullptr) return;
@@ -2674,14 +2697,10 @@ void CEntityManager::roll_drop_slot(int npc_h, short attacker_h, int stage_slot,
 
 	const hb::server::tier_config& tier_config = m_game->get_tier_config();
 
-	// The killer's reputation is the one per-player layer of the stack (#88):
-	// well-regarded players farm gear and uniques faster, outcasts slower, and
-	// everyone else — rating 0 — rolls exactly as authored. A kill with no live
-	// attacker record reads as neutral rather than as a penalty.
-	const int attacker_rating = (m_game->m_client_list[attacker_h] != nullptr)
-		? m_game->m_client_list[attacker_h]->m_rating : 0;
-	const double rep_factor =
-		tier_config.generosity.reputation_factor(attacker_rating);
+	// `rep_factor` — the killer's reputation, the one per-player layer of the
+	// stack (#88) — arrives from npc_dead_item_generator rather than being read
+	// again here, so both slots and the kill row the ledger writes (#85) are
+	// provably priced for the same player.
 
 	// The generosity stack and proportional saturation, resolved through the
 	// same function the dropodds report calls, so the two cannot disagree.

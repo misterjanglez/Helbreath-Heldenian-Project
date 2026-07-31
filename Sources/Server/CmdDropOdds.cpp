@@ -167,6 +167,19 @@ std::string row(const std::string& label, const std::vector<std::string>& column
 	return line;
 }
 
+// One grade's tier curve as a machine line. Two forms of the command publish it
+// — the aggregate report and the `rows` capture #85's analytics consume — and it
+// is the same statement in both, so a reader can compare a capture against an
+// older one without knowing which form produced it.
+void write_split_line(const hb::server::tier_config& config, int grade)
+{
+	const tier_split split(config.find_loot_grade(static_cast<uint8_t>(grade)));
+	std::string line = std::format("DROPODDS SPLIT {}", grade);
+	for (int tier = 1; tier <= tier_count; tier++)
+		line += " " + raw(split.share(tier));
+	hb::console::write(line);
+}
+
 std::string grade_label(const hb::server::tier_config& config, int grade)
 {
 	const hb::server::loot_grade_config* r = config.find_loot_grade(static_cast<uint8_t>(grade));
@@ -231,6 +244,24 @@ int parse_rating_suffix(const char* args, std::string& head)
 	return rating;
 }
 
+// `resolved_slot` and `resolve_slot` live in DropModel.h, beside the arithmetic
+// they call. Three readers need them now — the human listing below, the machine
+// lines #85's analytics consume as their predicted side, and the prover that
+// checks the expected-yield identity — and a per-kill expectation computed three
+// times is one that can disagree with itself.
+using hb::server::resolved_slot;
+
+// The slot lookup this file wants: the tables come off the validation context,
+// the multipliers and item configs off the game.
+bool resolve_slot(const CGame& game, const tier_validation_context& context,
+	int table_id, int stage_slot, uint8_t loot_grade, double rep_factor, resolved_slot& out)
+{
+	if (context.drop_tables == nullptr) return false;
+	return hb::server::resolve_slot(*context.drop_tables, table_id,
+		game.get_tier_config().generosity, stage_slot, loot_grade, rep_factor,
+		context.item_configs, context.item_config_count, out);
+}
+
 // The per-monster per-item listing: every row of both slots as "1 in N", with
 // what is left over for "nothing". This is the view the owner asked for and
 // that no tool produced under the old model.
@@ -245,25 +276,15 @@ void write_monster_rows(const CGame& game, const tier_validation_context& contex
 	for (int slot = 0; slot < 2; slot++)
 	{
 		if (context.drop_tables == nullptr) return;
-		const auto found = context.drop_tables->find(slots[slot]);
-		if (found == context.drop_tables->end())
+		resolved_slot resolved;
+		if (!resolve_slot(game, context, slots[slot], slot + 1,
+			static_cast<uint8_t>(npc.m_loot_grade), rep_factor, resolved))
 		{
 			hb::console::write(std::format("  stage {}: no table", slot + 1),
 				console_color::muted);
 			continue;
 		}
-		const drop_table& table = found->second;
-
-		std::vector<uint32_t> chances;
-		bool saturated = false;
-		hb::server::resolve_drop_chances(table, game.get_tier_config().generosity,
-			slot + 1, static_cast<uint8_t>(npc.m_loot_grade), rep_factor,
-			context.item_configs, context.item_config_count, chances, &saturated);
-
-		// The tail's chances come off the head's, exactly as the roller derives
-		// them, so this report cannot disagree with what actually drops.
-		std::vector<uint32_t> tail_chances;
-		hb::server::resolve_tail_chances(table, chances, tail_chances);
+		const drop_table& table = *resolved.table;
 
 		std::string header = std::format("  stage {}: table {} '{}'", slot + 1,
 			table.id, table.name);
@@ -282,7 +303,7 @@ void write_monster_rows(const CGame& game, const tier_validation_context& contex
 				table.guaranteed_rolls, table.roll_count_min,
 				table.guarantee_item_id, table.tail_rarity_divisor),
 				console_color::info);
-		if (saturated)
+		if (resolved.saturated)
 			hb::console::write(
 				"    SATURATED - rows were scaled back to 1.0; a bigger multiplier"
 				" is a no-op here", console_color::warning);
@@ -291,42 +312,36 @@ void write_monster_rows(const CGame& game, const tier_validation_context& contex
 		// divided one, so a row's per-kill expectation is not its per-roll chance
 		// times the roll count. Both are printed: the chance is what the data
 		// says, the expectation is what a player sees.
-		const int head_rolls = std::min(table.guaranteed_rolls, table.roll_count_min);
+		const int head_rolls = resolved.head_rolls;
 		auto expected_at = [&](double p_head, double p_tail, int rolls) {
 			const int head = std::min(head_rolls, rolls);
 			return head * p_head + (rolls - head) * p_tail;
 		};
 
-		// Summed first, because the guarantee item's own per-kill figure IS the
-		// head's leftover — printing it as 0 next to a 2.43 two lines below would
-		// read as a bug in the report.
-		const double total = static_cast<double>(hb::server::total_chance(chances))
-			/ drop_chance_denominator;
-		const double tail_total =
-			static_cast<double>(hb::server::total_chance(tail_chances))
-			/ drop_chance_denominator;
-		const double guarantee_per_kill = head_rolls * (1.0 - total);
+		// The guarantee item's own per-kill figure IS the head's leftover —
+		// printing it as 0 next to a 2.43 two lines below would read as a bug in
+		// the report.
+		const double total = resolved.head_total;
+		const double tail_total = resolved.tail_total;
+		const double guarantee_per_kill = resolved.guarantee_per_kill;
 
 		hb::console::write(std::format("    {:>5}  {:<30}{:>12}{:>14}{:>11}  {}",
 			"item", "name", "per roll", "1 in N", "per kill", "category"),
 			console_color::muted);
 
-		for (size_t i = 0; i < chances.size(); i++)
+		for (size_t i = 0; i < resolved.size(); i++)
 		{
-			const int item_id = table.entries[i].item_id;
-			const double p = static_cast<double>(chances[i]) / drop_chance_denominator;
-			const double p_tail =
-				static_cast<double>(tail_chances[i]) / drop_chance_denominator;
+			const int item_id = resolved.item_id(i);
+			const double p = resolved.per_roll(i);
 			const CItem* config = (item_id >= 0 && item_id < context.item_config_count)
 				? context.item_configs[item_id] : nullptr;
 			const uint8_t category = hb::server::drop_category_of(config, item_id);
-			const bool is_guarantee = item_id == table.guarantee_item_id;
+			const bool is_guarantee = resolved.is_guarantee(i);
 			hb::console::write(std::format("    {:>5}  {:<30}{:>12}{:>14}{:>11.4f}  {}{}{}",
 				item_id, config != nullptr ? config->m_name : "?",
 				is_guarantee ? std::string("guarantee") : pct(p),
 				is_guarantee ? std::string("-") : one_in(p),
-				is_guarantee ? guarantee_per_kill
-					: expected_at(p, p_tail, table.roll_count_min),
+				resolved.per_kill(i),
 				hb::server::drop_category_name(category),
 				hb::server::ordinary_tier_gear(context, item_id) != nullptr
 					? " (tier-rolls)" : "",
@@ -370,6 +385,82 @@ void write_monster_rows(const CGame& game, const tier_validation_context& contex
 	}
 }
 
+// The same monster, as machine lines only (#85, plan P4.3).
+//
+// This is the PREDICTED side of the observed-vs-authored diff, and it is emitted
+// here rather than recomputed by the analytics tool on purpose: a second
+// implementation of the drop arithmetic that disagreed with the roller would be
+// worse than no report at all (#66's founding constraint). Everything below comes
+// off `resolved_slot`, which is the same object the human listing prints from and
+// which resolves through the roller's own `resolve_drop_chances`.
+//
+// Three line kinds, so a monster's and a slot's properties are each stated once
+// rather than repeated on every row:
+//
+//   DROPODDS NPC  <npc_id> <grade> <monster name...>
+//   DROPODDS SLOT <npc_id> <stage> <table_id> <rolls_min> <rolls_max>
+//                 <guaranteed_rolls> <saturated> <rows>
+//   DROPODDS ROW  <npc_id> <stage> <item_id> <instanced> <gear> <rep_scaled>
+//                 <per_roll> <per_kill> <item name...>
+//
+// The NPC line is emitted for every priced monster, including one whose slots
+// name no table: it carries the monster NAME, which is the key the ledger joins
+// on — a drop's birth row records the monster it came from by name, so a tool
+// holding only ids could not match one to the other. It is also how "this
+// monster was killed and can drop nothing" stays a statement rather than a gap.
+//
+// `instanced` is the field that decides whether a row is measurable at all: only
+// a non-stackable item gets an `item_instances` birth row naming the monster that
+// dropped it, so the Counted rows are reported and then excluded by the tool
+// rather than silently missing from it.
+//
+// `rep_scaled` says the reputation layer moves this row (#88). It is what lets
+// the tool price a gear row against `npc_kills.rep_factor_sum` instead of the
+// plain kill count, and it is why these lines are meant to be captured at rating
+// 0 — the neutral figure is the one that multiplies.
+void write_monster_machine_rows(const CGame& game, const tier_validation_context& context,
+	int npc_id, const CNpc& npc, double rep_factor)
+{
+	hb::console::write(std::format("DROPODDS NPC {} {} {}",
+		npc_id, npc.m_loot_grade, npc.m_npc_name));
+
+	const int slots[2] = { npc.m_stage1_table_id, npc.m_stage2_table_id };
+	for (int slot = 0; slot < 2; slot++)
+	{
+		resolved_slot resolved;
+		if (!resolve_slot(game, context, slots[slot], slot + 1,
+			static_cast<uint8_t>(npc.m_loot_grade), rep_factor, resolved))
+			continue;
+		const drop_table& table = *resolved.table;
+
+		hb::console::write(std::format("DROPODDS SLOT {} {} {} {} {} {} {} {}",
+			npc_id, slot + 1, table.id,
+			table.roll_count_min, table.roll_count_max, table.guaranteed_rolls,
+			resolved.saturated ? 1 : 0, static_cast<int>(resolved.size())));
+
+		for (size_t i = 0; i < resolved.size(); i++)
+		{
+			const int item_id = resolved.item_id(i);
+			const CItem* config = (item_id >= 0 && item_id < context.item_config_count)
+				? context.item_configs[item_id] : nullptr;
+			const uint8_t category = hb::server::drop_category_of(config, item_id);
+
+			// A null config is a dangling row the validator reports; it reads as
+			// Counted here so the tool excludes it rather than looking for birth
+			// rows an item that does not exist can never have written.
+			const bool instanced = config != nullptr && !config->is_stackable();
+
+			hb::console::write(std::format("DROPODDS ROW {} {} {} {} {} {} {} {} {}",
+				npc_id, slot + 1, item_id,
+				instanced ? 1 : 0,
+				hb::server::ordinary_tier_gear(context, item_id) != nullptr ? 1 : 0,
+				hb::server::drop_multipliers::reputation_applies(category) ? 1 : 0,
+				raw(resolved.per_roll(i)), raw(resolved.per_kill(i)),
+				config != nullptr ? config->m_name : "?"));
+		}
+	}
+}
+
 } // namespace
 
 void CmdDropOdds::execute(CGame* game, const char* args)
@@ -390,6 +481,54 @@ void CmdDropOdds::execute(CGame* game, const char* args)
 	const int rating = parse_rating_suffix(args, head);
 	const double rep_factor = config.generosity.reputation_factor(rating);
 	args = head.c_str();
+
+	// ---- dropodds rows [id|name]: the predicted side, machine-readable -----
+	// A separate form rather than machine lines added to `dropodds npc`, so that
+	// the two existing captures used as regression evidence — the aggregate
+	// DROPODDS lines and the per-monster `npc` listing — stay byte-identical to
+	// what earlier tickets recorded. Nothing here prints for a human: the whole
+	// output is meant to be piped into the analytics tool.
+	if (std::strncmp(args, "rows", 4) == 0)
+	{
+		const char* which = args + 4;
+		while (*which == ' ') which++;
+		int wanted = -1;
+		if (*which != '\0') std::sscanf(which, "%d", &wanted);
+
+		// The stack rides the capture so a diff of two runs shows which world and
+		// which player the rows below were priced for. The analytics tool refuses
+		// a capture taken at a non-zero rating: the reputation layer is applied
+		// per row here, and the tool applies it again from the ledger's summed
+		// factors, so a pre-scaled capture would double it.
+		const hb::server::drop_multipliers& m = config.generosity;
+		hb::console::write(std::format("DROPODDS MODE {} {:.2f} {:.2f} {:.2f} {} {:.2f}",
+			item_system_mode_name(config.item_system), m.global, m.stage[1], m.stage[2],
+			rating, rep_factor));
+
+		// The tier split per loot grade, in the same shape the aggregate report
+		// publishes it. It is here because #63 — every monster in the game rolling
+		// one grade's curve — moves NO drop rate at all while the grade
+		// multipliers sit at 1.00: it moves only which tier the item lands on.
+		// So the rate rows below cannot see that fault, and this is what can.
+		for (int grade = 1; grade <= loot_grade_count; grade++)
+			write_split_line(config, grade);
+
+		int listed = 0;
+		for (int id = 0; id < context.npc_config_count; id++)
+		{
+			const CNpc* npc = context.npc_configs[id];
+			if (npc == nullptr) continue;
+			if (hb::server::npc_type_never_drops(npc->m_type)) continue;
+			if (*which != '\0' && id != wanted && hb_stricmp(npc->m_npc_name, which) != 0)
+				continue;
+			write_monster_machine_rows(*game, context, id, *npc, rep_factor);
+			listed++;
+		}
+		hb::console::write(std::format("DROPODDS ROWS {}", listed));
+		if (listed == 0 && *which != '\0')
+			hb::console::error("dropodds: no npc_config matches '{}'", which);
+		return;
+	}
 
 	// ---- dropodds npc <id|name>: the per-item rarity listing ---------------
 	if (std::strncmp(args, "npc", 3) == 0)
@@ -651,11 +790,7 @@ void CmdDropOdds::execute(CGame* game, const char* args)
 		line += " " + raw(anything_odds[grade]) + " " + std::to_string(rollup[grade].saturated);
 		hb::console::write(line);
 
-		const tier_split split(config.find_loot_grade(static_cast<uint8_t>(grade)));
-		std::string split_line = std::format("DROPODDS SPLIT {}", grade);
-		for (int tier = 1; tier <= tier_count; tier++)
-			split_line += " " + raw(split.share(tier));
-		hb::console::write(split_line);
+		write_split_line(config, grade);
 	}
 	for (const auto& [key, odds] : table_odds)
 	{

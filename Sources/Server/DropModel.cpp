@@ -2,6 +2,8 @@
 
 #include "Item.h"
 
+#include <algorithm>   // std::min, for the head/tail split
+
 using namespace hb::shared::item;
 
 namespace hb::server
@@ -190,6 +192,58 @@ int roll_drop_row(const std::vector<uint32_t>& chances, uint32_t draw)
 		if (draw < cumulative) return static_cast<int>(i);
 	}
 	return -1;                       // the remainder: nothing dropped
+}
+
+double resolved_slot::per_roll(size_t i) const
+{
+	return static_cast<double>(chances[i]) / drop_chance_denominator;
+}
+
+double resolved_slot::per_roll_tail(size_t i) const
+{
+	return static_cast<double>(tail_chances[i]) / drop_chance_denominator;
+}
+
+double resolved_slot::per_kill(size_t i) const
+{
+	// The guarantee item's per-kill figure IS the head's leftover: its own row
+	// carries no chance at all, and it is paid out precisely when a head roll
+	// comes up empty.
+	if (is_guarantee(i)) return guarantee_per_kill;
+	const double head = std::min(static_cast<double>(head_rolls), expected_rolls);
+	return head * per_roll(i) + (expected_rolls - head) * per_roll_tail(i);
+}
+
+double resolved_slot::expected_yield() const
+{
+	const double head = std::min(static_cast<double>(head_rolls), expected_rolls);
+	return head + (expected_rolls - head) * tail_total;
+}
+
+bool resolve_slot(const std::map<int, drop_table>& tables, int table_id,
+	const drop_multipliers& multipliers, int stage_slot, uint8_t loot_grade,
+	double rep_factor, const CItem* const* item_configs, int item_config_count,
+	resolved_slot& out)
+{
+	const auto found = tables.find(table_id);
+	if (found == tables.end()) return false;
+
+	out.table = &found->second;
+	resolve_drop_chances(*out.table, multipliers, stage_slot, loot_grade, rep_factor,
+		item_configs, item_config_count, out.chances, &out.saturated);
+
+	// The tail's chances come off the head's, exactly as the roller derives them,
+	// so no reader of this can disagree with what actually drops.
+	resolve_tail_chances(*out.table, out.chances, out.tail_chances);
+
+	out.head_rolls = std::min(out.table->guaranteed_rolls, out.table->roll_count_min);
+	out.expected_rolls = 0.5 * (out.table->roll_count_min + out.table->roll_count_max);
+	out.head_total = static_cast<double>(total_chance(out.chances))
+		/ drop_chance_denominator;
+	out.tail_total = static_cast<double>(total_chance(out.tail_chances))
+		/ drop_chance_denominator;
+	out.guarantee_per_kill = out.head_rolls * (1.0 - out.head_total);
+	return true;
 }
 
 } // namespace hb::server

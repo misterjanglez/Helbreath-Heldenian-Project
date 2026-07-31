@@ -235,6 +235,7 @@
     <ClInclude Include="CmdCoverageCheck.h" />
     <ClInclude Include="CmdItemLogCheck.h" />
     <ClInclude Include="CmdItemHistory.h" />
+    <ClInclude Include="CmdAnalyticsCheck.h" />
     <ClInclude Include="CmdBiographyCheck.h" />
     <ClInclude Include="CmdLedgerCheck.h" />
     <ClInclude Include="CmdLedgerValidate.h" />
@@ -402,6 +403,7 @@
     <ClCompile Include="CmdCoverageCheck.cpp" />
     <ClCompile Include="CmdItemLogCheck.cpp" />
     <ClCompile Include="CmdItemHistory.cpp" />
+    <ClCompile Include="CmdAnalyticsCheck.cpp" />
     <ClCompile Include="CmdBiographyCheck.cpp" />
     <ClCompile Include="CmdLedgerCheck.cpp" />
     <ClCompile Include="CmdLifecycleCheck.cpp" />

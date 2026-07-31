@@ -11,7 +11,8 @@
 // Single source of truth for the itemledger.db schema version: spliced into the
 // DDL stamp and passed to the VerifySqliteSchemaVersion gate. Bump on any ledger
 // schema change — stale dev DBs are refused, never migrated (D6).
-#define ITEM_LEDGER_SCHEMA_VERSION "1"
+// v2 (#85): npc_kills, the denominator every observed drop rate is divided by.
+#define ITEM_LEDGER_SCHEMA_VERSION "2"
 
 #include <chrono>
 #include <charconv>
@@ -323,6 +324,41 @@ namespace hb::server
 			" qty       INTEGER NOT NULL,"
 			" PRIMARY KEY (day, item_id, flow_type)"
 			");"
+			// The denominator (#85, plan P4.3). Every figure dropodds prints is a
+			// chance PER KILL, so an observed rate has nothing to divide by until
+			// kills are counted — and nothing in the server counted them
+			// (CClient::m_enemy_kill_count is per character and per nothing else).
+			//
+			// Aggregated by day and monster like item_flows, and for the same
+			// reason: a busy world kills thousands of the same monster and the
+			// analytics only ever read the total.
+			//
+			// rep_factor_sum is the sum of the killers' reputation multipliers,
+			// stored beside the count rather than bucketed by rating, because that
+			// layer multiplies LINEARLY on gear and unique rows (#88). The expected
+			// number of drops of one such row is therefore
+			// `rep_factor_sum x authored_ppb_at_rating_0`, exactly, with no
+			// per-rating breakdown to store or to join against. Ordinary rows
+			// ignore it and divide by `kills`.
+			//
+			// npc_name is stored beside the id, and that denormalisation is the
+			// whole reason the SQL half of the analytics works at all: a drop's
+			// birth row records the monster by NAME (origin_detail, which a
+			// Biography shows a human), while a kill is keyed by npc_config id.
+			// The ledger holds no name-to-id table and must not need one — it is
+			// readable on its own, never against a copy of gamedata.db — so
+			// without the name here the two halves could not be joined without a
+			// world file. Where one name covers several configs (14 Catapults, 3
+			// Guards) both sides pool identically, which is the honest reading.
+			"CREATE TABLE IF NOT EXISTS npc_kills ("
+			" day            INTEGER NOT NULL,"
+			" npc_id         INTEGER NOT NULL,"
+			" npc_name       TEXT    NOT NULL,"
+			" kills          INTEGER NOT NULL,"
+			" rep_factor_sum REAL    NOT NULL,"
+			" PRIMARY KEY (day, npc_id)"
+			");"
+			"CREATE INDEX IF NOT EXISTS idx_kills_name ON npc_kills(npc_name);"
 			"COMMIT;";
 
 		return exec_sql(m_db, schema);
@@ -496,9 +532,34 @@ namespace hb::server
 		m_flows[flow_key{ flow_day(), item_id, flow_type }] += qty;
 	}
 
+	void item_ledger_store::record_kill(int32_t npc_id, const char* npc_name, double rep_factor)
+	{
+		if (m_db == nullptr) {
+			return;
+		}
+
+		// An NPC that was never spawned from a config has none, and a kill keyed on
+		// -1 would pool every such death into one row that names no monster. The
+		// analytics divide by this number, so a row that cannot be attributed is
+		// worse than an absent one.
+		if (npc_id < 0) {
+			return;
+		}
+
+		kill_tally& tally = m_kills[kill_key{ flow_day(), npc_id }];
+		tally.kills += 1;
+		tally.rep_factor_sum += rep_factor;
+
+		// Written once per key rather than on every death: the name cannot change
+		// for a given config id, and this runs on every monster kill in the world.
+		if (tally.npc_name.empty() && npc_name != nullptr) {
+			tally.npc_name = npc_name;
+		}
+	}
+
 	size_t item_ledger_store::pending_count() const
 	{
-		return m_instances.size() + m_events.size() + m_flows.size();
+		return m_instances.size() + m_events.size() + m_flows.size() + m_kills.size();
 	}
 
 	int32_t item_ledger_store::flow_day() const
@@ -528,7 +589,8 @@ namespace hb::server
 		}
 
 		const bool advance_high_water = high_water > m_written_high_water;
-		if (m_instances.empty() && m_events.empty() && m_flows.empty() && !advance_high_water) {
+		if (m_instances.empty() && m_events.empty() && m_flows.empty() && m_kills.empty()
+			&& !advance_high_water) {
 			return true;
 		}
 
@@ -537,7 +599,8 @@ namespace hb::server
 		}
 
 		int dropped = 0;
-		bool ok = write_instances(dropped) && write_events(dropped) && write_flows(dropped);
+		bool ok = write_instances(dropped) && write_events(dropped) && write_flows(dropped)
+			&& write_kills(dropped);
 
 		// The high-water mark rides the same transaction as the rows it covers.
 		// Persisting it separately could leave a mark above instances that never
@@ -590,12 +653,15 @@ namespace hb::server
 		}
 
 		hb::logger::log<log_channel::items_misc>(
-			"[LEDGER] flushed {} instance(s), {} event(s), {} flow row(s); high-water {}",
-			m_instances.size(), m_events.size(), m_flows.size(), m_written_high_water);
+			"[LEDGER] flushed {} instance(s), {} event(s), {} flow row(s), {} kill row(s); "
+			"high-water {}",
+			m_instances.size(), m_events.size(), m_flows.size(), m_kills.size(),
+			m_written_high_water);
 
 		m_instances.clear();
 		m_events.clear();
 		m_flows.clear();
+		m_kills.clear();
 		return true;
 	}
 
@@ -672,6 +738,34 @@ namespace hb::server
 			{
 				return std::format("day {} item {} type {}",
 					row.first.day, row.first.item_id, row.first.flow_type);
+			}, dropped);
+	}
+
+	bool item_ledger_store::write_kills(int& dropped)
+	{
+		// Both columns accumulate, for the same reason the flow qty does: the
+		// buffer holds this window's delta and the row holds the day's total. They
+		// have to move together — a kills count advanced without its reputation
+		// sum would silently reprice every gear row that day.
+		return write_batch(m_db, "kill",
+			"INSERT INTO npc_kills (day, npc_id, npc_name, kills, rep_factor_sum)"
+			" VALUES (?,?,?,?,?)"
+			" ON CONFLICT(day, npc_id) DO UPDATE SET"
+			" kills = kills + excluded.kills,"
+			" rep_factor_sum = rep_factor_sum + excluded.rep_factor_sum;",
+			m_kills,
+			[](sqlite3_stmt* stmt, const std::pair<const kill_key, kill_tally>& row)
+			{
+				sqlite3_bind_int(stmt, 1, row.first.day);
+				sqlite3_bind_int(stmt, 2, row.first.npc_id);
+				sqlite3_bind_text(stmt, 3, row.second.npc_name.c_str(),
+					static_cast<int>(row.second.npc_name.size()), SQLITE_TRANSIENT);
+				sqlite3_bind_int64(stmt, 4, row.second.kills);
+				sqlite3_bind_double(stmt, 5, row.second.rep_factor_sum);
+			},
+			[](const std::pair<const kill_key, kill_tally>& row)
+			{
+				return std::format("day {} npc {}", row.first.day, row.first.npc_id);
 			}, dropped);
 	}
 

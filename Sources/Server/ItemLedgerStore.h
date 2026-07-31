@@ -5,6 +5,10 @@
 // custody or state transition it undergoes, and daily aggregate `item_flows`
 // counters for the Counted (stackable) tier that has no per-instance identity.
 //
+// One table there is not about an item at all: `npc_kills` (#85). Drop rarity is
+// authored per kill, so the analytics cannot state an observed rate without a
+// count of kills, and nothing else in the server keeps one.
+//
 // Three properties shape the whole class:
 //
 //   1. It is a passive audit trail, not the system of record (D3). The in-RAM
@@ -258,6 +262,37 @@ namespace hb::server
 		// Instanced item.
 		void record_flow(int32_t item_id, int32_t flow_type, int64_t qty);
 
+		// One monster death that was eligible to drop (#85, plan P4.3). Aggregated
+		// by day and monster like the flows, and buffered the same way.
+		//
+		// **This is the denominator, and it is the only reason the analytics can
+		// state a rate at all.** Every figure `dropodds` prints is a chance PER
+		// KILL, so an observed count of drops divides by nothing until kills are
+		// counted — and nothing in the server counted them.
+		//
+		// The alternative considered and rejected was to estimate kills from the
+		// ledger itself (total observed drops over total authored expectation).
+		// That number absorbs any error that scales a whole table equally — a
+		// doubled multiplier, a wrong loot grade — which is precisely the fault
+		// class the ticket exists to catch (#63).
+		//
+		// `rep_factor` is the killer's reputation multiplier, summed rather than
+		// bucketed by rating: the layer is linear on gear and unique rows (#88), so
+		// the sum is a sufficient statistic and the expected number of drops of one
+		// such row is `rep_factor_sum x authored_ppb_at_rating_0` exactly. Rows the
+		// layer does not touch divide by `kills` instead.
+		//
+		// `npc_id` is the npc_config id (CNpc::m_npc_config_id), which is what
+		// `npc_configs` and every drop table are keyed on. A negative id — an NPC
+		// spawned from no config — records nothing rather than pooling every such
+		// death into one row that names no monster.
+		//
+		// `npc_name` is stored beside it, and it is not redundant: a drop's birth
+		// row records the monster by NAME, so without the name here nothing could
+		// join a drop to a kill without a copy of gamedata.db — and the ledger is
+		// meant to be readable on its own.
+		void record_kill(int32_t npc_id, const char* npc_name, double rep_factor);
+
 		// --- Flushing --------------------------------------------------------
 		// Write everything buffered plus `high_water` into one transaction. True
 		// when the buffer reached disk (including the trivially-true empty case).
@@ -310,6 +345,7 @@ namespace hb::server
 		bool write_instances(int& dropped);
 		bool write_events(int& dropped);
 		bool write_flows(int& dropped);
+		bool write_kills(int& dropped);
 
 		// A yyyymmdd day number for the flow key, from local time — flow rows are
 		// read by humans tuning drop rates, so the day boundary that matters is
@@ -340,6 +376,33 @@ namespace hb::server
 			}
 		};
 		std::map<flow_key, int64_t> m_flows;
+
+		// (day, npc_id) -> kills + summed reputation factor. A map for the same
+		// reason the flows use one: a farmed monster dies thousands of times in a
+		// flush window and must cost one UPSERT, not thousands.
+		struct kill_key
+		{
+			int32_t day;
+			int32_t npc_id;
+
+			bool operator<(const kill_key& other) const
+			{
+				if (day != other.day) return day < other.day;
+				return npc_id < other.npc_id;
+			}
+		};
+
+		// The two numbers move together or the day's gear rows are mispriced, so
+		// they are one value rather than two parallel maps. The name rides here
+		// rather than in the key: it is a property of the id, and putting it in
+		// the key would make one mis-typed name split a monster's kills in two.
+		struct kill_tally
+		{
+			int64_t     kills = 0;
+			double      rep_factor_sum = 0.0;
+			std::string npc_name;
+		};
+		std::map<kill_key, kill_tally> m_kills;
 
 		int64_t m_recovered_high_water = 0;
 		int64_t m_written_high_water = 0;   // last value actually persisted

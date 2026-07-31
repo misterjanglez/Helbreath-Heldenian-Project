@@ -44,6 +44,7 @@
 #pragma once
 
 #include <cstdint>
+#include <map>
 #include <string>
 #include <vector>
 
@@ -288,5 +289,57 @@ int roll_drop_row(const std::vector<uint32_t>& chances, uint32_t draw);
 // Summed chances, for the expected-yield arithmetic the report needs. Returns a
 // uint64 because a saturated table sums to exactly the denominator.
 uint64_t total_chance(const std::vector<uint32_t>& chances);
+
+// One drop slot, fully resolved: the chances the roller would use and what a
+// kill expects of each row.
+//
+// It is here rather than inside the report because three readers now need those
+// numbers — the human `dropodds npc` listing, the machine `dropodds rows` lines
+// that #85's analytics consume as their PREDICTED side, and the prover that
+// checks the arithmetic. A per-kill expectation computed three times is a
+// per-kill expectation that can disagree with itself, and the whole value of the
+// observed-vs-authored diff rests on its predicted side being the same number
+// the report prints and the roller rolls.
+struct resolved_slot
+{
+	const drop_table* table = nullptr;
+	std::vector<uint32_t> chances;        // head chances, positionally on entries
+	std::vector<uint32_t> tail_chances;   // the same rows past the guaranteed head
+	bool   saturated = false;
+	int    head_rolls = 0;                // rolls that cannot come up empty
+	double expected_rolls = 0.0;          // rolls per kill, averaged over the range
+	double head_total = 0.0;              // chance a head roll yields anything
+	double tail_total = 0.0;
+	double guarantee_per_kill = 0.0;      // the head's leftover, paid in the guarantee item
+
+	size_t size() const { return chances.size(); }
+	int item_id(size_t i) const { return table->entries[i].item_id; }
+	bool is_guarantee(size_t i) const { return item_id(i) == table->guarantee_item_id; }
+
+	double per_roll(size_t i) const;
+	double per_roll_tail(size_t i) const;
+
+	// The expected number of this row's item one kill yields. A kill is
+	// `head_rolls` rolls at the authored rarity plus the rest at the divided one,
+	// so a row's per-kill expectation is NOT its per-roll chance times the roll
+	// count — which is the arithmetic #89 made non-obvious and this exists to
+	// state once.
+	double per_kill(size_t i) const;
+
+	// What a kill yields in total, across every row. Every head roll pays out
+	// something by construction (the leftover buys the guarantee item), and each
+	// roll past the head pays out with probability tail_total — so this is
+	// `head_rolls + (expected_rolls - head_rolls) * tail_total`, and the sum of
+	// per_kill() over all rows must equal it. That identity is what the prover
+	// checks; it is the one statement that catches a mis-derived head/tail split.
+	double expected_yield() const;
+};
+
+// Resolve one slot through the roller's own arithmetic. False when the table id
+// names no table — the monster simply has no drops in that slot.
+bool resolve_slot(const std::map<int, drop_table>& tables, int table_id,
+	const drop_multipliers& multipliers, int stage_slot, uint8_t loot_grade,
+	double rep_factor, const CItem* const* item_configs, int item_config_count,
+	resolved_slot& out);
 
 } // namespace hb::server

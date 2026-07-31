@@ -103,6 +103,20 @@ CREATE TABLE item_flows (                      -- Counted tier: stackable aggreg
 	qty INTEGER NOT NULL,
 	PRIMARY KEY (day, item_id, flow_type)
 );
+
+-- v2 (P4.3): the denominator. Drop rarity is authored per KILL, so no observed
+-- rate exists until kills are counted, and nothing else in the server counts
+-- them. Not about an item at all, which is why it sits apart from the tables
+-- above.
+CREATE TABLE npc_kills (
+	day INTEGER NOT NULL,                       -- yyyymmdd, local, as item_flows
+	npc_id INTEGER NOT NULL,                    -- npc_config id (CNpc::m_npc_config_id)
+	npc_name TEXT NOT NULL,                     -- the join key: a birth row names its monster
+	kills INTEGER NOT NULL,
+	rep_factor_sum REAL NOT NULL,               -- summed killer reputation; prices gear and unique rows
+	PRIMARY KEY (day, npc_id)
+);
+CREATE INDEX idx_kills_name ON npc_kills(npc_name);
 ```
 
 Serial allocator: high-water mark in `meta`, loaded at boot, minted in RAM, persisted with each
@@ -385,7 +399,63 @@ maps minutes apart, and the orphans are the events whose `item_instances` row th
 refused. Nothing to fix; the dev world wipes to v9 at P5.1. Recorded here because it is the
 validator's own evidence that it detects a real dupe-shaped fault, not a synthetic one.
 - P4.3 Analytics starter pack: drop-rate, entering-population, despawn-attrition SQL (DuckDB
-  optional for heavy aggregation — reads SQLite directly, no service install).
+  optional for heavy aggregation — reads SQLite directly, no service install). **DONE.**
+
+**The denominator (P4.3), and why it is a schema change.** Drop rarity is authored as a chance
+*per kill* (ADR 0005), so an observed count of drops divides by nothing until kills are counted —
+and nothing in the server counted them (`CClient::m_enemy_kill_count` is per character and per
+nothing else). The alternative was to estimate kills from the ledger itself, as total observed
+drops over total authored expectation; that was considered and rejected by the owner, because the
+estimate absorbs any error that scales a whole table equally — a doubled multiplier, a wrong loot
+grade — which is precisely the fault class this tooling exists to catch. So **ledger schema v2 adds
+`npc_kills(day, npc_id, npc_name, kills, rep_factor_sum)`**, written from
+`CEntityManager::npc_dead_item_generator` after its own guards, so the population counted is
+exactly the population `dropodds` prices.
+
+Two columns there are not obvious:
+
+- **`rep_factor_sum`**, not a rating bucket. The reputation layer is per-killer and multiplies gear
+  and unique rows *linearly* (#88), so the summed factor is a sufficient statistic: the expected
+  number of drops of such a row is `rep_factor_sum × authored_ppb_at_rating_0`, exactly, with no
+  per-rating breakdown to store or join against. Ordinary rows divide by `kills`.
+- **`npc_name`**, beside the id. A drop's birth row records its monster by NAME (`origin_detail`,
+  which is what a Biography shows a human) while a kill is keyed by config id, and the ledger holds
+  no name-to-id table because it must stay readable on its own, never against a copy of
+  `gamedata.db`. Without the name the SQL half could not join at all. Where one name covers several
+  configs (14 Catapults, 3 Guards) both sides pool identically.
+
+**The predicted side is consumed, never rebuilt.** `dropodds` gained a `rows` form emitting
+`DROPODDS MODE | SPLIT | NPC | SLOT | ROW` and nothing else. `resolved_slot` moved out of the
+report into `DropModel.h` beside `resolve_drop_chances`, so the human listing, the machine capture
+and the prover all read ONE derivation of a row's per-kill expectation — the arithmetic #89 made
+non-obvious. Both earlier `dropodds` captures used as regression evidence stayed byte-identical.
+
+**Scope: Instanced items only, and the reason is not squeamishness.** A stackable item has no birth
+row and so no source monster; `item_flows` aggregates it by day and item as a **quantity, not an
+occurrence count** — a gold drop books the number of coins, not the fact that a drop happened — so
+a monster column alone would still yield no "1 in N". Measured against today's data that leaves
+**2247 of 2328 (item, monster) pairs covered**, every tier-rolling gear row among them; the
+excluded 81 are Gold plus 30 stackable body parts.
+
+**What the ticket assumed and this cycle corrected: #63 does not move a drop rate.** Every
+per-grade generosity multiplier is 1.00, and ADR 0002 deliberately puts grade differentiation in
+quality and roster rather than frequency — so a monster rolling the wrong loot grade drops
+everything at exactly the authored rate. Nothing in the rate columns moves. What moves is the
+**tier** the item is born with, which the ledger records on the birth row. The audit therefore has
+a second half, an observed-vs-authored **tier mix per loot grade**, and that is the #63 detector;
+the rate diff could never have been.
+
+**Confidence scales with volume, and the pack says so per row.** For a row of chance `p`, seeing an
+error of factor `r` at `z` sigma needs `kills ≥ z² · r / (p · (r−1)²)` — for a doubled rate at 3
+sigma, `18/p`: about 1,280 kills for a 1-in-71 gear row, about 34,000 for a 1-in-1,878 boss
+Legendary. Rows below that threshold are reported **THIN**, which is neither a pass nor a failure.
+A 3-sigma gate also misfires about once in 370 rows, so a full run flags roughly three rows in a
+perfectly healthy world; the report prints that expectation beside the summary rather than leaving
+a reader to infer it.
+
+Artifacts: `Scripts/analytics/*.sql` (overview, drop rates, entering population, attrition, kill
+volume) plus `Scripts/drop_audit.py` for the joined view. Provers: `analyticscheck` for the store
+contract and the join, `drop_audit.py --selftest` for the audit's own arithmetic.
 
 **P5 — Ship**
 - P5.1 Deploy batch: Server identity bump, changelog roll-up, Debian deploy (systemd stop → copy →

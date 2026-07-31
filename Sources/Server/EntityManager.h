@@ -302,7 +302,12 @@ private:
     // and when the table says. Called once per slot; the slot number picks the
     // stage multiplier and decides whether the result tier-rolls, and nothing
     // else in here branches on it.
-    void roll_drop_slot(int npc_h, short attacker_h, int stage_slot, int table_id);
+    //
+    // `rep_factor` is the killer's reputation layer, resolved once by the caller.
+    // Not defaulted and not re-read here: the ledger records the factor the kill
+    // was priced at (#85), and a second read could disagree with the first.
+    void roll_drop_slot(int npc_h, short attacker_h, int stage_slot, int table_id,
+        double rep_factor);
     // A won row's stack size: count_throws rolls of min..max, summed.
     int roll_entry_count(const hb::server::drop_entry& entry, int min_count, int max_count);
     bool spawn_npc_drop_item(int npc_h, int item_id, int min_count, int max_count, short dx = 0, short dy = 0, bool tier_rolls = false);
