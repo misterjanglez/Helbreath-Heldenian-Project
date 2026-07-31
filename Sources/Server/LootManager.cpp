@@ -392,6 +392,12 @@ void LootManager::get_reward_money_handler(int client_h)
 
 		ret = m_game->m_item_manager->send_item_notify_msg(client_h, Notify::ItemObtained, item, 0);
 
+		// Reward gold merges into whatever the character is already carrying, so
+		// the husk is this caller's to free (#81).
+		if (erase_req == 1)
+			m_game->m_item_manager->destroy_item(item,
+				hb::server::destroy_reason::merged, client_h);
+
 		switch (ret) {
 		case sock::Event::QueueFull:
 		case sock::Event::SocketError:

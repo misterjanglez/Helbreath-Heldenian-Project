@@ -2179,6 +2179,10 @@ void MagicManager::player_magic_handler(int client_h, int dX, int dY, short type
 
 					ret = m_game->m_item_manager->send_item_notify_msg(client_h, Notify::ItemObtained, item, 0);
 
+					if (erase_req == 1)
+						m_game->m_item_manager->destroy_item(item,
+							hb::server::destroy_reason::merged, client_h);
+
 					switch (ret) {
 					case sock::Event::QueueFull:
 					case sock::Event::SocketError:

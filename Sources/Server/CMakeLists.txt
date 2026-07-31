@@ -23,6 +23,7 @@ set(SERVER_SOURCES
     Client.cpp
     CmdBroadcast.cpp
     CmdDropOdds.cpp
+    CmdCoverageCheck.cpp
     CmdGameDbCheck.cpp
     CmdGiveItem.cpp
     CheckTally.cpp

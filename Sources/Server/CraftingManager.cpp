@@ -189,6 +189,13 @@ void CraftingManager::req_create_portion_handler(int client_h, char* data)
 		if (item != nullptr) {
 			if (m_game->m_item_manager->add_client_item_list(client_h, item, &erase_req)) {
 				ret = m_game->m_item_manager->send_item_notify_msg(client_h, Notify::ItemObtained, item, 0);
+
+				// Portions stack, so a batch merges into one the crafter already
+				// had and leaves a husk for the caller to free (#81).
+				if (erase_req == 1)
+					m_game->m_item_manager->destroy_item(item,
+						hb::server::destroy_reason::merged, client_h);
+
 				switch (ret) {
 				case sock::Event::QueueFull:
 				case sock::Event::SocketError:
@@ -492,6 +499,12 @@ void CraftingManager::req_create_crafting_handler(int client_h, char* data)
 			if (m_game->m_item_manager->add_client_item_list(client_h, item, &erase_req))
 			{
 				ret = m_game->m_item_manager->send_item_notify_msg(client_h, Notify::ItemObtained, item, 0);
+
+				// A crafted stackable can merge into one the crafter already had.
+				if (erase_req == 1)
+					m_game->m_item_manager->destroy_item(item,
+						hb::server::destroy_reason::merged, client_h);
+
 				switch (ret) {
 				case sock::Event::QueueFull:
 				case sock::Event::SocketError:

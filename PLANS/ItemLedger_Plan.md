@@ -121,7 +121,91 @@ enforce this:
    defect.
 2. **Coverage audit gate** (P3 exit): enumerate every transition and verify each emits.
 
-Known gaps in today's `item_log()` (verified in code, 2026-07-29):
+### Transition inventory (P3.3 audit result, 2026-07-31 — #81)
+
+The enumeration the coverage audit produced, and the evidence for each row. This
+is the trust gate's output: Phase 4's tooling is only as good as this table.
+
+**Two tiers, one numbering.** `item_flows.flow_type` stores the *same* number
+`item_events.event_type` does — no second taxonomy was minted. An Instanced arrow
+sold writes `item_events(event_type=8)`; five Counted arrows sold write
+`item_flows(flow_type=8, qty=5)`. Ratified by the owner 2026-07-31: a second
+numbering would have been a second set of permanent world-fact values to keep
+from drifting against the first, and every flow this plan asked for (dropped,
+picked_up, despawned, consumed, shop_bought, shop_sold) already had a number.
+
+**The one chokepoint.** `ItemManager::begin_ledger_event` is the single door every
+emitter passes through — both `item_log()` overloads, `destroy_item`,
+`despawn_item`. It answers false for an item with no Serial, and since #81 it
+books an aggregate flow before it does. That is why the Counted tier cost zero new
+call sites.
+
+| Transition | Number | Instanced | Counted | Emitted at |
+|---|---|---|---|---|
+| Creation | `created` 100 | `item_instances` row + event | see note ¹ | `stamp_provenance` |
+| Give | 1 | ✓ | ✓ | `give_item_handler` — **both** branches since #81 |
+| Drop | 2 | ✓ | ✓ | `drop_item_handler`, give-fallbacks, `MagicManager` |
+| Pick up | 3 | ✓ | ✓ | `client_motion_get_item_handler`, `MagicManager` |
+| Deplete | 4 | ✓ | ✓ | `item_deplete_handler` (21 sites funnel here, #79) |
+| NPC drop | 5 | ✓ | ✓ | `EntityManager::npc_dead_item_generator` |
+| Shop buy | 7 | ✓ | ✓ | `request_purchase_item_handler` |
+| Shop sell | 8 | ✓ | ✓ ² | `req_sell_item_confirm_handler` |
+| Warehouse retrieve | 9 | ✓ | ✓ | `request_retrieve_item_handler` — **new in #81**, both branches |
+| Warehouse deposit | 10 | ✓ | ✓ | `set_item_to_bank_item` — **new in #81** |
+| Exchange | 11 | ✓ | ✓ | `confirm_exchange_item` (snapshot carries the traded count) |
+| Upgrade fail/success | 29/30 | ✓ | n/a | the upgrade handlers |
+| Use | 32 | ✓ | ✓ | `use_item_handler` |
+| Trading Post ×7 | 33–39 | ✓ | ✓ ³ | `deliver_to_bank` (out), per-call-site (in) — #80 |
+| GM mint | 40 | ✓ | ✓ | `mint_gm_items`, `GameCmdCreateItem`, `GameCmdGiveItem` |
+| Ground despawn | `despawned` 101 | ✓ | ✓ | `despawn_item` (expired / tile_overflow / world_shutdown) |
+| Destruction | `destroyed` 102 | ✓ | ✓ ⁴ | `destroy_item` |
+| Run boundary | `boundary` 103 | n/a | n/a | `item_ledger_store::open` |
+
+¹ **Counted creation is recorded per-venue, not at the mint funnel.** `stamp_provenance`
+cannot book it: every creation venue sets `m_instance.count` *after* `create_item`
+returns, so a flow booked inside the funnel would always be a stack of zero. Shop
+sale proceeds — real money-supply inflow — book `created` at the venue
+(`req_sell_item_confirm_handler`). Other Counted mints are recorded by whichever
+transition delivers them (an NPC gold drop by `NewGenDrop`, a reward by its own
+action), which is the honest shape: a Counted item has no identity, so it has no
+birth — only flows.
+
+² **The quantity is the amount that moved, not the stack's count.** A shop sale
+hands `item_log` the whole inventory slot and takes `num` out of it, so
+`item_log`'s trailing `qty` parameter overrides the item's own count. Selling 5
+arrows from a stack of 100 books 5. Everywhere else the item handed to the emitter
+*is* the portion that moved, which is why the default reads its count.
+
+³ A Trading Post bundle's Counted members book flows through the same escrow
+recorders; the Instanced members carry Serials and book events.
+
+⁴ **Except `destroy_reason::merged`, which books nothing** — a merge frees a husk
+whose contents live on in the stack it joined, so nothing left the world. Every
+gold pickup takes that path, so counting it would double-count the currency supply.
+
+**Actions with no caller** (a text-sink switch arm and nothing reaching it):
+`SkillLearn` 12, `Make` 13, `SummonMonster` 14, `Poisoned` 15, `MagicLearn` 16,
+`Repair` 17. None is a custody move: the first five consume an item, and that exit
+is already recorded by `destroy_item` through `item_deplete_handler`; `Repair` is a
+durability change on an item that never changes hands. Left unwired deliberately —
+adding an event that duplicates an exit already recorded would break "exactly one"
+as surely as recording none.
+
+**Known gap, deliberate:** gold *spent* is not booked. Purchases, repairs and
+magic-shop payments reduce the stack through `set_item_count_by_id` directly, which
+carries no transition, so the currency loop is closed on the inflow side only. Not
+closed here because it wants the same deliberate pass this ticket gave `flow_type`
+— the sinks are a handful of sites but each needs the right number, and `Repair`
+being one of them means picking a meaning for a value that has never been stored.
+
+**Mechanical enforcement.** Three scripts, all green as of this audit:
+`Scripts/check_item_factory.py` (nothing is born outside the factory — 7 sanctioned),
+`Scripts/check_item_destroy.py` (nothing dies outside the funnel — 29 classified),
+and `Scripts/check_item_merge.py` (**new in #81** — no husk is abandoned by a stack
+merge; 22 sites). The prover is `coveragecheck` (24/24).
+
+Known gaps in today's `item_log()` (verified in code, 2026-07-29 — **all closed by
+#79/#80/#81; kept as the record of what the audit was aimed at**):
 
 - `NewGenDrop` logs no location (`ItemManager.cpp:5193` passes `"", 0, 0`) and is filtered by
   `check_good_item()` — the ledger records **all** Instanced creations, unfiltered.
@@ -186,7 +270,10 @@ Blocking edges are genuine gates only; work the frontier (house rule from epic #
 - P3.2 Trading Post escrow events (coordinate with that workstream's phase status). *Blocked by
   P2.2.*
 - P3.3 Coverage audit — enumerate every mutation path, verify each emits. **Trust gate for P4.**
-  *Blocked by P3.1, P3.2.*
+  *Blocked by P3.1, P3.2.* **DONE 2026-07-31 (#81)** — inventory recorded above; the
+  Counted tier wired (`flow_type` = the event number, no second taxonomy); Warehouse
+  deposit/retrieve and the split-stack Give emitted for the first time; a 16-site husk
+  leak closed and made mechanical by `check_item_merge.py`; `coveragecheck` 24/24.
 - P3.4 Atomic multi-account commits: Exchange saves both parties in one `game.db` transaction;
   Trading Post custody moves made atomic (implementation-time pick: listings table moves into
   `game.db`, coordinated with that workstream). *Blocked by P1.2.*

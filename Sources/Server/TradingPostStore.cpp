@@ -796,7 +796,11 @@ namespace hb::server
 				all_ok = false;
 				continue;
 			}
-			if (!m_game->m_item_manager->set_item_to_bank_item(client_h, item)) {
+			// already_recorded: deliver_to_bank emitted the custody move for this
+			// bundle (TpTradeIn / TpRefund / TpDelist) before calling here, so a
+			// Deposit as well would give one move two events (#81).
+			if (!m_game->m_item_manager->set_item_to_bank_item(client_h, item,
+				ItemManager::bank_deposit::already_recorded)) {
 				hb::logger::error("[TP] deliver(online): Warehouse full for {} - lost {}",
 					m_game->m_client_list[client_h]->m_char_name, describe(e));
 				// Deliberately NOT reported in out_lost: this is the one failure

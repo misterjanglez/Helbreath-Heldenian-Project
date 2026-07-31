@@ -2394,6 +2394,10 @@ void WarManager::get_occupy_flag_handler(int client_h)
 
 				ret = m_game->m_item_manager->send_item_notify_msg(client_h, Notify::ItemObtained, item, 0);
 
+				if (erase_req == 1)
+					m_game->m_item_manager->destroy_item(item,
+						hb::server::destroy_reason::merged, client_h);
+
 				m_game->calc_total_weight(client_h);
 
 				switch (ret) {

@@ -241,7 +241,31 @@ public:
 	void clear_exchange_status(int to_h);
 
 	// Bank
-	bool set_item_to_bank_item(int client_h, CItem* item);
+	//
+	// Why the deposit door takes a transition (#81): a Warehouse deposit is a
+	// custody move the ledger has always been meant to carry — the plan names
+	// "Warehouse deposit/retrieve" in its opening paragraph — but until this
+	// ticket both ItemLogAction::Deposit and ::Retrieve had a text-sink switch
+	// arm and no caller anywhere, so the transition was silent in both sinks.
+	//
+	// It cannot simply emit for everyone, because the Trading Post reaches the
+	// same door to land a won bundle, and that move is already recorded as
+	// TpTradeIn/TpRefund by deliver_to_bank (#80). Emitting here as well would
+	// give one custody move two events, which the coverage law forbids as
+	// firmly as it forbids none. So the caller names which it is, and a mandatory
+	// parameter is what stops the next caller being silent by omission — the
+	// same reason deliver_to_bank made its escrow_move mandatory.
+	enum class bank_deposit
+	{
+		// A character put this in their Warehouse. Emits Deposit.
+		by_character,
+
+		// The item arrived by a route that already recorded the custody move
+		// (Trading Post delivery). Emits nothing.
+		already_recorded,
+	};
+
+	bool set_item_to_bank_item(int client_h, CItem* item, bank_deposit how);
 	bool set_item_to_bank_item(int client_h, short item_index);
 	void request_retrieve_item_handler(int client_h, char* data);
 
@@ -281,9 +305,27 @@ public:
 	// questions: the channels are for an operator tailing a file, the ledger is
 	// for a query run months later, so what the channels leave out on purpose
 	// (uninteresting items, unknown actions) the ledger still has to carry.
+	//
+	// Since #81 they are also the Counted tier's recorders: an item with no
+	// Serial books an item_flows aggregate instead of an item_events row, from
+	// the same call.
 	//----------------------------------------------------------------------
+
+	// How much of a Counted stack the transition moved.
+	//
+	// The default reads the item's own count, which is right wherever the item
+	// handed to the emitter IS the portion that moved — a split-off drop, a
+	// picked-up pile, an escrowed bundle. A caller passes an explicit amount
+	// when it is not: a shop sale hands over the whole stack and takes `num`
+	// out of it, so the stack's count would over-report the sale by everything
+	// the player kept.
+	//
+	// Ignored entirely for an Instanced item, whose transitions are events.
+	static constexpr int64_t flow_qty_from_item = -1;
+
 	bool item_log(int action, int client_h, char* name, CItem* item);
-	bool item_log(int action, int give_h, int recv_h, CItem* item, bool force_item_log = false);
+	bool item_log(int action, int give_h, int recv_h, CItem* item, bool force_item_log = false,
+		int64_t qty = flow_qty_from_item);
 
 	//----------------------------------------------------------------------
 	// Recording for a Serial the caller does not hold as a CItem (#80)
@@ -391,8 +433,25 @@ private:
 	// the dual sink, or a ledger-only value like destroyed from #79's exits. The
 	// bands are disjoint by static_assert, so one parameter can carry both
 	// without the two ever having to be told apart here.
+	//
+	// Answering false for a Counted item is not the same as recording nothing
+	// (#81). Before it declines, it books the transition as an aggregate flow —
+	// which is why the Counted tier costs zero new call sites: every emitter in
+	// the server already comes through this one door, so a stackable moving is
+	// recorded by the same line that records an Instanced one.
 	bool begin_ledger_event(int event_type, const CItem* item, int actor_h,
-		hb::server::ledger_event_record& event) const;
+		hb::server::ledger_event_record& event,
+		int64_t qty = flow_qty_from_item) const;
+
+	// One Counted transition, as an item_flows aggregate (D2). `event_type` is
+	// the same number an Instanced item would have written to
+	// item_events.event_type — there is deliberately no second taxonomy, see
+	// item_ledger_store::record_flow.
+	//
+	// Silent for an Instanced item, for qty 0, and when no ledger is open, so
+	// the guards live here rather than at each of the callers begin_ledger_event
+	// fans out to.
+	void record_counted_flow(int event_type, const CItem& item, int64_t qty) const;
 
 	// Writes an online character's identity and position onto an event. One
 	// definition of what those five columns mean, shared by both openings, so a

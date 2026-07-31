@@ -376,9 +376,19 @@ void ItemManager::destroy_item(CItem*& item, destroy_reason::destroy_reason reas
 
 	// begin_ledger_event answers false for a Counted item and when no ledger is
 	// open, which is the same door every other emitter goes through — so a
-	// stackable being freed costs one comparison and writes nothing.
+	// stackable being freed costs one comparison and, since #81, books an
+	// aggregate flow instead of an event.
+	//
+	// A merge is the exception, and it is the reason the qty is a parameter at
+	// all: `merged` frees a husk whose contents live on in the stack it joined,
+	// so nothing left the world. Counting it would make every gold pickup read
+	// as a destruction of exactly as much gold as the player just gained.
+	// Instanced items never reach that reason (only stackables merge), so this
+	// silences the flow without silencing any event.
+	const int64_t qty = (reason == destroy_reason::merged) ? 0 : flow_qty_from_item;
+
 	if (hb::server::ledger_event_record event;
-		begin_ledger_event(ledger_event::destroyed, item, actor_h, event))
+		begin_ledger_event(ledger_event::destroyed, item, actor_h, event, qty))
 	{
 		event.detail = destroyed_detail(reason);
 		ledger()->record_event(std::move(event));
@@ -694,6 +704,14 @@ int ItemManager::client_motion_get_item_handler(int client_h, short sX, short sY
 			item_log(ItemLogAction::get, client_h, 0, item);
 
 			ret = send_item_notify_msg(client_h, Notify::ItemObtained, item, 0);
+
+			// The pickup merged into a stack the character already had, so its
+			// contents live on in that slot and only the husk is left. Freed here
+			// rather than earlier because both sinks and the client packet above
+			// still had to read it, and freed before the switch below because
+			// that switch can return (#81).
+			if (erase_req == 1) destroy_item(item, destroy_reason::merged, client_h);
+
 			switch (ret) {
 			case sock::Event::QueueFull:
 			case sock::Event::SocketError:
@@ -1445,7 +1463,17 @@ void ItemManager::give_item_handler(int client_h, short item_index, int amount, 
 				}
 
 				if (add_client_item_list(owner_h, item, &erase_req)) {
+					// The split-stack half of a Give, which recorded nothing at all
+					// until #81 — only the whole-item branch below emitted, so one
+					// player handing another 500 gold was invisible to both sinks
+					// and to any dispute the custody chain exists to settle.
+					item_log(ItemLogAction::Give, client_h, owner_h, item);
+
 					ret = send_item_notify_msg(owner_h, Notify::ItemObtained, item, 0);
+
+					// Merged into the recipient's stack; the husk is spent.
+					if (erase_req == 1) destroy_item(item, destroy_reason::merged, owner_h);
+
 					switch (ret) {
 					case sock::Event::QueueFull:
 					case sock::Event::SocketError:
@@ -1492,7 +1520,7 @@ void ItemManager::give_item_handler(int client_h, short item_index, int amount, 
 
 				if (m_game->m_npc_list[owner_h]->m_npc_config_id == 58) { // Warehouse Keeper
 					// NPC     .
-					if (set_item_to_bank_item(client_h, item) == false) {
+					if (set_item_to_bank_item(client_h, item, bank_deposit::by_character) == false) {
 						m_game->send_notify_msg(0, client_h, Notify::CannotItemToBank, 0, 0, 0, 0);
 
 						m_game->m_map_list[m_game->m_client_list[client_h]->m_map_index]->set_item(m_game->m_client_list[client_h]->m_x, m_game->m_client_list[client_h]->m_y, item);
@@ -1571,6 +1599,11 @@ void ItemManager::give_item_handler(int client_h, short item_index, int amount, 
 						item_log(ItemLogAction::Give, client_h, owner_h, item);
 
 						ret = send_item_notify_msg(owner_h, Notify::ItemObtained, item, 0);
+
+						// A whole stackable slot handed over can still merge into
+						// one the recipient already had.
+						if (erase_req == 1) destroy_item(item, destroy_reason::merged, owner_h);
+
 						switch (ret) {
 						case sock::Event::QueueFull:
 						case sock::Event::SocketError:
@@ -1859,12 +1892,19 @@ void ItemManager::request_retrieve_item_handler(int client_h, char* data)
 				if ((m_game->m_client_list[client_h]->m_item_list[i] != 0) &&
 					(m_game->m_client_list[client_h]->m_item_list[i]->get_item_type() == m_game->m_client_list[client_h]->m_item_in_bank_list[bank_item_index]->get_item_type()) &&
 					(m_game->m_client_list[client_h]->m_item_list[i]->m_id_num == m_game->m_client_list[client_h]->m_item_in_bank_list[bank_item_index]->m_id_num)) {
-					// v1.41 !!! 
+					// Before the merge, while the withdrawn stack still knows how
+					// much it was: afterwards its count has been folded into the
+					// inventory stack and the amount retrieved is unrecoverable.
+					item_log(ItemLogAction::Retrieve, client_h, (int)-1,
+						m_game->m_client_list[client_h]->m_item_in_bank_list[bank_item_index]);
+
+					// v1.41 !!!
 					set_item_count(client_h, i, m_game->m_client_list[client_h]->m_item_list[i]->m_instance.count + m_game->m_client_list[client_h]->m_item_in_bank_list[bank_item_index]->m_instance.count);
 
 					// The withdrawn stack merged into one the character already
 					// had, so its contents are now in the inventory and only the
-					// husk is freed. Counted, so the funnel records nothing.
+					// husk is freed. Counted, so the funnel records no exit — and
+					// since #81 no flow either, because nothing left the world.
 					destroy_item(m_game->m_client_list[client_h]->m_item_in_bank_list[bank_item_index],
 						destroy_reason::merged, client_h);
 
@@ -1904,6 +1944,12 @@ void ItemManager::request_retrieve_item_handler(int client_h, char* data)
 		{
 			for(int i = 0; i < hb::shared::limits::MaxItems; i++)
 				if (m_game->m_client_list[client_h]->m_item_list[i] == 0) {
+					// The other half of the retrieve: this one takes a whole slot
+					// rather than merging, so the object carries on and only its
+					// custody changed.
+					item_log(ItemLogAction::Retrieve, client_h, (int)-1,
+						m_game->m_client_list[client_h]->m_item_in_bank_list[bank_item_index]);
+
 					m_game->m_client_list[client_h]->m_item_list[i] = m_game->m_client_list[client_h]->m_item_in_bank_list[bank_item_index];
 					// v1.3 1-27 12:22
 					m_game->m_client_list[client_h]->m_item_pos_list[i].x = 40;
@@ -1975,6 +2021,11 @@ bool ItemManager::set_item_to_bank_item(int client_h, short item_index)
 
 	for(int i = 0; i < hb::shared::limits::MaxBankItems; i++)
 		if (m_game->m_client_list[client_h]->m_item_in_bank_list[i] == 0) {
+
+			// Always a character deposit — the Trading Post reaches the CItem*
+			// overload, never this one — so there is no transition to choose.
+			item_log(ItemLogAction::Deposit, client_h, (int)-1,
+				m_game->m_client_list[client_h]->m_item_list[item_index]);
 
 			m_game->m_client_list[client_h]->m_item_in_bank_list[i] = m_game->m_client_list[client_h]->m_item_list[item_index];
 			item = m_game->m_client_list[client_h]->m_item_in_bank_list[i];
@@ -2752,7 +2803,7 @@ void ItemManager::use_item_handler(int client_h, short item_index, short dX, sho
 	}
 }
 
-bool ItemManager::set_item_to_bank_item(int client_h, CItem* item)
+bool ItemManager::set_item_to_bank_item(int client_h, CItem* item, bank_deposit how)
 {
 	int ret;
 
@@ -2763,6 +2814,12 @@ bool ItemManager::set_item_to_bank_item(int client_h, CItem* item)
 
 	for(int i = 0; i < hb::shared::limits::MaxBankItems; i++)
 		if (m_game->m_client_list[client_h]->m_item_in_bank_list[i] == 0) {
+
+			// Once the slot is found the deposit has happened, so this is where
+			// it is recorded: the failure return below means the Warehouse was
+			// full and the item never moved.
+			if (how == bank_deposit::by_character)
+				item_log(ItemLogAction::Deposit, client_h, (int)-1, item);
 
 			m_game->m_client_list[client_h]->m_item_in_bank_list[i] = item;
 
@@ -3218,7 +3275,11 @@ void ItemManager::req_sell_item_confirm_handler(int client_h, char item_id, int 
 
 			m_game->send_notify_msg(0, client_h, Notify::ItemSold, item_id, 0, 0, 0);
 
-			item_log(ItemLogAction::Sell, client_h, (int)-1, m_game->m_client_list[client_h]->m_item_list[item_id]);
+			// `num`, not the stack: the item handed over is the whole slot and the
+			// sale takes part of it, so the Counted flow has to be told the amount
+			// or selling 5 arrows out of 100 books a sale of 100 (#81). The
+			// Instanced path below is unaffected — it sells one whole item.
+			item_log(ItemLogAction::Sell, client_h, (int)-1, m_game->m_client_list[client_h]->m_item_list[item_id], false, num);
 
 			if (m_game->m_client_list[client_h]->m_item_list[item_id]->is_stackable()) {
 				// v1.41 !!!
@@ -3238,7 +3299,8 @@ void ItemManager::req_sell_item_confirm_handler(int client_h, char item_id, int 
 
 		m_game->send_notify_msg(0, client_h, Notify::ItemSold, item_id, 0, 0, 0);
 
-		item_log(ItemLogAction::Sell, client_h, (int)-1, m_game->m_client_list[client_h]->m_item_list[item_id]);
+		// The sold amount, for the same reason as the durability branch above.
+		item_log(ItemLogAction::Sell, client_h, (int)-1, m_game->m_client_list[client_h]->m_item_list[item_id], false, num);
 
 		if (m_game->m_client_list[client_h]->m_item_list[item_id]->is_stackable()) {
 			set_item_count(client_h, item_id, m_game->m_client_list[client_h]->m_item_list[item_id]->m_instance.count - num);
@@ -3256,9 +3318,22 @@ void ItemManager::req_sell_item_confirm_handler(int client_h, char item_id, int 
 	if (item_gold == nullptr) return;
 	item_gold->m_instance.count = price;
 
+	// Gold minted into the economy. Recorded here rather than at the minting
+	// funnel because the funnel cannot know the amount: every creation venue
+	// sets m_instance.count *after* create_item returns, so a flow booked inside
+	// stamp_provenance would be a stack of zero (#81). record_counted_flow
+	// rather than item_log so the shop text channel does not gain a second
+	// "Sell" line per sale describing the payout as an item the player sold.
+	record_counted_flow(hb::server::ledger_event::created, *item_gold, price);
+
 	if (add_client_item_list(client_h, item_gold, &erase_req)) {
 
 		ret = send_item_notify_msg(client_h, Notify::ItemObtained, item_gold, 0);
+
+		// Merged into gold the character already had; the husk is spent. The
+		// original freed it here too (HB382_CENTUU Game.cpp:30900) — the port
+		// dropped it, which leaked a CItem on every sale (#81).
+		if (erase_req == 1) destroy_item(item_gold, destroy_reason::merged, client_h);
 
 		m_game->calc_total_weight(client_h);
 
@@ -4416,6 +4491,8 @@ void ItemManager::get_hero_mantle_handler(int client_h, int item_id, const char*
 
 			ret = send_item_notify_msg(client_h, Notify::ItemObtained, item, 0);
 
+			if (erase_req == 1) destroy_item(item, destroy_reason::merged, client_h);
+
 			m_game->calc_total_weight(client_h);
 
 			switch (ret) {
@@ -4508,6 +4585,8 @@ void ItemManager::get_dark_item_handler(int client_h, int item_id)
 		item->m_instance.touch_effect_value3 = m_game->m_client_list[client_h]->m_char_id_num3;
 
 		ret = send_item_notify_msg(client_h, Notify::ItemObtained, item, 0);
+
+		if (erase_req == 1) destroy_item(item, destroy_reason::merged, client_h);
 
 		m_game->calc_total_weight(client_h);
 	}
@@ -4952,6 +5031,8 @@ bool ItemManager::add_item(int client_h, CItem* item, char mode)
 
 	if (add_client_item_list(client_h, item, &erase_req)) {
 		ret = send_item_notify_msg(client_h, Notify::ItemObtained, item, 0);
+
+		if (erase_req == 1) destroy_item(item, destroy_reason::merged, client_h);
 
 		return true;
 	}
@@ -5414,13 +5495,41 @@ CClient* ItemManager::client_at(int client_h) const
 	return m_game->m_client_list[client_h];
 }
 
-bool ItemManager::begin_ledger_event(int action, const CItem* item, int actor_h,
-	hb::server::ledger_event_record& event) const
+void ItemManager::record_counted_flow(int event_type, const CItem& item, int64_t qty) const
 {
-	// A Counted item has no identity for an event to hang off (D2). record_event
-	// would drop it at the door anyway; answering here instead means the caller
-	// never builds a detail string for it, on a path every gold drop takes.
-	if (item == nullptr || item->m_serial == 0) return false;
+	// Instanced items are events, not flows. Guarded here as well as at the one
+	// caller so a later emitter cannot reach this by a route that forgot.
+	if (item.m_serial != 0) return;
+
+	const int64_t moved = (qty == flow_qty_from_item)
+		? static_cast<int64_t>(item.m_instance.count)
+		: qty;
+
+	// A zero-quantity flow says nothing, and one caller means it: a stack merge
+	// passes 0 because nothing left the world — the husk's contents live on in
+	// the stack it merged into (destroy_reason::merged).
+	if (moved == 0) return;
+
+	if (hb::server::item_ledger_store* store = ledger())
+		store->record_flow(item.m_id_num, event_type, moved);
+}
+
+bool ItemManager::begin_ledger_event(int action, const CItem* item, int actor_h,
+	hb::server::ledger_event_record& event, int64_t qty) const
+{
+	if (item == nullptr) return false;
+
+	// A Counted item has no identity for an event to hang off (D2), so the same
+	// transition is booked as an aggregate instead and the caller is told there
+	// is no event to build. Recording here rather than at the call sites is what
+	// makes the Counted tier free: every emitter in the server — both item_log
+	// overloads, destroy_item, despawn_item — already comes through this door.
+	if (item->m_serial == 0)
+	{
+		record_counted_flow(action, *item, qty);
+		return false;
+	}
+
 	if (ledger() == nullptr) return false;
 
 	event.serial = item->m_serial;
@@ -5470,9 +5579,10 @@ void ItemManager::record_ledger_event(int event_type, int64_t serial,
 	store->record_event(std::move(event));
 }
 
-bool ItemManager::item_log(int action, int give_h, int recv_h, CItem* item, bool force_item_log)
+bool ItemManager::item_log(int action, int give_h, int recv_h, CItem* item, bool force_item_log,
+	int64_t qty)
 {
-	if (hb::server::ledger_event_record event; begin_ledger_event(action, item, give_h, event))
+	if (hb::server::ledger_event_record event; begin_ledger_event(action, item, give_h, event, qty))
 	{
 		// GmMint has no receiving player — recv_h carries the minted quantity —
 		// so it is the one action whose second handle must not be read as a
@@ -5908,6 +6018,9 @@ void ItemManager::req_create_slate_handler(int client_h, char* data)
 	item->m_instance.item_color = slate_colour;
 	if (add_client_item_list(client_h, item, &erase_req)) {
 		ret = send_item_notify_msg(client_h, Notify::ItemObtained, item, 0);
+
+		if (erase_req == 1) destroy_item(item, destroy_reason::merged, client_h);
+
 		switch (ret) {
 		case sock::Event::QueueFull:
 		case sock::Event::SocketError:

@@ -228,6 +228,28 @@ namespace hb::server
 		// key, so a thousand potions bought in one window cost one row, not one
 		// row per purchase. Negative qty is legal (a sink can be expressed either
 		// as its own flow_type or as a negation, and the ledger does not judge).
+		//
+		// **`flow_type` is a `ledger_event` value** — the same number an Instanced
+		// item would have recorded in item_events.event_type for the same
+		// transition (#81, ratified by the owner 2026-07-31). There is deliberately
+		// no second taxonomy:
+		//
+		//   Instanced arrow sold   -> item_events(serial=91, event_type=8)
+		//   Counted arrows sold x5 -> item_flows(item_id=41, flow_type=8, qty=5)
+		//
+		// The alternative — a purpose-built flow numbering — would have been a
+		// SECOND set of permanent world-fact numbers to keep from drifting against
+		// the first, which is the exact failure the 1..99 pass-through band above
+		// exists to prevent for events. It would also have bought nothing: the
+		// plan's own schema sketch (PLANS/ItemLedger_Plan.md) named the wanted
+		// flows as "dropped, picked_up, despawned, consumed, shop_bought,
+		// shop_sold", and every one of those already had a number — Drop, get,
+		// despawned, Deplete, Buy, Sell.
+		//
+		// Consequence to know when querying: direction is a property of the number,
+		// not a stored sign. `Drop` is a sink from an inventory and a source to the
+		// ground; both halves are the one event, counted once, as it is for an
+		// Instanced item.
 		void record_flow(int32_t item_id, int32_t flow_type, int64_t qty);
 
 		// --- Flushing --------------------------------------------------------

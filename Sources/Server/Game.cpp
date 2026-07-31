@@ -6574,6 +6574,12 @@ void CGame::client_common_handler(int client_h, char* data)
 				if (m_item_manager->add_client_item_list(client_h, gold_item, &erase_req))
 				{
 					m_item_manager->send_item_notify_msg(client_h, Notify::ItemObtained, gold_item, 0);
+
+					// Gold always merges when the character already has some, and
+					// the husk is the caller's to free (#81).
+					if (erase_req == 1)
+						m_item_manager->destroy_item(gold_item,
+							hb::server::destroy_reason::merged, client_h);
 				}
 				else
 				{
@@ -11339,6 +11345,10 @@ void CGame::check_special_event(int client_h)
 				item->m_instance.touch_effect_value3 = m_client_list[client_h]->m_char_id_num3;
 				item->m_instance.item_color = 14;
 
+				if (erase_req == 1)
+					m_item_manager->destroy_item(item,
+						hb::server::destroy_reason::merged, client_h);
+
 				m_client_list[client_h]->m_special_event_id = 0;
 			}
 		}
@@ -14450,6 +14460,10 @@ void CGame::get_angel_handler(int client_h, char* data, size_t msg_size)
 			hb::logger::log<log_channel::events>("get Angel : Char({}) Player-Majestic-Points({}) Angel Obtained(ID:{})", m_client_list[client_h]->m_char_name, m_client_list[client_h]->m_gizon_item_upgrade_left, item_id);
 
 			ret = m_item_manager->send_item_notify_msg(client_h, Notify::ItemObtained, item, 0);
+
+			if (erase_req == 1)
+				m_item_manager->destroy_item(item,
+					hb::server::destroy_reason::merged, client_h);
 
 			calc_total_weight(client_h);
 
