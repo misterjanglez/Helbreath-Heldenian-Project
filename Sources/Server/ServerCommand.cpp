@@ -3,13 +3,16 @@
 #include "CmdHelp.h"
 #include "CmdShowChat.h"
 #include "CmdAtomicCheck.h"
+#include "CmdBiographyCheck.h"
 #include "CmdBroadcast.h"
 #include "CmdCoverageCheck.h"
 #include "CmdDropOdds.h"
 #include "CmdGameDbCheck.h"
 #include "CmdGiveItem.h"
+#include "CmdItemHistory.h"
 #include "CmdItemLogCheck.h"
 #include "CmdLedgerCheck.h"
+#include "CmdLedgerValidate.h"
 #include "CmdLifecycleCheck.h"
 #include "CmdMintCheck.h"
 #include "CmdReconcile.h"
@@ -95,13 +98,16 @@ void ServerCommandManager::register_built_in_commands()
 	register_command(std::make_unique<CmdHelp>(m_commands));
 	register_command(std::make_unique<CmdShowChat>());
 	register_command(std::make_unique<CmdAtomicCheck>());
+	register_command(std::make_unique<CmdBiographyCheck>());
 	register_command(std::make_unique<CmdBroadcast>());
 	register_command(std::make_unique<CmdCoverageCheck>());
 	register_command(std::make_unique<CmdDropOdds>());
 	register_command(std::make_unique<CmdGameDbCheck>());
 	register_command(std::make_unique<CmdGiveItem>());
+	register_command(std::make_unique<CmdItemHistory>());
 	register_command(std::make_unique<CmdItemLogCheck>());
 	register_command(std::make_unique<CmdLedgerCheck>());
+	register_command(std::make_unique<CmdLedgerValidate>());
 	register_command(std::make_unique<CmdLifecycleCheck>());
 	register_command(std::make_unique<CmdMintCheck>());
 	register_command(std::make_unique<CmdReconcile>());

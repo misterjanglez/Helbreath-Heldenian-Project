@@ -348,6 +348,44 @@ namespace hb::server
 		}
 	}
 
+	sql_query::sql_query(sqlite3* db, const std::string& sql, const char* tag)
+		: m_stmt(db, sql.c_str())
+	{
+		if (!m_stmt) {
+			hb::logger::error("[{}] query failed: {}", tag,
+				db != nullptr ? sqlite3_errmsg(db) : "no connection");
+		}
+	}
+
+	bool sql_query::step()
+	{
+		return m_stmt && sqlite3_step(m_stmt.get()) == SQLITE_ROW;
+	}
+
+	int64_t sql_query::as_int(int column) const
+	{
+		return sqlite3_column_int64(m_stmt.get(), column);
+	}
+
+	std::string sql_query::as_text(int column) const
+	{
+		const unsigned char* text = sqlite3_column_text(m_stmt.get(), column);
+		return text != nullptr ? reinterpret_cast<const char*>(text) : std::string();
+	}
+
+	int64_t sql_scalar(sqlite3* db, const char* sql, int64_t fallback, const char* tag)
+	{
+		sql_query query(db, sql, tag);
+		return query.step() ? query.as_int(0) : fallback;
+	}
+
+	bool sql_table_exists(sqlite3* db, const char* name, const char* tag)
+	{
+		sql_query query(db, std::format(
+			"SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='{}';", name), tag);
+		return query.step() && query.as_int(0) > 0;
+	}
+
 	stmt_scope::~stmt_scope()
 	{
 		if (m_stmt == nullptr) {

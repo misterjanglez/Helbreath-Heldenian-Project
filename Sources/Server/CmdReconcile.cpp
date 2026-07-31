@@ -24,16 +24,15 @@
 #include "Game.h"
 #include "GameDatabase.h"
 #include "GmMintSpec.h"           // split_args
-#include "ItemLedgerStore.h"
+#include "ItemLedgerStore.h"      // default_ledger_path
 #include "ItemReconciliation.h"
 #include "Item.h"
+#include "LedgerTools.h"          // read_only_db, same_file, flush_if_live_ledger
 #include "Log.h"
 #include "ServerConsole.h"
 #include "ServerLogChannels.h"
-#include "sqlite3.h"
 
 #include <cstdlib>
-#include <filesystem>
 #include <format>
 #include <string>
 
@@ -43,55 +42,6 @@ namespace reconcile_class = hb::server::reconcile_class;
 namespace
 {
 	constexpr const char* default_world_db = "game.db";
-	constexpr const char* default_ledger_db = "itemledger.db";
-
-	// A read-only connection, closed however the command returns.
-	//
-	// Read-only is the contract, not a precaution: this job is pointed at the
-	// live files of a running server, and the one thing it must never do is
-	// become a second writer to them. SQLite enforces it at the connection.
-	class read_only_db
-	{
-	public:
-		explicit read_only_db(const std::string& path)
-		{
-			if (sqlite3_open_v2(path.c_str(), &m_db, SQLITE_OPEN_READONLY, nullptr) != SQLITE_OK) {
-				m_error = m_db ? sqlite3_errmsg(m_db) : "out of memory";
-				sqlite3_close(m_db);
-				m_db = nullptr;
-				return;
-			}
-			// A live WAL database can be busy behind a checkpoint. Waiting is
-			// right for a job an operator started and expects an answer from.
-			sqlite3_busy_timeout(m_db, 5000);
-		}
-
-		~read_only_db() { if (m_db) sqlite3_close(m_db); }
-
-		read_only_db(const read_only_db&) = delete;
-		read_only_db& operator=(const read_only_db&) = delete;
-
-		sqlite3* get() const { return m_db; }
-		const std::string& error() const { return m_error; }
-
-	private:
-		sqlite3* m_db = nullptr;
-		std::string m_error;
-	};
-
-	// Whether two paths name the same file. Compared as canonical paths rather
-	// than as strings: `reconcile game.db` and `reconcile ./game.db` are the
-	// live world and must both take the flush.
-	bool same_file(const std::string& a, const std::string& b)
-	{
-		if (a.empty() || b.empty()) return false;
-		std::error_code ec;
-		const auto left = std::filesystem::weakly_canonical(a, ec);
-		if (ec) return a == b;
-		const auto right = std::filesystem::weakly_canonical(b, ec);
-		if (ec) return a == b;
-		return left == right;
-	}
 
 	int count_online(CGame* game)
 	{
@@ -111,7 +61,7 @@ void CmdReconcile::execute(CGame* game, const char* args)
 	// lone `reconcile 0` (show everything, live world) is the shape an operator
 	// reaches for first.
 	std::string world_path = default_world_db;
-	std::string ledger_path = default_ledger_db;
+	std::string ledger_path = hb::server::default_ledger_path;
 	size_t sample_limit = 20;
 	int paths_given = 0;
 
@@ -137,31 +87,18 @@ void CmdReconcile::execute(CGame* game, const char* args)
 		return;
 	}
 
-	// The live ledger keeps its events in RAM until the flush cadence fires
-	// (D4), so reading the file without pushing them first would report the last
-	// few seconds of legitimate moves as anomalies — the report would be at its
-	// most alarming exactly when the server is busiest.
-	const bool live_world = same_file(world_path, hb::server::game_db().path());
-	const bool live_ledger = game->m_item_ledger_store != nullptr
-		&& game->m_item_ledger_store->is_open()
-		&& same_file(ledger_path,
-			sqlite3_db_filename(game->m_item_ledger_store->handle(), "main"));
-
-	if (live_ledger) {
-		const size_t pending = game->m_item_ledger_store->pending_count();
-		game->flush_item_ledger();
-		if (pending > 0) {
-			hb::console::info("reconcile: flushed {} buffered ledger event(s) before reading.",
-				pending);
-		}
+	const bool live_world = hb::server::same_file(world_path, hb::server::game_db().path());
+	if (const size_t pending = hb::server::flush_if_live_ledger(game, ledger_path); pending > 0) {
+		hb::console::info("reconcile: flushed {} buffered ledger event(s) before reading.",
+			pending);
 	}
 
-	read_only_db world(world_path);
+	hb::server::read_only_db world(world_path);
 	if (world.get() == nullptr) {
 		hb::console::error("reconcile: cannot open '{}' - {}.", world_path, world.error());
 		return;
 	}
-	read_only_db ledger(ledger_path);
+	hb::server::read_only_db ledger(ledger_path);
 	if (ledger.get() == nullptr) {
 		hb::console::error("reconcile: cannot open '{}' - {}.", ledger_path, ledger.error());
 		return;

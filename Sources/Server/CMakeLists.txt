@@ -22,6 +22,7 @@ set(SERVER_SOURCES
     AccountSqliteStore.cpp
     Client.cpp
     CmdAtomicCheck.cpp
+    CmdBiographyCheck.cpp
     CmdBroadcast.cpp
     CmdDropOdds.cpp
     CmdCoverageCheck.cpp
@@ -29,8 +30,10 @@ set(SERVER_SOURCES
     CmdGiveItem.cpp
     CheckTally.cpp
     CmdHelp.cpp
+    CmdItemHistory.cpp
     CmdItemLogCheck.cpp
     CmdLedgerCheck.cpp
+    CmdLedgerValidate.cpp
     CmdLifecycleCheck.cpp
     CmdMintCheck.cpp
     CmdReconcile.cpp
@@ -83,9 +86,11 @@ set(SERVER_SOURCES
     GameConfigSqliteStore.cpp
     ServerConfig.cpp
     GuildManager.cpp
+    ItemBiography.cpp
     ItemLedgerStore.cpp
     ItemReconciliation.cpp
     ItemManager.cpp
+    LedgerTools.cpp
     LegacyRollStrategy.cpp
     LoginServer.cpp
     LootManager.cpp

@@ -33,6 +33,7 @@
 
 #pragma once
 
+#include <cstdint>
 #include <string>
 #include <unordered_map>
 
@@ -200,6 +201,46 @@ namespace hb::server
 		sqlite3_stmt* m_stmt = nullptr;
 		bool m_owned = false;   // prepared here, so this scope finalizes it
 	};
+
+	// A stepped read with typed columns, over stmt_scope — which already answers
+	// the awkward half: on a handle a game_database owns this borrows from that
+	// connection's statement cache, and on a handle nothing owns (a read-only
+	// snapshot, which the audit jobs exist to read) it prepares and finalizes
+	// normally. Only the column accessors are new.
+	//
+	// Shared rather than copied into each audit job because those jobs have to
+	// read a database the same way. A per-file copy that treated a NULL column or
+	// a failed prepare differently would make two commands disagree about one
+	// file, for a reason nobody would think to look for.
+	//
+	// `tag` prefixes the error log when a statement will not compile, so a broken
+	// query names the job that owns it rather than only the SQL.
+	class sql_query
+	{
+	public:
+		sql_query(sqlite3* db, const std::string& sql, const char* tag);
+
+		// False when the statement would not compile. Stepping one is safe and
+		// simply ends immediately, so a caller may check this or not.
+		explicit operator bool() const { return m_stmt.get() != nullptr; }
+
+		bool step();
+
+		int64_t     as_int(int column) const;
+		std::string as_text(int column) const;   // a NULL column reads as empty
+
+	private:
+		stmt_scope m_stmt;
+	};
+
+	// First column of the first row; `fallback` when the query fails or returns
+	// nothing.
+	int64_t sql_scalar(sqlite3* db, const char* sql, int64_t fallback, const char* tag);
+
+	// Whether a table is present. This is what tells an audit job it was handed
+	// the wrong file — the mistake an operator makes at a command line where two
+	// database paths sit next to each other.
+	bool sql_table_exists(sqlite3* db, const char* name, const char* tag);
 
 	// A transaction, for the store functions that still speak `sqlite3*`. Same
 	// rule as stmt_scope: on a connection a game_database owns it is that

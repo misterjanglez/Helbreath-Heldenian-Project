@@ -321,7 +321,69 @@ them (`held_unrecorded`). That is a genuine ledger coverage gap, found by the de
 by review — **filed as #104**, deliberately not fixed inside this ticket. The dev worlds' large
 `never_placed` counts are the earlier provers' own minted Serials and are expected.
 - P4.2 Biography + state-machine validator: per-Serial history query and legal-transition replay
-  (offline CLI first; GM `/itemhistory` later).
+  (offline CLI first; GM `/itemhistory` later). **DONE 2026-07-31 (#84)** — `itemhistory <serial>`
+  (the Biography), `ledgervalidate` (the replay) and `biographycheck` (39/39, hash `8fe8ef76`
+  byte-identical on both platforms, five negative controls). The machine lives in
+  `ItemBiography.{h,cpp}` on **one** raw `sqlite3*` — legality is a property of the ledger alone,
+  so unlike P4.1 there is no world DB to compare against — and the same machine drives both
+  readers, so a Biography's place column cannot disagree with the validator's verdict. The GM
+  `/itemhistory` chat command stays deferred; this is the console/offline half.
+
+**The transition machine (P4.2)** — what each event presupposes, and where it leaves the item:
+
+| Event | required place | resulting place |
+|---|---|---|
+| `created` 100 | unborn | unplaced |
+| `NewGenDrop` 5 | unplaced | ground |
+| `Buy` 7, `GmMint` 40 | unplaced | inventory |
+| `Drop` 2 | inventory | ground |
+| `get` 3 | ground | inventory |
+| `Deposit` 10 | inventory | warehouse |
+| `Retrieve` 9 | warehouse | inventory |
+| `Give` 1, `Exchange` 11 | inventory | inventory (hand-off) |
+| `TpList` 33, `TpOffer` 35 | inventory | escrow |
+| `TpDelist` 34, `TpRescind` 36, `TpRefund` 37, `TpTradeOut` 38, `TpTradeIn` 39 | escrow | warehouse |
+| `Sell` 8, `Deplete` 4 | inventory | **unchanged** |
+| `despawned` 101 | ground | gone |
+| `destroyed` 102 | anywhere live | gone |
+| everything else (`Use`, `Repair`, both upgrade outcomes, the caller-less six) | anywhere live | unchanged |
+
+Two rules carry the whole thing:
+
+- **Unplaced is a wildcard source.** The minting funnel cannot know where a venue puts an item, so
+  a crafted sword reads `created` and then nothing until somebody drops or trades it. Demanding a
+  placement event would accuse every craft, quest and fishing item in the database. From `unborn`
+  or `unplaced` every transition is legal; the machine starts holding the ledger to its word at the
+  first event that says where the item is.
+- **`Sell` and `Deplete` are not exits**, which is a deliberate divergence from P4.1's locating
+  table above. The real emission order is `Sell` → `Deplete` → `destroyed`
+  (`ItemManager::item_deplete_handler`), so making either terminal would report every sale in the
+  database as an event after the item's death. The two tables answer different questions:
+  reconciliation asks who holds the item and hedges against a lost destruction row; this asks
+  whether a transition was possible.
+
+**Five violation classes**, four critical (a healthy ledger cannot produce them): `event_after_exit`
+(which is also how "destroyed once" is enforced — a second exit is an event after the first),
+`acquired_while_held` (the picked-up-twice class: taken into custody while already in custody with
+nobody having let go), `double_creation`, `orphan_event` (counted once per Serial, and it suppresses
+that Serial's other findings — one cause, one finding). The fifth, `released_when_absent`, is a
+warning because it is the shape a lost flush makes from the other direction.
+
+**The crash excuse.** Batched flushing means a crash loses the tail of a window, and losing one
+`Drop` makes the following `get` read as the strongest finding the tool has. A violation with a
+crash boundary's `event_id` between the Serial's previous event and the offending one is counted as
+`gap_excused` rather than accused. It applies only to the three transition-dependent classes — a
+birth row and its `created` event ride one flush transaction, so no hole can produce a Serial born
+twice or an event about a Serial never born.
+
+**What the first run found (2026-07-31), and what it means:** 27 `double_creation` and 46
+`orphan_event`, every one of them inside two short windows on 2026-07-30 (15:40–15:44 and
+20:01–20:18) and none since, across 1087 later events. Both are the already-fixed allocator
+incident — `CGame::on_timer` rebuilding `ItemManager` and zeroing the Serial allocator, fixed in
+`165c656a` — reconstructed from the ledger alone: the duplicate `created` pairs name two different
+maps minutes apart, and the orphans are the events whose `item_instances` row the UNIQUE constraint
+refused. Nothing to fix; the dev world wipes to v9 at P5.1. Recorded here because it is the
+validator's own evidence that it detects a real dupe-shaped fault, not a synthetic one.
 - P4.3 Analytics starter pack: drop-rate, entering-population, despawn-attrition SQL (DuckDB
   optional for heavy aggregation — reads SQLite directly, no service install).
 

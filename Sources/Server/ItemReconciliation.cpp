@@ -171,46 +171,23 @@ namespace
 	}
 
 	// --- Reading rows ------------------------------------------------------
-	// A stepped statement with typed columns, over the store layer's own
-	// stmt_scope — which already answers the awkward half of this: on a handle a
-	// game_database owns it borrows from that connection's cache, on a handle
-	// nothing owns (a read-only snapshot, which this job exists to read) it
-	// prepares and finalizes normally. Only the column accessors are new.
-	class query
+	// The shared reader (GameDatabase.h), tagged so a query that will not compile
+	// names this job in the log. Named `query` locally because that is what every
+	// call site below already calls it, and because the tag is a property of the
+	// file rather than of the call.
+	struct query : hb::server::sql_query
 	{
-	public:
-		query(sqlite3* db, const std::string& sql) : m_stmt(db, sql.c_str())
-		{
-			if (!m_stmt) {
-				hb::logger::error("[RECONCILE] query failed: {}", sqlite3_errmsg(db));
-			}
-		}
-
-		explicit operator bool() const { return static_cast<bool>(m_stmt); }
-		bool step() { return m_stmt && sqlite3_step(m_stmt.get()) == SQLITE_ROW; }
-
-		int64_t as_int(int col) const { return sqlite3_column_int64(m_stmt.get(), col); }
-		std::string as_text(int col) const
-		{
-			const unsigned char* text = sqlite3_column_text(m_stmt.get(), col);
-			return text ? reinterpret_cast<const char*>(text) : std::string();
-		}
-
-	private:
-		hb::server::stmt_scope m_stmt;
+		query(sqlite3* db, const std::string& sql) : sql_query(db, sql, "RECONCILE") {}
 	};
 
 	int64_t scalar(sqlite3* db, const char* sql, int64_t fallback)
 	{
-		query q(db, sql);
-		return q.step() ? q.as_int(0) : fallback;
+		return hb::server::sql_scalar(db, sql, fallback, "RECONCILE");
 	}
 
 	bool table_exists(sqlite3* db, const char* name)
 	{
-		query q(db, std::format(
-			"SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='{}';", name));
-		return q.step() && q.as_int(0) > 0;
+		return hb::server::sql_table_exists(db, name, "RECONCILE");
 	}
 
 	// A name for the report. Empty is what the schema stores as NULL, and the

@@ -1,5 +1,6 @@
 #pragma once
 #include <chrono>
+#include <cstdint>
 #include <ctime>
 #include <cstdio>
 
@@ -11,8 +12,16 @@ struct local_time
 
 	static local_time now()
 	{
-		auto tp = std::chrono::system_clock::now();
-		std::time_t t = std::chrono::system_clock::to_time_t(tp);
+		return from_unix(std::chrono::system_clock::to_time_t(
+			std::chrono::system_clock::now()));
+	}
+
+	// A stored timestamp, in the reader's own timezone. The Provenance Ledger
+	// keeps unix seconds and its Biographies are read by a person deciding what
+	// happened to somebody's item, so the hour that matters is theirs.
+	static local_time from_unix(int64_t seconds)
+	{
+		std::time_t t = static_cast<std::time_t>(seconds);
 		std::tm tm{};
 #ifdef _WIN32
 		localtime_s(&tm, &t);

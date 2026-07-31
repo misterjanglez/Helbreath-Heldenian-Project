@@ -177,6 +177,8 @@
     <ClInclude Include="CombatManager.h" />
     <ClInclude Include="ItemLedgerStore.h" />
     <ClInclude Include="ItemReconciliation.h" />
+    <ClInclude Include="ItemBiography.h" />
+    <ClInclude Include="LedgerTools.h" />
     <ClInclude Include="ItemManager.h" />
     <ClInclude Include="MagicManager.h" />
     <ClInclude Include="SkillManager.h" />
@@ -232,7 +234,10 @@
     <ClInclude Include="CmdAtomicCheck.h" />
     <ClInclude Include="CmdCoverageCheck.h" />
     <ClInclude Include="CmdItemLogCheck.h" />
+    <ClInclude Include="CmdItemHistory.h" />
+    <ClInclude Include="CmdBiographyCheck.h" />
     <ClInclude Include="CmdLedgerCheck.h" />
+    <ClInclude Include="CmdLedgerValidate.h" />
 
     <ClInclude Include="CmdLifecycleCheck.h" />
     <ClInclude Include="CmdMintCheck.h" />
@@ -357,6 +362,8 @@
     <ClCompile Include="CombatManager.cpp" />
     <ClCompile Include="ItemLedgerStore.cpp" />
     <ClCompile Include="ItemReconciliation.cpp" />
+    <ClCompile Include="ItemBiography.cpp" />
+    <ClCompile Include="LedgerTools.cpp" />
     <ClCompile Include="ItemManager.cpp" />
     <ClCompile Include="MagicManager.cpp" />
     <ClCompile Include="SkillManager.cpp" />
@@ -394,8 +401,11 @@
     <ClCompile Include="CmdAtomicCheck.cpp" />
     <ClCompile Include="CmdCoverageCheck.cpp" />
     <ClCompile Include="CmdItemLogCheck.cpp" />
+    <ClCompile Include="CmdItemHistory.cpp" />
+    <ClCompile Include="CmdBiographyCheck.cpp" />
     <ClCompile Include="CmdLedgerCheck.cpp" />
     <ClCompile Include="CmdLifecycleCheck.cpp" />
+    <ClCompile Include="CmdLedgerValidate.cpp" />
     <ClCompile Include="CmdMintCheck.cpp" />
     <ClCompile Include="CmdReconcile.cpp" />
     <ClCompile Include="CmdReconcileCheck.cpp" />

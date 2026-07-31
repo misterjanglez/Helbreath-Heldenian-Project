@@ -188,5 +188,9 @@ One Serial's ordered event history — the query that settles ownership disputes
 **Reconciliation**:
 The comparison of snapshot state (inventories, Warehouse) against the ledger's derived current-holder state. Mismatches — one Serial in two inventories, a holder the ledger never saw — are the dupe detector.
 
+**Transition machine**:
+The legal-move rules a Serial's Biography is replayed through (`ItemBiography.h`, table in `PLANS/ItemLedger_Plan.md`). Places: unborn, unplaced, inventory, warehouse, escrow, ground, gone. Where reconciliation needs both records, this checks the ledger against itself — an item cannot be picked up twice with no drop between, and nothing happens to it after it left the world.
+_Note_: an item minted and never placed may legally go anywhere (creation venues do not record placement), and `Sell`/`Deplete` are not exits (the exit is the `destroyed` that follows them).
+
 **Game DB**:
 The single consolidated account/character store (`game.db`) replacing the per-account `accounts/*.db` files: `UNIQUE` character names, one persistent WAL connection, atomic multi-account transactions (Exchange, Trading Post custody). `gamedata.db`, `MapInfo.db`, and `itemledger.db` remain separate.

@@ -45,6 +45,40 @@ namespace hb::server
 			gm_mint      = 15,
 			restored     = 16,  // rehydrated from persistence carrying no stored Serial
 		};
+
+		// The stable name of a venue, for the half of the ledger a human reads —
+		// a Biography line saying an item was born of origin 11 answers nothing.
+		// Beside the enum for the same reason destroy_reason::name is, and
+		// switch-based so a venue added without being named is a compiler warning
+		// rather than a row silently reading "unknown".
+		//
+		// These names are permanent world fact once real players exist: add
+		// freely, never rename, or every forensic query written against the old
+		// spelling stops matching without saying so.
+		inline const char* name(item_origin origin)
+		{
+			switch (origin)
+			{
+			case npc_drop:     return "npc_drop";
+			case shop_buy:     return "shop_buy";
+			case craft:        return "craft";
+			case quest:        return "quest";
+			case fishing:      return "fishing";
+			case mining:       return "mining";
+			case harvest:      return "harvest";
+			case lottery:      return "lottery";
+			case war_reward:   return "war_reward";
+			case hero_reward:  return "hero_reward";
+			case dark_claim:   return "dark_claim";
+			case angel_claim:  return "angel_claim";
+			case magic:        return "magic";
+			case event_reward: return "event_reward";
+			case gm_mint:      return "gm_mint";
+			case restored:     return "restored";
+			case none:         break;
+			}
+			return "none";
+		}
 	}
 
 	// Why an item left the population for good (plan P3.1).

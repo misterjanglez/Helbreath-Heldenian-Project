@@ -1330,9 +1330,9 @@ bool CGame::init()
 	// from a real dupe. A ledger the server cannot open is fatal for the same
 	// reason: running with a broken audit trail silently produces items whose
 	// history has a hole nobody will know to look for.
-	hb::logger::log("Opening Provenance Ledger (itemledger.db)");
-	if (!m_item_ledger_store->open("itemledger.db")) {
-		hb::logger::error("Cannot start server: itemledger.db unavailable");
+	hb::logger::log("Opening Provenance Ledger ({})", hb::server::default_ledger_path);
+	if (!m_item_ledger_store->open(hb::server::default_ledger_path)) {
+		hb::logger::error("Cannot start server: {} unavailable", hb::server::default_ledger_path);
 		return false;
 	}
 	m_item_manager->resume_serials_from(m_item_ledger_store->recovered_high_water());

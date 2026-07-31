@@ -45,6 +45,12 @@ class CItem;
 
 namespace hb::server
 {
+	// The ledger's filename, beside the class that opens it. The server names it
+	// once at boot and each offline tool defaults to it, so it lived in four
+	// places before this — and a rename that missed one would leave a tool
+	// reporting on a file nobody writes to.
+	constexpr const char* default_ledger_path = "itemledger.db";
+
 	// What one item_events row records.
 	//
 	// Values 1..99 are ItemLogAction (ServerMessages.h) passed straight through:
