@@ -33,6 +33,8 @@ set(SERVER_SOURCES
     CmdLedgerCheck.cpp
     CmdLifecycleCheck.cpp
     CmdMintCheck.cpp
+    CmdReconcile.cpp
+    CmdReconcileCheck.cpp
     CmdSerialCheck.cpp
     CmdTpEscrowCheck.cpp
     CmdReload.cpp
@@ -82,6 +84,7 @@ set(SERVER_SOURCES
     ServerConfig.cpp
     GuildManager.cpp
     ItemLedgerStore.cpp
+    ItemReconciliation.cpp
     ItemManager.cpp
     LegacyRollStrategy.cpp
     LoginServer.cpp

@@ -12,6 +12,8 @@
 #include "CmdLedgerCheck.h"
 #include "CmdLifecycleCheck.h"
 #include "CmdMintCheck.h"
+#include "CmdReconcile.h"
+#include "CmdReconcileCheck.h"
 #include "CmdSerialCheck.h"
 #include "CmdTpEscrowCheck.h"
 #include "CmdReload.h"
@@ -102,6 +104,8 @@ void ServerCommandManager::register_built_in_commands()
 	register_command(std::make_unique<CmdLedgerCheck>());
 	register_command(std::make_unique<CmdLifecycleCheck>());
 	register_command(std::make_unique<CmdMintCheck>());
+	register_command(std::make_unique<CmdReconcile>());
+	register_command(std::make_unique<CmdReconcileCheck>());
 	register_command(std::make_unique<CmdSerialCheck>());
 	register_command(std::make_unique<CmdTpEscrowCheck>());
 	register_command(std::make_unique<CmdReload>());

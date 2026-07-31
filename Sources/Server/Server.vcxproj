@@ -176,6 +176,7 @@
     <ClInclude Include="LootManager.h" />
     <ClInclude Include="CombatManager.h" />
     <ClInclude Include="ItemLedgerStore.h" />
+    <ClInclude Include="ItemReconciliation.h" />
     <ClInclude Include="ItemManager.h" />
     <ClInclude Include="MagicManager.h" />
     <ClInclude Include="SkillManager.h" />
@@ -235,6 +236,8 @@
 
     <ClInclude Include="CmdLifecycleCheck.h" />
     <ClInclude Include="CmdMintCheck.h" />
+    <ClInclude Include="CmdReconcile.h" />
+    <ClInclude Include="CmdReconcileCheck.h" />
     <ClInclude Include="CmdSerialCheck.h" />
     <ClInclude Include="CmdTpEscrowCheck.h" />
     <ClInclude Include="CmdReload.h" />
@@ -353,6 +356,7 @@
     <ClCompile Include="LootManager.cpp" />
     <ClCompile Include="CombatManager.cpp" />
     <ClCompile Include="ItemLedgerStore.cpp" />
+    <ClCompile Include="ItemReconciliation.cpp" />
     <ClCompile Include="ItemManager.cpp" />
     <ClCompile Include="MagicManager.cpp" />
     <ClCompile Include="SkillManager.cpp" />
@@ -393,6 +397,8 @@
     <ClCompile Include="CmdLedgerCheck.cpp" />
     <ClCompile Include="CmdLifecycleCheck.cpp" />
     <ClCompile Include="CmdMintCheck.cpp" />
+    <ClCompile Include="CmdReconcile.cpp" />
+    <ClCompile Include="CmdReconcileCheck.cpp" />
     <ClCompile Include="CmdSerialCheck.cpp" />
     <ClCompile Include="CmdTpEscrowCheck.cpp" />
     <ClCompile Include="CmdReload.cpp" />

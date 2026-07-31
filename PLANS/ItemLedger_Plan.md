@@ -287,7 +287,39 @@ Blocking edges are genuine gates only; work the frontier (house rule from epic #
 
 **P4 — Payoff tooling** *(all blocked by P3.3)*
 - P4.1 Reconciliation job: scan all inventories/Warehouse vs ledger current-holder; anomaly report
-  (offline tool or admin command).
+  (offline tool or admin command). **DONE 2026-07-31 (#83)** — `reconcile` (the tool) and
+  `reconcilecheck` (31/31, hash `20661646` byte-identical on both platforms, five negative
+  controls). The comparison lives in `ItemReconciliation.{h,cpp}` on two raw `sqlite3*` handles
+  so the prover can drive it against planted anomalies; the tool opens both files **read-only**,
+  which is what lets it be pointed at a live server. The derivation is the **last locating
+  event** per Serial — see the table below; events that say nothing about custody (`Use`, both
+  upgrade outcomes, the birth row, the run boundary, the six caller-less actions) are excluded in
+  SQL rather than allowed to mask the last real move.
+
+**Holder derivation (P4.1)** — what each event says about where the item ended up:
+
+| Resulting place | Events |
+|---|---|
+| the actor's inventory | `get` 3, `Buy` 7, `Retrieve` 9, `GmMint` 40 |
+| the counterparty's inventory | `Give` 1, `Exchange` 11 |
+| the actor's Warehouse | `Deposit` 10, and every escrow-out: `TpDelist` 34, `TpRescind` 36, `TpRefund` 37, `TpTradeOut` 38, `TpTradeIn` 39 |
+| the board's custody | `TpList` 33, `TpOffer` 35 |
+| the ground | `Drop` 2, `NewGenDrop` 5 |
+| out of the world | `Deplete` 4, `Sell` 8, `despawned` 101, `destroyed` 102 |
+
+**Nine anomaly classes**, four of them critical (a healthy world cannot produce them): `held_twice`
+(one Serial, two holders — the dupe), `held_but_gone`, `held_but_ground`, `unknown_serial`. The
+other five are states a *live* run makes honestly, because a logged-in character's inventory is in
+memory until it saves: `holder_mismatch`, `missing_holder`, `held_unrecorded`, `serial_missing`
+(an Instanced row carrying no Serial), `serial_on_counted`. Three no-holder states are counted
+rather than accused — on the ground, out of the world, never placed — plus `indeterminate` for a
+locating event that named nobody.
+
+**What the first run found (2026-07-31), and what it means:** `mint_gm_items` writes N birth rows
+and **one** `GmMint` event for a batch, so N−1 GM-minted copies have no event that says who holds
+them (`held_unrecorded`). That is a genuine ledger coverage gap, found by the detector rather than
+by review — **filed as #104**, deliberately not fixed inside this ticket. The dev worlds' large
+`never_placed` counts are the earlier provers' own minted Serials and are expected.
 - P4.2 Biography + state-machine validator: per-Serial history query and legal-transition replay
   (offline CLI first; GM `/itemhistory` later).
 - P4.3 Analytics starter pack: drop-rate, entering-population, despawn-attrition SQL (DuckDB
