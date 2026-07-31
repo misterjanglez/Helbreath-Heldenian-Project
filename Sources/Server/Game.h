@@ -33,6 +33,7 @@ extern bool G_bRunning;
 #include "NetMessages.h"
 #include "Packet/PacketMap.h"
 #include "Packet/PacketModifierCatalog.h"
+#include "Packet/PacketNotify.h"
 #include "ServerMessages.h"
 #include "Misc.h"
 #include "NetworkMsg.h"
@@ -459,6 +460,16 @@ public:
 	bool init_npc_attr(class CNpc * npc, int npc_config_id, short sClass, char sa);
 	int get_npc_config_id_by_name(const char * npc_name) const;
 	void send_notify_msg(int from_h, int to_h, uint16_t msg_type, uint32_t v1, uint64_t v2, uint32_t v3, const char * string, uint32_t v4 = 0, uint32_t v5 = 0, uint32_t v6 = 0, uint32_t v7 = 0, uint32_t v8 = 0, uint32_t v9 = 0, const char * string2 = 0);
+
+	// The Notify::DerivedStats payload for one client, with the header left
+	// blank for the sender to stamp.
+	//
+	// It is a function rather than inline in the send switch so the equip recalc
+	// can take a before-and-after of the WHOLE payload to decide whether the
+	// client needs telling. Its previous test — "did the six gear attributes
+	// move?" — was written when that was all this packet carried, and did not
+	// grow when the packet did.
+	hb::net::PacketNotifyDerivedStats build_derived_stats(const class CClient& who) const;
 	void send_item_attribute_change(int client_h, int item_index, CItem* item, uint32_t spec_value1 = 0, uint32_t spec_value2 = 0);
 	void send_gizon_item_change(int client_h, int item_index, CItem* item);
 	void send_exchange_item_notify(int from_h, int to_h, uint16_t msg_type, int item_index, CItem* item, int amount);

@@ -24,6 +24,7 @@ struct modifier_catalog_entry
 	bool marquee = false;
 	uint8_t effect_placement = 0;   // effect_placement enum: standalone vs inline
 	uint8_t bucket_sort_order = 0;  // THE tooltip ordering key (tier_buckets.sort_order)
+	std::string bucket_name;        // group heading for the Gear pane ("" = none)
 	uint8_t band_min = 0;           // display-unit band, for the GM creator's picker
 	uint8_t band_max = 0;
 

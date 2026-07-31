@@ -3,7 +3,10 @@
 #include "Game.h"
 #include "Player.h"
 
+#include "Game/BalanceConstants.h"
 #include "Game/SharedCalculations.h"
+
+#include <algorithm>
 
 namespace hb::client
 {
@@ -44,7 +47,6 @@ namespace hb::client
 		combat_summary out;
 		const CPlayer& player = *game.m_player;
 
-		out.defense_ratio = hb::shared::calc::defense_ratio_base(player.effective_dex());
 		out.attack_delay = player.m_playerStatus.attack_delay;
 
 		for (int i = 0; i < hb::shared::limits::MaxItems; i++)
@@ -67,19 +69,45 @@ namespace hb::client
 				out.damage_small = cfg->get_damage_range();
 				out.damage_large = cfg->get_damage_range_large();
 			}
-			else if (effect == item::ItemEffectType::Defense
-				|| effect == item::ItemEffectType::DefenseSpecAbility)
+			else if (item::is_defense_effect_type(effect))
 			{
 				out.armour_defence += hb::shared::calc::defense_ratio_from_item(
 					cfg->m_item_effect_value1,
 					worn->is_custom_made() ? worn->m_instance.special_effect_value2 : 0);
 			}
+
+			// Totalled in the walk that is already here rather than by calling
+			// equipped_mana_save, which would walk all fifty slots a second time
+			// for every frame the panel is open. What the two share is the part
+			// that could drift — which fields count, and the ceiling — and both
+			// of those are named once elsewhere.
+			out.mana_save_pct += cfg->mana_save_percent();
 		}
 
-		out.defense_ratio += out.armour_defence
-			+ out.rolled(item::modifier_id::defense_ratio);
-		if (out.defense_ratio <= 0) out.defense_ratio = 1;
+		out.hp_recovery_pct = out.rolled(item::modifier_id::hp_recovery);
+		out.mp_recovery_pct = out.rolled(item::modifier_id::mp_recovery);
+		out.sp_recovery_pct = out.rolled(item::modifier_id::sp_recovery);
+		out.mana_save_pct = std::min(out.mana_save_pct, hb::shared::balance::mana_save_max);
 
 		return out;
+	}
+
+	int equipped_mana_save(const CGame& game)
+	{
+		const CPlayer& player = *game.m_player;
+		int total = 0;
+
+		for (int i = 0; i < hb::shared::limits::MaxItems; i++)
+		{
+			const CItem* worn = player.m_item_list[i].get();
+			if (worn == nullptr || !game.m_is_item_equipped[i]) continue;
+
+			// The worn entry carries the instance; only the cached config row
+			// carries the effect fields.
+			const CItem* cfg = game.get_item_config(worn->m_id_num);
+			if (cfg != nullptr) total += cfg->mana_save_percent();
+		}
+
+		return std::min(total, hb::shared::balance::mana_save_max);
 	}
 }

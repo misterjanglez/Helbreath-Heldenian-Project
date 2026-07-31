@@ -105,6 +105,8 @@ namespace NetworkMessageHandlers {
 			data, sizeof(hb::net::PacketNotifyExp));
 		if (!pkt) return;
 		game->m_player->m_exp = pkt->exp;
+		// Reputation rides this packet and has done all along.
+		game->m_player->m_rating = pkt->rating;
 
 		if (game->m_player->m_exp > prev_exp)
 		{
@@ -187,13 +189,31 @@ namespace NetworkMessageHandlers {
 		game->m_player->m_lu_str = game->m_player->m_lu_vit = game->m_player->m_lu_dex = game->m_player->m_lu_int = game->m_player->m_lu_mag = game->m_player->m_lu_char = 0;
 	}
 
-	void HandleGearStats(CGame* game, char* data)
+	void HandleDerivedStats(CGame* game, char* data)
 	{
-		const auto* pkt = hb::net::PacketCast<hb::net::PacketNotifyGearStats>(
-			data, sizeof(hb::net::PacketNotifyGearStats));
+		const auto* pkt = hb::net::PacketCast<hb::net::PacketNotifyDerivedStats>(
+			data, sizeof(hb::net::PacketNotifyDerivedStats));
 		if (!pkt) return;
 
 		for (std::size_t i = 0; i < std::size(pkt->add_attribute); i++)
 			game->m_player->m_gear_attribute[i] = pkt->add_attribute[i];
+
+		auto& derived = game->m_player->m_derived;
+		derived.defense_ratio     = pkt->defense_ratio;
+		derived.absorb_body       = pkt->absorb_body;
+		derived.absorb_legs       = pkt->absorb_legs;
+		derived.absorb_arms       = pkt->absorb_arms;
+		derived.absorb_head       = pkt->absorb_head;
+		derived.absorb_shield     = pkt->absorb_shield;
+		derived.magic_absorb      = pkt->magic_absorb;
+		derived.magic_resistance  = pkt->magic_resistance;
+		derived.poison_resistance = pkt->poison_resistance;
+		derived.hit_bonus         = pkt->hit_bonus;
+		derived.absorb_air        = pkt->absorb_air;
+		derived.absorb_earth      = pkt->absorb_earth;
+		derived.absorb_fire       = pkt->absorb_fire;
+		derived.absorb_water      = pkt->absorb_water;
+		derived.physical_damage   = pkt->physical_damage;
+		derived.magical_damage    = pkt->magical_damage;
 	}
 } // namespace NetworkMessageHandlers

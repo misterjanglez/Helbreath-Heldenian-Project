@@ -938,7 +938,7 @@ void Screen_OnGame::draw_objects(short pivot_x, short pivot_y, short div_x, shor
 		{
 			item_tooltip tooltip;
 			build_item_tooltip(tooltip, item_selected_id, cfg, item_selected, /*in_inventory=*/false);
-			tooltip.draw(mouse_x, mouse_y + 25, m_game->m_Renderer);
+			tooltip.draw(mouse_x, mouse_y + 25);
 		}
 	}
 }

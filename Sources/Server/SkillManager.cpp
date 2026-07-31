@@ -256,11 +256,15 @@ void SkillManager::calculate_ssn_skill_index(int client_h, short skill_index, in
 			break;
 		}
 
+		// Whether this skill-up moved anything the derived-stats packet carries.
+		bool derived_changed = false;
+
 		if (m_game->m_client_list[client_h]->m_skill_progress[skill_index] == 0) {
 			if (m_game->m_client_list[client_h]->m_item_equipment_status[to_int(EquipPos::TwoHand)] != -1) {
 				weapon_index = m_game->m_client_list[client_h]->m_item_equipment_status[to_int(EquipPos::TwoHand)];
 				if (m_game->m_client_list[client_h]->m_item_list[weapon_index]->m_related_skill == skill_index) {
 					m_game->m_client_list[client_h]->m_hit_ratio++;
+					derived_changed = true;
 				}
 			}
 
@@ -269,6 +273,7 @@ void SkillManager::calculate_ssn_skill_index(int client_h, short skill_index, in
 				if (m_game->m_client_list[client_h]->m_item_list[weapon_index]->m_related_skill == skill_index) {
 					// Mace    .  1 .
 					m_game->m_client_list[client_h]->m_hit_ratio++;
+					derived_changed = true;
 				}
 			}
 		}
@@ -279,6 +284,14 @@ void SkillManager::calculate_ssn_skill_index(int client_h, short skill_index, in
 
 			// Skill    .
 			m_game->send_notify_msg(0, client_h, Notify::Skill, skill_index, m_game->m_client_list[client_h]->m_skill_mastery[skill_index], 0, 0);
+
+			// Magic Resistance mastery is the base of the resistance total the
+			// character panel is now told, and the weapon block above raises
+			// m_hit_ratio, so a skill-up moves figures that otherwise only
+			// refresh on an equip. Sent only when one of them actually moved —
+			// every other mastery leaves the packet identical.
+			if (derived_changed || skill_index == 3)
+				m_game->send_notify_msg(0, client_h, Notify::DerivedStats, 0, 0, 0, 0);
 		}
 	}
 }

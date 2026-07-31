@@ -32,6 +32,7 @@ set(SERVER_SOURCES
     CmdLifecycleCheck.cpp
     CmdMintCheck.cpp
     CmdSerialCheck.cpp
+    CmdTpEscrowCheck.cpp
     CmdReload.cpp
     CmdRollSmoke.cpp
     CmdScatterSmoke.cpp

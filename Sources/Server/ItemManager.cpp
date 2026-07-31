@@ -28,6 +28,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cstring>
 #include <format>
 #include <iterator>
 #include <string>
@@ -359,6 +360,16 @@ CItem* ItemManager::create_loot_item(int item_id, const hb::server::roll_context
 	return item;
 }
 
+// A destroyed event's `detail`. Shared by the two ways an item can end —
+// destroy_item holds the object, the Trading Post (#80) holds only the Serial —
+// so the two cannot come to disagree about how a reason is written down. The
+// column is the half of the ledger a human reads directly, and a query filtering
+// on it matches a string.
+std::string ItemManager::destroyed_detail(destroy_reason::destroy_reason reason)
+{
+	return hb::server::detail_json("reason", destroy_reason::name(reason));
+}
+
 void ItemManager::destroy_item(CItem*& item, destroy_reason::destroy_reason reason, int actor_h)
 {
 	if (item == nullptr) return;
@@ -369,7 +380,7 @@ void ItemManager::destroy_item(CItem*& item, destroy_reason::destroy_reason reas
 	if (hb::server::ledger_event_record event;
 		begin_ledger_event(ledger_event::destroyed, item, actor_h, event))
 	{
-		event.detail = hb::server::detail_json("reason", destroy_reason::name(reason));
+		event.detail = destroyed_detail(reason);
 		ledger()->record_event(std::move(event));
 	}
 
@@ -3651,13 +3662,19 @@ void ItemManager::calc_total_item_effect(int client_h, int equip_item_id, bool n
 	m_game->m_status_effect_manager->set_angel_flag(client_h, hb::shared::owner_class::Player, 0, 0);
 
 	// Snapshotted before the zeroing below so the recalc can tell whether the
-	// equipped set actually changed the totals — the client is only told when
-	// they move, the same way the two speed bytes are handled further down.
-	// std::array, not a C array sized by std::size(): GCC treats that bound as
-	// non-constant and the result decays into a VLA, which has no begin/end.
-	std::array<int, hb::shared::item::tier_attribute::charisma + 1> prev_add_attribute{};
-	std::copy(std::begin(m_game->m_client_list[client_h]->m_add_attribute),
-		std::end(m_game->m_client_list[client_h]->m_add_attribute), prev_add_attribute.begin());
+	// equipped set actually changed anything the wearer is shown — the client is
+	// only told when something moves, the same way the two speed bytes are
+	// handled further down.
+	//
+	// The WHOLE packet payload, not a chosen subset of it. This used to snapshot
+	// the six gear attributes alone, which was right when that was all the packet
+	// carried and silently wrong the moment it grew to twenty-two combat totals:
+	// a hit-ratio necklace, a damage ring and a defence necklace all move numbers
+	// without touching an attribute, so equipping one changed the panel not at
+	// all. Comparing the payload against itself is the only version of this test
+	// that cannot fall behind the packet again.
+	const hb::net::PacketNotifyDerivedStats prev_derived =
+		m_game->build_derived_stats(*m_game->m_client_list[client_h]);
 
 	for (int& gear_attribute : m_game->m_client_list[client_h]->m_add_attribute) gear_attribute = 0;
 
@@ -4098,16 +4115,22 @@ void ItemManager::calc_total_item_effect(int client_h, int equip_item_id, bool n
 			MsgId::EventMotion, Type::NullAction, 0, 0, 0);
 	}
 
-	// Gear attribute totals are private to the wearer, so unlike the speed bytes
-	// this goes to the owner alone. Sent from here because this is the one place
-	// the totals are recomputed — level-up is not the only thing that moves them,
-	// which is exactly why the character screen used to show nothing on equip.
+	// These totals are private to the wearer, so unlike the speed bytes this goes
+	// to the owner alone. Sent from here because this is the one place they are
+	// recomputed — level-up is not the only thing that moves them, which is
+	// exactly why the character screen used to show nothing on equip.
 	// Pre-init recalcs are skipped; the login path sends the first one.
-	if (m_game->m_client_list[client_h]->m_is_init_complete &&
-		!std::equal(prev_add_attribute.begin(), prev_add_attribute.end(),
-			std::begin(m_game->m_client_list[client_h]->m_add_attribute)))
+	//
+	// Compared byte for byte: the payload is packed on both compilers, both
+	// copies are value-initialized, and build_derived_stats leaves the header
+	// blank in each — so nothing but the stats themselves is under comparison.
+	if (m_game->m_client_list[client_h]->m_is_init_complete)
 	{
-		m_game->send_notify_msg(0, client_h, Notify::GearStats, 0, 0, 0, 0);
+		const hb::net::PacketNotifyDerivedStats now =
+			m_game->build_derived_stats(*m_game->m_client_list[client_h]);
+
+		if (std::memcmp(&now, &prev_derived, sizeof(now)) != 0)
+			m_game->send_notify_msg(0, client_h, Notify::DerivedStats, 0, 0, 0, 0);
 	}
 
 	// Combined ceiling, preserved from pre-3-C behavior. The catalog's
@@ -5407,14 +5430,44 @@ bool ItemManager::begin_ledger_event(int action, const CItem* item, int actor_h,
 	// event — an NPC drop, or a handle that has already gone — keeps those
 	// columns NULL rather than inventing a location for a query to trust.
 	if (const CClient* actor = client_at(actor_h))
-	{
-		event.actor_account = actor->m_account_name;
-		event.actor_char = actor->m_char_name;
-		event.map = actor->m_map_name;
-		event.x = actor->m_x;
-		event.y = actor->m_y;
-	}
+		stamp_actor(*actor, event);
 	return true;
+}
+
+void ItemManager::stamp_actor(const CClient& actor, hb::server::ledger_event_record& event)
+{
+	event.actor_account = actor.m_account_name;
+	event.actor_char = actor.m_char_name;
+	event.map = actor.m_map_name;
+	event.x = actor.m_x;
+	event.y = actor.m_y;
+}
+
+hb::server::ledger_event_record ItemManager::ledger_actor(const char* actor_char,
+	const CClient* actor) const
+{
+	hb::server::ledger_event_record base;
+	if (actor != nullptr)
+		stamp_actor(*actor, base);
+	else if (actor_char != nullptr)
+		base.actor_char = actor_char;
+	return base;
+}
+
+void ItemManager::record_ledger_event(int event_type, int64_t serial,
+	const hb::server::ledger_event_record& base)
+{
+	// Both guards ahead of the copy. A bundle of gold reaches here once per
+	// stack and must cost a comparison, not six string copies for a row that is
+	// then dropped at the store's door.
+	if (serial == 0) return;
+	hb::server::item_ledger_store* store = ledger();
+	if (store == nullptr) return;
+
+	hb::server::ledger_event_record event = base;
+	event.serial = serial;
+	event.event_type = event_type;
+	store->record_event(std::move(event));
 }
 
 bool ItemManager::item_log(int action, int give_h, int recv_h, CItem* item, bool force_item_log)

@@ -689,7 +689,6 @@
 #define	UPDATE_SCREEN_ONGAME7	"Too far to give the Item."
 #define	UPDATE_SCREEN_ONGAME8	"The quantity you enter is not correct."
 #define	UPDATE_SCREEN_ONGAME9	"You entered more quantity that you can carry."
-#define	UPDATE_SCREEN_ONGAME10	"Durability: {}/{}"
 #define	UPDATE_SCREEN_ONGAME12	"Press F1 for help."
 #define	UPDATE_SCREEN_ONGAME13	"Logging out...{}"
 #define	UPDATE_SCREEN_ONGAME14	"Restarting game...{}"
@@ -712,8 +711,6 @@
 #define	DRAW_DIALOGBOX_BANK4	"or click an item to take out on the list."
 #define	DRAW_DIALOGBOX_BANK5	"item to take out on the list."
 
-#define	DRAW_DIALOGBOX_CHARACTER1	"Criminal ({})"
-#define	DRAW_DIALOGBOX_CHARACTER2	"Contribution ({})"
 #define	DRAW_DIALOGBOX_CHARACTER3	"Aresden {} GuildMaster"
 #define	DRAW_DIALOGBOX_CHARACTER4	"Elvine {} GuildMaster"
 #define	DRAW_DIALOGBOX_CHARACTER5	"Aresden {} Guildsman"
@@ -741,10 +738,14 @@
 #define	UI_CHARACTER_MAG	"Mag"
 #define	UI_CHARACTER_VIT	"Vit"
 #define	UI_CHARACTER_CHR	"Chr"
-// The Quest and Party buttons take UI_BTN_QUEST / UI_BTN_PARTY below � same two
+// The Quest and Party buttons take UI_BTN_QUEST / UI_BTN_PARTY below � same two
 // words, transcribed from the same two button frames, so there is no second copy
 // to keep in step. Level Up deliberately does NOT: its frame says "Level Set.",
 // which is what the 2001 art had room for rather than what the button does.
+#define	UI_CHARACTER_PK_COUNT	"PK.Count"
+#define	UI_CHARACTER_REPUTATION	"Reputation"
+#define	UI_CHARACTER_CONTRIBUTION	"Contribution"
+#define	UI_CHARACTER_HUNGER	"Hunger"
 #define	UI_CHARACTER_BTN_LEVELUP	"Level Up"
 
 // The combat pane. These are new strings with no art behind them — the pane did
@@ -753,20 +754,38 @@
 #define	UI_COMBAT_TAB_GEAR	"Gear"
 #define	UI_COMBAT_HEAD_ATTACK	"Attack"
 #define	UI_COMBAT_HEAD_DEFENCE	"Defence"
-#define	UI_COMBAT_HEAD_GEAR	"From Equipment"
+// UI_COMBAT_HEAD_GEAR ("From Equipment") retired: the tab is already labelled
+// Gear, and the pane's bucket titles are the headings that carry information.
 #define	UI_COMBAT_DAMAGE_SMALL	"Damage"
 #define	UI_COMBAT_DAMAGE_LARGE	"vs. Large"
-#define	UI_COMBAT_ATTACK_DELAY	"Swing Delay"
+#define	UI_COMBAT_ATTACK_DELAY	"Swing"
 #define	UI_COMBAT_HIT_BONUS	"Hit Bonus"
 #define	UI_COMBAT_DEFENCE_RATIO	"Defence Ratio"
 #define	UI_COMBAT_ARMOUR	"Armour"
-#define	UI_COMBAT_PHYS_ABSORB	"Phys. Absorb"
+#define	UI_COMBAT_PHYS_ABSORB	"Avg Phys Absorb"
+#define	UI_COMBAT_SHIELD_ABSORB	"Shield Absorb"
+#define	UI_COMBAT_PHYS_DAMAGE	"Phys. Damage"
+#define	UI_COMBAT_MAGIC_DAMAGE	"Magic Damage"
+#define	UI_COMBAT_MANA_SAVE	"Mana Save"
+#define	UI_COMBAT_ABSORB_FIRE	"Fire Absorb"
+#define	UI_COMBAT_ABSORB_ICE	"Ice Absorb"
+#define	UI_COMBAT_ABSORB_LIGHT	"Light Absorb"
+#define	UI_COMBAT_ABSORB_EARTH	"Earth Absorb"
 #define	UI_COMBAT_MAGIC_RESIST	"Magic Resist"
 #define	UI_COMBAT_MAGIC_ABSORB	"Magic Absorb"
 #define	UI_COMBAT_POISON_RESIST	"Poison Resist"
+#define	UI_COMBAT_HEAD_RECOVERY	"Recovery"
+#define	UI_COMBAT_RECOVER_HP	"Health"
+#define	UI_COMBAT_RECOVER_MP	"Mana"
+#define	UI_COMBAT_RECOVER_SP	"Stamina"
+#define	UI_COMBAT_PER_TICK	"per tick"
+#define	UI_COMBAT_RECOVERY_RATE	"Recovery rate"
 #define	UI_COMBAT_NO_WEAPON	"Unarmed"
 #define	UI_COMBAT_NO_GEAR	"Nothing you are wearing rolls a modifier."
-#define	UI_COMBAT_GEAR_ONLY	"Absorb and resist rows are what your gear adds, not your total."
+#define	UI_COMBAT_ATTRS_ELSEWHERE	"Attribute bonuses are shown with the stats."
+// UI_COMBAT_GEAR_ONLY retired: it was the pane apologising that its absorb and
+// resist rows were only the gear contribution. Notify::DerivedStats made them
+// real totals, and the apology was left defined with nothing reading it.
 
 // Panel titles. These were the pak "title strip" frames on sheet 9 — a separate
 // small sprite per dialog with the lettering painted in — so like the captions
@@ -1237,12 +1256,41 @@
 #define	DRAW_DIALOGBOX_SHOP26	"(Warning!) Your level is too low for this item."
 #define	DRAW_DIALOGBOX_SHOP27	"Quantity:"
 #define	DRAW_DIALOGBOX_SHOP28	"Restores Hunger: {}-{}"
-#define	TOOLTIP_WEIGHT			"Weight: {:.2f} stone"
-#define	TOOLTIP_WEIGHT_STACK	"Weight: {:.2f} stones ({:.2f})"
-#define	TOOLTIP_USAGES			"Usages: {}/{}"
+// Shop rows render one fact as one sentence, so they keep whole-line formats.
+// The item tooltip splits caption from value into two columns and uses the
+// UI_TIP_* pair below instead.
 #define	TOOLTIP_RESTORES_HP		"Restores HP: {}-{}"
 #define	TOOLTIP_RESTORES_MP		"Restores MP: {}-{}"
 #define	TOOLTIP_RESTORES_SP		"Restores SP: {}-{}"
+
+// Item tooltip: captions for the left column...
+#define	UI_TIP_DAMAGE			"Damage"
+#define	UI_TIP_DAMAGE_LARGE		"vs. Large"
+#define	UI_TIP_SWING			"Swing"
+#define	UI_TIP_DEFENCE			"Defence"
+#define	UI_TIP_RESTORE_HP		"Restores HP"
+#define	UI_TIP_RESTORE_MP		"Restores MP"
+#define	UI_TIP_RESTORE_SP		"Restores SP"
+#define	UI_TIP_RESTORE_HUNGER	"Restores Hunger"
+#define	UI_TIP_REQ_LEVEL		"Level"
+#define	UI_TIP_REQ_STR			"Required Str"
+#define	UI_TIP_WEIGHT			"Weight"
+#define	UI_TIP_DURABILITY		"Durability"
+#define	UI_TIP_USAGES			"Usages"
+#define	UI_TIP_TOTAL			"Total Carried"
+// The one add_effect sub-type with no magnitude to show — it is a flag, so it
+// gets a sentence instead of a value. No live item enables it (see
+// AddEffectType::Lucky), which is why nobody has ever read this string.
+#define	UI_TIP_LUCKY			"Sometimes survives a fatal blow, and keeps its items."
+
+// ...and the value formats for the right one.
+#define	UI_TIP_RANGE			"{} - {}"
+#define	UI_TIP_MILLISECONDS		"{} ms"
+#define	UI_TIP_PERCENT			"+{}%"
+#define	UI_TIP_FRACTION			"{} / {}"
+#define	UI_TIP_STONE			"{:.2f} st"
+#define	UI_TIP_STONE_STACK		"{:.2f} st ({:.2f} each)"
+#define	UI_TIP_STR_TO_SWING		"{}  ({} to swing)"
 
 
 
@@ -1788,7 +1836,6 @@
 #define NOTIFY_MSG_FORCERECALLTIME1 "You have {} minutes to get forced recall. Recall is not available in the opposite town."
 #define NOTIFY_MSG_FORCERECALLTIME2 "You'll be forced to recall soon."
 
-#define DEF_MSG_TOTAL_NUMBER "Total : {}"
 
 #define DEF_MSG_EXP	"Exp: "
 

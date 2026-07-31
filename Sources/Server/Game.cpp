@@ -7230,6 +7230,57 @@ void CGame::send_exchange_item_notify(int from_h, int to_h, uint16_t msg_type, i
 
 // 05/29/2004 - Hypnotoad - Purchase Dicount updated to take charisma into consideration
 
+// The character's own stats stay on the status packets — creation, level-up and
+// persistence read those. This carries the gear contribution alongside, so the
+// client can render and re-derive with the same numbers the server's
+// effective_*() already use, plus the derived combat totals it has no way to
+// reach: they are accumulated across the equip pass into members that are read
+// at damage resolution and never left this side.
+//
+// The header is left blank. Only the sender knows the message id, and leaving it
+// out is what lets two payloads be compared byte for byte.
+hb::net::PacketNotifyDerivedStats CGame::build_derived_stats(const CClient& who) const
+{
+	hb::net::PacketNotifyDerivedStats pkt{};
+
+	for (std::size_t i = 0; i < std::size(pkt.add_attribute); i++)
+		pkt.add_attribute[i] = static_cast<int16_t>(who.m_add_attribute[i]);
+
+	const auto narrow = [](int value) { return static_cast<int16_t>(value); };
+
+	pkt.defense_ratio = narrow(who.m_defense_ratio);
+
+	// Zone 2 is the leggings and the boots added together, which is how the
+	// hit_point switch reads them — sent pre-summed so the client is not
+	// left to rediscover that pairing.
+	pkt.absorb_body   = narrow(who.m_damage_absorption_armor[to_int(EquipPos::Body)]);
+	pkt.absorb_legs   = narrow(who.m_damage_absorption_armor[to_int(EquipPos::Leggings)]
+	                         + who.m_damage_absorption_armor[to_int(EquipPos::Boots)]);
+	pkt.absorb_arms   = narrow(who.m_damage_absorption_armor[to_int(EquipPos::Arms)]);
+	pkt.absorb_head   = narrow(who.m_damage_absorption_armor[to_int(EquipPos::Head)]);
+	pkt.absorb_shield = narrow(who.m_damage_absorption_shield);
+
+	pkt.magic_absorb = narrow(who.m_add_abs_magical_defense);
+	// Two separate gear terms feed this and the skill is the base, so the
+	// total is assembled here rather than leaving the client to guess which
+	// halves it was given.
+	pkt.magic_resistance = narrow(who.m_skill_mastery[3]
+	                            + who.m_add_magic_resistance
+	                            + who.m_add_resist_magic);
+	pkt.poison_resistance = narrow(who.m_add_poison_resistance);
+	pkt.hit_bonus = narrow(who.m_hit_ratio + who.m_add_attack_ratio);
+
+	pkt.absorb_air   = narrow(who.m_add_abs_air);
+	pkt.absorb_earth = narrow(who.m_add_abs_earth);
+	pkt.absorb_fire  = narrow(who.m_add_abs_fire);
+	pkt.absorb_water = narrow(who.m_add_abs_water);
+
+	pkt.physical_damage = narrow(who.m_add_physical_damage);
+	pkt.magical_damage  = narrow(who.m_add_magical_damage);
+
+	return pkt;
+}
+
 void CGame::send_notify_msg(int from_h, int to_h, uint16_t msg_type, uint32_t v1, uint64_t v2, uint32_t v3, const char* string, uint32_t v4, uint32_t v5, uint32_t v6, uint32_t v7, uint32_t v8, uint32_t v9, const char* string2)
 {
 	int ret = 0;
@@ -8661,51 +8712,11 @@ void CGame::send_notify_msg(int from_h, int to_h, uint16_t msg_type, uint32_t v1
 
 	case Notify::DerivedStats:
 	{
-		// The stats above stay the character's own — creation, level-up and
-		// persistence read those. This carries the gear contribution alongside
-		// so the client can render and re-derive with the same numbers the
-		// server's effective_*() already use, plus the derived combat totals it
-		// has no way to reach: they are accumulated across the equip pass into
-		// members that are read at damage resolution and never left this side.
 		const CClient* who = m_client_list[to_h];
 
-		hb::net::PacketNotifyDerivedStats pkt{};
+		hb::net::PacketNotifyDerivedStats pkt = build_derived_stats(*who);
 		pkt.header.msg_id = MsgId::Notify;
 		pkt.header.msg_type = msg_type;
-		for (std::size_t i = 0; i < std::size(pkt.add_attribute); i++)
-			pkt.add_attribute[i] = static_cast<int16_t>(who->m_add_attribute[i]);
-
-		const auto narrow = [](int value) { return static_cast<int16_t>(value); };
-
-		pkt.defense_ratio = narrow(who->m_defense_ratio);
-
-		// Zone 2 is the leggings and the boots added together, which is how the
-		// hit_point switch reads them — sent pre-summed so the client is not
-		// left to rediscover that pairing.
-		pkt.absorb_body   = narrow(who->m_damage_absorption_armor[to_int(EquipPos::Body)]);
-		pkt.absorb_legs   = narrow(who->m_damage_absorption_armor[to_int(EquipPos::Leggings)]
-		                         + who->m_damage_absorption_armor[to_int(EquipPos::Boots)]);
-		pkt.absorb_arms   = narrow(who->m_damage_absorption_armor[to_int(EquipPos::Arms)]);
-		pkt.absorb_head   = narrow(who->m_damage_absorption_armor[to_int(EquipPos::Head)]);
-		pkt.absorb_shield = narrow(who->m_damage_absorption_shield);
-
-		pkt.magic_absorb = narrow(who->m_add_abs_magical_defense);
-		// Two separate gear terms feed this and the skill is the base, so the
-		// total is assembled here rather than leaving the client to guess which
-		// halves it was given.
-		pkt.magic_resistance = narrow(who->m_skill_mastery[3]
-		                            + who->m_add_magic_resistance
-		                            + who->m_add_resist_magic);
-		pkt.poison_resistance = narrow(who->m_add_poison_resistance);
-		pkt.hit_bonus = narrow(who->m_hit_ratio + who->m_add_attack_ratio);
-
-		pkt.absorb_air   = narrow(who->m_add_abs_air);
-		pkt.absorb_earth = narrow(who->m_add_abs_earth);
-		pkt.absorb_fire  = narrow(who->m_add_abs_fire);
-		pkt.absorb_water = narrow(who->m_add_abs_water);
-
-		pkt.physical_damage = narrow(who->m_add_physical_damage);
-		pkt.magical_damage  = narrow(who->m_add_magical_damage);
 
 		ret = who->m_socket->send_msg(reinterpret_cast<char*>(&pkt), sizeof(pkt));
 		break;

@@ -154,26 +154,53 @@ enum class ItemEffectType : int16_t
 //------------------------------------------------------------------------
 // add_effect Sub-Types (used with ItemEffectType::add_effect)
 // m_item_effect_value1 contains the sub-type, m_item_effect_value2 contains the value
+//
+// These names were WRONG from 3 upward and had been since the enum was written.
+// It called 3 PoisonResist when the server adds physical damage, 7 FireAbsorb
+// when the server adds AIR absorption, 13 Summon when it is a gem's HP recovery,
+// and it stopped at 19 with two names (SpecialAbility, ParalysisImmune) for what
+// are in fact the INT and MAG angelic pendants. Only 1 and 2 ever lined up.
+//
+// It survived because those two were the only ones anybody had asked for — the
+// enum was wrong but inert. It stopped being inert the moment the item tooltip
+// needed to say what a named unique does.
+//
+// The authority is the server's equip switch (ItemManager.cpp, the
+// `case ItemEffectType::add_effect:` block) reconciled against the sub-types
+// live `items` rows actually carry — the enum is a naming of that data, never a
+// definition of it. Verified 2026-07-30 against 51 live rows spanning sub-types
+// 1-7, 9-12 and 16-19.
 //------------------------------------------------------------------------
 enum class AddEffectType : int16_t
 {
-    MagicResist     = 1,   // Additional magic resistance
-    ManaSave        = 2,   // Mana save percentage
-    PoisonResist    = 3,   // Poison resistance
-    CriticalHit     = 4,   // Critical hit chance
-    Poisoning       = 5,   // Poison attack
-    RepairItem      = 6,   // Repair item
-    FireAbsorb      = 7,   // Fire damage absorption
-    IceAbsorb       = 8,   // Ice damage absorption
-    LightAbsorb     = 9,   // Light damage absorption
-    ExpBonus        = 10,  // Experience bonus
-    GoldBonus       = 11,  // Gold drop bonus
-    // 12 unused
-    Summon          = 13,  // Summon creature
-    CancelBuff      = 14,  // Cancel buffs
-    // 15-17 unused
-    SpecialAbility  = 18,  // Special ability
-    ParalysisImmune = 19   // Paralysis immunity
+    MagicResist      = 1,   // += m_add_resist_magic
+    ManaSave         = 2,   // += m_mana_save_ratio, capped at 80
+    PhysicalDamage   = 3,   // += m_add_physical_damage
+    DefenseRatio     = 4,   // += m_defense_ratio
+    Lucky            = 5,   // sets m_is_lucky_effect, and ONLY when value2 != 0
+    MagicalDamage    = 6,   // += m_add_magical_damage
+    AbsorbAir        = 7,   // += m_add_abs_air   (shown as "Light" in the UI)
+    AbsorbEarth      = 8,   // += m_add_abs_earth (no live item carries it)
+    AbsorbFire       = 9,   // += m_add_abs_fire
+    AbsorbWater      = 10,  // += m_add_abs_water (shown as "Ice" in the UI)
+    PoisonResist     = 11,  // += m_add_poison_resistance
+    HitRatio         = 12,  // += m_hit_ratio
+
+    // The four Magin gems. Each scales off the INSTANCE's purity
+    // (special_effect_value2) rather than the config's value2, and no row in
+    // `items` carries any of them — they were never ported. Named so the numbers
+    // are not mistaken for spare, not because anything reaches them.
+    MaginRuby        = 13,  // += m_add_hp                    (purity / 5)
+    MaginDiamond     = 14,  // += m_add_attack_ratio          (purity / 5)
+    MaginEmerald     = 15,  // += m_add_abs_magical_defense   (purity / 10, cap 80)
+    MaginSapphire    = 30,  // += m_damage_absorption_armor[] (purity / 10, 4 zones)
+
+    // The angelic pendants, which take their magnitude from the enchant bonus
+    // (+1) instead of value2 and raise m_angelic_* rather than a combat total.
+    AngelicStr       = 16,
+    AngelicDex       = 17,
+    AngelicInt       = 18,
+    AngelicMag       = 19
 };
 
 constexpr int16_t to_int(AddEffectType type) { return static_cast<int16_t>(type); }
@@ -252,6 +279,20 @@ constexpr bool is_attack_effect_type(ItemEffectType type)
            type == ItemEffectType::AttackMaxHPDown ||
            type == ItemEffectType::AttackDefense ||
            type == ItemEffectType::AttackSpecAbility;
+}
+
+// Check if item effect type is a defence type — i.e. whether value1 is a
+// defence figure at all.
+//
+// Worth stating rather than assuming from the slot: an item can sit in an
+// armour slot and NOT be one of these, in which case value1 means something
+// else entirely. Both Santa Costumes are add_effect items worn at FullBody, so
+// their value1 is the sub-type id 10 (water absorption) — read as a defence
+// percentage it renders as "+10% Defence", which is what the tooltip did.
+constexpr bool is_defense_effect_type(ItemEffectType type)
+{
+    return type == ItemEffectType::Defense ||
+           type == ItemEffectType::DefenseSpecAbility;
 }
 
 // The legacy roll gate: only these effect types ever roll attributes.

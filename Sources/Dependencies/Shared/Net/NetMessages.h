@@ -369,7 +369,7 @@ namespace Notify
 		// Attribute-ladder totals from equipped gear (Item Tiers spec §4). Its own
 		// message rather than a widened ForceStatRefresh: that one also resets the
 		// client's pending level-up allocation, which an equip must not touch.
-		GearStats                               = 0x0BFD,
+		DerivedStats                            = 0x0BFD,
 		RepairAllPrices                         = 0x0F11,
 		MobKills                                = 0x0A68,
 #ifdef TESTER_ONLY

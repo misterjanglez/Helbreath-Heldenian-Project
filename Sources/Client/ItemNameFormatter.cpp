@@ -41,12 +41,13 @@ const tier_presentation_entry* item_name_formatter::tier_row(uint8_t tier) const
 	return &m_tier_presentation[tier - 1];
 }
 
-namespace {
-
 // Format a catalog format string with the scaled value(s). An attribute-pair
 // row (spec §12) carries two placeholders and consumes both rolls; a one-
 // placeholder row simply ignores the second argument. Format strings are
 // replicated data — never trust them to be valid.
+//
+// Declared in the header: the Gear pane needs the same rendering, and having
+// its own was how it came to print "+21" for a row the catalog calls "+21%".
 std::string format_catalog_value(const std::string& fmt, uint32_t value, uint32_t value2)
 {
 	try
@@ -58,6 +59,8 @@ std::string format_catalog_value(const std::string& fmt, uint32_t value, uint32_
 		return std::to_string(value);
 	}
 }
+
+namespace {
 
 // Lead the tier word onto the item name using the replicated template
 // ("{tier} {name}"). Each placeholder's first occurrence is substituted, from
@@ -184,6 +187,110 @@ CItem* item_name_formatter::get_config(int item_id) const
 	return (*m_item_configs)[item_id].get();
 }
 
+// What an item's CONFIG says it does, as opposed to what its instance rolled.
+//
+// add_effect is the legacy home for every named unique's benefit — the whole
+// Magic Necklace range, the stat and mage rings, the elemental and poison
+// necklaces, the angelic pendants — and exactly one of its live sub-types, mana
+// save, had ever been given a line. Everything else rendered as a name, a
+// weight and a durability and said nothing at all about what it was for, which
+// is why a Necklace of Xelima and a plain one read identically.
+//
+// The captions are the character panel's own on purpose: a player reading
+// "Hit Bonus +100" on a necklace should find those same words on the row it
+// moves when they put it on. The units follow the panel too, including calling
+// air absorption "Light" and water "Ice" — which is what those two elements
+// have been called on screen since long before either had a row.
+//
+// The authority for the mapping is the server's equip switch, never the enum's
+// old names; see AddEffectType.
+static void append_config_effects(ItemNameInfo& result, const CItem& cfg,
+	const hb::shared::item::item_instance_data& data)
+{
+	namespace item = hb::shared::item;
+
+	// Asked for rather than switched on, because two unrelated effect types
+	// both spell mana save and only one of them is an add_effect.
+	if (const int mana_save = cfg.mana_save_percent(); mana_save > 0)
+	{
+		result.is_special = true;
+		result.effects.push_back({ UI_COMBAT_MANA_SAVE, std::format("+{}%", mana_save) });
+	}
+
+	if (cfg.get_item_effect_type() != item::ItemEffectType::add_effect) return;
+
+	const auto sub_type = static_cast<item::AddEffectType>(cfg.m_item_effect_value1);
+
+	// The pendants are the one family whose magnitude is not value2 — the server
+	// takes theirs from the enchant bonus — so they are the one family the
+	// zero-magnitude gate below must not judge by it.
+	const bool angelic = sub_type == item::AddEffectType::AngelicStr
+		|| sub_type == item::AddEffectType::AngelicDex
+		|| sub_type == item::AddEffectType::AngelicInt
+		|| sub_type == item::AddEffectType::AngelicMag;
+
+	// A magnitude of zero earns no row, the way every gated row on the character
+	// panel already works. Not hypothetical: the Necklace of Kloness is a
+	// defence-ratio item configured with value2 = 0 — in the original as much as
+	// here — so it adds nothing when worn, and "Defence Ratio +0" would read as a
+	// rendering fault rather than as the broken config row it actually is. It
+	// also retires the Lucky flag, whose sole item is zero for the same reason.
+	const int value = cfg.m_item_effect_value2;
+	if (value == 0 && !angelic) return;
+
+	const char* caption = nullptr;
+	std::string text;
+
+	switch (sub_type)
+	{
+	case item::AddEffectType::MagicResist:   caption = UI_COMBAT_MAGIC_RESIST;   text = std::format("+{}", value); break;
+	case item::AddEffectType::PhysicalDamage:caption = UI_COMBAT_PHYS_DAMAGE;    text = std::format("+{}", value); break;
+	case item::AddEffectType::DefenseRatio:  caption = UI_COMBAT_DEFENCE_RATIO;  text = std::format("+{}", value); break;
+	case item::AddEffectType::MagicalDamage: caption = UI_COMBAT_MAGIC_DAMAGE;   text = std::format("+{}", value); break;
+	case item::AddEffectType::HitRatio:      caption = UI_COMBAT_HIT_BONUS;      text = std::format("+{}", value); break;
+	case item::AddEffectType::AbsorbAir:     caption = UI_COMBAT_ABSORB_LIGHT;   text = std::format("{}%", value); break;
+	case item::AddEffectType::AbsorbEarth:   caption = UI_COMBAT_ABSORB_EARTH;   text = std::format("{}%", value); break;
+	case item::AddEffectType::AbsorbFire:    caption = UI_COMBAT_ABSORB_FIRE;    text = std::format("{}%", value); break;
+	case item::AddEffectType::AbsorbWater:   caption = UI_COMBAT_ABSORB_ICE;     text = std::format("{}%", value); break;
+
+	// Not a percentage, unlike the four elemental rows above it. Poison
+	// resistance is added to the Poison Resistance mastery and the sum is rolled
+	// against dice(1,100) to shake the poison off, so it is a score in the same
+	// way magic resistance is — and 500 is a sentinel the server reads as
+	// outright immunity, which "500%" said nothing about.
+	case item::AddEffectType::PoisonResist:  caption = UI_COMBAT_POISON_RESIST;  text = std::format("+{}", value); break;
+
+	// The pendants take their magnitude from the enchant bonus rather than
+	// value2, and the server adds one to it — a +3 pendant is +4 to the stat,
+	// which is the figure the panel's own stat block will show.
+	case item::AddEffectType::AngelicStr:    caption = UI_CHARACTER_STR;         text = std::format("+{}", data.get_enchant_bonus() + 1); break;
+	case item::AddEffectType::AngelicDex:    caption = UI_CHARACTER_DEX;         text = std::format("+{}", data.get_enchant_bonus() + 1); break;
+	case item::AddEffectType::AngelicInt:    caption = UI_CHARACTER_INT;         text = std::format("+{}", data.get_enchant_bonus() + 1); break;
+	case item::AddEffectType::AngelicMag:    caption = UI_CHARACTER_MAG;         text = std::format("+{}", data.get_enchant_bonus() + 1); break;
+
+	// A flag, not a magnitude — so it gets a sentence and no value column, and
+	// the zero gate above is what keeps it honest. The server raises the flag
+	// only when value2 is non-zero, and the one item that has ever carried this
+	// sub-type has value2 = 0 in the original config as much as in ours: the
+	// Lucky Gold Ring genuinely does nothing, and inventing an effect for it is
+	// not this function's business. Unreachable today, and correct if the data
+	// ever changes.
+	case item::AddEffectType::Lucky:         caption = UI_TIP_LUCKY;                                               break;
+
+	// Handled above, from either of its two effect types.
+	case item::AddEffectType::ManaSave: break;
+
+	// The four Magin gems scale off the instance's purity and no row in `items`
+	// carries any of them, so the arithmetic here would be untestable against
+	// anything the game can produce. Deliberately not ported — the same call
+	// combat_summary made about the Ruby's HP recovery term.
+	default: break;
+	}
+
+	if (caption == nullptr) return;
+	result.effects.push_back({ caption, std::move(text) });
+}
+
 ItemNameInfo item_name_formatter::format(CItem* item)
 {
 	return format(item->m_id_num, item->to_instance_data());
@@ -293,25 +400,7 @@ ItemNameInfo item_name_formatter::format(short item_id, const hb::shared::item::
 			append_modifier_effect(result.effects, lines[i].type, lines[i].value, lines[i].value2);
 	}
 
-	// Mana save is a property of the item config, not of the instance, so it is
-	// added here rather than alongside the rolled modifiers. It used to live in
-	// the CItem* overload, which meant every caller holding an id and an instance
-	// POD — a shop row, a ground pile — silently lost the line.
-	{
-		const auto effect_type = cfg->get_item_effect_type();
-		int mana_save = 0;
-		if (effect_type == hb::shared::item::ItemEffectType::AttackManaSave)
-			mana_save = cfg->m_item_effect_value4;
-		else if (effect_type == hb::shared::item::ItemEffectType::add_effect &&
-		         cfg->m_item_effect_value1 == hb::shared::item::to_int(hb::shared::item::AddEffectType::ManaSave))
-			mana_save = cfg->m_item_effect_value2;
-
-		if (mana_save > 0)
-		{
-			result.is_special = true;
-			result.effects.push_back({"Mana save ", std::format("+{}%", mana_save)});
-		}
-	}
+	append_config_effects(result, *cfg, data);
 
 	apply_tier_presentation(result, data.get_tier());
 

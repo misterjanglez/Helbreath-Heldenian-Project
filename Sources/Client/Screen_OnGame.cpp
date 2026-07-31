@@ -17,6 +17,8 @@
 #include "ChatManager.h"
 #include "ItemNameFormatter.h"
 #include "ItemTooltip.h"
+#include "UITheme.h"
+#include "Game/SharedCalculations.h"
 #include "ConfigManager.h"
 #include "BalanceConstants.h"
 #include "IInput.h"
@@ -868,19 +870,27 @@ void Screen_OnGame::render_item_tooltip()
 
     item_tooltip tooltip;
     build_item_tooltip(tooltip, item->m_id_num, cfg, item->m_instance, /*in_inventory=*/true);
-    tooltip.draw(m_sMsX, m_sMsY + 25, m_game->m_Renderer);
+    tooltip.draw(m_sMsX, m_sMsY + 25);
 }
 
 void Screen_OnGame::build_item_tooltip(item_tooltip& tooltip, short id_num, const CItem* cfg,
     const hb::shared::item::item_instance_data& instance, bool in_inventory) const
 {
-    std::string G_cTxt;
+    namespace theme = hb::client::ui_theme;
+
+    // Two value colors and no more. Green is an ordinary figure, amber is the
+    // one the item exists for — its damage or its defence — and anything a
+    // rolled line has raised above the config's own number. Captions carry no
+    // color at all, which is what lets the value column be read on its own.
+    const auto& plain = theme::palette::value;
+    const auto& boosted = theme::palette::value_hi;
+
     const bool is_equippable = cfg->is_armor() || cfg->is_weapon() || cfg->is_accessory();
 
     auto itemInfo = item_name_formatter::get().format(id_num, instance);
 
     // 1. Name — tier color, else the dye tint of a prefixed item, else special, else white
-    tooltip.add_line(itemInfo.name,
+    tooltip.add_header(itemInfo.name,
         item_name_color(itemInfo, GameColors::UIWhite, name_dye_tint(instance)));
 
     // 2. Classification
@@ -891,137 +901,137 @@ void Screen_OnGame::build_item_tooltip(item_tooltip& tooltip, short id_num, cons
             slot = cfg->m_is_skirt ? "Skirt" : "Pants";
         else if (cfg->get_equip_pos() == EquipPos::Body)
             slot = (cfg->m_gender_requirement == 2) ? "Bodice" : "Shirt";
-        G_cTxt = std::format("Clothing - {}", slot);
-        tooltip.add_line(G_cTxt, GameColors::InfoGrayLight);
+        tooltip.add_subhead(std::format("Clothing - {}", slot));
     }
     else if (cfg->m_armor_class == armor_class::armor)
     {
         const char* slot = equip_pos_name(cfg->get_equip_pos());
         if (cfg->get_equip_pos() == EquipPos::Body)
             slot = "Chest";
-        G_cTxt = std::format("Armor - {}", slot);
-        tooltip.add_line(G_cTxt, GameColors::InfoGrayLight);
+        tooltip.add_subhead(std::format("Armor - {}", slot));
     }
     else if (cfg->is_weapon())
     {
-        const char* slot = equip_pos_name(cfg->get_equip_pos());
-        G_cTxt = std::format("Weapon - {}", slot);
-        tooltip.add_line(G_cTxt, GameColors::InfoGrayLight);
+        tooltip.add_subhead(std::format("Weapon - {}", equip_pos_name(cfg->get_equip_pos())));
     }
     else if (cfg->get_item_sub_type() == item_sub_type::angelic)
     {
-        tooltip.add_line("Accessory - Angelic Pendant", GameColors::InfoGrayLight);
+        tooltip.add_subhead("Accessory - Angelic Pendant");
     }
     else if (cfg->get_item_sub_type() == item_sub_type::pendant)
     {
-        tooltip.add_line("Accessory - Pendant", GameColors::InfoGrayLight);
+        tooltip.add_subhead("Accessory - Pendant");
     }
     else if (cfg->is_accessory())
     {
-        const char* slot = equip_pos_name(cfg->get_equip_pos());
-        G_cTxt = std::format("Accessory - {}", slot);
-        tooltip.add_line(G_cTxt, GameColors::InfoGrayLight);
+        tooltip.add_subhead(std::format("Accessory - {}", equip_pos_name(cfg->get_equip_pos())));
     }
 
-    // 3. Base combat stats with inline modifiers
-    // Collect inline modifiers from effects
+    tooltip.add_rule();
+
+    // 3. Inline modifier fragments. These are the rolled lines the catalog
+    // places ON another row rather than giving one of their own: Sharp and
+    // Ancient belong to the damage figure, Light to the weight, Strong to the
+    // durability. They ride in the value column beside the number they modify,
+    // which is also why that number is then drawn as boosted.
     std::string damage_mod_str;
     std::string defense_mod_str;
     std::string weight_mod_str;
     std::string durability_mod_str;
     for (const auto& eff : itemInfo.effects)
     {
-        if (eff.category == effect_category::inline_damage)
+        std::string* fragment = nullptr;
+        switch (eff.category)
         {
-            if (damage_mod_str.empty()) damage_mod_str = " (";
-            else damage_mod_str += ", ";
-            damage_mod_str += eff.label;
+        case effect_category::inline_damage:     fragment = &damage_mod_str; break;
+        case effect_category::inline_defense:    fragment = &defense_mod_str; break;
+        case effect_category::inline_weight:     fragment = &weight_mod_str; break;
+        case effect_category::inline_durability: durability_mod_str = eff.value; continue;
+        default: continue;
         }
-        else if (eff.category == effect_category::inline_defense)
-        {
-            if (defense_mod_str.empty()) defense_mod_str = " (";
-            else defense_mod_str += ", ";
-            defense_mod_str += eff.label;
-        }
-        else if (eff.category == effect_category::inline_weight)
-        {
-            if (weight_mod_str.empty()) weight_mod_str = " (";
-            else weight_mod_str += ", ";
-            weight_mod_str += eff.label;
-        }
-        else if (eff.category == effect_category::inline_durability)
-        {
-            durability_mod_str = eff.value;
-        }
+        *fragment += fragment->empty() ? " (" : ", ";
+        *fragment += eff.label;
     }
     if (!damage_mod_str.empty()) damage_mod_str += ")";
     if (!defense_mod_str.empty()) defense_mod_str += ")";
     if (!weight_mod_str.empty()) weight_mod_str += ")";
 
-    // Weapon damage
+    // 4. What the item does in a fight
+    const auto effectType = cfg->get_item_effect_type();
+
     if (cfg->get_equip_pos() == EquipPos::RightHand || cfg->get_equip_pos() == EquipPos::TwoHand)
     {
-        auto range = cfg->get_damage_range();
-        G_cTxt = std::format("Damage: {}-{}", range.min, range.max);
-        if (!damage_mod_str.empty())
-            tooltip.add_dual_line(G_cTxt, GameColors::InfoGrayLight, damage_mod_str, GameColors::UIItemName_Special);
-        else
-            tooltip.add_line(G_cTxt, GameColors::InfoGrayLight);
+        const auto range = cfg->get_damage_range();
+        tooltip.add_row(UI_TIP_DAMAGE,
+            std::format(UI_TIP_RANGE, range.min, range.max) + damage_mod_str, boosted);
+
+        // Only a weapon configured differently against large targets earns the
+        // second row; the rest would print the same two numbers twice. This is
+        // the one figure that can separate two weapons reading identically.
+        const auto large = cfg->get_damage_range_large();
+        if (large.min != range.min || large.max != range.max)
+            tooltip.add_row(UI_TIP_DAMAGE_LARGE, std::format(UI_TIP_RANGE, large.min, large.max), plain);
+
+        // What this weapon swings at for THIS player — the same arithmetic the
+        // server runs at equip time, which is what makes it comparable between
+        // two weapons in the pack rather than an abstract speed rating.
+        const int delay = hb::shared::calc::attack_delay(
+            CItem::apply_agile(cfg->m_swing_speed,
+                instance.attributes.has_modifier(hb::shared::item::modifier_id::agile)),
+            m_game->m_player->effective_str(), m_game->m_player->m_angelic_str);
+        tooltip.add_row(UI_TIP_SWING,
+            std::format(UI_TIP_MILLISECONDS, hb::shared::calc::swing_time(delay)), plain);
     }
-    // Shield/armor defense
-    else if (cfg->is_armor() || cfg->get_equip_pos() == EquipPos::LeftHand)
+    // Shield/armor defense — gated on the effect type, because value1 is only a
+    // defence figure when the item is actually configured as a defence one. Both
+    // Santa Costumes are add_effect items worn at FullBody, so their value1 is
+    // the sub-type id 10 (water absorption); read here it rendered as
+    // "Defence +10%", a number the server never gives them. What they do get is
+    // printed with the rest of the add_effect lines below.
+    else if ((cfg->is_armor() || cfg->get_equip_pos() == EquipPos::LeftHand)
+        && hb::shared::item::is_defense_effect_type(effectType))
     {
-        G_cTxt = std::format("Defence: +{}%", cfg->m_item_effect_value1);
-        if (!defense_mod_str.empty())
-            tooltip.add_dual_line(G_cTxt, GameColors::InfoGrayLight, defense_mod_str, GameColors::UIItemName_Special);
-        else
-            tooltip.add_line(G_cTxt, GameColors::InfoGrayLight);
+        tooltip.add_row(UI_TIP_DEFENCE,
+            std::format(UI_TIP_PERCENT, cfg->m_item_effect_value1) + defense_mod_str, boosted);
     }
 
-    // 4. Standalone bonuses
+    // 5. Consumables
+    const char* restores = nullptr;
+    switch (effectType)
+    {
+    case ItemEffectType::HP:      restores = UI_TIP_RESTORE_HP; break;
+    case ItemEffectType::MP:      restores = UI_TIP_RESTORE_MP; break;
+    case ItemEffectType::SP:      restores = UI_TIP_RESTORE_SP; break;
+    case ItemEffectType::HPStock: restores = UI_TIP_RESTORE_HUNGER; break;
+    default: break;
+    }
+    if (restores != nullptr)
+    {
+        const auto range = parse_dice(cfg->m_item_effect_value1, cfg->m_item_effect_value2, cfg->m_item_effect_value3);
+        tooltip.add_row(restores, std::format(UI_TIP_RANGE, range.min, range.max), plain);
+    }
+
+    // 6. Standalone rolled lines, in their own group
+    tooltip.add_rule();
     for (const auto& eff : itemInfo.effects)
     {
         if (eff.category != effect_category::standalone) continue;
         if (eff.label.empty() && eff.value.empty()) continue;
+
+        // A label the catalog wrote as a whole sentence — "Replace 5% damage to
+        // mana" — has no value to put in the second column, and splitting one
+        // out would mean inventing a caption for it.
         if (eff.value.empty())
-            tooltip.add_line(eff.label, GameColors::InfoGrayLight);
+            tooltip.add_full(eff.label, plain);
         else
-            tooltip.add_dual_line(eff.label, GameColors::InfoGrayLight, eff.value, GameColors::UIItemName_Special);
+            tooltip.add_row(eff.label, eff.value, plain);
     }
 
-    // 5. Consumable info — HP/MP/SP potions and food
-    auto effectType = cfg->get_item_effect_type();
-    if (effectType == ItemEffectType::HP)
-    {
-        auto range = parse_dice(cfg->m_item_effect_value1, cfg->m_item_effect_value2, cfg->m_item_effect_value3);
-        G_cTxt = std::format(TOOLTIP_RESTORES_HP, range.min, range.max);
-        tooltip.add_line(G_cTxt, GameColors::InfoGrayLight);
-    }
-    else if (effectType == ItemEffectType::MP)
-    {
-        auto range = parse_dice(cfg->m_item_effect_value1, cfg->m_item_effect_value2, cfg->m_item_effect_value3);
-        G_cTxt = std::format(TOOLTIP_RESTORES_MP, range.min, range.max);
-        tooltip.add_line(G_cTxt, GameColors::InfoGrayLight);
-    }
-    else if (effectType == ItemEffectType::SP)
-    {
-        auto range = parse_dice(cfg->m_item_effect_value1, cfg->m_item_effect_value2, cfg->m_item_effect_value3);
-        G_cTxt = std::format(TOOLTIP_RESTORES_SP, range.min, range.max);
-        tooltip.add_line(G_cTxt, GameColors::InfoGrayLight);
-    }
-    else if (effectType == ItemEffectType::HPStock)
-    {
-        auto range = parse_dice(cfg->m_item_effect_value1, cfg->m_item_effect_value2, cfg->m_item_effect_value3);
-        G_cTxt = std::format(DRAW_DIALOGBOX_SHOP28, range.min, range.max);
-        tooltip.add_line(G_cTxt, GameColors::InfoGrayLight);
-    }
+    // 7. What it costs to carry and to wear
+    tooltip.add_rule();
 
-    // 6. Requirements
     if (cfg->m_level_requirement != 0)
-    {
-        G_cTxt = std::format("{}: {}", DRAW_DIALOGBOX_SHOP24, cfg->m_level_requirement);
-        tooltip.add_line(G_cTxt, GameColors::InfoGrayLight);
-    }
+        tooltip.add_row(UI_TIP_REQ_LEVEL, std::format("{}", cfg->m_level_requirement), plain);
 
     int eff_weight = m_game->effective_item_weight(cfg->m_weight, instance);
     if (is_equippable && eff_weight >= hb::shared::balance::equip_str_threshold)
@@ -1032,61 +1042,55 @@ void Screen_OnGame::build_item_tooltip(item_tooltip& tooltip, short id_num, cons
             int full_speed_str = CItem::apply_agile(cfg->m_swing_speed,
                 instance.attributes.has_modifier(hb::shared::item::modifier_id::agile))
                 * hb::shared::balance::swing_str_divisor;
-            G_cTxt = std::format("Required Str: {} ({} full speed)", req_str, full_speed_str);
+            tooltip.add_row(UI_TIP_REQ_STR, std::format(UI_TIP_STR_TO_SWING, req_str, full_speed_str), plain);
         }
         else
         {
-            G_cTxt = std::format("Required Str: {}", req_str);
+            tooltip.add_row(UI_TIP_REQ_STR, std::format("{}", req_str), plain);
         }
-        tooltip.add_line(G_cTxt, GameColors::InfoGrayLight);
     }
 
-    // 7. Weight — using shared weight functions, inline light modifier
     if (cfg->m_weight > 0)
     {
-        float unit_stones = CItem::weight_to_stones(eff_weight);
+        const float unit_stones = CItem::weight_to_stones(eff_weight);
+        std::string weight;
         if (cfg->is_stackable() && instance.count > 1)
         {
-            int stack_raw = CItem::calc_item_stack_weight(eff_weight, static_cast<int>(instance.count));
-            float total_stones = CItem::weight_to_stones(stack_raw);
-            G_cTxt = std::format(TOOLTIP_WEIGHT_STACK, total_stones, unit_stones);
+            const int stack_raw = CItem::calc_item_stack_weight(eff_weight, static_cast<int>(instance.count));
+            weight = std::format(UI_TIP_STONE_STACK, CItem::weight_to_stones(stack_raw), unit_stones);
         }
         else
         {
-            G_cTxt = std::format(TOOLTIP_WEIGHT, unit_stones);
+            weight = std::format(UI_TIP_STONE, unit_stones);
         }
-        if (!weight_mod_str.empty())
-            tooltip.add_dual_line(G_cTxt, GameColors::InfoGrayLight, weight_mod_str, GameColors::UIItemName_Special);
-        else
-            tooltip.add_line(G_cTxt, GameColors::InfoGrayLight);
+        tooltip.add_row(UI_TIP_WEIGHT, weight + weight_mod_str,
+            weight_mod_str.empty() ? plain : boosted);
     }
 
-    // 8. Durability / Usages
     if (is_equippable)
     {
+        // Strong raises the ceiling rather than the current value, so the
+        // fraction has to be recomputed against the boosted maximum or the
+        // item would read as damaged the moment it was rolled.
+        int max_durability = cfg->m_durability;
         if (!durability_mod_str.empty())
         {
-            // Strong prefix: show boosted durability with green values
             int boost_pct = 0;
             try { boost_pct = std::stoi(durability_mod_str.substr(1)); } catch (...) {}
-            int boosted_max = cfg->m_durability * (100 + boost_pct) / 100;
-            G_cTxt = std::format("Durability: {}/{}", instance.cur_durability, boosted_max);
-            std::string boost_str = std::format(" ({})", durability_mod_str);
-            tooltip.add_dual_line(G_cTxt, GameColors::UIItemName_Special, boost_str, GameColors::UIItemName_Special);
+            max_durability = cfg->m_durability * (100 + boost_pct) / 100;
         }
-        else
-        {
-            G_cTxt = std::format(UPDATE_SCREEN_ONGAME10, instance.cur_durability, cfg->m_durability);
-            tooltip.add_line(G_cTxt, GameColors::InfoGrayLight);
-        }
+        tooltip.add_row(UI_TIP_DURABILITY,
+            std::format(UI_TIP_FRACTION, instance.cur_durability, max_durability)
+                + (durability_mod_str.empty() ? std::string{} : std::format(" ({})", durability_mod_str)),
+            durability_mod_str.empty() ? plain : boosted);
     }
     else if (effectType == ItemEffectType::AlterItemDrop && cfg->m_durability > 0)
     {
-        G_cTxt = std::format(TOOLTIP_USAGES, instance.cur_durability, cfg->m_durability);
-        tooltip.add_line(G_cTxt, GameColors::InfoGrayLight);
+        tooltip.add_row(UI_TIP_USAGES,
+            std::format(UI_TIP_FRACTION, instance.cur_durability, cfg->m_durability), plain);
     }
 
-    // 9. Stack count. Carried, this is how many of the item the player holds
+    // Stack count. Carried, this is how many of the item the player holds
     // across the whole pack; on the ground there is nothing to total up, so the
     // pile's own count stands in.
     if (cfg->is_stackable())
@@ -1102,10 +1106,7 @@ void Screen_OnGame::build_item_tooltip(item_tooltip& tooltip, short id_num, cons
         }
 
         if (count > 1)
-        {
-            G_cTxt = std::format(DEF_MSG_TOTAL_NUMBER, count);
-            tooltip.add_line(G_cTxt, GameColors::UIDescription);
-        }
+            tooltip.add_row(UI_TIP_TOTAL, std::format("{}", count), plain);
     }
 }
 

@@ -285,6 +285,49 @@ public:
 	bool item_log(int action, int client_h, char* name, CItem* item);
 	bool item_log(int action, int give_h, int recv_h, CItem* item, bool force_item_log = false);
 
+	//----------------------------------------------------------------------
+	// Recording for a Serial the caller does not hold as a CItem (#80)
+	//
+	// The Trading Post is why these exist. Under ADR 0001 an escrowed bundle is
+	// database rows, not objects: the CItem is destroyed on the way in and
+	// rebuilt on the way out, so between those two moments the only thing that
+	// identifies the item is its Serial. Every other emitter has an object to
+	// point at; escrow has a number.
+	//
+	// They come as a pair — prepare the shared half once, then record each
+	// Serial against it — because escrow moves in bundles. The alternative,
+	// a self-contained call per item, would re-resolve the same character and
+	// rebuild the same JSON once per item in the bundle.
+	//----------------------------------------------------------------------
+
+	// The half of a ledger event that a whole bundle shares: who did it and,
+	// when they are online, where they were standing.
+	//
+	// `actor` is the caller's already-resolved client, or null when the
+	// character is offline. It is passed in rather than looked up from the name
+	// because resolving a name means scanning every client slot, and the callers
+	// that record a bundle have the answer in hand — the escrow-out path had to
+	// resolve it to know where to deliver.
+	//
+	// An offline actor contributes their name and no location. That is the
+	// honest answer — an escrowed item is returned to a character, not to a
+	// place — and it is what the handle-based path already does with a handle
+	// that no longer resolves.
+	hb::server::ledger_event_record ledger_actor(const char* actor_char,
+		const CClient* actor) const;
+
+	// One transition of an already-minted item, against a base record the caller
+	// prepared with ledger_actor (and whose counterparty and detail it filled
+	// in). Records nothing for a Counted item — serial 0 has no instance for an
+	// event to point at — and copies the base only for a row that will exist.
+	void record_ledger_event(int event_type, int64_t serial,
+		const hb::server::ledger_event_record& base);
+
+	// A destroyed event's `detail`. Public because a caller ending a whole
+	// bundle builds it once, and shared with destroy_item so the two ways an
+	// item can end cannot come to disagree about how a reason is written down.
+	static std::string destroyed_detail(hb::server::destroy_reason::destroy_reason reason);
+
 	// The text sink's noise filter: a whitelist of the item types worth a line in
 	// a channel a human reads. Deliberately NOT consulted by the ledger half —
 	// an audit log that only records the items somebody once thought interesting
@@ -350,6 +393,11 @@ private:
 	// without the two ever having to be told apart here.
 	bool begin_ledger_event(int event_type, const CItem* item, int actor_h,
 		hb::server::ledger_event_record& event) const;
+
+	// Writes an online character's identity and position onto an event. One
+	// definition of what those five columns mean, shared by both openings, so a
+	// column added later cannot reach one emitter and silently miss the other.
+	static void stamp_actor(const CClient& actor, hb::server::ledger_event_record& event);
 
 	// Field-by-field copy. `to` is the destination — private because
 	// create_snapshot is the only sanctioned reason to copy an item: a copy that

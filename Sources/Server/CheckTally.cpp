@@ -1,10 +1,14 @@
 #include "CheckTally.h"
 
+#include "Client.h"
 #include "Game.h"
 #include "Item.h"
+#include "ItemLedgerStore.h"
 #include "ItemManager.h"
 #include "sqlite3.h"
 
+#include <cstdio>
+#include <format>
 #include <filesystem>
 
 namespace hb::server
@@ -68,5 +72,95 @@ namespace hb::server
 		}
 		sqlite3_finalize(stmt);
 		return value;
+	}
+
+	namespace
+	{
+		std::string event_sql(const char* expr, int event_type, int64_t serial)
+		{
+			return std::format("SELECT {} FROM item_events WHERE serial={} AND event_type={};",
+				expr, serial, event_type);
+		}
+	}
+
+	int64_t event_scalar(sqlite3* db, const char* expr, int event_type, int64_t serial)
+	{
+		return probe_scalar(db, event_sql(expr, event_type, serial).c_str());
+	}
+
+	std::string event_text(sqlite3* db, const char* column, int event_type, int64_t serial)
+	{
+		return probe_text(db, event_sql(column, event_type, serial).c_str());
+	}
+
+	ledger_sink_swap::ledger_sink_swap(CGame* game, const char* probe_path)
+		: m_path(probe_path != nullptr ? probe_path : "")
+	{
+		if (game == nullptr || m_path.empty()) return;
+
+		remove_probe_db(m_path.c_str());
+
+		auto scratch = std::make_unique<item_ledger_store>();
+		if (!scratch->open(m_path)) {
+			// The live sink stays installed and the caller reports the failure.
+			// m_game is left null, so ok() is false and the destructor has
+			// nothing to put back.
+			return;
+		}
+
+		m_live = std::move(game->m_item_ledger_store);
+		game->m_item_ledger_store = std::move(scratch);
+		m_game = game;
+	}
+
+	ledger_sink_swap::~ledger_sink_swap()
+	{
+		restore();
+		if (!m_path.empty()) remove_probe_db(m_path.c_str());
+	}
+
+	void ledger_sink_swap::restore()
+	{
+		if (m_game == nullptr) return;
+		m_game->m_item_ledger_store = std::move(m_live);
+		m_game = nullptr;
+	}
+
+	item_ledger_store& ledger_sink_swap::scratch() const
+	{
+		return *m_game->m_item_ledger_store;
+	}
+
+	probe_client::probe_client(CGame* game, int handle, const char* account, const char* name,
+		const char* map, int x, int y)
+		: m_game(game), m_handle(handle)
+	{
+		CClient* client = new CClient(G_pIOPool->get_context());
+		std::snprintf(client->m_account_name, sizeof(client->m_account_name), "%s", account);
+		std::snprintf(client->m_char_name, sizeof(client->m_char_name), "%s", name);
+		std::snprintf(client->m_map_name, sizeof(client->m_map_name), "%s", map);
+		client->m_x = static_cast<short>(x);
+		client->m_y = static_cast<short>(y);
+
+		// find_client_by_name skips a client that has not finished logging in, so
+		// without this a synthetic client is invisible to every by-name path in
+		// the server — which is most of the ones worth testing, since a name is
+		// all an escrow row or a notice ever carries.
+		client->m_is_init_complete = true;
+
+		m_game->m_client_list[m_handle] = client;
+	}
+
+	probe_client::~probe_client()
+	{
+		delete m_game->m_client_list[m_handle];
+		m_game->m_client_list[m_handle] = nullptr;
+	}
+
+	int find_free_handle(CGame* game, int from)
+	{
+		for (int i = from; i < hb::server::config::MaxClients; i++)
+			if (game->m_client_list[i] == nullptr) return i;
+		return -1;
 	}
 }

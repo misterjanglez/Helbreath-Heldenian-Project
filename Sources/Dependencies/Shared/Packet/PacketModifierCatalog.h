@@ -46,6 +46,11 @@ namespace net {
 		// key: bucket_id is an identity and a foreign-key target, so reordering
 		// the tooltip must not mean renumbering it everywhere it is referenced.
 		uint8_t bucket_sort_order;
+		// The bucket's player-facing name, denormalized onto the row for the
+		// same reason sort_order is: buckets have no packet of their own. The
+		// character panel's Gear tab titles its groups with it — before this it
+		// could order and rule them apart but had nothing to call them.
+		char bucket_name[16];
 		// Display-unit band, so the GM creator's value picker can offer only
 		// legal values instead of learning the window from a rejection string.
 		// uint8 covers the seeded data (widest band tops out at 91).

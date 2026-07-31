@@ -108,6 +108,17 @@ private:
 	const std::string* m_tier_name_template = nullptr;
 };
 
+// Format a replicated catalog format string against its scaled value(s) — the
+// one place that decides what "+{}%" or "-{}%" or "{}" actually renders as.
+//
+// It lives here rather than inside the formatter because two surfaces need it:
+// the item tooltip, and the character panel's Gear tab, which until now printed
+// every total as "+{}" and so reported nine kinds of percentage as a bare
+// number and inverted the sign on the two reduction rows.
+//
+// A format string is replicated data and is never trusted to be valid.
+std::string format_catalog_value(const std::string& fmt, uint32_t value, uint32_t value2 = 0);
+
 // The one item-name color picker (spec §11). Precedence: the Tier color for a
 // tiered instance, then the legacy dye tint a caller passes for a prefixed
 // item, then the special-item green, then the caller's own resting color.

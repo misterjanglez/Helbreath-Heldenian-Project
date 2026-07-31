@@ -3,6 +3,7 @@
 #include "Game.h"
 #include "Client.h"
 #include "Item.h"
+#include "ItemLedgerStore.h"   // detail_json, for the escrow events' `detail`
 #include "ItemManager.h"
 #include "LoginServer.h"
 #include "AccountSqliteStore.h"
@@ -373,6 +374,68 @@ namespace hb::server
 		return true;
 	}
 
+	// ---- Provenance Ledger (#80) ---------------------------------------------
+
+	void trading_post_store::record_escrow_event(const escrow_move& move,
+		const std::vector<escrow_item>& items,
+		const char* actor_char, const CClient* actor)
+	{
+		if (m_game == nullptr || m_game->m_item_manager == nullptr) {
+			return;
+		}
+		ItemManager& manager = *m_game->m_item_manager;
+
+		// The actor and the ids are properties of the transition, not of the
+		// item, so the shared half of the row is assembled once and the loop
+		// below only adds a Serial. Four items in a Listing all moved for the
+		// same reason, at the same moment, between the same two parties.
+		hb::server::ledger_event_record base = manager.ledger_actor(actor_char, actor);
+		if (move.counterparty_char != nullptr) {
+			base.counterparty_char = move.counterparty_char;
+		}
+		base.detail = move.offer_id != 0
+			? hb::server::detail_json({ { "listing", move.listing_id }, { "offer", move.offer_id } })
+			: hb::server::detail_json("listing", move.listing_id);
+
+		for (const auto& e : items) {
+			// Counted items are skipped inside record_ledger_event (serial 0), so
+			// a bundle of gold costs a comparison and writes nothing. Their
+			// aggregate flow counters are #81's — flow_type numbers are permanent
+			// world fact and naming them while closing a different gap is how a
+			// numbering gets picked badly.
+			manager.record_ledger_event(move.action, e.serial, base);
+		}
+	}
+
+	void trading_post_store::record_escrow_exit(const std::vector<int64_t>& serials,
+		hb::server::destroy_reason::destroy_reason reason,
+		const char* owner_char, const CClient* owner)
+	{
+		if (serials.empty() || m_game == nullptr || m_game->m_item_manager == nullptr) {
+			return;
+		}
+		ItemManager& manager = *m_game->m_item_manager;
+
+		hb::server::ledger_event_record base = manager.ledger_actor(owner_char, owner);
+		base.detail = ItemManager::destroyed_detail(reason);
+
+		for (int64_t serial : serials) {
+			manager.record_ledger_event(hb::server::ledger_event::destroyed, serial, base);
+		}
+	}
+
+	void trading_post_store::record_escrow_exit(const std::vector<escrow_item>& items,
+		hb::server::destroy_reason::destroy_reason reason,
+		const char* owner_char, const CClient* owner)
+	{
+		std::vector<int64_t> serials;
+		serials.reserve(items.size());
+		for (const auto& e : items) {
+			serials.push_back(e.serial);
+		}
+		record_escrow_exit(serials, reason, owner_char, owner);
+	}
+
 	bool trading_post_store::insert_item_rows(const char* table, const char* id_column,
 		int64_t owner_id, const std::vector<escrow_item>& items)
 	{
@@ -481,6 +544,11 @@ namespace hb::server
 
 		if (!ok) {
 			exec_sql(m_db, "ROLLBACK;");
+			// The inventory was already reduced and saved, so this is the loss the
+			// ordering above chose over a dupe. It has to reach the ledger, or the
+			// items' last recorded holder stays a character who no longer has them.
+			record_escrow_exit(items, hb::server::destroy_reason::delivery_lost,
+				seller->m_char_name, seller);
 			hb::logger::error("[TP] LISTING INSERT FAILED for {} - {} item(s) lost:",
 				seller->m_char_name, static_cast<int>(items.size()));
 			for (const auto& e : items) {
@@ -492,6 +560,8 @@ namespace hb::server
 
 		out_listing_id = listing_id;
 		out_result = hb::net::TpResultCode::Ok;
+		record_escrow_event({ ItemLogAction::TpList, nullptr, listing_id, 0 }, items,
+			seller->m_char_name, seller);
 		for (const auto& e : items) {
 			hb::logger::log<log_channel::trade>("[TP] {} {} -> listing {} <- {}",
 				seller->m_char_name, tp_action_name(ItemLogAction::TpList), listing_id, describe(e));
@@ -589,6 +659,8 @@ namespace hb::server
 
 		if (!ok) {
 			exec_sql(m_db, "ROLLBACK;");
+			record_escrow_exit(items, hb::server::destroy_reason::delivery_lost,
+				offerer->m_char_name, offerer);
 			hb::logger::error("[TP] OFFER INSERT FAILED for {} on listing {} - {} item(s) lost:",
 				offerer->m_char_name, listing_id, static_cast<int>(items.size()));
 			for (const auto& e : items) {
@@ -600,6 +672,8 @@ namespace hb::server
 
 		out_offer_id = offer_id;
 		out_result = hb::net::TpResultCode::Ok;
+		record_escrow_event({ ItemLogAction::TpOffer, nullptr, listing_id, offer_id }, items,
+			offerer->m_char_name, offerer);
 		for (const auto& e : items) {
 			hb::logger::log<log_channel::trade>("[TP] {} {} -> offer {} on listing {} <- {}",
 				offerer->m_char_name, tp_action_name(ItemLogAction::TpOffer), offer_id, listing_id, describe(e));
@@ -608,13 +682,14 @@ namespace hb::server
 	}
 
 	bool trading_post_store::load_offer(int64_t offer_id, std::string& out_offerer,
-		std::vector<escrow_item>& out_items)
+		std::vector<escrow_item>& out_items, int64_t* out_listing_id)
 	{
 		out_offerer.clear();
 		out_items.clear();
+		if (out_listing_id != nullptr) *out_listing_id = 0;
 
 		sqlite3_stmt* stmt = nullptr;
-		if (sqlite3_prepare_v2(m_db, "SELECT offerer_name FROM offers WHERE offer_id=?;",
+		if (sqlite3_prepare_v2(m_db, "SELECT offerer_name, listing_id FROM offers WHERE offer_id=?;",
 			-1, &stmt, nullptr) != SQLITE_OK) {
 			return false;
 		}
@@ -625,6 +700,7 @@ namespace hb::server
 			if (name != nullptr) {
 				out_offerer = reinterpret_cast<const char*>(name);
 			}
+			if (out_listing_id != nullptr) *out_listing_id = sqlite3_column_int64(stmt, 1);
 			found = true;
 		}
 		sqlite3_finalize(stmt);
@@ -671,7 +747,7 @@ namespace hb::server
 	}
 
 	bool trading_post_store::deliver_to_bank(const char* character_name,
-		const std::vector<escrow_item>& items)
+		const std::vector<escrow_item>& items, const escrow_move& move)
 	{
 		if (items.empty()) {
 			return true;
@@ -681,18 +757,40 @@ namespace hb::server
 		}
 
 		const int h = m_game->find_client_by_name(character_name);
-		if (h != 0 && m_game->m_client_list[h] != nullptr) {
-			return deliver_to_online(h, items);
-		}
-		return deliver_to_offline(character_name, items);
+		CClient* recipient = (h != 0) ? m_game->m_client_list[h] : nullptr;
+
+		// The custody move is recorded before the delivery is attempted, because
+		// it is true either way: the escrow row is already deleted and committed
+		// by the time anyone reaches here (the ADR ordering), so the item has left
+		// the board whatever happens next. A delivery that then fails adds its own
+		// exit below, and the pair reads as what actually happened rather than as
+		// a custody move that quietly never took place.
+		record_escrow_event(move, items, character_name, recipient);
+
+		// What did not arrive. Neither mechanic records anything itself, so a new
+		// failure branch in either one cannot forget to — it just does not report
+		// the Serial as landed — and two branches cannot both claim the same one.
+		std::vector<int64_t> lost;
+		const bool all_ok = (recipient != nullptr)
+			? deliver_to_online(h, items, lost)
+			: deliver_to_offline(character_name, items, lost);
+
+		record_escrow_exit(lost, hb::server::destroy_reason::delivery_lost,
+			character_name, recipient);
+		return all_ok;
 	}
 
-	bool trading_post_store::deliver_to_online(int client_h, const std::vector<escrow_item>& items)
+	bool trading_post_store::deliver_to_online(int client_h, const std::vector<escrow_item>& items,
+		std::vector<int64_t>& out_lost)
 	{
 		bool all_ok = true;
 		for (const auto& e : items) {
 			CItem* item = build_item(e);
 			if (item == nullptr) {
+				// No object was built, so there is nothing for destroy_item to end
+				// — but the escrow row is already deleted and the item is just as
+				// gone as one that failed to fit in a Warehouse.
+				out_lost.push_back(e.serial);
 				hb::logger::error("[TP] deliver(online): unknown item id {} - lost",
 					static_cast<int>(e.item_id));
 				all_ok = false;
@@ -701,6 +799,10 @@ namespace hb::server
 			if (!m_game->m_item_manager->set_item_to_bank_item(client_h, item)) {
 				hb::logger::error("[TP] deliver(online): Warehouse full for {} - lost {}",
 					m_game->m_client_list[client_h]->m_char_name, describe(e));
+				// Deliberately NOT reported in out_lost: this is the one failure
+				// holding a live CItem, and destroy_item is the funnel every
+				// object exit goes through, so the event is already written.
+				// Reporting it as well would give one Serial two exits.
 				m_game->m_item_manager->destroy_item(item,
 					hb::server::destroy_reason::delivery_lost, client_h);
 				all_ok = false;
@@ -716,16 +818,23 @@ namespace hb::server
 	}
 
 	bool trading_post_store::deliver_to_offline(const char* character_name,
-		const std::vector<escrow_item>& items)
+		const std::vector<escrow_item>& items, std::vector<int64_t>& out_lost)
 	{
+		// Nothing reached the account store, so the whole bundle is gone.
+		auto lose_everything = [&]()
+		{
+			for (const auto& e : items) {
+				out_lost.push_back(e.serial);
+				hb::logger::error("[TP]   lost {}", describe(e));
+			}
+		};
+
 		char account_name[32];
 		std::memset(account_name, 0, sizeof(account_name));
 		if (!ResolveCharacterToAccount(character_name, account_name, sizeof(account_name))) {
 			hb::logger::error("[TP] deliver(offline): cannot resolve account for {} - {} item(s) lost",
 				character_name, static_cast<int>(items.size()));
-			for (const auto& e : items) {
-				hb::logger::error("[TP]   lost {}", describe(e));
-			}
+			lose_everything();
 			return false;
 		}
 
@@ -733,9 +842,7 @@ namespace hb::server
 		if (db == nullptr) {
 			hb::logger::error("[TP] deliver(offline): Game DB not open (account {}) - {} item(s) lost",
 				account_name, static_cast<int>(items.size()));
-			for (const auto& e : items) {
-				hb::logger::error("[TP]   lost {}", describe(e));
-			}
+			lose_everything();
 			return false;
 		}
 
@@ -758,6 +865,7 @@ namespace hb::server
 		bool all_ok = true;
 		for (const auto& e : items) {
 			if (next_slot >= hb::shared::limits::MaxBankItems) {
+				out_lost.push_back(e.serial);
 				hb::logger::error("[TP] deliver(offline): Warehouse full for {} - lost {}",
 					character_name, describe(e));
 				all_ok = false;
@@ -787,10 +895,17 @@ namespace hb::server
 				&& InsertCharacterBankItems(db, character_name, rows)
 				&& txn.commit();
 			if (!inserted) {
+				// Over `rows`, not `items`: anything already dropped above for a
+				// full Warehouse is in out_lost already, and a second entry for
+				// the same Serial is precisely the double-exit Reconciliation
+				// would report as an anomaly. The text lines follow the same set,
+				// which they previously did not - the count said `rows` and the
+				// lines listed `items`.
 				hb::logger::error("[TP] deliver(offline): bank insert failed for {} - {} item(s) lost",
 					character_name, static_cast<int>(rows.size()));
-				for (const auto& e : items) {
-					hb::logger::error("[TP]   lost {}", describe(e));
+				for (const auto& r : rows) {
+					out_lost.push_back(r.serial);
+					hb::logger::error("[TP]   lost item id {}", static_cast<int>(r.item_id));
 				}
 				all_ok = false;
 			}
@@ -806,8 +921,9 @@ namespace hb::server
 		}
 
 		std::string offerer;
+		int64_t listing_id = 0;
 		std::vector<escrow_item> items;
-		if (!load_offer(offer_id, offerer, items)) {
+		if (!load_offer(offer_id, offerer, items, &listing_id)) {
 			return false; // already gone (rescinded, finalized, or a race loser)
 		}
 
@@ -836,7 +952,8 @@ namespace hb::server
 			return false;
 		}
 
-		const bool delivered = deliver_to_bank(offerer.c_str(), items);
+		const bool delivered = deliver_to_bank(offerer.c_str(), items,
+			{ log_action, nullptr, listing_id, offer_id });
 		for (const auto& e : items) {
 			hb::logger::log<log_channel::trade>("[TP] {} offer {} -> {} <- {}",
 				tp_action_name(log_action), offer_id, offerer, describe(e));
@@ -1286,9 +1403,18 @@ namespace hb::server
 		// 3) Remove the Listing (cascades its items; all Offers are gone by now).
 		delete_listing_row(listing_id);
 
-		// 4) Deliver from the in-memory snapshots.
-		const bool to_seller = deliver_to_bank(seller_name.c_str(), winning_items);
-		const bool to_winner = deliver_to_bank(winner_name.c_str(), listing_items);
+		// 4) Deliver from the in-memory snapshots. These are the two events that
+		// carry a counterparty: a finalized Trade is the only escrow transition
+		// where an item genuinely passed from one character to another, so this is
+		// where "who did I get this from" becomes answerable months later.
+		// The two deliveries that carry a counterparty, and the only two: a
+		// finalized Trade is the one escrow transition where an item genuinely
+		// passed from one character to another, so this is where "who did I get
+		// this from" becomes answerable months later.
+		const bool to_seller = deliver_to_bank(seller_name.c_str(), winning_items,
+			{ ItemLogAction::TpTradeOut, winner_name.c_str(), listing_id, offer_id });
+		const bool to_winner = deliver_to_bank(winner_name.c_str(), listing_items,
+			{ ItemLogAction::TpTradeIn, seller_name.c_str(), listing_id, offer_id });
 
 		for (const auto& e : winning_items) {
 			hb::logger::log<log_channel::trade>("[TP] {} listing {} offer {} -> {} <- {}",
@@ -1350,7 +1476,8 @@ namespace hb::server
 		// remove the Listing and return its bundle to the Seller.
 		refund_all_offers_on_listing(listing_id);
 		delete_listing_row(listing_id);
-		const bool returned = deliver_to_bank(seller_name.c_str(), listing_items);
+		const bool returned = deliver_to_bank(seller_name.c_str(), listing_items,
+			{ ItemLogAction::TpDelist, nullptr, listing_id, 0 });
 
 		for (const auto& e : listing_items) {
 			hb::logger::log<log_channel::trade>("[TP] {} listing {} -> {} <- {}",
@@ -1448,6 +1575,12 @@ namespace hb::server
 			std::vector<escrow_item> listing_items;
 			load_listing_items(lid, listing_items);
 			delete_listing_row(lid);
+			// Never delivered and never returned — the escrowed bundle shares the
+			// fate of the inventory it was pulled from, so this is an exit, not a
+			// custody move, and it is the last thing the ledger will ever say
+			// about these Serials.
+			record_escrow_exit(listing_items,
+				hb::server::destroy_reason::character_deleted, character_name, nullptr);
 			for (const auto& e : listing_items) {
 				hb::logger::log<log_channel::trade>("[TP] void: destroyed {}'s listing {} item <- {}",
 					character_name, lid, describe(e));
@@ -1478,6 +1611,8 @@ namespace hb::server
 			std::vector<escrow_item> offer_items;
 			load_offer(oid, ignore, offer_items);
 			delete_offer_row(oid);
+			record_escrow_exit(offer_items,
+				hb::server::destroy_reason::character_deleted, character_name, nullptr);
 			for (const auto& e : offer_items) {
 				hb::logger::log<log_channel::trade>("[TP] void: destroyed {}'s offer {} item <- {}",
 					character_name, oid, describe(e));

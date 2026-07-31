@@ -68,6 +68,8 @@ void CPlayer::reset()
     m_enemy_kill_count = 0;
     m_reward_gold = 0;
     m_contribution = 0;
+    m_rating = 0;
+    m_derived = derived_stats{};
     m_super_attack_left = 0;
     m_special_ability_type = 0;
     m_special_ability_time_left_sec = 0;

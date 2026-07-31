@@ -11,6 +11,7 @@
 #include "CmdLifecycleCheck.h"
 #include "CmdMintCheck.h"
 #include "CmdSerialCheck.h"
+#include "CmdTpEscrowCheck.h"
 #include "CmdReload.h"
 #include "CmdRollSmoke.h"
 #include "CmdScatterSmoke.h"
@@ -98,6 +99,7 @@ void ServerCommandManager::register_built_in_commands()
 	register_command(std::make_unique<CmdLifecycleCheck>());
 	register_command(std::make_unique<CmdMintCheck>());
 	register_command(std::make_unique<CmdSerialCheck>());
+	register_command(std::make_unique<CmdTpEscrowCheck>());
 	register_command(std::make_unique<CmdReload>());
 	register_command(std::make_unique<CmdRollSmoke>());
 	register_command(std::make_unique<CmdScatterSmoke>());

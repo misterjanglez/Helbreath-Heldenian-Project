@@ -513,17 +513,21 @@ bool load_tier_config(sqlite3* db, tier_config& out)
 				break;
 			}
 
-	// Denormalize each bucket's sort_order onto the catalog rows that name it,
-	// once, so the packet can carry the tooltip ordering key per row without a
-	// bucket packet of its own. A row whose bucket is missing falls back to its
-	// bucket_id, which is what the tooltip sorted on before this replicated.
+	// Denormalize each bucket's sort_order and name onto the catalog rows that
+	// name it, once, so the packet can carry the tooltip ordering key and the
+	// group heading per row without a bucket packet of its own. A row whose
+	// bucket is missing falls back to its bucket_id, which is what the tooltip
+	// sorted on before this replicated, and to no name at all — a heading is
+	// the one thing better omitted than guessed.
 	for (auto& row : fresh.catalog)
 	{
 		row.bucket_sort_order = row.bucket_id;
+		row.bucket_name.clear();
 		for (const auto& bucket : fresh.buckets)
 			if (bucket.bucket_id == row.bucket_id)
 			{
 				row.bucket_sort_order = static_cast<uint8_t>(bucket.sort_order);
+				row.bucket_name = bucket.name;
 				break;
 			}
 	}

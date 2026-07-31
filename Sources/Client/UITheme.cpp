@@ -122,6 +122,18 @@ namespace hb::client::ui_theme
 		row_text(x, y, loose, text_string, text_color, text::Align::MiddleLeft);
 	}
 
+	int wrapped_label(int x, int y, int w, const char* text_string, const color& text_color)
+	{
+		// The box is measured rather than guessed. Under Align::TopLeft the height
+		// is not a clip — the lines simply stack down from y — so the only thing it
+		// has to be is honest, and returning it is what lets a caller stack
+		// anything underneath without re-measuring the same string.
+		const int h = text::measure_wrapped_text_height(GameFont::Default, text_string, w);
+		text::draw_text_wrapped(GameFont::Default, x, y, w, h, text_string,
+		                        text::TextStyle::from_color(text_color), text::Align::TopLeft);
+		return h;
+	}
+
 	void value(int x, int y, int w, const char* text_string, const color& text_color)
 	{
 		row_text(x, y, w, text_string, text_color, text::Align::MiddleRight);

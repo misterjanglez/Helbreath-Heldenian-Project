@@ -5,8 +5,10 @@
 #include <vector>
 
 #include "Item/ItemAttributeData.h"
+#include "ItemProvenance.h"   // destroy_reason, for the escrow-exit recorders
 
 struct sqlite3;
+class CClient;
 class CGame;
 class CItem;
 
@@ -42,6 +44,22 @@ namespace hb::server
 		int16_t  spec_effect_value3  = 0;
 		uint16_t cur_durability      = 0;
 		hb::shared::item::item_attribute_data attributes;
+	};
+
+	// Which escrow transition a delivery is, for the Provenance Ledger (#80).
+	//
+	// A parameter of deliver_to_bank rather than something emitted beside it:
+	// that function is this store's single escrow-out door, so making the
+	// transition mandatory to name is what stops the next one ever being
+	// delivered without being recorded. There is no "unspecified" — an item
+	// leaving escrow is always one of the seven Tp* transitions, and a default
+	// would just be somewhere for a future caller to hide.
+	struct escrow_move
+	{
+		int         action            = 0;        // ItemLogAction::Tp*
+		const char* counterparty_char = nullptr;  // only a finalized Trade has one
+		int64_t     listing_id        = 0;
+		int64_t     offer_id          = 0;        // 0 when the move is not about an Offer
 	};
 
 	// One Listing summarized for a board browse row: identity + a compact preview
@@ -94,6 +112,14 @@ namespace hb::server
 	//   escrow-in : remove from inventory + forced save BEFORE the escrow insert
 	//   escrow-out: delete the escrow row + commit BEFORE delivery
 	// Every transition is logged to the trade channel for manual GM recovery.
+	//
+	// Every transition ALSO appends a Provenance Ledger event (#80, plan P3.2).
+	// The two sinks are the pair #78 established everywhere else — the channel is
+	// for an operator tailing a file, the ledger is for a query run months later
+	// — and escrow is the transition that needs the second one most: it is the
+	// only place in the economy where an item changes hands between two accounts
+	// without either of them ever holding it at the same time. See
+	// record_escrow_event for what an escrowed item's Serial does in the meantime.
 	class trading_post_store
 	{
 	public:
@@ -136,15 +162,25 @@ namespace hb::server
 			int64_t& out_offer_id, uint16_t& out_result);
 
 		// --- Escrow-out -----------------------------------------------------
-		// Deliver items to a character's Warehouse (bank). Online recipients get
-		// an in-memory bank add plus a forced save; offline recipients get a
-		// direct insert into their account DB at max(slot)+1, bounded only by
-		// the hard MaxBankItems cap (the soft 200 cap is intentionally ignored).
-		// Callers MUST have already deleted the backing escrow rows and
-		// committed before calling this. Returns false if any item could not be
-		// placed; every such loss is logged for GM recovery.
+		// The single door out of escrow. Deliver items to a character's
+		// Warehouse (bank): online recipients get an in-memory bank add plus a
+		// forced save; offline recipients get a direct insert into their account
+		// DB at max(slot)+1, bounded only by the hard MaxBankItems cap (the soft
+		// 200 cap is intentionally ignored). Callers MUST have already deleted
+		// the backing escrow rows and committed before calling this. Returns
+		// false if any item could not be placed; every such loss is logged for
+		// GM recovery.
+		//
+		// This is also where escrow-out reaches the Provenance Ledger (#80).
+		// `move` says which transition the delivery is, and the recording is
+		// this function's job rather than each caller's for the reason #78
+		// turned item_log() into a dual sink: coverage that depends on every
+		// call site remembering is coverage with a hole in it the day someone
+		// adds the eighth one. Recorded here, a transition cannot be delivered
+		// without being recorded, and an item that fails to land gets its exit
+		// event in the same place — so the pair can never come apart.
 		bool deliver_to_bank(const char* character_name,
-			const std::vector<escrow_item>& items);
+			const std::vector<escrow_item>& items, const escrow_move& move);
 
 		// --- Refunds (built on deliver_to_bank) -----------------------------
 		// Return a single Offer's items to its offerer: read the items, delete
@@ -239,8 +275,57 @@ namespace hb::server
 			int64_t owner_id, const std::vector<escrow_item>& items);
 
 		// Load an Offer's offerer name and items. Returns false if it is gone.
+		//
+		// `out_listing_id` is optional because only the refund path needs it: the
+		// ledger event an Offer produces carries its Listing — the thread that
+		// ties a whole trade, both bundles and every offerer, into one query —
+		// and it is already in the row this reads, so it costs no second query.
+		// The other callers either know it or do not care.
 		bool load_offer(int64_t offer_id, std::string& out_offerer,
-			std::vector<escrow_item>& out_items);
+			std::vector<escrow_item>& out_items, int64_t* out_listing_id = nullptr);
+
+		// --- Provenance Ledger (#80, plan P3.2) -----------------------------
+		// One event per Instanced item in a bundle that just changed custody.
+		//
+		// Escrow is the one custody transfer with no CItem to hang an event off:
+		// the object is destroyed when the item is pulled from inventory and
+		// rebuilt only when it is delivered, so between those moments the Serial
+		// carried on the escrow row (added by #77 for exactly this) is the item's
+		// entire identity. That is why these go through ItemManager's by-Serial
+		// recorders rather than through item_log().
+		//
+		// `move.counterparty_char` is set only where the item genuinely passed
+		// between two characters — the two halves of a finalized Trade. Listing,
+		// delisting, offering and rescinding are one character and the board, and
+		// naming a counterparty there would invent a transfer that did not
+		// happen.
+		//
+		// `actor` is the recorded character's client when they are online and
+		// null when they are not; the caller has already resolved it, and an
+		// offline actor is an ordinary case here rather than an error.
+		void record_escrow_event(const escrow_move& move,
+			const std::vector<escrow_item>& items,
+			const char* actor_char, const CClient* actor);
+
+		// An escrowed item that is not coming back out. Two reasons reach this:
+		// `delivery_lost`, where a transfer failed with the item already out of
+		// its owner's hands (ADR 0001 orders every escrow step to fail as loss
+		// rather than duplication, so these are the deliberate cost of that
+		// choice), and `character_deleted`, where nothing failed at all. Spelling
+		// the reason at the call site rather than burying it behind two function
+		// names keeps the most-read column of a destruction visible where it is
+		// decided.
+		//
+		// An audit trail that recorded the custody move and then stayed silent
+		// about the exit would name the wrong holder forever, which is the whole
+		// reason these exist. The owner is recorded as the actor: it was their
+		// item, whether they were sending it or receiving it.
+		void record_escrow_exit(const std::vector<int64_t>& serials,
+			hb::server::destroy_reason::destroy_reason reason,
+			const char* owner_char, const CClient* owner);
+		void record_escrow_exit(const std::vector<escrow_item>& items,
+			hb::server::destroy_reason::destroy_reason reason,
+			const char* owner_char, const CClient* owner);
 
 		// Load a Listing's escrowed bundle, ordered by slot.
 		bool load_listing_items(int64_t listing_id, std::vector<escrow_item>& out);
@@ -266,9 +351,20 @@ namespace hb::server
 		// Insert one notices row (offline notice).
 		void queue_notice(const char* character_name, const std::string& message);
 
-		bool deliver_to_online(int client_h, const std::vector<escrow_item>& items);
+		// The two delivery mechanics. Neither records anything: each reports the
+		// Serials that did NOT land in `out_lost` and lets deliver_to_bank emit
+		// the exits, so a branch added to either of them cannot forget to — and
+		// cannot double-record one the other already covered.
+		//
+		// The one exception is a full Warehouse on the online path, which is the
+		// only failure holding a live CItem. That goes through destroy_item, the
+		// destruction funnel every object exit in the server goes through
+		// (Scripts/check_item_destroy.py), so it is already recorded and is
+		// deliberately absent from `out_lost`.
+		bool deliver_to_online(int client_h, const std::vector<escrow_item>& items,
+			std::vector<int64_t>& out_lost);
 		bool deliver_to_offline(const char* character_name,
-			const std::vector<escrow_item>& items);
+			const std::vector<escrow_item>& items, std::vector<int64_t>& out_lost);
 
 		// Rebuild a heap CItem from an escrow_item (config attrs via
 		// init_item_attr, then the stored instance columns overlaid). Caller

@@ -634,14 +634,64 @@ namespace net {
 		uint8_t attack_delay;
 	};
 
-	// Gear attribute totals, already clamped at the per-attribute aggregate cap
-	// server-side. Indexed by hb::shared::item::tier_attribute so both ends fill
-	// and read it in a loop — six named fields invited a silently transposed
-	// assignment, the same reasoning that shaped CClient::m_add_attribute.
-	// int16 rather than uint8: the cap is a data value, not a wire guarantee.
-	struct HB_PACKED PacketNotifyGearStats {
+	// The derived combat totals, which the client cannot work out for itself.
+	//
+	// It re-derives what it can — max HP/MP/SP, carry weight, defence ratio, the
+	// rolled modifier lines — but absorption, resistance and the hit terms are
+	// accumulated across the equip pass into CClient members and never leave the
+	// server, so the character pane could only ever show the GEAR CONTRIBUTION
+	// and had to say so on screen. These are the totals themselves.
+	//
+	// Everything is int16: the caps are data values, not wire guarantees.
+	struct HB_PACKED PacketNotifyDerivedStats {
 		PacketHeader header;
+
+		// Gear attribute totals, already clamped at the per-attribute aggregate
+		// cap server-side. Indexed by hb::shared::item::tier_attribute so both
+		// ends fill and read it in a loop — six named fields invited a silently
+		// transposed assignment, the same reasoning that shaped
+		// CClient::m_add_attribute.
 		int16_t add_attribute[hb::shared::item::tier_attribute::charisma + 1];
+
+		// The server's own figure, which the client had been reproducing from
+		// the equip formulas rather than being told.
+		int16_t defense_ratio;
+
+		// Physical absorption is resolved PER HIT ZONE, so there is no single
+		// number to send. A blow rolls dice(1,10000) and lands on the body
+		// (49.99%), the legs (25%), the arms (15%) or the head (10.01%), and
+		// only that zone's armour absorbs it — each clamped at 80. These are the
+		// four zones as the resolution reads them, `legs` already being the
+		// leggings+boots sum that zone 2 adds together. The client shows the
+		// hit-weighted average, which is the only honest scalar.
+		//
+		// The shield is not one of the zones: it applies on top, and only when a
+		// dice(1,100) roll comes in under the wearer's Shield mastery.
+		int16_t absorb_body;
+		int16_t absorb_legs;
+		int16_t absorb_arms;
+		int16_t absorb_head;
+		int16_t absorb_shield;
+
+		int16_t magic_absorb;        // m_add_abs_magical_defense
+		// skill_mastery[3] + m_add_magic_resistance + m_add_resist_magic — two
+		// separate gear terms feed one total and neither is the whole of it.
+		int16_t magic_resistance;
+		int16_t poison_resistance;   // m_add_poison_resistance
+
+		// The equipment half of the hit roll only. A true hit ratio depends on
+		// which weapon is swinging (the mastery index varies by weapon) and is
+		// clamped between the server's configured floor and ceiling, so a single
+		// "hit ratio" figure would be a fiction; this stays the bonus it is.
+		int16_t hit_bonus;
+
+		int16_t absorb_air;
+		int16_t absorb_earth;
+		int16_t absorb_fire;
+		int16_t absorb_water;
+
+		int16_t physical_damage;     // m_add_physical_damage
+		int16_t magical_damage;      // m_add_magical_damage
 	};
 
 	struct HB_PACKED PacketNotifyQuestReward {

@@ -149,7 +149,18 @@ namespace hb::client::ui_theme
 	void slider(int x, int y, int w, int value_offset);
 
 	// Left-aligned caption, vertically centred in a metrics::row_height row.
+	//
+	// Deliberately unclipped: it aligns inside a loose box far wider than any
+	// caption, so a short one is never cut off. The cost is that a caption wider
+	// than its panel neither wraps NOR clips — it simply draws off the edge, and
+	// nothing in the drawing reports that it did. Captions are the right use;
+	// anything sentence-length in a narrow pane wants wrapped_label.
 	void label(int x, int y, const char* text, const color& text_color = palette::label);
+
+	// Left-aligned text that wraps inside w, returning the height it consumed so
+	// a caller can carry on beneath it.
+	int wrapped_label(int x, int y, int w, const char* text,
+	                  const color& text_color = palette::label);
 
 	// Right-aligned value ending at x + w.
 	void value(int x, int y, int w, const char* text, const color& text_color = palette::value);

@@ -146,6 +146,61 @@ int sp_regen_roll_variance(const formula_engine& fe, Args&&... args)
 }
 
 // ============================================================================
+// Physical Absorption
+//
+// A blow picks one hit zone and only that zone's armour absorbs it. The server
+// rolls dice(1,10000) and splits it four ways (CombatManager, the hit_point
+// switch); the thresholds below are those splits in per-ten-thousand, stated
+// here so the character panel's average and the resolution that produces it
+// cannot drift. The combat switch should adopt these in place of its literals.
+//
+// There is deliberately no "total physical absorption": the zones are
+// alternatives, not addends, and summing them would overstate by about 4x.
+// ============================================================================
+
+namespace hit_zone
+{
+	constexpr int body_ppm  = 4999;   // 1..4999
+	constexpr int legs_ppm  = 2500;   // 5000..7499  (leggings + boots, summed)
+	constexpr int arms_ppm  = 1500;   // 7500..8999
+	constexpr int head_ppm  = 1002;   // 9000..10000
+	constexpr int total_ppm = body_ppm + legs_ppm + arms_ppm + head_ppm;
+
+	// Each zone is clamped before it is applied, so the cap belongs to the zone
+	// rather than to the sum.
+	constexpr int max_absorb_pct = 80;
+}
+
+// The share of an average blow that armour absorbs: each zone's absorption
+// clamped, then weighted by how often that zone is the one struck. This is what
+// a single "physical absorption" number can honestly mean.
+inline int physical_absorption_average(int body, int legs, int arms, int head)
+{
+	const auto zone = [](int value) { return std::clamp(value, 0, hit_zone::max_absorb_pct); };
+
+	return (zone(body) * hit_zone::body_ppm
+	      + zone(legs) * hit_zone::legs_ppm
+	      + zone(arms) * hit_zone::arms_ppm
+	      + zone(head) * hit_zone::head_ppm) / hit_zone::total_ppm;
+}
+
+// ============================================================================
+// Percentage Bonus
+//
+// How a recovery percentage is applied to a rolled amount. Not a DB formula —
+// arithmetic the server's RegenManager has inline, reproduced here because the
+// character panel prints the resulting range and must round it the same way the
+// server does. Stated once so the two cannot drift; RegenManager should adopt
+// this in place of its own copy, exactly as the defence-ratio pair below.
+// ============================================================================
+
+inline int apply_percent_bonus(int base, int percent)
+{
+	if (percent == 0) return base;
+	return base + static_cast<int>(static_cast<double>(percent) / 100.0 * static_cast<double>(base));
+}
+
+// ============================================================================
 // Weapon Swing Formulas (computed directly from balance constants)
 // ============================================================================
 

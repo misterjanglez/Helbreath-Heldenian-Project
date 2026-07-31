@@ -32,8 +32,10 @@
 #pragma once
 
 #include <cstdint>
+#include <initializer_list>
 #include <map>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "ServerMessages.h"   // ItemLogAction, for the event-band static_assert
@@ -104,6 +106,17 @@ namespace hb::server
 	// column is only worth having if every row in it parses.
 	std::string detail_json(const char* key, const std::string& value);
 	std::string detail_json(const char* key, int64_t value);
+
+	// The same encoder for an event that needs more than one field. Trading Post
+	// escrow (#80) is what asks for it: a refund names both the Offer it came out
+	// of and the Listing that Offer was on, and it is the Listing id that lets one
+	// query pull a whole trade — every bundle, every offerer, both directions —
+	// out of a table of unrelated events.
+	//
+	// A list rather than a widening family of fixed-arity overloads, because the
+	// fields a transition wants are a property of the transition and the next one
+	// will want a different number of them.
+	std::string detail_json(std::initializer_list<std::pair<const char*, int64_t>> fields);
 
 	// One item_instances row: the birth record of an Instanced item.
 	struct ledger_instance

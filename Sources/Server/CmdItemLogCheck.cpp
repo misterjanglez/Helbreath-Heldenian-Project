@@ -60,8 +60,10 @@ namespace item_origin = hb::server::item_origin;
 namespace ledger_event = hb::server::ledger_event;
 namespace ItemLogAction = hb::server::net::ItemLogAction;
 using hb::server::check_tally;
+using hb::server::find_free_handle;
 using hb::server::find_probe_item;
 using hb::server::item_ledger_store;
+using hb::server::probe_client;
 using hb::server::probe_scalar;
 using hb::server::probe_text;
 
@@ -90,58 +92,6 @@ namespace
 	static_assert(static_cast<int>(ItemLogAction::Drop) == drop_event_number,
 		"ItemLogAction::Drop moved: every ledger row already written means something else now.");
 
-	// Moves the game's ledger sink aside for the duration of the run and puts the
-	// live store back however this command returns — including the early bail-outs
-	// below. Leaving the scratch store installed would point every later item
-	// transition at a file this command deletes on the way out.
-	struct sink_swap
-	{
-		CGame* game = nullptr;
-		std::unique_ptr<item_ledger_store> live;
-
-		~sink_swap()
-		{
-			if (game != nullptr) game->m_item_ledger_store = std::move(live);
-			hb::server::remove_probe_db(probe_db);
-		}
-	};
-
-	// A synthetic client in a free handle, so "the actor is recorded" can be
-	// tested through the half that matters rather than only through its NULL
-	// path. The game loop cannot see it — a console command runs inside the tick,
-	// not beside it — and it is removed before this command returns.
-	struct probe_client
-	{
-		CGame* game;
-		int handle;
-
-		probe_client(CGame* g, int h, const char* name) : game(g), handle(h)
-		{
-			CClient* client = new CClient(G_pIOPool->get_context());
-			std::snprintf(client->m_account_name, sizeof(client->m_account_name), "%s", actor_account);
-			std::snprintf(client->m_char_name, sizeof(client->m_char_name), "%s", name);
-			std::snprintf(client->m_map_name, sizeof(client->m_map_name), "%s", probe_map);
-			client->m_x = probe_x;
-			client->m_y = probe_y;
-			game->m_client_list[handle] = client;
-		}
-
-		~probe_client()
-		{
-			delete game->m_client_list[handle];
-			game->m_client_list[handle] = nullptr;
-		}
-
-		probe_client(const probe_client&) = delete;
-		probe_client& operator=(const probe_client&) = delete;
-	};
-
-	int find_free_handle(CGame* game, int from)
-	{
-		for (int i = from; i < hb::server::config::MaxClients; i++)
-			if (game->m_client_list[i] == nullptr) return i;
-		return -1;
-	}
 }
 
 void CmdItemLogCheck::execute(CGame* game, const char* args)
@@ -183,24 +133,16 @@ void CmdItemLogCheck::execute(CGame* game, const char* args)
 	// Redirect the sink. Everything below records into the scratch file.
 	//----------------------------------------------------------------------
 
-	hb::server::remove_probe_db(probe_db);
-
-	sink_swap swap;
-
-	auto scratch = std::make_unique<item_ledger_store>();
-	if (!scratch->open(probe_db))
+	hb::server::ledger_sink_swap swap(game, probe_db);
+	if (!swap.ok())
 	{
 		hb::console::error("itemlogcheck: could not create the scratch ledger '{}'.", probe_db);
 		return;
 	}
+	item_ledger_store& ledger = swap.scratch();
 
-	swap.game = game;
-	swap.live = std::move(game->m_item_ledger_store);
-	game->m_item_ledger_store = std::move(scratch);
-	item_ledger_store& ledger = *game->m_item_ledger_store;
-
-	const probe_client actor(game, actor_h, actor_char);
-	const probe_client other(game, other_h, other_char);
+	const probe_client actor(game, actor_h, actor_account, actor_char, probe_map, probe_x, probe_y);
+	const probe_client other(game, other_h, actor_account, other_char, probe_map, probe_x, probe_y);
 
 	//----------------------------------------------------------------------
 	// Creation. The Counted half is observed in the buffer, because "nothing
@@ -271,18 +213,14 @@ void CmdItemLogCheck::execute(CGame* game, const char* args)
 
 	sqlite3* db = ledger.handle();
 
-	// Every check below reads one column off one event of one Serial, so the
-	// query is written once and only the projection varies. The serials are
-	// predicates, never output — the machine lines have to compare across
-	// platforms.
-	auto sql = [&](const std::string& expr, int type, int64_t serial)
-	{
-		return std::format("SELECT {} FROM item_events WHERE serial={} AND event_type={};",
-			expr, serial, type);
-	};
+	// Every check below reads one projection off one event of one Serial, which
+	// is what event_scalar/event_text are; these only add this prover's default
+	// of "the subject item". The serials are predicates, never output — the
+	// machine lines have to compare across platforms.
 	auto number_of = [&](const std::string& expr, int type, int64_t serial = 0)
 	{
-		return probe_scalar(db, sql(expr, type, serial != 0 ? serial : subject->m_serial).c_str());
+		return hb::server::event_scalar(db, expr.c_str(), type,
+			serial != 0 ? serial : subject->m_serial);
 	};
 	auto count_of = [&](int type, int64_t serial = 0)
 	{
@@ -290,7 +228,7 @@ void CmdItemLogCheck::execute(CGame* game, const char* args)
 	};
 	auto text_of = [&](const char* column, int type)
 	{
-		return probe_text(db, sql(column, type, subject->m_serial).c_str());
+		return hb::server::event_text(db, column, type, subject->m_serial);
 	};
 	auto is_null = [&](const char* column, int type)
 	{
@@ -387,8 +325,7 @@ void CmdItemLogCheck::execute(CGame* game, const char* args)
 	// promises never to fail a game action.
 	//----------------------------------------------------------------------
 
-	game->m_item_ledger_store = std::move(swap.live);
-	swap.game = nullptr;
+	swap.restore();
 
 	const std::string restored_file = probe_text(
 		game->m_item_ledger_store != nullptr ? game->m_item_ledger_store->handle() : nullptr,

@@ -98,7 +98,7 @@ public:
     int m_angelic_str, m_angelic_int, m_angelic_dex, m_angelic_mag;
 
     // Attribute-ladder totals from equipped gear (Item Tiers spec §4), server
-    // -authoritative: filled from Notify::GearStats, never derived locally the
+    // -authoritative: filled from Notify::DerivedStats, never derived locally the
     // way the angelic pendants above are. Indexed by tier_attribute to match
     // the packet and CClient::m_add_attribute exactly, so the copy is a loop.
     int m_gear_attribute[hb::shared::item::tier_attribute::charisma + 1]{};
@@ -114,6 +114,42 @@ public:
     int effective_mag() const      { return m_mag + m_gear_attribute[hb::shared::item::tier_attribute::magic]; }
     int effective_charisma() const { return m_charisma + m_gear_attribute[hb::shared::item::tier_attribute::charisma]; }
 
+    // The derived combat totals, straight off Notify::DerivedStats. These are
+    // the figures the client cannot reach: absorption, resistance and the hit
+    // terms are accumulated across the server's equip pass and used at damage
+    // resolution, so before they travelled the character pane could only show
+    // what the rolled modifier lines added and had to say so on screen.
+    //
+    // Kept as one struct rather than fifteen loose members so the handler is a
+    // field-for-field copy and the pane reads one object.
+    struct derived_stats
+    {
+        int defense_ratio = 0;
+
+        // Per hit zone, not addends — a blow lands on exactly one of them. See
+        // hb::shared::calc::physical_absorption_average for the only honest way
+        // to collapse these into one number.
+        int absorb_body = 0;
+        int absorb_legs = 0;
+        int absorb_arms = 0;
+        int absorb_head = 0;
+        int absorb_shield = 0;    // on top, and only on a successful parry roll
+
+        int magic_absorb = 0;
+        int magic_resistance = 0; // total, skill mastery included
+        int poison_resistance = 0;
+        int hit_bonus = 0;        // equipment term only; see the packet comment
+
+        int absorb_air = 0;
+        int absorb_earth = 0;
+        int absorb_fire = 0;
+        int absorb_water = 0;
+
+        int physical_damage = 0;
+        int magical_damage = 0;
+    };
+    derived_stats m_derived;
+
     // PROGRESSION
     int m_level;
     uint32_t m_exp;
@@ -125,6 +161,10 @@ public:
     int m_ac, m_thac0;
     hb::shared::entity::PlayerStatus m_playerStatus;
     int m_pk_count, m_enemy_kill_count, m_reward_gold, m_contribution;
+    // Reputation. Server-authoritative and already on the wire three times over
+    // — the init header, every exp change, and each time someone rates you —
+    // the client just never kept it until the character panel wanted a row.
+    int m_rating;
     int m_super_attack_left, m_special_ability_type, m_special_ability_time_left_sec;
 
     // APPEARANCE

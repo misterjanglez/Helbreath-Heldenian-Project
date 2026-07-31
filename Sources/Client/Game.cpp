@@ -1294,6 +1294,7 @@ bool CGame::cache_process_modifier_catalog(char* data, uint32_t msg_size)
 		e.marquee = entries[i].marquee != 0;
 		e.effect_placement = entries[i].effect_placement;
 		e.bucket_sort_order = entries[i].bucket_sort_order;
+		e.bucket_name = to_string(entries[i].bucket_name, sizeof(entries[i].bucket_name));
 		e.band_min = entries[i].band_min;
 		e.band_max = entries[i].band_max;
 	}
@@ -6438,6 +6439,7 @@ void CGame::init_data_response_handler(char* packet_data)
 		break;
 	}
 	m_player->m_contribution = pkt->contribution;
+	m_player->m_rating = pkt->rating;
 	is_observer = pkt->observer_mode != 0;
 	m_player->m_hp = pkt->hp;
 	m_discount = static_cast<char>(pkt->discount);

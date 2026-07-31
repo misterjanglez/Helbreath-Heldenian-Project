@@ -133,6 +133,14 @@ namespace hb::server
 		return nlohmann::json::object({ { key, value } }).dump();
 	}
 
+	std::string detail_json(std::initializer_list<std::pair<const char*, int64_t>> fields)
+	{
+		nlohmann::json object = nlohmann::json::object();
+		for (const auto& field : fields)
+			object[field.first] = field.second;
+		return object.dump();
+	}
+
 	item_ledger_store::~item_ledger_store()
 	{
 		close();

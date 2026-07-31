@@ -64,8 +64,10 @@ namespace item_origin = hb::server::item_origin;
 namespace ledger_event = hb::server::ledger_event;
 namespace ItemLogAction = hb::server::net::ItemLogAction;
 using hb::server::check_tally;
+using hb::server::find_free_handle;
 using hb::server::find_probe_item;
 using hb::server::item_ledger_store;
+using hb::server::probe_client;
 using hb::server::probe_scalar;
 using hb::server::probe_text;
 
@@ -100,55 +102,6 @@ namespace
 		"ledger_event::destroyed moved: every destruction row already written means something else now.");
 	static_assert(static_cast<int>(ItemLogAction::Buy) == buy_event_number,
 		"ItemLogAction::Buy moved: every shop-purchase row already written means something else now.");
-
-	// Moves the game's ledger sink aside for the run and puts the live store back
-	// however this command returns, including the early bail-outs.
-	struct sink_swap
-	{
-		CGame* game = nullptr;
-		std::unique_ptr<item_ledger_store> live;
-
-		~sink_swap()
-		{
-			if (game != nullptr) game->m_item_ledger_store = std::move(live);
-			hb::server::remove_probe_db(probe_db);
-		}
-	};
-
-	// A synthetic client in a free handle, so the actor columns can be tested
-	// through the half that matters rather than only through their NULL path.
-	struct probe_client
-	{
-		CGame* game;
-		int handle;
-
-		probe_client(CGame* g, int h) : game(g), handle(h)
-		{
-			CClient* client = new CClient(G_pIOPool->get_context());
-			std::snprintf(client->m_account_name, sizeof(client->m_account_name), "%s", actor_account);
-			std::snprintf(client->m_char_name, sizeof(client->m_char_name), "%s", actor_char);
-			std::snprintf(client->m_map_name, sizeof(client->m_map_name), "%s", actor_map);
-			client->m_x = actor_x;
-			client->m_y = actor_y;
-			game->m_client_list[handle] = client;
-		}
-
-		~probe_client()
-		{
-			delete game->m_client_list[handle];
-			game->m_client_list[handle] = nullptr;
-		}
-
-		probe_client(const probe_client&) = delete;
-		probe_client& operator=(const probe_client&) = delete;
-	};
-
-	int find_free_handle(CGame* game)
-	{
-		for (int i = 1; i < hb::server::config::MaxClients; i++)
-			if (game->m_client_list[i] == nullptr) return i;
-		return -1;
-	}
 
 	// A loaded map with room for the tile probes, and a tile on it that starts
 	// empty. Taken from live data rather than hardcoded: which maps exist is a
@@ -220,23 +173,15 @@ void CmdLifecycleCheck::execute(CGame* game, const char* args)
 	// Redirect the sink. Everything below records into the scratch file.
 	//----------------------------------------------------------------------
 
-	hb::server::remove_probe_db(probe_db);
-
-	sink_swap swap;
-
-	auto scratch = std::make_unique<item_ledger_store>();
-	if (!scratch->open(probe_db))
+	hb::server::ledger_sink_swap swap(game, probe_db);
+	if (!swap.ok())
 	{
 		hb::console::error("lifecyclecheck: could not create the scratch ledger '{}'.", probe_db);
 		return;
 	}
+	item_ledger_store& ledger = swap.scratch();
 
-	swap.game = game;
-	swap.live = std::move(game->m_item_ledger_store);
-	game->m_item_ledger_store = std::move(scratch);
-	item_ledger_store& ledger = *game->m_item_ledger_store;
-
-	const probe_client actor(game, actor_h);
+	const probe_client actor(game, actor_h, actor_account, actor_char, actor_map, actor_x, actor_y);
 
 	using item_ptr = std::unique_ptr<CItem>;
 
@@ -372,21 +317,15 @@ void CmdLifecycleCheck::execute(CGame* game, const char* args)
 	};
 	auto event_count = [&](int event_type, int64_t serial)
 	{
-		return probe_scalar(db, std::format(
-			"SELECT COUNT(*) FROM item_events WHERE event_type={} AND serial={}",
-			event_type, serial).c_str());
+		return hb::server::event_scalar(db, "COUNT(*)", event_type, serial);
 	};
 	auto event_text = [&](const char* column, int event_type, int64_t serial)
 	{
-		return probe_text(db, std::format(
-			"SELECT {} FROM item_events WHERE event_type={} AND serial={}",
-			column, event_type, serial).c_str());
+		return hb::server::event_text(db, column, event_type, serial);
 	};
 	auto event_scalar = [&](const char* column, int event_type, int64_t serial)
 	{
-		return probe_scalar(db, std::format(
-			"SELECT {} FROM item_events WHERE event_type={} AND serial={}",
-			column, event_type, serial).c_str());
+		return hb::server::event_scalar(db, column, event_type, serial);
 	};
 
 	//----------------------------------------------------------------------

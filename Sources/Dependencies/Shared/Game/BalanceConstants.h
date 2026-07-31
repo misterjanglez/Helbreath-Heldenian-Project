@@ -25,4 +25,9 @@ namespace hb::shared::balance
 	constexpr int quick_action_unlock_pct   = 95;
 	constexpr int weight_units_per_stone = 1000;
 	constexpr int equip_str_threshold    = 11 * weight_units_per_stone;
+	// Ceiling on the worn set's accumulated mana saving. The server clamps
+	// m_mana_save_ratio to it in the equip switch and the client clamps its own
+	// total to it at cast time; both had the bare 80. The server's copy is a
+	// literal still — that switch belongs to a different workstream.
+	constexpr int mana_save_max          = 80;
 }

@@ -132,6 +132,10 @@ namespace NetworkMessageHandlers {
 			data, sizeof(hb::net::PacketNotifyRatingPlayer));
 		if (!pkt) return;
 		value = pkt->result;
+		// The server fills this from the RECIPIENT's own rating and sends one
+		// copy to each party, so it is always ours no matter whose name the
+		// message names (Game.cpp, Notify::RatingPlayer).
+		game->m_player->m_rating = pkt->rating;
 		memcpy(name, pkt->name, sizeof(pkt->name));
 		if (game->m_player->m_player_name == std::string_view(name, strnlen(name, hb::shared::limits::CharNameLen)))
 		{

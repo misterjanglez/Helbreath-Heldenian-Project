@@ -92,8 +92,9 @@ ALLOWED: dict[tuple[str, str], str] = {
     # --- custody moved elsewhere, object freed --------------------------
     ("Sources/Server/TradingPostStore.cpp", "delete client->m_item_list[p.slot];"):
         "Trading Post escrow: the item is now persisted in the listing, so this "
-        "frees the inventory copy of something that still exists. The escrow "
-        "transition is issue #80's to emit",
+        "frees the inventory copy of something that still exists. The custody "
+        "move itself is recorded by record_escrow_event (#80), and the Serial on "
+        "the escrow row is what the rebuilt item comes back out with",
     # --- RAM release of something the Game DB still holds ---------------
     ("Sources/Server/Client.cpp", "delete m_item_list[i];"):
         "logout teardown: the character's rows stay in game.db, so this frees "

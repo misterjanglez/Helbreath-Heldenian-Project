@@ -281,6 +281,27 @@ public:
         m_item_effect_type = hb::shared::item::to_int(type);
     }
 
+    // The mana-saving percentage this config carries, or 0 if it carries none.
+    //
+    // An item can spell it either of two ways — a wand says it with its own
+    // effect type and value4, an MS necklace says it as add_effect sub-type 2
+    // with value2 — and there is no item anywhere that does both. Three
+    // surfaces read it (the cast-cost calculation, the item tooltip, the
+    // character panel) and each had grown its own copy of the pair.
+    //
+    // Uncapped on purpose: the 80 ceiling belongs to the accumulated total, not
+    // to one item, and the server applies it the same way at equip time.
+    int mana_save_percent() const
+    {
+        const auto type = get_item_effect_type();
+        if (type == hb::shared::item::ItemEffectType::AttackManaSave)
+            return m_item_effect_value4;
+        if (type == hb::shared::item::ItemEffectType::add_effect
+            && m_item_effect_value1 == hb::shared::item::to_int(hb::shared::item::AddEffectType::ManaSave))
+            return m_item_effect_value2;
+        return 0;
+    }
+
     bool sprite_is_female() const
     {
         return m_gender_requirement == 2;

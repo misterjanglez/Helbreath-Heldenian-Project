@@ -1,4 +1,5 @@
 ﻿#include "MagicCastingSystem.h"
+#include "CombatSummary.h"
 #include "Game.h"
 #include "PacketSendHelpers.h"
 
@@ -22,41 +23,14 @@ void magic_casting_system::set_game(CGame* game)
 int magic_casting_system::get_mana_cost(int magic_no)
 {
 	if (!m_game) return 1;
-	int i, mana_save, mana_cost;
-	mana_save = 0;
 	if (magic_no < 0 || magic_no >= 100) return 1;
 	if (!m_game->m_magic_cfg_list[magic_no]) return 1;
-	for (i = 0; i < hb::shared::limits::MaxItems; i++)
-	{
-		if (m_game->m_player->m_item_list[i] == 0) continue;
-		if (m_game->m_is_item_equipped[i] == true)
-		{
-			// Look up the item config — inventory items don't carry effect data
-			CItem* cfg = m_game->get_item_config(m_game->m_player->m_item_list[i]->m_id_num);
-			if (!cfg) continue;
 
-			auto effectType = cfg->get_item_effect_type();
-			switch (effectType)
-			{
-			case hb::shared::item::ItemEffectType::AttackManaSave:
-				mana_save += cfg->m_item_effect_value4;
-				break;
+	// Totalled and capped in one place now — the character panel shows the same
+	// figure, and two walks of the worn set were free to disagree about it.
+	const int mana_save = hb::client::equipped_mana_save(*m_game);
 
-			case hb::shared::item::ItemEffectType::add_effect:
-				if (cfg->m_item_effect_value1 == hb::shared::item::to_int(hb::shared::item::AddEffectType::ManaSave))
-				{
-					mana_save += cfg->m_item_effect_value2;
-				}
-				break;
-
-			default:
-				break;
-			}
-		}
-	}
-	// Mana save max = 80%
-	if (mana_save > 80) mana_save = 80;
-	mana_cost = m_game->m_magic_cfg_list[magic_no]->m_value_1;
+	int mana_cost = m_game->m_magic_cfg_list[magic_no]->m_value_1;
 	if (m_game->m_player->m_is_safe_attack_mode) mana_cost = mana_cost * 140 / 100;
 	if (mana_save > 0)
 	{

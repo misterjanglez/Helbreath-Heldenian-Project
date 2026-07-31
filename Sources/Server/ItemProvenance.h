@@ -88,8 +88,15 @@ namespace hb::server
 			// than timing out — today, burned by a fire spell.
 			ground_burn,
 
-			// Handed to a player who had nowhere to put it, and lost rather than
-			// returned. A delivery failure, not a player choice.
+			// A custody transfer failed with the item already out of its owner's
+			// hands, and it was lost rather than returned. A delivery failure, not
+			// a player choice.
+			//
+			// Two venues reach it, both Trading Post (#80), and both are the
+			// deliberate loss side of ADR 0001's ordering — escrow is arranged so
+			// that a failure loses an item rather than duplicating it: a Warehouse
+			// that could not take a returning bundle, and an escrow row that could
+			// not be written after the inventory was already reduced.
 			delivery_lost,
 
 			// A stackable that merged into a stack the holder already had: the
@@ -101,6 +108,14 @@ namespace hb::server
 			// them. It exists so that if that invariant ever breaks, the ledger
 			// says something true instead of calling a merge a consumption.
 			merged,
+
+			// The character that owned it was deleted. Only escrowed Trading Post
+			// items reach this: they share the fate of the inventory they were
+			// pulled from, so they are never delivered and never returned.
+			//
+			// A separate reason from delivery_lost because nothing failed here.
+			// Rolled into it, every character deletion would read as an outage.
+			character_deleted,
 		};
 
 		// The stable wire/storage name of a reason. Kept beside the enum so the
@@ -110,14 +125,15 @@ namespace hb::server
 		{
 			switch (reason)
 			{
-			case consumed:      return "consumed";
-			case sold:          return "sold";
-			case upgrade_break: return "upgrade_break";
-			case discarded:     return "discarded";
-			case ground_burn:   return "ground_burn";
-			case delivery_lost: return "delivery_lost";
-			case merged:        return "merged";
-			case unspecified:   break;
+			case consumed:          return "consumed";
+			case sold:              return "sold";
+			case upgrade_break:     return "upgrade_break";
+			case discarded:         return "discarded";
+			case ground_burn:       return "ground_burn";
+			case delivery_lost:     return "delivery_lost";
+			case merged:            return "merged";
+			case character_deleted: return "character_deleted";
+			case unspecified:       break;
 			}
 			return "unspecified";
 		}
