@@ -27,9 +27,11 @@ powershell -ExecutionPolicy Bypass -File Sources\build.ps1 -Target Server -Confi
 - Deploy: `cp Sources/Debug/HelbreathServer Binaries/Server/ && chmod +x Binaries/Server/HelbreathServer`
 - Run from: `cd Binaries/Server && ./HelbreathServer`
 
-**TRAP — a partial source sync builds green while silently omitting your new file.** `SERVER_SOURCES` in `Sources/Server/CMakeLists.txt` is an **explicit list, not a glob**. Copying only your changed `.cpp` files to a Linux box leaves that box's `CMakeLists.txt` stale, so the new file is never compiled — and the build still reports success. Hit on 2026-07-29 (#72): the box's tree predated #66, `CmdDropOdds.cpp` had never been compiled by GCC, the "green" gate proved nothing, and the binary answered `Unknown command: 'dropodds'`.
+**A partial source sync used to build green while silently omitting your new file. It now fails configure instead (#100).** `SERVER_SOURCES` in `Sources/Server/CMakeLists.txt` is an **explicit list, not a glob**, so copying only your changed `.cpp` files to a Linux box left that box's `CMakeLists.txt` stale and the new file was never compiled — with the build still reporting success. Hit on 2026-07-29 (#72): the box's tree predated #66, `CmdDropOdds.cpp` had never been compiled by GCC, the "green" gate proved nothing, and the binary answered `Unknown command: 'dropodds'`.
 
-- Whenever a cycle **adds** a file, sync the whole server subset (`Sources/{Server,Dependencies/Shared,Dependencies/Server,cmake}` + version files), not just the diff. The incremental build reconfigures itself when `CMakeLists.txt` changes.
+`Sources/cmake/source_guard.cmake` now globs each source directory for verification only and stops the configure with a `FATAL_ERROR` naming any `.cpp` that is on disk but in no list. It guards `SERVER_SOURCES`, both `SHARED_SOURCES` lists, `SFMLENGINE_SOURCES`, `AUTOUPDATER_SOURCES` and `CCONTROLS_SOURCES`. A file that is deliberately not compiled must be named in the `EXCLUDE` argument of the matching `hb_guard_source_list()` call, with a comment; a named exclusion that no longer exists on disk also fails configure. This is CMake-only — MSBuild uses the `.vcxproj` files and is unaffected.
+
+- Whenever a cycle **adds** a file, still sync the whole server subset (`Sources/{Server,Dependencies/Shared,Dependencies/Server,cmake}` + version files), not just the diff. The guard reports an omission but does not repair a stale tree.
 - **Never treat "build succeeded" as the gate.** Exercise the change on the Linux binary — for a console command, `./HelbreathServer --<command>` against a copy of the Windows `gamedata.db` gives machine-readable output that should be byte-identical to Windows.
 
 ### Linux (CMake — Client)

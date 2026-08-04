@@ -3,6 +3,9 @@ cmake_minimum_required(VERSION 3.16)
 # Include generated version info (provides HB_CLIENT_VERSION etc.)
 include(${CMAKE_CURRENT_SOURCE_DIR}/../version.cmake OPTIONAL)
 
+# Configure-time guard against a source file on disk that no list compiles
+include(${CMAKE_CURRENT_SOURCE_DIR}/../cmake/source_guard.cmake)
+
 project(HelbreathClient
     VERSION ${HB_CLIENT_VERSION}
     LANGUAGES CXX
@@ -16,7 +19,7 @@ if(NOT CMAKE_BUILD_TYPE)
 endif()
 
 # ---------------------------------------------------------------------------
-# SFMLEngine static library (9 .cpp files)
+# SFMLEngine static library — every .cpp in Sources/SFMLEngine
 # ---------------------------------------------------------------------------
 set(SFMLENGINE_SOURCES
     ../SFMLEngine/RendererFactory.cpp
@@ -28,6 +31,12 @@ set(SFMLENGINE_SOURCES
     ../SFMLEngine/SFMLTextRenderer.cpp
     ../SFMLEngine/SFMLTexture.cpp
     ../SFMLEngine/SFMLWindow.cpp
+)
+
+hb_guard_source_list(
+    LIST  SFMLENGINE_SOURCES
+    DIR   ${CMAKE_CURRENT_SOURCE_DIR}/../SFMLEngine
+    LABEL "SFMLEngine sources"
 )
 
 # ---------------------------------------------------------------------------
@@ -51,6 +60,14 @@ set(AUTOUPDATER_SOURCES
     ${AUTOUPDATER_DIR}/updater_gui_x11.cpp
 )
 
+# The updater has one GUI back-end per platform; this build is the Linux one.
+hb_guard_source_list(
+    LIST    AUTOUPDATER_SOURCES
+    DIR     ${AUTOUPDATER_DIR}
+    LABEL   "AutoUpdater sources"
+    EXCLUDE updater_gui_win32.cpp
+)
+
 add_library(AutoUpdater STATIC ${AUTOUPDATER_SOURCES})
 
 target_include_directories(AutoUpdater PRIVATE
@@ -62,7 +79,7 @@ find_package(X11 REQUIRED)
 target_link_libraries(AutoUpdater PRIVATE X11::X11)
 
 # ---------------------------------------------------------------------------
-# Shared sources (8 .cpp files)
+# Shared sources — every .cpp in Dependencies/Shared; the client uses them all
 # ---------------------------------------------------------------------------
 set(SHARED_SOURCES
     ../Dependencies/Shared/Log/LogBackend.cpp
@@ -78,10 +95,22 @@ set(SHARED_SOURCES
     ../Dependencies/Shared/Game/FormulaEngine.cpp
 )
 
+hb_guard_source_list(
+    LIST  SHARED_SOURCES
+    DIR   ${CMAKE_CURRENT_SOURCE_DIR}/../Dependencies/Shared
+    LABEL "Shared sources (client)"
+    RECURSE
+)
+
 # ---------------------------------------------------------------------------
 # Client sources (all .cpp in Sources/Client/)
+#
+# Globbed rather than listed, so no guard applies. CONFIGURE_DEPENDS is what
+# makes that safe: without it the glob is evaluated once and a .cpp added later
+# is never compiled, on a build that reports success — the same silent omission
+# the guard exists to prevent, reached by a different route.
 # ---------------------------------------------------------------------------
-file(GLOB CLIENT_SOURCES "*.cpp")
+file(GLOB CLIENT_SOURCES CONFIGURE_DEPENDS "*.cpp")
 
 # ---------------------------------------------------------------------------
 # Executable

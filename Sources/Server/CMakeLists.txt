@@ -3,6 +3,9 @@ cmake_minimum_required(VERSION 3.16)
 # Include generated version info (provides HB_SERVER_VERSION etc.)
 include(${CMAKE_CURRENT_SOURCE_DIR}/../version.cmake OPTIONAL)
 
+# Configure-time guard against a source file on disk that no list compiles
+include(${CMAKE_CURRENT_SOURCE_DIR}/../cmake/source_guard.cmake)
+
 project(HelbreathServer
     VERSION ${HB_SERVER_VERSION}
     LANGUAGES C CXX
@@ -16,7 +19,8 @@ if(NOT CMAKE_BUILD_TYPE)
 endif()
 
 # ---------------------------------------------------------------------------
-# Server sources (64 .cpp files)
+# Server sources — every .cpp in this directory; hb_guard_source_list() below
+# fails the configure if one is missing, so the count needs no comment.
 # ---------------------------------------------------------------------------
 set(SERVER_SOURCES
     AccountSqliteStore.cpp
@@ -119,8 +123,14 @@ set(SERVER_SOURCES
     Wmain.cpp
 )
 
+hb_guard_source_list(
+    LIST  SERVER_SOURCES
+    DIR   ${CMAKE_CURRENT_SOURCE_DIR}
+    LABEL "Server sources"
+)
+
 # ---------------------------------------------------------------------------
-# Shared sources (3 .cpp files)
+# Shared sources — everything in Dependencies/Shared except Render (see below)
 # ---------------------------------------------------------------------------
 set(SHARED_SOURCES
     ../Dependencies/Shared/Net/ASIOSocket.cpp
@@ -129,6 +139,21 @@ set(SHARED_SOURCES
     ../Dependencies/Shared/Util/SHA256.cpp
     ../Dependencies/Shared/Util/error_monitor.cpp
     ../Dependencies/Shared/Game/FormulaEngine.cpp
+)
+
+# The server draws no graphics, so it compiles none of Shared/Render. Each of
+# those files is named rather than the directory skipped, so that a new Render
+# source forces a deliberate decision instead of being assumed client-only.
+hb_guard_source_list(
+    LIST    SHARED_SOURCES
+    DIR     ${CMAKE_CURRENT_SOURCE_DIR}/../Dependencies/Shared
+    LABEL   "Shared sources (server)"
+    RECURSE
+    EXCLUDE Render/Application.cpp
+            Render/Event.cpp
+            Render/ISpriteFactory.cpp
+            Render/ResolutionConfig.cpp
+            Render/TextLib.cpp
 )
 
 # ---------------------------------------------------------------------------
