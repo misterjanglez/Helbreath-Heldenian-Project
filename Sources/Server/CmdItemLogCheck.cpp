@@ -14,9 +14,11 @@
 //     a client handle that no longer resolves. Both are ordinary in a running
 //     world, and an event lost that way leaves a Serial whose biography skips a
 //     custody change — indistinguishable from a dupe afterwards.
-//   - GmMint's second argument is the minted quantity, not a handle. Reading it
-//     as a counterparty would either name the wrong player in the audit trail
-//     or index the client array with a count.
+//   - A GM mint makes N items in one command, and until #104 recorded one event
+//     for the batch. The other N-1 copies had a birth row, a Serial and a holder,
+//     and nothing in the ledger saying who that holder was — which is the state
+//     a duped item is in. Nothing about the log file looks wrong when this
+//     happens, because the line that is there is correct.
 //
 // So this proves the payload rather than the plumbing: that the rows land, and
 // that each column says what a forensic query will later assume it says.
@@ -50,11 +52,13 @@
 #include "ServerMessages.h"
 #include "sqlite3.h"
 
+#include <algorithm>
 #include <cstdio>
 #include <filesystem>
 #include <format>
 #include <memory>
 #include <string>
+#include <vector>
 
 namespace item_origin = hb::server::item_origin;
 namespace ledger_event = hb::server::ledger_event;
@@ -81,6 +85,17 @@ namespace
 	// A quote inside the NPC name on purpose: the detail column is JSON, and one
 	// unescaped quote from a content file makes a row no reader can parse.
 	constexpr const char* probe_npc_expected = "{\"npc\":\"Probe\\\"Slime\"}";
+
+	// How many copies the batch mint asks for. Three is the smallest number that
+	// tells the two failure modes apart: one event for the batch, and one event
+	// per copy. Two would also do it, but a run that recorded the first and the
+	// last would look identical to a correct one.
+	constexpr int batch_copies = 3;
+
+	// A probe client is born with nothing, and carrying capacity is strength and
+	// level (`max_load`), so the batch venue's weight gate would refuse every
+	// copy and leave the counts below comparing zero against zero.
+	constexpr int probe_str = 100;
 
 	// ItemLogAction::Drop's stored number, written out as a literal rather than
 	// taken from the enum. The passthrough check reads this back out of the file,
@@ -181,11 +196,13 @@ void CmdItemLogCheck::execute(CGame* game, const char* args)
 	const bool drop_logged = items.item_log(ItemLogAction::Drop, actor_h, -1, subject.get());
 	const bool give_logged = items.item_log(ItemLogAction::Give, actor_h, other_h, subject.get());
 
-	// GmMint's second handle is the minted quantity. Passing a live client handle
-	// as that quantity is the sharp version of this check: if the special case is
-	// ever "tidied up", the counterparty column fills in with a real name instead
-	// of staying NULL, and this goes red rather than looking plausible.
-	const bool mint_logged = items.item_log(ItemLogAction::GmMint, actor_h, other_h, subject.get());
+	// The operator door of a GM mint, on its own. It writes the trade-channel
+	// line for a whole request and records nothing — asserted below against the
+	// subject's own Serial, so a venue that called only this one would leave a
+	// visible hole rather than a half-recorded item. The second call is a handle
+	// that resolves to nobody: no actor, no line.
+	const bool mint_line = items.log_gm_mint(actor_h, batch_copies, subject.get());
+	const bool mint_line_absent = items.log_gm_mint(absent_h, batch_copies, subject.get());
 
 	// An action the text switch has no case for. It returns false, and the
 	// transition still happened.
@@ -200,6 +217,55 @@ void CmdItemLogCheck::execute(CGame* game, const char* args)
 	char npc_name[] = "Probe\"Slime";
 	items.item_log(ItemLogAction::NewGenDrop, 0, npc_name, subject.get());
 	const bool unlogged_logged = items.item_log(ItemLogAction::NewGenDrop, 0, npc_name, unlogged.get());
+
+	//----------------------------------------------------------------------
+	// The batch mints, through the venues rather than through the entry point.
+	// Calling the ledger door by hand N times would prove the door works and
+	// say nothing about whether a venue opens it N times, which is the whole of
+	// #104. Both venues are driven: the two GM creation commands share
+	// add_client_bulk_item_list for a non-stackable batch, and the tester menu
+	// and /createitem's attributed form share mint_gm_items.
+	//----------------------------------------------------------------------
+
+	// Carrying capacity, or both venues refuse every copy on weight and the
+	// counts below compare zero against zero.
+	game->m_client_list[actor_h]->m_str = probe_str;
+
+	// The Serials of the probe item the actor is holding. Read off the holder
+	// rather than off the ledger: the question is whether the ledger can name a
+	// holder for every copy somebody is carrying, so asking the ledger which
+	// Serials it knows about would let it answer itself.
+	auto held_copies = [&]()
+	{
+		std::vector<int64_t> serials;
+		for (int i = 0; i < hb::shared::limits::MaxItems; i++)
+		{
+			const CItem* held = game->m_client_list[actor_h]->m_item_list[i];
+			if (held != nullptr && held->m_id_num == instanced_id && held->m_serial != 0)
+				serials.push_back(held->m_serial);
+		}
+		return serials;
+	};
+
+	const int bulk_created = items.add_client_bulk_item_list(actor_h,
+		game->m_item_config_list[instanced_id]->m_name, batch_copies);
+	const std::vector<int64_t> bulk_serials = held_copies();
+
+	// A plain request — no tier, no lines — is legal in both roll modes, so what
+	// the tiered venue proves here does not depend on which mode the world
+	// booted in. `error` is checked through the count it returns.
+	std::string mint_error;
+	const int tiered_created = items.mint_gm_items(actor_h, instanced_id, batch_copies,
+		hb::shared::item::item_attribute_data{}, mint_error);
+
+	// Serials are monotonic, so the second venue's copies are the ones above the
+	// high mark the first one left — cheaper than diffing two inventories, and
+	// it does not assume anything about which slots either venue picked.
+	const int64_t bulk_mark = bulk_serials.empty()
+		? 0 : *std::max_element(bulk_serials.begin(), bulk_serials.end());
+	std::vector<int64_t> tiered_serials;
+	for (const int64_t serial : held_copies())
+		if (serial > bulk_mark) tiered_serials.push_back(serial);
 
 	if (!ledger.flush(0))
 	{
@@ -226,13 +292,14 @@ void CmdItemLogCheck::execute(CGame* game, const char* args)
 	{
 		return number_of("COUNT(*)", type, serial);
 	};
-	auto text_of = [&](const char* column, int type)
+	auto text_of = [&](const char* column, int type, int64_t serial = 0)
 	{
-		return hb::server::event_text(db, column, type, subject->m_serial);
+		return hb::server::event_text(db, column, type,
+			serial != 0 ? serial : subject->m_serial);
 	};
-	auto is_null = [&](const char* column, int type)
+	auto is_null = [&](const char* column, int type, int64_t serial = 0)
 	{
-		return number_of(std::string(column) + " IS NULL", type) == 1;
+		return number_of(std::string(column) + " IS NULL", type, serial) == 1;
 	};
 
 	// A birth row and its creation event are one fact and arrive together. A
@@ -303,12 +370,53 @@ void CmdItemLogCheck::execute(CGame* game, const char* args)
 
 	tally.record("counted_no_event", counted_event_silent);
 
-	// GmMint's quantity stayed a quantity.
-	tally.record("gm_mint_qty_is_not_a_counterparty",
-		mint_logged
-		&& count_of(ItemLogAction::GmMint) == 1
-		&& text_of("detail", ItemLogAction::GmMint) == std::format("{{\"qty\":{}}}", other_h)
-		&& is_null("counterparty_char", ItemLogAction::GmMint));
+	// The two doors of a mint, and what each of them is NOT. The operator line
+	// went out for a request the ledger knows nothing about, and the subject's
+	// Serial has no mint event: the text channel cannot stand in for the ledger,
+	// which is what makes a venue that forgets one of the two doors visible.
+	tally.record("gm_mint_line_is_not_an_event",
+		mint_line
+		&& mint_line_absent == false
+		&& count_of(ItemLogAction::GmMint) == 0);
+
+	// #104: one event per copy, not one per request. Every copy a venue puts in
+	// the inventory has its own birth row, so a batch recorded once leaves the
+	// rest of them held by a player the ledger cannot name — `held_unrecorded`,
+	// which is the anomaly class this whole subsystem exists to make impossible.
+	// Both venues are counted the same way, because they answer the same
+	// question and a copy of the arithmetic could pass for one and not the other.
+	auto every_copy_recorded = [&](const std::vector<int64_t>& serials, int created)
+	{
+		if (created != batch_copies || static_cast<int>(serials.size()) != batch_copies)
+			return false;
+
+		int64_t events = 0;
+		int64_t births = 0;
+		for (const int64_t serial : serials)
+		{
+			events += count_of(ItemLogAction::GmMint, serial);
+			births += probe_scalar(db, std::format(
+				"SELECT COUNT(*) FROM item_instances WHERE serial={};", serial).c_str());
+		}
+		return events == batch_copies && births == batch_copies;
+	};
+
+	tally.record("gm_mint_event_per_copy_bulk",
+		every_copy_recorded(bulk_serials, bulk_created));
+
+	tally.record("gm_mint_event_per_copy_tiered",
+		every_copy_recorded(tiered_serials, tiered_created));
+
+	// What one of those events says. A mint has no counterparty — the character
+	// the copy landed on is the actor, which is also what makes GmMint locating
+	// — and no detail: the batch size used to be recorded there as {"qty":N},
+	// and with a row per copy the rows are the count.
+	const int64_t first_copy = bulk_serials.empty() ? 0 : bulk_serials.front();
+	tally.record("gm_mint_names_the_holder",
+		first_copy != 0
+		&& text_of("actor_char", ItemLogAction::GmMint, first_copy) == actor_char
+		&& is_null("counterparty_char", ItemLogAction::GmMint, first_copy)
+		&& is_null("detail", ItemLogAction::GmMint, first_copy));
 
 	// The NPC that dropped it, escaped so the column stays parseable JSON. This
 	// is the only birth context an NPC drop has until #79 puts the location and

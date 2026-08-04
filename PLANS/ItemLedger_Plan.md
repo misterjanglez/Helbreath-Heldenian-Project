@@ -334,6 +334,18 @@ and **one** `GmMint` event for a batch, so N−1 GM-minted copies have no event 
 them (`held_unrecorded`). That is a genuine ledger coverage gap, found by the detector rather than
 by review — **filed as #104**, deliberately not fixed inside this ticket. The dev worlds' large
 `never_placed` counts are the earlier provers' own minted Serials and are expected.
+
+**#104 closed it (2026-08-04).** Minting now has two entry points instead of item_log's one,
+because its sinks count different things: `record_gm_mint` per copy (the ledger's unit is the
+Serial) and `log_gm_mint` once per request (the operator channel's unit is the command, and a
+hundred lines for one `/createitem` is its own kind of unreadable). The four venues —
+`add_client_bulk_item_list`, `mint_gm_items` and the true-stack branch of `/createitem` and
+`/giveitem` — call them in that shape. `GmMint` is therefore no longer a case in `item_log`, and
+with it goes the quantity that used to travel in `recv_h`: that parameter is a counterparty handle
+in every action now, which is the deeper fix #78 deferred to "whoever adds the next emitter". The
+`{"qty":N}` detail is gone too — with a row per copy, the rows are the count. `itemlogcheck` (18/18)
+drives both batch venues for real and counts births against events, and fails when either venue is
+put back to one event per batch.
 - P4.2 Biography + state-machine validator: per-Serial history query and legal-transition replay
   (offline CLI first; GM `/itemhistory` later). **DONE 2026-07-31 (#84)** — `itemhistory <serial>`
   (the Biography), `ledgervalidate` (the replay) and `biographycheck` (39/39, hash `8fe8ef76`

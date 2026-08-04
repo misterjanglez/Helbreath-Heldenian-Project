@@ -853,6 +853,10 @@ int ItemManager::add_client_bulk_item_list(int client_h, const char* item_name, 
 			destroy_item(item, destroy_reason::discarded, client_h);
 			break;
 		}
+
+		// Per copy, not per batch: each of these has its own birth row, so a
+		// single event for the bundle would leave the rest held by nobody (#104).
+		record_gm_mint(client_h, item);
 	}
 
 	// Send one bulk notification with total count
@@ -880,7 +884,7 @@ int ItemManager::add_client_bulk_item_list(int client_h, const char* item_name, 
 
 		// Every caller of this helper is a GM creation command, so the bundle
 		// is a mint: one audit line for the batch (the copies are identical).
-		item_log(ItemLogAction::GmMint, client_h, created, first_item);
+		log_gm_mint(client_h, created, first_item);
 	}
 
 	return created;
@@ -899,7 +903,8 @@ int ItemManager::mint_gm_items(int client_h, int item_id, int count,
 	if (count < 1) count = 1;
 
 	int created = 0;
-	// The most recent copy, kept readable until the audit line is written.
+	// The most recent copy, kept readable until the audit LINE is written — the
+	// ledger half is already done by then, recorded per copy inside the loop.
 	// A stackable copy merges into an existing slot and becomes ours to
 	// delete; holding it one iteration longer is what lets the log describe
 	// what was minted rather than what happened to survive.
@@ -932,6 +937,11 @@ int ItemManager::mint_gm_items(int client_h, int item_id, int count,
 		}
 
 		send_item_notify_msg(client_h, Notify::ItemObtained, item, 0);
+		// Per copy, and here rather than after the loop, because each copy has
+		// its own birth row and its own Serial to be held by somebody (#104).
+		// A merged Counted copy is still alive at this point, which is what its
+		// aggregate flow is read off.
+		record_gm_mint(client_h, item);
 		// The previous copy, if it was a stack merge and therefore ours. Freeing
 		// it is not an exit — the stack it merged into is carrying its contents —
 		// and it is Counted anyway, so the funnel records nothing and only frees.
@@ -944,7 +954,7 @@ int ItemManager::mint_gm_items(int client_h, int item_id, int count,
 	// One audit line per request: every copy is identical, so the quantity is
 	// the only thing that varies across them.
 	if (created > 0 && minted != nullptr)
-		item_log(ItemLogAction::GmMint, client_h, created, minted);
+		log_gm_mint(client_h, created, minted);
 	if (minted_is_ours) destroy_item(minted, destroy_reason::merged, client_h);
 
 	return created;
@@ -5617,15 +5627,11 @@ bool ItemManager::item_log(int action, int give_h, int recv_h, CItem* item, bool
 {
 	if (hb::server::ledger_event_record event; begin_ledger_event(action, item, give_h, event, qty))
 	{
-		// GmMint has no receiving player — recv_h carries the minted quantity —
-		// so it is the one action whose second handle must not be read as a
-		// counterparty. The two are exclusive, which is what this says. It also
-		// explains the shape of a GM batch in the ledger: every copy gets its own
-		// birth row from the factory, and one of them carries the GmMint event
-		// for the request.
-		if (action == ItemLogAction::GmMint)
-			event.detail = hb::server::detail_json("qty", recv_h);
-		else if (const CClient* recv = client_at(recv_h))
+		// `recv_h` is a counterparty handle in every action that reaches here.
+		// It was not always: GM minting used to pass its quantity through this
+		// parameter, so the reading of a column depended on another column. #104
+		// gave minting its own door (record_gm_mint) and took the exception away.
+		if (const CClient* recv = client_at(recv_h))
 			event.counterparty_char = recv->m_char_name;
 
 		ledger()->record_event(std::move(event));
@@ -5686,14 +5692,46 @@ bool ItemManager::item_log(int action, int give_h, int recv_h, CItem* item, bool
 		hb::logger::log<log_channel::upgrades>("{} IP({}) Upgrade {} {} at {}({},{})", m_game->m_client_list[give_h]->m_char_name, m_game->m_client_list[give_h]->m_ip_address, true ? "Success" : "Fail", format_item_info(item), m_game->m_client_list[give_h]->m_map_name, m_game->m_client_list[give_h]->m_x, m_game->m_client_list[give_h]->m_y);
 		break;
 
-	// GM minting has no receiving player, so recv_h carries the quantity.
-	case ItemLogAction::GmMint:
-		hb::logger::log<log_channel::trade>("{} IP({}) GmMint {}x {} at {}({},{})", m_game->m_client_list[give_h]->m_char_name, m_game->m_client_list[give_h]->m_ip_address, recv_h, format_item_info(item), m_game->m_client_list[give_h]->m_map_name, m_game->m_client_list[give_h]->m_x, m_game->m_client_list[give_h]->m_y);
-		break;
+	// GmMint has no case here: a mint is one line for a request of N copies and
+	// N events, so it writes through log_gm_mint / record_gm_mint instead (#104).
 
 	default:
 		return false;
 	}
+	return true;
+}
+
+//////////////////////////////////////////////////////////////////////
+// GM minting — the two doors (#104)
+//
+// Split out of item_log because the sinks count different things. See the
+// declarations in ItemManager.h for which unit belongs to which sink and why
+// the quantity no longer travels in a handle parameter.
+//////////////////////////////////////////////////////////////////////
+
+void ItemManager::record_gm_mint(int client_h, CItem* item)
+{
+	// One copy, one event. There is no counterparty: the character the copy
+	// landed on is the actor, which is also what makes GmMint a locating event
+	// for Reconciliation — it says who holds it, and now it says that about
+	// every copy rather than about one of them.
+	if (hb::server::ledger_event_record event;
+		begin_ledger_event(ItemLogAction::GmMint, item, client_h, event))
+	{
+		ledger()->record_event(std::move(event));
+	}
+}
+
+bool ItemManager::log_gm_mint(int client_h, int quantity, CItem* sample)
+{
+	if (sample == nullptr) return false;
+
+	const CClient* actor = client_at(client_h);
+	if (actor == nullptr) return false;
+
+	hb::logger::log<log_channel::trade>("{} IP({}) GmMint {}x {} at {}({},{})",
+		actor->m_char_name, actor->m_ip_address, quantity, format_item_info(sample),
+		actor->m_map_name, actor->m_x, actor->m_y);
 	return true;
 }
 

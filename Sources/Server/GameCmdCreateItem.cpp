@@ -93,8 +93,11 @@ bool GameCmdCreateItem::execute(CGame* game, int client_h, const char* args)
 			{
 				game->m_item_manager->send_item_notify_msg(client_h, Notify::ItemObtained, item, 0);
 				created = amount;
-				game->m_item_manager->item_log(hb::server::net::ItemLogAction::GmMint,
-					client_h, created, item);
+				// One stack is one copy, so the two mint doors (#104) are one
+				// call each here. Both run before the merge husk is freed —
+				// a Counted stack's aggregate is read off the item itself.
+				game->m_item_manager->record_gm_mint(client_h, item);
+				game->m_item_manager->log_gm_mint(client_h, created, item);
 				// Merged into an existing stack: the contents live on in the slot
 				// it merged into, so this frees a Counted husk and records nothing.
 				if (erase_req == 1)

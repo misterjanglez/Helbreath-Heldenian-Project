@@ -189,7 +189,8 @@ public:
 	bool add_item(int client_h, CItem* item, char mode);
 	bool add_client_item_list(int client_h, CItem* item, int* del_req);
 	// Bulk GM creation: `amount` distinct copies into free slots (no merging),
-	// one bulk notification, one GmMint audit line. Returns how many landed.
+	// one bulk notification, one GmMint audit line — and one ledger event per
+	// copy, which is not the same count (#104). Returns how many landed.
 	int add_client_bulk_item_list(int client_h, const char* item_name, int amount);
 	void release_item_handler(int client_h, short item_index, bool notice);
 	int set_item_count(int client_h, int item_index, uint64_t count);
@@ -328,6 +329,38 @@ public:
 		int64_t qty = flow_qty_from_item);
 
 	//----------------------------------------------------------------------
+	// GM minting — the one action with two doors (#104)
+	//
+	// Every other action moves one thing, so one call feeds both sinks. A mint
+	// makes N things at once, and the two sinks disagree about what N is:
+	//
+	//   - The ledger's unit is the Serial. N copies are N events, because the
+	//     factory gives each copy its own birth row and an event that names one
+	//     of them leaves the other N-1 held by nobody — which Reconciliation
+	//     reads as `held_unrecorded`, the one question the ledger exists to
+	//     answer. That was the #104 defect: one event for the whole batch.
+	//   - The operator channel's unit is the request. One line, whether the GM
+	//     asked for one copy or a hundred; a hundred lines for one command is a
+	//     different kind of unreadable log.
+	//
+	// So a minting venue calls record_gm_mint per copy and log_gm_mint once.
+	// Splitting them is also what retires the quantity that used to travel in
+	// item_log's `recv_h` (#78 deferred it to "whoever adds the next emitter"):
+	// that parameter is now a counterparty handle in every action without
+	// exception, and a quantity is a parameter that says so.
+
+	// The ledger door. Call it as each copy lands and while that copy is still
+	// alive — a Counted copy that merged into an existing stack is freed a line
+	// later, and its aggregate flow is read off the husk before it goes.
+	void record_gm_mint(int client_h, CItem* item);
+
+	// The operator door: one trade-channel line for a whole mint request.
+	// `quantity` is what was actually created, and `sample` any one of the
+	// copies, since a batch is identical by construction. False when there is
+	// nothing to describe or nobody to attribute it to, matching item_log.
+	bool log_gm_mint(int client_h, int quantity, CItem* sample);
+
+	//----------------------------------------------------------------------
 	// Recording for a Serial the caller does not hold as a CItem (#80)
 	//
 	// The Trading Post is why these exist. Under ADR 0001 an escrowed bundle is
@@ -419,8 +452,9 @@ private:
 	hb::server::item_ledger_store* ledger() const;
 
 	// m_client_list index 0 is never a client, and the log calls pass 0 and -1
-	// as "nobody" — GmMint even passes a quantity where a handle goes. Null for
-	// anything that does not resolve, so the ledger path never indexes on trust.
+	// as "nobody". Null for anything that does not resolve, so the ledger path
+	// never indexes on trust. (Until #104 one action also passed a quantity
+	// where a handle goes, which this survived by not trusting the number.)
 	CClient* client_at(int client_h) const;
 
 	// Fills what every ledger event shares — Serial, type, and the actor's name,

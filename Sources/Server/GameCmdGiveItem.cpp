@@ -75,8 +75,10 @@ bool GameCmdGiveItem::execute(CGame* game, int client_h, const char* args)
 				created = amount;
 				// Audited against the receiving character — what the economy
 				// audit reads is items entering an inventory out of nothing.
-				game->m_item_manager->item_log(hb::server::net::ItemLogAction::GmMint,
-					target_h, created, item);
+				// One stack is one copy, so the two mint doors (#104) are one
+				// call each, both before the merge husk is freed.
+				game->m_item_manager->record_gm_mint(target_h, item);
+				game->m_item_manager->log_gm_mint(target_h, created, item);
 				// Merged into an existing stack: the contents live on in the slot
 				// it merged into, so this frees a Counted husk and records nothing.
 				if (erase_req == 1)

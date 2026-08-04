@@ -146,8 +146,9 @@ namespace hb::server
 		// shutdown it should be zero, because world_shutdown despawns them.
 		int64_t on_ground = 0;
 		// Minted and never moved: a birth row and no locating event, held by
-		// nobody. A GM batch mint makes these by design — it writes one GmMint
-		// event for the whole batch — and so does every prover that mints.
+		// nobody. Every prover that mints makes these. A GM batch used to make
+		// them too — one GmMint event for N copies — until #104 gave minting an
+		// event per copy, so a batch now leaves none of these behind.
 		int64_t never_placed = 0;
 		// The ledger says it left the world and nothing holds it. The healthy
 		// end state of most items.
