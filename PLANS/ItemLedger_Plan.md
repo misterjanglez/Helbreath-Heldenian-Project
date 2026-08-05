@@ -238,7 +238,7 @@ classes counts the same units twice:
 | Class | Numbers | Question it answers |
 |---|---|---|
 | Source | `created` 100, `NewGenDrop` 5 | how much entered the world |
-| Sink — route | `Buy` 7, `MagicLearn` 16, `Repair` 17 | how much left, and to what |
+| Sink — route | `Buy` 7, `Make` 13, `MagicLearn` 16, `Repair` 17 | how much left, and to what |
 | Sink — exit | `Deplete` 4, `destroyed` 102, `despawned` 101 | the slot emptied / it left the world |
 | Movement | `Give` 1, `Drop` 2, `get` 3, `Retrieve` 9, `Deposit` 10, `Exchange` 11, Trading Post 33–39 | it changed hands; the total is unmoved |
 
@@ -248,42 +248,68 @@ because those answer different questions — so money supply is
 `coveragecheck` asserts this overlap rather than leaving it to be discovered.
 
 **Actions with no caller** (a text-sink switch arm and nothing reaching it):
-`SkillLearn` 12, `Make` 13, `SummonMonster` 14, `Poisoned` 15. None is a custody
-move: each consumes an item, and that exit is recorded by `destroy_item` through
-`item_deplete_handler`. Left unwired deliberately — adding an event that
-duplicates an exit already recorded would break "exactly one" as surely as
-recording none. `Repair` 17 and `MagicLearn` 16 left this list in #103, and what
-they record is the *payment*, not the act: a repair is a durability change on an
-item that never changes hands, and a spell learned is not an item at all.
+`SkillLearn` 12, `SummonMonster` 14, `Poisoned` 15. None is a custody move; the
+consumption each would describe is recorded as an exit by `destroy_item` through
+`item_deplete_handler` where it happens today. Left unwired deliberately —
+adding an event that duplicates an exit already recorded would break "exactly
+one" as surely as recording none. `Repair` 17 and `MagicLearn` 16 left this list
+in #103, and what they record is the *payment*, not the act: a repair is a
+durability change on an item that never changes hands, and a spell learned is
+not an item at all. `Make` 13 left it in #105: for crafting reagents the
+deplete-covers-it rationale held only when a stack emptied — precisely the case
+that needed no help — so `Make` now records the *consumption of the materials*,
+partial and emptying alike, while the made item books its own birth at the
+factory.
 
-**Known gap, found by #103's review and filed as #105:** the sibling setter
-`ItemManager::set_item_count` (by slot index) has the hole #103 just closed on
-`set_item_count_by_id`. It books only when the count reaches exactly 0, via
-`item_deplete_handler`; a *partial* decrement overwrites the count and records
-nothing. Three live callers take that path — `CraftingManager.cpp:179` and `:455`
-(potion brewing, jewel and necklace crafting) and `ItemManager.cpp:5411`
-(`BuildItem` element consumption) — and none of them logs anywhere else, so
-reagents consumed out of a stack the player did not empty are unrecorded. This
-also means the paragraph above understates the case for `Make` 13: the exit it
-would duplicate is only recorded when a stack empties. Other `set_item_count`
-callers are clean — the sale, exchange, split and Warehouse paths each emit an
-explicit `item_log` immediately before the mutation, and the Trading Post books
-its escrow on DB commit instead. Out of scope for #103, which is about the
-currency loop; wiring it needs the same deliberate pass on which number a
-consumed reagent should carry — and #103's own fix does not copy over, because
-the split callers here mutate the count *before* the call, so a delta computed
-inside would read zero. See #105.
+**Closed by #105: the slot-keyed sibling.** `ItemManager::set_item_count` (by
+slot index) had the hole #103 closed on `set_item_count_by_id`: it booked only
+when the count reached exactly 0, via `item_deplete_handler`, so a *partial*
+decrement overwrote the count and recorded nothing. Three live callers took
+that path — potion brewing and jewel/necklace crafting (`CraftingManager.cpp`)
+and `BuildItem` element consumption (`ItemManager.cpp`) — none of which logged
+anywhere else, so reagents consumed out of a stack the player did not empty
+were unrecorded; inside the crafting loops, whether a reagent reached the
+ledger depended on whether it happened to stack. The transition is now a
+required parameter here too, booked before the zero branch (which frees the
+item), and the quantity is the decrease computed inside the call — a body the
+by-id sibling now *delegates to* after its lookup, since #105 left the two
+line-for-line twins, so the booking contract has one implementation. What
+could *not* be copied from #103 was the assumption that every caller passes a
+target count: the stack-split callers used to mutate `m_instance.count` first
+and pass the already-current value — a shape whose delta reads zero by
+construction, and which would let a wrongly-passed real action book nothing
+while looking correct. #105 converted them to pass targets, so the
+delta-inside contract is sound at every live site; `coveragecheck` still pins
+that a pre-applied decrease books nothing, against the shape reappearing.
+Callers with nothing to book pass `ItemManager::flow_none` and say why at the
+site — a decrease already carried by a preceding `item_log` (shop sale,
+Exchange), an escrow recorder tied to the DB commit (Trading Post), a rise
+(the Warehouse-merge and give-reject restore paths), or a split whose moved
+portion is its own item and books its own move. `flow_none` is never stored:
+`set_item_count` skips it and `record_counted_flow` refuses it at the funnel,
+so no flow row ever carries a 0.
+
+**Known-open doors, found by #105's review and filed:** arrow consumption is a
+hand-rolled inline copy of the setter with the same partial-decrement hole and
+one more — its emptying shot books no exit rows at all, because it decrements
+before calling deplete (#109). A rejected Give books a `destroyed` flow for
+items the player kept — `discarded` where the merge semantics apply (#110).
+And the product side of crafting is unbooked: a brewed stack enters the world
+with no `created` flow, so the craft loop reads as a pure sink now that #105
+records its material side (#111).
 
 **Mechanical enforcement.** Three scripts, all green as of this audit:
 `Scripts/check_item_factory.py` (nothing is born outside the factory — 7 sanctioned),
 `Scripts/check_item_destroy.py` (nothing dies outside the funnel — 29 classified),
 and `Scripts/check_item_merge.py` (**new in #81** — no husk is abandoned by a stack
-merge; 22 sites). The prover is `coveragecheck` (33/33 since #103).
+merge; 22 sites). The prover is `coveragecheck` (40/40 since #105).
 
 What `coveragecheck` does *not* prove, and cannot cheaply: that each venue names
 the right route. A venue cannot omit a transition — the parameter is required, so
 that much is a compile error — but one naming `Buy` where it meant `Repair` is a
-review matter, and the four sites in the table above are what that review checks.
+review matter. What that review checks: the four payment sites (#103), the three
+`Make` sites, and the nine `flow_none` sites whose justification is written where
+each is passed (#105).
 
 Known gaps in today's `item_log()` (verified in code, 2026-07-29 — **all closed by
 #79/#80/#81; kept as the record of what the audit was aimed at**):

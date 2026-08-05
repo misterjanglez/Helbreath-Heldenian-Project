@@ -21,6 +21,13 @@
 // checks below assert the funnel books what it removes, under one number per
 // route, always positive.
 //
+// #105 closed the same hole in the slot-keyed sibling: `set_item_count` booked
+// only when a stack emptied, so the reagents a recipe took out of a stack it
+// did not empty — the common case of every craft — were unrecorded. Those
+// checks walk one reagent stack through every caller shape: a consumption
+// books `Make` for the decrease, and a flow_none decrease, a rise and an
+// already-applied decrease book nothing.
+//
 // What these checks do not prove, and cannot cheaply: that each VENUE names the
 // right route. The parameter is required rather than defaulted, so a venue
 // cannot omit a transition — that much is a compile error — but a venue naming
@@ -121,6 +128,15 @@ namespace
 	constexpr int64_t study_qty    = 37;
 	constexpr int64_t refund_qty   = 41;   // a count that RISES, which books nothing
 
+	// The reagent stack the slot-keyed checks (#105) consume, on a THIRD
+	// stackable id for the reason the purse is on a second: emptying it books
+	// exit rows, and a shared id would add them to another group's total.
+	constexpr int64_t reagent_qty   = 101;
+	constexpr int64_t consume_qty   = 43;   // a partial decrement, which must book Make
+	constexpr int64_t elsewhere_qty = 47;   // a decrease whose venue already booked (flow_none)
+	constexpr int64_t rise_qty      = 53;   // a count that RISES, which books nothing
+	constexpr int64_t applied_qty   = 3;    // a decrease the caller applied first (delta 0)
+
 	// Stored numbers as literals. These are permanent world fact the moment real
 	// players exist, and a check that queried with the same symbol it stored
 	// would still pass if both were renumbered together.
@@ -128,6 +144,7 @@ namespace
 	constexpr int get_flow_number      = 3;
 	constexpr int buy_flow_number      = 7;
 	constexpr int sell_flow_number     = 8;
+	constexpr int make_flow_number     = 13;
 	constexpr int study_flow_number    = 16;
 	constexpr int repair_flow_number   = 17;
 	constexpr int retrieve_event_number = 9;
@@ -145,6 +162,8 @@ namespace
 		"ItemLogAction::Buy moved: every gold-spent-at-a-shop flow means something else now.");
 	static_assert(static_cast<int>(ItemLogAction::MagicLearn) == study_flow_number,
 		"ItemLogAction::MagicLearn moved: every spell-payment flow means something else now.");
+	static_assert(static_cast<int>(ItemLogAction::Make) == make_flow_number,
+		"ItemLogAction::Make moved: every reagent-consumption flow means something else now.");
 	static_assert(static_cast<int>(ItemLogAction::Repair) == repair_flow_number,
 		"ItemLogAction::Repair moved: every repair-bill flow already written means something else now.");
 	static_assert(static_cast<int>(ItemLogAction::Retrieve) == retrieve_event_number,
@@ -206,9 +225,14 @@ void CmdCoverageCheck::execute(CGame* game, const char* args)
 	// nothing books the exit rows the merge checks measure to the coin, so the
 	// two groups cannot share an item id.
 	const int spend_id = find_probe_item(game, true, counted_id + 1);
+
+	// And a third for the slot-keyed checks (#105), disjoint from both groups
+	// above for the reason the purse is disjoint from the first.
+	const int craft_id = find_probe_item(game, true, spend_id + 1);
 	if (items.is_valid_item_id(instanced_id) == false
 		|| items.is_valid_item_id(counted_id) == false
-		|| items.is_valid_item_id(spend_id) == false)
+		|| items.is_valid_item_id(spend_id) == false
+		|| items.is_valid_item_id(craft_id) == false)
 	{
 		hb::console::error("coveragecheck: no usable probe item ids.");
 		return;
@@ -357,6 +381,49 @@ void CmdCoverageCheck::execute(CGame* game, const char* args)
 	items.set_item_count_by_id(actor_h, spend_item, 0, ItemLogAction::Repair);
 
 	//----------------------------------------------------------------------
+	// The slot-keyed sibling (#105): reagents consumed by crafting.
+	//
+	// set_item_count had the hole its by-id sibling above was cured of: it
+	// booked only when a stack emptied, so a recipe taking 10 reagents out of
+	// a stack of 50 recorded nothing. Driven through set_item_count for the
+	// reason the purse drives through set_item_count_by_id — what is at issue
+	// is whether the funnel books what it removes.
+	//
+	// One reagent stack in slot 1 of the same carrier, walked through every
+	// caller shape: a real consumption (Make), a decrease whose venue already
+	// booked it (flow_none, the shop-sale shape), a count that rises (the
+	// Warehouse-merge shape), a decrease the caller applied before the call
+	// (a shape no live caller takes since #105 converted the splits to pass
+	// targets — pinned here), and the consumption that empties the stack.
+	//----------------------------------------------------------------------
+
+	const bool reagent_slot_free = (carrier->m_item_list[1] == nullptr);
+	if (reagent_slot_free) carrier->m_item_list[1] = counted_probe(items, craft_id, reagent_qty);
+	const bool reagent_held = reagent_slot_free && carrier->m_item_list[1] != nullptr;
+
+	// Absolute counts, as with the purse above.
+	constexpr int64_t after_consume   = reagent_qty - consume_qty;       // 101 - 43 = 58
+	constexpr int64_t after_elsewhere = after_consume - elsewhere_qty;   // 58 - 47 = 11
+	constexpr int64_t after_rise      = after_elsewhere + rise_qty;      // 11 + 53 = 64
+	constexpr int64_t after_applied   = after_rise - applied_qty;        // 64 - 3 = 61
+
+	items.set_item_count(actor_h, 1, after_consume, ItemLogAction::Make);
+	items.set_item_count(actor_h, 1, after_elsewhere, ItemManager::flow_none);
+	items.set_item_count(actor_h, 1, after_rise, ItemLogAction::Make);
+
+	// The pre-applied shape: a caller that mutates the count first and passes
+	// the already-current value gets a delta of zero, so even a real flow type
+	// books nothing. No live caller takes this shape — #105 converted the
+	// splits that did to pass targets — but the funnel's answer to it is
+	// permanent arithmetic, so it stays pinned in case one reappears.
+	if (reagent_held) carrier->m_item_list[1]->m_instance.count = static_cast<uint64_t>(after_applied);
+	items.set_item_count(actor_h, 1, after_applied, ItemLogAction::Make);
+
+	// And the consumption that empties the stack: Make for the remainder,
+	// beside the exit rows every emptied stack books.
+	items.set_item_count(actor_h, 1, 0, ItemLogAction::Make);
+
+	//----------------------------------------------------------------------
 	// The Instanced tier is untouched by any of it.
 	//----------------------------------------------------------------------
 
@@ -436,6 +503,14 @@ void CmdCoverageCheck::execute(CGame* game, const char* args)
 	auto spend_flow_rows = [&](int flow_type)
 	{
 		return hb::server::flow_scalar(db, "COUNT(*)", day, spend_id, flow_type);
+	};
+	auto craft_flow_qty = [&](int flow_type)
+	{
+		return hb::server::flow_scalar(db, "qty", day, craft_id, flow_type);
+	};
+	auto craft_flow_rows = [&](int flow_type)
+	{
+		return hb::server::flow_scalar(db, "COUNT(*)", day, craft_id, flow_type);
 	};
 	auto instanced_flow_rows = [&]()
 	{
@@ -579,6 +654,52 @@ void CmdCoverageCheck::execute(CGame* game, const char* args)
 	// this is asserted rather than left to be discovered.
 	tally.record("emptied_purse_books_exit_too",
 		spend_flow_qty(destroyed_number) == last_coins);
+
+	//----------------------------------------------------------------------
+	// The slot-keyed sibling (#105)
+	//----------------------------------------------------------------------
+
+	tally.record("reagent_held", reagent_held);
+
+	// The headline: a partial consumption is recorded at all. Before this
+	// ticket set_item_count booked only the stack-emptying case, and this row
+	// did not exist.
+	tally.record("reagent_consumption_books_flow",
+		craft_flow_rows(make_flow_number) == 1);
+
+	// Read once, asserted under three names below; every row reached disk in
+	// the single flush above, so the three share one fact.
+	const int64_t booked_make = craft_flow_qty(make_flow_number);
+
+	// It books the DECREASE, both times the count fell by this route — the
+	// partial consumption and the one that emptied the stack. The numbers a
+	// wrong implementation lands on are all distinct from 104: booking the
+	// target count gives 58, booking what the stack held gives 162, and each
+	// of the three no-book shapes below adds its own prime.
+	tally.record("reagent_books_the_decrease",
+		booked_make == consume_qty + after_applied);
+
+	// flow_none books nothing even though the count fell — the shop-sale
+	// shape, whose Sell already carried the amount. Nothing may land under 0:
+	// the sentinel is a statement about the call site, never a stored number.
+	tally.record("flow_none_books_nothing", craft_flow_rows(0) == 0);
+
+	// A rise books nothing, as with the purse's refund: had it booked, Make
+	// would be 53 (or 11) high.
+	tally.record("reagent_gain_books_nothing",
+		booked_make == consume_qty + after_applied);
+
+	// A decrease the caller already applied books nothing more — the delta
+	// reads zero. Nothing in the tree takes this shape since #105 converted
+	// the splits to pass targets; had the pass-through booked, Make would be
+	// 3 high.
+	tally.record("applied_decrease_books_nothing",
+		booked_make == consume_qty + after_applied);
+
+	// The emptying consumption books its exit rows beside the route, exactly
+	// as the purse's last payment does.
+	tally.record("emptied_reagent_books_exit_too",
+		craft_flow_qty(destroyed_number) == after_applied);
 
 	//----------------------------------------------------------------------
 	// Instanced tier unaffected

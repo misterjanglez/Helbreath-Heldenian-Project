@@ -259,7 +259,11 @@ namespace hb::server
 			}
 			const uint64_t held = it->m_instance.count;
 			if (p.amount < held) {
-				m_game->m_item_manager->set_item_count(client_h, p.slot, held - p.amount);
+				// flow_none: escrow is booked by record_escrow_event inside
+				// scope.on_commit — tied to the DB commit, a stronger guarantee
+				// than a flow here would be.
+				m_game->m_item_manager->set_item_count(client_h, p.slot, held - p.amount,
+					ItemManager::flow_none);
 			}
 			else {
 				const bool was_equipped = client->m_is_item_equipped[p.slot];

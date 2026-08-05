@@ -10,6 +10,7 @@
 #include "Packet/SharedPackets.h"
 #include "Log.h"
 #include "ServerLogChannels.h"
+#include "ServerMessages.h"
 #include "TimeUtils.h"
 
 extern char G_cTxt[512];
@@ -20,6 +21,7 @@ using namespace hb::shared::net;
 using namespace hb::server::config;
 using namespace hb::shared::item;
 namespace sock = hb::shared::net::socket;
+namespace ItemLogAction = hb::server::net::ItemLogAction;
 
 CraftingManager::CraftingManager()
 {
@@ -175,9 +177,15 @@ void CraftingManager::req_create_portion_handler(int client_h, char* data)
 	if (strlen(portion_name) != 0) {
 		for(int i = 0; i < 6; i++)
 			if (item_index[i] != -1) {
+				// Both branches now record the consumption (#105): a stackable
+				// reagent books a Make flow for what the brew took, computed
+				// inside the call, where before it booked only when the stack
+				// emptied — the common case, 10 out of a stack of 50, was the
+				// unrecorded one.
 				if (m_game->m_client_list[client_h]->m_item_list[item_index[i]]->is_stackable())
 					m_game->m_item_manager->set_item_count(client_h, item_index[i],
-						m_game->m_client_list[client_h]->m_item_list[item_index[i]]->m_instance.count - item_number[i]);
+						m_game->m_client_list[client_h]->m_item_list[item_index[i]]->m_instance.count - item_number[i],
+						ItemLogAction::Make);
 				else m_game->m_item_manager->item_deplete_handler(client_h, item_index[i], false);
 			}
 
@@ -452,8 +460,10 @@ void CraftingManager::req_create_crafting_handler(int client_h, char* data)
 			{
 				if (m_game->m_client_list[client_h]->m_item_list[item_index[i]]->is_stackable())
 				{
+					// Make, as in the brewing loop above (#105).
 					m_game->m_item_manager->set_item_count(client_h, item_index[i],
-						m_game->m_client_list[client_h]->m_item_list[item_index[i]]->m_instance.count - item_number[i]);
+						m_game->m_client_list[client_h]->m_item_list[item_index[i]]->m_instance.count - item_number[i],
+						ItemLogAction::Make);
 				}
 				else // Non-stackable items get depleted
 				{

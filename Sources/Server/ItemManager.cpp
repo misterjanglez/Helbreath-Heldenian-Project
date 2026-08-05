@@ -603,10 +603,11 @@ void ItemManager::drop_item_handler(int client_h, short item_index, int amount, 
 			return;
 		}
 
-		m_game->m_client_list[client_h]->m_item_list[item_index]->m_instance.count -= amount;
-
 		// v1.41 !!!
-		set_item_count(client_h, item_index, m_game->m_client_list[client_h]->m_item_list[item_index]->m_instance.count);
+		// flow_none: the moved portion is `item`, whose Drop below books it.
+		// The remainder is passed as a target — the setter computes its delta
+		// from the live count, so the decrease must not be pre-applied (#105).
+		set_item_count(client_h, item_index, m_game->m_client_list[client_h]->m_item_list[item_index]->m_instance.count - amount, flow_none);
 
 		m_game->m_map_list[m_game->m_client_list[client_h]->m_map_index]->set_item(m_game->m_client_list[client_h]->m_x,
 			m_game->m_client_list[client_h]->m_y, item);
@@ -1442,9 +1443,10 @@ void ItemManager::give_item_handler(int client_h, short item_index, int amount, 
 		if (item == nullptr) return;
 		item->m_instance.count = amount;
 
-		m_game->m_client_list[client_h]->m_item_list[item_index]->m_instance.count -= amount;
-
-		set_item_count(client_h, item_index, m_game->m_client_list[client_h]->m_item_list[item_index]->m_instance.count);
+		// flow_none: the split piece books its own move at whichever destination
+		// it reaches (a Give, a Deposit, a Drop). Target count, not a
+		// pre-applied decrease, as in drop_item_handler (#105).
+		set_item_count(client_h, item_index, m_game->m_client_list[client_h]->m_item_list[item_index]->m_instance.count - amount, flow_none);
 
 		// dX, dY     .
 		m_game->m_map_list[m_game->m_client_list[client_h]->m_map_index]->get_owner(&owner_h, &owner_type, dX, dY);
@@ -1558,9 +1560,9 @@ void ItemManager::give_item_handler(int client_h, short item_index, int amount, 
 					}
 				}
 				else {
-					// NPC cannot receive items — restore count and reject
-					m_game->m_client_list[client_h]->m_item_list[item_index]->m_instance.count += amount;
-					set_item_count(client_h, item_index, m_game->m_client_list[client_h]->m_item_list[item_index]->m_instance.count);
+					// NPC cannot receive items — restore count and reject.
+					// flow_none: the count rises back to what it was.
+					set_item_count(client_h, item_index, m_game->m_client_list[client_h]->m_item_list[item_index]->m_instance.count + amount, flow_none);
 					m_game->send_notify_msg(0, client_h, Notify::CannotGiveItem, item_index, amount, 0, char_name);
 					destroy_item(item, destroy_reason::discarded, client_h);
 					m_game->calc_total_weight(client_h);
@@ -1728,20 +1730,38 @@ void ItemManager::give_item_handler(int client_h, short item_index, int amount, 
 	}
 }
 
-int ItemManager::set_item_count(int client_h, int item_index, uint64_t count)
+int ItemManager::set_item_count(int client_h, int item_index, uint64_t count,
+	int32_t flow_type)
 {
-	uint16_t weight;
-
 	if (m_game->m_client_list[client_h] == 0) return -1;
 	if (m_game->m_client_list[client_h]->m_item_list[item_index] == 0) return -1;
 
-	weight = get_item_weight(m_game->m_client_list[client_h]->m_item_list[item_index], 1);//m_game->m_client_list[client_h]->m_item_list[item_index]->m_weight;
+	CItem* stack = m_game->m_client_list[client_h]->m_item_list[item_index];
+	uint16_t weight = get_item_weight(stack, 1);
+
+	// The outflow, booked before either branch below runs (#103, #105). It has
+	// to be first: the count == 0 branch destroys `stack`, so a booking after
+	// it would read a freed item.
+	//
+	// The amount is what this call removes, not what remains and not what the
+	// stack held. Nothing is booked when the count does not fall, whatever the
+	// flow type says — a future *inflow* caller records its own gain at its own
+	// venue, the shape the shop-sale proceeds already use, and the reason no
+	// row here is ever negative.
+	if (flow_type != flow_none && count < stack->m_instance.count)
+		record_counted_flow(flow_type, *stack,
+			static_cast<int64_t>(stack->m_instance.count - count));
 
 	if (count == 0) {
+		// Also books Deplete and destroyed for the whole remainder, as every
+		// emptied stack does. Different questions, different numbers — the flow
+		// above still fires, or "gold spent on repairs" would silently omit
+		// exactly the repairs that emptied the purse, and "reagents consumed by
+		// crafting" the recipes that finished a stack.
 		item_deplete_handler(client_h, item_index, false);
 	}
 	else {
-		m_game->m_client_list[client_h]->m_item_list[item_index]->m_instance.count = count;
+		stack->m_instance.count = count;
 		m_game->send_notify_msg(0, client_h, Notify::set_item_count, item_index, count, (char)true, 0);
 	}
 
@@ -1770,38 +1790,11 @@ int ItemManager::set_item_count_by_id(int client_h, short item_id, uint64_t coun
 	for(int i = 0; i < hb::shared::limits::MaxItems; i++) {
 		if (m_game->m_client_list[client_h]->m_item_list[i] != nullptr &&
 		    m_game->m_client_list[client_h]->m_item_list[i]->m_id_num == item_id) {
-
-			CItem* stack = m_game->m_client_list[client_h]->m_item_list[i];
-			uint16_t weight = get_item_weight(stack, 1);
-
-			// The outflow, booked before either branch below runs (#103). It has
-			// to be first: the count == 0 branch destroys `stack`, so a booking
-			// after it would read a freed item.
-			//
-			// The amount is what this call removes, not what remains and not
-			// what the stack held. Nothing is booked when the count does not
-			// fall, which leaves a hypothetical future *inflow* caller to record
-			// its own gain at its own venue — the shape the shop-sale proceeds
-			// already use, and the reason no row here is ever negative.
-			if (count < stack->m_instance.count)
-				record_counted_flow(flow_type, *stack,
-					static_cast<int64_t>(stack->m_instance.count - count));
-
-			if (count == 0) {
-				// Also books Deplete and destroyed for the whole remainder, as
-				// every emptied stack in the game does. That is a different
-				// question answered by different numbers — the slot emptied, and
-				// the item left the world — so the route flow above still has to
-				// fire, or "gold spent on repairs" would silently omit exactly
-				// the repairs that emptied a purse.
-				item_deplete_handler(client_h, i, false);
-			}
-			else {
-				stack->m_instance.count = count;
-				m_game->send_notify_msg(0, client_h, Notify::set_item_count, i, count, (char)true, 0);
-			}
-
-			return weight;
+			// One booking contract, one body: #105 gave the slot-keyed setter
+			// the same pre-branch flow booking #103 gave this one, which left
+			// the two bodies line-for-line twins. The id → slot lookup is the
+			// only thing this function still owns.
+			return set_item_count(client_h, i, count, flow_type);
 		}
 	}
 
@@ -1954,7 +1947,9 @@ void ItemManager::request_retrieve_item_handler(int client_h, char* data)
 						m_game->m_client_list[client_h]->m_item_in_bank_list[bank_item_index]);
 
 					// v1.41 !!!
-					set_item_count(client_h, i, m_game->m_client_list[client_h]->m_item_list[i]->m_instance.count + m_game->m_client_list[client_h]->m_item_in_bank_list[bank_item_index]->m_instance.count);
+					// flow_none: the Retrieve above carried the amount, and this
+					// is the merge's rise — nothing is leaving.
+					set_item_count(client_h, i, m_game->m_client_list[client_h]->m_item_list[i]->m_instance.count + m_game->m_client_list[client_h]->m_item_in_bank_list[bank_item_index]->m_instance.count, flow_none);
 
 					// The withdrawn stack merged into one the character already
 					// had, so its contents are now in the inventory and only the
@@ -3338,7 +3333,9 @@ void ItemManager::req_sell_item_confirm_handler(int client_h, char item_id, int 
 
 			if (m_game->m_client_list[client_h]->m_item_list[item_id]->is_stackable()) {
 				// v1.41 !!!
-				set_item_count(client_h, item_id, m_game->m_client_list[client_h]->m_item_list[item_id]->m_instance.count - num);
+				// flow_none: the Sell above carried `num`; a flow here would
+				// count the sale twice.
+				set_item_count(client_h, item_id, m_game->m_client_list[client_h]->m_item_list[item_id]->m_instance.count - num, flow_none);
 			}
 			else item_deplete_handler(client_h, item_id, false, destroy_reason::sold);
 		}
@@ -3358,7 +3355,8 @@ void ItemManager::req_sell_item_confirm_handler(int client_h, char item_id, int 
 		item_log(ItemLogAction::Sell, client_h, (int)-1, m_game->m_client_list[client_h]->m_item_list[item_id], false, num);
 
 		if (m_game->m_client_list[client_h]->m_item_list[item_id]->is_stackable()) {
-			set_item_count(client_h, item_id, m_game->m_client_list[client_h]->m_item_list[item_id]->m_instance.count - num);
+			// flow_none: the Sell above carried `num`, as in the branch above.
+			set_item_count(client_h, item_id, m_game->m_client_list[client_h]->m_item_list[item_id]->m_instance.count - num, flow_none);
 		}
 		else item_deplete_handler(client_h, item_id, false, destroy_reason::sold);
 	}
@@ -5012,7 +5010,8 @@ void ItemManager::confirm_exchange_item(int client_h)
 							amount_left = static_cast<int>(m_game->m_client_list[ex_h]->m_item_list[m_game->m_client_list[ex_h]->m_exchange_item_index[i]]->m_instance.count) - m_game->m_client_list[ex_h]->m_exchange_item_amount[i];
 							if (amount_left < 0) amount_left = 0;
 							// v1.41 !!!
-							set_item_count(ex_h, m_game->m_client_list[ex_h]->m_exchange_item_index[i], amount_left);
+							// flow_none: the Exchange above carried the moved copy.
+							set_item_count(ex_h, m_game->m_client_list[ex_h]->m_exchange_item_index[i], amount_left, flow_none);
 							// m_game->m_client_list[ex_h]->m_item_list[m_game->m_client_list[ex_h]->m_exchange_item_index]->m_name, amount_left);
 						}
 						else {
@@ -5032,7 +5031,8 @@ void ItemManager::confirm_exchange_item(int client_h)
 							amount_left = static_cast<int>(m_game->m_client_list[client_h]->m_item_list[m_game->m_client_list[client_h]->m_exchange_item_index[i]]->m_instance.count) - m_game->m_client_list[client_h]->m_exchange_item_amount[i];
 							if (amount_left < 0) amount_left = 0;
 							// v1.41 !!!
-							set_item_count(client_h, m_game->m_client_list[client_h]->m_exchange_item_index[i], amount_left);
+							// flow_none: the Exchange above carried the moved copy.
+							set_item_count(client_h, m_game->m_client_list[client_h]->m_exchange_item_index[i], amount_left, flow_none);
 							// m_game->m_client_list[client_h]->m_item_list[m_game->m_client_list[client_h]->m_exchange_item_index]->m_name, amount_left);
 						}
 						else {
@@ -5408,7 +5408,11 @@ void ItemManager::build_item_handler(int client_h, char* data)
 						else {
 							count = static_cast<int>(m_game->m_client_list[client_h]->m_item_list[element_item_id[x]]->m_instance.count) - m_game->m_build_item_list[i]->m_material_item_count[x];
 							if (count < 0) count = 0;
-							set_item_count(client_h, element_item_id[x], count);
+							// Element consumption books Make (#105). The clamp
+							// above means a short stack books what it actually
+							// held, not the recipe's demand — the delta is
+							// computed inside the call.
+							set_item_count(client_h, element_item_id[x], count, ItemLogAction::Make);
 						}
 					}
 
@@ -5574,6 +5578,11 @@ void ItemManager::record_counted_flow(int event_type, const CItem& item, int64_t
 	// Instanced items are events, not flows. Guarded here as well as at the one
 	// caller so a later emitter cannot reach this by a route that forgot.
 	if (item.m_serial != 0) return;
+
+	// flow_none is an API sentinel, never a stored number (#105). Guarded at
+	// the funnel for the reason the serial is: "no flow row ever carries a 0"
+	// must not depend on which door a future emitter comes through.
+	if (event_type == flow_none) return;
 
 	const int64_t moved = (qty == flow_qty_from_item)
 		? static_cast<int64_t>(item.m_instance.count)

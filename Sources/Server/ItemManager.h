@@ -193,7 +193,37 @@ public:
 	// copy, which is not the same count (#104). Returns how many landed.
 	int add_client_bulk_item_list(int client_h, const char* item_name, int amount);
 	void release_item_handler(int client_h, short item_index, bool notice);
-	int set_item_count(int client_h, int item_index, uint64_t count);
+
+	// "No transition to book here" — the value set_item_count callers pass when
+	// the count rises, or when the transition is already booked at the call
+	// site: a preceding item_log carrying the moved quantity, an escrow
+	// recorder tied to the DB commit, or a split whose moved portion is its own
+	// item and books its own move. Each site passing it says which of those it
+	// is. Never stored: set_item_count skips it and record_counted_flow refuses
+	// it at the funnel, so no flow row ever carries a 0.
+	static constexpr int32_t flow_none = 0;
+
+	// Sets a stackable's count by slot index and books what left as a Counted
+	// flow, the way set_item_count_by_id does by item id — this sibling kept the
+	// hole for one more ticket (#105): it booked only the count-reaches-0 case,
+	// through item_deplete_handler's exit rows, so a recipe taking 10 reagents
+	// out of a stack of 50 recorded nothing. The three crafting venues (potion
+	// brewing, jewel and necklace crafting, BuildItem elements) pass `Make`, and
+	// what is stored against that number is the consumption of the materials —
+	// the made item books its own birth at the factory, so the two are one
+	// recipe seen from its two ends.
+	//
+	// The quantity booked is the DECREASE this call makes, computed inside for
+	// the reason #103 ratified: a caller-supplied amount can disagree with what
+	// actually changed; a delta cannot. That contract has one rule for callers
+	// — pass the TARGET count, never m_instance.count after mutating it
+	// yourself. A pre-applied decrease reads as a delta of zero and books
+	// nothing while looking correct; no in-tree caller does that (#105
+	// converted the splits that did), and coveragecheck pins the books-nothing
+	// behavior in case the shape reappears. No default: omitting the parameter
+	// is a compile error, which is what keeps the hole from reopening.
+	int set_item_count(int client_h, int item_index, uint64_t count,
+		int32_t flow_type);
 
 	// Sets a stackable's count by item id and books what left as a Counted flow
 	// (#103). Every caller it has is a payment to an NPC — gold spent on a
@@ -211,11 +241,13 @@ public:
 	// omitting it is a compile error, which is what keeps the hole from
 	// reopening the next time somebody needs to take gold off a player.
 	//
-	// The quantity booked is the DECREASE this call makes, computed here from
-	// the count it is about to overwrite. A caller-supplied amount could
-	// disagree with what actually changed; a delta cannot. A count that does not
-	// fall books nothing — quantities are positive, always, because direction is
-	// a property of the flow number and never of a stored sign (D6, #81).
+	// The quantity booked is the DECREASE this call makes, computed inside
+	// set_item_count — to which this delegates after the id → slot lookup
+	// (#105), so the booking contract has one body. A caller-supplied amount
+	// could disagree with what actually changed; a delta cannot. A count that
+	// does not fall books nothing — quantities are positive, always, because
+	// direction is a property of the flow number and never of a stored sign
+	// (D6, #81).
 	int set_item_count_by_id(int client_h, short item_id, uint64_t count,
 		int32_t flow_type);
 	uint64_t get_item_count_by_id(int client_h, short item_id);
