@@ -76,11 +76,18 @@ namespace hb::server
 		int m_total = 0;
 	};
 
-	// The first loaded item-config row with the wanted stackability, or -1.
-	// Deriving probe items from data beats hard-coded ids that a content edit
-	// could quietly turn into the wrong kind of item — and both provers must pick
-	// the same way, or their outputs stop being evidence about the same thing.
-	int find_probe_item(CGame* game, bool want_stackable);
+	// The first loaded item-config row at or above `from` with the wanted
+	// stackability, or -1. Deriving probe items from data beats hard-coded ids
+	// that a content edit could quietly turn into the wrong kind of item — and
+	// both provers must pick the same way, or their outputs stop being evidence
+	// about the same thing.
+	//
+	// `from` is how a prover takes a SECOND probe of the same kind, the way
+	// find_free_handle below hands out a second client handle. Flow rows are
+	// keyed by (day, item_id, flow_type), so two groups of checks that share one
+	// item id share its rows: a check asserting an exact quantity then measures
+	// whatever the other group happened to add to it.
+	int find_probe_item(CGame* game, bool want_stackable, int from = 0);
 
 	// The first non-stackable item the text log's noise filter does NOT cover, or
 	// -1. What `itemlogcheck` needs to tell the two sinks apart: an item the
@@ -116,6 +123,16 @@ namespace hb::server
 	// these for the defaults each of them wants.
 	int64_t event_scalar(sqlite3* db, const char* expr, int event_type, int64_t serial);
 	std::string event_text(sqlite3* db, const char* column, int event_type, int64_t serial);
+
+	// The same, for the Counted tier's aggregates: one projection off one
+	// item_flows row, keyed the way every flow question is — by day, item and
+	// flow number. `expr` may be a column name or an aggregate ("COUNT(*)"), and
+	// -1 still means "no row" per probe_scalar.
+	//
+	// Here for the reason event_scalar is: the SELECT names a table and three
+	// columns a later schema change will move, and the provers had four
+	// hand-typed copies of it between them by the time #103 wanted a fifth.
+	int64_t flow_scalar(sqlite3* db, const char* expr, int32_t day, int item_id, int flow_type);
 
 	// Redirects the game's ledger sink to a scratch database for the length of a
 	// prover run and puts the live store back however the command returns —

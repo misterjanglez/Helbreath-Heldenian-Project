@@ -13,6 +13,20 @@
 //     caller in the whole server, so a gold drop, a potion drunk and a stack of
 //     arrows sold were invisible in both sinks.
 //
+// A third half arrived with #103, and it is the half that makes the money supply
+// answerable: the Counted tier booked inflows but not outflows. Gold leaving a
+// player's hands to an NPC reduces the stack through `set_item_count_by_id`, and
+// that call carried no transition — so a purchase, a repair bill and a spell
+// were unrecorded while every route gold took INTO the world was counted. The
+// checks below assert the funnel books what it removes, under one number per
+// route, always positive.
+//
+// What these checks do not prove, and cannot cheaply: that each VENUE names the
+// right route. The parameter is required rather than defaulted, so a venue
+// cannot omit a transition — that much is a compile error — but a venue naming
+// `Buy` where it meant `Repair` is a review matter, and the venue-to-number
+// table is in PLANS/ItemLedger_Plan.md for that review to check against.
+//
 // The taxonomy question that held it up is settled here by NOT answering it:
 // `flow_type` stores the same number the Instanced path stores in
 // `item_events.event_type`. A second numbering would have been a second set of
@@ -98,12 +112,24 @@ namespace
 	constexpr int64_t exit_qty     = 19;
 	constexpr int64_t despawn_qty  = 23;
 
+	// The purse the outflow checks (#103) spend from, and the three payments it
+	// makes. On a SECOND stackable id, because spending a stack to nothing books
+	// the same exit rows the checks above measure exactly.
+	constexpr int64_t purse_qty    = 211;
+	constexpr int64_t buy_qty      = 29;
+	constexpr int64_t repair_qty   = 31;
+	constexpr int64_t study_qty    = 37;
+	constexpr int64_t refund_qty   = 41;   // a count that RISES, which books nothing
+
 	// Stored numbers as literals. These are permanent world fact the moment real
 	// players exist, and a check that queried with the same symbol it stored
 	// would still pass if both were renumbered together.
 	constexpr int drop_flow_number     = 2;
 	constexpr int get_flow_number      = 3;
+	constexpr int buy_flow_number      = 7;
 	constexpr int sell_flow_number     = 8;
+	constexpr int study_flow_number    = 16;
+	constexpr int repair_flow_number   = 17;
 	constexpr int retrieve_event_number = 9;
 	constexpr int deposit_event_number  = 10;
 	constexpr int give_event_number     = 1;
@@ -115,6 +141,12 @@ namespace
 		"ItemLogAction::get moved: every pickup flow already written means something else now.");
 	static_assert(static_cast<int>(ItemLogAction::Sell) == sell_flow_number,
 		"ItemLogAction::Sell moved: every shop-sale flow already written means something else now.");
+	static_assert(static_cast<int>(ItemLogAction::Buy) == buy_flow_number,
+		"ItemLogAction::Buy moved: every gold-spent-at-a-shop flow means something else now.");
+	static_assert(static_cast<int>(ItemLogAction::MagicLearn) == study_flow_number,
+		"ItemLogAction::MagicLearn moved: every spell-payment flow means something else now.");
+	static_assert(static_cast<int>(ItemLogAction::Repair) == repair_flow_number,
+		"ItemLogAction::Repair moved: every repair-bill flow already written means something else now.");
 	static_assert(static_cast<int>(ItemLogAction::Retrieve) == retrieve_event_number,
 		"ItemLogAction::Retrieve moved: every Warehouse retrieval row means something else now.");
 	static_assert(static_cast<int>(ItemLogAction::Deposit) == deposit_event_number,
@@ -169,8 +201,14 @@ void CmdCoverageCheck::execute(CGame* game, const char* args)
 
 	const int instanced_id = find_probe_item(game, false);
 	const int counted_id = find_probe_item(game, true);
+
+	// A second stackable for the outflow checks (#103): spending a purse to
+	// nothing books the exit rows the merge checks measure to the coin, so the
+	// two groups cannot share an item id.
+	const int spend_id = find_probe_item(game, true, counted_id + 1);
 	if (items.is_valid_item_id(instanced_id) == false
-		|| items.is_valid_item_id(counted_id) == false)
+		|| items.is_valid_item_id(counted_id) == false
+		|| items.is_valid_item_id(spend_id) == false)
 	{
 		hb::console::error("coveragecheck: no usable probe item ids.");
 		return;
@@ -256,6 +294,69 @@ void CmdCoverageCheck::execute(CGame* game, const char* args)
 	items.despawn_item(rotted_raw, despawn_reason::expired, actor_map, actor_x, actor_y);
 
 	//----------------------------------------------------------------------
+	// Outflows: the sink half of the currency loop (#103).
+	//
+	// Money entering the world was booked from the start; money leaving a
+	// player's hands to an NPC was not, because a payment reduces the stack
+	// through set_item_count_by_id and that call carried no transition. So a
+	// purchase, a repair bill and a spell were invisible while every inflow was
+	// counted, and "is the money supply diverging" had only one side.
+	//
+	// Driven through set_item_count_by_id rather than through record_flow, for
+	// the same reason #81 drove its Warehouse checks through the real handlers:
+	// calling the recorder proves only that the recorder records. What is at
+	// issue is whether the funnel books what it removes.
+	//
+	// One purse, spent by all three routes. It survives every payment but the
+	// last, so the exits it eventually books land on `spend_id` and leave the
+	// merge checks above measuring their own rows.
+	//----------------------------------------------------------------------
+
+	// Slot 0 of a synthetic client, the same placement the other provers use
+	// (place_in_inventory, CmdAtomicCheck.cpp) — a probe_client starts with every
+	// slot null and nothing above this fills one. Not add_client_item_list: that
+	// door weighs the stack against the carrier's max load, and a probe has no
+	// strength or level, so a purse worth carrying never fits. The purse is setup
+	// for the checks below, not evidence for them — what is under test is
+	// set_item_count_by_id — so buying the real door's weight formula here would
+	// only make the outcome depend on balance data.
+	//
+	// The inventory owns it from here; the probe_client destructor frees whatever
+	// is left in its item list, as it does for the banked probe below.
+	CClient* carrier = game->m_client_list[actor_h];
+	const bool slot_was_free = (carrier->m_item_list[0] == nullptr);
+	if (slot_was_free) carrier->m_item_list[0] = counted_probe(items, spend_id, purse_qty);
+
+	// Asserted rather than assumed: a check added above that parks something in
+	// slot 0 would otherwise leave these checks measuring the wrong stack.
+	const bool purse_held = slot_was_free && carrier->m_item_list[0] != nullptr;
+
+	// Absolute counts, because that is what the call takes and what the checks
+	// below are written against. Deriving them by subtraction would leave a
+	// reader hand-simulating a sequence to learn what any one payment booked.
+	constexpr int64_t after_buy    = purse_qty - buy_qty;      // 211 - 29 = 182
+	constexpr int64_t after_repair = after_buy - repair_qty;   // 182 - 31 = 151
+	constexpr int64_t after_study  = after_repair - study_qty; // 151 - 37 = 114
+	constexpr int64_t last_coins   = after_study + refund_qty; // 114 + 41 = 155
+
+	const short spend_item = static_cast<short>(spend_id);
+
+	items.set_item_count_by_id(actor_h, spend_item, after_buy, ItemLogAction::Buy);
+	items.set_item_count_by_id(actor_h, spend_item, after_repair, ItemLogAction::Repair);
+	items.set_item_count_by_id(actor_h, spend_item, after_study, ItemLogAction::MagicLearn);
+
+	// A count that RISES. Nothing may be booked: quantities are positive and
+	// direction is a property of the number, so a gain has no outflow to record
+	// — the venue that granted it books its own inflow, as a shop sale does.
+	items.set_item_count_by_id(actor_h, spend_item, last_coins, ItemLogAction::Buy);
+
+	// And the purse spent to the last coin. The stack empties, so this also
+	// books Deplete and destroyed for the whole remainder — the route flow still
+	// has to fire, or "gold spent on repairs" would omit exactly the repairs
+	// that cleaned a player out.
+	items.set_item_count_by_id(actor_h, spend_item, 0, ItemLogAction::Repair);
+
+	//----------------------------------------------------------------------
 	// The Instanced tier is untouched by any of it.
 	//----------------------------------------------------------------------
 
@@ -322,15 +423,19 @@ void CmdCoverageCheck::execute(CGame* game, const char* args)
 
 	auto flow_qty = [&](int flow_type)
 	{
-		return probe_scalar(db, std::format(
-			"SELECT qty FROM item_flows WHERE day={} AND item_id={} AND flow_type={}",
-			day, counted_id, flow_type).c_str());
+		return hb::server::flow_scalar(db, "qty", day, counted_id, flow_type);
 	};
 	auto flow_rows = [&](int flow_type)
 	{
-		return probe_scalar(db, std::format(
-			"SELECT COUNT(*) FROM item_flows WHERE day={} AND item_id={} AND flow_type={}",
-			day, counted_id, flow_type).c_str());
+		return hb::server::flow_scalar(db, "COUNT(*)", day, counted_id, flow_type);
+	};
+	auto spend_flow_qty = [&](int flow_type)
+	{
+		return hb::server::flow_scalar(db, "qty", day, spend_id, flow_type);
+	};
+	auto spend_flow_rows = [&](int flow_type)
+	{
+		return hb::server::flow_scalar(db, "COUNT(*)", day, spend_id, flow_type);
 	};
 	auto instanced_flow_rows = [&]()
 	{
@@ -415,6 +520,65 @@ void CmdCoverageCheck::execute(CGame* game, const char* args)
 
 	// Despawn is its own exit and its own number.
 	tally.record("despawn_books_flow", flow_qty(despawned_number) == despawn_qty);
+
+	//----------------------------------------------------------------------
+	// Outflows (#103)
+	//----------------------------------------------------------------------
+
+	tally.record("purse_held", purse_held);
+
+	// The headline: a payment to an NPC is recorded at all. Before this ticket
+	// set_item_count_by_id carried no transition and this row did not exist.
+	tally.record("outflow_books_flow", spend_flow_rows(buy_flow_number) == 1);
+
+	// Read once and asserted twice — the purchase row is what both the quantity
+	// check and the gain check below turn on, and nothing writes to it between
+	// them (every row reaches disk in the single flush above).
+	const int64_t booked_buy = spend_flow_qty(buy_flow_number);
+
+	// ...and it books what LEFT. The two numbers a wrong implementation reaches
+	// for are both present and both wrong: the count after the payment
+	// (after_buy) and the stack it came out of (purse_qty).
+	tally.record("outflow_books_what_left", booked_buy == buy_qty);
+
+	// One number per route, so the three payments are three rows. This is the
+	// half that makes the ledger answer "where does the money go" rather than
+	// only "how much of it is gone".
+	tally.record("outflow_routes_stay_distinct",
+		spend_flow_qty(study_flow_number) == study_qty
+		&& spend_flow_rows(repair_flow_number) == 1);
+
+	// The stored number is READ BACK rather than filtered on, for the reason the
+	// pickup check above gives: every other query here confirms its own premise.
+	// Keyed on the spell payment, whose quantity is unique on this item id.
+	tally.record("outflow_number_is_the_action_number",
+		probe_scalar(db, std::format(
+			"SELECT flow_type FROM item_flows WHERE day={} AND item_id={} AND qty={}",
+			day, spend_id, study_qty).c_str()) == study_flow_number);
+
+	// A count that rose added nothing. The whole sign convention rests on this:
+	// direction is a property of the number, so an outflow recorder that booked
+	// a gain would be recording a sink that never happened.
+	tally.record("gain_books_no_outflow", booked_buy == buy_qty);
+
+	// Quantities are positive everywhere, in every row the run produced — the
+	// convention stated once, checked against the whole file rather than against
+	// the rows this ticket happens to write.
+	tally.record("no_flow_is_negative",
+		probe_scalar(db, "SELECT COUNT(*) FROM item_flows WHERE qty<0") == 0);
+
+	// Spending the last coin still books the route. The stack empties on that
+	// payment, which sends it down item_deplete_handler — a path that books its
+	// own exit rows and would happily have swallowed the payment with them.
+	tally.record("emptied_purse_books_route",
+		spend_flow_qty(repair_flow_number) == repair_qty + last_coins);
+
+	// ...and the exit rows are still there beside it. They answer a different
+	// question — the slot emptied, the item left the world — and a reader adding
+	// them to the route numbers would count the same coins twice, which is why
+	// this is asserted rather than left to be discovered.
+	tally.record("emptied_purse_books_exit_too",
+		spend_flow_qty(destroyed_number) == last_coins);
 
 	//----------------------------------------------------------------------
 	// Instanced tier unaffected

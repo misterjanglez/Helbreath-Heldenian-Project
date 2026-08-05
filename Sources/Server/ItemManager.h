@@ -194,7 +194,30 @@ public:
 	int add_client_bulk_item_list(int client_h, const char* item_name, int amount);
 	void release_item_handler(int client_h, short item_index, bool notice);
 	int set_item_count(int client_h, int item_index, uint64_t count);
-	int set_item_count_by_id(int client_h, short item_id, uint64_t count);
+
+	// Sets a stackable's count by item id and books what left as a Counted flow
+	// (#103). Every caller it has is a payment to an NPC — gold spent on a
+	// purchase, a repair bill, a spell — which is why the transition is a
+	// parameter here rather than something each venue remembers to record: this
+	// call *is* the outflow, and before #103 it carried no transition at all, so
+	// the currency loop was closed on the inflow side only.
+	//
+	// `flow_type` is the same numbering everything else in the ledger uses
+	// (ItemLedgerStore.h): `Buy` for a purchase, `Repair` for a repair bill,
+	// `MagicLearn` for a spell. Route-specific rather than one shared sink
+	// number, mirroring the inflow side — gold enters as `created` at the shop
+	// and as `NewGenDrop` off a monster — so "how much gold left, and by which
+	// route" is one query per route and their sum is the total. No default:
+	// omitting it is a compile error, which is what keeps the hole from
+	// reopening the next time somebody needs to take gold off a player.
+	//
+	// The quantity booked is the DECREASE this call makes, computed here from
+	// the count it is about to overwrite. A caller-supplied amount could
+	// disagree with what actually changed; a delta cannot. A count that does not
+	// fall books nothing — quantities are positive, always, because direction is
+	// a property of the flow number and never of a stored sign (D6, #81).
+	int set_item_count_by_id(int client_h, short item_id, uint64_t count,
+		int32_t flow_type);
 	uint64_t get_item_count_by_id(int client_h, short item_id);
 	int get_item_space_left(int client_h);
 	void set_item_pos(int client_h, char* data);
@@ -470,9 +493,16 @@ private:
 	//
 	// Answering false for a Counted item is not the same as recording nothing
 	// (#81). Before it declines, it books the transition as an aggregate flow —
-	// which is why the Counted tier costs zero new call sites: every emitter in
-	// the server already comes through this one door, so a stackable moving is
+	// which is why the Counted tier costs zero new call sites: every emitter that
+	// has an EVENT to build comes through this one door, so a stackable moving is
 	// recorded by the same line that records an Instanced one.
+	//
+	// Two Counted-only venues call record_counted_flow directly instead, and both
+	// have the same reason: they know a quantity this door would get wrong. Shop
+	// sale proceeds are minted with a count set after the factory returns (#81),
+	// and a payment to an NPC books the decrease it makes rather than the stack
+	// it came out of (#103). Neither has an Instanced counterpart to build an
+	// event for, so neither loses anything by not passing here.
 	bool begin_ledger_event(int event_type, const CItem* item, int actor_h,
 		hb::server::ledger_event_record& event,
 		int64_t qty = flow_qty_from_item) const;

@@ -1370,7 +1370,11 @@ void ItemManager::request_purchase_item_handler(int client_h, const char* item_n
 			if (erase_req == 1) destroy_item(item, destroy_reason::merged, client_h);
 
 			// Gold  .      .
-			gold_weight = set_item_count_by_id(client_h, hb::shared::item::ItemId::Gold, gold_count - temp_price);
+			// The other half of the purchase (#103). The item bought books Buy
+			// above; the gold that paid for it books Buy too, under its own
+			// item_id — so a shop trade is one number read from two sides.
+			gold_weight = set_item_count_by_id(client_h, hb::shared::item::ItemId::Gold,
+				gold_count - temp_price, ItemLogAction::Buy);
 			m_game->calc_total_weight(client_h);
 
 			m_game->m_city_status[m_game->m_client_list[client_h]->m_side].funds += temp_price;
@@ -1758,7 +1762,8 @@ uint64_t ItemManager::get_item_count_by_id(int client_h, short item_id)
 	return 0;
 }
 
-int ItemManager::set_item_count_by_id(int client_h, short item_id, uint64_t count)
+int ItemManager::set_item_count_by_id(int client_h, short item_id, uint64_t count,
+	int32_t flow_type)
 {
 	if (m_game->m_client_list[client_h] == nullptr) return -1;
 
@@ -1766,13 +1771,33 @@ int ItemManager::set_item_count_by_id(int client_h, short item_id, uint64_t coun
 		if (m_game->m_client_list[client_h]->m_item_list[i] != nullptr &&
 		    m_game->m_client_list[client_h]->m_item_list[i]->m_id_num == item_id) {
 
-			uint16_t weight = get_item_weight(m_game->m_client_list[client_h]->m_item_list[i], 1);
+			CItem* stack = m_game->m_client_list[client_h]->m_item_list[i];
+			uint16_t weight = get_item_weight(stack, 1);
+
+			// The outflow, booked before either branch below runs (#103). It has
+			// to be first: the count == 0 branch destroys `stack`, so a booking
+			// after it would read a freed item.
+			//
+			// The amount is what this call removes, not what remains and not
+			// what the stack held. Nothing is booked when the count does not
+			// fall, which leaves a hypothetical future *inflow* caller to record
+			// its own gain at its own venue — the shape the shop-sale proceeds
+			// already use, and the reason no row here is ever negative.
+			if (count < stack->m_instance.count)
+				record_counted_flow(flow_type, *stack,
+					static_cast<int64_t>(stack->m_instance.count - count));
 
 			if (count == 0) {
+				// Also books Deplete and destroyed for the whole remainder, as
+				// every emptied stack in the game does. That is a different
+				// question answered by different numbers — the slot emptied, and
+				// the item left the world — so the route flow above still has to
+				// fire, or "gold spent on repairs" would silently omit exactly
+				// the repairs that emptied a purse.
 				item_deplete_handler(client_h, i, false);
 			}
 			else {
-				m_game->m_client_list[client_h]->m_item_list[i]->m_instance.count = count;
+				stack->m_instance.count = count;
 				m_game->send_notify_msg(0, client_h, Notify::set_item_count, i, count, (char)true, 0);
 			}
 
@@ -3500,7 +3525,13 @@ void ItemManager::req_repair_item_cofirm_handler(int client_h, char item_id, con
 			m_game->m_client_list[client_h]->m_item_list[item_id]->m_instance.cur_durability = m_game->m_client_list[client_h]->m_item_list[item_id]->m_durability;
 			m_game->send_notify_msg(0, client_h, Notify::ItemRepaired, item_id, m_game->m_client_list[client_h]->m_item_list[item_id]->m_instance.cur_durability, 0, 0);
 
-			gold_weight = set_item_count_by_id(client_h, hb::shared::item::ItemId::Gold, gold_count - price);
+			// The repair bill (#103). `Repair` had a text-sink switch arm and no
+			// caller in the whole server before this, so this is the first
+			// meaning ever stored against the number: gold that left a player to
+			// an NPC smith. The repair itself stays unrecorded — it is a
+			// durability change on an item that never changes hands.
+			gold_weight = set_item_count_by_id(client_h, hb::shared::item::ItemId::Gold,
+				gold_count - price, ItemLogAction::Repair);
 
 			m_game->calc_total_weight(client_h);
 
@@ -6956,6 +6987,17 @@ void ItemManager::request_repair_all_items_confirm_handler(int client_h)
 				m_game->send_notify_msg(0, client_h, Notify::ItemRepaired, m_game->m_client_list[client_h]->m_repair_all[i].index, m_game->m_client_list[client_h]->m_item_list[m_game->m_client_list[client_h]->m_repair_all[i].index]->m_instance.cur_durability, 0, 0);
 			}
 		}
-		m_game->calc_total_weight(set_item_count_by_id(client_h, hb::shared::item::ItemId::Gold, get_item_count_by_id(client_h, hb::shared::item::ItemId::Gold) - totalPrice));
+		// The same bill as the single-item repair above, so the same number
+		// (#103): one query answers "gold spent on repairs" whichever door the
+		// player used.
+		//
+		// !!! BUG POINT — calc_total_weight wants a client handle and is handed
+		// set_item_count_by_id's return, which is a weight. The player's carried
+		// load is therefore not recalculated after a repair-all. Faithful to the
+		// original (HGServer Game.cpp:57630 has the identical line), so it is
+		// left as-is here rather than fixed in passing by a ledger ticket.
+		m_game->calc_total_weight(set_item_count_by_id(client_h, hb::shared::item::ItemId::Gold,
+			get_item_count_by_id(client_h, hb::shared::item::ItemId::Gold) - totalPrice,
+			ItemLogAction::Repair));
 	}
 }

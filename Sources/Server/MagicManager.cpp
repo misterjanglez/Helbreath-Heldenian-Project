@@ -2566,7 +2566,13 @@ void MagicManager::request_study_magic_handler(int client_h, const char* name, b
 
 		if ((req_int <= (m_game->m_client_list[client_h]->effective_int() + m_game->m_client_list[client_h]->m_angelic_int)) && (magic)) {
 
-			if (is_purchase) m_game->m_item_manager->set_item_count_by_id(client_h, hb::shared::item::ItemId::Gold, gold_count - cost);
+			// Gold paid to a magic shop (#103). `MagicLearn` had a text-sink
+			// switch arm and no caller before this, and what is stored against
+			// it is the payment, not the lesson: a spell learned is not an item
+			// and has no place in an item ledger, while the gold that bought it
+			// is a real sink out of the money supply.
+			if (is_purchase) m_game->m_item_manager->set_item_count_by_id(client_h,
+				hb::shared::item::ItemId::Gold, gold_count - cost, ItemLogAction::MagicLearn);
 
 			m_game->calc_total_weight(client_h);
 

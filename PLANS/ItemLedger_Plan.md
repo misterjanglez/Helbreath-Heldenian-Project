@@ -162,8 +162,10 @@ call sites.
 | Pick up | 3 | ✓ | ✓ | `client_motion_get_item_handler`, `MagicManager` |
 | Deplete | 4 | ✓ | ✓ | `item_deplete_handler` (21 sites funnel here, #79) |
 | NPC drop | 5 | ✓ | ✓ | `EntityManager::npc_dead_item_generator` |
-| Shop buy | 7 | ✓ | ✓ | `request_purchase_item_handler` |
+| Shop buy | 7 | ✓ | ✓ | `request_purchase_item_handler` — **the gold too since #103** ⁵ |
 | Shop sell | 8 | ✓ | ✓ ² | `req_sell_item_confirm_handler` |
+| Magic-shop payment | 16 | n/a | ✓ | `request_study_magic_handler` — **new in #103** ⁵ |
+| Repair bill | 17 | n/a | ✓ | both repair-confirm handlers — **new in #103** ⁵ |
 | Warehouse retrieve | 9 | ✓ | ✓ | `request_retrieve_item_handler` — **new in #81**, both branches |
 | Warehouse deposit | 10 | ✓ | ✓ | `set_item_to_bank_item` — **new in #81** |
 | Exchange | 11 | ✓ | ✓ | `confirm_exchange_item` (snapshot carries the traded count) |
@@ -197,26 +199,91 @@ recorders; the Instanced members carry Serials and book events.
 whose contents live on in the stack it joined, so nothing left the world. Every
 gold pickup takes that path, so counting it would double-count the currency supply.
 
-**Actions with no caller** (a text-sink switch arm and nothing reaching it):
-`SkillLearn` 12, `Make` 13, `SummonMonster` 14, `Poisoned` 15, `MagicLearn` 16,
-`Repair` 17. None is a custody move: the first five consume an item, and that exit
-is already recorded by `destroy_item` through `item_deplete_handler`; `Repair` is a
-durability change on an item that never changes hands. Left unwired deliberately —
-adding an event that duplicates an exit already recorded would break "exactly one"
-as surely as recording none.
+⁵ **The outflow half of the currency loop, closed by #103.** Money leaving a
+player's hands to an NPC reduces the stack through `set_item_count_by_id`, and
+that call carried no transition — so purchases, repair bills and spell payments
+were unrecorded while every route money took *into* the world was counted. The
+transition is now a required parameter of that call: omitting one is a compile
+error, and the quantity booked is the *decrease the call makes*, computed inside
+it, because a caller-supplied amount can disagree with what actually changed and
+a delta cannot.
 
-**Known gap, deliberate:** gold *spent* is not booked. Purchases, repairs and
-magic-shop payments reduce the stack through `set_item_count_by_id` directly, which
-carries no transition, so the currency loop is closed on the inflow side only. Not
-closed here because it wants the same deliberate pass this ticket gave `flow_type`
-— the sinks are a handful of sites but each needs the right number, and `Repair`
-being one of them means picking a meaning for a value that has never been stored.
+### The direction convention (ratified by the owner 2026-08-04, #103)
+
+Two one-way doors, decided together because the first row written fixes both.
+
+**1. One flow number per route, never a shared sink number.** Gold paid at a shop
+books `Buy` 7, a repair bill books `Repair` 17, a spell books `MagicLearn` 16.
+This mirrors the inflow side, which was already route-specific — money enters as
+`created` 100 at the shop and as `NewGenDrop` 5 off a monster — so "how much left,
+by which route" is one query per route and their sum is the total. `Repair` and
+`MagicLearn` had a text-sink switch arm and no caller before this, so these are
+the first meanings ever stored against those numbers.
+
+*Rejected:* one shared number for every sink. `destroyed` 102 was the tempting
+one, since it mirrors `created` 100 exactly — but `item_deplete_handler` already
+books `destroyed` when a stack empties, so an exhaustive payment would have been
+counted twice under it, and the route would have been lost as well.
+
+**2. Quantities are positive. Always.** Direction is a property of the number, not
+of a stored sign — the same rule #81 ratified for the taxonomy, and what
+`record_flow` already documented. A count that *rises* books nothing here; the
+venue that granted the gain records its own inflow at its own venue, as the shop
+sale proceeds do. `record_flow` still permits a negative qty and still does not
+judge; nothing in the server passes one.
+
+**What a reader must know.** Three classes of number, and adding across the
+classes counts the same units twice:
+
+| Class | Numbers | Question it answers |
+|---|---|---|
+| Source | `created` 100, `NewGenDrop` 5 | how much entered the world |
+| Sink — route | `Buy` 7, `MagicLearn` 16, `Repair` 17 | how much left, and to what |
+| Sink — exit | `Deplete` 4, `destroyed` 102, `despawned` 101 | the slot emptied / it left the world |
+| Movement | `Give` 1, `Drop` 2, `get` 3, `Retrieve` 9, `Deposit` 10, `Exchange` 11, Trading Post 33–39 | it changed hands; the total is unmoved |
+
+A payment that empties a purse books its **route** number *and* the exit numbers,
+because those answer different questions — so money supply is
+`sum(source) - sum(sink-route)`, and the exit rows are read on their own.
+`coveragecheck` asserts this overlap rather than leaving it to be discovered.
+
+**Actions with no caller** (a text-sink switch arm and nothing reaching it):
+`SkillLearn` 12, `Make` 13, `SummonMonster` 14, `Poisoned` 15. None is a custody
+move: each consumes an item, and that exit is recorded by `destroy_item` through
+`item_deplete_handler`. Left unwired deliberately — adding an event that
+duplicates an exit already recorded would break "exactly one" as surely as
+recording none. `Repair` 17 and `MagicLearn` 16 left this list in #103, and what
+they record is the *payment*, not the act: a repair is a durability change on an
+item that never changes hands, and a spell learned is not an item at all.
+
+**Known gap, found by #103's review and filed as #105:** the sibling setter
+`ItemManager::set_item_count` (by slot index) has the hole #103 just closed on
+`set_item_count_by_id`. It books only when the count reaches exactly 0, via
+`item_deplete_handler`; a *partial* decrement overwrites the count and records
+nothing. Three live callers take that path — `CraftingManager.cpp:179` and `:455`
+(potion brewing, jewel and necklace crafting) and `ItemManager.cpp:5411`
+(`BuildItem` element consumption) — and none of them logs anywhere else, so
+reagents consumed out of a stack the player did not empty are unrecorded. This
+also means the paragraph above understates the case for `Make` 13: the exit it
+would duplicate is only recorded when a stack empties. Other `set_item_count`
+callers are clean — the sale, exchange, split and Warehouse paths each emit an
+explicit `item_log` immediately before the mutation, and the Trading Post books
+its escrow on DB commit instead. Out of scope for #103, which is about the
+currency loop; wiring it needs the same deliberate pass on which number a
+consumed reagent should carry — and #103's own fix does not copy over, because
+the split callers here mutate the count *before* the call, so a delta computed
+inside would read zero. See #105.
 
 **Mechanical enforcement.** Three scripts, all green as of this audit:
 `Scripts/check_item_factory.py` (nothing is born outside the factory — 7 sanctioned),
 `Scripts/check_item_destroy.py` (nothing dies outside the funnel — 29 classified),
 and `Scripts/check_item_merge.py` (**new in #81** — no husk is abandoned by a stack
-merge; 22 sites). The prover is `coveragecheck` (24/24).
+merge; 22 sites). The prover is `coveragecheck` (33/33 since #103).
+
+What `coveragecheck` does *not* prove, and cannot cheaply: that each venue names
+the right route. A venue cannot omit a transition — the parameter is required, so
+that much is a compile error — but one naming `Buy` where it meant `Repair` is a
+review matter, and the four sites in the table above are what that review checks.
 
 Known gaps in today's `item_log()` (verified in code, 2026-07-29 — **all closed by
 #79/#80/#81; kept as the record of what the audit was aimed at**):

@@ -13,9 +13,9 @@
 
 namespace hb::server
 {
-	int find_probe_item(CGame* game, bool want_stackable)
+	int find_probe_item(CGame* game, bool want_stackable, int from)
 	{
-		for (int i = 0; i < hb::server::config::MaxItemTypes; i++)
+		for (int i = from; i < hb::server::config::MaxItemTypes; i++)
 		{
 			CItem* config = game->m_item_config_list[i];
 			if (config == nullptr) continue;
@@ -86,6 +86,13 @@ namespace hb::server
 	int64_t event_scalar(sqlite3* db, const char* expr, int event_type, int64_t serial)
 	{
 		return probe_scalar(db, event_sql(expr, event_type, serial).c_str());
+	}
+
+	int64_t flow_scalar(sqlite3* db, const char* expr, int32_t day, int item_id, int flow_type)
+	{
+		return probe_scalar(db, std::format(
+			"SELECT {} FROM item_flows WHERE day={} AND item_id={} AND flow_type={};",
+			expr, day, item_id, flow_type).c_str());
 	}
 
 	std::string event_text(sqlite3* db, const char* column, int event_type, int64_t serial)

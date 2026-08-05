@@ -93,12 +93,37 @@ never blocks it. Two things to know:
 | 2 | Drop | 32 | Use |
 | 3 | get (pick up) | 33–39 | Trading Post escrow |
 | 4 | Deplete | 40 | GmMint |
-| 5 | NewGenDrop (monster drop) | 100 | created |
-| 7 | Buy | 101 | despawned |
-| 8 | Sell | 102 | destroyed |
-| 9 / 10 | Retrieve / Deposit | 103 | boundary (a server run started) |
+| 5 | NewGenDrop (monster drop) | 16 | MagicLearn (gold paid for a spell) |
+| 7 | Buy | 17 | Repair (gold paid for a repair) |
+| 8 | Sell | 100 | created |
+| 9 / 10 | Retrieve / Deposit | 101 | despawned |
+| 11 | Exchange | 102 | destroyed |
+| — | — | 103 | boundary (a server run started) |
 
 `item_flows.flow_type` uses the **same** numbers for the Counted (stackable) tier.
+
+### Reading a flow: direction is in the number, never in the sign
+
+Quantities are always positive (#103). Which way the units moved is a property of
+the flow number, so a reader has to classify before it adds — and adding across
+the classes counts the same units twice:
+
+- **Source** — `created` 100, `NewGenDrop` 5. Units entered the world.
+- **Sink, by route** — `Buy` 7, `MagicLearn` 16, `Repair` 17. Gold left a player
+  to an NPC, and the number says which counter it was paid at.
+- **Sink, by exit** — `Deplete` 4, `destroyed` 102, `despawned` 101. The slot
+  emptied, the item left the world, the ground item rotted.
+- **Movement** — `Give` 1, `Drop` 2, `get` 3, `Retrieve` 9, `Deposit` 10,
+  `Exchange` 11, Trading Post 33–39. It changed hands; the world total is unmoved.
+
+**Money supply is `sum(source) − sum(sink-by-route)` for `item_id = 90` (Gold).**
+Do not add the exit rows into that: a payment that spends a purse to the last coin
+books its route number *and* `Deplete` *and* `destroyed`, because those answer a
+different question. The exit rows are read on their own.
+
+One number can appear on both sides of a trade, distinguished by `item_id`: a shop
+purchase books `Buy` 7 on the item bought *and* `Buy` 7 on the gold that paid for
+it. That is the same transaction read from two sides, not a double count.
 
 ## What these queries cannot tell you
 
