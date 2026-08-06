@@ -170,7 +170,7 @@ call sites.
 | Warehouse deposit | 10 | ✓ | ✓ | `set_item_to_bank_item` — **new in #81** |
 | Exchange | 11 | ✓ | ✓ | `confirm_exchange_item` (snapshot carries the traded count) |
 | Upgrade fail/success | 29/30 | ✓ | n/a | the upgrade handlers |
-| Use | 32 | ✓ | ✓ | `use_item_handler` |
+| Use | 32 | — ⁶ | ✓ | ammunition: `calculate_attack_effect` → `set_item_count` — **new in #109** |
 | Trading Post ×7 | 33–39 | ✓ | ✓ ³ | `deliver_to_bank` (out), per-call-site (in) — #80 |
 | GM mint | 40 | ✓ | ✓ | `mint_gm_items`, `GameCmdCreateItem`, `GameCmdGiveItem` |
 | Ground despawn | `despawned` 101 | ✓ | ✓ | `despawn_item` (expired / tile_overflow / world_shutdown) |
@@ -208,6 +208,13 @@ error, and the quantity booked is the *decrease the call makes*, computed inside
 it, because a caller-supplied amount can disagree with what actually changed and
 a delta cannot.
 
+⁶ **`Use` has no live Instanced emitter** — the one historical call site (slate
+reading) is commented out, and the fixtures that write `Use` events (reconcile,
+biography) are synthetic. Its first stored meaning arrived on the Counted side
+with #109: ammunition consumed by firing, booked by `set_item_count` from the
+combat site, one arrow per consuming shot. Arrows are stackable, so an Instanced
+arrow cannot exist; the tier split is not a gap.
+
 ### The direction convention (ratified by the owner 2026-08-04, #103)
 
 Two one-way doors, decided together because the first row written fixes both.
@@ -238,7 +245,7 @@ classes counts the same units twice:
 | Class | Numbers | Question it answers |
 |---|---|---|
 | Source | `created` 100, `NewGenDrop` 5 | how much entered the world |
-| Sink — route | `Buy` 7, `Make` 13, `MagicLearn` 16, `Repair` 17 | how much left, and to what |
+| Sink — route | `Buy` 7, `Make` 13, `MagicLearn` 16, `Repair` 17, `Use` 32 | how much left, and to what |
 | Sink — exit | `Deplete` 4, `destroyed` 102, `despawned` 101 | the slot emptied / it left the world |
 | Movement | `Give` 1, `Drop` 2, `get` 3, `Retrieve` 9, `Deposit` 10, `Exchange` 11, Trading Post 33–39 | it changed hands; the total is unmoved |
 
@@ -289,20 +296,33 @@ portion is its own item and books its own move. `flow_none` is never stored:
 `set_item_count` skips it and `record_counted_flow` refuses it at the funnel,
 so no flow row ever carries a 0.
 
-**Known-open doors, found by #105's review and filed:** arrow consumption is a
-hand-rolled inline copy of the setter with the same partial-decrement hole and
-one more — its emptying shot books no exit rows at all, because it decrements
-before calling deplete (#109). A rejected Give books a `destroyed` flow for
-items the player kept — `discarded` where the merge semantics apply (#110).
-And the product side of crafting is unbooked: a brewed stack enters the world
-with no `created` flow, so the craft loop reads as a pure sink now that #105
-records its material side (#111).
+**Closed by #109: the last hand-rolled copy.** Arrow consumption in
+`CombatManager::calculate_attack_effect` inlined the setter's
+decrement-or-deplete-and-notify body — minus the booking, and with the
+decrement *before* the deplete call, so the quiver-emptying shot handed the
+exit bookings a count-0 stack and the zero-quantity guard dropped them: an
+emptied quiver left neither a `Deplete` row nor a `destroyed` row, the one
+emptied stack in the game with no exit. The site now calls
+`set_item_count(…, Use, use_response=false)` — one arrow per consuming shot, a
+Directional-bow sweep application consumes and sends nothing — so `Use` 32
+gained its first stored meaning: *ammunition consumed by firing*, a sink-route
+number beside `Make`. The setter's notify byte became a parameter
+(`use_response`, default true) because the client reads it as "this answers an
+item-use you initiated" and releases its slot lock; a fired arrow is the
+server's doing and keeps sending false, as the site has since the original.
+No direct `m_instance.count` decrement remains anywhere in the server.
+
+**Known-open doors, found by #105's review and filed:** a rejected Give books
+a `destroyed` flow for items the player kept — `discarded` where the merge
+semantics apply (#110). And the product side of crafting is unbooked: a brewed
+stack enters the world with no `created` flow, so the craft loop reads as a
+pure sink now that #105 records its material side (#111).
 
 **Mechanical enforcement.** Three scripts, all green as of this audit:
 `Scripts/check_item_factory.py` (nothing is born outside the factory — 7 sanctioned),
 `Scripts/check_item_destroy.py` (nothing dies outside the funnel — 29 classified),
 and `Scripts/check_item_merge.py` (**new in #81** — no husk is abandoned by a stack
-merge; 22 sites). The prover is `coveragecheck` (40/40 since #105).
+merge; 22 sites). The prover is `coveragecheck` (45/45 since #109).
 
 What `coveragecheck` does *not* prove, and cannot cheaply: that each venue names
 the right route. A venue cannot omit a transition — the parameter is required, so

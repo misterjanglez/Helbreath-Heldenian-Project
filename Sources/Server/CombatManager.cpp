@@ -2913,20 +2913,23 @@ uint32_t CombatManager::calculate_attack_effect(short target_h, char target_type
 					return 0;
 				}
 				else {
-					if (m_game->m_client_list[attacker_h]->m_item_list[m_game->m_client_list[attacker_h]->m_arrow_index] == 0)
+					CClient* attacker = m_game->m_client_list[attacker_h];
+					const int arrow_index = attacker->m_arrow_index;
+					CItem* arrow = attacker->m_item_list[arrow_index];
+					if (arrow == 0)
 						return 0;
 
-					int arrow_id_num = m_game->m_client_list[attacker_h]->m_item_list[m_game->m_client_list[attacker_h]->m_arrow_index]->m_id_num;
+					int arrow_id_num = arrow->m_id_num;
 
-					if (arrow_use != true)
-						m_game->m_client_list[attacker_h]->m_item_list[m_game->m_client_list[attacker_h]->m_arrow_index]->m_instance.count--;
-					if (m_game->m_client_list[attacker_h]->m_item_list[m_game->m_client_list[attacker_h]->m_arrow_index]->m_instance.count <= 0) {
-
-						m_game->m_item_manager->item_deplete_handler(attacker_h, m_game->m_client_list[attacker_h]->m_arrow_index, false);
-						m_game->m_client_list[attacker_h]->m_arrow_index = m_game->m_item_manager->get_arrow_item_index(attacker_h);
-					}
-					else {
-						m_game->send_notify_msg(0, attacker_h, Notify::set_item_count, m_game->m_client_list[attacker_h]->m_arrow_index, m_game->m_client_list[attacker_h]->m_item_list[m_game->m_client_list[attacker_h]->m_arrow_index]->m_instance.count, false, 0);
+					// One arrow per consuming shot, booked as `Use` through
+					// set_item_count — the one decrement-or-deplete-and-notify
+					// implementation (#109); see its header for the notify byte
+					// and for which branch refreshes m_arrow_index and the carry
+					// weight. A Directional-bow sweep application (arrow_use)
+					// consumes nothing and sends nothing.
+					if (arrow_use != true) {
+						m_game->m_item_manager->set_item_count(attacker_h, arrow_index,
+							arrow->m_instance.count - 1, ItemLogAction::Use, false);
 						m_game->calc_total_weight(attacker_h);
 					}
 

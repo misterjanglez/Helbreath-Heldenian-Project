@@ -222,8 +222,20 @@ public:
 	// converted the splits that did), and coveragecheck pins the books-nothing
 	// behavior in case the shape reappears. No default: omitting the parameter
 	// is a compile error, which is what keeps the hole from reopening.
+	//
+	// Post-conditions the two branches do not share: the count==0 branch runs
+	// item_deplete_handler, which refreshes m_arrow_index and recalculates
+	// carry weight; the surviving branch does neither, so a caller that needs
+	// the total weight current recalculates after the call.
+	//
+	// `is_use_item_result` is the count notify's third byte — the client
+	// treats true as the answer to an item-use it initiated and releases that
+	// slot's client-side lock. It may default (unlike flow_type) because a
+	// wrong byte is a transient UI lock state, not lost audit data. Ammunition
+	// (#109) passes false — a fired arrow is the server's doing, the byte that
+	// site has sent since the original.
 	int set_item_count(int client_h, int item_index, uint64_t count,
-		int32_t flow_type);
+		int32_t flow_type, bool is_use_item_result = true);
 
 	// Sets a stackable's count by item id and books what left as a Counted flow
 	// (#103). Every caller it has is a payment to an NPC — gold spent on a
@@ -247,7 +259,9 @@ public:
 	// could disagree with what actually changed; a delta cannot. A count that
 	// does not fall books nothing — quantities are positive, always, because
 	// direction is a property of the flow number and never of a stored sign
-	// (D6, #81).
+	// (D6, #81). Deliberately no `is_use_item_result` parameter: every caller
+	// is a payment answering a dialog the player opened, so the delegation
+	// passes the sibling's default (true).
 	int set_item_count_by_id(int client_h, short item_id, uint64_t count,
 		int32_t flow_type);
 	uint64_t get_item_count_by_id(int client_h, short item_id);

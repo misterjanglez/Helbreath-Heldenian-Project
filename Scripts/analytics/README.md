@@ -97,7 +97,7 @@ never blocks it. Two things to know:
 | 7 | Buy | 17 | Repair (gold paid for a repair) |
 | 8 | Sell | 100 | created |
 | 9 / 10 | Retrieve / Deposit | 101 | despawned |
-| 11 | Exchange | 102 | destroyed |
+| 13 | Make (reagents consumed by crafting) | 102 | destroyed |
 | — | — | 103 | boundary (a server run started) |
 
 `item_flows.flow_type` uses the **same** numbers for the Counted (stackable) tier.
@@ -109,8 +109,9 @@ the flow number, so a reader has to classify before it adds — and adding acros
 the classes counts the same units twice:
 
 - **Source** — `created` 100, `NewGenDrop` 5. Units entered the world.
-- **Sink, by route** — `Buy` 7, `MagicLearn` 16, `Repair` 17. Gold left a player
-  to an NPC, and the number says which counter it was paid at.
+- **Sink, by route** — `Buy` 7, `Make` 13, `MagicLearn` 16, `Repair` 17,
+  `Use` 32. Units left a player's hands for good and the number says how: paid
+  at a counter, taken by a recipe, fired from a bow (#109).
 - **Sink, by exit** — `Deplete` 4, `destroyed` 102, `despawned` 101. The slot
   emptied, the item left the world, the ground item rotted.
 - **Movement** — `Give` 1, `Drop` 2, `get` 3, `Retrieve` 9, `Deposit` 10,

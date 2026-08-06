@@ -28,6 +28,17 @@
 // books `Make` for the decrease, and a flow_none decrease, a rise and an
 // already-applied decrease book nothing.
 //
+// #109 folded the last hand-rolled copy of that setter into it: arrow
+// consumption in CombatManager inlined the decrement-or-deplete body, so a
+// fired arrow booked nothing and — because the copy decremented BEFORE calling
+// deplete — the quiver-emptying shot handed the exit bookings a count-0 stack,
+// which the zero-quantity guard drops. An emptied quiver left no Deplete row
+// and no destroyed row, where every other emptied stack in the game books
+// both. The checks below fire a quiver dry one arrow at a time and assert the
+// ammunition number: `Use` books each shot's decrease, accumulates across
+// shots, and the last arrow books its exit rows for a count of one — the
+// stack as it stood when deplete took it, not after.
+//
 // What these checks do not prove, and cannot cheaply: that each VENUE names the
 // right route. The parameter is required rather than defaulted, so a venue
 // cannot omit a transition — that much is a compile error — but a venue naming
@@ -137,6 +148,12 @@ namespace
 	constexpr int64_t rise_qty      = 53;   // a count that RISES, which books nothing
 	constexpr int64_t applied_qty   = 3;    // a decrease the caller applied first (delta 0)
 
+	// The quiver the ammunition checks (#109) fire dry, on a FOURTH stackable
+	// id: its last arrow books exit rows, and a shared id would land them in
+	// another group's total. One more unused prime, so a sum that mixed groups
+	// cannot land right by coincidence.
+	constexpr int64_t quiver_qty    = 59;
+
 	// Stored numbers as literals. These are permanent world fact the moment real
 	// players exist, and a check that queried with the same symbol it stored
 	// would still pass if both were renumbered together.
@@ -147,6 +164,7 @@ namespace
 	constexpr int make_flow_number     = 13;
 	constexpr int study_flow_number    = 16;
 	constexpr int repair_flow_number   = 17;
+	constexpr int use_flow_number      = 32;
 	constexpr int retrieve_event_number = 9;
 	constexpr int deposit_event_number  = 10;
 	constexpr int give_event_number     = 1;
@@ -166,6 +184,8 @@ namespace
 		"ItemLogAction::Make moved: every reagent-consumption flow means something else now.");
 	static_assert(static_cast<int>(ItemLogAction::Repair) == repair_flow_number,
 		"ItemLogAction::Repair moved: every repair-bill flow already written means something else now.");
+	static_assert(static_cast<int>(ItemLogAction::Use) == use_flow_number,
+		"ItemLogAction::Use moved: every ammunition-consumption flow means something else now.");
 	static_assert(static_cast<int>(ItemLogAction::Retrieve) == retrieve_event_number,
 		"ItemLogAction::Retrieve moved: every Warehouse retrieval row means something else now.");
 	static_assert(static_cast<int>(ItemLogAction::Deposit) == deposit_event_number,
@@ -229,10 +249,14 @@ void CmdCoverageCheck::execute(CGame* game, const char* args)
 	// And a third for the slot-keyed checks (#105), disjoint from both groups
 	// above for the reason the purse is disjoint from the first.
 	const int craft_id = find_probe_item(game, true, spend_id + 1);
+
+	// And a fourth for the ammunition checks (#109), disjoint again.
+	const int arrow_id = find_probe_item(game, true, craft_id + 1);
 	if (items.is_valid_item_id(instanced_id) == false
 		|| items.is_valid_item_id(counted_id) == false
 		|| items.is_valid_item_id(spend_id) == false
-		|| items.is_valid_item_id(craft_id) == false)
+		|| items.is_valid_item_id(craft_id) == false
+		|| items.is_valid_item_id(arrow_id) == false)
 	{
 		hb::console::error("coveragecheck: no usable probe item ids.");
 		return;
@@ -424,6 +448,36 @@ void CmdCoverageCheck::execute(CGame* game, const char* args)
 	items.set_item_count(actor_h, 1, 0, ItemLogAction::Make);
 
 	//----------------------------------------------------------------------
+	// Ammunition (#109): the last hand-rolled copy of the setter, folded in.
+	//
+	// Arrow consumption in CombatManager reimplemented the body inline —
+	// decrement, deplete at zero, notify otherwise — minus the booking, and
+	// with the decrement BEFORE the deplete call, so the quiver-emptying shot
+	// handed the exit bookings a count-0 stack and the zero-quantity guard
+	// dropped them: an emptied quiver left neither a Deplete row nor a
+	// destroyed row. Driven through set_item_count with the caller's real
+	// shape — one arrow per shot, target count, `Use`, dry to the last arrow —
+	// for the reason the reagent checks drive through it: what is at issue is
+	// the door's own booking under the ammunition number. The combat caller's
+	// own choices — the sweep-shot exclusion, the notify byte (wire-only, so
+	// no check can read it), the weight recalc — are reviewed by reading.
+	//----------------------------------------------------------------------
+
+	const bool quiver_slot_free = (carrier->m_item_list[2] == nullptr);
+	if (quiver_slot_free) carrier->m_item_list[2] = counted_probe(items, arrow_id, quiver_qty);
+	const bool quiver_held = quiver_slot_free && carrier->m_item_list[2] != nullptr;
+
+	// Every shot removes exactly one, which is what makes the accumulated Use
+	// row equal the quiver: a door that booked the target count would sum to
+	// 1711, one that booked what the stack held to 1770 — both off-total. The
+	// last iteration passes 0 and empties the stack, arrow in hand. The false
+	// is the combat site's notify byte, passed for fidelity only — it never
+	// reaches the ledger.
+	for (int64_t left = quiver_qty; left > 0; --left)
+		items.set_item_count(actor_h, 2, static_cast<uint64_t>(left - 1),
+			ItemLogAction::Use, false);
+
+	//----------------------------------------------------------------------
 	// The Instanced tier is untouched by any of it.
 	//----------------------------------------------------------------------
 
@@ -511,6 +565,14 @@ void CmdCoverageCheck::execute(CGame* game, const char* args)
 	auto craft_flow_rows = [&](int flow_type)
 	{
 		return hb::server::flow_scalar(db, "COUNT(*)", day, craft_id, flow_type);
+	};
+	auto arrow_flow_qty = [&](int flow_type)
+	{
+		return hb::server::flow_scalar(db, "qty", day, arrow_id, flow_type);
+	};
+	auto arrow_flow_rows = [&](int flow_type)
+	{
+		return hb::server::flow_scalar(db, "COUNT(*)", day, arrow_id, flow_type);
 	};
 	auto instanced_flow_rows = [&]()
 	{
@@ -700,6 +762,39 @@ void CmdCoverageCheck::execute(CGame* game, const char* args)
 	// as the purse's last payment does.
 	tally.record("emptied_reagent_books_exit_too",
 		craft_flow_qty(destroyed_number) == after_applied);
+
+	//----------------------------------------------------------------------
+	// Ammunition (#109)
+	//----------------------------------------------------------------------
+
+	tally.record("quiver_held", quiver_held);
+
+	// The headline: a fired arrow is recorded at all. Before this ticket the
+	// combat site booked nothing anywhere, and ammunition — the highest-volume
+	// Counted consumable in the game — was absent from the consumption picture
+	// the tier had for reagents and gold.
+	tally.record("fired_arrow_books_use", arrow_flow_rows(use_flow_number) == 1);
+
+	// Fifty-nine single-arrow decreases accumulate to the quiver, in one row.
+	tally.record("arrow_shots_accumulate",
+		arrow_flow_qty(use_flow_number) == quiver_qty);
+
+	// The stored number is READ BACK rather than filtered on, as with the
+	// pickup and the spell payment above. Keyed on the accumulated Use row,
+	// whose quantity is unique on this item id.
+	tally.record("use_number_is_the_action_number",
+		probe_scalar(db, std::format(
+			"SELECT flow_type FROM item_flows WHERE day={} AND item_id={} AND qty={}",
+			day, arrow_id, quiver_qty).c_str()) == use_flow_number);
+
+	// The last arrow books its exit rows for a count of ONE — the stack as it
+	// stood when deplete took it. The hand-rolled copy decremented first, so
+	// deplete read a count of 0, the zero-quantity guard dropped both bookings,
+	// and an emptied quiver was the one emptied stack in the game with no
+	// destroyed row. A door that regressed to that shape books no row at all
+	// here, not a row of the wrong size.
+	tally.record("emptied_quiver_books_exit_too",
+		arrow_flow_qty(destroyed_number) == 1);
 
 	//----------------------------------------------------------------------
 	// Instanced tier unaffected

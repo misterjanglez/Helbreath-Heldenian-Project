@@ -1731,7 +1731,7 @@ void ItemManager::give_item_handler(int client_h, short item_index, int amount, 
 }
 
 int ItemManager::set_item_count(int client_h, int item_index, uint64_t count,
-	int32_t flow_type)
+	int32_t flow_type, bool is_use_item_result)
 {
 	if (m_game->m_client_list[client_h] == 0) return -1;
 	if (m_game->m_client_list[client_h]->m_item_list[item_index] == 0) return -1;
@@ -1762,7 +1762,7 @@ int ItemManager::set_item_count(int client_h, int item_index, uint64_t count,
 	}
 	else {
 		stack->m_instance.count = count;
-		m_game->send_notify_msg(0, client_h, Notify::set_item_count, item_index, count, (char)true, 0);
+		m_game->send_notify_msg(0, client_h, Notify::set_item_count, item_index, count, (char)is_use_item_result, 0);
 	}
 
 	return weight;
