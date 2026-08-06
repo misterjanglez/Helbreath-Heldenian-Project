@@ -32,6 +32,7 @@ bool LoadMapStrikePoints(sqlite3* db, const char* map_name, CMap* map);
 bool LoadMapItemEvents(sqlite3* db, const char* map_name, CMap* map);
 bool LoadMapHeldenianTowers(sqlite3* db, const char* map_name, CMap* map);
 bool LoadMapHeldenianGateDoors(sqlite3* db, const char* map_name, CMap* map);
+bool LoadMapHeldenianWinningZone(sqlite3* db, const char* map_name, CMap* map);
 bool LoadMapNpcs(sqlite3* db, const char* map_name, CMap* map);
 bool LoadMapApocalypseBoss(sqlite3* db, const char* map_name, CMap* map);
 bool LoadMapDynamicGate(sqlite3* db, const char* map_name, CMap* map);

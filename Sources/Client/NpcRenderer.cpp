@@ -9,6 +9,14 @@
 using namespace hb::client::sprite_id;
 using namespace hb::shared::direction;
 
+// Gates have no pose-4 special-state sheets (their pak ships three poses); a stray
+// special_frame must not push them onto an unpopulated sprite slot.
+static bool npc_special_state(const CEntityRenderState& state)
+{
+	return state.m_appearance.HasNpcSpecialState()
+		&& state.m_owner_type != hb::shared::owner::Gate;
+}
+
 hb::shared::sprite::BoundRect CNpcRenderer::draw_stop(int indexX, int indexY, int sX, int sY, bool trans, uint32_t time)
 {
 	hb::shared::sprite::BoundRect invalidRect = {0, -1, 0, 0};
@@ -32,7 +40,7 @@ hb::shared::sprite::BoundRect CNpcRenderer::draw_stop(int indexX, int indexY, in
 	eq.calc_colors(state);
 
 	// Special frame from NPC appearance
-	if (state.m_appearance.HasNpcSpecialState())
+	if (npc_special_state(state))
 	{
 		eq.m_body_index = Mob + (state.m_owner_type - 10) * 8 * 7 + (4 * 8);
 		state.m_frame = state.m_appearance.special_frame - 1;
@@ -159,6 +167,8 @@ hb::shared::sprite::BoundRect CNpcRenderer::draw_move(int indexX, int indexY, in
 	if (RenderHelpers::check_invisibility(m_game, state, inv, admin_invis))
 		return invalidRect;
 
+	RenderHelpers::apply_direction_override(state);
+
 	// NPC body index: HBT uses pose 0, all others use pose 1
 	int npcPose = (state.m_owner_type == hb::shared::owner::HBT) ? 0 : 1;
 	EquipmentIndices eq = EquipmentIndices::CalcNpc(state, npcPose);
@@ -283,6 +293,8 @@ hb::shared::sprite::BoundRect CNpcRenderer::draw_run(int indexX, int indexY, int
 	if (RenderHelpers::check_invisibility(m_game, state, inv, admin_invis))
 		return invalidRect;
 
+	RenderHelpers::apply_direction_override(state);
+
 	// NPC default in OnRun: all equipment -1, no specific body index pose override
 	// Original code has no body_index assignment for NPC default in OnRun
 	EquipmentIndices eq = EquipmentIndices::CalcNpc(state, 1);
@@ -344,9 +356,11 @@ hb::shared::sprite::BoundRect CNpcRenderer::draw_attack(int indexX, int indexY, 
 	if (RenderHelpers::check_invisibility(m_game, state, inv, admin_invis))
 		return invalidRect;
 
+	RenderHelpers::apply_direction_override(state);
+
 	// NPC attack pose calculation with per-mob-type overrides
 	EquipmentIndices eq;
-	if (state.m_appearance.HasNpcSpecialState())
+	if (npc_special_state(state))
 	{
 		eq = EquipmentIndices::CalcNpc(state, 4);
 		state.m_frame = state.m_appearance.special_frame - 1;
@@ -407,6 +421,8 @@ hb::shared::sprite::BoundRect CNpcRenderer::draw_attack_move(int indexX, int ind
 	// Invisibility check
 	if (RenderHelpers::check_invisibility(m_game, state, inv, admin_invis))
 		return invalidRect;
+
+	RenderHelpers::apply_direction_override(state);
 
 	// Frame clamping — same as original
 	switch (state.m_frame) {
@@ -549,6 +565,8 @@ hb::shared::sprite::BoundRect CNpcRenderer::draw_damage(int indexX, int indexY, 
 	if (RenderHelpers::check_invisibility(m_game, state, inv, admin_invis))
 		return invalidRect;
 
+	RenderHelpers::apply_direction_override(state);
+
 	// Two-state NPC damage: complex per-mob overrides
 	char frame = state.m_frame;
 	int npcPose;
@@ -556,7 +574,7 @@ hb::shared::sprite::BoundRect CNpcRenderer::draw_damage(int indexX, int indexY, 
 	if (frame < 4)
 	{
 		// Idle state — per-mob overrides
-		if (state.m_appearance.HasNpcSpecialState())
+		if (npc_special_state(state))
 			npcPose = 4; // special frame from NPC appearance
 		else if (state.m_owner_type == hb::shared::owner::Wyvern) npcPose = 0;
 		else if (state.m_owner_type == hb::shared::owner::McGaffin) npcPose = 0;
@@ -574,7 +592,7 @@ hb::shared::sprite::BoundRect CNpcRenderer::draw_damage(int indexX, int indexY, 
 	{
 		frame -= 4;
 		// Damage recoil state — per-mob overrides
-		if (state.m_appearance.HasNpcSpecialState())
+		if (npc_special_state(state))
 			npcPose = 4;
 		else if (state.m_owner_type == hb::shared::owner::Wyvern) npcPose = 0;
 		else if (state.m_owner_type == hb::shared::owner::McGaffin) npcPose = 0;
@@ -593,7 +611,7 @@ hb::shared::sprite::BoundRect CNpcRenderer::draw_damage(int indexX, int indexY, 
 	eq.calc_colors(state);
 
 	// Apply NPC special frame override
-	if (state.m_appearance.HasNpcSpecialState())
+	if (npc_special_state(state))
 		frame = state.m_appearance.special_frame - 1;
 
 	state.m_frame = frame;
@@ -666,6 +684,8 @@ hb::shared::sprite::BoundRect CNpcRenderer::draw_damage_move(int indexX, int ind
 	case direction::northwest: state.m_dir = direction::southeast; break;
 	}
 
+	RenderHelpers::apply_direction_override(state);
+
 	// Per-mob pose overrides
 	int npcPose;
 	if (state.m_owner_type == hb::shared::owner::Wyvern) npcPose = 0;
@@ -673,6 +693,7 @@ hb::shared::sprite::BoundRect CNpcRenderer::draw_damage_move(int indexX, int ind
 	else if (state.m_owner_type == hb::shared::owner::HBT) npcPose = 2;
 	else if (state.m_owner_type == hb::shared::owner::CT) npcPose = 2;
 	else if (state.m_owner_type == hb::shared::owner::AGC) npcPose = 2;
+	else if (state.m_owner_type == hb::shared::owner::Gate) npcPose = 1;	// damaged-door sheet; the gate pak has no pose 3
 	else npcPose = 3;
 
 	EquipmentIndices eq = EquipmentIndices::CalcNpc(state, npcPose);
@@ -735,12 +756,14 @@ hb::shared::sprite::BoundRect CNpcRenderer::draw_dying(int indexX, int indexY, i
 	int originalFrame = state.m_frame;
 	char frame = state.m_frame;
 
+	RenderHelpers::apply_direction_override(state);
+
 	// NPC dying: two-state with per-mob overrides
 	int npcPose;
 
 	if (frame < 4)
 	{
-		if (state.m_appearance.HasNpcSpecialState())
+		if (npc_special_state(state))
 			npcPose = 4;
 		else if (state.m_owner_type == hb::shared::owner::Wyvern) npcPose = 2;
 		else if (state.m_owner_type == hb::shared::owner::FireWyvern) npcPose = 2;
@@ -760,7 +783,7 @@ hb::shared::sprite::BoundRect CNpcRenderer::draw_dying(int indexX, int indexY, i
 		case hb::shared::owner::EnergyShield:
 		case hb::shared::owner::GrandMagicGenerator:
 		case hb::shared::owner::ManaStone:
-			if (!state.m_appearance.HasNpcSpecialState()) frame = 0;
+			if (!npc_special_state(state)) frame = 0;
 			break;
 		case hb::shared::owner::Catapult: frame = 0; break;
 		}
@@ -772,7 +795,7 @@ hb::shared::sprite::BoundRect CNpcRenderer::draw_dying(int indexX, int indexY, i
 		default: frame -= 4; break;
 		}
 
-		if (state.m_appearance.HasNpcSpecialState())
+		if (npc_special_state(state))
 			npcPose = 4;
 		else if (state.m_owner_type == hb::shared::owner::Wyvern) npcPose = 2;
 		else if (state.m_owner_type == hb::shared::owner::FireWyvern) npcPose = 2;
@@ -788,7 +811,7 @@ hb::shared::sprite::BoundRect CNpcRenderer::draw_dying(int indexX, int indexY, i
 	eq.calc_colors(state);
 
 	// Apply NPC special frame override
-	if (state.m_appearance.HasNpcSpecialState())
+	if (npc_special_state(state))
 		frame = state.m_appearance.special_frame - 1;
 
 	state.m_frame = frame;
@@ -881,6 +904,8 @@ hb::shared::sprite::BoundRect CNpcRenderer::draw_dead(int indexX, int indexY, in
 
 	// Wyvern: early return — no corpse
 	if (state.m_owner_type == hb::shared::owner::Wyvern) return invalidRect;
+
+	RenderHelpers::apply_direction_override(state);
 
 	// Per-mob frame and pose table
 	int frame;

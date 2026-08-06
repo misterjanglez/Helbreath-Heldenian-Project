@@ -4,6 +4,10 @@
 
 class CGame;
 
+// Shared by the writer (create_heldenian_guid) and the boot reader so the two
+// path spellings cannot drift apart again (case matters on Linux).
+constexpr const char* heldenian_guid_file = "GameData/HeldenianGUID.Txt";
+
 class WarManager
 {
 public:
@@ -66,9 +70,12 @@ public:
 	void create_heldenian_guid(uint32_t heldenian_guid, int winner_side);
 	void manual_start_heldenian_mode(int heldenian_type);
 	void manual_end_heldenian_mode();
-	bool notify_heldenian_winner();
 	void remove_heldenian_npc(int npc_h);
-	void request_heldenian_teleport(int client_h, char* data, size_t msg_size);
+	void set_heldenian_gate_arch(int map_index, short gate_x, short gate_y, bool sealed);
+	void unseal_heldenian_gate_for_npc(int npc_h);
+	bool get_heldenian_entry_point(int client_h, char* map_name, short* dX, short* dY);
+	void request_heldenian_tp_list(int client_h);
+	void request_heldenian_tp(int client_h, char* data, size_t msg_size);
 	bool check_heldenian_map(int attacker_h, int map_index, char type);
 	void check_heldenian_result_calculation(int client_h);
 	void remove_occupy_flags(int map_index);

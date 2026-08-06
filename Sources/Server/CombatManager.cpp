@@ -350,8 +350,12 @@ void CombatManager::effect_damage_spot(short attacker_h, char attacker_type, sho
 	if (attacker_type == hb::shared::owner_class::Npc)
 		if (m_game->m_npc_list[attacker_h] == 0) return;
 
+	// Prep-phase gate ("magic casting is forbidden until real battle"): spell damage on the
+	// war maps is dead until the battle opens. The original tested initiated == TRUE here,
+	// which silenced every player-cast spell for the whole battle instead.
 	if ((attacker_type == hb::shared::owner_class::Player) && (m_game->m_map_list[m_game->m_client_list[attacker_h]->m_map_index] != 0) &&
-		(m_game->m_map_list[m_game->m_client_list[attacker_h]->m_map_index]->m_is_heldenian_map == 1) && (m_game->m_heldenian_initiated)) return;
+		(m_game->m_map_list[m_game->m_client_list[attacker_h]->m_map_index]->m_is_heldenian_map == 1) &&
+		(m_game->m_is_heldenian_mode) && (m_game->m_heldenian_initiated == false)) return;
 
 	time = GameClock::GetTimeMS();
 	damage = m_game->dice(v1, v2) + v3;
@@ -3505,6 +3509,7 @@ uint32_t CombatManager::calculate_attack_effect(short target_h, char target_type
 			case 0:
 			case 3:
 			case 5:
+			case 8:	// castle gates are damageable structures — the original listed only 1-5 here
 				m_game->m_npc_list[target_h]->m_hp -= damage;
 				break;
 			}

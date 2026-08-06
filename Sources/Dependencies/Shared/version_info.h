@@ -7,34 +7,34 @@ namespace hb::version
 namespace compatibility
 {
 constexpr int major = 0;
-constexpr int minor = 9;
+constexpr int minor = 10;
 constexpr int patch = 0;
 constexpr int build_number = 0;
 constexpr const char* stage = "alpha";
-constexpr const char* display_version = "0.9-alpha";
-constexpr const char* full_version = "0.9.0-alpha+build.0";
+constexpr const char* display_version = "0.10-alpha";
+constexpr const char* full_version = "0.10.0-alpha+build.0";
 } // namespace compatibility
 
 namespace server
 {
 constexpr int major = 0;
-constexpr int minor = 19;
+constexpr int minor = 35;
 constexpr int patch = 0;
-constexpr int build_number = 300;
+constexpr int build_number = 325;
 constexpr const char* stage = "alpha";
-constexpr const char* display_version = "0.19-alpha";
-constexpr const char* full_version = "0.19.0-alpha+build.300";
+constexpr const char* display_version = "0.35-alpha";
+constexpr const char* full_version = "0.35.0-alpha+build.325";
 } // namespace server
 
 namespace client
 {
 constexpr int major = 0;
-constexpr int minor = 10;
-constexpr int patch = 2;
-constexpr int build_number = 408;
+constexpr int minor = 15;
+constexpr int patch = 1;
+constexpr int build_number = 434;
 constexpr const char* stage = "alpha";
-constexpr const char* display_version = "0.10.2-alpha";
-constexpr const char* full_version = "0.10.2-alpha+build.408";
+constexpr const char* display_version = "0.15.1-alpha";
+constexpr const char* full_version = "0.15.1-alpha+build.434";
 } // namespace client
 
 namespace launcher
@@ -42,12 +42,12 @@ namespace launcher
 constexpr int major = 0;
 constexpr int minor = 1;
 constexpr int patch = 0;
-constexpr int build_number = 38;
+constexpr int build_number = 56;
 constexpr const char* stage = "alpha";
 constexpr const char* display_version = "0.1-alpha";
-constexpr const char* full_version = "0.1.0-alpha+build.38";
+constexpr const char* full_version = "0.1.0-alpha+build.56";
 } // namespace launcher
 
-constexpr const char* build_timestamp = "2026-07-30T11:48:47";
+constexpr const char* build_timestamp = "2026-08-06T19:26:26";
 
 } // namespace hb::version

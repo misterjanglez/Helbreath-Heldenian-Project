@@ -888,7 +888,6 @@ public:
 	bool	m_is_apocalypse_mode_legacy;
 	bool	m_is_heldenian_mode;
 	bool	m_is_heldenian_teleport;
-	char	m_heldenian_type;
 
 	uint32_t m_apocalypse_guid;
 	
@@ -941,7 +940,7 @@ public:
 
 	bool var_89C, var_8A0;
 	char m_heldenian_victory_type, m_last_heldenian_winner, m_heldenian_mode_type;
-	int m_heldenian_aresden_dead, m_heldenian_elvine_dead, var_A38, var_88C;
+	int m_heldenian_aresden_dead, m_heldenian_elvine_dead;
 	int m_heldenian_aresden_left_tower, m_heldenian_elvine_left_tower;
 	uint32_t m_heldenian_guid, m_heldenian_start_hour, m_heldenian_start_minute, m_heldenian_start_time, m_heldenian_finish_time;
 	bool m_received_item_list;

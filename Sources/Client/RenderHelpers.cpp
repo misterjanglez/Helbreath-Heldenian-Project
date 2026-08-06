@@ -313,8 +313,9 @@ void apply_direction_override(CEntityRenderState& state)
 		state.m_dir = direction::north;
 		break;
 	case hb::shared::owner::Gate:
-		if (state.m_dir <= direction::east) state.m_dir = direction::east;
-		else state.m_dir = direction::south;
+		// The gate pak only ships the two diagonals (east/west); south is an empty stub.
+		if (state.m_dir <= direction::southeast) state.m_dir = direction::east;
+		else state.m_dir = direction::west;
 		break;
 	}
 }

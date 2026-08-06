@@ -48,7 +48,9 @@ namespace ServerMsgId
 
 		// Server teleport messages
 		RequestCityHallTeleport                 = 0x0EA03202,
-		request_heldenian_teleport                = 0x0EA03206,
+		request_heldenian_tp_list                 = 0x0EA03206,
+		response_heldenian_tp_list                = 0x0EA03207,
+		request_heldenian_tp                      = 0x0EA03208,
 		RequestHeldenianWinner                  = 0x3D001240,
 
 		// Game server status messages

@@ -242,6 +242,8 @@ int CEntityManager::create_entity(
             case 2:
             case 3:
             case 5:
+            case 8:	// castle gates: structures must never take even a first step —
+            		// a step overwrites the door facing the war code assigns after spawn
                 m_npc_list[i]->m_behavior = Behavior::stop;
 
                 switch (m_npc_list[i]->m_type) {
@@ -260,6 +262,13 @@ int CEntityManager::create_entity(
                     // he is pinned square to the camera rather than given the
                     // merchants' random SE/S/SW spread.
                     m_npc_list[i]->m_dir = direction::south;
+                    break;
+
+                case hb::shared::owner::Gate:
+                    // Deterministic pre-facing: the war code overwrites this with the
+                    // door row's direction right after spawn, but the spawn broadcast
+                    // goes out first — a dice facing here would reach any observer.
+                    m_npc_list[i]->m_dir = direction::east;
                     break;
 
                 default:
@@ -1096,6 +1105,13 @@ void CEntityManager::on_entity_killed(int entity_handle, short attacker_h, char 
         }
     }
 
+    // ========================================================================
+    // 13. A fallen castle gate opens its archway (type-2 siege)
+    // ========================================================================
+    if ((type == 91) && (m_map_list[map_index] != 0) && m_map_list[map_index]->m_is_heldenian_map) {
+        m_game->m_war_manager->unseal_heldenian_gate_for_npc(entity_handle);
+    }
+
 }
 
 int CEntityManager::kill_entities_on_map(int map_index, bool include_static, int attacker_h)
@@ -1288,6 +1304,7 @@ void CEntityManager::npc_behavior_move(int npc_h)
 	case 2:
 	case 3:
 	case 5:
+	case 8:	// castle gates (type 91) — structures; the original shipped 8 for them but never stopped it
 		m_npc_list[npc_h]->m_behavior = Behavior::stop;
 		m_npc_list[npc_h]->m_behavior_turn_count = 0;
 		return;
@@ -1529,6 +1546,7 @@ void CEntityManager::npc_behavior_attack(int npc_h)
 	case 2:
 	case 3:
 	case 4:
+	case 8:	// castle gates take no autonomous actions either
 		return;
 
 	case 5:

@@ -321,6 +321,16 @@ bool EnsureMapInfoDatabase(sqlite3** outDb, std::string& outPath, bool* outCreat
 		" FOREIGN KEY (map_name) REFERENCES maps(map_name) ON DELETE CASCADE"
 		");"
 
+		// Heldenian winning zone (type-2 castle siege flag-plant area)
+		"CREATE TABLE IF NOT EXISTS map_heldenian_winning_zone ("
+		" map_name TEXT PRIMARY KEY,"
+		" tile_x INTEGER NOT NULL,"
+		" tile_y INTEGER NOT NULL,"
+		" tile_w INTEGER NOT NULL,"
+		" tile_h INTEGER NOT NULL,"
+		" FOREIGN KEY (map_name) REFERENCES maps(map_name) ON DELETE CASCADE"
+		");"
+
 		// Static NPCs
 		"CREATE TABLE IF NOT EXISTS map_npcs ("
 		" id INTEGER PRIMARY KEY AUTOINCREMENT,"
@@ -998,6 +1008,35 @@ bool LoadMapHeldenianGateDoors(sqlite3* db, const char* map_name, CMap* map)
 	return true;
 }
 
+bool LoadMapHeldenianWinningZone(sqlite3* db, const char* map_name, CMap* map)
+{
+	if (db == nullptr || map_name == nullptr || map == nullptr) {
+		return false;
+	}
+
+	const char* sql =
+		"SELECT tile_x, tile_y, tile_w, tile_h"
+		" FROM map_heldenian_winning_zone WHERE map_name = ? COLLATE NOCASE;";
+
+	sqlite3_stmt* stmt = nullptr;
+	if (sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) != SQLITE_OK) {
+		return false;
+	}
+
+	PrepareAndBindText(stmt, 1, map_name);
+
+	if (sqlite3_step(stmt) == SQLITE_ROW) {
+		map->m_heldenian_winning_zone = hb::shared::geometry::GameRectangle(
+			sqlite3_column_int(stmt, 0),
+			sqlite3_column_int(stmt, 1),
+			sqlite3_column_int(stmt, 2),
+			sqlite3_column_int(stmt, 3));
+	}
+
+	sqlite3_finalize(stmt);
+	return true;
+}
+
 bool LoadMapNpcs(sqlite3* db, const char* map_name, CMap* map)
 {
 	// NPCs are handled differently - they are spawned by CGame, not stored in CMap directly
@@ -1097,6 +1136,7 @@ bool LoadMapConfig(sqlite3* db, const char* map_name, CMap* map)
 	LoadMapItemEvents(db, map_name, map);
 	LoadMapHeldenianTowers(db, map_name, map);
 	LoadMapHeldenianGateDoors(db, map_name, map);
+	LoadMapHeldenianWinningZone(db, map_name, map);
 	LoadMapNpcs(db, map_name, map);
 	LoadMapApocalypseBoss(db, map_name, map);
 	LoadMapDynamicGate(db, map_name, map);

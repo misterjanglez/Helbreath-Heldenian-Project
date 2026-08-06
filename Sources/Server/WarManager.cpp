@@ -1262,10 +1262,6 @@ void WarManager::set_heldenian_mode()
 	SysTime = hb::time::local_time::now();
 	m_game->m_heldenian_start_hour = SysTime.hour;
 	m_game->m_heldenian_start_minute = SysTime.minute;
-
-	if (m_game->m_heldenian_mode_type != 2) {
-		m_game->m_heldenian_victory_type = m_game->m_last_heldenian_winner;
-	}
 }
 
 void WarManager::global_start_heldenian_mode()
@@ -1293,17 +1289,25 @@ void WarManager::local_start_heldenian_mode(short v1, short v2, uint32_t heldeni
 	}
 
 	if (heldenian_guid != 0) {
-		create_heldenian_guid(heldenian_guid, 0);
+		// Persist the new war's guid; keep the standing winner so a mid-war crash doesn't erase the title.
+		create_heldenian_guid(heldenian_guid, m_game->m_last_heldenian_winner);
 		m_game->m_heldenian_guid = heldenian_guid;
 	}
 	m_game->m_heldenian_aresden_left_tower = 0;
 	m_game->m_heldenian_elvine_left_tower = 0;
 	m_game->m_heldenian_aresden_dead = 0;
 	m_game->m_heldenian_elvine_dead = 0;
+	// The previous winner holds the title until the war produces a new one
+	// (type 2: an attacker's flag-plant; type 1: the end-of-war tie-break ladder).
+	m_game->m_heldenian_victory_type = m_game->m_last_heldenian_winner;
 
+	// These sweeps ran with break-instead-of-continue in the original (and in #96's
+	// defect list): the first non-matching entry aborted the whole scan, so stray
+	// mobs and players survived on the war maps and occupied the door tiles the
+	// gate spawns need. Full scans now — #95's clean-siege acceptance depends on it.
 	for(int i = 0; i < MaxClients; i++) {
 		if (m_game->m_client_list[i] != 0) {
-			if (m_game->m_client_list[i]->m_is_init_complete != true) break;
+			if (m_game->m_client_list[i]->m_is_init_complete != true) continue;
 			m_game->m_client_list[i]->m_var = 2;
 			m_game->send_notify_msg(0, i, Notify::HeldenianTeleport, 0, 0, 0, 0);
 			m_game->m_client_list[i]->m_war_contribution = 0;
@@ -1314,19 +1318,19 @@ void WarManager::local_start_heldenian_mode(short v1, short v2, uint32_t heldeni
 	}
 
 	for (x = 0; x < MaxMaps; x++) {
-		if (m_game->m_map_list[x] == 0) break;
+		if (m_game->m_map_list[x] == 0) continue;
 		if (m_game->m_map_list[x]->m_is_heldenian_map) {
 			for(int i = 0; i < MaxClients; i++) {
-				if (m_game->m_client_list[i] == 0) break;
-				if (m_game->m_client_list[i]->m_is_init_complete != true) break;
-				if (m_game->m_client_list[i]->m_map_index != x) break;
+				if (m_game->m_client_list[i] == 0) continue;
+				if (m_game->m_client_list[i]->m_is_init_complete != true) continue;
+				if (m_game->m_client_list[i]->m_map_index != x) continue;
 				m_game->send_notify_msg(0, i, Notify::Unknown0BE8, 0, 0, 0, 0);
 				m_game->request_teleport_handler(i, "1   ", 0, -1, -1);
 			}
 			for(int i = 0; i < MaxNpcs; i++) {
-				if (m_game->m_npc_list[i] == 0) break;
-				if (m_game->m_npc_list[i]->m_is_killed) break;
-				if (m_game->m_npc_list[i]->m_map_index != x) break;
+				if (m_game->m_npc_list[i] == 0) continue;
+				if (m_game->m_npc_list[i]->m_is_killed) continue;
+				if (m_game->m_npc_list[i]->m_map_index != x) continue;
 				m_game->m_npc_list[i]->m_is_summoned = true;
 				remove_heldenian_npc(i);
 			}
@@ -1373,6 +1377,8 @@ void WarManager::local_start_heldenian_mode(short v1, short v2, uint32_t heldeni
 			else if (m_game->m_heldenian_mode_type == 2) {
 				if (strcmp(m_game->m_map_list[x]->m_name, "hrampart") == 0) {
 					for(int i = 0; i < smap::MaxHeldenianDoor; i++) {
+						if ((m_game->m_map_list[x]->m_heldenian_gate_door[i].x == 0) &&
+							(m_game->m_map_list[x]->m_heldenian_gate_door[i].y == 0)) break;
 						naming_value = m_game->m_map_list[x]->get_empty_naming_value();
 						if (naming_value != -1) {
 							dX = m_game->m_map_list[x]->m_heldenian_gate_door[i].x;
@@ -1398,7 +1404,36 @@ void WarManager::local_start_heldenian_mode(short v1, short v2, uint32_t heldeni
 								if ((m_game->m_npc_list[ret] != 0) && (ret > 0) && (ret < MaxNpcs)) {
 									m_game->m_npc_list[ret]->m_build_count = 0;
 									m_game->m_npc_list[ret]->m_dir = m_game->m_map_list[x]->m_heldenian_gate_door[i].dir;
+
+									// The spawn search may have nudged the gate off its door tile
+									// (anything left standing there does that); seat it back exactly.
+									short door_x = m_game->m_map_list[x]->m_heldenian_gate_door[i].x;
+									short door_y = m_game->m_map_list[x]->m_heldenian_gate_door[i].y;
+									if ((m_game->m_npc_list[ret]->m_x != door_x) || (m_game->m_npc_list[ret]->m_y != door_y)) {
+										m_game->m_map_list[x]->get_owner(&owner_h, &owner_type, door_x, door_y);
+										if (owner_h == 0) {
+											m_game->m_map_list[x]->clear_owner(5, ret, hb::shared::owner_class::Npc, m_game->m_npc_list[ret]->m_x, m_game->m_npc_list[ret]->m_y);
+											m_game->m_map_list[x]->set_owner(ret, hb::shared::owner_class::Npc, door_x, door_y);
+											m_game->m_npc_list[ret]->m_x = door_x;
+											m_game->m_npc_list[ret]->m_y = door_y;
+										}
+										else {
+											hb::logger::warn("Heldenian gate {} could not be seated on its door ({}, {}): tile owned by handle {} class {}",
+												i, door_x, door_y, owner_h, static_cast<int>(owner_type));
+										}
+									}
+
+									// The spawn broadcast went out before the door facing was assigned; the
+									// gate never moves again, so push the corrected facing (the gate art only
+									// exists for the door directions) the way the construction stages do.
+									m_game->send_event_to_near_client_type_a(ret, hb::shared::owner_class::Npc, MsgId::EventMotion, Type::NullAction, 0, 0, 0);
+
+									hb::logger::log<log_channel::events>("Heldenian gate {} seated at ({}, {}) facing {}",
+										i, m_game->m_npc_list[ret]->m_x, m_game->m_npc_list[ret]->m_y, static_cast<int>(m_game->m_npc_list[ret]->m_dir));
 								}
+								// The arch is derived from the door row, not the NPC (spawn placement may nudge it)
+								set_heldenian_gate_arch(x, m_game->m_map_list[x]->m_heldenian_gate_door[i].x,
+									m_game->m_map_list[x]->m_heldenian_gate_door[i].y, true);
 							}
 						}
 					}
@@ -1408,6 +1443,18 @@ void WarManager::local_start_heldenian_mode(short v1, short v2, uint32_t heldeni
 	}
 	m_game->m_heldenian_initiated = true;
 	m_game->m_is_heldenian_mode = true;
+
+	// The GM start opens the battle immediately, so follow the prep notice with the
+	// battle-live one — the same HeldenianTeleport/HeldenianStart pairing the login
+	// paths send. Without it, clients keep showing "casting is forbidden until real
+	// battle" for a battle the server already considers live. The real prep window
+	// (initiated=false between the T-300 notice and the start) arrives with the
+	// event scheduler (#97).
+	for (int i = 0; i < MaxClients; i++)
+		if ((m_game->m_client_list[i] != 0) && (m_game->m_client_list[i]->m_is_init_complete)) {
+			m_game->send_notify_msg(0, i, Notify::HeldenianStart, 0, 0, 0, 0);
+		}
+
 	hb::logger::log<log_channel::events>("Heldenian started");
 	m_game->m_heldenian_start_time = static_cast<uint32_t>(time(0));
 }
@@ -1429,50 +1476,45 @@ void WarManager::local_end_heldenian_mode()
 	m_game->m_heldenian_initiated = true;
 
 	m_game->m_heldenian_finish_time = static_cast<uint32_t>(time(0));
-	if (m_game->var_88C == 1) {
-		if (m_game->m_heldenian_mode_type == 1) {
-			if (m_game->m_heldenian_aresden_left_tower > m_game->m_heldenian_elvine_left_tower) {
-				m_game->m_heldenian_victory_type = 1;
-			}
-			else if (m_game->m_heldenian_aresden_left_tower < m_game->m_heldenian_elvine_left_tower) {
-				m_game->m_heldenian_victory_type = 2;
-			}
-			else if (m_game->m_heldenian_aresden_dead < m_game->m_heldenian_elvine_dead) {
-				m_game->m_heldenian_victory_type = 1;
-			}
-			else if (m_game->m_heldenian_aresden_dead > m_game->m_heldenian_elvine_dead) {
-				m_game->m_heldenian_victory_type = 2;
-			}
-			else {
-				m_game->m_last_heldenian_winner = m_game->m_heldenian_victory_type;
-			}
+	if (m_game->m_heldenian_mode_type == 1) {
+		// Battlefield tie-break ladder: towers left, then deaths; a full tie keeps the previous winner.
+		if (m_game->m_heldenian_aresden_left_tower > m_game->m_heldenian_elvine_left_tower) {
+			m_game->m_heldenian_victory_type = 1;
 		}
-		else if (m_game->m_heldenian_mode_type == 2) {
-			m_game->m_last_heldenian_winner = m_game->m_heldenian_victory_type;
+		else if (m_game->m_heldenian_aresden_left_tower < m_game->m_heldenian_elvine_left_tower) {
+			m_game->m_heldenian_victory_type = 2;
 		}
-		m_game->m_last_heldenian_winner = m_game->m_heldenian_victory_type;
-		if (notify_heldenian_winner() == false) {
-			hb::logger::log("Heldenian ended, result report failed");
+		else if (m_game->m_heldenian_aresden_dead < m_game->m_heldenian_elvine_dead) {
+			m_game->m_heldenian_victory_type = 1;
+		}
+		else if (m_game->m_heldenian_aresden_dead > m_game->m_heldenian_elvine_dead) {
+			m_game->m_heldenian_victory_type = 2;
 		}
 	}
+	// Type 2: m_heldenian_victory_type holds the defender from war start, or the attacker who planted the flag.
+	m_game->m_last_heldenian_winner = m_game->m_heldenian_victory_type;
 	hb::logger::log("Heldenian ended, winner side: {}", m_game->m_last_heldenian_winner);
 
-	for(int i = 0; i < MaxMaps; i++)
-	{
-		if (m_game->m_map_list[i] != 0)
-		{
-			for (int x = 0; x < MaxClients; x++)
-				if ((m_game->m_client_list[x] != 0) && (m_game->m_client_list[x]->m_is_init_complete)) {
-					m_game->send_notify_msg(0, x, Notify::HeldenianEnd, 0, 0, 0, 0);
-					if (m_game->m_map_list[m_game->m_client_list[x]->m_map_index]->m_is_heldenian_map) {
-						for (int n = 0; n < MaxNpcs; n++)
-							if ((m_game->m_npc_list[n] != 0) && (m_game->m_map_list[m_game->m_npc_list[n]->m_map_index] != 0) && (m_game->m_npc_list[n]->m_is_summoned)) {
-								remove_heldenian_npc(n);
-							}
-						remove_occupy_flags(x);
-					}
-				}
+	// Announce the result once per client, and recall everyone still on a war map.
+	for (int x = 0; x < MaxClients; x++)
+		if ((m_game->m_client_list[x] != 0) && (m_game->m_client_list[x]->m_is_init_complete)) {
+			m_game->send_notify_msg(0, x, Notify::HeldenianEnd, 0, 0, 0, 0);
+			if ((m_game->m_map_list[m_game->m_client_list[x]->m_map_index] != 0) &&
+				(m_game->m_map_list[m_game->m_client_list[x]->m_map_index]->m_is_heldenian_map)) {
+				m_game->request_teleport_handler(x, "1   ", 0, -1, -1);
+			}
 		}
+
+	// Clear the field for the next war: every war structure and flag on the heldenian maps goes.
+	for (int i = 0; i < MaxMaps; i++)
+	{
+		if ((m_game->m_map_list[i] == 0) || (m_game->m_map_list[i]->m_is_heldenian_map == false)) continue;
+		for (int n = 0; n < MaxNpcs; n++)
+			if ((m_game->m_npc_list[n] != 0) && (m_game->m_npc_list[n]->m_map_index == i)) {
+				m_game->m_npc_list[n]->m_is_summoned = true;
+				remove_heldenian_npc(n);
+			}
+		remove_occupy_flags(i);
 	}
 	create_heldenian_guid(m_game->m_heldenian_guid, m_game->m_heldenian_victory_type);
 }
@@ -1508,18 +1550,12 @@ bool WarManager::update_heldenian_status()
 
 void WarManager::create_heldenian_guid(uint32_t heldenian_guid, int winner_side)
 {
-	char* cp, txt[256], fn[256], temp[1024];
+	char* cp, txt[256], temp[1024];
 	FILE* file;
 
 	std::filesystem::create_directories("GameData");
-	std::memset(fn, 0, sizeof(fn));
 
-	strcat(fn, "GameData");
-	strcat(fn, "/");
-	strcat(fn, "/");
-	strcat(fn, "HeldenianGUID.Txt");
-
-	file = fopen(fn, "wt");
+	file = fopen(heldenian_guid_file, "wt");
 	if (file == 0) {
 		hb::logger::log("Cannot create HeldenianGUID({}) file", heldenian_guid);
 	}
@@ -1527,7 +1563,7 @@ void WarManager::create_heldenian_guid(uint32_t heldenian_guid, int winner_side)
 		std::memset(temp, 0, sizeof(temp));
 
 		std::memset(txt, 0, sizeof(txt));
-		std::snprintf(txt, sizeof(txt), "HeldenianGUID = %d", heldenian_guid);
+		std::snprintf(txt, sizeof(txt), "HeldenianGUID = %u\n", heldenian_guid);
 		strcat(temp, txt);
 
 		std::memset(txt, 0, sizeof(txt));
@@ -1570,21 +1606,13 @@ void WarManager::manual_end_heldenian_mode()
 	m_game->m_heldenian_running = false;
 }
 
-bool WarManager::notify_heldenian_winner()
-{
-	if (m_game->var_88C == 0) {
-		return true;
-	}
-	else {
-		return false;
-	}
-
-}
-
 void WarManager::remove_heldenian_npc(int npc_h)
 {
 	if (m_game->m_npc_list[npc_h] == 0) return;
 	if (m_game->m_npc_list[npc_h]->m_is_killed) return;
+
+	// A castle gate taken down by the war sweep reopens its archway
+	if (m_game->m_npc_list[npc_h]->m_type == 91) unseal_heldenian_gate_for_npc(npc_h);
 
 	m_game->m_npc_list[npc_h]->m_is_killed = true;
 	m_game->m_npc_list[npc_h]->m_hp = 0;
@@ -1605,63 +1633,119 @@ void WarManager::remove_heldenian_npc(int npc_h)
 
 }
 
-void WarManager::request_heldenian_teleport(int client_h, char* data, size_t msg_size)
+// A castle gate guards a 3-tile archway running along the anti-diagonal (the shipped
+// door direction); the gate NPC itself occupies only one tile, so the arch is sealed
+// by temp-blocking the span plus each tile's south-east shoulder — two tiles thick,
+// because movement validates only the destination tile and a single-thick diagonal
+// line can be crossed corner-to-corner. The .amd wall layer (m_is_move_allowed, never
+// mutated at runtime) bounds the span, so seal and unseal compute the same tiles.
+void WarManager::set_heldenian_gate_arch(int map_index, short gate_x, short gate_y, bool sealed)
 {
-	char tmp_name[hb::shared::limits::NpcNameLen], txt[512], map_name[11]{};
-	short tX = 0, tY = 0, loc = 0;
-	int ret, why_return = 0;
+	constexpr int max_reach = 5;
+	class CMap* map = m_game->m_map_list[map_index];
+	class CTile* tile;
+
+	if (map == 0) return;
+
+	for (int side_dir = -1; side_dir <= 1; side_dir += 2)
+		for (int step = (side_dir < 0) ? 1 : 0; step <= max_reach; step++) {
+			short x = static_cast<short>(gate_x + side_dir * step);
+			short y = static_cast<short>(gate_y - side_dir * step);
+			tile = (class CTile*)(map->m_tile + x + y * map->m_size_x);
+			if (tile->m_is_move_allowed == false) break;
+			map->set_temp_move_allowed_flag(x, y, !sealed);
+			tile = (class CTile*)(map->m_tile + (x + 1) + y * map->m_size_x);
+			if (tile->m_is_move_allowed) map->set_temp_move_allowed_flag(x + 1, y, !sealed);
+		}
+}
+
+// Finds the gate-door row a dying/removed gate NPC belongs to and reopens its arch.
+void WarManager::unseal_heldenian_gate_for_npc(int npc_h)
+{
+	int dx, dy;
+
+	if (m_game->m_npc_list[npc_h] == 0) return;
+	int map_index = m_game->m_npc_list[npc_h]->m_map_index;
+	class CMap* map = m_game->m_map_list[map_index];
+	if ((map == 0) || (map->m_is_heldenian_map == false)) return;
+
+	for (int i = 0; i < smap::MaxHeldenianDoor; i++) {
+		if ((map->m_heldenian_gate_door[i].x == 0) && (map->m_heldenian_gate_door[i].y == 0)) break;
+		dx = map->m_heldenian_gate_door[i].x - m_game->m_npc_list[npc_h]->m_x;
+		dy = map->m_heldenian_gate_door[i].y - m_game->m_npc_list[npc_h]->m_y;
+		if ((dx >= -3) && (dx <= 3) && (dy >= -3) && (dy <= 3)) {
+			set_heldenian_gate_arch(map_index, map->m_heldenian_gate_door[i].x, map->m_heldenian_gate_door[i].y, false);
+			return;
+		}
+	}
+}
+
+// Computes this client's war-entry point: btfield spawns by side for a battlefield war,
+// the defender/attacker rampart spawns for a castle siege. False = no war to enter
+// (or this client cannot fight in it). map_name must hold MapNameLen bytes.
+bool WarManager::get_heldenian_entry_point(int client_h, char* map_name, short* dX, short* dY)
+{
+	if (m_game->m_client_list[client_h] == 0) return false;
+	if (m_game->m_is_heldenian_mode != true) return false;
+	if (m_game->m_client_list[client_h]->m_is_player_civil) return false;
+	if ((m_game->m_client_list[client_h]->m_side != 1) && (m_game->m_client_list[client_h]->m_side != 2)) return false;
+
+	if (m_game->m_heldenian_mode_type == 1) {
+		std::memcpy(map_name, "btfield", 7);
+		if (m_game->m_client_list[client_h]->m_side == 1) {
+			*dX = 68;
+			*dY = 225;
+		}
+		else {
+			*dX = 202;
+			*dY = 70;
+		}
+		return true;
+	}
+	if (m_game->m_heldenian_mode_type == 2) {
+		std::memcpy(map_name, "hrampart", 8);
+		if (m_game->m_client_list[client_h]->m_side == m_game->m_last_heldenian_winner) {
+			*dX = 81;
+			*dY = 42;
+		}
+		else {
+			*dX = 156;
+			*dY = 153;
+		}
+		return true;
+	}
+	return false;
+}
+
+// Command Hall "Teleport to Battle Field": answers with a one-entry teleport list
+// (or an empty one when no war is running), the shape handle_heldenian_teleport_list expects.
+void WarManager::request_heldenian_tp_list(int client_h)
+{
+	char txt[sizeof(hb::net::PacketResponseTeleportListHeader) + sizeof(hb::net::PacketResponseTeleportListEntry)]{};
+	char map_name[hb::shared::limits::MapNameLen]{};
+	short dX = 0, dY = 0;
+	int ret;
 
 	if (m_game->m_client_list[client_h] == 0) return;
 
-	const auto* header = hb::net::PacketCast<hb::net::PacketHeader>(data, sizeof(hb::net::PacketHeader));
-	if (!header) return;
-	char* cp = (char*)(data + sizeof(hb::net::PacketHeader));
-	std::memset(tmp_name, 0, sizeof(tmp_name));
-	strcpy(tmp_name, cp);
-	if (strcmp(tmp_name, "Gail") == 0) {
-		std::memset(txt, 0, sizeof(txt));
-		if ((m_game->m_is_heldenian_mode == 1) && (m_game->m_client_list[client_h]->m_is_player_civil != true) && (m_game->m_client_list[client_h]->m_side == 2 || m_game->m_client_list[client_h]->m_side == 1)) {
-			if (m_game->m_heldenian_type == 1) {
-				std::memcpy(map_name, "btfield", 7);
-				if (m_game->m_client_list[client_h]->m_side == 1) {
-					tX = 68;
-					tY = 225;
-					loc = 1;
-				}
-				else if (m_game->m_client_list[client_h]->m_side == 2) {
-					tX = 202;
-					tY = 70;
-					loc = 2;
-				}
-			}
-			else if (m_game->m_heldenian_type == 2) {
-				std::memcpy(map_name, "hrampart", 8);
-				if (m_game->m_client_list[client_h]->m_side == m_game->m_last_heldenian_winner) {
-					tX = 81;
-					tY = 42;
-					loc = 3;
-				}
-				else {
-					tX = 156;
-					tY = 153;
-					loc = 4;
-				}
-			}
-			why_return = 0;
-		}
+	auto& resp = *reinterpret_cast<hb::net::PacketResponseTeleportListHeader*>(txt);
+	resp.header.msg_id = ServerMsgId::response_heldenian_tp_list;
+	resp.header.msg_type = 0;
+	resp.count = 0;
+
+	size_t size = sizeof(resp);
+	if (get_heldenian_entry_point(client_h, map_name, &dX, &dY)) {
+		auto& entry = *reinterpret_cast<hb::net::PacketResponseTeleportListEntry*>(txt + sizeof(resp));
+		entry.index = 0;
+		std::memcpy(entry.map_name, map_name, sizeof(entry.map_name));
+		entry.x = dX;
+		entry.y = dY;
+		entry.cost = 0;
+		resp.count = 1;
+		size += sizeof(entry);
 	}
 
-	// Build response into txt buffer
-	std::memset(txt, 0, sizeof(txt));
-	auto& resp = *reinterpret_cast<hb::net::HeldenianTeleportResponse*>(txt + sizeof(hb::net::PacketHeader));
-	resp.count = 4;
-	resp.location = loc;
-	std::memcpy(resp.map_name, map_name, sizeof(resp.map_name));
-	resp.x = tX;
-	resp.y = tY;
-	resp.why_return = why_return;
-
-	ret = m_game->m_client_list[client_h]->m_socket->send_msg(txt, static_cast<int>(sizeof(hb::net::PacketHeader) + sizeof(hb::net::HeldenianTeleportResponse)));
+	ret = m_game->m_client_list[client_h]->m_socket->send_msg(txt, static_cast<int>(size));
 	switch (ret) {
 	case sock::Event::QueueFull:
 	case sock::Event::SocketError:
@@ -1669,6 +1753,23 @@ void WarManager::request_heldenian_teleport(int client_h, char* data, size_t msg
 	case sock::Event::SocketClosed:
 		m_game->delete_client(client_h, true, true);
 		break;
+	}
+}
+
+// The pick from that list. The id is display-side only — the destination is
+// recomputed here, never trusted from the wire.
+void WarManager::request_heldenian_tp(int client_h, char* data, size_t msg_size)
+{
+	char map_name[hb::shared::limits::MapNameLen]{};
+	short dX = 0, dY = 0;
+
+	if (m_game->m_client_list[client_h] == 0) return;
+
+	const auto* req = hb::net::PacketCast<hb::net::PacketRequestTeleportId>(data, msg_size);
+	if (!req) return;
+
+	if (get_heldenian_entry_point(client_h, map_name, &dX, &dY)) {
+		m_game->request_teleport_handler(client_h, "2   ", map_name, dX, dY);
 	}
 }
 
@@ -1680,7 +1781,7 @@ bool WarManager::check_heldenian_map(int attacker_h, int map_index, char type)
 
 	ret = 0;
 	if (m_game->m_client_list[attacker_h] == 0) return 0;
-	if ((m_game->m_is_heldenian_mode == 1) || (m_game->m_heldenian_type == 1)) {
+	if (m_game->m_is_heldenian_mode == 1) {
 		if (type == hb::shared::owner_class::Player) {
 			if ((m_game->m_map_list[m_game->m_client_list[attacker_h]->m_map_index] != 0) && (m_game->m_client_list[attacker_h]->m_side > 0)) {
 				tX = m_game->m_client_list[attacker_h]->m_x;
@@ -1733,7 +1834,7 @@ void WarManager::check_heldenian_result_calculation(int client_h)
 
 	if (m_game->m_client_list[client_h] == 0) return;
 	if (m_game->m_client_list[client_h]->m_var != 2) return;
-	if ((m_game->m_heldenian_type == 0) || (m_game->m_client_list[client_h]->m_heldenian_guid == 0)) return;
+	if ((m_game->m_heldenian_mode_type <= 0) || (m_game->m_client_list[client_h]->m_heldenian_guid == 0)) return;
 	if (m_game->m_client_list[client_h]->m_heldenian_guid == m_game->m_heldenian_guid) {
 		if (m_game->m_client_list[client_h]->m_side == m_game->m_last_heldenian_winner) {
 			if (m_game->m_client_list[client_h]->m_level <= 80) {
@@ -1762,39 +1863,23 @@ void WarManager::check_heldenian_result_calculation(int client_h)
 
 void WarManager::remove_occupy_flags(int map_index)
 {
-	uint32_t time = GameClock::GetTimeMS();
-	
 	short dX, dY;
-	int dynamic_object_index;
-	class COccupyFlag* occupy_flag_index;
 	class CTile* tile;
 
 	if (m_game->m_map_list[map_index] == 0) return;
 	for(int i = 1; i < smap::MaxOccupyFlag; i++)
-		//if (m_game->m_map_list[map_index]->m_occupy_flag[i]) return; // centu : wtf ?
 		if (m_game->m_map_list[map_index]->m_occupy_flag[i]) {
 			dX = m_game->m_map_list[map_index]->m_occupy_flag[i]->m_x;
 			dY = m_game->m_map_list[map_index]->m_occupy_flag[i]->m_y;
+
 			tile = (class CTile*)(m_game->m_map_list[map_index]->m_tile + dX + dY * m_game->m_map_list[map_index]->m_size_y);
+			tile->m_occupy_flag_index = 0;
+
+			m_game->m_dynamic_object_manager->remove_dynamic_object(m_game->m_map_list[map_index]->m_occupy_flag[i]->m_dynamic_object_index);
+
+			delete m_game->m_map_list[map_index]->m_occupy_flag[i];
+			m_game->m_map_list[map_index]->m_occupy_flag[i] = 0;
 			m_game->m_map_list[map_index]->m_total_occupy_flags--;
-			dynamic_object_index = m_game->m_map_list[map_index]->m_occupy_flag[i]->m_dynamic_object_index;
-			if (m_game->m_dynamic_object_manager->m_dynamic_object_list[dynamic_object_index] == 0) return;
-
-			m_game->send_event_to_near_client_type_b(MsgId::DynamicObject, MsgType::Reject, m_game->m_dynamic_object_manager->m_dynamic_object_list[dynamic_object_index]->m_map_index,
-				m_game->m_dynamic_object_manager->m_dynamic_object_list[dynamic_object_index]->m_x, m_game->m_dynamic_object_manager->m_dynamic_object_list[dynamic_object_index]->m_y,
-				m_game->m_dynamic_object_manager->m_dynamic_object_list[dynamic_object_index]->m_type, dynamic_object_index, 0, (short)0);
-
-			m_game->m_map_list[m_game->m_dynamic_object_manager->m_dynamic_object_list[dynamic_object_index]->m_map_index]->set_dynamic_object(0, 0, m_game->m_dynamic_object_manager->m_dynamic_object_list[dynamic_object_index]->m_x, m_game->m_dynamic_object_manager->m_dynamic_object_list[dynamic_object_index]->m_y, time);
-
-			occupy_flag_index = m_game->m_map_list[map_index]->m_occupy_flag[i];
-
-			if (m_game->m_dynamic_object_manager->m_dynamic_object_list[dynamic_object_index] == 0) {
-				for(int ix = dX - 2; ix <= dX + 2; ix++)
-					for(int iy = dY - 2; iy <= dY + 2; iy++) {
-						tile = (class CTile*)(m_game->m_map_list[map_index]->m_tile + ix + iy * m_game->m_map_list[map_index]->m_size_y);
-						tile->m_owner = 0;
-					}
-			}
 		}
 }
 
@@ -2138,7 +2223,7 @@ bool WarManager::read_heldenian_guid_file(const char* fn)
 					break;
 				case 2:
 					m_game->m_last_heldenian_winner = atoi(token);
-					hb::logger::log("HeldenianWinnerSide = {}", m_game->m_last_heldenian_winner);
+					hb::logger::log("HeldenianWinnerSide = {}", static_cast<int>(m_game->m_last_heldenian_winner));
 					read_mode = 0;
 					break;
 				}
@@ -2543,29 +2628,47 @@ void WarManager::set_summon_mob_action(int client_h, int mode, size_t msg_size, 
 
 bool WarManager::set_occupy_flag(char map_index, int dX, int dY, int side, int ek_num, int client_h)
 {
-	int   dynamic_object_index, index;
+	int   dynamic_object_index = 0, index;
 	class CTile* tile;
-	uint32_t time;
-
-	time = GameClock::GetTimeMS();
 
 	if (m_game->m_map_list[map_index] == 0) return false;
-	if (((m_game->m_is_heldenian_mode == false) || (static_cast<char>(m_game->m_is_heldenian_mode) != m_game->m_heldenian_type)) &&
-		(m_game->m_heldenian_initiated == 1)) return false;
-	if ((m_game->m_heldenian_type == 1) && (m_game->m_bt_field_map_index == -1)) return false;
-	if ((m_game->m_heldenian_type == 2) && (m_game->m_godh_map_index == -1)) return false;
 
-	tile = (class CTile*)(m_game->m_map_list[map_index]->m_tile + dX + dY * m_game->m_map_list[map_index]->m_size_y);
-	if (tile->m_attribute != 0) return false;
-	side = m_game->m_last_heldenian_winner;
+	bool siege_plant = false;
+	if (m_game->m_is_heldenian_mode) {
+		if (m_game->m_heldenian_mode_type == 1) {
+			// Battlefield: flags carry the previous winner's side and only that side plants (original rule)
+			if (m_game->m_bt_field_map_index == -1) return false;
+			side = m_game->m_last_heldenian_winner;
+			if ((client_h > 0) && (m_game->m_client_list[client_h] != 0)) {
+				if (m_game->m_client_list[client_h]->m_side != side) return false;
+			}
+		}
+		else if (m_game->m_heldenian_mode_type == 2) {
+			// Castle siege: an attacker plants their own flag inside the winning zone to take
+			// the castle; the previous winner defends and wins by holding until the war ends.
+			if (m_game->m_godh_map_index == -1) return false;
+			if ((client_h <= 0) || (m_game->m_client_list[client_h] == 0)) return false;
+
+			side = m_game->m_client_list[client_h]->m_side;
+			if (side == m_game->m_last_heldenian_winner) return false;
+			if (map_index != m_game->m_godh_map_index) return false;
+
+			// Half-open bounds; an unconfigured zone (width/height 0) rejects every plant.
+			const auto& zone = m_game->m_map_list[map_index]->m_heldenian_winning_zone;
+			if ((dX < zone.Left()) || (dX >= zone.Right()) ||
+				(dY < zone.Top()) || (dY >= zone.Bottom())) return false;
+			siege_plant = true;
+		}
+	}
+	// Outside heldenian (crusade EK flags): the flag keeps the side the item carries.
+
+	if ((side != 1) && (side != 2)) return false;
+
 	if ((dX < 25) || (dX >= m_game->m_map_list[map_index]->m_size_x - 25) ||
 		(dY < 25) || (dY >= m_game->m_map_list[map_index]->m_size_y - 25)) return false;
 
-	if ((client_h > 0) && (m_game->m_client_list[client_h] != 0)) {
-		if (m_game->m_client_list[client_h]->m_side != side) return false;
-	}
-
 	tile = (class CTile*)(m_game->m_map_list[map_index]->m_tile + dX + dY * m_game->m_map_list[map_index]->m_size_y);
+	if (tile->m_attribute != 0) return false;
 	if (tile->m_occupy_flag_index != 0) return false;
 	if (tile->m_is_move_allowed == false)  return false;
 
@@ -2590,14 +2693,15 @@ bool WarManager::set_occupy_flag(char map_index, int dX, int dY, int side, int e
 	switch (side) {
 	case 1:	dynamic_object_index = m_game->m_dynamic_object_manager->add_dynamic_object_list(0, 0, dynamic_object::AresdenFlag1, map_index, dX, dY, 0, 0);	break;
 	case 2:	dynamic_object_index = m_game->m_dynamic_object_manager->add_dynamic_object_list(0, 0, dynamic_object::ElvineFlag1, map_index, dX, dY, 0, 0);	break;
-	default: dynamic_object_index = 0;
 	}
+	if (dynamic_object_index == 0) return false;
 
 	ek_num = 1;
 	index = m_game->m_map_list[map_index]->register_occupy_flag(dX, dY, side, ek_num, dynamic_object_index);
 	if (index < 0) {
-		if (dynamic_object_index > 1000)
-			return true;
+		// No free flag slot: take the just-created flag object back down.
+		m_game->m_dynamic_object_manager->remove_dynamic_object(dynamic_object_index);
+		return false;
 	}
 
 	tile = (class CTile*)(m_game->m_map_list[map_index]->m_tile + dX + dY * m_game->m_map_list[map_index]->m_size_y);
@@ -2605,7 +2709,7 @@ bool WarManager::set_occupy_flag(char map_index, int dX, int dY, int side, int e
 
 	m_game->m_map_list[map_index]->m_total_occupy_flags++;
 
-	if (m_game->m_heldenian_type == 1) {
+	if ((m_game->m_is_heldenian_mode) && (m_game->m_heldenian_mode_type == 1)) {
 		for(int ix = dX - 3; ix <= dX + 3; ix++)
 			for(int iy = dY - 3; iy <= dY + 3; iy++) {
 				if ((ix < 0) || (ix >= m_game->m_map_list[map_index]->m_size_x) ||
@@ -2625,11 +2729,12 @@ bool WarManager::set_occupy_flag(char map_index, int dX, int dY, int side, int e
 			}
 	}
 
-	if (m_game->m_heldenian_type == 2) {
-		if (side == m_game->m_last_heldenian_winner) {
-			m_game->m_heldenian_victory_type = side;
-			//sub_4AB9D0
-		}
+	if (siege_plant) {
+		// The attackers took the castle: end the siege now with them as the victors.
+		m_game->m_heldenian_victory_type = static_cast<char>(side);
+		hb::logger::log<log_channel::events>("Heldenian castle flag planted by {} (side {}) at godh({}, {})",
+			m_game->m_client_list[client_h]->m_char_name, side, dX, dY);
+		global_end_heldenian_mode();
 	}
 	return true;
 }

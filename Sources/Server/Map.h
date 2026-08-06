@@ -253,6 +253,9 @@ public:
 		short y;
 	} m_heldenian_gate_door[hb::server::map::MaxHeldenianDoor];
 
+	// Type-2 heldenian: attackers win by planting a flag inside this zone (width 0 = no zone on this map)
+	hb::shared::geometry::GameRectangle m_heldenian_winning_zone;
+
 	struct {
 		short type_id;
 		short x;

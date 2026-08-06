@@ -88,6 +88,32 @@ int DynamicObjectManager::add_dynamic_object_list(short owner, char owner_type, 
 	return 0;
 }
 
+// Symmetric inverse of add_dynamic_object_list: undoes the map cell, the near-client
+// notify, and the move-block that the flag/mineral types apply on creation.
+void DynamicObjectManager::remove_dynamic_object(int index)
+{
+	if ((index <= 0) || (index >= MaxDynamicObjects)) return;
+
+	CDynamicObject* obj = m_dynamic_object_list[index];
+	if (obj == 0) return;
+
+	m_game->send_event_to_near_client_type_b(MsgId::DynamicObject, MsgType::Reject, obj->m_map_index,
+		obj->m_x, obj->m_y, obj->m_type, index, 0, (short)0);
+	m_game->m_map_list[obj->m_map_index]->set_dynamic_object(0, 0, obj->m_x, obj->m_y, GameClock::GetTimeMS());
+
+	switch (obj->m_type) {
+	case dynamic_object::AresdenFlag1:
+	case dynamic_object::ElvineFlag1:
+	case dynamic_object::Mineral1:
+	case dynamic_object::Mineral2:
+		m_game->m_map_list[obj->m_map_index]->set_temp_move_allowed_flag(obj->m_x, obj->m_y, true);
+		break;
+	}
+
+	delete obj;
+	m_dynamic_object_list[index] = 0;
+}
+
 void DynamicObjectManager::check_dynamic_object_list()
 {
 

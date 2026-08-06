@@ -1064,7 +1064,6 @@ bool CGame::init()
 	m_crusade_guid = 0;
 	m_crusade_winner_side = 0;
 	m_last_crusade_winner = 0;
-	m_last_heldenian_winner = 0;
 	m_last_crusade_date = -1;
 	m_final_shutdown_count = 0;
 	m_is_crusade_war_starter = false;
@@ -1072,12 +1071,11 @@ bool CGame::init()
 	m_latest_crusade_day_of_week = -1;
 
 	m_heldenian_initiated = false;
-	m_heldenian_type = false;
 	m_is_heldenian_mode = false;
 	m_heldenian_running = false;
-	m_heldenian_aresden_left_tower = 0;
 	m_heldenian_mode_type = -1;
 	m_last_heldenian_winner = -1;
+	m_heldenian_victory_type = -1;
 	m_heldenian_aresden_left_tower = 0;
 	m_heldenian_elvine_left_tower = 0;
 	m_heldenian_aresden_dead = 0;
@@ -6101,8 +6099,12 @@ void CGame::msg_process()
 				state_change_handler(client_h, data, msg_size);
 				break;
 
-			case ServerMsgId::request_heldenian_teleport:
-				m_war_manager->request_heldenian_teleport(client_h, data, msg_size);
+			case ServerMsgId::request_heldenian_tp_list:
+				m_war_manager->request_heldenian_tp_list(client_h);
+				break;
+
+			case ServerMsgId::request_heldenian_tp:
+				m_war_manager->request_heldenian_tp(client_h, data, msg_size);
 				break;
 
 			case ServerMsgId::RequestCityHallTeleport:
@@ -12823,9 +12825,10 @@ void CGame::on_start_game_signal()
 		CloseGameConfigDatabase(configDb);
 	}
 
-	m_war_manager->read_crusade_guid_file("GameData/CrusadeGUID.txt");
-	m_war_manager->read_apocalypse_guid_file("GameData/ApocalypseGUID.txt");
-	m_war_manager->read_heldenian_guid_file("GameData/HeldenianGUID.txt");
+	// Writers emit *.Txt — the reader spellings must match exactly on Linux.
+	m_war_manager->read_crusade_guid_file("GameData/CrusadeGUID.Txt");
+	m_war_manager->read_apocalypse_guid_file("GameData/ApocalypseGUID.Txt");
+	m_war_manager->read_heldenian_guid_file(heldenian_guid_file);
 
 	hb::logger::log("Game server activated");
 
