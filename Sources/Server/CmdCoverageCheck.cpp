@@ -44,8 +44,10 @@
 // destroyed flow for the piece's whole count, even though the refusal had
 // just restored every unit to the giver's stack: an exit in the ledger, no
 // exit in the world, mintable by handing part of a stack to any NPC that
-// cannot receive it. The reject check below drives the real handler against
-// a synthetic refuser and asserts the round trip books nothing at all.
+// cannot receive it. #112 then removed the round trip itself — the handler
+// resolves its destination before splitting, so a refused Give never makes
+// a piece to mis-book. The reject check below drives the real handler
+// against a synthetic refuser and asserts the refusal books nothing at all.
 //
 // #111 closed the product side of the loop #105 opened. Reagents booked their
 // Make exits while a stackable product entered the world unbooked — created by
@@ -176,9 +178,9 @@ namespace
 	// cannot land right by coincidence.
 	constexpr int64_t quiver_qty    = 59;
 
-	// The stack a rejected Give (#110) splits and gets back, on a FIFTH id kept
-	// clear of every group above — its assertion is that the id books NO row of
-	// any type, which only a virgin id can make. Two more unused primes.
+	// The stack a rejected Give (#110, #112) leaves untouched, on a FIFTH id
+	// kept clear of every group above — its assertion is that the id books NO
+	// row of any type, which only a virgin id can make. Two more unused primes.
 	constexpr int64_t reject_stack_qty = 67;
 	constexpr int64_t reject_give_qty  = 61;
 
@@ -583,34 +585,34 @@ void CmdCoverageCheck::execute(CGame* game, const char* args)
 	items.item_log(ItemLogAction::Give, actor_h, peer_h, handed.get());
 
 	//----------------------------------------------------------------------
-	// The rejected Give (#110): the exit that never happened.
+	// The rejected Give (#110, #112): the exit that never happened.
 	//
-	// give_item_handler splits off a piece, the NPC refuses, the stack is
-	// restored to its full count, and the piece is freed. Until #110 that
-	// free said `discarded` — a destroyed flow for the piece's whole count,
-	// booked while the player kept every unit, so the exit totals drifted
-	// upward with ordinary play (hand five arrows to a shopkeeper). The
-	// honest reason is `merged`: the piece's contents live on in the stack
-	// they were restored to, the exact shape the merge exclusion was built
-	// for.
+	// Until #110, give_item_handler split off a piece, the NPC refused, the
+	// stack was restored to its full count, and the piece was freed as
+	// `discarded` — a destroyed flow for the piece's whole count, booked
+	// while the player kept every unit, so the exit totals drifted upward
+	// with ordinary play (hand five arrows to a shopkeeper). #110 made the
+	// free honest (`merged`); #112 removed it: the handler resolves its
+	// destination before the split now, so a refusal happens while there is
+	// no piece, no count change, and no destroy reason to get wrong.
 	//
 	// Driven through the REAL give_item_handler, for the reason the deposit
-	// drives through set_item_to_bank_item: what is at issue is the reason
-	// the call site passes, and only the door knows it. On the fifth id the
+	// drives through set_item_to_bank_item: what is at issue is the door's
+	// own routing, and only the door knows it. On the fifth id the
 	// assertion can be the sharpest in the file — NO flow row of any type —
-	// and every wrong turn through the handler breaks it: a revert to
-	// `discarded` books destroyed, missing the refuser drops the piece on
-	// the ground and books Drop. The handler's early returns are excluded by
-	// construction (the probe is init-complete, the slot holds a stackable,
-	// the amount is positive and less than the stack).
+	// and the wrong turns through the handler break it: freeing a refused
+	// piece as `discarded` books destroyed, missing the refuser drops the
+	// piece on the ground and books Drop. The handler's early returns are
+	// excluded by construction (the probe is init-complete, the slot holds
+	// a stackable, the amount is positive and less than the stack).
 	//
 	// The refuser is synthetic, like the probe clients: a bare CNpc in a
-	// free slot, parked on the target tile and removed after. The reject
-	// branch reads its name and its config id — anything but the Warehouse
-	// Keeper's 58 refuses — and never needs the spawn machinery. Last of
-	// the drives, so the tile juggling can disturb nothing after it; the
-	// tile's prior owner is put back, as the atomicity prover's Give does,
-	// because map 0 is live.
+	// free slot, parked on the target tile and removed after. The gate
+	// reads its name and its config id — anything but the Warehouse
+	// Keeper's 58 refuses a split piece — and never needs the spawn
+	// machinery. Last of the drives, so the tile juggling can disturb
+	// nothing after it; the tile's prior owner is put back, as the
+	// atomicity prover's Give does, because map 0 is live.
 	//----------------------------------------------------------------------
 
 	// Slot 3: slot 0 is taken again by now — the Warehouse retrieve above
@@ -966,19 +968,19 @@ void CmdCoverageCheck::execute(CGame* game, const char* args)
 
 	tally.record("reject_probe_held", reject_held);
 
-	// The player kept the stack: the refusal restored every unit the split
-	// took out. Read from the slot, not assumed — a drive that never reached
-	// the reject branch would leave a different number here (6 if the piece
-	// was never restored, -1 if the slot emptied) before it could leave the
-	// right one.
+	// The player kept the stack: since #112 the refusal comes before the
+	// split, so the count never moves at all. Read from the slot, not
+	// assumed — a drive that never reached the refusal would leave a
+	// different number here (6 if a split piece went unrestored, -1 if the
+	// slot emptied) before it could leave the right one.
 	tally.record("rejected_give_returns_the_stack",
 		reject_count_after == reject_stack_qty);
 
-	// And the ledger recorded NOTHING for the whole round trip: not the
-	// split (flow_none), not the restore (a rise), not the freed piece
-	// (merged). Until #110 this id held a destroyed flow of reject_give_qty
-	// — an exit row for items still in the giver's slot, which is exactly
-	// the drift this ticket exists to stop.
+	// And the ledger recorded NOTHING: no piece created, no count moved,
+	// nothing freed — the refusal precedes them all (#112). Until #110 this
+	// id held a destroyed flow of reject_give_qty — an exit row for items
+	// still in the giver's slot, which is exactly the drift this check
+	// exists to stop; #110 silenced the mis-booked free, #112 removed it.
 	tally.record("rejected_give_books_nothing", any_flow_rows(reject_id) == 0);
 
 	//----------------------------------------------------------------------

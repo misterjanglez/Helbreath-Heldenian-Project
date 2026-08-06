@@ -331,8 +331,23 @@ shape), and `drop_item_handler`'s equivalent guards went away instead of being
 relabeled: the zero-amount check returns before the piece exists and its
 provably-unreachable sibling is deleted, so a garbage drop has nothing to
 mis-book. The self-give swallow keeps `discarded` — its count is never restored,
-so that exit is real. #112 holds the structural follow-up: resolve the Give's
-destination *before* splitting, so a refusal never creates a piece at all.
+so that exit is real. #112 held the structural follow-up and closed it — see
+below.
+
+**Closed by #112: the inverted order.** `give_item_handler` decided *what* to
+move before it knew *where it could go* — the split branch created the piece
+and reduced the giver's stack, and only then resolved the target tile's owner,
+so every refusing destination had to restore the count, free the piece, and
+pick a destroy reason whose booking is silent. The destination is resolved
+once, up front, and an NPC that cannot receive (anyone but the Warehouse
+Keeper, plus the Shop Keeper for whole slots) refuses before anything exists:
+no piece, no count change, no `merged`-for-a-restore — the phantom-exit class
+#110 closed is now closed structurally, because no future destination can
+reintroduce it. The duplicated `get_owner` + `object_id` reconciliation block
+collapsed to one copy. Server-only wire reduction on the refusal path (the
+down-then-up count notifies and the equipped-item release are gone; only
+`CannotGiveItem` remains); the self-give swallow keeps its exact semantics and
+its real `discarded` exit.
 
 **Closed by #111: the unbooked entries.** The product side of crafting was
 unbooked — a crafted stack entered the world with no `created` flow, so the

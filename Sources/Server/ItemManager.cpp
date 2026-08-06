@@ -1443,8 +1443,61 @@ void ItemManager::give_item_handler(int client_h, short item_index, int amount, 
 
 	std::memset(char_name, 0, sizeof(char_name));
 
-	if ((m_game->m_client_list[client_h]->m_item_list[item_index]->is_stackable()) &&
-		(m_game->m_client_list[client_h]->m_item_list[item_index]->m_instance.count > static_cast<uint64_t>(amount))) {
+	// Destination before contents (#112). Who stands on the target tile is
+	// resolved once, up front — both halves below used to carry this block
+	// line-for-line, because each derived the answer only after committing
+	// its own side effects, and every refusal then had to restore a count
+	// and free a piece that need never have existed.
+	m_game->m_map_list[m_game->m_client_list[client_h]->m_map_index]->get_owner(&owner_h, &owner_type, dX, dY);
+
+	if (object_id != 0) {
+		if (hb::shared::object_id::is_player_id(object_id)) {
+			if ((object_id > 0) && (object_id < MaxClients)) {
+				if (m_game->m_client_list[object_id] != 0) {
+					if ((uint16_t)owner_h != object_id) owner_h = 0;
+				}
+			}
+		}
+		else {
+			// NPC
+			uint16_t npcIdx = hb::shared::object_id::ToNpcIndex(object_id);
+			if (hb::shared::object_id::IsNpcID(object_id) && (npcIdx > 0) && (npcIdx < MaxNpcs)) {
+				if (m_game->m_npc_list[npcIdx] != 0) {
+					if ((uint16_t)owner_h != npcIdx) owner_h = 0;
+				}
+			}
+		}
+	}
+
+	// Split or whole is the stack's own property, never the destination's,
+	// so the gate below can know which acceptance set applies before either
+	// branch commits anything.
+	const bool is_split = (m_game->m_client_list[client_h]->m_item_list[item_index]->is_stackable()) &&
+		(m_game->m_client_list[client_h]->m_item_list[item_index]->m_instance.count > static_cast<uint64_t>(amount));
+
+	// The destination's route, bound beside is_split so the gate and the
+	// branch dispatch below read one answer and each config id appears once.
+	const bool npc_target = (owner_h != 0) && (owner_type != hb::shared::owner_class::Player);
+	const int npc_config_id = npc_target ? m_game->m_npc_list[owner_h]->m_npc_config_id : 0;
+	const bool to_warehouse = (npc_config_id == 58);					// Warehouse Keeper
+
+	if (npc_target) {
+		memcpy(char_name, m_game->m_npc_list[owner_h]->m_npc_name, hb::shared::limits::NpcNameLen - 1);
+
+		// The whole acceptance roster: the Warehouse Keeper takes anything,
+		// the Shop Keeper takes whole slots only. Every other NPC refuses
+		// HERE, while there is nothing to undo — no piece, no count change,
+		// no destroy reason (#112). The giver hears the rejection and
+		// nothing else.
+		const bool accepts = to_warehouse
+			|| (is_split == false && npc_config_id == 56);				// Shop Keeper
+		if (accepts == false) {
+			m_game->send_notify_msg(0, client_h, Notify::CannotGiveItem, item_index, amount, 0, char_name);
+			return;
+		}
+	}
+
+	if (is_split) {
 
 		// Split stack piece, as in drop_item_handler: Counted, so no identity
 		// is created or divided here.
@@ -1456,28 +1509,6 @@ void ItemManager::give_item_handler(int client_h, short item_index, int amount, 
 		// it reaches (a Give, a Deposit, a Drop). Target count, not a
 		// pre-applied decrease, as in drop_item_handler (#105).
 		set_item_count(client_h, item_index, m_game->m_client_list[client_h]->m_item_list[item_index]->m_instance.count - amount, flow_none);
-
-		// dX, dY     .
-		m_game->m_map_list[m_game->m_client_list[client_h]->m_map_index]->get_owner(&owner_h, &owner_type, dX, dY);
-
-		if (object_id != 0) {
-			if (hb::shared::object_id::is_player_id(object_id)) {
-				if ((object_id > 0) && (object_id < MaxClients)) {
-					if (m_game->m_client_list[object_id] != 0) {
-						if ((uint16_t)owner_h != object_id) owner_h = 0;
-					}
-				}
-			}
-			else {
-				// NPC
-				uint16_t npcIdx = hb::shared::object_id::ToNpcIndex(object_id);
-				if (hb::shared::object_id::IsNpcID(object_id) && (npcIdx > 0) && (npcIdx < MaxNpcs)) {
-					if (m_game->m_npc_list[npcIdx] != 0) {
-						if ((uint16_t)owner_h != npcIdx) owner_h = 0;
-					}
-				}
-			}
-		}
 
 		if (owner_h == 0) {
 			m_game->m_map_list[m_game->m_client_list[client_h]->m_map_index]->set_item(m_game->m_client_list[client_h]->m_x, m_game->m_client_list[client_h]->m_y, item);
@@ -1493,6 +1524,9 @@ void ItemManager::give_item_handler(int client_h, short item_index, int amount, 
 				memcpy(char_name, m_game->m_client_list[owner_h]->m_char_name, hb::shared::limits::CharNameLen - 1);
 
 				if (owner_h == client_h) {
+					// The original's anti-hack shape, kept exactly: a self-give
+					// swallows the piece. The count is never restored, so this
+					// exit is real — `discarded` stays (#110, #112).
 					destroy_item(item, destroy_reason::discarded, client_h);
 					return;
 				}
@@ -1551,38 +1585,19 @@ void ItemManager::give_item_handler(int client_h, short item_index, int amount, 
 
 			}
 			else {
-				// NPC  .
-				memcpy(char_name, m_game->m_npc_list[owner_h]->m_npc_name, hb::shared::limits::NpcNameLen - 1);
+				// Only the Warehouse Keeper reaches here with a split piece —
+				// every other NPC was refused at the gate above, before the
+				// piece existed (#112).
+				if (set_item_to_bank_item(client_h, item, bank_deposit::by_character) == false) {
+					m_game->send_notify_msg(0, client_h, Notify::CannotItemToBank, 0, 0, 0, 0);
 
-				if (m_game->m_npc_list[owner_h]->m_npc_config_id == 58) { // Warehouse Keeper
-					// NPC     .
-					if (set_item_to_bank_item(client_h, item, bank_deposit::by_character) == false) {
-						m_game->send_notify_msg(0, client_h, Notify::CannotItemToBank, 0, 0, 0, 0);
+					m_game->m_map_list[m_game->m_client_list[client_h]->m_map_index]->set_item(m_game->m_client_list[client_h]->m_x, m_game->m_client_list[client_h]->m_y, item);
 
-						m_game->m_map_list[m_game->m_client_list[client_h]->m_map_index]->set_item(m_game->m_client_list[client_h]->m_x, m_game->m_client_list[client_h]->m_y, item);
+					// v1.411
+					item_log(ItemLogAction::Drop, client_h, 0, item);
 
-						// v1.411
-						item_log(ItemLogAction::Drop, client_h, 0, item);
-
-						m_game->send_ground_item_event(CommonType::ItemDrop, m_game->m_client_list[client_h]->m_map_index,
-							m_game->m_client_list[client_h]->m_x, m_game->m_client_list[client_h]->m_y, item);
-					}
-				}
-				else {
-					// NPC cannot receive items — restore count and reject.
-					// flow_none: the count rises back to what it was.
-					set_item_count(client_h, item_index, m_game->m_client_list[client_h]->m_item_list[item_index]->m_instance.count + amount, flow_none);
-					m_game->send_notify_msg(0, client_h, Notify::CannotGiveItem, item_index, amount, 0, char_name);
-
-					// merged, not discarded: the piece's contents live on in the
-					// stack the line above restored them to, so nothing left the
-					// world. `discarded` would book a destroyed flow for the full
-					// amount while the player keeps every unit of it — a phantom
-					// exit any player can mint by handing part of a stack to a
-					// shopkeeper (#110).
-					destroy_item(item, destroy_reason::merged, client_h);
-					m_game->calc_total_weight(client_h);
-					return;
+					m_game->send_ground_item_event(CommonType::ItemDrop, m_game->m_client_list[client_h]->m_map_index,
+						m_game->m_client_list[client_h]->m_x, m_game->m_client_list[client_h]->m_y, item);
 				}
 			}
 		}
@@ -1593,28 +1608,6 @@ void ItemManager::give_item_handler(int client_h, short item_index, int amount, 
 
 		if (m_game->m_client_list[client_h]->m_item_list[item_index]->get_item_sub_type() == hb::shared::item::item_sub_type::ammo)
 			m_game->m_client_list[client_h]->m_arrow_index = -1;
-
-		// dX, dY     .
-		m_game->m_map_list[m_game->m_client_list[client_h]->m_map_index]->get_owner(&owner_h, &owner_type, dX, dY); // dX, dY   .         .
-
-		if (object_id != 0) {
-			if (hb::shared::object_id::is_player_id(object_id)) {
-				if ((object_id > 0) && (object_id < MaxClients)) {
-					if (m_game->m_client_list[object_id] != 0) {
-						if ((uint16_t)owner_h != object_id) owner_h = 0;
-					}
-				}
-			}
-			else {
-				// NPC
-				uint16_t npcIdx = hb::shared::object_id::ToNpcIndex(object_id);
-				if (hb::shared::object_id::IsNpcID(object_id) && (npcIdx > 0) && (npcIdx < MaxNpcs)) {
-					if (m_game->m_npc_list[npcIdx] != 0) {
-						if ((uint16_t)owner_h != npcIdx) owner_h = 0;
-					}
-				}
-			}
-		}
 
 		if (owner_h == 0) {
 			m_game->m_map_list[m_game->m_client_list[client_h]->m_map_index]->set_item(m_game->m_client_list[client_h]->m_x,
@@ -1685,9 +1678,9 @@ void ItemManager::give_item_handler(int client_h, short item_index, int amount, 
 				}
 			}
 			else {
-				memcpy(char_name, m_game->m_npc_list[owner_h]->m_npc_name, hb::shared::limits::NpcNameLen - 1);
-
-				if (m_game->m_npc_list[owner_h]->m_npc_config_id == 58) { // Warehouse Keeper
+				// The gate above admits only two NPCs this far with a whole
+				// slot (#112); char_name already holds the NPC's name.
+				if (to_warehouse) {
 					if (set_item_to_bank_item(client_h, item_index) == false) {
 						m_game->send_notify_msg(0, client_h, Notify::CannotItemToBank, 0, 0, 0, 0);
 
@@ -1702,7 +1695,7 @@ void ItemManager::give_item_handler(int client_h, short item_index, int amount, 
 							m_game->m_client_list[client_h]->m_item_list[item_index]);
 					}
 				}
-				else if (m_game->m_npc_list[owner_h]->m_npc_config_id == 56) { // Shop Keeper
+				else { // Shop Keeper — the only other NPC the gate admits
 					m_game->m_map_list[m_game->m_client_list[client_h]->m_map_index]->set_item(m_game->m_client_list[client_h]->m_x,
 						m_game->m_client_list[client_h]->m_y,
 						m_game->m_client_list[client_h]->m_item_list[item_index]);
@@ -1714,12 +1707,6 @@ void ItemManager::give_item_handler(int client_h, short item_index, int amount, 
 						m_game->m_client_list[client_h]->m_item_list[item_index]);
 
 					std::memset(char_name, 0, sizeof(char_name));
-				}
-				else {
-					// NPC cannot receive items — reject and keep item in inventory
-					m_game->send_notify_msg(0, client_h, Notify::CannotGiveItem, item_index, amount, 0, char_name);
-					m_game->calc_total_weight(client_h);
-					return;
 				}
 			}
 
