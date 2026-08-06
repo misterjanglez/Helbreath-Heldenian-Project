@@ -133,9 +133,13 @@ namespace hb::server
 			// not be written after the inventory was already reduced.
 			delivery_lost,
 
-			// A stackable that merged into a stack the holder already had: the
-			// husk is freed, but its contents live on in the slot it merged into,
-			// so nothing left the world.
+			// A stackable whose contents live on in a stack the holder holds, so
+			// nothing left the world. Two shapes reach it: a pickup that merged
+			// into a stack the holder already had, and a split piece freed after
+			// its contents were restored to the stack it was split from — a Give
+			// an NPC refused (#110). Either way the husk is freed and the units
+			// remain in play, which is why this is the one reason the flow
+			// booking excludes (#81).
 			//
 			// Only stackables merge, so this reason should never reach a row —
 			// Counted items carry no Serial and the funnel records nothing for

@@ -39,6 +39,14 @@
 // shots, and the last arrow books its exit rows for a count of one — the
 // stack as it stood when deplete took it, not after.
 //
+// #110 corrected the opposite failure — not a missing booking but a phantom
+// one. The split piece a rejected Give frees was `discarded`, which books a
+// destroyed flow for the piece's whole count, even though the refusal had
+// just restored every unit to the giver's stack: an exit in the ledger, no
+// exit in the world, mintable by handing part of a stack to any NPC that
+// cannot receive it. The reject check below drives the real handler against
+// a synthetic refuser and asserts the round trip books nothing at all.
+//
 // What these checks do not prove, and cannot cheaply: that each VENUE names the
 // right route. The parameter is required rather than defaulted, so a venue
 // cannot omit a transition — that much is a compile error — but a venue naming
@@ -80,6 +88,8 @@
 #include "ItemLedgerStore.h"
 #include "ItemManager.h"
 #include "ItemProvenance.h"
+#include "Map.h"
+#include "Npc.h"
 #include "Packet/SharedPackets.h"
 #include "ServerConsole.h"
 #include "ServerMessages.h"
@@ -153,6 +163,12 @@ namespace
 	// another group's total. One more unused prime, so a sum that mixed groups
 	// cannot land right by coincidence.
 	constexpr int64_t quiver_qty    = 59;
+
+	// The stack a rejected Give (#110) splits and gets back, on a FIFTH id kept
+	// clear of every group above — its assertion is that the id books NO row of
+	// any type, which only a virgin id can make. Two more unused primes.
+	constexpr int64_t reject_stack_qty = 67;
+	constexpr int64_t reject_give_qty  = 61;
 
 	// Stored numbers as literals. These are permanent world fact the moment real
 	// players exist, and a check that queried with the same symbol it stored
@@ -252,11 +268,16 @@ void CmdCoverageCheck::execute(CGame* game, const char* args)
 
 	// And a fourth for the ammunition checks (#109), disjoint again.
 	const int arrow_id = find_probe_item(game, true, craft_id + 1);
+
+	// And a fifth for the rejected Give (#110), disjoint so that "books no row
+	// at all" stays a statement about the reject path alone.
+	const int reject_id = find_probe_item(game, true, arrow_id + 1);
 	if (items.is_valid_item_id(instanced_id) == false
 		|| items.is_valid_item_id(counted_id) == false
 		|| items.is_valid_item_id(spend_id) == false
 		|| items.is_valid_item_id(craft_id) == false
-		|| items.is_valid_item_id(arrow_id) == false)
+		|| items.is_valid_item_id(arrow_id) == false
+		|| items.is_valid_item_id(reject_id) == false)
 	{
 		hb::console::error("coveragecheck: no usable probe item ids.");
 		return;
@@ -534,6 +555,85 @@ void CmdCoverageCheck::execute(CGame* game, const char* args)
 	items.item_log(ItemLogAction::Give, actor_h, peer_h, handed.get());
 
 	//----------------------------------------------------------------------
+	// The rejected Give (#110): the exit that never happened.
+	//
+	// give_item_handler splits off a piece, the NPC refuses, the stack is
+	// restored to its full count, and the piece is freed. Until #110 that
+	// free said `discarded` — a destroyed flow for the piece's whole count,
+	// booked while the player kept every unit, so the exit totals drifted
+	// upward with ordinary play (hand five arrows to a shopkeeper). The
+	// honest reason is `merged`: the piece's contents live on in the stack
+	// they were restored to, the exact shape the merge exclusion was built
+	// for.
+	//
+	// Driven through the REAL give_item_handler, for the reason the deposit
+	// drives through set_item_to_bank_item: what is at issue is the reason
+	// the call site passes, and only the door knows it. On the fifth id the
+	// assertion can be the sharpest in the file — NO flow row of any type —
+	// and every wrong turn through the handler breaks it: a revert to
+	// `discarded` books destroyed, missing the refuser drops the piece on
+	// the ground and books Drop. The handler's early returns are excluded by
+	// construction (the probe is init-complete, the slot holds a stackable,
+	// the amount is positive and less than the stack).
+	//
+	// The refuser is synthetic, like the probe clients: a bare CNpc in a
+	// free slot, parked on the target tile and removed after. The reject
+	// branch reads its name and its config id — anything but the Warehouse
+	// Keeper's 58 refuses — and never needs the spawn machinery. Last of
+	// the drives, so the tile juggling can disturb nothing after it; the
+	// tile's prior owner is put back, as the atomicity prover's Give does,
+	// because map 0 is live.
+	//----------------------------------------------------------------------
+
+	// Slot 3: slot 0 is taken again by now — the Warehouse retrieve above
+	// lands its item in the first free slot, which the emptied purse had
+	// left open.
+	const bool reject_slot_free = (carrier->m_item_list[3] == nullptr);
+	if (reject_slot_free) carrier->m_item_list[3] = counted_probe(items, reject_id, reject_stack_qty);
+	const bool reject_held = reject_slot_free && carrier->m_item_list[3] != nullptr;
+
+	int refuser_h = 0;
+	if (reject_held && game->m_npc_list != nullptr)
+		for (int i = 1; i < hb::server::config::MaxNpcs; i++)
+			if (game->m_npc_list[i] == nullptr) { refuser_h = i; break; }
+
+	CMap* reject_map = game->m_map_list[0];
+	int64_t reject_count_after = -1;
+
+	if (reject_held && refuser_h != 0 && reject_map != nullptr)
+	{
+		// A CClient starts at map index -1; this is the one drive that walks
+		// a path dereferencing m_map_list[m_map_index], so it gets a real
+		// map (the atomicity prover's make_playable shape). Not restored:
+		// unlike the tile below, the probe dies with the run.
+		carrier->m_map_index = 0;
+
+		game->m_npc_list[refuser_h] = new CNpc("Probe");
+		// The constructor's -1 would already refuse; set explicitly so the
+		// check cannot come to hang on a constructor default.
+		game->m_npc_list[refuser_h]->m_npc_config_id = 1;
+
+		const short reject_x = static_cast<short>(actor_x + 1);
+		const short reject_y = static_cast<short>(actor_y);
+
+		short prior_owner = 0;
+		char prior_class = 0;
+		reject_map->get_owner(&prior_owner, &prior_class, reject_x, reject_y);
+		reject_map->set_owner(static_cast<short>(refuser_h),
+			hb::shared::owner_class::Npc, reject_x, reject_y);
+
+		items.give_item_handler(actor_h, 3, static_cast<int>(reject_give_qty),
+			reject_x, reject_y, 0, nullptr);
+
+		reject_map->set_owner(prior_owner, prior_class, reject_x, reject_y);
+		delete game->m_npc_list[refuser_h];
+		game->m_npc_list[refuser_h] = nullptr;
+
+		if (carrier->m_item_list[3] != nullptr)
+			reject_count_after = static_cast<int64_t>(carrier->m_item_list[3]->m_instance.count);
+	}
+
+	//----------------------------------------------------------------------
 	// Flush and read the columns a forensic query would read.
 	//----------------------------------------------------------------------
 
@@ -574,10 +674,14 @@ void CmdCoverageCheck::execute(CGame* game, const char* args)
 	{
 		return hb::server::flow_scalar(db, "COUNT(*)", day, arrow_id, flow_type);
 	};
-	auto instanced_flow_rows = [&]()
+	// Any flow row at all for an id, whatever its day or type. Two callers,
+	// two different claims of total absence: the Instanced probe must never
+	// reach the aggregate table, and the rejected Give's id must end the run
+	// virgin.
+	auto any_flow_rows = [&](int item_id)
 	{
 		return probe_scalar(db, std::format(
-			"SELECT COUNT(*) FROM item_flows WHERE item_id={}", instanced_id).c_str());
+			"SELECT COUNT(*) FROM item_flows WHERE item_id={}", item_id).c_str());
 	};
 	auto event_count = [&](int event_type, int64_t serial)
 	{
@@ -797,6 +901,27 @@ void CmdCoverageCheck::execute(CGame* game, const char* args)
 		arrow_flow_qty(destroyed_number) == 1);
 
 	//----------------------------------------------------------------------
+	// The rejected Give (#110)
+	//----------------------------------------------------------------------
+
+	tally.record("reject_probe_held", reject_held);
+
+	// The player kept the stack: the refusal restored every unit the split
+	// took out. Read from the slot, not assumed — a drive that never reached
+	// the reject branch would leave a different number here (6 if the piece
+	// was never restored, -1 if the slot emptied) before it could leave the
+	// right one.
+	tally.record("rejected_give_returns_the_stack",
+		reject_count_after == reject_stack_qty);
+
+	// And the ledger recorded NOTHING for the whole round trip: not the
+	// split (flow_none), not the restore (a rise), not the freed piece
+	// (merged). Until #110 this id held a destroyed flow of reject_give_qty
+	// — an exit row for items still in the giver's slot, which is exactly
+	// the drift this ticket exists to stop.
+	tally.record("rejected_give_books_nothing", any_flow_rows(reject_id) == 0);
+
+	//----------------------------------------------------------------------
 	// Instanced tier unaffected
 	//----------------------------------------------------------------------
 
@@ -806,7 +931,7 @@ void CmdCoverageCheck::execute(CGame* game, const char* args)
 	// The other half of the boundary, and the one a naive implementation gets
 	// wrong: an item with identity must never also be counted in aggregate, or
 	// every Instanced transition is recorded twice in two different shapes.
-	tally.record("instanced_books_no_flow", instanced_flow_rows() == 0);
+	tally.record("instanced_books_no_flow", any_flow_rows(instanced_id) == 0);
 	tally.record("instanced_ignores_explicit_qty",
 		event_count(get_flow_number, instanced_serial) == 1);
 

@@ -198,6 +198,9 @@ recorders; the Instanced members carry Serials and book events.
 ⁴ **Except `destroy_reason::merged`, which books nothing** — a merge frees a husk
 whose contents live on in the stack it joined, so nothing left the world. Every
 gold pickup takes that path, so counting it would double-count the currency supply.
+Since #110 the reason covers both shapes of that truth: the pickup-merge, and a
+split piece freed after its contents were restored to the stack it came from (a
+Give an NPC refused).
 
 ⁵ **The outflow half of the currency loop, closed by #103.** Money leaving a
 player's hands to an NPC reduces the stack through `set_item_count_by_id`, and
@@ -312,11 +315,21 @@ item-use you initiated" and releases its slot lock; a fired arrow is the
 server's doing and keeps sending false, as the site has since the original.
 No direct `m_instance.count` decrement remains anywhere in the server.
 
-**Known-open doors, found by #105's review and filed:** a rejected Give books
-a `destroyed` flow for items the player kept — `discarded` where the merge
-semantics apply (#110). And the product side of crafting is unbooked: a brewed
-stack enters the world with no `created` flow, so the craft loop reads as a
-pure sink now that #105 records its material side (#111).
+**Closed by #110: the phantom exit.** A rejected Give restored the split piece's
+contents to the giver's stack and then freed the piece as `discarded`, booking a
+`destroyed` flow for units the player kept — the exit totals drifted upward with
+every refused hand-over. The freed piece is a `merged` now (footnote ⁴'s second
+shape), and `drop_item_handler`'s equivalent guards went away instead of being
+relabeled: the zero-amount check returns before the piece exists and its
+provably-unreachable sibling is deleted, so a garbage drop has nothing to
+mis-book. The self-give swallow keeps `discarded` — its count is never restored,
+so that exit is real. #112 holds the structural follow-up: resolve the Give's
+destination *before* splitting, so a refusal never creates a piece at all.
+
+**Known-open door, found by #105's review and filed:** the product side of
+crafting is unbooked — a brewed stack enters the world with no `created` flow,
+so the craft loop reads as a pure sink now that #105 records its material side
+(#111).
 
 **Mechanical enforcement.** Three scripts, all green as of this audit:
 `Scripts/check_item_factory.py` (nothing is born outside the factory — 7 sanctioned),

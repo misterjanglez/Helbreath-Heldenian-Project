@@ -586,22 +586,19 @@ void ItemManager::drop_item_handler(int client_h, short item_index, int amount, 
 
 	if ((m_game->m_client_list[client_h]->m_item_list[item_index]->is_stackable()) &&
 		(m_game->m_client_list[client_h]->m_item_list[item_index]->m_instance.count > static_cast<uint64_t>(amount))) {
+		// The door above admits amount == 0; out before anything exists. The
+		// original create-then-deleted here, which a ledger keeps silent only
+		// by the accident that a factory piece counts 0 (#110). Its second
+		// guard (amount > count) is gone: the enclosing branch requires
+		// count > amount.
+		if (amount <= 0) return;
+
 		// Splitting a stack is not a birth — the same Counted stuff now sits in
 		// two places. Stackables carry no Serial, so there is no identity to
 		// divide and no origin to inherit.
 		item = create_item(m_game->m_client_list[client_h]->m_item_list[item_index]->m_name, item_origin::none);
 		if (item == nullptr) return;
-
-		if (amount <= 0) {
-			destroy_item(item, destroy_reason::discarded, client_h);
-			return;
-		}
 		item->m_instance.count = amount;
-
-		if (static_cast<uint64_t>(amount) > m_game->m_client_list[client_h]->m_item_list[item_index]->m_instance.count) {
-			destroy_item(item, destroy_reason::discarded, client_h);
-			return;
-		}
 
 		// v1.41 !!!
 		// flow_none: the moved portion is `item`, whose Drop below books it.
@@ -1564,7 +1561,14 @@ void ItemManager::give_item_handler(int client_h, short item_index, int amount, 
 					// flow_none: the count rises back to what it was.
 					set_item_count(client_h, item_index, m_game->m_client_list[client_h]->m_item_list[item_index]->m_instance.count + amount, flow_none);
 					m_game->send_notify_msg(0, client_h, Notify::CannotGiveItem, item_index, amount, 0, char_name);
-					destroy_item(item, destroy_reason::discarded, client_h);
+
+					// merged, not discarded: the piece's contents live on in the
+					// stack the line above restored them to, so nothing left the
+					// world. `discarded` would book a destroyed flow for the full
+					// amount while the player keeps every unit of it — a phantom
+					// exit any player can mint by handing part of a stack to a
+					// shopkeeper (#110).
+					destroy_item(item, destroy_reason::merged, client_h);
 					m_game->calc_total_weight(client_h);
 					return;
 				}
