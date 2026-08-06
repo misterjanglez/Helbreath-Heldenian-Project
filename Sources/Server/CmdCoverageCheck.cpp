@@ -47,6 +47,18 @@
 // cannot receive it. The reject check below drives the real handler against
 // a synthetic refuser and asserts the round trip books nothing at all.
 //
+// #111 closed the product side of the loop #105 opened. Reagents booked their
+// Make exits while a stackable product entered the world unbooked — created by
+// the factory, handed to the inventory, no flow on the whole path — so a
+// crafted batch eventually exited a world it never entered. The factory cannot
+// book it (every venue sets the count after create_item returns, the same #81
+// arithmetic the trap note below describes), so the venues book through one
+// named door, record_created_flow, once the count is real. The checks below
+// drive that door with the shapes that matter: a finished batch books
+// `created` for the batch quantity and books it exactly once — the husk its
+// merge frees adds nothing — while an Instanced product and a factory-fresh
+// count of 0 book no row at all.
+//
 // What these checks do not prove, and cannot cheaply: that each VENUE names the
 // right route. The parameter is required rather than defaulted, so a venue
 // cannot omit a transition — that much is a compile error — but a venue naming
@@ -170,6 +182,10 @@ namespace
 	constexpr int64_t reject_stack_qty = 67;
 	constexpr int64_t reject_give_qty  = 61;
 
+	// The finished batch a craft venue books (#111), on a SIXTH id so its
+	// `created` inflow is the only row the id holds. One more unused prime.
+	constexpr int64_t craft_batch_qty = 71;
+
 	// Stored numbers as literals. These are permanent world fact the moment real
 	// players exist, and a check that queried with the same symbol it stored
 	// would still pass if both were renumbered together.
@@ -186,6 +202,7 @@ namespace
 	constexpr int give_event_number     = 1;
 	constexpr int despawned_number      = 101;
 	constexpr int destroyed_number      = 102;
+	constexpr int created_number        = 100;
 	static_assert(static_cast<int>(ItemLogAction::Drop) == drop_flow_number,
 		"ItemLogAction::Drop moved: every drop flow already written means something else now.");
 	static_assert(static_cast<int>(ItemLogAction::get) == get_flow_number,
@@ -212,6 +229,8 @@ namespace
 		"ledger_event::despawned moved: every despawn row already written means something else now.");
 	static_assert(static_cast<int>(ledger_event::destroyed) == destroyed_number,
 		"ledger_event::destroyed moved: every destruction row already written means something else now.");
+	static_assert(static_cast<int>(ledger_event::created) == created_number,
+		"ledger_event::created moved: every mint flow already written means something else now.");
 
 	// Today as yyyymmdd, local time — the same rule item_ledger_store::flow_day
 	// uses. Recomputed here rather than exposed from the store so the check is
@@ -272,12 +291,21 @@ void CmdCoverageCheck::execute(CGame* game, const char* args)
 	// And a fifth for the rejected Give (#110), disjoint so that "books no row
 	// at all" stays a statement about the reject path alone.
 	const int reject_id = find_probe_item(game, true, arrow_id + 1);
+
+	// A sixth for the created inflow (#111), and a seventh that must end the
+	// run virgin: it takes the no-book shape (a factory-fresh count of 0
+	// through the created door), and "books nothing" is a statement only a
+	// clean id can make.
+	const int craftout_id = find_probe_item(game, true, reject_id + 1);
+	const int blank_id = find_probe_item(game, true, craftout_id + 1);
 	if (items.is_valid_item_id(instanced_id) == false
 		|| items.is_valid_item_id(counted_id) == false
 		|| items.is_valid_item_id(spend_id) == false
 		|| items.is_valid_item_id(craft_id) == false
 		|| items.is_valid_item_id(arrow_id) == false
-		|| items.is_valid_item_id(reject_id) == false)
+		|| items.is_valid_item_id(reject_id) == false
+		|| items.is_valid_item_id(craftout_id) == false
+		|| items.is_valid_item_id(blank_id) == false)
 	{
 		hb::console::error("coveragecheck: no usable probe item ids.");
 		return;
@@ -634,6 +662,38 @@ void CmdCoverageCheck::execute(CGame* game, const char* args)
 	}
 
 	//----------------------------------------------------------------------
+	// The created inflow (#111): a finished stackable enters the world.
+	//
+	// Driven through record_created_flow — the door itself, as the outflow
+	// checks drive set_item_count_by_id — in the sequence every venue runs:
+	// the two-argument door sets the batch count on the factory-fresh item
+	// and books, the product is handed on, the merge husk freed `merged`.
+	// The husk free is the case the ticket pins: the venue booked before the
+	// merge, so the free must add nothing, or every crafted batch that landed
+	// on an existing stack would enter the world twice.
+	//----------------------------------------------------------------------
+
+	CItem* crafted_raw = items.create_item(craftout_id, item_origin::craft);
+	const bool crafted_made = (crafted_raw != nullptr);
+	if (crafted_made)
+	{
+		items.record_created_flow(*crafted_raw, static_cast<uint64_t>(craft_batch_qty));
+		items.destroy_item(crafted_raw, destroy_reason::merged, actor_h);
+	}
+
+	// The two no-book shapes. A venue that calls before setting the count
+	// holds the factory-fresh 0, and the zero-quantity guard keeps the row out
+	// — the same arithmetic that keeps a husk merge silent. An Instanced
+	// product declines on its serial: its birth is the factory's created
+	// EVENT, and a flow beside it would record the same birth twice in two
+	// shapes. The Instanced drive has no tally line of its own — it runs
+	// before the flush, so instanced_books_no_flow below is its assertion,
+	// now covering the created door along with every older route.
+	item_ptr countless{ items.create_item(blank_id, item_origin::craft) };
+	if (countless != nullptr) items.record_created_flow(*countless);
+	items.record_created_flow(*instanced);
+
+	//----------------------------------------------------------------------
 	// Flush and read the columns a forensic query would read.
 	//----------------------------------------------------------------------
 
@@ -922,6 +982,33 @@ void CmdCoverageCheck::execute(CGame* game, const char* args)
 	tally.record("rejected_give_books_nothing", any_flow_rows(reject_id) == 0);
 
 	//----------------------------------------------------------------------
+	// The created inflow (#111)
+	//----------------------------------------------------------------------
+
+	tally.record("crafted_probe_made", crafted_made);
+
+	// The headline: a finished stackable's entry is recorded at all. Before
+	// this ticket the shop-sale payout was the only created flow in the
+	// server, and a crafted batch entered the world without a row.
+	tally.record("crafted_stack_books_created",
+		hb::server::flow_scalar(db, "COUNT(*)", day, craftout_id, created_number) == 1);
+
+	// ...for the batch quantity, exactly once. The drive freed the merge husk
+	// after booking, so a door that booked the free again lands on 142, and a
+	// venue that booked the factory default instead of the batch lands on no
+	// row at all.
+	tally.record("crafted_stack_books_the_batch",
+		hb::server::flow_scalar(db, "qty", day, craftout_id, created_number) == craft_batch_qty);
+
+	// The count-first contract: a factory-fresh 0 through the created door
+	// books nothing, so a venue that forgets the count reproduces the hole
+	// this ticket closed rather than filing zeros under it. The id must end
+	// the run untouched by ANY row for the same reason the rejected Give's
+	// must. The created door's other no-op — an Instanced item — has no line
+	// here: its drive ran above, so instanced_books_no_flow below carries it.
+	tally.record("factory_count_books_no_created", any_flow_rows(blank_id) == 0);
+
+	//----------------------------------------------------------------------
 	// Instanced tier unaffected
 	//----------------------------------------------------------------------
 
@@ -931,6 +1018,8 @@ void CmdCoverageCheck::execute(CGame* game, const char* args)
 	// The other half of the boundary, and the one a naive implementation gets
 	// wrong: an item with identity must never also be counted in aggregate, or
 	// every Instanced transition is recorded twice in two different shapes.
+	// Since #111 the routes under this assertion include the created door —
+	// the drive above pushed the Instanced probe through record_created_flow.
 	tally.record("instanced_books_no_flow", any_flow_rows(instanced_id) == 0);
 	tally.record("instanced_ignores_explicit_qty",
 		event_count(get_flow_number, instanced_serial) == 1);

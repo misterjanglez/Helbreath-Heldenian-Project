@@ -822,6 +822,11 @@ int ItemManager::add_client_bulk_item_list(int client_h, const char* item_name, 
 		CItem* item = create_item(item_name, item_origin::gm_mint, birth_at(client_h));
 		if (item == nullptr) break;
 
+		// One copy is one unit, as in mint_gm_items (#111). Both GM commands
+		// route stackables away from this bulk door today, but that is caller
+		// discipline — the count makes a stackable copy safe by construction.
+		item->m_instance.count = 1;
+
 		// Weight check
 		if ((m_game->m_client_list[client_h]->m_cur_weight_load + get_item_weight(item, 1)) > m_game->calc_max_load(client_h))
 		{
@@ -916,6 +921,13 @@ int ItemManager::mint_gm_items(int client_h, int item_id, int count,
 			error = "item config init failed";
 			break;
 		}
+
+		// One copy is one unit. The factory leaves count 0 (#81), and this
+		// venue's Counted booking reads the count off the item at
+		// record_gm_mint below — so a stackable copy would merge into an
+		// existing slot as nothing AND book a GmMint flow of zero, the #111
+		// double hole in the one mint door that never set a count.
+		item->m_instance.count = 1;
 
 		// The mode decides what a legal instance is. A rejection is a property
 		// of the request, not of this copy, so the first one ends the run.
@@ -3373,15 +3385,14 @@ void ItemManager::req_sell_item_confirm_handler(int client_h, char item_id, int 
 	// by event instead of an instance row. The venue lives on the event.
 	item_gold = create_item(hb::shared::item::ItemId::Gold, item_origin::none);
 	if (item_gold == nullptr) return;
-	item_gold->m_instance.count = price;
 
 	// Gold minted into the economy. Recorded here rather than at the minting
 	// funnel because the funnel cannot know the amount: every creation venue
 	// sets m_instance.count *after* create_item returns, so a flow booked inside
-	// stamp_provenance would be a stack of zero (#81). record_counted_flow
-	// rather than item_log so the shop text channel does not gain a second
-	// "Sell" line per sale describing the payout as an item the player sold.
-	record_counted_flow(hb::server::ledger_event::created, *item_gold, price);
+	// stamp_provenance would be a stack of zero (#81). The created door rather
+	// than item_log so the shop text channel does not gain a second "Sell" line
+	// per sale describing the payout as an item the player sold.
+	record_created_flow(*item_gold, price);
 
 	if (add_client_item_list(client_h, item_gold, &erase_req)) {
 
@@ -5332,6 +5343,13 @@ void ItemManager::build_item_handler(int client_h, char* data)
 					birth_at(client_h));
 				if (item == nullptr) return;
 
+				// One build is one product. For the stackable products (Super
+				// and Ultra Coal) the factory's count of 0 merged into an
+				// existing stack as nothing — materials consumed, air yielded —
+				// and the created flow is the product-side mirror of the
+				// elements' Make exits (#105, #111).
+				record_created_flow(*item, 1);
+
 				// Custom-Made
 				item->set_custom_made(true);
 
@@ -5599,6 +5617,22 @@ void ItemManager::record_counted_flow(int event_type, const CItem& item, int64_t
 
 	if (hb::server::item_ledger_store* store = ledger())
 		store->record_flow(item.m_id_num, event_type, moved);
+}
+
+void ItemManager::record_created_flow(const CItem& item) const
+{
+	// Every guard lives in the funnel below: an Instanced item is declined by
+	// its serial, and a factory-fresh count of 0 by the zero-quantity rule —
+	// which is why the call sites can be unconditional (#111). The quantity is
+	// the sentinel, not a re-derivation: a venue books the whole stack it just
+	// counted, which is exactly what flow_qty_from_item means everywhere else.
+	record_counted_flow(hb::server::ledger_event::created, item, flow_qty_from_item);
+}
+
+void ItemManager::record_created_flow(CItem& item, uint64_t count) const
+{
+	item.m_instance.count = count;
+	record_created_flow(item);
 }
 
 bool ItemManager::begin_ledger_event(int action, const CItem* item, int actor_h,
@@ -6121,6 +6155,11 @@ void ItemManager::req_create_slate_handler(int client_h, char* data)
 	// 867 is the slate item; the roll above only chose which flavour it reads as.
 	item = create_item(867, item_origin::craft, birth_at(client_h));
 	if (item == nullptr) return;
+
+	// The fourth craft venue books like the other three (#111). The slate is
+	// Instanced today, so the flow no-ops — the call is here so a config flip
+	// to stackable cannot reopen the hole.
+	record_created_flow(*item, 1);
 
 	item->set_touch_effect_type(TouchEffectType::ID);
 	item->m_instance.touch_effect_value1 = static_cast<short>(m_game->dice(1, 100000));

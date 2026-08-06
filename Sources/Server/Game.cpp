@@ -6571,7 +6571,11 @@ void CGame::client_common_handler(int client_h, char* data)
 			CItem* gold_item = m_item_manager->create_item(hb::shared::item::ItemId::Gold, hb::server::item_origin::none);
 			if (gold_item != nullptr)
 			{
-				gold_item->m_instance.count = 1000000;
+				// Tester money is still money entering the world: unbooked, a
+				// single menu press puts the supply a million coins out of
+				// reconcilable reach (#111).
+				m_item_manager->record_created_flow(*gold_item, 1000000);
+
 				int erase_req = 0;
 				if (m_item_manager->add_client_item_list(client_h, gold_item, &erase_req))
 				{
@@ -10850,19 +10854,20 @@ void CGame::calc_exp_stock(int client_h)
 
 	if ((is_level_up) && (m_client_list[client_h]->m_level <= 5)) {
 		// Gold .  1~5 100 Gold .
-		// Counted: gold carries no Serial and no origin.
+		// Counted: gold carries no Serial and no origin. Minted out of
+		// nothing, so the venue books the inflow with the count (#111).
 		item = m_item_manager->create_item(hb::shared::item::ItemId::Gold, hb::server::item_origin::none);
 		if (item == nullptr) return;
-		item->m_instance.count = (uint32_t)100000;
+		m_item_manager->record_created_flow(*item, 100000);
 		m_item_manager->add_item(client_h, item, 0);
 	}
 
 	if ((is_level_up) && (m_client_list[client_h]->m_level > 5) && (m_client_list[client_h]->m_level <= 20)) {
 		// Gold .  5~20 300 Gold .
-		// Counted: gold carries no Serial and no origin.
+		// Counted: gold carries no Serial and no origin. Booked as above (#111).
 		item = m_item_manager->create_item(hb::shared::item::ItemId::Gold, hb::server::item_origin::none);
 		if (item == nullptr) return;
-		item->m_instance.count = (uint32_t)100000;
+		m_item_manager->record_created_flow(*item, 100000);
 		m_item_manager->add_item(client_h, item, 0);
 	}
 }

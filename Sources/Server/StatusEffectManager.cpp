@@ -332,6 +332,12 @@ void StatusEffectManager::check_farming_action(short attacker_h, short target_h,
 		m_game->m_item_manager->birth_at(attacker_h));
 	if (item == nullptr) return;
 
+	// One pick yields one crop. Most crops are stackable, so until #111 the
+	// harvest hit the ground as an empty factory stack and merged into the
+	// farmer's existing crop as nothing; the flow no-ops for the Instanced
+	// ones (Corn, Ginseng).
+	m_game->m_item_manager->record_created_flow(*item, 1);
+
 	if (type == 0) {
 		m_game->m_map_list[m_game->m_client_list[attacker_h]->m_map_index]->set_item(m_game->m_client_list[attacker_h]->m_x, m_game->m_client_list[attacker_h]->m_y, item);
 		m_game->send_ground_item_event(CommonType::ItemDrop, m_game->m_client_list[attacker_h]->m_map_index,

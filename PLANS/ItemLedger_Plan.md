@@ -179,12 +179,20 @@ call sites.
 
 ¹ **Counted creation is recorded per-venue, not at the mint funnel.** `stamp_provenance`
 cannot book it: every creation venue sets `m_instance.count` *after* `create_item`
-returns, so a flow booked inside the funnel would always be a stack of zero. Shop
-sale proceeds — real money-supply inflow — book `created` at the venue
-(`req_sell_item_confirm_handler`). Other Counted mints are recorded by whichever
-transition delivers them (an NPC gold drop by `NewGenDrop`, a reward by its own
-action), which is the honest shape: a Counted item has no identity, so it has no
-birth — only flows.
+returns, so a flow booked inside the funnel would always be a stack of zero. Since
+#111 the venues book through one named door — `ItemManager::record_created_flow`,
+whose two-argument form sets the count and books in one call, so the
+count-then-book ordering is not expressible wrongly. It no-ops for an Instanced
+item (its birth is the factory's event) and for a count of 0, so mixed-product
+venues call it unconditionally. The roster (`grep record_created_flow`): shop
+sale proceeds, both `CraftingManager` venues, BuildItem, slates, mining, crop
+harvest, the fishing spawner (`create_fish`, after nothing can refuse the
+registration), war reward money, level-up gold, the tester menu's gold, and
+quest rewards. Counted mints delivered by an already-booked transition stay with
+that transition (an NPC drop by `NewGenDrop` 5, a purchase by `Buy` 7, a GM mint
+by 40 — whose two mint doors now set the copy's count of 1 themselves, since
+their per-copy booking reads the quantity off the item) — a Counted item has no
+identity, so it has no birth — only flows.
 
 ² **The quantity is the amount that moved, not the stack's count.** A shop sale
 hands `item_log` the whole inventory slot and takes `num` out of it, so
@@ -326,16 +334,26 @@ mis-book. The self-give swallow keeps `discarded` — its count is never restore
 so that exit is real. #112 holds the structural follow-up: resolve the Give's
 destination *before* splitting, so a refusal never creates a piece at all.
 
-**Known-open door, found by #105's review and filed:** the product side of
-crafting is unbooked — a brewed stack enters the world with no `created` flow,
-so the craft loop reads as a pure sink now that #105 records its material side
-(#111).
+**Closed by #111: the unbooked entries.** The product side of crafting was
+unbooked — a crafted stack entered the world with no `created` flow, so the
+craft loop read as a pure sink once #105 recorded its material side. The sweep
+the ticket asked for found the same hole at every venue that mints a stackable
+outside the booked drop/trade/mint paths; all of them book through
+`record_created_flow` now (footnote ¹ holds the roster). The same sweep
+surfaced a port bug the ledger made visible: the craft/gather venues never set
+the product's count, and this port's `CItem` defaults it to 0 where the
+original constructor said 1 — so a crafted Ware or mined nugget merged into an
+existing stack as *nothing*. Each venue now sets the count explicitly, which is
+also what gives the booking a real quantity.
 
-**Mechanical enforcement.** Three scripts, all green as of this audit:
+**Mechanical enforcement.** Four scripts, all green as of this audit:
 `Scripts/check_item_factory.py` (nothing is born outside the factory — 7 sanctioned),
-`Scripts/check_item_destroy.py` (nothing dies outside the funnel — 29 classified),
-and `Scripts/check_item_merge.py` (**new in #81** — no husk is abandoned by a stack
-merge; 22 sites). The prover is `coveragecheck` (45/45 since #109).
+`Scripts/check_item_destroy.py` (nothing dies outside the funnel — 30 classified),
+`Scripts/check_item_merge.py` (**new in #81** — no husk is abandoned by a stack
+merge; 22 sites), and `Scripts/check_created_flow.py` (**new in #111** — every
+creation call site is classified for how its Counted entry books; 32 sites in 14
+files, so the thirteenth venue cannot be added silently). The prover is
+`coveragecheck` (52/52 since #111).
 
 What `coveragecheck` does *not* prove, and cannot cheaply: that each venue names
 the right route. A venue cannot omit a transition — the parameter is required, so

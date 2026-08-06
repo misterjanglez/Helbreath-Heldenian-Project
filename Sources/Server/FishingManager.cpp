@@ -79,6 +79,14 @@ int FishingManager::create_fish(char map_index, short sX, short sY, short type, 
 			m_fish[i]->m_dynamic_object_handle = dynamic_handle;
 			m_game->m_map_list[map_index]->m_cur_fish++;
 
+			// The catch enters the world here, once nothing above can refuse
+			// it — every earlier exit hands the item back or frees it
+			// unregistered. One hook holds one catch; the rare stackable one
+			// (a Diamond) would otherwise land in the angler's inventory as an
+			// empty factory stack (#111). No-op for the Instanced fish
+			// species.
+			m_game->m_item_manager->record_created_flow(*item, 1);
+
 			return i;
 		}
 

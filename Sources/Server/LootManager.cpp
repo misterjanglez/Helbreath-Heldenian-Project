@@ -386,6 +386,13 @@ void LootManager::get_reward_money_handler(int client_h)
 		reward_gold_left = m_game->m_client_list[client_h]->m_reward_gold - maxGold;
 	}
 
+	// Reward gold is minted out of nothing here, exactly like sale proceeds —
+	// and until #111 it was an unbooked way for gold to enter the world, while
+	// every route gold takes OUT was counted (#103). The one-argument form:
+	// the count above is derived off the finished item (capped by what the
+	// carrier can hold), so this is the venue that sets it itself.
+	m_game->m_item_manager->record_created_flow(*item);
+
 	if (m_game->m_item_manager->add_client_item_list(client_h, item, &erase_req)) {
 
 		m_game->m_client_list[client_h]->m_reward_gold = reward_gold_left;

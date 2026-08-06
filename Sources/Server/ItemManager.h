@@ -210,7 +210,8 @@ public:
 	// out of a stack of 50 recorded nothing. The three crafting venues (potion
 	// brewing, jewel and necklace crafting, BuildItem elements) pass `Make`, and
 	// what is stored against that number is the consumption of the materials —
-	// the made item books its own birth at the factory, so the two are one
+	// the made item books its own birth (at the factory when Instanced, through
+	// record_created_flow at the venue when Counted, #111), so the two are one
 	// recipe seen from its two ends.
 	//
 	// The quantity booked is the DECREASE this call makes, computed inside for
@@ -467,6 +468,28 @@ public:
 	void record_ledger_event(int event_type, int64_t serial,
 		const hb::server::ledger_event_record& base);
 
+	// Books the `created` inflow for a Counted item, called by the venue that
+	// finished it, at the moment its count is real. The factory cannot do this:
+	// every creation venue sets m_instance.count *after* create_item returns, so
+	// a flow booked in stamp_provenance would carry a stack of zero (#81). The
+	// named door is what keeps the exceptions to the begin_ledger_event funnel
+	// enumerable (#111): a venue-side booking is `grep record_created_flow`.
+	//
+	// No-op for an Instanced item — its birth is the factory's created event —
+	// so a venue whose product is only sometimes stackable (crafting, mining, a
+	// quest reward) calls it unconditionally and the right tier books. Also a
+	// no-op for a count of 0, which is the factory default: a venue that calls
+	// before setting the count books nothing, the same silent hole this door
+	// exists to close. The two-argument form below is how a venue avoids ever
+	// holding that ordering in its hands.
+	void record_created_flow(const CItem& item) const;
+
+	// The venue form: sets the count the factory could not know, then books —
+	// one call, so count-then-book is not expressible in the wrong order. The
+	// one venue whose count is derived off the finished item (reward gold,
+	// capped by carry weight) sets it itself and calls the form above.
+	void record_created_flow(CItem& item, uint64_t count) const;
+
 	// A destroyed event's `detail`. Public because a caller ending a whole
 	// bundle builds it once, and shared with destroy_item so the two ways an
 	// item can end cannot come to disagree about how a reason is written down.
@@ -543,12 +566,13 @@ private:
 	// has an EVENT to build comes through this one door, so a stackable moving is
 	// recorded by the same line that records an Instanced one.
 	//
-	// Two Counted-only venues call record_counted_flow directly instead, and both
-	// have the same reason: they know a quantity this door would get wrong. Shop
-	// sale proceeds are minted with a count set after the factory returns (#81),
-	// and a payment to an NPC books the decrease it makes rather than the stack
-	// it came out of (#103). Neither has an Instanced counterpart to build an
-	// event for, so neither loses anything by not passing here.
+	// Venues that know a quantity this door would get wrong do not pass here.
+	// A stack minted into the world books through record_created_flow once its
+	// venue has set the count the factory could not know (#81, #111), and a
+	// payment to an NPC books the decrease it makes rather than the stack it
+	// came out of (#103). None of them loses an event by not passing here — an
+	// Instanced product's birth is booked at the factory, and the rest have no
+	// Instanced counterpart at all.
 	bool begin_ledger_event(int event_type, const CItem* item, int actor_h,
 		hb::server::ledger_event_record& event,
 		int64_t qty = flow_qty_from_item) const;

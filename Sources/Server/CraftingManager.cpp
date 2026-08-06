@@ -195,6 +195,12 @@ void CraftingManager::req_create_portion_handler(int client_h, char* data)
 		item = m_game->m_item_manager->create_item(portion_name, hb::server::item_origin::craft,
 			m_game->m_item_manager->birth_at(client_h));
 		if (item != nullptr) {
+			// One brew is one potion, entering the world as the product-side
+			// mirror of the reagents' Make exits above (#105, #111). Every
+			// potion in today's data is Instanced, so the flow no-ops — the
+			// call is here so a config flip cannot reopen the hole.
+			m_game->m_item_manager->record_created_flow(*item, 1);
+
 			if (m_game->m_item_manager->add_client_item_list(client_h, item, &erase_req)) {
 				ret = m_game->m_item_manager->send_item_notify_msg(client_h, Notify::ItemObtained, item, 0);
 
@@ -484,7 +490,15 @@ void CraftingManager::req_create_crafting_handler(int client_h, char* data)
 		item = m_game->m_item_manager->create_item(crafting_name, hb::server::item_origin::craft,
 			m_game->m_item_manager->birth_at(client_h));
 		if (item != nullptr)
-		{	// // Snoopy: Added Purity to Oils/Elixirs
+		{
+			// One craft is one product. The Wares this venue makes are
+			// stackable, so until #111 a crafted Ware carried the factory's
+			// count of 0 and merged into the crafter's existing stack as
+			// nothing — materials consumed (and booked Make above, #105), the
+			// product neither arrived nor entered the ledger.
+			m_game->m_item_manager->record_created_flow(*item, 1);
+
+			// // Snoopy: Added Purity to Oils/Elixirs
 			if (purity != 0)
 			{
 				item->m_instance.special_effect_value2 = purity;
