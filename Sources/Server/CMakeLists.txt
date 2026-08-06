@@ -120,7 +120,7 @@ set(SERVER_SOURCES
     TradingPostManager.cpp
     TradingPostStore.cpp
     WarManager.cpp
-    Wmain.cpp
+    wmain.cpp
 )
 
 hb_guard_source_list(
