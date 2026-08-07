@@ -48,6 +48,8 @@ namespace ServerMsgId
 
 		// Server teleport messages
 		RequestCityHallTeleport                 = 0x0EA03202,
+		response_teleport_list                    = 0x0EA03203,
+		request_charged_teleport                  = 0x0EA03204,
 		request_heldenian_tp_list                 = 0x0EA03206,
 		response_heldenian_tp_list                = 0x0EA03207,
 		request_heldenian_tp                      = 0x0EA03208,

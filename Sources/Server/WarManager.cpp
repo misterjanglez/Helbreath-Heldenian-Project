@@ -1503,9 +1503,15 @@ void WarManager::local_end_heldenian_mode()
 	hb::logger::log("Heldenian ended, winner side: {}", m_game->m_last_heldenian_winner);
 
 	// Announce the result once per client, and recall everyone still on a war map.
+	// Retail popped the victory dialog at every war end; the leaked lineage never
+	// sent HeldenianVictory from anywhere, so the client's dialog was dead (#114).
+	// A winner of -1 (no titleholder after a fully tied first war) renders as the
+	// dialog's side-0 tie text.
+	const uint32_t victory_side = (m_game->m_last_heldenian_winner > 0) ? m_game->m_last_heldenian_winner : 0;
 	for (int x = 0; x < MaxClients; x++)
 		if ((m_game->m_client_list[x] != 0) && (m_game->m_client_list[x]->m_is_init_complete)) {
 			m_game->send_notify_msg(0, x, Notify::HeldenianEnd, 0, 0, 0, 0);
+			m_game->send_notify_msg(0, x, Notify::HeldenianVictory, victory_side, 0, 0, 0);
 			if ((m_game->m_map_list[m_game->m_client_list[x]->m_map_index] != 0) &&
 				(m_game->m_map_list[m_game->m_client_list[x]->m_map_index]->m_is_heldenian_map)) {
 				m_game->request_teleport_handler(x, "1   ", 0, -1, -1);
@@ -1689,15 +1695,10 @@ bool WarManager::get_heldenian_entry_point(int client_h, char* map_name, short* 
 	if ((m_game->m_client_list[client_h]->m_side != 1) && (m_game->m_client_list[client_h]->m_side != 2)) return false;
 
 	if (m_game->m_heldenian_mode_type == 1) {
-		std::memcpy(map_name, "btfield", 7);
-		if (m_game->m_client_list[client_h]->m_side == 1) {
-			*dX = 68;
-			*dY = 225;
-		}
-		else {
-			*dX = 202;
-			*dY = 70;
-		}
+		const tp_list_entry& spawn = btfield_spawn[m_game->m_client_list[client_h]->m_side - 1];
+		std::memcpy(map_name, spawn.map_name, strlen(spawn.map_name));
+		*dX = spawn.x;
+		*dY = spawn.y;
 		return true;
 	}
 	if (m_game->m_heldenian_mode_type == 2) {
@@ -1719,39 +1720,18 @@ bool WarManager::get_heldenian_entry_point(int client_h, char* map_name, short* 
 // (or an empty one when no war is running), the shape handle_heldenian_teleport_list expects.
 void WarManager::request_heldenian_tp_list(int client_h)
 {
-	char txt[sizeof(hb::net::PacketResponseTeleportListHeader) + sizeof(hb::net::PacketResponseTeleportListEntry)]{};
 	char map_name[hb::shared::limits::MapNameLen]{};
+	tp_list_entry list[1];
 	short dX = 0, dY = 0;
-	int ret;
+	int count = 0;
 
 	if (m_game->m_client_list[client_h] == 0) return;
 
-	auto& resp = *reinterpret_cast<hb::net::PacketResponseTeleportListHeader*>(txt);
-	resp.header.msg_id = ServerMsgId::response_heldenian_tp_list;
-	resp.header.msg_type = 0;
-	resp.count = 0;
-
-	size_t size = sizeof(resp);
 	if (get_heldenian_entry_point(client_h, map_name, &dX, &dY)) {
-		auto& entry = *reinterpret_cast<hb::net::PacketResponseTeleportListEntry*>(txt + sizeof(resp));
-		entry.index = 0;
-		std::memcpy(entry.map_name, map_name, sizeof(entry.map_name));
-		entry.x = dX;
-		entry.y = dY;
-		entry.cost = 0;
-		resp.count = 1;
-		size += sizeof(entry);
+		list[0] = { map_name, dX, dY };
+		count = 1;
 	}
-
-	ret = m_game->m_client_list[client_h]->m_socket->send_msg(txt, static_cast<int>(size));
-	switch (ret) {
-	case sock::Event::QueueFull:
-	case sock::Event::SocketError:
-	case sock::Event::CriticalError:
-	case sock::Event::SocketClosed:
-		m_game->delete_client(client_h, true, true);
-		break;
-	}
+	send_teleport_list(client_h, ServerMsgId::response_heldenian_tp_list, list, count);
 }
 
 // The pick from that list. The id is display-side only — the destination is
@@ -1769,6 +1749,127 @@ void WarManager::request_heldenian_tp(int client_h, char* data, size_t msg_size)
 	if (get_heldenian_entry_point(client_h, map_name, &dX, &dY)) {
 		m_game->request_teleport_handler(client_h, "2   ", map_name, dX, dY);
 	}
+}
+
+// Packs and sends one teleport list (header + count entries) on the given wire
+// id — the shape shared by the Command Hall war list and the City Hall list.
+// Callers have already null-checked the client.
+void WarManager::send_teleport_list(int client_h, uint32_t msg_id, const tp_list_entry* entries, int count)
+{
+	char txt[sizeof(hb::net::PacketResponseTeleportListHeader) + max_tp_list_entries * sizeof(hb::net::PacketResponseTeleportListEntry)]{};
+	int ret;
+
+	if (count > max_tp_list_entries) count = max_tp_list_entries;
+
+	auto& resp = *reinterpret_cast<hb::net::PacketResponseTeleportListHeader*>(txt);
+	resp.header.msg_id = msg_id;
+	resp.header.msg_type = 0;
+	resp.count = count;
+
+	size_t size = sizeof(resp);
+	for (int i = 0; i < count; i++) {
+		auto& entry = *reinterpret_cast<hb::net::PacketResponseTeleportListEntry*>(txt + size);
+		entry.index = i;
+		std::memcpy(entry.map_name, entries[i].map_name, strnlen(entries[i].map_name, sizeof(entry.map_name)));
+		entry.x = entries[i].x;
+		entry.y = entries[i].y;
+		entry.cost = 0;
+		size += sizeof(entry);
+	}
+
+	ret = m_game->m_client_list[client_h]->m_socket->send_msg(txt, static_cast<int>(size));
+	switch (ret) {
+	case sock::Event::QueueFull:
+	case sock::Event::SocketError:
+	case sock::Event::CriticalError:
+	case sock::Event::SocketClosed:
+		m_game->delete_client(client_h, true, true);
+		break;
+	}
+}
+
+// City Hall "Teleport" (the William menu): the between-wars teleport list. The
+// leaked server answered this request by instantly recalling the citizen to
+// dungeon level 2; retail answered with the list the client still renders.
+// Restoring the list gives the Heldenian winner's privilege its home (#114):
+// the nation holding the title may jump to btfield and hunt it while no war runs.
+int WarManager::build_cityhall_tp_list(int client_h, tp_list_entry* entries)
+{
+	int count = 0;
+
+	// Dungeon level 2, the lineage's standing civic teleport (citizens only).
+	if (memcmp(m_game->m_client_list[client_h]->m_location, "aresden", 7) == 0) {
+		entries[count++] = { "dglv2", 263, 258 };
+	}
+	else if (memcmp(m_game->m_client_list[client_h]->m_location, "elvine", 6) == 0) {
+		entries[count++] = { "dglv2", 209, 258 };
+	}
+
+	// The winner's hunting ground. Only the titleholding nation, and never while
+	// a war runs on the field (a winner of -1 means no titleholder: nobody).
+	if ((m_game->m_is_heldenian_mode == false) &&
+		((m_game->m_last_heldenian_winner == 1) || (m_game->m_last_heldenian_winner == 2)) &&
+		(m_game->m_client_list[client_h]->m_side == m_game->m_last_heldenian_winner)) {
+		entries[count++] = btfield_spawn[m_game->m_last_heldenian_winner - 1];
+	}
+	return count;
+}
+
+void WarManager::request_cityhall_tp_list(int client_h)
+{
+	tp_list_entry list[max_tp_list_entries];
+
+	if (m_game->m_client_list[client_h] == 0) return;
+
+	const int count = build_cityhall_tp_list(client_h, list);
+	send_teleport_list(client_h, ServerMsgId::response_teleport_list, list, count);
+}
+
+// The pick from that list; the id is matched against a fresh list so a stale or
+// forged pick (a war began, the title moved, the sender never had the entry)
+// falls through to nothing.
+void WarManager::request_cityhall_tp(int client_h, char* data, size_t msg_size)
+{
+	tp_list_entry list[max_tp_list_entries];
+
+	if (m_game->m_client_list[client_h] == 0) return;
+
+	const auto* req = hb::net::PacketCast<hb::net::PacketRequestTeleportId>(data, msg_size);
+	if (!req) return;
+
+	const int count = build_cityhall_tp_list(client_h, list);
+	if ((req->teleport_id < 0) || (req->teleport_id >= count)) return;
+
+	m_game->request_teleport_handler(client_h, "2   ", list[req->teleport_id].map_name, list[req->teleport_id].x, list[req->teleport_id].y);
+}
+
+// Loser-town price doubling (#114): "There is no price change in winning nation.
+// But in defeated nation, price of all items sold in the shop will double."
+// (official Heldenian guide; the owner recalls repair bills doubling too). Keyed
+// to the town the shop stands in — town interiors (gshop_*, bsmith_*, the
+// warehouses) carry the town's location_name in MapInfo, so this covers every
+// map the town's shops and smiths stand on, a neutral visitor pays it, and a
+// neutral-town shop never does. The penalty follows the standing title, war
+// running or not.
+int WarManager::heldenian_shop_price_multiplier(int client_h)
+{
+	if (m_game->m_client_list[client_h] == 0) return 1;
+	const int map_index = m_game->m_client_list[client_h]->m_map_index;
+	if ((map_index < 0) || (map_index >= MaxMaps) || (m_game->m_map_list[map_index] == 0)) return 1;
+
+	const char* location = m_game->m_map_list[map_index]->m_location_name;
+	if (m_game->m_last_heldenian_winner == 1)
+		return (memcmp(location, "elvine", 6) == 0) ? 2 : 1;
+	if (m_game->m_last_heldenian_winner == 2)
+		return (memcmp(location, "aresden", 7) == 0) ? 2 : 1;
+	return 1;
+}
+
+// The same penalty as the wire byte the init data carries: the client quotes
+// shop stock at sell_price*(100+discount)/100, so the doubling rides as +100.
+uint8_t WarManager::heldenian_shop_discount(int client_h)
+{
+	return static_cast<uint8_t>((heldenian_shop_price_multiplier(client_h) - 1) * 100);
 }
 
 bool WarManager::check_heldenian_map(int attacker_h, int map_index, char type)

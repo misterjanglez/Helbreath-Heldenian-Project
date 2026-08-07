@@ -344,6 +344,14 @@ private:
     bool apocalypse_suppresses_spawns(int map_index) const;
 
     /**
+     * During a Heldenian, the war maps must field no wild mobs: the war-start
+     * sweep clears them and this pause keeps the generators from repopulating
+     * them mid-war (#114). Between wars btfield's generator is the winner's
+     * hunting population.
+     */
+    bool heldenian_suppresses_spawns(int map_index) const;
+
+    /**
      * Generate next unique GUID for new entity.
      */
     uint32_t generate_entity_guid();

@@ -3067,6 +3067,14 @@ bool CEntityManager::apocalypse_suppresses_spawns(int map_index) const
 		&& map->m_apocalypse_mob_gen_type != 0;
 }
 
+bool CEntityManager::heldenian_suppresses_spawns(int map_index) const
+{
+	const CMap* map = m_map_list[map_index];
+	return map != nullptr
+		&& m_game->m_is_heldenian_mode
+		&& map->m_is_heldenian_map;
+}
+
 void CEntityManager::process_random_spawns(int map_index)
 {
 	int naming_value, result;
@@ -3078,6 +3086,9 @@ void CEntityManager::process_random_spawns(int map_index)
 	for(int i = 0; i < m_max_maps; i++) {
 		// Random Mob Generator
 		if (apocalypse_suppresses_spawns(i))
+			continue;
+
+		if (heldenian_suppresses_spawns(i))
 			continue;
 
 		int result_num = 0;
@@ -3891,6 +3902,9 @@ void CEntityManager::process_spot_spawns(int map_index)
         return;
 
     if (apocalypse_suppresses_spawns(map_index))
+        return;
+
+    if (heldenian_suppresses_spawns(map_index))
         return;
 
     // Check if map has room for more objects

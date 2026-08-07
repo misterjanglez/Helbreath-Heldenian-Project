@@ -2146,7 +2146,7 @@ void CGame::request_init_data_handler(int client_h, char* data, char key, size_t
 	init_header->observer_mode = static_cast<std::uint8_t>(m_client_list[client_h]->m_is_observer_mode);
 	init_header->rating = m_client_list[client_h]->m_rating;
 	init_header->hp = m_client_list[client_h]->m_hp;
-	init_header->discount = 0;
+	init_header->discount = m_war_manager->heldenian_shop_discount(client_h);
 
 	size = compose_init_map_data(m_client_list[client_h]->m_x - hb::shared::view::CenterX, m_client_list[client_h]->m_y - hb::shared::view::CenterY, client_h, initMapData);
 	writer.AppendBytes(initMapData, static_cast<std::size_t>(size));
@@ -6111,12 +6111,11 @@ void CGame::msg_process()
 				break;
 
 			case ServerMsgId::RequestCityHallTeleport:
-				if (memcmp(m_client_list[client_h]->m_location, "aresden", 7) == 0) {
-					request_teleport_handler(client_h, "2   ", "dglv2", 263, 258);
-				}
-				else if (memcmp(m_client_list[client_h]->m_location, "elvine", 6) == 0) {
-					request_teleport_handler(client_h, "2   ", "dglv2", 209, 258);
-				}
+				m_war_manager->request_cityhall_tp_list(client_h);
+				break;
+
+			case ServerMsgId::request_charged_teleport:
+				m_war_manager->request_cityhall_tp(client_h, data, msg_size);
 				break;
 
 			case MSGID_REQUEST_SHOP_CONTENTS:
@@ -7325,6 +7324,15 @@ void CGame::send_notify_msg(int from_h, int to_h, uint16_t msg_type, uint32_t v1
 		pkt.elvine_tower_left = static_cast<int16_t>(v2);
 		pkt.aresden_dead = static_cast<int16_t>(v3);
 		pkt.elvine_dead = static_cast<int16_t>(v4);
+		ret = m_client_list[to_h]->m_socket->send_msg(reinterpret_cast<char*>(&pkt), sizeof(pkt));
+		break;
+	}
+	case Notify::HeldenianVictory:
+	{
+		hb::net::PacketNotifyHeldenianVictory pkt{};
+		pkt.header.msg_id = MsgId::Notify;
+		pkt.header.msg_type = msg_type;
+		pkt.side = static_cast<int16_t>(v1);
 		ret = m_client_list[to_h]->m_socket->send_msg(reinterpret_cast<char*>(&pkt), sizeof(pkt));
 		break;
 	}
@@ -9316,7 +9324,7 @@ void CGame::request_teleport_handler(int client_h, const char* data, const char*
 	init_header->observer_mode = static_cast<std::uint8_t>(m_client_list[client_h]->m_is_observer_mode);
 	init_header->rating = m_client_list[client_h]->m_rating;
 	init_header->hp = m_client_list[client_h]->m_hp;
-	init_header->discount = 0;
+	init_header->discount = m_war_manager->heldenian_shop_discount(client_h);
 
 	size = compose_init_map_data(m_client_list[client_h]->m_x - hb::shared::view::CenterX, m_client_list[client_h]->m_y - hb::shared::view::CenterY, client_h, initMapData);
 	writer.AppendBytes(initMapData, static_cast<std::size_t>(size));
@@ -12197,7 +12205,7 @@ bool CGame::gm_teleport_to(int client_h, const char* dest_map, short dest_x, sho
 	init_header->observer_mode = static_cast<std::uint8_t>(m_client_list[client_h]->m_is_observer_mode);
 	init_header->rating = m_client_list[client_h]->m_rating;
 	init_header->hp = m_client_list[client_h]->m_hp;
-	init_header->discount = 0;
+	init_header->discount = m_war_manager->heldenian_shop_discount(client_h);
 
 	int size = compose_init_map_data(m_client_list[client_h]->m_x - hb::shared::view::CenterX, m_client_list[client_h]->m_y - hb::shared::view::CenterY, client_h, initMapData);
 	writer.AppendBytes(initMapData, static_cast<std::size_t>(size));

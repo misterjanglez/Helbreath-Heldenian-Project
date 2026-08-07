@@ -76,6 +76,10 @@ public:
 	bool get_heldenian_entry_point(int client_h, char* map_name, short* dX, short* dY);
 	void request_heldenian_tp_list(int client_h);
 	void request_heldenian_tp(int client_h, char* data, size_t msg_size);
+	void request_cityhall_tp_list(int client_h);
+	void request_cityhall_tp(int client_h, char* data, size_t msg_size);
+	int heldenian_shop_price_multiplier(int client_h);
+	uint8_t heldenian_shop_discount(int client_h);
 	bool check_heldenian_map(int attacker_h, int map_index, char type);
 	void check_heldenian_result_calculation(int client_h);
 	void remove_occupy_flags(int map_index);
@@ -117,6 +121,20 @@ public:
 	void get_fightzone_ticket_handler(int client_h);
 
 private:
+	// One row of a teleport list. Both list responses and the City Hall pick
+	// recompute their rows server-side, so the wire carries display data only.
+	struct tp_list_entry
+	{
+		const char* map_name;
+		short x, y;
+	};
+	static constexpr int max_tp_list_entries = 2;
+	// Battlefield war-entry spawns by side (index side-1), shared by the war
+	// teleport and the winner's between-wars hunt teleport (#114).
+	static constexpr tp_list_entry btfield_spawn[2] = { { "btfield", 68, 225 }, { "btfield", 202, 70 } };
+	int build_cityhall_tp_list(int client_h, tp_list_entry* entries);
+	void send_teleport_list(int client_h, uint32_t msg_id, const tp_list_entry* entries, int count);
+
 	void check_apocalypse_map_cleared(int map_index);
 	void apocalypse_gate_travel_tick();
 	void open_apocalypse_gate(int map_index);

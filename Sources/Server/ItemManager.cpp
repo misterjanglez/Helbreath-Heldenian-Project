@@ -1310,6 +1310,11 @@ void ItemManager::request_purchase_item_handler(int client_h, const char* item_n
 		return;
 	}
 
+	// Heldenian loser-town penalty: the shop's asking price doubles before the
+	// charisma haggle (#114); the client's quote doubles the same way through the
+	// init-data discount field.
+	const int heldenian_price_multiplier = m_game->m_war_manager->heldenian_shop_price_multiplier(client_h);
+
 	for(int i = 1; i <= num; i++) {
 
 		item = create_item(resolved_item_id, item_origin::shop_buy, birth_at(client_h));
@@ -1322,7 +1327,7 @@ void ItemManager::request_purchase_item_handler(int client_h, const char* item_n
 
 		item->m_instance.count = item_count;
 
-		cost = static_cast<int>(item->m_sell_price * item->m_instance.count);
+		cost = static_cast<int>(item->m_sell_price * item->m_instance.count) * heldenian_price_multiplier;
 
 		gold_count = get_item_count_by_id(client_h, hb::shared::item::ItemId::Gold);
 
@@ -3456,6 +3461,9 @@ void ItemManager::req_repair_item_handler(int client_h, char item_id, char repai
 			price = static_cast<short>((m_game->m_client_list[client_h]->m_item_list[item_id]->m_sell_price / 2) - d3);
 		}
 
+		// Heldenian loser-town penalty: the smith's bill doubles too (#114).
+		price *= m_game->m_war_manager->heldenian_shop_price_multiplier(client_h);
+
 		m_game->send_notify_msg(0, client_h, Notify::RepairItemPrice, item_id, remain_life, price, m_game->m_client_list[client_h]->m_item_list[item_id]->m_name);
 	}
 	else {
@@ -3496,6 +3504,9 @@ void ItemManager::req_repair_item_cofirm_handler(int client_h, char item_id, con
 
 			price = static_cast<short>((m_game->m_client_list[client_h]->m_item_list[item_id]->m_sell_price / 2) - d3);
 		}
+
+		// Same doubling as the quote above (#114) — the two computations must agree.
+		price *= m_game->m_war_manager->heldenian_shop_price_multiplier(client_h);
 
 		// price         .
 		gold_count = get_item_count_by_id(client_h, hb::shared::item::ItemId::Gold);
@@ -6943,6 +6954,10 @@ void ItemManager::request_repair_all_items_handler(int client_h)
 
 	m_game->m_client_list[client_h]->total_item_repair = 0;
 
+	// Heldenian loser-town penalty (#114). Applied to the stored quotes, which
+	// both the RepairAllPrices packet and the confirm's bill read back.
+	const int heldenian_price_multiplier = m_game->m_war_manager->heldenian_shop_price_multiplier(client_h);
+
 	for(int i = 0; i < hb::shared::limits::MaxItems; i++) {
 		if (m_game->m_client_list[client_h]->m_item_list[i] != 0) {
 
@@ -6965,7 +6980,7 @@ void ItemManager::request_repair_all_items_handler(int client_h)
 					price = ((m_game->m_client_list[client_h]->m_item_list[i]->m_sell_price / 2) - static_cast<int32_t>(d3));
 				}
 				m_game->m_client_list[client_h]->m_repair_all[m_game->m_client_list[client_h]->total_item_repair].index = i;
-				m_game->m_client_list[client_h]->m_repair_all[m_game->m_client_list[client_h]->total_item_repair].price = price;
+				m_game->m_client_list[client_h]->m_repair_all[m_game->m_client_list[client_h]->total_item_repair].price = price * heldenian_price_multiplier;
 				m_game->m_client_list[client_h]->total_item_repair++;
 			}
 		}
