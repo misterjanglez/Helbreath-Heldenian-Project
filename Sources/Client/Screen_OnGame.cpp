@@ -185,8 +185,8 @@ void Screen_OnGame::on_initialize()
     m_gate_posit_x = m_gate_posit_y = -1;
     m_heldenian_aresden_left_tower = -1;
     m_heldenian_elvine_left_tower = -1;
-    m_heldenian_aresden_flags = -1;
-    m_heldenian_elvine_flags = -1;
+    m_heldenian_aresden_dead = -1;
+    m_heldenian_elvine_dead = -1;
     m_is_xmas = false;
     m_total_party_member = 0;
     m_party_status = 0;
@@ -826,12 +826,14 @@ void Screen_OnGame::on_render()
         m_game->m_effect_manager->add_effect(EffectType::BUBBLES_DRUNK, m_game->m_Camera.get_x() + rand() % LOGICAL_MAX_X(), m_game->m_Camera.get_y() + rand() % LOGICAL_MAX_Y(), 0, 0, -1 * (rand() % 80), 1);
     }
 
-    // Heldenian tower count
-    if ((m_heldenian_aresden_left_tower != -1) && (m_game->m_cur_location.starts_with("BtField"))) {
+    // Heldenian battlefield scoreboard. The ported gate compared against cased
+    // "BtField", which the lowercase server names never matched — it never
+    // rendered (#96).
+    if ((m_heldenian_aresden_left_tower != -1) && (m_game->m_cur_location == "btfield")) {
         std::string G_cTxt;
-        G_cTxt = std::format("Aresden Flags : {}", m_heldenian_aresden_flags);
+        G_cTxt = std::format("Aresden Deaths : {}", m_heldenian_aresden_dead);
         hb::shared::text::draw_text(GameFont::Default, 10, 140, G_cTxt.c_str(), hb::shared::text::TextStyle::from_color(GameColors::UIWhite));
-        G_cTxt = std::format("Elvine Flags : {}", m_heldenian_elvine_flags);
+        G_cTxt = std::format("Elvine Deaths : {}", m_heldenian_elvine_dead);
         hb::shared::text::draw_text(GameFont::Default, 10, 160, G_cTxt.c_str(), hb::shared::text::TextStyle::from_color(GameColors::UIWhite));
         G_cTxt = std::format("Aresden's rest building number : {}", m_heldenian_aresden_left_tower);
         hb::shared::text::draw_text(GameFont::Default, 10, 180, G_cTxt.c_str(), hb::shared::text::TextStyle::from_color(GameColors::UIWhite));

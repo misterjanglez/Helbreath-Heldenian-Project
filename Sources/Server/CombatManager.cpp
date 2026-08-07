@@ -1568,7 +1568,7 @@ bool CombatManager::analyze_criminal_action(int client_h, short dX, short dY, bo
 				tY = (int)m_game->m_client_list[client_h]->m_y;
 				int npc_config_id = m_game->get_npc_config_id_by_name(npc_name);
 				if (m_game->create_new_npc(npc_config_id, name, m_game->m_map_list[m_game->m_client_list[client_h]->m_map_index]->m_name, 0, 0, MoveType::Random,
-					&tX, &tY, npc_waypoint, 0, 0, -1, false, true) == false) {
+					&tX, &tY, npc_waypoint, 0, 0, -1, false, true) == 0) {
 					m_game->m_map_list[m_game->m_client_list[client_h]->m_map_index]->set_naming_value_empty(naming_value);
 				}
 				else {

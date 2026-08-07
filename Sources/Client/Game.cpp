@@ -4129,17 +4129,19 @@ char CGame::get_hardcoded_map_index(const char* map_name, char* name)
 		std::snprintf(name, 21, "%s", GET_OFFICIAL_MAP_NAME75);
 		return 30;
 	}
-	else if (strcmp(map_name, "BtField") == 0)
+	// The server sends lowercase map names — cased entries here never match (#96
+	// fixed btfield/godh/hrampart and cmdhall_1/cmdhall_2).
+	else if (strcmp(map_name, "btfield") == 0)
 	{
 		std::snprintf(name, 21, "%s", GET_OFFICIAL_MAP_NAME76);
 		return 35;
 	}
-	else if (strcmp(map_name, "GodH") == 0)
+	else if (strcmp(map_name, "godh") == 0)
 	{
 		std::snprintf(name, 21, "%s", GET_OFFICIAL_MAP_NAME77);
 		return 36;
 	}
-	else if (strcmp(map_name, "HRampart") == 0)
+	else if (strcmp(map_name, "hrampart") == 0)
 	{
 		std::snprintf(name, 21, "%s", GET_OFFICIAL_MAP_NAME78);
 		return 37;
@@ -4329,12 +4331,12 @@ char CGame::get_hardcoded_map_index(const char* map_name, char* name)
 		std::snprintf(name, 21, "%s", GET_OFFICIAL_MAP_NAME64);	// Elvine Jail
 		return -1;
 	}
-	else if (strcmp(map_name, "CmdHall_1") == 0) // Snoopy: Commander Halls
+	else if (strcmp(map_name, "cmdhall_1") == 0) // Snoopy: Commander Halls
 	{
 		std::snprintf(name, 21, "%s", GET_OFFICIAL_MAP_NAME79);
 		return -1;
 	}
-	else if (strcmp(map_name, "CmdHall_2") == 0)
+	else if (strcmp(map_name, "cmdhall_2") == 0)
 	{
 		std::snprintf(name, 21, "%s", GET_OFFICIAL_MAP_NAME79);
 		return -1;

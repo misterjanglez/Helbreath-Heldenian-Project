@@ -6901,7 +6901,7 @@ bool ItemManager::plant_seed_bag(int map_index, int dX, int dY, int item_effect_
 			tY = dY;
 
 			ret = m_game->create_new_npc(npc_config_id, name, m_game->m_map_list[m_game->m_client_list[client_h]->m_map_index]->m_name, 0, 0, MoveType::Random, &tX, &tY, npc_waypoint_index, 0, 0, 0, false, true);
-			if (ret == false) {
+			if (ret == 0) {
 				m_game->m_map_list[map_index]->set_naming_value_empty(naming_value);
 			}
 			else {

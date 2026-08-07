@@ -68,8 +68,11 @@ namespace net {
 		PacketHeader header;
 		int16_t aresden_tower_left;
 		int16_t elvine_tower_left;
-		int16_t aresden_flags;
-		int16_t elvine_flags;
+		// Death tallies (the type-1 tie-break data). The original client called
+		// these fields "flags", but the server has always filled them from the
+		// per-side death counters (#96).
+		int16_t aresden_dead;
+		int16_t elvine_dead;
 		uint8_t padding[2];
 	};
 

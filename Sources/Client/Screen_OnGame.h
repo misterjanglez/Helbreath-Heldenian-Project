@@ -176,8 +176,8 @@ public:
     uint32_t m_abaddon_storm_until = 0;
     int m_heldenian_aresden_left_tower = -1;
     int m_heldenian_elvine_left_tower = -1;
-    int m_heldenian_aresden_flags = -1;
-    int m_heldenian_elvine_flags = -1;
+    int m_heldenian_aresden_dead = -1;
+    int m_heldenian_elvine_dead = -1;
     bool m_is_xmas = false;
     int m_total_party_member = 0;
     int m_party_status = 0;

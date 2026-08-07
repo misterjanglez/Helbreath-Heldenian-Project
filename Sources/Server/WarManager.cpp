@@ -212,7 +212,7 @@ void WarManager::create_crusade_structures()
 						tY = (int)m_game->m_crusade_structures[i].y;
 						int npc_config_id = m_game->get_npc_config_id_by_name(npc_name);
 						if (m_game->create_new_npc(npc_config_id, name, m_game->m_map_list[z]->m_name, 0, 0, MoveType::Random,
-							&tX, &tY, npc_way_point, 0, 0, -1, false) == false) {
+							&tX, &tY, npc_way_point, 0, 0, -1, false) == 0) {
 							// NameValue .
 							m_game->m_map_list[z]->set_naming_value_empty(naming_value);
 						}
@@ -557,7 +557,7 @@ bool WarManager::set_construction_kit(int map_index, int dX, int dY, int type, i
 		tY = (int)dY;
 		int npc_config_id = m_game->get_npc_config_id_by_name(npc_name);
 		if (m_game->create_new_npc(npc_config_id, name, m_game->m_map_list[m_game->m_client_list[client_h]->m_map_index]->m_name, 0, (rand() % 9),
-			MoveType::Random, &tX, &tY, npc_waypoint, 0, 0, -1, false, false) == false) {
+			MoveType::Random, &tX, &tY, npc_waypoint, 0, 0, -1, false, false) == 0) {
 			// NameValue .
 			m_game->m_map_list[m_game->m_client_list[client_h]->m_map_index]->set_naming_value_empty(naming_value);
 		}
@@ -1227,7 +1227,7 @@ void WarManager::request_summon_war_unit_handler(int client_h, int dX, int dY, c
 			}
 			else ret = m_game->create_new_npc(npc_config_id, name, m_game->m_map_list[m_game->m_client_list[client_h]->m_map_index]->m_name, 0, 0, MoveType::Guard, &tX, &tY, npc_way_point, 0, 0, -1, false, false, false, false);
 
-			if (ret == false) {
+			if (ret == 0) {
 				// NameValue .
 				m_game->m_map_list[m_game->m_client_list[client_h]->m_map_index]->set_naming_value_empty(naming_value);
 			}
@@ -1274,8 +1274,7 @@ void WarManager::global_start_heldenian_mode()
 void WarManager::local_start_heldenian_mode(short v1, short v2, uint32_t heldenian_guid)
 {
 	int x, z, naming_value;
-	char name[hb::shared::limits::CharNameLen], npc_waypoint_index[10], side, owner_type;
-	short owner_h;
+	char name[hb::shared::limits::CharNameLen], npc_waypoint_index[10], side;
 	int ret;
 	int dX, dY;
 
@@ -1309,6 +1308,10 @@ void WarManager::local_start_heldenian_mode(short v1, short v2, uint32_t heldeni
 		if (m_game->m_client_list[i] != 0) {
 			if (m_game->m_client_list[i]->m_is_init_complete != true) continue;
 			m_game->m_client_list[i]->m_var = 2;
+			// Enroll everyone online for the payout pass. The original never stamped
+			// the guid at war start, so check_heldenian_result_calculation could only
+			// ever match (and pay) mid-war logins (#96).
+			m_game->m_client_list[i]->m_heldenian_guid = m_game->m_heldenian_guid;
 			m_game->send_notify_msg(0, i, Notify::HeldenianTeleport, 0, 0, 0, 0);
 			m_game->m_client_list[i]->m_war_contribution = 0;
 			m_game->m_client_list[i]->m_construction_point = (m_game->m_client_list[i]->m_charisma * 300);
@@ -1361,9 +1364,12 @@ void WarManager::local_start_heldenian_mode(short v1, short v2, uint32_t heldeni
 								m_game->m_map_list[x]->set_naming_value_empty(naming_value);
 							}
 							else {
-								m_game->m_map_list[x]->get_owner(&owner_h, &owner_type, dX, dY);
-								if ((m_game->m_npc_list[owner_h] != 0) && (owner_h > 0) && (owner_h < MaxNpcs)) {
-									m_game->m_npc_list[owner_h]->m_build_count = 0;
+								// ret is the tower's npc handle. The old get_owner probe on the
+								// requested tile answered with whatever stood there instead of
+								// the tower whenever the spawn search nudged it — and indexed
+								// the npc list before bounds-checking the handle (#96).
+								if ((ret < MaxNpcs) && (m_game->m_npc_list[ret] != 0)) {
+									m_game->m_npc_list[ret]->m_build_count = 0;
 								}
 								if (side == 1)	m_game->m_heldenian_aresden_left_tower += 1;
 								if (side == 2) m_game->m_heldenian_elvine_left_tower += 1;
@@ -1400,8 +1406,7 @@ void WarManager::local_start_heldenian_mode(short v1, short v2, uint32_t heldeni
 								m_game->m_map_list[x]->set_naming_value_empty(naming_value);
 							}
 							else {
-								//m_game->m_map_list[x]->get_owner(&owner_h, &owner_type, dX, dY);
-								if ((m_game->m_npc_list[ret] != 0) && (ret > 0) && (ret < MaxNpcs)) {
+								if ((ret < MaxNpcs) && (m_game->m_npc_list[ret] != 0)) {
 									m_game->m_npc_list[ret]->m_build_count = 0;
 									m_game->m_npc_list[ret]->m_dir = m_game->m_map_list[x]->m_heldenian_gate_door[i].dir;
 
@@ -1410,6 +1415,8 @@ void WarManager::local_start_heldenian_mode(short v1, short v2, uint32_t heldeni
 									short door_x = m_game->m_map_list[x]->m_heldenian_gate_door[i].x;
 									short door_y = m_game->m_map_list[x]->m_heldenian_gate_door[i].y;
 									if ((m_game->m_npc_list[ret]->m_x != door_x) || (m_game->m_npc_list[ret]->m_y != door_y)) {
+										short owner_h;
+										char owner_type;
 										m_game->m_map_list[x]->get_owner(&owner_h, &owner_type, door_x, door_y);
 										if (owner_h == 0) {
 											m_game->m_map_list[x]->clear_owner(5, ret, hb::shared::owner_class::Npc, m_game->m_npc_list[ret]->m_x, m_game->m_npc_list[ret]->m_y);
@@ -1521,30 +1528,21 @@ void WarManager::local_end_heldenian_mode()
 
 bool WarManager::update_heldenian_status()
 {
-	
-	bool flag;
-	int short_cut_index, client_h;
-
 	if (m_game->m_is_heldenian_mode != true) return false;
-	for(int i = 0; i < MaxMaps; i++)
-		if (m_game->m_map_list[i] != 0) {
-			if (m_game->m_map_list[i]->m_is_heldenian_map) {
-				flag = true;
-				short_cut_index = 0;
-			}
-			if (flag) {
-				client_h = m_game->m_client_shortcut[short_cut_index];
-				short_cut_index++;
-				if (client_h == 0) {
-					flag = 0;
-				}
-				else {
-					if ((m_game->m_client_list[client_h] != 0) && (m_game->m_client_list[client_h]->m_is_init_complete) && (strcmp(m_game->m_map_list[m_game->m_client_list[client_h]->m_map_index]->m_name, "btfield") == 0)) {
-						m_game->send_notify_msg(0, client_h, Notify::HeldenianCount, m_game->m_heldenian_aresden_left_tower, m_game->m_heldenian_elvine_left_tower, m_game->m_heldenian_aresden_dead, 0, m_game->m_heldenian_elvine_dead, 0);
-					}
-				}
-			}
-		}
+	if (m_game->m_bt_field_map_index == -1) return true;
+
+	// The original's map-interleaved walk read its carry flag uninitialized and
+	// notified at most one client per registered map slot (#96); plain walk over
+	// the connected-client shortcut instead.
+	for (int i = 0; m_game->m_client_shortcut[i] != 0; i++) {
+		const int client_h = m_game->m_client_shortcut[i];
+		if (m_game->m_client_list[client_h] == 0) continue;
+		if (m_game->m_client_list[client_h]->m_is_init_complete != true) continue;
+		if (m_game->m_client_list[client_h]->m_map_index != m_game->m_bt_field_map_index) continue;
+		m_game->send_notify_msg(0, client_h, Notify::HeldenianCount,
+			m_game->m_heldenian_aresden_left_tower, m_game->m_heldenian_elvine_left_tower,
+			m_game->m_heldenian_aresden_dead, nullptr, m_game->m_heldenian_elvine_dead);
+	}
 	return true;
 }
 
@@ -1830,10 +1828,11 @@ bool WarManager::check_heldenian_map(int attacker_h, int map_index, char type)
 
 void WarManager::check_heldenian_result_calculation(int client_h)
 {
-	double v1, v2, v3;
-
 	if (m_game->m_client_list[client_h] == 0) return;
 	if (m_game->m_client_list[client_h]->m_var != 2) return;
+	// Pay only once the war is over (the crusade twin's guard, dropped here in the
+	// original): mid-war, m_last_heldenian_winner still names the PREVIOUS winner (#96).
+	if (m_game->m_is_heldenian_mode) return;
 	if ((m_game->m_heldenian_mode_type <= 0) || (m_game->m_client_list[client_h]->m_heldenian_guid == 0)) return;
 	if (m_game->m_client_list[client_h]->m_heldenian_guid == m_game->m_heldenian_guid) {
 		if (m_game->m_client_list[client_h]->m_side == m_game->m_last_heldenian_winner) {
@@ -1846,10 +1845,9 @@ void WarManager::check_heldenian_result_calculation(int client_h)
 			else if (m_game->m_client_list[client_h]->m_level > 100) {
 				m_game->m_client_list[client_h]->m_war_contribution += (m_game->m_client_list[client_h]->m_level) * 30;
 			}
-			v2 = (double)m_game->m_client_list[client_h]->m_exp;
-			v3 = (double)m_game->m_client_list[client_h]->m_war_contribution * 1.2f;
-			v1 = v2 + v3;
-			m_game->get_exp(client_h, (uint32_t)v1);
+			// get_exp ADDS its argument; the original seeded it with the character's
+			// current exp on top of the war pay, doubling the winner (§3.3/§3.5 bug).
+			m_game->get_exp(client_h, (uint32_t)(m_game->m_client_list[client_h]->m_war_contribution * 1.2));
 		}
 		else {
 			m_game->get_exp(client_h, (m_game->m_client_list[client_h]->m_war_contribution / 5));
@@ -2118,7 +2116,7 @@ void WarManager::spawn_apocalypse_boss(int map_index)
 	int tY = rc.y + (rc.height > 0 ? m_game->dice(1, rc.height) - 1 : 0);
 
 	if (m_game->create_new_npc(npc_id, name, map->m_name, 0, 0, MoveType::Random,
-		&tX, &tY, 0, 0, 0, -1, false, false, false, false, true) == false) {
+		&tX, &tY, 0, 0, 0, -1, false, false, false, false, true) == 0) {
 		map->set_naming_value_empty(naming_value);
 		hb::logger::warn("Apocalypse boss spawn failed (npc {}) on map '{}'", npc_id, map->m_name);
 		return;
@@ -2304,7 +2302,7 @@ void WarManager::energy_sphere_processor()
 		cName_Internal[1] = m_game->m_middleland_map_index + 65;
 
 		int npc_config_id = m_game->get_npc_config_id_by_name("Energy-Sphere");
-		if ((m_game->create_new_npc(npc_config_id, cName_Internal, m_game->m_map_list[m_game->m_middleland_map_index]->m_name, (rand() % 5), sa, MoveType::Random, &pX, &pY, waypoint, 0, 0, -1, false, false, false)) == false) {
+		if ((m_game->create_new_npc(npc_config_id, cName_Internal, m_game->m_map_list[m_game->m_middleland_map_index]->m_name, (rand() % 5), sa, MoveType::Random, &pX, &pY, waypoint, 0, 0, -1, false, false, false)) == 0) {
 			m_game->m_map_list[m_game->m_middleland_map_index]->set_naming_value_empty(naming_value);
 			return;
 		}
@@ -2445,10 +2443,14 @@ void WarManager::get_occupy_flag_handler(int client_h)
 	if (m_game->m_client_list[client_h]->m_enemy_kill_count < 3) return;
 	if (m_game->m_client_list[client_h]->m_side == 0) return;
 
+	// The original looked these up by their Korean config names, which no
+	// English item table ever matched — even the original's own shipped Item.cfg
+	// says "AresdenFlag" — so the EK exchange silently created nothing (#96).
+	// These are the plain flags (247/248), not the Master pair.
 	std::memset(item_name, 0, sizeof(item_name));
 	switch (m_game->m_client_list[client_h]->m_side) {
-	case 1: strcpy(item_name, "¾Æ·¹½ºµ§±ê¹ß"); break;
-	case 2: strcpy(item_name, "¿¤¹ÙÀÎ±ê¹ß");   break;
+	case 1: strcpy(item_name, "Aresden Flag"); break;
+	case 2: strcpy(item_name, "Elvine Flag");  break;
 	}
 
 	// ReqPurchaseItemHandler   .

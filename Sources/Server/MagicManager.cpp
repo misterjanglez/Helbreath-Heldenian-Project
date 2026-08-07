@@ -1832,7 +1832,7 @@ void MagicManager::player_magic_handler(int client_h, int dX, int dY, short type
 			name[0] = '_';
 			name[1] = m_game->m_client_list[client_h]->m_map_index + 65;
 
-			if (m_game->create_new_npc(selected_npc_id, name, m_game->m_map_list[m_game->m_client_list[client_h]->m_map_index]->m_name, 0, 0, MoveType::Random, &dX, &dY, npc_waypoint, 0, 0, m_game->m_client_list[client_h]->m_side, false, true) == false)
+			if (m_game->create_new_npc(selected_npc_id, name, m_game->m_map_list[m_game->m_client_list[client_h]->m_map_index]->m_name, 0, 0, MoveType::Random, &dX, &dY, npc_waypoint, 0, 0, m_game->m_client_list[client_h]->m_side, false, true) == 0)
 			{
 				m_game->m_map_list[m_game->m_client_list[client_h]->m_map_index]->set_naming_value_empty(naming_value);
 				m_game->send_notify_msg(0, client_h, Notify::NoticeMsg, 0, 0, 0,

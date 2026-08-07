@@ -496,6 +496,7 @@ public:
 	void chat_msg_handler(int client_h, char * data, size_t msg_size);
 	bool is_blocked_by(int sender_h, int receiver_h) const;
 	void npc_process();
+	// Returns the new npc's handle (>= 1), or 0 on failure (#96).
 	int create_new_npc(int npc_config_id, char * name, char * map_name, short sClass, char sa, char move_type, int * offset_x, int * offset_y, char * waypoint_list, hb::shared::geometry::GameRectangle * area, int spot_mob_index, char change_side, bool hide_gen_mode, bool is_summoned = false, bool firm_berserk = false, bool is_master = false, bool bypass_mob_limit = false);
 	//bool create_new_npc(char * npc_name, char * name, char * map_name, short sX, short sY);
 	int spawn_map_npcs_from_database(struct sqlite3* db, int map_index);

@@ -5154,12 +5154,15 @@ bool CGame::get_is_string_is_number(char* str)
 int CGame::create_new_npc(int npc_config_id, char* name, char* map_name, short sClass, char sa, char move_type, int* offset_x, int* offset_y, char* waypoint_list, hb::shared::geometry::GameRectangle* area, int spot_mob_index, char change_side, bool hide_gen_mode, bool is_summoned, bool firm_berserk, bool is_master, bool bypass_mob_limit)
 {
 	if (m_entity_manager == 0)
-		return false;
+		return 0;
 
-	return (m_entity_manager->create_entity(
+	// Normalizes create_entity's -1 failure sentinel to 0 (see the contract on
+	// the declaration).
+	int npc_h = m_entity_manager->create_entity(
 		npc_config_id, name, map_name, sClass, sa, move_type,
 		offset_x, offset_y, waypoint_list, area, spot_mob_index, change_side,
-		hide_gen_mode, is_summoned, firm_berserk, is_master, bypass_mob_limit) > 0);
+		hide_gen_mode, is_summoned, firm_berserk, is_master, bypass_mob_limit);
+	return (npc_h > 0) ? npc_h : 0;
 }
 
 int CGame::spawn_map_npcs_from_database(sqlite3* db, int map_index)
@@ -5229,7 +5232,7 @@ int CGame::spawn_map_npcs_from_database(sqlite3* db, int map_index)
 		name[1] = static_cast<char>(map_index + 65);
 
 		// Spawn the NPC
-		if (create_new_npc(npc_config_id, name, m_map_list[map_index]->m_name, 0, 0, npc_move_type, 0, 0, npc_waypoint_index, 0, 0, -1, false) == false) {
+		if (create_new_npc(npc_config_id, name, m_map_list[map_index]->m_name, 0, 0, npc_move_type, 0, 0, npc_waypoint_index, 0, 0, -1, false) == 0) {
 			m_map_list[map_index]->set_naming_value_empty(naming_value);
 			hb::logger::warn("- Failed to spawn static NPC (config_id={}) for map: {}", npc_config_id, m_map_list[map_index]->m_name);
 		}
@@ -7320,8 +7323,8 @@ void CGame::send_notify_msg(int from_h, int to_h, uint16_t msg_type, uint32_t v1
 		pkt.header.msg_type = msg_type;
 		pkt.aresden_tower_left = static_cast<int16_t>(v1);
 		pkt.elvine_tower_left = static_cast<int16_t>(v2);
-		pkt.aresden_flags = static_cast<int16_t>(v3);
-		pkt.elvine_flags = static_cast<int16_t>(v4);
+		pkt.aresden_dead = static_cast<int16_t>(v3);
+		pkt.elvine_dead = static_cast<int16_t>(v4);
 		ret = m_client_list[to_h]->m_socket->send_msg(reinterpret_cast<char*>(&pkt), sizeof(pkt));
 		break;
 	}

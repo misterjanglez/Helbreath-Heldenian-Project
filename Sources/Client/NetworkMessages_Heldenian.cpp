@@ -33,8 +33,8 @@ void HandleHeldenianVictory(CGame* game, char* data)
 	game->show_heldenian_victory(side);
 	game->on_game()->m_heldenian_aresden_left_tower = -1;
 	game->on_game()->m_heldenian_elvine_left_tower = -1;
-	game->on_game()->m_heldenian_aresden_flags = -1;
-	game->on_game()->m_heldenian_elvine_flags = -1;
+	game->on_game()->m_heldenian_aresden_dead = -1;
+	game->on_game()->m_heldenian_elvine_dead = -1;
 }
 
 void HandleHeldenianCount(CGame* game, char* data)
@@ -44,8 +44,8 @@ void HandleHeldenianCount(CGame* game, char* data)
 	if (!pkt) return;
 	game->on_game()->m_heldenian_aresden_left_tower = pkt->aresden_tower_left;
 	game->on_game()->m_heldenian_elvine_left_tower = pkt->elvine_tower_left;
-	game->on_game()->m_heldenian_aresden_flags = pkt->aresden_flags;
-	game->on_game()->m_heldenian_elvine_flags = pkt->elvine_flags;
+	game->on_game()->m_heldenian_aresden_dead = pkt->aresden_dead;
+	game->on_game()->m_heldenian_elvine_dead = pkt->elvine_dead;
 }
 
 void HandleHeldenianRecall(CGame* game, char* data)

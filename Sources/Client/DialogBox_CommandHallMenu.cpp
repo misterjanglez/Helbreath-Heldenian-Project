@@ -142,7 +142,7 @@ void DialogBox_CommandHallMenu::on_draw()
 
 	case mode::take_flag:
 		put_aligned_string(sX, sX + size_x, sY + 45, "You may acquire Flags with EK points.", GameColors::UIMagicBlue);
-		put_aligned_string(sX, sX + size_x, sY + 70, "Price is 10 EK per Flag.", GameColors::UIMagicBlue);
+		put_aligned_string(sX, sX + size_x, sY + 70, "Price is 12 EK per Flag.", GameColors::UIMagicBlue);
 		if (mouse_in(link_take_flag))
 			put_aligned_string(sX, sX + size_x, sY + 140, "Take a Flag", GameColors::UIWhite);
 		else

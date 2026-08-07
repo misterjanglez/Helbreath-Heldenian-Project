@@ -1,2 +1,2 @@
-HeldenianGUID = 34067
+HeldenianGUID = 21852
 winner-side = 2
