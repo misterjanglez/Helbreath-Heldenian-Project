@@ -118,6 +118,11 @@ namespace
 	{
 		return kill_scalar(db, "CAST(ROUND(rep_factor_sum * 100) AS INTEGER)", npc_id);
 	}
+
+	int64_t kill_title_x100(sqlite3* db, int32_t npc_id)
+	{
+		return kill_scalar(db, "CAST(ROUND(title_factor_sum * 100) AS INTEGER)", npc_id);
+	}
 }
 
 void CmdAnalyticsCheck::execute(CGame* game, const char* args)
@@ -145,27 +150,28 @@ void CmdAnalyticsCheck::execute(CGame* game, const char* args)
 	// death handler, on the game loop; if it ever reached disk synchronously,
 	// every monster death in the world would be paying for I/O.
 	const size_t before = scratch->pending_count();
-	scratch->record_kill(probe_npc_a, probe_name_a, 1.0);
+	scratch->record_kill(probe_npc_a, probe_name_a, 1.0, 1.0);
 	tally.record("kill_buffers",
 		scratch->pending_count() == before + 1
 		&& probe_scalar(db, "SELECT COUNT(*) FROM npc_kills;") == 0);
 
 	// Two more kills of the same monster in the same window. One row, not three:
 	// a farmed monster dies thousands of times between flushes and must cost one
-	// UPSERT, not thousands of rows.
-	scratch->record_kill(probe_npc_a, probe_name_a, rep_low);
-	scratch->record_kill(probe_npc_a, probe_name_a, rep_high);
+	// UPSERT, not thousands of rows. These two carry the Huntmaster tier-shift
+	// (#122), so the title sum below reads 1.00 + 1.25 + 1.25.
+	scratch->record_kill(probe_npc_a, probe_name_a, rep_low, 1.25);
+	scratch->record_kill(probe_npc_a, probe_name_a, rep_high, 1.25);
 	tally.record("kill_aggregates_in_window", scratch->pending_count() == before + 1);
 
 	// A different monster is a different row.
-	scratch->record_kill(probe_npc_b, probe_name_b, 1.0);
+	scratch->record_kill(probe_npc_b, probe_name_b, 1.0, 1.0);
 	tally.record("kill_separates_monsters", scratch->pending_count() == before + 2);
 
 	// An NPC spawned from no config has id -1. Booking it would pool every such
 	// death into one row naming no monster, and the analytics divide by that
 	// number — a row that cannot be attributed is worse than an absent one.
 	const size_t before_unconfigured = scratch->pending_count();
-	scratch->record_kill(-1, "nobody", 1.0);
+	scratch->record_kill(-1, "nobody", 1.0, 1.0);
 	tally.record("unconfigured_npc_refused",
 		scratch->pending_count() == before_unconfigured);
 
@@ -186,6 +192,13 @@ void CmdAnalyticsCheck::execute(CGame* game, const char* args)
 		kill_rep_x100(db, probe_npc_a) == 325
 		&& kill_rep_x100(db, probe_npc_b) == 100);
 
+	// The Huntmaster tier-shift (#122) is the second per-player layer, summed
+	// in its own column for the same sufficient-statistic reason — and it must
+	// not bleed into rep_factor_sum (asserted just above on the same rows).
+	tally.record("kill_sums_title_factor",
+		kill_title_x100(db, probe_npc_a) == 350
+		&& kill_title_x100(db, probe_npc_b) == 100);
+
 	tally.record("kill_stores_name",
 		kill_text(db, "npc_name", probe_npc_a) == probe_name_a
 		&& kill_text(db, "npc_name", probe_npc_b) == probe_name_b);
@@ -194,8 +207,8 @@ void CmdAnalyticsCheck::execute(CGame* game, const char* args)
 	// and the row holds the day's total, so a second window must ADD. An UPSERT
 	// that replaced would leave plausible numbers that are simply too small, and
 	// every rate computed from them too generous.
-	scratch->record_kill(probe_npc_a, probe_name_a, rep_high);
-	scratch->record_kill(probe_npc_a, probe_name_a, rep_high);
+	scratch->record_kill(probe_npc_a, probe_name_a, rep_high, 1.0);
+	scratch->record_kill(probe_npc_a, probe_name_a, rep_high, 1.0);
 	const bool second_window = scratch->flush(0);
 	tally.record("kill_accumulates_across_flushes",
 		second_window
@@ -206,7 +219,7 @@ void CmdAnalyticsCheck::execute(CGame* game, const char* args)
 	// The name is a property of the config id, written once per key rather than
 	// on every death. A rename mid-window must not split a monster's kills, and
 	// the first name recorded is what the day's row keeps.
-	scratch->record_kill(probe_npc_a, "Renamed", 1.0);
+	scratch->record_kill(probe_npc_a, "Renamed", 1.0, 1.0);
 	const bool renamed_flushed = scratch->flush(0);
 	tally.record("kill_name_is_stable",
 		renamed_flushed
@@ -216,7 +229,7 @@ void CmdAnalyticsCheck::execute(CGame* game, const char* args)
 	// Two configs under one name — 14 Catapults, 3 Guards — stay two rows keyed
 	// by id, and pool only when a query groups by name. Pooling at the writer
 	// would make the two indistinguishable forever.
-	scratch->record_kill(probe_npc_shared, probe_name_a, 1.0);
+	scratch->record_kill(probe_npc_shared, probe_name_a, 1.0, 1.0);
 	const bool shared_flushed = scratch->flush(0);
 	tally.record("shared_name_stays_two_rows",
 		shared_flushed

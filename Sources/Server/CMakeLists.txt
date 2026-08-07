@@ -33,7 +33,9 @@ set(SERVER_SOURCES
     CmdCoverageCheck.cpp
     CmdGameDbCheck.cpp
     CmdGiveItem.cpp
+    CmdGuildCheck.cpp
     CmdGuildDbCheck.cpp
+    CmdGuildProgCheck.cpp
     CheckTally.cpp
     CmdHelp.cpp
     CmdItemHistory.cpp
@@ -68,6 +70,7 @@ set(SERVER_SOURCES
     GameDatabase.cpp
     GmMintSpec.cpp
     GameChatCommand.cpp
+    GameCmdBanGuild.cpp
     GameCmdBeginApocalypse.cpp
     GameCmdBeginCrusade.cpp
     GameCmdBeginHeldenian.cpp
@@ -92,6 +95,7 @@ set(SERVER_SOURCES
     GameConfigSqliteStore.cpp
     ServerConfig.cpp
     GuildManager.cpp
+    GuildProgressionConfig.cpp
     GuildSqliteStore.cpp
     ItemBiography.cpp
     ItemLedgerStore.cpp

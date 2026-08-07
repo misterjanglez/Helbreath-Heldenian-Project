@@ -111,6 +111,19 @@ constexpr bool is_valid_guild_title(int kind)
 	return kind >= guild_title::commander && kind <= guild_title::raidmaster;
 }
 
+// The Title's name, for guild.log lines, the provers and — later — the
+// client dialogs (#124). Lowercase because log lines are.
+constexpr const char* guild_title_name(int kind)
+{
+	switch (kind)
+	{
+	case guild_title::commander:  return "commander";
+	case guild_title::huntmaster: return "huntmaster";
+	case guild_title::raidmaster: return "raidmaster";
+	default:                      return "unknown";
+	}
+}
+
 // The queued join/leave ceremony (§3.1.1 deviation 2): requests wait until any
 // approver decides. Stored in guilds.db (guild_requests.kind).
 namespace guild_request
@@ -126,6 +139,21 @@ constexpr bool is_valid_guild_request(int kind)
 {
 	return kind == guild_request::join || kind == guild_request::leave;
 }
+
+// The §3.1/§3.1.1 ceremony numbers, shared because the client dialogs gate the
+// same buttons the server enforces (the original client pre-checked level and
+// charisma before opening the create dialog, and #124 will again).
+constexpr int guild_create_min_level = 20;
+constexpr int guild_create_min_charisma = 20;
+
+// The floor the Guildmaster's charisma may never redistribute below (§3.1.1:
+// the CHR-20 rule applies to the Guildmaster only; everyone else keeps the
+// universal stat floor).
+constexpr int guildmaster_charisma_floor = 20;
+
+// Kennedy self-dismissal: the ceremony's price in experience, subtracted with
+// a clamp at zero exactly as the original did (no level-down exists).
+constexpr int kennedy_secession_exp_penalty = 300;
 
 // Guild name rules (#120): 1..20 characters from letters/digits/space/'_'/'-'.
 // Uniqueness is case-insensitive and lives in the guilds.db schema; these are

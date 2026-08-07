@@ -20,6 +20,7 @@
 #include "GameCmdEndHeldenian.h"
 #include "GameCmdBeginApocalypse.h"
 #include "GameCmdEndApocalypse.h"
+#include "GameCmdBanGuild.h"
 #include "Game.h"
 #include "Client.h"
 #include "AdminLevel.h"
@@ -124,6 +125,22 @@ void GameChatCommandManager::log_command(int client_h, const char* command)
 	fclose(file);
 }
 
+bool parse_char_name(const char* args,
+	char (&out)[hb::shared::limits::CharNameLen])
+{
+	std::memset(out, 0, sizeof(out));
+	if (args == nullptr)
+		return false;
+
+	for (size_t i = 0; i < hb::shared::limits::CharNameLen - 1; i++)
+	{
+		if (args[i] == '\0' || args[i] == ' ' || args[i] == '\t')
+			break;
+		out[i] = args[i];
+	}
+	return out[0] != '\0';
+}
+
 void GameChatCommandManager::register_built_in_commands()
 {
 	register_command(std::make_unique<GameCmdWhisper>());
@@ -148,6 +165,7 @@ void GameChatCommandManager::register_built_in_commands()
 	register_command(std::make_unique<GameCmdEndHeldenian>());
 	register_command(std::make_unique<GameCmdBeginApocalypse>());
 	register_command(std::make_unique<GameCmdEndApocalypse>());
+	register_command(std::make_unique<GameCmdBanGuild>());
 }
 
 void GameChatCommandManager::seed_command_permissions()

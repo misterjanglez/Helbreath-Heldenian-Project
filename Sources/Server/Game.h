@@ -24,6 +24,7 @@ namespace hb::server { class trading_post_store; }
 namespace hb::server { class trading_post_manager; }
 namespace hb::server { class item_ledger_store; }
 namespace hb::server { class guild_sqlite_store; }
+namespace hb::server { class guild_manager; }
 extern hb::shared::net::IOServicePool* G_pIOPool;
 extern bool G_bRunning;
 
@@ -62,6 +63,7 @@ extern bool G_bRunning;
 #include "GameConfigSqliteStore.h"
 #include "TierConfigStore.h"
 #include "TierConfigValidator.h"
+#include "GuildProgressionConfig.h"
 #include "RollStrategy.h"
 
 namespace hb::server::config
@@ -294,6 +296,10 @@ public:
 	// tier + legacy-pool table, validates it, and either swaps it in (true)
 	// or rejects it leaving the running config untouched (false).
 	bool reload_tier_tables();
+	// Transactional `reload guilds` (#122): the guild progression dataset
+	// under the same candidate/reject contract, including the world check —
+	// a curve shorter than a level some guild already earned is rejected.
+	bool reload_guild_progression();
 	void apply_server_config(const server_config& cfg);
 	bool reload_server_config();
 	void send_server_config_update();
@@ -427,7 +433,7 @@ public:
 	// Despawn every ground item in the world, for shutdown.
 	void despawn_all_ground_items();
 
-	int get_map_index(char * map_name);
+	int get_map_index(const char* map_name);
 	void weather_processor();
 	int calc_player_num(char map_index, short dX, short dY, char radius);
 	int get_exp_level(uint32_t exp);
@@ -592,7 +598,6 @@ public:
 	class MiningManager * m_mining_manager;    // Mineral spawning/mining manager
 	class CraftingManager * m_crafting_manager; // Potion/crafting recipe manager
 	class QuestManager * m_quest_manager;       // Quest assignment/progress manager
-	class GuildManager * m_guild_manager;       // Guild operations manager
 	class DelayEventManager * m_delay_event_manager; // Delay event processor
 	class DynamicObjectManager * m_dynamic_object_manager; // Dynamic object manager
 	class LootManager * m_loot_manager; // Kill rewards and penalties
@@ -606,6 +611,11 @@ public:
 	std::unique_ptr<hb::server::trading_post_manager> m_trading_post_manager; // Trading Post request handlers
 	std::unique_ptr<hb::server::item_ledger_store> m_item_ledger_store; // Provenance Ledger (itemledger.db)
 	std::unique_ptr<hb::server::guild_sqlite_store> m_guild_store; // Guild world-state (guilds.db, #120)
+	// The guild policy engine + membership index (#121). A unique_ptr sibling
+	// of the stores on purpose: the on_timer first-tick block re-news the raw
+	// manager pointers, and an index living there would be silently emptied
+	// the way the ItemManager Serial allocator once was.
+	std::unique_ptr<hb::server::guild_manager> m_guild_manager;
 
 	// Pending ground-item notes, oldest first (#79). A deque because the sweep
 	// only ever drains the front while placements only ever append to the back,
@@ -724,6 +734,7 @@ public:
 
 	uint32_t m_weather_time, m_game_time_1, m_game_time_2, m_game_time_3, m_game_time_4, m_game_time_5, m_game_time_6;
 	uint32_t m_equip_validation_time = 0;
+	uint32_t m_guild_title_time = 0;     // the #122 Title duty-slot sweep cadence
 
 	char  m_day_or_night;
  	int   m_skill_progress_threshold[102];
@@ -813,6 +824,14 @@ public:
 	// GM command helpers
 	int find_client_by_name(const char* name) const;
 	bool gm_teleport_to(int client_h, const char* dest_map, short dest_x, short dest_y);
+
+	// Remove a handle from every per-client index a manager keeps (today the
+	// guild membership index, #121; guild chat and Title holders will join
+	// it). One named door because TWO teardown paths must agree: delete_client
+	// for real logins, and probe_client's destructor for the synthetic prover
+	// clients that never go through delete_client — a handle left in a live
+	// index would be inherited by the next login that lands in the slot.
+	void detach_client_from_indexes(int client_h);
 
 	// Auto-start/end times for the three war events, from event_schedule (#97).
 	std::vector<hb::server::config::event_schedule_row> m_event_schedule;
@@ -942,8 +961,28 @@ private:
 
 public:
 
+	// The guild progression dataset (#122): the Guild Level curve + knobs the
+	// guild engine, the Title bonus hooks and the repair discount read. Same
+	// replace-wholesale contract as m_tier_config — loaded at boot, swapped
+	// only by reload_guild_progression — but public (like m_guild_store) so
+	// guildprogcheck can stage a synthetic curve under a restore guard; no
+	// production code writes it outside boot and reload.
+	hb::server::guild_progression_config m_guild_progression;
+
 	const hb::server::tier_config& get_tier_config() const { return m_tier_config; }
+	const hb::server::guild_progression_config& get_guild_progression() const { return m_guild_progression; }
 	hb::server::roll_strategy& get_roll_strategy() { return *m_roll_strategy; }
+
+	// #122 Title bonuses: the one test every Huntmaster/Raidmaster combat and
+	// loot hook shares — true only while title_bonuses_enabled is on and the
+	// client's hydrated cache holds the kind. Reads no store, ever.
+	bool client_holds_title(int client_h, int title_kind) const;
+
+	// #122 passive: percent off this client's repair bills for their Guild
+	// Level (a curve grant, not a Title bonus — deliberately no switch: the
+	// curve reads 0 below Level 5, and levels cannot rise while donations
+	// are dark). Applied before the Heldenian loser x2 at every repair site.
+	int guild_repair_discount_pct(int client_h) const;
 
 	void check_force_recall_time(int client_h);
 	void set_playing_status(int client_h);

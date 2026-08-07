@@ -291,7 +291,14 @@ namespace hb::server
 		// row records the monster by NAME, so without the name here nothing could
 		// join a drop to a kill without a copy of gamedata.db — and the ledger is
 		// meant to be readable on its own.
-		void record_kill(int32_t npc_id, const char* npc_name, double rep_factor);
+		//
+		// `title_factor` (#122) is the killer's Huntmaster tier-shift, the second
+		// per-player layer, summed for the same sufficient-statistic reason —
+		// 1.0 for every kill without the Title. It scales the tier MIX, not the
+		// drop chance, so rate analytics divide by rep_factor_sum as before and
+		// tier-mix analytics get their own denominator.
+		void record_kill(int32_t npc_id, const char* npc_name, double rep_factor,
+			double title_factor);
 
 		// --- Flushing --------------------------------------------------------
 		// Write everything buffered plus `high_water` into one transaction. True
@@ -392,14 +399,15 @@ namespace hb::server
 			}
 		};
 
-		// The two numbers move together or the day's gear rows are mispriced, so
-		// they are one value rather than two parallel maps. The name rides here
+		// These numbers move together or the day's gear rows are mispriced, so
+		// they are one value rather than parallel maps. The name rides here
 		// rather than in the key: it is a property of the id, and putting it in
 		// the key would make one mis-typed name split a monster's kills in two.
 		struct kill_tally
 		{
 			int64_t     kills = 0;
 			double      rep_factor_sum = 0.0;
+			double      title_factor_sum = 0.0;   // Huntmaster tier-shift (#122)
 			std::string npc_name;
 		};
 		std::map<kill_key, kill_tally> m_kills;

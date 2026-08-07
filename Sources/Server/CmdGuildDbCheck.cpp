@@ -104,8 +104,8 @@ void CmdGuildDbCheck::execute(CGame* game, const char* args)
 	// disband cascade is decoration without them.
 	tally.record("live_wal", probe_text(live, "PRAGMA journal_mode;") == "wal");
 	tally.record("live_foreign_keys", probe_scalar(live, "PRAGMA foreign_keys;") == 1);
-	tally.record("live_schema_v1",
-		probe_text(live, "SELECT value FROM meta WHERE key='schema_version';") == "1");
+	tally.record("live_schema_v2",
+		probe_text(live, "SELECT value FROM meta WHERE key='schema_version';") == "2");
 
 	// The boot gate already required this to start, so this proves the sweep
 	// still holds mid-run rather than only at boot. On failure the detail
@@ -131,22 +131,22 @@ void CmdGuildDbCheck::execute(CGame* game, const char* args)
 	}
 	sqlite3* db = scratch.handle();
 
-	tally.record("fresh_stamps_v1",
-		probe_text(db, "SELECT value FROM meta WHERE key='schema_version';") == "1");
+	tally.record("fresh_stamps_v2",
+		probe_text(db, "SELECT value FROM meta WHERE key='schema_version';") == "2");
 
 	// Idempotent: a second ensure on a current-version file is a no-op pass.
 	tally.record("ensure_idempotent", hb::server::ensure_guild_schema(db, probe_db));
 
 	{
 		// Any other stamp is refused — fresh start has no migration behind it.
-		// Stamped "2" rather than something absurd: a future version is the
-		// stamp a gate written as "less than" instead of "not equal" would let
-		// through.
+		// Stamped one version AHEAD rather than something absurd: a future
+		// version is the stamp a gate written as "less than" instead of
+		// "not equal" would let through.
 		sqlite3* stale = nullptr;
 		bool refused = false;
 		if (sqlite3_open(probe_stale_db, &stale) == SQLITE_OK) {
 			if (exec(stale, "CREATE TABLE meta(key TEXT PRIMARY KEY, value TEXT NOT NULL);")
-				&& exec(stale, "INSERT INTO meta(key,value) VALUES('schema_version','2');")) {
+				&& exec(stale, "INSERT INTO meta(key,value) VALUES('schema_version','3');")) {
 				refused = !hb::server::ensure_guild_schema(stale, "guilddbcheck(stale)");
 			}
 			sqlite3_close(stale);
@@ -250,13 +250,43 @@ void CmdGuildDbCheck::execute(CGame* game, const char* args)
 	tally.record("transfer_to_outsider_refused", !scratch.transfer_mastership(knights, "Cara"));
 
 	{
+		// record_donation is one transaction over three facts: the donor's
+		// lifetime counters, the guild's cumulative burn counters, and the
+		// engine-computed level MAX'd in (§3.1.2).
 		guild_member_record bob;
-		tally.record("donation_counters_accrue",
-			scratch.add_donation("Bob", 100, 2, 3)
-			&& !scratch.add_donation("Bob", -1, 0, 0)
+		guild_record after;
+		tally.record("donation_accrues_member_and_guild",
+			scratch.record_donation(knights, "Bob", 100, 2, 3, 1)
 			&& scratch.member_of("Bob", bob)
-			&& bob.donated_gold == 100 && bob.donated_ek == 2 && bob.donated_contribution == 3);
+			&& bob.donated_gold == 100 && bob.donated_ek == 2 && bob.donated_contribution == 3
+			&& scratch.load_guild(knights, after)
+			&& after.burned_gold == 100 && after.burned_ek == 2
+			&& after.burned_contribution == 3 && after.level == 1);
+		tally.record("donation_raises_level",
+			scratch.record_donation(knights, "Bob", 50, 0, 0, 3)
+			&& scratch.load_guild(knights, after)
+			&& after.burned_gold == 150 && after.level == 3);
+		tally.record("donation_never_lowers_level",
+			scratch.record_donation(knights, "Bob", 10, 0, 0, 2)
+			&& scratch.load_guild(knights, after)
+			&& after.burned_gold == 160 && after.level == 3);
+		tally.record("donation_negative_refused",
+			!scratch.record_donation(knights, "Bob", -1, 0, 0, 3));
+		tally.record("donation_of_nothing_refused",
+			!scratch.record_donation(knights, "Bob", 0, 0, 0, 3));
+		tally.record("donation_wrong_guild_refused",
+			!scratch.record_donation(knights, "Cara", 100, 0, 0, 1)
+			&& !scratch.record_donation(knights, "Nobody", 100, 0, 0, 1));
 	}
+
+	// Alice fell to officer in the transfer above; the master is not an
+	// officer, so the capacity gate's count reads exactly 1.
+	tally.record("officer_count_excludes_master",
+		scratch.officer_count(knights) == 1);
+
+	// Knights sit at level 3 after the MAX proof above; Rangers at 1.
+	tally.record("max_guild_level_spans_guilds",
+		scratch.max_guild_level() == 3);
 
 	//----------------------------------------------------------------------
 	// Permission masks as data.
@@ -321,7 +351,9 @@ void CmdGuildDbCheck::execute(CGame* game, const char* args)
 	//----------------------------------------------------------------------
 
 	tally.record("claim_title_ok",
-		scratch.claim_title(knights, guild_title::huntmaster, "Bob", t1));
+		scratch.claim_title(knights, guild_title::huntmaster, "Bob", t1)
+		&& scratch.title_count(knights, guild_title::huntmaster) == 1
+		&& scratch.title_count(knights, guild_title::raidmaster) == 0);
 	tally.record("one_title_per_member",
 		!scratch.claim_title(knights, guild_title::raidmaster, "Bob", t1));
 	tally.record("claim_across_guilds_refused",
@@ -345,6 +377,17 @@ void CmdGuildDbCheck::execute(CGame* game, const char* args)
 			&& scratch.claim_title(knights, guild_title::raidmaster, "Eve", t2)
 			&& scratch.remove_member("Eve")
 			&& !scratch.title_of("Eve", orphan));
+	}
+	{
+		// The inactivity sweep's one-statement view: every held Title across
+		// every guild, not one bucket at a time. Alice's Huntmaster plus a
+		// second guild's Commander, then back down.
+		const bool staged = scratch.claim_title(rangers, guild_title::commander, "Cara", t2);
+		tally.record("all_titles_spans_guilds",
+			staged
+			&& scratch.all_titles().size() == 2
+			&& scratch.release_title("Cara")
+			&& scratch.all_titles().size() == 1);
 	}
 
 	//----------------------------------------------------------------------

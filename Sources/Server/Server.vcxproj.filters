@@ -81,7 +81,13 @@
     <ClInclude Include="CmdGiveItem.h">
       <Filter>Console\Commands</Filter>
     </ClInclude>
+    <ClInclude Include="CmdGuildCheck.h">
+      <Filter>Console\Commands</Filter>
+    </ClInclude>
     <ClInclude Include="CmdGuildDbCheck.h">
+      <Filter>Console\Commands</Filter>
+    </ClInclude>
+    <ClInclude Include="CmdGuildProgCheck.h">
       <Filter>Console\Commands</Filter>
     </ClInclude>
     <ClInclude Include="CmdHelp.h">
@@ -132,6 +138,9 @@
     <ClInclude Include="GuildManager.h">
       <Filter>World</Filter>
     </ClInclude>
+    <ClInclude Include="GuildProgressionConfig.h">
+      <Filter>World</Filter>
+    </ClInclude>
     <ClInclude Include="GuildSqliteStore.h">
       <Filter>World</Filter>
     </ClInclude>
@@ -156,6 +165,9 @@
     <ClInclude Include="Game.h" />
     <ClInclude Include="GameChatCommand.h">
       <Filter>Game Chat</Filter>
+    </ClInclude>
+    <ClInclude Include="GameCmdBanGuild.h">
+      <Filter>Game Chat\Commands</Filter>
     </ClInclude>
     <ClInclude Include="GameCmdBlock.h">
       <Filter>Game Chat\Commands</Filter>
@@ -531,7 +543,13 @@
     <ClCompile Include="CmdGiveItem.cpp">
       <Filter>Console\Commands</Filter>
     </ClCompile>
+    <ClCompile Include="CmdGuildCheck.cpp">
+      <Filter>Console\Commands</Filter>
+    </ClCompile>
     <ClCompile Include="CmdGuildDbCheck.cpp">
+      <Filter>Console\Commands</Filter>
+    </ClCompile>
+    <ClCompile Include="CmdGuildProgCheck.cpp">
       <Filter>Console\Commands</Filter>
     </ClCompile>
     <ClCompile Include="CmdHelp.cpp">
@@ -576,6 +594,9 @@
     <ClCompile Include="GuildManager.cpp">
       <Filter>World</Filter>
     </ClCompile>
+    <ClCompile Include="GuildProgressionConfig.cpp">
+      <Filter>World</Filter>
+    </ClCompile>
     <ClCompile Include="GuildSqliteStore.cpp">
       <Filter>World</Filter>
     </ClCompile>
@@ -600,6 +621,9 @@
     <ClCompile Include="Game.cpp" />
     <ClCompile Include="GameChatCommand.cpp">
       <Filter>Game Chat</Filter>
+    </ClCompile>
+    <ClCompile Include="GameCmdBanGuild.cpp">
+      <Filter>Game Chat\Commands</Filter>
     </ClCompile>
     <ClCompile Include="GameCmdBlock.cpp">
       <Filter>Game Chat\Commands</Filter>

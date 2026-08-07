@@ -218,7 +218,7 @@ _Avoid_: Officer (bare, which means the Rank)
 A capability a Rank grants its holder (approving joins, kicking, claiming Commander, withdrawing from the Treasury, speaking in the Council).
 
 **Guild Level**:
-The guild-wide progression rung earned by Donations, which unlocks Title slots, member capacity, and perks.
+The guild-wide progression rung earned by Donations — each level is a gate requiring gold AND enemy kills AND contribution (three cumulative counters, no conversion between them) — which unlocks Title slots, member capacity, Officer capacity, and perks.
 _Avoid_: guild rank
 
 **Donation**:
@@ -230,7 +230,7 @@ The guild's shared gold wallet — deposited by any member, withdrawn by Officer
 _Avoid_: bank (reserved for the Warehouse), vault (reserved for possible future item storage)
 
 **Title**:
-A claimable, slot-limited distinction — Commander, Huntmaster, or Raidmaster — whose slot count grows with Guild Level and whose bonuses apply only while held. First come, first served; leaders may re-assign; absence releases it.
+A claimable, slot-limited duty — Commander, Huntmaster, or Raidmaster — whose slot count grows with Guild Level and whose bonuses apply only while held. First come, first served; leaders may re-assign; ten minutes of inactivity releases it. A live role for the session, not a persistent honor.
 
 **Commander**:
 The war-command Title: eligibility to take the Commander duty in a Crusade. Officer-and-above may claim.

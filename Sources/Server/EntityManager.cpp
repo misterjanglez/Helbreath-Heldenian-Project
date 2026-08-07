@@ -8,6 +8,7 @@
 #include "MagicManager.h"
 #include "ItemManager.h"
 #include "ItemLedgerStore.h"   // record_kill: the drop analytics' denominator (#85)
+#include "Game/GuildDefs.h"    // guild_title: the Huntmaster tier-shift (#122)
 #include "CombatManager.h"
 #include "QuestManager.h"
 #include "DelayEventManager.h"
@@ -2647,6 +2648,19 @@ void CEntityManager::npc_dead_item_generator(int npc_h, short attacker_h, char a
 	const double rep_factor =
 		m_game->get_tier_config().generosity.reputation_factor(attacker_rating);
 
+	// The Huntmaster tier-shift (#122, §3.1.2 item 4): the second per-player
+	// layer, resolved here once — factor and tier floor both — for the same
+	// reason as the reputation factor: the rolls below (including corpse-
+	// decay drops placed after any reload) and the kill row must be priced
+	// for the same player at the same instant. 100 = neutral; the knob
+	// speaks only while title_bonuses_enabled is on and the killer holds
+	// the Title.
+	const int tier_shift_pct = m_game->client_holds_title(attacker_h,
+		hb::shared::guild::guild_title::huntmaster)
+		? m_game->get_guild_progression().huntmaster_tier_shift_pct : 100;
+	const int tier_shift_min_tier =
+		m_game->get_guild_progression().huntmaster_tier_shift_min_tier;
+
 	// The denominator (#85). Recorded after the guards above and before the rolls
 	// below, so the population counted here is exactly the population `dropodds`
 	// prices — summons, unsummons and the guard/dummy/crop types are out of both.
@@ -2655,7 +2669,8 @@ void CEntityManager::npc_dead_item_generator(int npc_h, short attacker_h, char a
 	// every rate as 1 in 1.
 	if (hb::server::item_ledger_store* ledger = m_game->m_item_ledger_store.get())
 		ledger->record_kill(m_npc_list[npc_h]->m_npc_config_id,
-			m_npc_list[npc_h]->m_npc_name, rep_factor);
+			m_npc_list[npc_h]->m_npc_name, rep_factor,
+			static_cast<double>(tier_shift_pct) / 100.0);
 
 	// One engine, run twice. The slot a table was reached through is the ONLY
 	// thing "stage" means: it picks the stage multiplier and decides whether
@@ -2666,8 +2681,8 @@ void CEntityManager::npc_dead_item_generator(int npc_h, short attacker_h, char a
 	// There is no gold preempt any more and no flat per-stage gate: gold is an
 	// ordinary row competing on its own absolute chance, and every other row
 	// states its own. The leftover probability is "nothing".
-	roll_drop_slot(npc_h, attacker_h, 1, m_npc_list[npc_h]->m_stage1_table_id, rep_factor);
-	roll_drop_slot(npc_h, attacker_h, 2, m_npc_list[npc_h]->m_stage2_table_id, rep_factor);
+	roll_drop_slot(npc_h, attacker_h, 1, m_npc_list[npc_h]->m_stage1_table_id, rep_factor, tier_shift_pct, tier_shift_min_tier);
+	roll_drop_slot(npc_h, attacker_h, 2, m_npc_list[npc_h]->m_stage2_table_id, rep_factor, tier_shift_pct, tier_shift_min_tier);
 }
 
 // A row's stack size: `count_throws` rolls of min..max, summed. One throw is
@@ -2706,7 +2721,7 @@ int CEntityManager::roll_entry_count(const hb::server::drop_entry& entry,
 // ADR 0005 said it belonged: a layer of the generosity stack, scoped to the
 // categories a player farms for rather than to a stage.
 void CEntityManager::roll_drop_slot(int npc_h, short attacker_h, int stage_slot, int table_id,
-	double rep_factor)
+	double rep_factor, int tier_shift_pct, int tier_shift_min_tier)
 {
 	const hb::server::drop_table* table = m_game->m_item_manager->get_drop_table(table_id);
 	if (table == nullptr) return;
@@ -2806,17 +2821,17 @@ void CEntityManager::roll_drop_slot(int npc_h, short attacker_h, int stage_slot,
 			// Rolled now, while the attacker is still valid, and placed by
 			// spawn_pending_drops when the corpse's regen timer elapses.
 			queue_pending_drop(npc_h, entry.item_id, min_count, max_count,
-				dx, dy, tier_rolls);
+				dx, dy, tier_rolls, tier_shift_pct, tier_shift_min_tier);
 			placed++;
 		}
 		else if (spawn_npc_drop_item(npc_h, entry.item_id, min_count, max_count,
-			dx, dy, tier_rolls)) {
+			dx, dy, tier_rolls, tier_shift_pct, tier_shift_min_tier)) {
 			placed++;
 		}
 	}
 }
 
-bool CEntityManager::spawn_npc_drop_item(int npc_h, int item_id, int min_count, int max_count, short dx, short dy, bool tier_rolls)
+bool CEntityManager::spawn_npc_drop_item(int npc_h, int item_id, int min_count, int max_count, short dx, short dy, bool tier_rolls, int tier_shift_pct, int tier_shift_min_tier)
 {
 	if (item_id <= 0) return false;
 	if (m_npc_list[npc_h] == nullptr) return false;
@@ -2861,6 +2876,8 @@ bool CEntityManager::spawn_npc_drop_item(int npc_h, int item_id, int min_count, 
 	hb::server::roll_context roll_context;
 	roll_context.loot_grade = static_cast<uint8_t>(m_npc_list[npc_h]->m_loot_grade);
 	roll_context.tier_rolls = tier_rolls;
+	roll_context.tier_shift_pct = tier_shift_pct;
+	roll_context.tier_shift_min_tier = tier_shift_min_tier;
 
 	// What the ledger could not know until now: which NPC dropped it and onto
 	// which tile. The NPC name is the birth row's origin_detail — its schema home
@@ -2886,7 +2903,7 @@ bool CEntityManager::spawn_npc_drop_item(int npc_h, int item_id, int min_count, 
 }
 
 // Queue a drop rolled at death for placement when the corpse decays.
-void CEntityManager::queue_pending_drop(int npc_h, int item_id, int min_count, int max_count, short dx, short dy, bool tier_rolls)
+void CEntityManager::queue_pending_drop(int npc_h, int item_id, int min_count, int max_count, short dx, short dy, bool tier_rolls, int tier_shift_pct, int tier_shift_min_tier)
 {
 	if (m_npc_list[npc_h] == 0) return;
 	CNpc* npc = m_npc_list[npc_h];
@@ -2899,6 +2916,8 @@ void CEntityManager::queue_pending_drop(int npc_h, int item_id, int min_count, i
 	d.dx = dx;
 	d.dy = dy;
 	d.tier_rolls = tier_rolls;
+	d.tier_shift_pct = tier_shift_pct;
+	d.tier_shift_min_tier = tier_shift_min_tier;
 }
 
 // Place all pending (delayed) drops for a decaying corpse. Called from
@@ -2912,7 +2931,7 @@ void CEntityManager::spawn_pending_drops(int npc_h)
 	for (int i = 0; i < npc->m_pending_drop_count; i++) {
 		const PendingDrop& d = npc->m_pending_drops[i];
 		spawn_npc_drop_item(npc_h, d.item_id, d.min_count, d.max_count, d.dx, d.dy,
-			d.tier_rolls);
+			d.tier_rolls, d.tier_shift_pct, d.tier_shift_min_tier);
 	}
 	npc->m_pending_drop_count = 0;
 }

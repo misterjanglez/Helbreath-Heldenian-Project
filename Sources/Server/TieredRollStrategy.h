@@ -40,7 +40,8 @@ public:
 
 
 private:
-	uint8_t roll_tier(const loot_grade_config& grade);
+	uint8_t roll_tier(const loot_grade_config& grade, int tier_shift_pct,
+		int tier_shift_min_tier);
 	uint8_t roll_modifier_value(const tier_config& config,
 		const modifier_catalog_config& modifier, uint8_t tier,
 		const tier_curve_config& curve);

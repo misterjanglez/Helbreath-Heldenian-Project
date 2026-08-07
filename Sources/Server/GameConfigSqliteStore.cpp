@@ -34,7 +34,8 @@ using namespace hb::server::config;
 // and the stamp is bookkeeping for operators, not a migration input.
 // 10: drop tables carry absolute per-kill rarity in ppb and split by stage (#73).
 // 11: event_schedule grows battle_type for heldenian rows (#97).
-#define GAMECONFIG_DB_SCHEMA_VERSION "11"
+// 12: guild_level_curve + guild_settings — the §3.1.2 progression dataset (#122).
+#define GAMECONFIG_DB_SCHEMA_VERSION "12"
 
 namespace
 {
@@ -654,6 +655,68 @@ bool EnsureGameConfigDatabase(sqlite3** outDb, std::string& outPath, bool* outCr
         " key TEXT PRIMARY KEY,"
         " value TEXT NOT NULL"
         ");"
+        // Guild progression (#122, plan §3.1.2): the Guild Level curve plus
+        // the scalar knobs the guild engine reads. Requirement columns are
+        // CUMULATIVE lifetime burn totals (the plan's table prints per-level
+        // deltas; these are its running sums — level 20 checks out at
+        // 60.17M / 1,335 / 939). Max Guild Level IS the highest row: adding
+        // levels later is an INSERT, not a code change.
+        "CREATE TABLE IF NOT EXISTS guild_level_curve ("
+        " level INTEGER PRIMARY KEY,"
+        " gold INTEGER NOT NULL,"                  // cumulative burned gold to earn this level
+        " enemy_kills INTEGER NOT NULL,"           // cumulative burned EKs
+        " contribution INTEGER NOT NULL,"          // cumulative burned contribution
+        " member_cap INTEGER NOT NULL,"
+        " officer_cap INTEGER NOT NULL,"           // the guildmaster is never counted
+        " hunt_slots INTEGER NOT NULL,"            // Huntmaster Title slots
+        " raid_slots INTEGER NOT NULL,"            // Raidmaster Title slots
+        " repair_pct INTEGER NOT NULL"             // % off repairs, before the heldenian loser x2
+        ");"
+        // The §3.1.2 v1 seed arc (12-18 months to level 20 for a committed
+        // guild; re-derived at the pre-enable review). OR IGNORE preserves an
+        // operator's tuning; the boot validator — not this seed — is what
+        // keeps edited rows coherent.
+        "INSERT OR IGNORE INTO guild_level_curve"
+        " (level, gold, enemy_kills, contribution, member_cap, officer_cap,"
+        "  hunt_slots, raid_slots, repair_pct) VALUES"
+        " (1,0,0,0,15,1,0,0,0),"
+        " (2,150000,5,5,20,1,1,1,0),"
+        " (3,350000,11,11,25,2,1,1,0),"
+        " (4,610000,19,18,30,2,1,1,0),"
+        " (5,940000,29,27,35,2,1,1,5),"
+        " (6,1360000,42,38,40,3,1,1,5),"
+        " (7,1900000,58,51,45,3,1,1,5),"
+        " (8,2590000,78,67,50,3,1,1,5),"
+        " (9,3470000,103,87,55,4,1,1,5),"
+        " (10,4570000,135,112,60,4,1,1,10),"
+        " (11,5970000,175,142,66,4,1,1,10),"
+        " (12,7870000,225,179,72,5,2,2,10),"
+        " (13,10270000,287,224,79,5,2,2,10),"
+        " (14,13270000,365,279,86,5,2,2,10),"
+        " (15,17170000,460,346,93,6,2,2,15),"
+        " (16,22170000,575,426,100,6,2,2,15),"
+        " (17,28470000,715,521,107,6,2,2,15),"
+        " (18,36570000,885,636,114,7,3,3,15),"
+        " (19,46970000,1090,774,121,7,3,3,15),"
+        " (20,60170000,1335,939,128,7,3,3,20);"
+        // Guild scalar knobs. Both enable switches ship OFF (§3.1.2 item 6):
+        // the burn lane and the bonus lane wait for the pre-enable review,
+        // while claiming, roster and Treasury are always-on and read no switch.
+        "CREATE TABLE IF NOT EXISTS guild_settings ("
+        " key TEXT PRIMARY KEY,"
+        " value TEXT NOT NULL"
+        ");"
+        "INSERT OR IGNORE INTO guild_settings(key, value) VALUES"
+        " ('donations_enabled','0'),"
+        " ('title_bonuses_enabled','0'),"
+        " ('title_inactivity_ms','600000'),"       // 10 min: a Title is a live duty slot
+        " ('donation_min_gold','1000'),"
+        " ('donation_min_ek','1'),"
+        " ('donation_min_contribution','1'),"
+        " ('huntmaster_damage_pct','10'),"         // +% physical and magic vs NPCs
+        " ('huntmaster_tier_shift_pct','125'),"    // x1.25 on rare-or-better tier weights
+        " ('huntmaster_tier_shift_min_tier','2')," // 2 = rare
+        " ('raidmaster_attack_power','3');"        // flat AP vs players
         "COMMIT;";
 
     if (!ExecSql(db, schemaSql)) {

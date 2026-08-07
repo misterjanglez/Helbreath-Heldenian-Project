@@ -3461,6 +3461,10 @@ void ItemManager::req_repair_item_handler(int client_h, char item_id, char repai
 			price = static_cast<short>((m_game->m_client_list[client_h]->m_item_list[item_id]->m_sell_price / 2) - d3);
 		}
 
+		// Guild repair discount (#122, §3.1.2): before the Heldenian x2, so the
+		// war penalty keeps its teeth. Must stay bit-identical to the confirm's.
+		price -= (price * m_game->guild_repair_discount_pct(client_h)) / 100;
+
 		// Heldenian loser-town penalty: the smith's bill doubles too (#114).
 		price *= m_game->m_war_manager->heldenian_shop_price_multiplier(client_h);
 
@@ -3504,6 +3508,9 @@ void ItemManager::req_repair_item_cofirm_handler(int client_h, char item_id, con
 
 			price = static_cast<short>((m_game->m_client_list[client_h]->m_item_list[item_id]->m_sell_price / 2) - d3);
 		}
+
+		// Same discount as the quote above (#122) — the two computations must agree.
+		price -= (price * m_game->guild_repair_discount_pct(client_h)) / 100;
 
 		// Same doubling as the quote above (#114) — the two computations must agree.
 		price *= m_game->m_war_manager->heldenian_shop_price_multiplier(client_h);
@@ -6412,6 +6419,26 @@ int ItemManager::find_inventory_item(int client_h, short item_id) const
 	return found;
 }
 
+bool ItemManager::grant_gold(int client_h, uint64_t amount)
+{
+	if (amount == 0 || m_game->m_client_list[client_h] == nullptr)
+	{
+		return false;
+	}
+	// Gold is Counted: no Serial, no origin — the venue lives on the flow
+	// event. The two-argument record_created_flow sets the stack count AND
+	// books the inflow, before add_item so a failed delivery still ground-
+	// drops a booked stack rather than delivering an unbooked one (#111).
+	CItem* gold = create_item(hb::shared::item::ItemId::Gold,
+		hb::server::item_origin::none);
+	if (gold == nullptr)
+	{
+		return false;
+	}
+	record_created_flow(*gold, amount);
+	return add_item(client_h, gold, 0);
+}
+
 // One enchant roll against the seeded per-step rate (basis points out of
 // 10000). The old hardcoded 30/25/20/15/10/10/8/8/5/3% ladder now lives in
 // `enchant_steps`, with the Merien route's doubling already folded into the
@@ -6955,8 +6982,11 @@ void ItemManager::request_repair_all_items_handler(int client_h)
 	m_game->m_client_list[client_h]->total_item_repair = 0;
 
 	// Heldenian loser-town penalty (#114). Applied to the stored quotes, which
-	// both the RepairAllPrices packet and the confirm's bill read back.
+	// both the RepairAllPrices packet and the confirm's bill read back. The
+	// guild repair discount (#122) multiplies in first, hoisted like the
+	// multiplier because neither changes mid-scan.
 	const int heldenian_price_multiplier = m_game->m_war_manager->heldenian_shop_price_multiplier(client_h);
+	const int guild_discount_pct = m_game->guild_repair_discount_pct(client_h);
 
 	for(int i = 0; i < hb::shared::limits::MaxItems; i++) {
 		if (m_game->m_client_list[client_h]->m_item_list[i] != 0) {
@@ -6979,6 +7009,7 @@ void ItemManager::request_repair_all_items_handler(int client_h)
 					d3 = (d3 * d2);
 					price = ((m_game->m_client_list[client_h]->m_item_list[i]->m_sell_price / 2) - static_cast<int32_t>(d3));
 				}
+				price -= (price * guild_discount_pct) / 100;
 				m_game->m_client_list[client_h]->m_repair_all[m_game->m_client_list[client_h]->total_item_repair].index = i;
 				m_game->m_client_list[client_h]->m_repair_all[m_game->m_client_list[client_h]->total_item_repair].price = price * heldenian_price_multiplier;
 				m_game->m_client_list[client_h]->total_item_repair++;

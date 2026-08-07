@@ -11,6 +11,7 @@
 #include "Packet/PacketTradingPost.h"
 #include "sqlite3.h"
 #include "Log.h"
+#include "TimeUtils.h"
 
 #include "ServerLogChannels.h"
 
@@ -39,12 +40,6 @@ namespace
 	bool bind_text(sqlite3_stmt* stmt, int idx, const char* value)
 	{
 		return sqlite3_bind_text(stmt, idx, value ? value : "", -1, SQLITE_TRANSIENT) == SQLITE_OK;
-	}
-
-	int64_t now_unix()
-	{
-		return static_cast<int64_t>(std::chrono::duration_cast<std::chrono::seconds>(
-			std::chrono::system_clock::now().time_since_epoch()).count());
 	}
 
 	const char* tp_action_name(int action)
@@ -484,7 +479,7 @@ namespace hb::server
 			return false;
 		}
 
-		const int64_t created = now_unix();
+		const int64_t created = hb::time::unix_now();
 		const int64_t expires = created +
 			static_cast<int64_t>(hb::shared::limits::TpListingExpiryDays) * 86400;
 
@@ -623,7 +618,7 @@ namespace hb::server
 			return false;
 		}
 
-		const int64_t created = now_unix();
+		const int64_t created = hb::time::unix_now();
 
 		custody_scope scope(m_db);
 		scope.on_rollback([this, client_h, items]()
@@ -1623,7 +1618,7 @@ namespace hb::server
 		if (!is_open()) {
 			return;
 		}
-		const int64_t now = now_unix();
+		const int64_t now = hb::time::unix_now();
 		std::vector<int64_t> ids;
 		sqlite3_stmt* stmt = nullptr;
 		if (sqlite3_prepare_v2(m_db,
@@ -1795,7 +1790,7 @@ namespace hb::server
 			-1, &stmt, nullptr) == SQLITE_OK) {
 			bind_text(stmt, 1, character_name);
 			bind_text(stmt, 2, message.c_str());
-			sqlite3_bind_int64(stmt, 3, now_unix());
+			sqlite3_bind_int64(stmt, 3, hb::time::unix_now());
 			sqlite3_step(stmt);
 			sqlite3_finalize(stmt);
 		}

@@ -17,6 +17,7 @@
 #include <string>
 #include <set>
 #include "GameGeometry.h"
+#include "Game/GuildDefs.h"
 #include "Appearance.h"
 #include "PlayerStatusData.h"
 #include "MarqueeEffects.h"
@@ -409,6 +410,21 @@ public:
 	int  index;
 	char name[hb::shared::limits::CharNameLen];
 	} m_party_member_name[hb::shared::limits::MaxPartyMembers];
+
+	// Guild membership cache (#121). Truth lives in guilds.db; these four are
+	// hydrated from one member_of() read at login and refreshed by every
+	// engine mutation that touches this member (GuildManager.h). guid 0 =
+	// unguilded; the mask is the member's rank's permission bits (ADR 0006),
+	// cached so every gate is one AND away.
+	int64_t  m_guild_guid;
+	char     m_guild_name[hb::shared::guild::max_guild_name_length + 1];
+	int      m_guild_rank;
+	uint32_t m_guild_permission_mask;
+	// #122: cached guilds.level (curve grants — repair discount — read this;
+	// kept fresh by hydration and the level-up walk) and the held Title kind
+	// (0 = none; the per-attack bonus hooks read this, never the store).
+	int      m_guild_level;
+	int      m_guild_title;
 
 	// New 07/05/2004
 	uint32_t m_last_action_time;

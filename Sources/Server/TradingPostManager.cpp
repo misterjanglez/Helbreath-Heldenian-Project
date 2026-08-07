@@ -7,6 +7,7 @@
 #include "OwnerType.h"
 #include "Packet/PacketTradingPost.h"
 #include "Packet/PacketHelpers.h"
+#include "TimeUtils.h"
 
 #include <chrono>
 #include <cstdio>
@@ -27,12 +28,6 @@ namespace
 	// Auctioneer interaction radius in tiles. A dialog opened from a short distance
 	// is fine; the scan stays small (a box around the actor) and precise.
 	constexpr int auctioneer_range = 5;
-
-	int64_t now_seconds()
-	{
-		return static_cast<int64_t>(std::chrono::duration_cast<std::chrono::seconds>(
-			std::chrono::system_clock::now().time_since_epoch()).count());
-	}
 
 	uint16_t hours_until(int64_t expires_at, int64_t now)
 	{
@@ -92,7 +87,7 @@ namespace
 	void send_board_page_packet(CGame* game, int client_h, uint16_t page,
 		const std::vector<hb::server::listing_brief>& rows, int total)
 	{
-		const int64_t now = now_seconds();
+		const int64_t now = hb::time::unix_now();
 		PacketResponseTpBoardPage pkt{};
 		pkt.header.msg_id = MsgId::ResponseTpBoardPage;
 		pkt.header.msg_type = MsgType::Confirm;
@@ -272,7 +267,7 @@ namespace hb::server
 			return;
 		}
 
-		const int64_t now = now_seconds();
+		const int64_t now = hb::time::unix_now();
 		PacketResponseTpListingDetail pkt{};
 		pkt.header.msg_id = MsgId::ResponseTpListingDetail;
 		pkt.header.msg_type = MsgType::Confirm;

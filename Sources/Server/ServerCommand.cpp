@@ -10,7 +10,9 @@
 #include "CmdDropOdds.h"
 #include "CmdGameDbCheck.h"
 #include "CmdGiveItem.h"
+#include "CmdGuildCheck.h"
 #include "CmdGuildDbCheck.h"
+#include "CmdGuildProgCheck.h"
 #include "CmdItemHistory.h"
 #include "CmdItemLogCheck.h"
 #include "CmdLedgerCheck.h"
@@ -107,7 +109,9 @@ void ServerCommandManager::register_built_in_commands()
 	register_command(std::make_unique<CmdDropOdds>());
 	register_command(std::make_unique<CmdGameDbCheck>());
 	register_command(std::make_unique<CmdGiveItem>());
+	register_command(std::make_unique<CmdGuildCheck>());
 	register_command(std::make_unique<CmdGuildDbCheck>());
+	register_command(std::make_unique<CmdGuildProgCheck>());
 	register_command(std::make_unique<CmdItemHistory>());
 	register_command(std::make_unique<CmdItemLogCheck>());
 	register_command(std::make_unique<CmdLedgerCheck>());

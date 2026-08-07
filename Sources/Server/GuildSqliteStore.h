@@ -4,9 +4,9 @@
 // had an empty [GUILDSMAN] section and no reader — with this store. Decision D1
 // put it in its own database rather than game.db: guilds are world-state, not
 // account-state, and unlike Trading Post escrow (#82) nothing a guild row
-// changes must commit atomically WITH a character save — Donations burn
-// counters and mint XP, and a crash between those two is a few lost points,
-// not a duplicated item.
+// changes must commit atomically WITH a character save — a Donation burns the
+// donor's live counters and then records itself here, and a crash between
+// those two is a few lost points, not a duplicated item.
 //
 // Fresh start is absolute: the pre-gut guild columns survive only in
 // `.guild_migration_bak` files, and those are archaeology — this store never
@@ -52,7 +52,9 @@ namespace hb::server
 
 	// One guilds row. guid is the server-minted permanent identity (§3.1) —
 	// AUTOINCREMENT in the schema, so a disbanded guild's guid is never
-	// re-issued to a later one.
+	// re-issued to a later one. The three burned_* counters are the §3.1.2
+	// requirement-gate lanes (cumulative lifetime burns, no conversion
+	// between them); level is earned-and-kept, only ever raised.
 	struct guild_record
 	{
 		int64_t     guid = 0;
@@ -60,7 +62,9 @@ namespace hb::server
 		int         side = 0;           // 1 aresden / 2 elvine
 		std::string master_name;
 		int64_t     created_at = 0;     // unix seconds
-		int64_t     xp = 0;             // burn-economy progression (ADR 0007)
+		int64_t     burned_gold = 0;
+		int64_t     burned_ek = 0;
+		int64_t     burned_contribution = 0;
 		int         level = 1;
 	};
 
@@ -142,7 +146,9 @@ namespace hb::server
 		// Create a guild and everything a valid one must have, in one
 		// transaction: the guilds row, the master's member row (guildmaster
 		// rank), the three §3.1.1 default permission masks, and an empty
-		// Treasury. False with out_error set on an invalid name, an unknown
+		// Treasury. The master's own pending join requests elsewhere retire in
+		// the same transaction (the add_member rule — founding is joining).
+		// False with out_error set on an invalid name, an unknown
 		// side, a taken name (case-insensitive), or a master who is already in
 		// a guild. Creation *gates* (level, CHR, citizenship, town, crusade)
 		// are the engine's checks, not repeated here.
@@ -158,16 +164,29 @@ namespace hb::server
 		bool find_guild_by_name(const char* name, guild_record& out);
 		std::vector<guild_record> all_guilds();
 
-		// Progression counters (ADR 0007). The XP->Level curve is
-		// balance-session data in gamedata.db; the engine computes, this
-		// records. Refuses negative xp or a level below 1.
-		bool set_progress(int64_t guid, int64_t xp, int level);
+		// The highest Guild Level any guild holds (0 when none exist) — what
+		// the boot and reload world-vs-curve checks divide the curve against.
+		int max_guild_level();
+
+		// Record one Donation's full effect in a single transaction (§3.1.2):
+		// the donor's lifetime counters, the guild's three cumulative burn
+		// counters, and the level the engine computed against the curve —
+		// MAX'd in, never lowered, because levels are earned-and-kept
+		// (requirements are checked only on the way up). Deltas must be
+		// non-negative with at least one positive; new_level at least 1; the
+		// donor must be a member of `guid`. The burn itself — decrementing
+		// the donor's live gold/EK/contribution — happens on the character,
+		// in the engine, before this records it.
+		bool record_donation(int64_t guid, const char* char_name, int64_t gold,
+			int64_t enemy_kills, int64_t contribution, int new_level);
 
 		// --- Membership ------------------------------------------------------
 		// Add a member at officer or guildsman rank. Refuses the guildmaster
 		// rank (only create/transfer mint that), an unknown guild, and a
 		// character already in any guild (schema-enforced; this reports it as
-		// a clean false).
+		// a clean false). Every pending join request of the new member — at
+		// this guild and any other — retires in the same transaction, because
+		// a member with a join still queued is a state validate() refuses.
 		bool add_member(int64_t guid, const char* char_name, int rank, int64_t now);
 
 		// Remove a member; their held Title and their pending leave request go
@@ -194,12 +213,10 @@ namespace hb::server
 		std::vector<guild_member_record> roster(int64_t guid);
 		int member_count(int64_t guid);
 
-		// Accrue lifetime donation counters (§3.1.1 deviation 4). Deltas are
-		// what was burned; negative deltas are refused. The burn itself —
-		// decrementing the donor's live gold/EK/contribution — happens on the
-		// character, in the engine, before this records it.
-		bool add_donation(const char* char_name, int64_t gold, int64_t enemy_kills,
-			int64_t contribution);
+		// How many members of `guid` hold the officer rank — the promote-side
+		// capacity gate (§3.1.2 item 2) reads this. The guildmaster is not an
+		// officer and so is naturally outside the count.
+		int officer_count(int64_t guid);
 
 		// --- Permission masks (ADR 0006) ------------------------------------
 		bool permission_mask(int64_t guid, int rank, uint32_t& out_mask);
@@ -219,6 +236,12 @@ namespace hb::server
 		bool load_request(int64_t request_id, guild_request_record& out);
 		bool delete_request(int64_t request_id);
 		std::vector<guild_request_record> pending_requests(int64_t guid);
+
+		// True when an identical request (guild, character, kind) is already
+		// queued — one seek on the UNIQUE index, so the engine's duplicate
+		// gate can name request_pending without materializing the queue (the
+		// constraint itself stays the backstop).
+		bool has_pending_request(int64_t guid, const char* char_name, int kind);
 
 		// --- Treasury (§3.1.1 deviation 6) ----------------------------------
 		// The wallet is gold in, gold out, and nothing else: it never mints
@@ -253,6 +276,14 @@ namespace hb::server
 		std::vector<guild_title_record> titles(int64_t guid);
 		bool title_of(const char* holder_name, guild_title_record& out);
 
+		// How many Titles of one kind `guid`'s members hold — the claim
+		// gate's slot arithmetic, in the officer_count shape.
+		int title_count(int64_t guid, int kind);
+
+		// Every held Title across every guild, for the engine's inactivity
+		// sweep — one statement instead of an all_guilds() walk.
+		std::vector<guild_title_record> all_titles();
+
 		// --- Boot validation -------------------------------------------------
 		// The TierConfig-style fail-fast sweep, run at every boot: foreign-key
 		// orphans, illegal names/sides/ranks/kinds/bits, a master who is not
@@ -270,6 +301,15 @@ namespace hb::server
 		// Whether this member is their own guild's master — the one row
 		// set_rank and remove_member must refuse to touch.
 		bool is_guild_master(const guild_member_record& member);
+
+		// The request-retirement policy, in one place: minting a membership
+		// (create_guild / add_member) retires the character's JOIN
+		// applications at every guild; removing a membership (remove_member)
+		// retires whatever they had queued at THAT guild — only leave
+		// requests can exist for a member. Both run inside their caller's
+		// transaction.
+		bool retire_join_requests(const char* char_name);
+		bool retire_guild_requests(const char* char_name, int64_t guid);
 
 		// The one UPDATE that moves a member between ranks. False when the
 		// row does not exist, so no two callers can disagree about what a

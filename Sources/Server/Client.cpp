@@ -40,6 +40,10 @@ CClient::CClient(asio::io_context& ctx)
 	m_last_full_object_time = 0;
 	m_afk_activity_time = 0;
 
+	// Real logins overwrite these from the character row; before that they
+	// were read-before-write garbage, which the synthetic prover clients hit
+	// as a Windows-vs-Linux divergence in calc_max_load (#121).
+	m_str = m_int = m_vit = m_dex = m_mag = m_charisma = 0;
 	m_angelic_str = m_angelic_int = m_angelic_dex = m_angelic_mag = 0;
 	for (int& gear_attribute : m_add_attribute) gear_attribute = 0;
 
@@ -200,6 +204,14 @@ CClient::CClient(asio::io_context& ctx)
 	m_party_status = 0;
 	m_req_join_party_client_h = 0;
 	std::memset(m_req_join_party_name, 0, sizeof(m_req_join_party_name));
+
+	// Guild cache (#121/#122): the unguilded shape until hydrate_login says otherwise.
+	m_guild_guid = 0;
+	std::memset(m_guild_name, 0, sizeof(m_guild_name));
+	m_guild_rank = hb::shared::guild::guild_rank::none;
+	m_guild_permission_mask = 0;
+	m_guild_level = 0;
+	m_guild_title = 0;
 
 	/*m_party_rank = -1; // v1.42
 	m_party_member_count = 0;

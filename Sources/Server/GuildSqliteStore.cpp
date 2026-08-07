@@ -34,7 +34,9 @@ namespace
 {
 	// Single source of truth for the guilds.db schema version. Bump on any
 	// schema change (fresh start — stale files are refused, never migrated).
-	constexpr const char* guilds_db_schema_version = "1";
+	// 2: the single xp column becomes the three cumulative burn counters of
+	//    §3.1.2's requirement gates (#122).
+	constexpr const char* guilds_db_schema_version = "2";
 
 	bool exec_sql(sqlite3* db, const char* sql)
 	{
@@ -64,13 +66,15 @@ namespace
 	// Column order contract for every guilds / guild_members SELECT below.
 	void read_guild_row(sqlite3_stmt* stmt, hb::server::guild_record& out)
 	{
-		out.guid        = sqlite3_column_int64(stmt, 0);
-		out.name        = column_string(stmt, 1);
-		out.side        = sqlite3_column_int(stmt, 2);
-		out.master_name = column_string(stmt, 3);
-		out.created_at  = sqlite3_column_int64(stmt, 4);
-		out.xp          = sqlite3_column_int64(stmt, 5);
-		out.level       = sqlite3_column_int(stmt, 6);
+		out.guid                = sqlite3_column_int64(stmt, 0);
+		out.name                = column_string(stmt, 1);
+		out.side                = sqlite3_column_int(stmt, 2);
+		out.master_name         = column_string(stmt, 3);
+		out.created_at          = sqlite3_column_int64(stmt, 4);
+		out.burned_gold         = sqlite3_column_int64(stmt, 5);
+		out.burned_ek           = sqlite3_column_int64(stmt, 6);
+		out.burned_contribution = sqlite3_column_int64(stmt, 7);
+		out.level               = sqlite3_column_int(stmt, 8);
 	}
 
 	void read_member_row(sqlite3_stmt* stmt, hb::server::guild_member_record& out)
@@ -139,14 +143,18 @@ bool ensure_guild_schema(sqlite3* db, const char* db_label)
 
 		// guid is AUTOINCREMENT so a disbanded guild's identity is never
 		// re-issued — characters' crusade_guid and later audit trails may
-		// outlive the guild they name.
+		// outlive the guild they name. The burned_* counters are §3.1.2's
+		// three requirement-gate lanes: cumulative lifetime burns, and level
+		// is earned-and-kept (record_donation only ever raises it).
 		"CREATE TABLE IF NOT EXISTS guilds ("
 		" guid INTEGER PRIMARY KEY AUTOINCREMENT,"
 		" name TEXT NOT NULL UNIQUE COLLATE NOCASE CHECK(length(name) BETWEEN 1 AND {1}),"
 		" side INTEGER NOT NULL CHECK(side IN (1,2)),"
 		" master_name TEXT NOT NULL COLLATE NOCASE,"
 		" created_at INTEGER NOT NULL,"
-		" xp INTEGER NOT NULL DEFAULT 0 CHECK(xp >= 0),"
+		" burned_gold INTEGER NOT NULL DEFAULT 0 CHECK(burned_gold >= 0),"
+		" burned_ek INTEGER NOT NULL DEFAULT 0 CHECK(burned_ek >= 0),"
+		" burned_contribution INTEGER NOT NULL DEFAULT 0 CHECK(burned_contribution >= 0),"
 		" level INTEGER NOT NULL DEFAULT 1 CHECK(level >= 1)"
 		");"
 
@@ -327,6 +335,14 @@ bool guild_sqlite_store::create_guild(const char* name, int side,
 		}
 	}
 
+	// A member may hold no pending join requests anywhere (validate() sweeps
+	// exactly that), and the new master may have had applications out.
+	if (!retire_join_requests(master_name))
+	{
+		out_error = std::format("join-request retirement failed: {}", sqlite3_errmsg(m_db.handle()));
+		return false;
+	}
+
 	for (int rank = guild_rank::guildmaster; rank <= guild_rank::guildsman; rank++)
 	{
 		sqlite3_stmt* stmt = m_db.cached(
@@ -386,7 +402,8 @@ bool guild_sqlite_store::load_guild(int64_t guid, guild_record& out)
 		return false;
 	}
 	sqlite3_stmt* stmt = m_db.cached(
-		"SELECT guid, name, side, master_name, created_at, xp, level"
+		"SELECT guid, name, side, master_name, created_at,"
+		" burned_gold, burned_ek, burned_contribution, level"
 		" FROM guilds WHERE guid = ?;");
 	if (stmt == nullptr || sqlite3_bind_int64(stmt, 1, guid) != SQLITE_OK)
 	{
@@ -408,7 +425,8 @@ bool guild_sqlite_store::find_guild_by_name(const char* name, guild_record& out)
 		return false;
 	}
 	sqlite3_stmt* stmt = m_db.cached(
-		"SELECT guid, name, side, master_name, created_at, xp, level"
+		"SELECT guid, name, side, master_name, created_at,"
+		" burned_gold, burned_ek, burned_contribution, level"
 		" FROM guilds WHERE name = ?;");
 	if (stmt == nullptr || !bind_text(stmt, 1, name))
 	{
@@ -431,7 +449,8 @@ std::vector<guild_record> guild_sqlite_store::all_guilds()
 		return rows;
 	}
 	sqlite3_stmt* stmt = m_db.cached(
-		"SELECT guid, name, side, master_name, created_at, xp, level"
+		"SELECT guid, name, side, master_name, created_at,"
+		" burned_gold, burned_ek, burned_contribution, level"
 		" FROM guilds ORDER BY guid;");
 	if (stmt == nullptr)
 	{
@@ -445,23 +464,100 @@ std::vector<guild_record> guild_sqlite_store::all_guilds()
 	return rows;
 }
 
-bool guild_sqlite_store::set_progress(int64_t guid, int64_t xp, int level)
+int guild_sqlite_store::max_guild_level()
 {
-	if (!is_open() || xp < 0 || level < 1)
+	if (!is_open())
 	{
-		return false;
+		return 0;
 	}
 	sqlite3_stmt* stmt = m_db.cached(
-		"UPDATE guilds SET xp = ?, level = ? WHERE guid = ?;");
-	if (stmt == nullptr
-		|| sqlite3_bind_int64(stmt, 1, xp) != SQLITE_OK
-		|| sqlite3_bind_int(stmt, 2, level) != SQLITE_OK
-		|| sqlite3_bind_int64(stmt, 3, guid) != SQLITE_OK
-		|| sqlite3_step(stmt) != SQLITE_DONE)
+		"SELECT IFNULL(MAX(level), 0) FROM guilds;");
+	if (stmt == nullptr)
+	{
+		return 0;
+	}
+	int level = 0;
+	if (sqlite3_step(stmt) == SQLITE_ROW)
+	{
+		level = sqlite3_column_int(stmt, 0);
+	}
+	sqlite3_reset(stmt);
+	return level;
+}
+
+bool guild_sqlite_store::record_donation(int64_t guid, const char* char_name,
+	int64_t gold, int64_t enemy_kills, int64_t contribution, int new_level)
+{
+	if (!is_open() || char_name == nullptr || new_level < 1)
 	{
 		return false;
 	}
-	return sqlite3_changes(m_db.handle()) > 0;
+	if (gold < 0 || enemy_kills < 0 || contribution < 0)
+	{
+		return false;
+	}
+	if (gold == 0 && enemy_kills == 0 && contribution == 0)
+	{
+		return false;   // a donation of nothing is not a donation
+	}
+	// The donor must be a member of THIS guild — a lifetime counter accrued
+	// in one guild against burn counters in another is a row set that means
+	// nothing (the engine's gates make this unreachable; this keeps it so).
+	{
+		guild_member_record member;
+		if (!member_of(char_name, member) || member.guild_guid != guid)
+		{
+			return false;
+		}
+	}
+
+	txn_scope txn(m_db.handle());
+	if (!txn.active())
+	{
+		return false;
+	}
+
+	{
+		sqlite3_stmt* stmt = m_db.cached(
+			"UPDATE guild_members SET"
+			" donated_gold = donated_gold + ?,"
+			" donated_ek = donated_ek + ?,"
+			" donated_contribution = donated_contribution + ?"
+			" WHERE char_name = ?;");
+		if (stmt == nullptr
+			|| sqlite3_bind_int64(stmt, 1, gold) != SQLITE_OK
+			|| sqlite3_bind_int64(stmt, 2, enemy_kills) != SQLITE_OK
+			|| sqlite3_bind_int64(stmt, 3, contribution) != SQLITE_OK
+			|| !bind_text(stmt, 4, char_name)
+			|| sqlite3_step(stmt) != SQLITE_DONE
+			|| sqlite3_changes(m_db.handle()) == 0)
+		{
+			return false;
+		}
+	}
+	{
+		// MAX() keeps levels earned-and-kept: a caller passing a stale or
+		// lower level can never demote what an earlier donation earned.
+		sqlite3_stmt* stmt = m_db.cached(
+			"UPDATE guilds SET"
+			" burned_gold = burned_gold + ?,"
+			" burned_ek = burned_ek + ?,"
+			" burned_contribution = burned_contribution + ?,"
+			" level = MAX(level, ?)"
+			" WHERE guid = ?;");
+		if (stmt == nullptr
+			|| sqlite3_bind_int64(stmt, 1, gold) != SQLITE_OK
+			|| sqlite3_bind_int64(stmt, 2, enemy_kills) != SQLITE_OK
+			|| sqlite3_bind_int64(stmt, 3, contribution) != SQLITE_OK
+			|| sqlite3_bind_int(stmt, 4, new_level) != SQLITE_OK
+			|| sqlite3_bind_int64(stmt, 5, guid) != SQLITE_OK
+			|| sqlite3_step(stmt) != SQLITE_DONE
+			|| sqlite3_changes(m_db.handle()) == 0)
+		{
+			return false;
+		}
+	}
+	return txn.commit();
 }
 
 //--------------------------------------------------------------------
@@ -488,15 +584,33 @@ bool guild_sqlite_store::add_member(int64_t guid, const char* char_name, int ran
 	{
 		return false;
 	}
-	sqlite3_stmt* stmt = m_db.cached(
-		"INSERT INTO guild_members(char_name, guild_guid, rank, joined_at)"
-		" VALUES(?,?,?,?);");
-	return stmt != nullptr
-		&& bind_text(stmt, 1, char_name)
-		&& sqlite3_bind_int64(stmt, 2, guid) == SQLITE_OK
-		&& sqlite3_bind_int(stmt, 3, rank) == SQLITE_OK
-		&& sqlite3_bind_int64(stmt, 4, now) == SQLITE_OK
-		&& sqlite3_step(stmt) == SQLITE_DONE;
+
+	txn_scope txn(m_db.handle());
+	if (!txn.active())
+	{
+		return false;
+	}
+
+	{
+		sqlite3_stmt* stmt = m_db.cached(
+			"INSERT INTO guild_members(char_name, guild_guid, rank, joined_at)"
+			" VALUES(?,?,?,?);");
+		if (stmt == nullptr
+			|| !bind_text(stmt, 1, char_name)
+			|| sqlite3_bind_int64(stmt, 2, guid) != SQLITE_OK
+			|| sqlite3_bind_int(stmt, 3, rank) != SQLITE_OK
+			|| sqlite3_bind_int64(stmt, 4, now) != SQLITE_OK
+			|| sqlite3_step(stmt) != SQLITE_DONE)
+		{
+			return false;
+		}
+	}
+
+	// Every pending join request of the new member retires with the join —
+	// including the one being approved, which is why the approve flow needs
+	// no separate delete. A member with a request still queued somewhere is
+	// exactly the stale state validate() refuses to boot.
+	return retire_join_requests(char_name) && txn.commit();
 }
 
 bool guild_sqlite_store::remove_member(const char* char_name)
@@ -527,16 +641,9 @@ bool guild_sqlite_store::remove_member(const char* char_name)
 	// The held Title cascades with the member row (schema). The pending leave
 	// request does not — it references no member row — so it is retired here;
 	// join requests to OTHER guilds are the character's own business and stay.
+	if (!retire_guild_requests(char_name, member.guild_guid))
 	{
-		sqlite3_stmt* stmt = m_db.cached(
-			"DELETE FROM guild_requests WHERE char_name = ? AND guild_guid = ?;");
-		if (stmt == nullptr
-			|| !bind_text(stmt, 1, char_name)
-			|| sqlite3_bind_int64(stmt, 2, member.guild_guid) != SQLITE_OK
-			|| sqlite3_step(stmt) != SQLITE_DONE)
-		{
-			return false;
-		}
+		return false;
 	}
 	{
 		sqlite3_stmt* stmt = m_db.cached("DELETE FROM guild_members WHERE char_name = ?;");
@@ -683,33 +790,27 @@ int guild_sqlite_store::member_count(int64_t guid)
 	return count;
 }
 
-bool guild_sqlite_store::add_donation(const char* char_name, int64_t gold,
-	int64_t enemy_kills, int64_t contribution)
+int guild_sqlite_store::officer_count(int64_t guid)
 {
-	if (!is_open() || char_name == nullptr)
+	if (!is_open())
 	{
-		return false;
-	}
-	if (gold < 0 || enemy_kills < 0 || contribution < 0)
-	{
-		return false;
+		return 0;
 	}
 	sqlite3_stmt* stmt = m_db.cached(
-		"UPDATE guild_members SET"
-		" donated_gold = donated_gold + ?,"
-		" donated_ek = donated_ek + ?,"
-		" donated_contribution = donated_contribution + ?"
-		" WHERE char_name = ?;");
+		"SELECT COUNT(*) FROM guild_members WHERE guild_guid = ? AND rank = ?;");
 	if (stmt == nullptr
-		|| sqlite3_bind_int64(stmt, 1, gold) != SQLITE_OK
-		|| sqlite3_bind_int64(stmt, 2, enemy_kills) != SQLITE_OK
-		|| sqlite3_bind_int64(stmt, 3, contribution) != SQLITE_OK
-		|| !bind_text(stmt, 4, char_name)
-		|| sqlite3_step(stmt) != SQLITE_DONE)
+		|| sqlite3_bind_int64(stmt, 1, guid) != SQLITE_OK
+		|| sqlite3_bind_int(stmt, 2, guild_rank::officer) != SQLITE_OK)
 	{
-		return false;
+		return 0;
 	}
-	return sqlite3_changes(m_db.handle()) > 0;
+	int count = 0;
+	if (sqlite3_step(stmt) == SQLITE_ROW)
+	{
+		count = sqlite3_column_int(stmt, 0);
+	}
+	sqlite3_reset(stmt);
+	return count;
 }
 
 //--------------------------------------------------------------------
@@ -866,6 +967,28 @@ std::vector<guild_request_record> guild_sqlite_store::pending_requests(int64_t g
 		read_request_row(stmt, rows.emplace_back());
 	}
 	return rows;
+}
+
+bool guild_sqlite_store::has_pending_request(int64_t guid, const char* char_name,
+	int kind)
+{
+	if (!is_open() || char_name == nullptr)
+	{
+		return false;
+	}
+	sqlite3_stmt* stmt = m_db.cached(
+		"SELECT 1 FROM guild_requests"
+		" WHERE guild_guid = ? AND char_name = ? AND kind = ? LIMIT 1;");
+	if (stmt == nullptr
+		|| sqlite3_bind_int64(stmt, 1, guid) != SQLITE_OK
+		|| !bind_text(stmt, 2, char_name)
+		|| sqlite3_bind_int(stmt, 3, kind) != SQLITE_OK)
+	{
+		return false;
+	}
+	const bool found = (sqlite3_step(stmt) == SQLITE_ROW);
+	sqlite3_reset(stmt);
+	return found;
 }
 
 //--------------------------------------------------------------------
@@ -1097,6 +1220,50 @@ bool guild_sqlite_store::title_of(const char* holder_name, guild_title_record& o
 	return true;
 }
 
+int guild_sqlite_store::title_count(int64_t guid, int kind)
+{
+	if (!is_open())
+	{
+		return 0;
+	}
+	sqlite3_stmt* stmt = m_db.cached(
+		"SELECT COUNT(*) FROM guild_titles WHERE guild_guid = ? AND kind = ?;");
+	if (stmt == nullptr
+		|| sqlite3_bind_int64(stmt, 1, guid) != SQLITE_OK
+		|| sqlite3_bind_int(stmt, 2, kind) != SQLITE_OK)
+	{
+		return 0;
+	}
+	int count = 0;
+	if (sqlite3_step(stmt) == SQLITE_ROW)
+	{
+		count = sqlite3_column_int(stmt, 0);
+	}
+	sqlite3_reset(stmt);
+	return count;
+}
+
+std::vector<guild_title_record> guild_sqlite_store::all_titles()
+{
+	std::vector<guild_title_record> rows;
+	if (!is_open())
+	{
+		return rows;
+	}
+	sqlite3_stmt* stmt = m_db.cached(
+		"SELECT guild_guid, kind, holder_name, claimed_at, last_seen_at"
+		" FROM guild_titles ORDER BY guild_guid, kind, holder_name;");
+	if (stmt == nullptr)
+	{
+		return rows;
+	}
+	while (sqlite3_step(stmt) == SQLITE_ROW)
+	{
+		read_title_row(stmt, rows.emplace_back());
+	}
+	return rows;
+}
+
 //--------------------------------------------------------------------
 // Boot validation
 //--------------------------------------------------------------------
@@ -1161,10 +1328,13 @@ std::vector<std::string> guild_sqlite_store::validate()
 			errors.push_back(std::format("guilds: guid {} '{}': illegal side {}",
 				guild.guid, guild.name, guild.side));
 		}
-		if (guild.xp < 0 || guild.level < 1)
+		if (guild.burned_gold < 0 || guild.burned_ek < 0
+			|| guild.burned_contribution < 0 || guild.level < 1)
 		{
-			errors.push_back(std::format("guilds: guid {} '{}': illegal progression xp {} level {}",
-				guild.guid, guild.name, guild.xp, guild.level));
+			errors.push_back(std::format(
+				"guilds: guid {} '{}': illegal progression burned {}/{}/{} level {}",
+				guild.guid, guild.name, guild.burned_gold, guild.burned_ek,
+				guild.burned_contribution, guild.level));
 		}
 	}
 
@@ -1348,6 +1518,26 @@ bool guild_sqlite_store::is_guild_master(const guild_member_record& member)
 	guild_record guild;
 	return load_guild(member.guild_guid, guild)
 		&& hb_stricmp(guild.master_name.c_str(), member.char_name.c_str()) == 0;
+}
+
+bool guild_sqlite_store::retire_join_requests(const char* char_name)
+{
+	sqlite3_stmt* stmt = m_db.cached(
+		"DELETE FROM guild_requests WHERE char_name = ? AND kind = ?;");
+	return stmt != nullptr
+		&& bind_text(stmt, 1, char_name)
+		&& sqlite3_bind_int(stmt, 2, guild_request::join) == SQLITE_OK
+		&& sqlite3_step(stmt) == SQLITE_DONE;
+}
+
+bool guild_sqlite_store::retire_guild_requests(const char* char_name, int64_t guid)
+{
+	sqlite3_stmt* stmt = m_db.cached(
+		"DELETE FROM guild_requests WHERE char_name = ? AND guild_guid = ?;");
+	return stmt != nullptr
+		&& bind_text(stmt, 1, char_name)
+		&& sqlite3_bind_int64(stmt, 2, guid) == SQLITE_OK
+		&& sqlite3_step(stmt) == SQLITE_DONE;
 }
 
 bool guild_sqlite_store::write_rank(const char* char_name, int rank)

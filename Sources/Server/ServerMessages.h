@@ -205,13 +205,20 @@ namespace ItemLogAction
 		// economy audit wants every one of them. This action has no receiving
 		// player: `recv_h` carries the minted quantity instead.
 		GmMint                                  = 40,
+		// Guild economy outflows (#122). Donated gold is burned at the altar —
+		// destroyed, not moved — and Treasury gold enters the guild's wallet;
+		// route-specific like Buy/Repair so "how much gold left, by which
+		// door" stays one query per door. The return legs (withdraw, disband
+		// payout) ride grant_gold's created inflow like every other grant.
+		GuildDonation                           = 41,
+		GuildTreasury                           = 42,
 
 		// Highest action value in use. The Provenance Ledger stores these numbers
 		// directly in item_events.event_type and reserves its own band above them
 		// (ItemLedgerStore.h), so it static_asserts against this — which turns
 		// "do not collide with the ledger" from a comment into a build error.
 		// Keep it equal to the largest value above.
-		max_action                              = GmMint,
+		max_action                              = GuildTreasury,
 	};
 }
 

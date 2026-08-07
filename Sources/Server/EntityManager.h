@@ -303,16 +303,18 @@ private:
     // stage multiplier and decides whether the result tier-rolls, and nothing
     // else in here branches on it.
     //
-    // `rep_factor` is the killer's reputation layer, resolved once by the caller.
-    // Not defaulted and not re-read here: the ledger records the factor the kill
-    // was priced at (#85), and a second read could disagree with the first.
+    // `rep_factor` is the killer's reputation layer; `tier_shift_pct` and
+    // `tier_shift_min_tier` are the killer's Huntmaster tier-shift (#122) —
+    // all resolved once by the caller. Not defaulted and not re-read here:
+    // the ledger records the factors the kill was priced at (#85), and a
+    // second read could disagree with the first.
     void roll_drop_slot(int npc_h, short attacker_h, int stage_slot, int table_id,
-        double rep_factor);
+        double rep_factor, int tier_shift_pct, int tier_shift_min_tier);
     // A won row's stack size: count_throws rolls of min..max, summed.
     int roll_entry_count(const hb::server::drop_entry& entry, int min_count, int max_count);
-    bool spawn_npc_drop_item(int npc_h, int item_id, int min_count, int max_count, short dx = 0, short dy = 0, bool tier_rolls = false);
+    bool spawn_npc_drop_item(int npc_h, int item_id, int min_count, int max_count, short dx = 0, short dy = 0, bool tier_rolls = false, int tier_shift_pct = 100, int tier_shift_min_tier = 2);
     // Queue a stage-2 drop rolled at death to be placed when the corpse decays.
-    void queue_pending_drop(int npc_h, int item_id, int min_count, int max_count, short dx, short dy, bool tier_rolls);
+    void queue_pending_drop(int npc_h, int item_id, int min_count, int max_count, short dx, short dy, bool tier_rolls, int tier_shift_pct, int tier_shift_min_tier);
     // Place all pending (delayed) stage-2 drops for a decaying corpse.
     void spawn_pending_drops(int npc_h);
 

@@ -6,6 +6,16 @@
 
 namespace hb::time {
 
+// The wall clock as unix seconds — the `now` every SQLite store takes as a
+// parameter (ledger events, escrow rows, guild joins). One body because a
+// store that stamped seconds and one that stamped milliseconds would disagree
+// about every expiry and every audit line, for a reason nobody would look for.
+inline int64_t unix_now()
+{
+	return static_cast<int64_t>(std::chrono::duration_cast<std::chrono::seconds>(
+		std::chrono::system_clock::now().time_since_epoch()).count());
+}
+
 struct local_time
 {
 	int year, month, day, hour, minute, second, day_of_week;

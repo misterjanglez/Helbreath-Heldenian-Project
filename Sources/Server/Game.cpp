@@ -295,8 +295,6 @@ CGame::CGame()
 	m_crafting_manager->set_game(this);
 	m_quest_manager = new QuestManager();
 	m_quest_manager->set_game(this);
-	m_guild_manager = new GuildManager();
-	m_guild_manager->set_game(this);
 	m_delay_event_manager = new DelayEventManager();
 	m_delay_event_manager->set_game(this);
 	m_delay_event_manager->init_arrays();
@@ -324,6 +322,7 @@ CGame::CGame()
 	m_trading_post_manager->set_game(this);
 	m_item_ledger_store = std::make_unique<hb::server::item_ledger_store>();
 	m_guild_store = std::make_unique<hb::server::guild_sqlite_store>();
+	m_guild_manager = std::make_unique<hb::server::guild_manager>(this);
 	m_regen_manager->set_game(this);
 
 	for(int i = 0; i < hb::shared::limits::MaxMagicType; i++)
@@ -442,10 +441,6 @@ CGame::~CGame()
 	if (m_quest_manager != nullptr) {
 		delete m_quest_manager;
 		m_quest_manager = nullptr;
-	}
-	if (m_guild_manager != nullptr) {
-		delete m_guild_manager;
-		m_guild_manager = nullptr;
 	}
 	if (m_delay_event_manager != nullptr) {
 		m_delay_event_manager->cleanup_arrays();
@@ -948,8 +943,9 @@ bool CGame::init()
 	m_elvine_mana = 0;
 
 	if (m_fishing_manager != nullptr) m_fishing_manager->m_fish_time = time;
-	m_special_event_time = m_weather_time = m_equip_validation_time = m_game_time_1 =
-		m_game_time_2 = m_game_time_3 = m_game_time_4 = m_game_time_5 = m_game_time_6 = time;
+	m_special_event_time = m_weather_time = m_equip_validation_time = m_guild_title_time =
+		m_game_time_1 = m_game_time_2 = m_game_time_3 = m_game_time_4 = m_game_time_5 =
+		m_game_time_6 = time;
 
 	m_is_special_event_time = false;
 
@@ -1260,6 +1256,25 @@ bool CGame::init()
 		hb::logger::warn("Summon thresholds not configured, Summon spell will have no creature pool");
 	}
 
+	// Guild progression dataset (#122): the Guild Level curve + knobs the
+	// guild engine reads. Fail-fast like the tier dataset above (§3.1.2) — a
+	// curve the validator cannot explain does not boot. The world half of the
+	// rule (no guild above the curve's max level) runs after the guild store
+	// opens, further down.
+	if (!hb::server::load_guild_progression(configDb, m_guild_progression)) {
+		hb::logger::error("Cannot start server: guild progression failed to load from gamedata.db");
+		CloseGameConfigDatabase(configDb);
+		return false;
+	}
+	if (const auto guild_prog_errors = hb::server::validate_guild_progression(m_guild_progression);
+		!guild_prog_errors.empty()) {
+		hb::server::log_guild_progression_errors(guild_prog_errors);
+		hb::logger::error("Cannot start server: guild progression dataset failed validation ({} error(s))",
+			guild_prog_errors.size());
+		CloseGameConfigDatabase(configDb);
+		return false;
+	}
+
 	read_notify_msg_list_file("gameconfigs/notice.txt");
 	m_notice_time = time;
 
@@ -1324,6 +1339,16 @@ bool CGame::init()
 		}
 		hb::logger::error("Cannot start server: guild store failed validation ({} error(s))",
 			guild_errors.size());
+		return false;
+	}
+
+	// The world half of the §3.1.2 curve rule: levels already earned are
+	// never revoked, so a guilds.db level above the curve's max means curve
+	// rows were removed after the fact — refused like any other lie.
+	if (const auto world_errors = hb::server::validate_guild_progression_world(
+		m_guild_progression, m_guild_store->max_guild_level()); !world_errors.empty()) {
+		hb::server::log_guild_progression_errors(world_errors);
+		hb::logger::error("Cannot start server: guild levels exceed the progression curve");
 		return false;
 	}
 
@@ -3169,6 +3194,77 @@ bool CGame::reload_tier_tables()
 	return ok;
 }
 
+bool CGame::client_holds_title(int client_h, int title_kind) const
+{
+	if (!m_guild_progression.title_bonuses_enabled)
+	{
+		return false;
+	}
+	if (client_h < 0 || client_h >= hb::server::config::MaxClients)
+	{
+		return false;
+	}
+	const CClient* client = m_client_list[client_h];
+	return client != nullptr && client->m_guild_title == title_kind;
+}
+
+int CGame::guild_repair_discount_pct(int client_h) const
+{
+	if (client_h < 0 || client_h >= hb::server::config::MaxClients)
+	{
+		return 0;
+	}
+	const CClient* client = m_client_list[client_h];
+	if (client == nullptr || client->m_guild_guid == 0)
+	{
+		return 0;
+	}
+	const hb::server::guild_level_row* row =
+		m_guild_progression.find_level(client->m_guild_level);
+	return row != nullptr ? row->repair_pct : 0;
+}
+
+bool CGame::reload_guild_progression()
+{
+	sqlite3* configDb = nullptr;
+	std::string dbPath;
+	bool created = false;
+	if (!EnsureGameConfigDatabase(&configDb, dbPath, &created)) return false;
+
+	// Candidate/reject (§3.1.2): the running config is replaced wholesale or
+	// not at all. The world check rides the reload too — a curve shorter than
+	// a level some guild already earned is rejected live, not at next boot.
+	bool ok = false;
+	hb::server::guild_progression_config candidate;
+	if (!hb::server::load_guild_progression(configDb, candidate))
+	{
+		hb::logger::error("reload guilds: candidate dataset failed to load - running config untouched");
+	}
+	else
+	{
+		auto errors = hb::server::validate_guild_progression(candidate);
+		const int highest_guild_level =
+			(m_guild_store != nullptr && m_guild_store->is_open())
+			? m_guild_store->max_guild_level() : 0;
+		const auto world_errors = hb::server::validate_guild_progression_world(
+			candidate, highest_guild_level);
+		errors.insert(errors.end(), world_errors.begin(), world_errors.end());
+		if (!errors.empty())
+		{
+			hb::server::log_guild_progression_errors(errors);
+			hb::logger::error("reload guilds rejected: {} validation error(s) - running config untouched",
+				errors.size());
+		}
+		else
+		{
+			m_guild_progression = std::move(candidate);
+			ok = true;
+		}
+	}
+	CloseGameConfigDatabase(configDb);
+	return ok;
+}
+
 void CGame::fill_player_map_object(hb::net::PacketMapDataObjectPlayer& obj, short owner_h, int viewer_h)
 {
 	auto* client = m_client_list[owner_h];
@@ -3565,6 +3661,10 @@ void CGame::delete_client(int client_h, bool save, bool notify, bool count_logou
 	}
 
 	m_total_clients--;
+
+	// While the client (and its cached guild guid) still exists; a
+	// never-hydrated login is a no-op (#121).
+	detach_client_from_indexes(client_h);
 
 	// Cancel async operations before freeing the socket
 	if (m_client_list[client_h]->m_socket != 0)
@@ -4926,6 +5026,10 @@ void CGame::init_player_data(int client_h, char* data, uint32_t size)
 	if (m_client_list[client_h]->m_level > 100)
 		if (m_client_list[client_h]->m_is_player_civil)
 			force_change_play_mode(client_h, false);
+
+	// Guild membership rides guilds.db, not the character row: one member_of()
+	// read fills the CClient cache and the online index (#121).
+	m_guild_manager->hydrate_login(client_h);
 
 	m_client_list[client_h]->m_next_level_exp = m_level_exp_table[m_client_list[client_h]->m_level + 1]; //get_level_exp(m_client_list[client_h]->m_level + 1);
 
@@ -9723,6 +9827,15 @@ void CGame::state_change_handler(int client_h, char* data, size_t msg_size)
 	if (old_str + old_vit + old_dex + old_int + old_mag + old_char != expected_stats)
 		return;
 
+	// The Guildmaster's charisma floor (§3.1.1: the CHR-20 rule binds the
+	// master only — the guild's creation gate must keep holding its holder).
+	// Checked before the universal floors, in the original's order.
+	if (old_char - cChar < m_guild_manager->min_charisma(client_h))
+	{
+		send_notify_msg(0, client_h, Notify::StateChangeFailed, 0, 0, 0, 0);
+		return;
+	}
+
 	// Each stat must stay >= base_stat_value and <= CharPointLimit after reduction
 	if ((old_str - str < m_base_stat_value) || (old_str - str > CharPointLimit)) { send_notify_msg(0, client_h, Notify::StateChangeFailed, 0, 0, 0, 0); return; }
 	if ((old_vit - vit < m_base_stat_value) || (old_vit - vit > CharPointLimit)) { send_notify_msg(0, client_h, Notify::StateChangeFailed, 0, 0, 0, 0); return; }
@@ -10868,7 +10981,6 @@ void CGame::response_save_player_data_reply_handler(char* data, size_t msg_size)
 void CGame::calc_exp_stock(int client_h)
 {
 	bool is_level_up;
-	CItem* item;
 
 	if (m_client_list[client_h] == 0) return;
 	if (m_client_list[client_h]->m_is_init_complete == false) return;
@@ -10892,21 +11004,12 @@ void CGame::calc_exp_stock(int client_h)
 
 	if ((is_level_up) && (m_client_list[client_h]->m_level <= 5)) {
 		// Gold .  1~5 100 Gold .
-		// Counted: gold carries no Serial and no origin. Minted out of
-		// nothing, so the venue books the inflow with the count (#111).
-		item = m_item_manager->create_item(hb::shared::item::ItemId::Gold, hb::server::item_origin::none);
-		if (item == nullptr) return;
-		m_item_manager->record_created_flow(*item, 100000);
-		m_item_manager->add_item(client_h, item, 0);
+		m_item_manager->grant_gold(client_h, 100000);
 	}
 
 	if ((is_level_up) && (m_client_list[client_h]->m_level > 5) && (m_client_list[client_h]->m_level <= 20)) {
 		// Gold .  5~20 300 Gold .
-		// Counted: gold carries no Serial and no origin. Booked as above (#111).
-		item = m_item_manager->create_item(hb::shared::item::ItemId::Gold, hb::server::item_origin::none);
-		if (item == nullptr) return;
-		m_item_manager->record_created_flow(*item, 100000);
-		m_item_manager->add_item(client_h, item, 0);
+		m_item_manager->grant_gold(client_h, 100000);
 	}
 }
 
@@ -10998,18 +11101,17 @@ void CGame::weather_processor()
 **	return value		:: int																						**
 *********************************************************************************************************************/
 
-int CGame::get_map_index(char* map_name)
+int CGame::get_map_index(const char* map_name)
 {
 	int map_index;
-	char tmp_name[256];
-
-	std::memset(tmp_name, 0, sizeof(tmp_name));
-	strcpy(tmp_name, map_name);
 
 	map_index = -1;
 	for(int i = 0; i < MaxMaps; i++)
 		if (m_map_list[i] != 0) {
-			if (memcmp(m_map_list[i]->m_name, map_name, 10) == 0)
+			// strcmp, not the old 10-byte memcmp: m_name is zero-padded so
+			// the result is identical for every map buffer, and a caller's
+			// short string literal no longer gets read past its end.
+			if (strcmp(m_map_list[i]->m_name, map_name) == 0)
 				map_index = i;
 		}
 
@@ -12140,6 +12242,11 @@ int CGame::get_command_required_level(const char* cmdName) const
 	return hb::shared::admin::Administrator;
 }
 
+void CGame::detach_client_from_indexes(int client_h)
+{
+	m_guild_manager->on_logout(client_h);
+}
+
 int CGame::find_client_by_name(const char* name) const
 {
 	if (name == nullptr) return 0;
@@ -12612,8 +12719,6 @@ void CGame::on_timer(char type)
 	m_crafting_manager->set_game(this);
 	m_quest_manager = new QuestManager();
 	m_quest_manager->set_game(this);
-	m_guild_manager = new GuildManager();
-	m_guild_manager->set_game(this);
 	m_delay_event_manager = new DelayEventManager();
 	m_delay_event_manager->set_game(this);
 	m_delay_event_manager->init_arrays();
@@ -12658,9 +12763,6 @@ void CGame::on_timer(char type)
 			}
 			if (m_quest_manager != nullptr) {
 				m_quest_manager->set_game(this);
-			}
-			if (m_guild_manager != nullptr) {
-				m_guild_manager->set_game(this);
 			}
 			if (m_delay_event_manager != nullptr) {
 				m_delay_event_manager->set_game(this);
@@ -12757,6 +12859,15 @@ void CGame::on_timer(char type)
 		}
 		m_equip_validation_time += 10000;
 		if (time - m_equip_validation_time > 10000) m_equip_validation_time = time;
+	}
+
+	// Guild Title duty-slot sweep (#122): the 10-minute inactivity release of
+	// §3.1.2 item 3, on a ten-second cadence against a ten-minute knob.
+	if ((time - m_guild_title_time) > 10000)
+	{
+		m_guild_manager->tick_titles(time);
+		m_guild_title_time += 10000;
+		if (time - m_guild_title_time > 10000) m_guild_title_time = time;
 	}
 
 	// Scheduled shutdown: send milestone notifications, then begin disconnect

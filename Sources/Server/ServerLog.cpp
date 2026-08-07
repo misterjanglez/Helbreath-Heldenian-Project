@@ -22,6 +22,7 @@ static constexpr std::string_view channel_filenames[] =
 	"upgrades.log",         // upgrades
 	"bank.log",             // bank
 	"misc.log",             // items_misc
+	"guild.log",            // guild
 };
 static_assert(std::size(channel_filenames) == static_cast<size_t>(hb::log_channel::count));
 

@@ -126,11 +126,47 @@ Session complete; where this section conflicts with §3.1, this section wins. De
 5. **Titles** (new, ADR 0007) — Commander / Huntmaster / Raidmaster slot machine: counts = f(Guild Level); Commander claims need Officer+, Hunt/Raid any member; one Title per member; first-come-first-served; Officer+ strip/re-assign; AFK/offline timer auto-release; bonuses only while held; shown on roster + character dialog only (overhead unchanged in v1).
 6. **Treasury** (new) — gold-only shared wallet: deposit any member, withdraw Officer+ (logged); never feeds XP in either direction (the altar/wallet firewall); disband hands the remainder to the master. Item vault: **fast-follow mini design session** against the Provenance Ledger (new `guild_bank` place in the transition machine), not Phase 2.
 7. **Council channel** (new) — prefix `&`, renders `[Council]`; members: every Council-permission holder (Officer+ default) across all guilds of one town; always-on; **no SP cost** (original channels untouched). `[Guild]` chat restore (D6) unchanged — note the live mode-1 prefix arm is `@` while the plan said `^`; match the original's symbols at implementation.
-8. **Balance session** (new design gate) — a dedicated child ticket of the Phase-2 epic decides all perk/Title numbers: Huntmaster/Raidmaster bonuses, passive perk picks (member-cap curve committed; repair discount / Heldenian mercenary budget / max-level gold name are candidates; guildhall recall rejected), XP rates, slot curves, and the enable switch. Machinery ships with Phase 2 reading neutral data; the session gates turning it on, not landing the code.
+8. **Balance session** (new design gate) — a dedicated child ticket of the Phase-2 epic decides all perk/Title numbers: Huntmaster/Raidmaster bonuses, passive perk picks (member-cap curve committed; repair discount / Heldenian mercenary budget / max-level gold name are candidates; guildhall recall rejected), XP rates, slot curves, and the enable switch. Machinery ships with Phase 2 reading neutral data; the session gates turning it on, not landing the code. *(Resolved: §3.1.2, #126.)*
 
 **Out of scope (ruled, this effort):** formal alliances (the Council *is* the cross-guild coordination feature; sides are fixed, so pacts add ceremony without payoff — returns only if the destination is redrawn); emblems/heraldry (later/never); MOTD (later/maybe never); guild war-stats/leaderboards (later — the lifetime-donation data already accrues); global removal of chat SP costs (parked as its own future one-line decision).
 
 **Phase-3/4 handoff:** Commander = Officer+ permission + Guild-Level slot count, superseding §3.2 "guildmaster only"; *who sets rally/construct points when multiple Commanders stand* is a Phase-3 kickoff question. Fightzone (§3.4): the reservation gate becomes the fightzone-reserve permission; the Treasury may fund reservations — its first real sink — when Phase 4 lands.
+
+### 3.1.2 Guild balance session outcome (2026-08-07, #126) — the numbers §3.1.1 deferred
+
+Session complete (5 grilling rounds). Where this conflicts with §3.1.1 or ADR 0007's mechanism sketch, this wins. Governing principle (owner-confirmed): **the mechanisms below are binding code shape; every number is a v1 seed** shipped as `gamedata.db` rows — one per-level curve table + one scalar-knob table — boot-validated **fail-fast** (TierConfigValidator posture, not `event_schedule`'s warn-and-skip) and live-reloadable via the candidate/reject reload pattern. Max Guild Level = the highest curve row (adding levels later is an INSERT, not a patch). The seed table re-derives at the pre-enable review against the finalized economy (drop tables, quests, formulas, Rebirth #136) holding the arc constant; levels already earned are never revoked by later edits — requirements are checked only on the way up, and the validator enforces contiguous levels and non-decreasing cumulative requirements.
+
+1. **Progression = requirement gates, not an XP pool** (amends ADR 0007's "mint Guild XP" sketch). Each guild tracks three cumulative lifetime burn counters — gold, enemy kills, contribution. Guild Level N is earned the instant all three cross N's cumulative thresholds (AND-gate); over-donation carries forward; there is no conversion between lanes, so a guild must farm AND war AND quest to advance. Donation minimums: 1,000 gold / 1 EK / 1 contribution. Donation handlers validate donor balance ≥ amount and reject non-positive amounts (`m_contribution` can persist negative today — #129). *Machinery impact: #120 stores three accumulators, not one `xp` column.*
+2. **Officer capacity = f(Guild Level)** (amends §3.1.1 item 1). Each guild holds at most `officers(level)` Officers (curve below, 1→7; the Guildmaster is excluded from the count); promote fails at capacity. Commander remains **one claimable slot at every level** — pinned until Phase 3 rules multi-commander rally/construct semantics — so what grows with Guild Level is the supply of eligible Officers, and with it Council membership. *Machinery impact: #121 promote gains the capacity check.*
+3. **Titles are live duty slots** (sharpens ADR 0007's "AFK/offline timer"). A held Title auto-releases after **10 minutes of inactivity** (scalar knob, ms; rides the existing `m_afk_activity_time` clock — logout and disconnect are inactivity), uniform across all three Titles; first-come-first-served re-claim. A Title is a session-scoped duty, not a persistent honor; a disconnected Commander frees the war seat for the next Officer within minutes.
+4. **Title bonuses (apply only while held; gated by `title_bonuses_enabled`):** **Huntmaster** = +10% physical *and* magic damage vs NPCs only, plus a loot **tier-shift: ×1.25 on rare-or-better `loot_grades` weights** (renormalized) for kills the titleholder lands. Tier-shift, not drop-chance % — grade-5 tables are chance-saturated, so a chance perk would no-op exactly on bosses; the factor is resolved once per kill and ledger-recorded like the reputation factor; the magic-damage seam must patch both `effect_damage_spot` and `effect_damage_spot_damage_move`. **Raidmaster** = flat +3 attack power vs players, always-on while held (hero-accolade flat language; preserves the game's no-always-on-percentage precedent). **Commander** = no new bonus (the existing crusade duty bonuses stand).
+5. **Passive perks:** member cap + Officer cap per the curve; **repair discount 5/10/15/20% at Guild Levels 5/10/15/20**, applied before (multiplicative under) the Heldenian loser ×2 so the war penalty keeps its teeth — patches all three duplicated repair-cost sites (#132 unifies them); **gold guild name at max Guild Level** (client render, #124). **Deferred, not v1:** Heldenian mercenary-budget % — blocked on #127 (ruling recorded: the intended cap is 12,000, effective charisma, one knob, all sites); revisit when Phase 3/4 make CP a daily currency. **Rejected in #93 (stands):** guildhall recall.
+6. **Enable switches:** `donations_enabled` (the altar accepts burns and counts them toward gates) and `title_bonuses_enabled` (held Titles grant bonuses) — independent; roster, Treasury, chat, and Title *claiming* ship always-on, so the social layer soaks while the power lane waits. Production flip conditions: (1) curve+knob rows entered; (2) tester-menu mints closed in the deployed build; (3) the epic's multi-player smoke; (4) seed table re-derived against the finalized economy incl. Rebirth (#136). The testing world flips freely.
+
+**V1 seed table.** Arc: 12–18 months to Guild Level 20 for a committed ~5-active guild. Snapshot throughput model: ~1.25M gold / ~40 EK / ~50 contribution donatable per guild-week — gold is the binding lane (~48 weeks at the snapshot; the real, slower economy lands it in-window). Per-level growth ≈ ×1.28, back-loaded; Level 2 lands inside the first weeks — and requires the guild's first war outing (5 EKs), intentionally. Gold/EK/Contribution are per-level deltas (stored cumulatively). Lifetime totals at L20: **~60.2M gold / 1,335 EK / 939 contribution** — the EK total ≈ one hero set's worth of kills spread across the whole guild over the whole arc.
+
+| Lvl | Gold | EK | Contrib | Members | Officers | Hunt | Raid | Repair | Unlocks |
+|----:|-----:|---:|--------:|--------:|---------:|:----:|:----:|-------:|:--------|
+| 1 | — | — | — | 15 | 1 | – | – | – | founding; Commander slot (pinned 1 forever) |
+| 2 | 150k | 5 | 5 | 20 | 1 | 1 | 1 | – | Huntmaster/Raidmaster arrive |
+| 3 | 200k | 6 | 6 | 25 | 2 | 1 | 1 | – | |
+| 4 | 260k | 8 | 7 | 30 | 2 | 1 | 1 | – | |
+| 5 | 330k | 10 | 9 | 35 | 2 | 1 | 1 | 5% | repair discount I |
+| 6 | 420k | 13 | 11 | 40 | 3 | 1 | 1 | 5% | |
+| 7 | 540k | 16 | 13 | 45 | 3 | 1 | 1 | 5% | |
+| 8 | 690k | 20 | 16 | 50 | 3 | 1 | 1 | 5% | |
+| 9 | 880k | 25 | 20 | 55 | 4 | 1 | 1 | 5% | |
+| 10 | 1.1M | 32 | 25 | 60 | 4 | 1 | 1 | 10% | repair discount II |
+| 11 | 1.4M | 40 | 30 | 66 | 4 | 1 | 1 | 10% | |
+| 12 | 1.9M | 50 | 37 | 72 | 5 | 2 | 2 | 10% | second Hunt/Raid slots |
+| 13 | 2.4M | 62 | 45 | 79 | 5 | 2 | 2 | 10% | |
+| 14 | 3.0M | 78 | 55 | 86 | 5 | 2 | 2 | 10% | |
+| 15 | 3.9M | 95 | 67 | 93 | 6 | 2 | 2 | 15% | repair discount III |
+| 16 | 5.0M | 115 | 80 | 100 | 6 | 2 | 2 | 15% | |
+| 17 | 6.3M | 140 | 95 | 107 | 6 | 2 | 2 | 15% | |
+| 18 | 8.1M | 170 | 115 | 114 | 7 | 3 | 3 | 15% | third Hunt/Raid slots |
+| 19 | 10.4M | 205 | 138 | 121 | 7 | 3 | 3 | 15% | |
+| 20 | 13.2M | 245 | 165 | **128** | 7 | 3 | 3 | **20%** | gold guild name; cap = the original's never-enforced 128, finally earned |
 
 ### 3.2 Crusade command layer
 
@@ -230,15 +266,15 @@ Just enough to host Phase 2 cleanly, not the full retrofit:
 
 ### Phase 2 — Guild rebuild (the flagship)
 
-**Design session #93 complete (2026-08-07)** — the contract is §3.1 as amended by §3.1.1 (ranks on permission bits, burn-economy progression, Title slots, Treasury, Council). Into the shells upstream left, on the Phase-1 rails (epic + sub-issues per §8):
+**Design session #93 complete (2026-08-07)** — the contract is §3.1 as amended by §3.1.1 (ranks on permission bits, burn-economy progression, Title slots, Treasury, Council). **Balance session #126 complete (2026-08-07)** — mechanisms + v1 seed data in §3.1.2. Into the shells upstream left, on the Phase-1 rails (epic + sub-issues per §8):
 
-- **Store:** `guild_sqlite_store` on `guilds.db` (D1) — `guilds` (guid, name, side, master, created, xp/level), `guild_members` (rank, joined, lifetime donations), per-rank permission masks, join/leave request queue, Treasury ledger, Title assignments. Boot-validated like TierConfig; no flat files; fresh start.
+- **Store:** `guild_sqlite_store` on `guilds.db` (D1) — `guilds` (guid, name, side, master, created, xp/level *(amended by §3.1.2: three cumulative burn counters — gold/EK/contribution — replace the single `xp`)*), `guild_members` (rank, joined, lifetime donations), per-rank permission masks, join/leave request queue, Treasury ledger, Title assignments. Boot-validated like TierConfig; no flat files; fresh start.
 - **Server guild core:** create/disband/queued join-leave approval/kick/ban/promote/demote/transfer handlers, membership index (guid → member handles — kills the original's 2000-slot linear scans), login hydration of `CClient` guild fields, Kennedy flows (apply-by-name, self-exit with officer auto-demote), master-only CHR floor, crusade-block rules.
-- **Server progression:** Donation burn handlers (gold/EK/contribution decrement the live counters), Guild XP → Level engine, Title slot machine (claim/strip/AFK-release), Treasury deposit/withdraw with log — all knobs in `gamedata.db`, shipped neutral pending the balance session.
+- **Server progression:** Donation burn handlers (gold/EK/contribution decrement the live counters), Guild XP → Level engine *(amended by §3.1.2: per-level requirement gates — three counters, all-AND — replace the XP pool)*, Title slot machine (claim/strip/10-min-inactivity release), Officer-capacity check on promote, Treasury deposit/withdraw with log — all knobs in `gamedata.db`, seeded per §3.1.2, gated by the two enable switches.
 - **Wire:** new `PacketGuild.h` family + re-allocated IDs (Appendix A is the reference; don't reproduce the original's two ID collisions; reserve an invite id for later). Own-guild fields (+ rank title, guild level) re-enter the char-init contents; lazy name-cache protocol restored; kill-notice guild fields. **Compatibility bump** (shared with Phase 3).
 - **Client:** `guild_manager` name cache, guild UI suite rebuilt on `IDialogBox` (D2; salvage: the 734-line pre-gut reference + strings + PSD): guild menu, Roster with permission-gated moderation buttons, Donate panel, Treasury panel, Title claiming, operation queue; overhead guild line, character-dialog suffix.
 - **Chat:** `[Guild]` on the original prefixes (D6) + the `&` `[Council]` channel (Officer+ per town, no SP).
-- **Balance design session** (child ticket, gates data-enable): Title bonuses, passive perk picks, XP rates, slot/cap curves.
+- **Balance design session** (child ticket, gates data-enable): Title bonuses, passive perk picks, XP rates, slot/cap curves. *(Complete — §3.1.2, #126.)*
 
 ### Phase 3 — Crusade command layer (guild-dependent restorations)
 
@@ -278,6 +314,8 @@ Ladder: #1/#10 piloted in P1; #4 next; rest ordered by §4.3
 **Ratification outcome (2026-07-29):** D1–D6, D8, D9, D10 **locked as recommended**. D7 **open** — deferred to the Party design session, where the owner will scope legacy-fidelity vs improvements for the whole party system; guild deviations are likewise scoped in the Guild design session before Phase 2.
 
 **2026-08-07:** the Guild design session (#93) is complete — outcomes in §3.1.1, ADR 0006, ADR 0007. The one decision it deliberately leaves open (perk/Title numbers + enable) is the balance-session child ticket of the Phase-2 epic.
+
+**2026-08-07 (later):** the balance session (#126) is complete — mechanisms + v1 seed data in §3.1.2, ADR 0007 addendum. Progression became per-level requirement gates (three burn counters, all-AND); Officer capacity scales with Guild Level; Titles are 10-minute-inactivity duty slots; Huntmaster (+10% vs NPCs + rare-or-better tier-shift ×1.25) / Raidmaster (flat +3 AP vs players) / passive perks seeded as live-reloadable `gamedata.db` rows behind two enable switches. Homework fallout filed as #127–#135; the owner's Rebirth/NG+ mechanic is #136 (its own design session; the seed table re-derives after it lands).
 
 | # | Decision | Recommendation |
 |---|---|---|

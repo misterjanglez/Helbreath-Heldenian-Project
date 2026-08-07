@@ -327,6 +327,8 @@ namespace hb::server
 		case ItemLogAction::TpTradeOut:     return "TpTradeOut";
 		case ItemLogAction::TpTradeIn:      return "TpTradeIn";
 		case ItemLogAction::GmMint:         return "GmMint";
+		case ItemLogAction::GuildDonation:  return "GuildDonation";
+		case ItemLogAction::GuildTreasury:  return "GuildTreasury";
 		case ledger_event::created:         return "created";
 		case ledger_event::despawned:       return "despawned";
 		case ledger_event::destroyed:       return "destroyed";

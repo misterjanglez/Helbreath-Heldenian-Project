@@ -12,7 +12,9 @@
 // DDL stamp and passed to the VerifySqliteSchemaVersion gate. Bump on any ledger
 // schema change — stale dev DBs are refused, never migrated (D6).
 // v2 (#85): npc_kills, the denominator every observed drop rate is divided by.
-#define ITEM_LEDGER_SCHEMA_VERSION "2"
+// v3 (#122): npc_kills grows title_factor_sum, the Huntmaster tier-shift's own
+//            denominator (tier mix, not drop rate).
+#define ITEM_LEDGER_SCHEMA_VERSION "3"
 
 #include <chrono>
 #include <charconv>
@@ -32,12 +34,6 @@ namespace
 			return false;
 		}
 		return true;
-	}
-
-	int64_t now_unix()
-	{
-		return static_cast<int64_t>(std::chrono::duration_cast<std::chrono::seconds>(
-			std::chrono::system_clock::now().time_since_epoch()).count());
 	}
 
 	// Empty string means NULL, for every nullable text column in the schema. A
@@ -220,7 +216,7 @@ namespace hb::server
 
 		ledger_event_record boundary;
 		boundary.serial = 0;
-		boundary.at = now_unix();
+		boundary.at = hb::time::unix_now();
 		boundary.event_type = ledger_event::boundary;
 		boundary.detail = nlohmann::json::object({
 			{ "boot", 1 }, { "prev_shutdown", previous_state } }).dump();
@@ -356,6 +352,7 @@ namespace hb::server
 			" npc_name       TEXT    NOT NULL,"
 			" kills          INTEGER NOT NULL,"
 			" rep_factor_sum REAL    NOT NULL,"
+			" title_factor_sum REAL  NOT NULL,"   // Huntmaster tier-shift (#122)
 			" PRIMARY KEY (day, npc_id)"
 			");"
 			"CREATE INDEX IF NOT EXISTS idx_kills_name ON npc_kills(npc_name);"
@@ -466,7 +463,7 @@ namespace hb::server
 			return;
 		}
 
-		const int64_t at = now_unix();
+		const int64_t at = hb::time::unix_now();
 
 		ledger_instance instance;
 		instance.serial = item.m_serial;
@@ -517,7 +514,7 @@ namespace hb::server
 		// forgotten one the epoch. A caller that does set `at` keeps it: replaying
 		// a known time is the only reason to want that column not to be now.
 		if (event.at == 0) {
-			event.at = now_unix();
+			event.at = hb::time::unix_now();
 		}
 
 		m_events.push_back(std::move(event));
@@ -532,7 +529,8 @@ namespace hb::server
 		m_flows[flow_key{ flow_day(), item_id, flow_type }] += qty;
 	}
 
-	void item_ledger_store::record_kill(int32_t npc_id, const char* npc_name, double rep_factor)
+	void item_ledger_store::record_kill(int32_t npc_id, const char* npc_name, double rep_factor,
+		double title_factor)
 	{
 		if (m_db == nullptr) {
 			return;
@@ -549,6 +547,7 @@ namespace hb::server
 		kill_tally& tally = m_kills[kill_key{ flow_day(), npc_id }];
 		tally.kills += 1;
 		tally.rep_factor_sum += rep_factor;
+		tally.title_factor_sum += title_factor;
 
 		// Written once per key rather than on every death: the name cannot change
 		// for a given config id, and this runs on every monster kill in the world.
@@ -567,7 +566,7 @@ namespace hb::server
 		// Every stackable that moves lands here, and the answer changes once a
 		// day, so the timezone conversion is memoized against the second it was
 		// derived from. Still exact — a new second is always re-derived.
-		const int64_t now = now_unix();
+		const int64_t now = hb::time::unix_now();
 		if (m_flow_day != 0 && m_flow_day_at == now) {
 			return m_flow_day;
 		}
@@ -748,11 +747,13 @@ namespace hb::server
 		// have to move together — a kills count advanced without its reputation
 		// sum would silently reprice every gear row that day.
 		return write_batch(m_db, "kill",
-			"INSERT INTO npc_kills (day, npc_id, npc_name, kills, rep_factor_sum)"
-			" VALUES (?,?,?,?,?)"
+			"INSERT INTO npc_kills (day, npc_id, npc_name, kills, rep_factor_sum,"
+			" title_factor_sum)"
+			" VALUES (?,?,?,?,?,?)"
 			" ON CONFLICT(day, npc_id) DO UPDATE SET"
 			" kills = kills + excluded.kills,"
-			" rep_factor_sum = rep_factor_sum + excluded.rep_factor_sum;",
+			" rep_factor_sum = rep_factor_sum + excluded.rep_factor_sum,"
+			" title_factor_sum = title_factor_sum + excluded.title_factor_sum;",
 			m_kills,
 			[](sqlite3_stmt* stmt, const std::pair<const kill_key, kill_tally>& row)
 			{
@@ -762,6 +763,7 @@ namespace hb::server
 					static_cast<int>(row.second.npc_name.size()), SQLITE_TRANSIENT);
 				sqlite3_bind_int64(stmt, 4, row.second.kills);
 				sqlite3_bind_double(stmt, 5, row.second.rep_factor_sum);
+				sqlite3_bind_double(stmt, 6, row.second.title_factor_sum);
 			},
 			[](const std::pair<const kill_key, kill_tally>& row)
 			{

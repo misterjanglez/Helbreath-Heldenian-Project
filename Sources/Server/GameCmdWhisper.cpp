@@ -23,20 +23,8 @@ bool GameCmdWhisper::execute(CGame* game, int client_h, const char* args)
 		return true;
 	}
 
-	// Extract player name (max 10 chars)
-	char name[hb::shared::limits::CharNameLen] = {};
-	size_t nameLen = std::strlen(args);
-	if (nameLen > hb::shared::limits::CharNameLen - 1) nameLen = hb::shared::limits::CharNameLen - 1;
-
-	// Copy only the first word (stop at space)
-	for (size_t i = 0; i < nameLen; i++)
-	{
-		if (args[i] == ' ' || args[i] == '\t')
-			break;
-		name[i] = args[i];
-	}
-
-	if (name[0] == '\0')
+	char name[hb::shared::limits::CharNameLen];
+	if (!parse_char_name(args, name))
 		return true;
 
 	game->m_client_list[client_h]->m_whisper_player_index = -1;

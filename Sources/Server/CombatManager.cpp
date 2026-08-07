@@ -14,6 +14,7 @@
 #include "Packet/SharedPackets.h"
 #include "SharedCalculations.h"
 #include "BalanceConstants.h"
+#include "Game/GuildDefs.h"
 #include "Log.h"
 #include "ServerLogChannels.h"
 
@@ -430,6 +431,14 @@ void CombatManager::effect_damage_spot(short attacker_h, char attacker_type, sho
 
 		if (m_game->m_war_manager->check_heldenian_map(attacker_h, m_game->m_bt_field_map_index, hb::shared::owner_class::Player) == 1) {
 			damage += damage / 3;
+		}
+
+		// Huntmaster (#122, §3.1.2): +pct magic damage vs NPCs only, while
+		// the Title is held and title_bonuses_enabled — the twin of the
+		// physical hook in calculate_attack_effect.
+		if ((target_type == hb::shared::owner_class::Npc)
+			&& m_game->client_holds_title(attacker_h, hb::shared::guild::guild_title::huntmaster)) {
+			damage += (damage * m_game->get_guild_progression().huntmaster_damage_pct) / 100;
 		}
 
 		if ((target_type == hb::shared::owner_class::Player) && (m_game->m_is_crusade_mode) && (m_game->m_client_list[attacker_h]->m_crusade_duty == 1)) {
@@ -939,6 +948,13 @@ void CombatManager::effect_damage_spot_damage_move(short attacker_h, char attack
 
 		if (m_game->m_war_manager->check_heldenian_map(attacker_h, m_game->m_bt_field_map_index, hb::shared::owner_class::Player) == 1) {
 			damage += damage / 3;
+		}
+
+		// Huntmaster (#122): the same +pct-vs-NPC term as effect_damage_spot —
+		// the two attacker blocks are near-duplicates and must stay in step.
+		if ((target_type == hb::shared::owner_class::Npc)
+			&& m_game->client_holds_title(attacker_h, hb::shared::guild::guild_title::huntmaster)) {
+			damage += (damage * m_game->get_guild_progression().huntmaster_damage_pct) / 100;
 		}
 
 		attacker_side = m_game->m_client_list[attacker_h]->m_side;
@@ -2544,6 +2560,16 @@ uint32_t CombatManager::calculate_attack_effect(short target_h, char target_type
 			iAP_L += 5;
 		}
 
+		// Raidmaster (#122, §3.1.2): flat +N attack power vs players while the
+		// Title is held — the hero-accolade language, placed beside it so the
+		// fight-zone/crusade multipliers below compound it the same way.
+		if ((target_type == hb::shared::owner_class::Player)
+			&& m_game->client_holds_title(attacker_h, hb::shared::guild::guild_title::raidmaster)) {
+			const int ap = m_game->get_guild_progression().raidmaster_attack_power;
+			iAP_SM += ap;
+			iAP_L += ap;
+		}
+
 		item_index = m_game->m_client_list[attacker_h]->m_item_equipment_status[to_int(EquipPos::RightHand)];
 		if ((item_index != -1) && (m_game->m_client_list[attacker_h]->m_item_list[item_index] != 0)) {
 			if ((m_game->m_client_list[attacker_h]->m_item_list[item_index]->m_id_num == 851) || // KlonessEsterk 
@@ -3095,6 +3121,16 @@ uint32_t CombatManager::calculate_attack_effect(short target_h, char target_type
 			if (m_game->m_war_manager->check_heldenian_map(attacker_h, m_game->m_bt_field_map_index, hb::shared::owner_class::Player) == 1) {
 				iAP_SM += iAP_SM / 3;
 				iAP_L += iAP_L / 3;
+			}
+
+			// Huntmaster (#122): +pct physical damage vs NPCs only — the
+			// physical twin of the effect_damage_spot magic hook, in the same
+			// post-hit block as the other percentage terms.
+			if ((target_type == hb::shared::owner_class::Npc)
+				&& m_game->client_holds_title(attacker_h, hb::shared::guild::guild_title::huntmaster)) {
+				const int pct = m_game->get_guild_progression().huntmaster_damage_pct;
+				iAP_SM += (iAP_SM * pct) / 100;
+				iAP_L += (iAP_L * pct) / 100;
 			}
 
 			if ((target_type == hb::shared::owner_class::Player) && (m_game->m_is_crusade_mode) && (m_game->m_client_list[attacker_h]->m_crusade_duty == 1)) {

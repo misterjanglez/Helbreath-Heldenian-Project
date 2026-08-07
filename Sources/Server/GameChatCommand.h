@@ -5,7 +5,15 @@
 #include <vector>
 #include <memory>
 
+#include "NetConstants.h"
+
 class CGame;
+
+// First word of `args` into `out` (clamped to the 10-char wire name), false
+// when there is none. The fourth command to hand-roll this loop is why it
+// lives here — three copies had already grown three spellings of the bound.
+bool parse_char_name(const char* args,
+	char (&out)[hb::shared::limits::CharNameLen]);
 
 class GameChatCommand
 {

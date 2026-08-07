@@ -21,6 +21,7 @@ enum class log_channel : int
 	upgrades,           // upgrades.log
 	bank,               // bank.log
 	items_misc,         // misc.log
+	guild,              // guild.log
 
 	count
 };
@@ -44,6 +45,7 @@ constexpr std::string_view channel_name(log_channel ch)
 	case log_channel::upgrades:     return "upgrades";
 	case log_channel::bank:         return "bank";
 	case log_channel::items_misc:   return "items_misc";
+	case log_channel::guild:        return "guild";
 	default:                        return "unknown";
 	}
 }

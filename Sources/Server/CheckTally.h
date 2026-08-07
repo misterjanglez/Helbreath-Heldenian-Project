@@ -182,6 +182,28 @@ namespace hb::server
 		std::unique_ptr<item_ledger_store> m_live;
 	};
 
+	// Redirects the game's guild store to a scratch guilds.db for the length of
+	// a prover run and puts the live store back however the command returns —
+	// the guild-engine sibling of ledger_sink_swap, shared since the second
+	// guild prover (#122) needed it too. The scratch file is removed on the way
+	// in and the way out, like every scratch here.
+	class guild_store_swap
+	{
+	public:
+		guild_store_swap(CGame* game, const char* path);
+		~guild_store_swap();
+
+		guild_store_swap(const guild_store_swap&) = delete;
+		guild_store_swap& operator=(const guild_store_swap&) = delete;
+
+		bool ok() const { return m_game != nullptr; }
+
+	private:
+		CGame*      m_game = nullptr;
+		std::string m_path;
+		std::unique_ptr<class guild_sqlite_store> m_live;
+	};
+
 	// A synthetic client parked in a free client handle, so a prover can test the
 	// half of the actor columns that matters rather than only their NULL path.
 	// The game loop cannot see it — a console command runs inside the tick, not
@@ -214,6 +236,12 @@ namespace hb::server
 	// The lowest free client handle at or above `from`, or -1 when the server is
 	// full. Provers that need several take them one after another.
 	int find_free_handle(CGame* game, int from = 1);
+
+	// Mint one item into a probe client's inventory through the real factory
+	// and delivery path (so the ledger books a true birth), destroying it on
+	// a refused delivery or a merge. Shared since the second guild prover
+	// (#122) needed the same staging guildcheck already had.
+	bool give_item(CGame* game, int handle, short item_id);
 
 	// The `accounts` row a probe character's save hangs on, in a scratch world.
 	// `characters` has a foreign key to `accounts`, so a probe saved without one

@@ -39,6 +39,16 @@ struct roll_context
 	// It is NOT "the drop at the moment of death": delay is a table property
 	// now (#73), so a stage-1 table set to corpse-decay still tier-rolls.
 	bool tier_rolls = false;
+
+	// The Huntmaster tier-shift (#122, §3.1.2): x/100 applied to tier
+	// weights from `tier_shift_min_tier` up (2 = rare-or-better). 100 =
+	// neutral. BOTH halves are resolved ONCE per kill beside the reputation
+	// factor — the pct ledger-recorded with it — then carried here (and
+	// through the corpse-decay queue) so every drop of that kill rolls the
+	// exact shift the kill was priced at, and the roll strategy never reads
+	// the guild dataset (a reload between kill and decay changes nothing).
+	int tier_shift_pct = 100;
+	int tier_shift_min_tier = 2;
 };
 
 // The stage-1 base drop chance retired with #73: every drop-table row now

@@ -2,6 +2,7 @@
 
 #include "Client.h"
 #include "Game.h"
+#include "GuildSqliteStore.h"
 #include "Item.h"
 #include "ItemLedgerStore.h"
 #include "ItemManager.h"
@@ -138,6 +139,34 @@ namespace hb::server
 		return *m_game->m_item_ledger_store;
 	}
 
+	guild_store_swap::guild_store_swap(CGame* game, const char* path)
+		: m_path(path != nullptr ? path : "")
+	{
+		if (game == nullptr || m_path.empty()) return;
+
+		remove_probe_db(m_path.c_str());
+
+		auto scratch = std::make_unique<guild_sqlite_store>();
+		if (!scratch->open(m_path))
+		{
+			return;
+		}
+		m_live = std::move(game->m_guild_store);
+		game->m_guild_store = std::move(scratch);
+		m_game = game;
+	}
+
+	guild_store_swap::~guild_store_swap()
+	{
+		if (m_game == nullptr)
+		{
+			return;
+		}
+		m_game->m_guild_store->close();
+		m_game->m_guild_store = std::move(m_live);
+		remove_probe_db(m_path.c_str());
+	}
+
 	probe_client::probe_client(CGame* game, int handle, const char* account, const char* name,
 		const char* map, int x, int y)
 		: m_game(game), m_handle(handle)
@@ -160,8 +189,35 @@ namespace hb::server
 
 	probe_client::~probe_client()
 	{
+		// Probes never pass through delete_client, so the per-client indexes
+		// (guild membership, #121) must be detached here — a handle left in a
+		// live index would be inherited by the next real login in this slot.
+		m_game->detach_client_from_indexes(m_handle);
 		delete m_game->m_client_list[m_handle];
 		m_game->m_client_list[m_handle] = nullptr;
+	}
+
+	bool give_item(CGame* game, int handle, short item_id)
+	{
+		CItem* item = game->m_item_manager->create_item(item_id,
+			hb::server::item_origin::none);
+		if (item == nullptr)
+		{
+			return false;
+		}
+		int erase_req = 0;
+		if (!game->m_item_manager->add_client_item_list(handle, item, &erase_req))
+		{
+			game->m_item_manager->destroy_item(item,
+				hb::server::destroy_reason::discarded, handle);
+			return false;
+		}
+		if (erase_req == 1)
+		{
+			game->m_item_manager->destroy_item(item,
+				hb::server::destroy_reason::merged, handle);
+		}
+		return true;
 	}
 
 	int find_free_handle(CGame* game, int from)

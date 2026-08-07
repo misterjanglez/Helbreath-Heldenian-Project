@@ -512,7 +512,23 @@ private:
 	void upgrade_majestic_item(int client_h, int item_index);
 	void upgrade_hero_cape(int client_h, int item_index);
 
+public:
+	// The last inventory slot holding item_id, or -1 (last keeps the retail
+	// scan's choice among duplicates). Public since #121 (the birth_at
+	// treatment): the guild ticket ceremonies and the guildcheck prover ask
+	// exactly this question, and a second hand-rolled scan is a second place
+	// for the slot rules to drift.
 	int find_inventory_item(int client_h, short item_id) const;
+
+	// Mint `amount` gold into a player: create, book the created inflow with
+	// the count (#111 — the two-argument record_created_flow is what sets the
+	// stack AND records it, in that order), then deliver through add_item,
+	// whose fallback is the ground at their feet. One named door so no venue
+	// re-derives the ordering rule; the level-up grants and the guild
+	// Treasury payout (#121) all pay through here.
+	bool grant_gold(int client_h, uint64_t amount);
+
+private:
 
 	// Assigns identity to a freshly created item: the origin always, and a
 	// Serial only when the item is Instanced (non-stackable, per D2). Minting is

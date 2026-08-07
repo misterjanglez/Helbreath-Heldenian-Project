@@ -61,6 +61,12 @@ struct PendingDrop
 	// corpse-decay still tier-rolls, and a stage-2 one still never does, so the
 	// answer cannot be re-derived at placement time.
 	bool  tier_rolls;
+	// The Huntmaster tier-shift resolved at the kill (#122) — factor and
+	// tier floor both — carried for the same reason: the killer may be gone
+	// by decay time, and the ledger already recorded this exact factor
+	// against the kill.
+	int   tier_shift_pct;
+	int   tier_shift_min_tier;
 };
 
 // Config-sourced fields live in the base (NpcConfigFields.h); everything below

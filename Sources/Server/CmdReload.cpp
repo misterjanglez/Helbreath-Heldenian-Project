@@ -12,7 +12,7 @@ void CmdReload::execute(CGame* game, const char* args)
 {
 	if (args == nullptr || args[0] == '\0')
 	{
-		hb::console::error("Usage: reload <items|magic|skills|npcs|shops|config|formulas|colors|tiers|all>");
+		hb::console::error("Usage: reload <items|magic|skills|npcs|shops|config|formulas|colors|tiers|guilds|all>");
 		return;
 	}
 
@@ -25,6 +25,7 @@ void CmdReload::execute(CGame* game, const char* args)
 	bool formulas = false;
 	bool colors = false;
 	bool tiers = false;
+	bool guilds = false;
 
 	if (hb_stricmp(args, "items") == 0)
 		items = true;
@@ -45,6 +46,8 @@ void CmdReload::execute(CGame* game, const char* args)
 	else if (hb_stricmp(args, "tiers") == 0 ||
 		hb_stricmp(args, "catalog") == 0 || hb_stricmp(args, "attributes") == 0)  // legacy aliases
 		tiers = true;
+	else if (hb_stricmp(args, "guilds") == 0)
+		guilds = true;
 	else if (hb_stricmp(args, "all") == 0)
 	{
 		items = true;
@@ -56,10 +59,11 @@ void CmdReload::execute(CGame* game, const char* args)
 		formulas = true;
 		colors = true;
 		tiers = true;
+		guilds = true;
 	}
 	else
 	{
-		hb::console::error("Unknown reload target: '{}'. Use items, magic, skills, npcs, shops, config, formulas, colors, tiers, or all.", args);
+		hb::console::error("Unknown reload target: '{}'. Use items, magic, skills, npcs, shops, config, formulas, colors, tiers, guilds, or all.", args);
 		return;
 	}
 
@@ -97,6 +101,16 @@ void CmdReload::execute(CGame* game, const char* args)
 			hb::console::success("Tier + legacy-pool tables reloaded");
 	}
 
+	// Guild progression rides the same candidate/reject contract; it has no
+	// client push — the dataset is server-side until the #123 wire family.
+	bool guilds_ok = false;
+	if (guilds)
+	{
+		guilds_ok = game->reload_guild_progression();
+		if (guilds_ok)
+			hb::console::success("Guild progression reloaded");
+	}
+
 	// Send reload notification to clients first (shows top bar message)
 	if (items || magic || skills || npcs || shops || formulas || colors || tiers_ok)
 		game->send_config_reload_notification(items, magic, skills, npcs, formulas, colors, tiers_ok);
@@ -111,8 +125,8 @@ void CmdReload::execute(CGame* game, const char* args)
 	if (items || magic || skills || npcs || formulas || colors || tiers_ok)
 		game->push_config_reload_to_clients(items, magic, skills, npcs, formulas, colors, tiers_ok);
 
-	if (tiers && !tiers_ok)
-		hb::console::error("Reload complete with errors: {} (tiers rejected - running config untouched, details in server log)", args);
+	if ((tiers && !tiers_ok) || (guilds && !guilds_ok))
+		hb::console::error("Reload complete with errors: {} (rejected candidate leaves the running config untouched, details in server log)", args);
 	else
 		hb::console::success("Reload complete: {}", args);
 	hb::logger::log<hb::log_channel::commands>("reload {}", args);

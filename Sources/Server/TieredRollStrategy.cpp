@@ -64,11 +64,28 @@ bool is_tier_scope_gear(const CItem& item)
 // Grade -> Tier: one weighted pick over the grade's four tier weights.
 // Staircase zero-weights are the hard gate (vermin can only land Common);
 // the validator guarantees at least one weight is positive.
-uint8_t tiered_roll_strategy::roll_tier(const loot_grade_config& grade)
+uint8_t tiered_roll_strategy::roll_tier(const loot_grade_config& grade, int tier_shift_pct,
+	int tier_shift_min_tier)
 {
 	int weights[tier_count];
 	for (uint8_t tier = 1; tier <= tier_count; tier++)
 		weights[tier - 1] = grade.tier_weight(tier);
+
+	// The Huntmaster tier-shift (#122, §3.1.2): weights from the shift floor
+	// up scale by pct/100 — in integer math, because this path carries the
+	// dropodds byte-identity gate and must never accumulate floats. A
+	// staircase zero stays zero (the hard gates hold), and pick_weighted sums
+	// whatever it is given, so renormalization is free. Tier-shift rather
+	// than drop-chance % because chance-saturated boss tables would null a
+	// chance perk. Both halves arrive frozen from the kill site — this
+	// strategy reads only its own dataset.
+	if (tier_shift_pct != 100)
+	{
+		for (uint8_t tier = 1; tier <= tier_count; tier++)
+			if (tier >= tier_shift_min_tier)
+				weights[tier - 1] = weights[tier - 1] * tier_shift_pct / 100;
+	}
+
 	return static_cast<uint8_t>(pick_weighted(weights,
 		[](int weight) { return weight; }, m_rng) + 1);
 }
@@ -135,7 +152,8 @@ bool tiered_roll_strategy::roll(CItem& item, const roll_context& context)
 	const loot_grade_config* grade = config.find_loot_grade(context.loot_grade);
 	if (grade == nullptr) return false;
 
-	const uint8_t tier = roll_tier(*grade);
+	const uint8_t tier = roll_tier(*grade, context.tier_shift_pct,
+		context.tier_shift_min_tier);
 
 	const tier_curve_config* curve = config.find_tier_curve(tier);
 	if (curve == nullptr) return false;   // validator guarantees the four tier curves

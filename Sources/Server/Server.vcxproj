@@ -170,7 +170,9 @@
     <ClInclude Include="MiningManager.h" />
     <ClInclude Include="CraftingManager.h" />
     <ClInclude Include="QuestManager.h" />
+    <ClInclude Include="CmdGuildProgCheck.h" />
     <ClInclude Include="GuildManager.h" />
+    <ClInclude Include="GuildProgressionConfig.h" />
     <ClInclude Include="GuildSqliteStore.h" />
     <ClInclude Include="DelayEventManager.h" />
     <ClInclude Include="DynamicObjectManager.h" />
@@ -232,6 +234,7 @@
     <ClInclude Include="DropModel.h" />
     <ClInclude Include="CmdShowChat.h" />
     <ClInclude Include="CmdGiveItem.h" />
+    <ClInclude Include="CmdGuildCheck.h" />
     <ClInclude Include="CmdGuildDbCheck.h" />
     <ClInclude Include="CheckTally.h" />
     <ClInclude Include="CmdAtomicCheck.h" />
@@ -255,6 +258,7 @@
     <ClInclude Include="GmMintSpec.h" />
     <ClInclude Include="GameChatCommand.h" />
     <ClInclude Include="GameCmdWhisper.h" />
+    <ClInclude Include="GameCmdBanGuild.h" />
     <ClInclude Include="GameCmdBlock.h" />
     <ClInclude Include="GameCmdUnblock.h" />
     <ClInclude Include="GameCmdGM.h" />
@@ -358,7 +362,9 @@
     <ClCompile Include="MiningManager.cpp" />
     <ClCompile Include="CraftingManager.cpp" />
     <ClCompile Include="QuestManager.cpp" />
+    <ClCompile Include="CmdGuildProgCheck.cpp" />
     <ClCompile Include="GuildManager.cpp" />
+    <ClCompile Include="GuildProgressionConfig.cpp" />
     <ClCompile Include="GuildSqliteStore.cpp" />
     <ClCompile Include="DelayEventManager.cpp" />
     <ClCompile Include="DropModel.cpp" />
@@ -402,6 +408,7 @@
     <ClCompile Include="CmdDropOdds.cpp" />
     <ClCompile Include="CmdShowChat.cpp" />
     <ClCompile Include="CmdGiveItem.cpp" />
+    <ClCompile Include="CmdGuildCheck.cpp" />
     <ClCompile Include="CmdGuildDbCheck.cpp" />
     <ClCompile Include="CheckTally.cpp" />
     <ClCompile Include="CmdAtomicCheck.cpp" />
@@ -410,7 +417,7 @@
     <ClCompile Include="CmdItemHistory.cpp" />
     <ClCompile Include="CmdAnalyticsCheck.cpp" />
     <ClCompile Include="CmdBiographyCheck.cpp" />
-    <ClCompile Include="CmdLedgerCheck.cpp" />
+    <ClCompile Include="CmdLedgerCheck.cpp" />
     <ClCompile Include="CmdLifecycleCheck.cpp" />
     <ClCompile Include="CmdLedgerValidate.cpp" />
     <ClCompile Include="CmdMintCheck.cpp" />
@@ -424,6 +431,7 @@
     <ClCompile Include="GmMintSpec.cpp" />
     <ClCompile Include="GameChatCommand.cpp" />
     <ClCompile Include="GameCmdWhisper.cpp" />
+    <ClCompile Include="GameCmdBanGuild.cpp" />
     <ClCompile Include="GameCmdBlock.cpp" />
     <ClCompile Include="GameCmdUnblock.cpp" />
     <ClCompile Include="GameCmdGM.cpp" />

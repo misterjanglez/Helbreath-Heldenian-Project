@@ -16,18 +16,8 @@ bool GameCmdBlock::execute(CGame* game, int client_h, const char* args)
 		return true;
 	}
 
-	// Extract character name (max 10 chars, first word only)
-	char char_name[hb::shared::limits::CharNameLen] = {};
-	size_t nameLen = std::strlen(args);
-	if (nameLen > 10) nameLen = 10;
-	for (size_t i = 0; i < nameLen; i++)
-	{
-		if (args[i] == ' ' || args[i] == '\t')
-			break;
-		char_name[i] = args[i];
-	}
-
-	if (char_name[0] == '\0')
+	char char_name[hb::shared::limits::CharNameLen];
+	if (!parse_char_name(args, char_name))
 		return true;
 
 	// Can't block yourself
