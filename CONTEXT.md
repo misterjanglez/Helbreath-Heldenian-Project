@@ -195,6 +195,65 @@ _Note_: an item minted and never placed may legally go anywhere (creation venues
 **Game DB**:
 The single consolidated account/character store (`game.db`) replacing the per-account `accounts/*.db` files: `UNIQUE` character names, one persistent WAL connection, atomic multi-account transactions (Exchange, Trading Post custody). `gamedata.db`, `MapInfo.db`, and `itemledger.db` remain separate.
 
+### Guilds
+
+Design locked 2026-08-07 (session #93). Binding contract: `PLANS/CoreSystems_Restoration_Plan.md` §3.1/§3.1.1; decision records: `docs/adr/0006-guild-rank-permission-bitmask.md`, `docs/adr/0007-guild-burn-economy-title-slots.md`.
+
+**Guild**:
+A town-bound organization of citizens of one side, led by a Guildmaster.
+
+**Rank**:
+A member's position inside a Guild — Guildmaster, Officer, or Guildsman — determining which Permissions they hold. Never the guild's progression rung (that is Guild Level).
+_Avoid_: role, grade
+
+**Officer**:
+The delegated middle Rank, able to approve Join Requests, kick, and coordinate in the Council. Distinct from the Guildhall Officer NPC.
+_Avoid_: elder
+
+**Guildhall Officer**:
+The guildhall NPC — named Kennedy in-game — who handles guild-name applications and self-secession.
+_Avoid_: Officer (bare, which means the Rank)
+
+**Permission**:
+A capability a Rank grants its holder (approving joins, kicking, claiming Commander, withdrawing from the Treasury, speaking in the Council).
+
+**Guild Level**:
+The guild-wide progression rung earned by Donations, which unlocks Title slots, member capacity, and perks.
+_Avoid_: guild rank
+
+**Donation**:
+The irreversible sacrifice of a member's own gold, enemy kills, or contribution to feed the guild's progression. Donated resources cease to exist for the donor.
+_Avoid_: deposit (which is reversible and feeds nothing)
+
+**Treasury**:
+The guild's shared gold wallet — deposited by any member, withdrawn by Officers and above. Storage only; never feeds progression.
+_Avoid_: bank (reserved for the Warehouse), vault (reserved for possible future item storage)
+
+**Title**:
+A claimable, slot-limited distinction — Commander, Huntmaster, or Raidmaster — whose slot count grows with Guild Level and whose bonuses apply only while held. First come, first served; leaders may re-assign; absence releases it.
+
+**Commander**:
+The war-command Title: eligibility to take the Commander duty in a Crusade. Officer-and-above may claim.
+
+**Huntmaster**:
+The PvE-bonus Title.
+
+**Raidmaster**:
+The PvP-bonus Title.
+
+**Council**:
+The per-town chat channel shared by the leaders (Officer and above) of all that town's guilds.
+_Avoid_: command channel, officer chat
+
+**Roster**:
+The guild's member list — names, Ranks, Titles, online status — and the surface for moderation actions.
+
+**Join Request**:
+A pending application to a guild, opened by handing an Admission Ticket to an approver or filing at the Guildhall Officer; it waits in queue until an approver decides.
+
+**Admission Ticket / Secession Ticket**:
+The purchasable papers (items 88/89) that open a Join Request or a leave request. Consumed on filing, whatever the outcome.
+
 ### War Events (crusade, heldenian, apocalypse)
 
 **War event**:

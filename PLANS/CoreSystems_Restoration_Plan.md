@@ -111,9 +111,30 @@ Condensed from the 2026-07-29 original-source inventory. These are the *rules to
 - **Gates elsewhere:** rank 0 required for crusade Commander duty and fightzone reservation; rank 0 cannot drop charisma below 20; guild membership required for Constructor (client) and help-routing.
 - **Persistence (original):** flat file per guild with an empty `[GUILDSMAN]` section and *no reader* — membership lived only in character files. **The rebuild replaces this wholesale with SQLite** (that was the entire point of the gut): normalized `guilds` + `guild_members` tables behind a store, `CClient` hydrated at login, no flat files (Decision D1 picks the DB home).
 
+### 3.1.1 Guild design session outcome (2026-08-07, #93) — amendments to §3.1
+
+Session complete; where this section conflicts with §3.1, this section wins. Decision records: ADR 0006 (permission-bitmask ranks), ADR 0007 (burn economy + Title slots). Domain terms: `CONTEXT.md` §Guilds. Default stance chosen by the owner: original-shaped with QoL latitude, every deviation recorded here.
+
+**Kept original-faithful:** creation gates (level ≥ 20, CHR ≥ 20, citizen, own town, free, not during crusade); ticket ceremonies on items 88/89 (purchase prices are data knobs; recover original values at implementation); refusable leave-approval plus Kennedy self-exit at −300 exp; `/banguild`; typed-name disband (master only, not during crusade, broadcast); the lazy name-cache wire pattern; overhead "(GuildName RankTitle)" suppressed during crusade; the CHR-20 floor applies to the Guildmaster only; SQLite per D1; fresh start — `.guild_migration_bak` data is archaeology, never resurrected.
+
+**Deviations (decided):**
+
+1. **Ranks** — Guildmaster / Officer / Guildsman on permission bitmasks (ADR 0006). Default masks: approve joins/leaves, kick (below own rank), Council access, Commander eligibility, fightzone reservation, Treasury withdraw (logged) = Officer+; promote/demote = Guildmaster; transfer-mastership and disband = Guildmaster, hardcoded. Succession: transfer action demotes the old master to Officer; a Guildmaster cannot Kennedy-exit or file secession while master; no inactivity auto-succession (GM resolves).
+2. **Join flow** — admission ticket handed to *any online approver*, or filed at Kennedy by guild name (offline-proof path); requests queue until any approver decides. Officers may Kennedy-exit (auto-demote on the way out). Moderation is **UI-first**: roster action buttons (approve queue, kick, promote, demote, strip Title); slash commands remain as fallback.
+3. **Roster** (new) — member list with Rank, Title, online status; the original had none at all.
+4. **Progression** (new, ADR 0007) — Donations burn the donor's gold / enemy kills / contribution (the same counters personal accolades read) and mint Guild XP; data-driven Guild Levels; member cap = f(Guild Level) — resolving the deferred cap question; per-member lifetime donation totals recorded from day one.
+5. **Titles** (new, ADR 0007) — Commander / Huntmaster / Raidmaster slot machine: counts = f(Guild Level); Commander claims need Officer+, Hunt/Raid any member; one Title per member; first-come-first-served; Officer+ strip/re-assign; AFK/offline timer auto-release; bonuses only while held; shown on roster + character dialog only (overhead unchanged in v1).
+6. **Treasury** (new) — gold-only shared wallet: deposit any member, withdraw Officer+ (logged); never feeds XP in either direction (the altar/wallet firewall); disband hands the remainder to the master. Item vault: **fast-follow mini design session** against the Provenance Ledger (new `guild_bank` place in the transition machine), not Phase 2.
+7. **Council channel** (new) — prefix `&`, renders `[Council]`; members: every Council-permission holder (Officer+ default) across all guilds of one town; always-on; **no SP cost** (original channels untouched). `[Guild]` chat restore (D6) unchanged — note the live mode-1 prefix arm is `@` while the plan said `^`; match the original's symbols at implementation.
+8. **Balance session** (new design gate) — a dedicated child ticket of the Phase-2 epic decides all perk/Title numbers: Huntmaster/Raidmaster bonuses, passive perk picks (member-cap curve committed; repair discount / Heldenian mercenary budget / max-level gold name are candidates; guildhall recall rejected), XP rates, slot curves, and the enable switch. Machinery ships with Phase 2 reading neutral data; the session gates turning it on, not landing the code.
+
+**Out of scope (ruled, this effort):** formal alliances (the Council *is* the cross-guild coordination feature; sides are fixed, so pacts add ceremony without payoff — returns only if the destination is redrawn); emblems/heraldry (later/never); MOTD (later/maybe never); guild war-stats/leaderboards (later — the lifetime-donation data already accrues); global removal of chat SP costs (parked as its own future one-line decision).
+
+**Phase-3/4 handoff:** Commander = Officer+ permission + Guild-Level slot count, superseding §3.2 "guildmaster only"; *who sets rally/construct points when multiple Commanders stand* is a Phase-3 kickoff question. Fightzone (§3.4): the reservation gate becomes the fightzone-reserve permission; the Treasury may fund reservations — its first real sink — when Phase 4 lands.
+
 ### 3.2 Crusade command layer
 
-- **Duties:** Commander = **guildmaster only, server-enforced**; Constructor = guild member (client-gated in the original — enforce server-side too in the rebuild); Soldier = any citizen. No level gates. Travellers excluded (client).
+- **Duties:** Commander = **guildmaster only, server-enforced** *(amended by §3.1.1: Commander is now an Officer+-claimable Title with Guild-Level slot counts; multi-commander rally/construct semantics land at Phase-3 kickoff)*; Constructor = guild member (client-gated in the original — enforce server-side too in the rebuild); Soldier = any citizen. No level gates. Travellers excluded (client).
 - **Commander:** sees the full middleland structure map (others see only Mana Stones); sets the guild **rally point** and **construct zone** via minimap click (→ `TcLoc` broadcast to the guild); summons war units (beetle 1000 / knights 2000 / cavalry+golem 3000 / catapult 1500 CP); receives pooled CP from guildmates **+10% WC kickback** (points destroyed if no same-guild commander online — soften? Decision D5); winner-side commander seeds 3000 CP next war.
 - **Constructor:** places Arrow/Cannon Tower, Mana Collector, Detector within ±10 tiles of the construct zone, **max 10 structures per guild**, guard towers need ±2 clearance; structures spawn inactive (`BuildCount 10`) and are finished by **pickaxe hits** (thresholds 10/5/1 → appearance stages → active), rewarding WC 700/700/500/500.
 - **Soldier:** rally teleport; `/help` pings routed to the *same-guild* commander.
@@ -131,7 +152,7 @@ Condensed from the 2026-07-29 original-source inventory. These are the *rules to
 
 ### 3.4 Fightzone
 
-Guildmaster reserves zone 1-8 for **1,500 gold** in 2-hour slots (booking closes 5 min before), **day-parity rule** `(day + side + zone) % 2 == 0`, grants **50 tickets**; tickets admit guildsmen; energy-sphere match on the zone map. Original stored the reservation against a *client handle* (evaporates on logout) — store against the guild in the rebuild.
+Guildmaster reserves zone 1-8 for **1,500 gold** in 2-hour slots (booking closes 5 min before), **day-parity rule** `(day + side + zone) % 2 == 0`, grants **50 tickets**; tickets admit guildsmen; energy-sphere match on the zone map. Original stored the reservation against a *client handle* (evaporates on logout) — store against the guild in the rebuild. *(Amended by §3.1.1: the reserver gate becomes the fightzone-reserve permission, Officer+ default; the Treasury may pay the fee.)*
 
 ### 3.5 Faithfulness stance
 
@@ -209,13 +230,15 @@ Just enough to host Phase 2 cleanly, not the full retrofit:
 
 ### Phase 2 — Guild rebuild (the flagship)
 
-**Gated on the Guild design session** (owner directive at ratification): the owner has changes in mind that will deviate from the original; that session scopes fidelity-vs-new against §3.1, amends this plan, and seeds the Phase-2 epic. Then, into the shells upstream left, on the Phase-1 rails:
+**Design session #93 complete (2026-08-07)** — the contract is §3.1 as amended by §3.1.1 (ranks on permission bits, burn-economy progression, Title slots, Treasury, Council). Into the shells upstream left, on the Phase-1 rails (epic + sub-issues per §8):
 
-- **Store:** `guild_sqlite_store` — `guilds` (guid, name, side/location, master, created) + `guild_members` (guid, char_name, rank, joined); home per D1. Boot-validated like TierConfig; no flat files.
-- **Server `GuildManager`:** create/disband/join-approve/dismiss/ban/name-query handlers per §3.1, membership index (guid → member handles — kills the original's 2000-slot linear scans), login hydration of `CClient` guild fields, `[Guild]` chat (D6), Kennedy secession flow, rank-0 charisma floor.
-- **Wire:** new `PacketGuild.h` family + re-allocated IDs (Appendix A is the reference; don't reproduce the original's two ID collisions). Own-guild fields re-enter the char-init contents; lazy name-cache protocol restored. **Compatibility bump** (shared with Phase 3).
-- **Client:** `guild_manager` name cache, `DialogBox_GuildMenu`/`GuildOperation` rebuilt (salvage: the 734-line pre-gut reference + strings + PSD; stay on `IDialogBox` per D2), overhead guild line, character-dialog suffix, kill-notice guild fields.
-- **DB migration:** additive columns/tables only; decide whether to resurrect old guild data from the `.guild_migration_bak` files (probably not — fresh start).
+- **Store:** `guild_sqlite_store` on `guilds.db` (D1) — `guilds` (guid, name, side, master, created, xp/level), `guild_members` (rank, joined, lifetime donations), per-rank permission masks, join/leave request queue, Treasury ledger, Title assignments. Boot-validated like TierConfig; no flat files; fresh start.
+- **Server guild core:** create/disband/queued join-leave approval/kick/ban/promote/demote/transfer handlers, membership index (guid → member handles — kills the original's 2000-slot linear scans), login hydration of `CClient` guild fields, Kennedy flows (apply-by-name, self-exit with officer auto-demote), master-only CHR floor, crusade-block rules.
+- **Server progression:** Donation burn handlers (gold/EK/contribution decrement the live counters), Guild XP → Level engine, Title slot machine (claim/strip/AFK-release), Treasury deposit/withdraw with log — all knobs in `gamedata.db`, shipped neutral pending the balance session.
+- **Wire:** new `PacketGuild.h` family + re-allocated IDs (Appendix A is the reference; don't reproduce the original's two ID collisions; reserve an invite id for later). Own-guild fields (+ rank title, guild level) re-enter the char-init contents; lazy name-cache protocol restored; kill-notice guild fields. **Compatibility bump** (shared with Phase 3).
+- **Client:** `guild_manager` name cache, guild UI suite rebuilt on `IDialogBox` (D2; salvage: the 734-line pre-gut reference + strings + PSD): guild menu, Roster with permission-gated moderation buttons, Donate panel, Treasury panel, Title claiming, operation queue; overhead guild line, character-dialog suffix.
+- **Chat:** `[Guild]` on the original prefixes (D6) + the `&` `[Council]` channel (Officer+ per town, no SP).
+- **Balance design session** (child ticket, gates data-enable): Title bonuses, passive perk picks, XP rates, slot/cap curves.
 
 ### Phase 3 — Crusade command layer (guild-dependent restorations)
 
@@ -254,6 +277,8 @@ Ladder: #1/#10 piloted in P1; #4 next; rest ordered by §4.3
 
 **Ratification outcome (2026-07-29):** D1–D6, D8, D9, D10 **locked as recommended**. D7 **open** — deferred to the Party design session, where the owner will scope legacy-fidelity vs improvements for the whole party system; guild deviations are likewise scoped in the Guild design session before Phase 2.
 
+**2026-08-07:** the Guild design session (#93) is complete — outcomes in §3.1.1, ADR 0006, ADR 0007. The one decision it deliberately leaves open (perk/Title numbers + enable) is the balance-session child ticket of the Phase-2 epic.
+
 | # | Decision | Recommendation |
 |---|---|---|
 | D1 | Guild DB home: tables inside each account-store `.db`, or a separate `guilds.db` (TradingPost precedent) | Separate `guilds.db` — guilds are world-state, not account-state; account DBs stay per-account; mirrors `tradingpost.db` |
@@ -275,7 +300,10 @@ One epic per axis-1 phase, sub-issues per §5 bullets, mirroring the Item-Tiers 
 - **Epic #92** — Phase 0: War-event repair (`wayfinder:map`), sub-issues **#95** (castle-siege data + victory hook), **#96** (heldenian engine fixes incl. D4), **#97** (event scheduler), **#98** (dead-code cleanup), **#99** (party mechanical audit, defects-only).
 - **#93** — Guild design wayfinder session (`wayfinder:grilling`) — **gates Phase 2**; scopes owner deviations from §3.1, seeds the Phase-2 epic.
 - **#94** — Party design wayfinder session (`wayfinder:grilling`) — owns **D7** and all party behavior decisions.
-- Phase 1/3/4 epics are created at their kickoffs (Phase 2's by #93's output).
+- Phase 1/3/4 epics are created at their kickoffs.
+
+**Created 2026-08-07 (#93's output; session resolved and closed):**
+- **Epic #119** — Phase 2: Guild rebuild (`wayfinder:map`), sub-issues **#120** (guilds.db store), **#121** (server guild core), **#122** (progression: altar/Levels/Titles/Treasury), **#123** (wire: PacketGuild + Compatibility bump shared with Phase 3), **#124** (client UI suite on IDialogBox), **#125** (chat: [Guild] + [Council]), **#126** (perks & Title bonuses balance session, `wayfinder:grilling` — gates enabling the progression data, not landing the code). Implementation order #120→#121→{#122,#123}→{#124,#125} via native dependencies; #126 runs anytime.
 
 ---
 
