@@ -183,6 +183,7 @@
     <ClInclude Include="MagicManager.h" />
     <ClInclude Include="SkillManager.h" />
     <ClInclude Include="WarManager.h" />
+    <ClInclude Include="EventSchedule.h" />
     <ClInclude Include="StatusEffectManager.h" />
     <ClInclude Include="MarqueeEffects.h" />
     <ClInclude Include="RegenManager.h" />

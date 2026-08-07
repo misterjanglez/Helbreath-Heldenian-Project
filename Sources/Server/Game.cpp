@@ -833,32 +833,6 @@ bool CGame::init()
 	for(int i = 0; i < MaxNpcTypes; i++)
 		m_npc_construction_point[i] = 0;
 
-	for(int i = 0; i < MaxSchedule; i++) {
-		m_crusade_war_schedule[i].day = -1;
-		m_crusade_war_schedule[i].hour = -1;
-		m_crusade_war_schedule[i].minute = -1;
-	}
-
-	for(int i = 0; i < MaxApocalypse; i++) {
-		m_apocalypse_schedule_start[i].day = -1;
-		m_apocalypse_schedule_start[i].hour = -1;
-		m_apocalypse_schedule_start[i].minute = -1;
-	}
-
-	for(int i = 0; i < MaxHeldenian; i++) {
-		m_heldenian_schedule[i].day = -1;
-		m_heldenian_schedule[i].start_hour = -1;
-		m_heldenian_schedule[i].start_minute = -1;
-		m_heldenian_schedule[i].end_hour = -1;
-		m_heldenian_schedule[i].end_minute = -1;
-	}
-
-	for(int i = 0; i < MaxApocalypse; i++) {
-		m_apocalypse_schedule_end[i].day = -1;
-		m_apocalypse_schedule_end[i].hour = -1;
-		m_apocalypse_schedule_end[i].minute = -1;
-	}
-
 	m_npc_construction_point[1] = 100;
 	m_npc_construction_point[2] = 100;
 	m_npc_construction_point[3] = 100;
@@ -1066,13 +1040,9 @@ bool CGame::init()
 	m_last_crusade_winner = 0;
 	m_last_crusade_date = -1;
 	m_final_shutdown_count = 0;
-	m_is_crusade_war_starter = false;
-	m_is_apocalypse_starter = false;
-	m_latest_crusade_day_of_week = -1;
 
 	m_heldenian_initiated = false;
 	m_is_heldenian_mode = false;
-	m_heldenian_running = false;
 	m_heldenian_mode_type = -1;
 	m_last_heldenian_winner = -1;
 	m_heldenian_victory_type = -1;
@@ -12709,9 +12679,7 @@ void CGame::on_timer(char type)
 		m_fishing_manager->fish_processor();
 		m_fishing_manager->fish_generator();
 		m_war_manager->send_collected_mana();
-		m_war_manager->crusade_war_starter();
-		//ApocalypseStarter();
-		m_war_manager->apocalypse_ender();
+		m_war_manager->event_scheduler();
 		m_fishing_manager->m_fish_time += 5000;
 		if (time - m_fishing_manager->m_fish_time > 5000) m_fishing_manager->m_fish_time = time;
 	}
@@ -12736,9 +12704,6 @@ void CGame::on_timer(char type)
 		if (time - m_equip_validation_time > 10000) m_equip_validation_time = time;
 	}
 
-	if ((m_heldenian_running) && (m_is_heldenian_mode)) {
-		m_war_manager->set_heldenian_mode();
-	}
 	// Scheduled shutdown: send milestone notifications, then begin disconnect
 	if (m_shutdown_start_time != 0 && !m_on_exit_process)
 	{
@@ -13209,26 +13174,6 @@ void CGame::reload_color_palette()
 	compute_color_palette_hash();
 	CloseGameConfigDatabase(configDb);
 }
-
-/*void CGame::ApocalypseStarter()
-{
- hb::time::local_time SysTime{};
- 
-
-	if (m_is_apocalypse_mode ) return;
-	if (m_is_apocalypse_starter == false) return;
-
-	SysTime = hb::time::local_time::now();
-
-	for(int i = 0; i < MaxApocalypse; i++)
-	if	((m_apocalypse_schedule_start[i].day == SysTime.day_of_week) &&
-		(m_apocalypse_schedule_start[i].hour == SysTime.hour) &&
-		(m_apocalypse_schedule_start[i].minute == SysTime.minute)) {
-			PutLogList("(!) Automated apocalypse is initiated!");
-			GlobalStartApocalypseMode();
-			return;
-	}
-}*/
 
 // New 06/05/2004
 // Party Code

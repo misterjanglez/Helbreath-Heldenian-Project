@@ -72,7 +72,6 @@ bool SaveBuildItemConfigs(sqlite3* db, const CGame* game);
 bool LoadBuildItemConfigs(sqlite3* db, CGame* game);
 bool SaveCrusadeConfig(sqlite3* db, const CGame* game);
 bool LoadCrusadeConfig(sqlite3* db, CGame* game);
-bool SaveScheduleConfig(sqlite3* db, const CGame* game);
 bool LoadScheduleConfig(sqlite3* db, CGame* game);
 bool LoadCreationItems(sqlite3* db, std::vector<creation_item_entry>& out_items);
 bool SaveCreationItems(sqlite3* db, const std::vector<creation_item_entry>& items);

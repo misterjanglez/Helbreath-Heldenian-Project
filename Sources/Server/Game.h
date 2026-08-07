@@ -17,6 +17,7 @@
 #include <string>
 #include <memory>
 #include "TimeUtils.h"
+#include "EventSchedule.h"
 
 namespace hb::shared::net { class IOServicePool; }
 namespace hb::server { class trading_post_store; }
@@ -125,9 +126,6 @@ constexpr int MaxQuestType              = 200;
 
 // Game limits
 constexpr int MaxConstructNum           = 10;
-constexpr int MaxSchedule               = 10;
-constexpr int MaxApocalypse             = 7;
-constexpr int MaxHeldenian              = 10;
 // Combat constants
 constexpr int MinimumHitRatio           = 15;
 constexpr int MaximumHitRatio           = 99;
@@ -720,11 +718,6 @@ public:
 
 	uint32_t m_weather_time, m_game_time_1, m_game_time_2, m_game_time_3, m_game_time_4, m_game_time_5, m_game_time_6;
 	uint32_t m_equip_validation_time = 0;
-	
-	// Crusade Schedule
-	bool m_is_crusade_war_starter;
-	bool m_is_apocalypse_starter;
-	int m_latest_crusade_day_of_week;
 
 	char  m_day_or_night;
  	int   m_skill_progress_threshold[102];
@@ -815,32 +808,8 @@ public:
 	int find_client_by_name(const char* name) const;
 	bool gm_teleport_to(int client_h, const char* dest_map, short dest_x, short dest_y);
 
-	// Crusade Scheduler
-	struct {
-		int day;
-		int hour;
-		int minute;
-	} m_crusade_war_schedule[hb::server::config::MaxSchedule];
-
-	struct {
-		int day;
-		int hour;
-		int minute;
-	} m_apocalypse_schedule_start[hb::server::config::MaxApocalypse];
-
-	struct {
-		int day;
-		int start_hour;
-		int start_minute;
-		int end_hour;
-		int end_minute;
-	} m_heldenian_schedule[hb::server::config::MaxHeldenian];
-
-	struct {
-		int day;
-		int hour;
-		int minute;
-	} m_apocalypse_schedule_end[hb::server::config::MaxApocalypse];
+	// Auto-start/end times for the three war events, from event_schedule (#97).
+	std::vector<hb::server::config::event_schedule_row> m_event_schedule;
 
 	int m_total_middle_crusade_structures;
  
@@ -939,14 +908,12 @@ public:
 
 	// ============================================================================
 
-	bool var_89C, var_8A0;
 	char m_heldenian_victory_type, m_last_heldenian_winner, m_heldenian_mode_type;
 	int m_heldenian_aresden_dead, m_heldenian_elvine_dead;
 	int m_heldenian_aresden_left_tower, m_heldenian_elvine_left_tower;
-	uint32_t m_heldenian_guid, m_heldenian_start_hour, m_heldenian_start_minute, m_heldenian_start_time, m_heldenian_finish_time;
+	uint32_t m_heldenian_guid, m_heldenian_start_time, m_heldenian_finish_time;
 	bool m_received_item_list;
 	bool m_heldenian_initiated;
-	bool m_heldenian_running;
 
 private:
 

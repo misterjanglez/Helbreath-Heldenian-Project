@@ -33,7 +33,8 @@ using namespace hb::server::config;
 // place (idempotent CREATE TABLE IF NOT EXISTS + HasColumn/ALTER migrations)
 // and the stamp is bookkeeping for operators, not a migration input.
 // 10: drop tables carry absolute per-kill rarity in ppb and split by stage (#73).
-#define GAMECONFIG_DB_SCHEMA_VERSION "10"
+// 11: event_schedule grows battle_type for heldenian rows (#97).
+#define GAMECONFIG_DB_SCHEMA_VERSION "11"
 
 namespace
 {
@@ -487,6 +488,7 @@ bool EnsureGameConfigDatabase(sqlite3** outDb, std::string& outPath, bool* outCr
         " end_hour INTEGER,"
         " end_minute INTEGER,"
         " is_active INTEGER NOT NULL DEFAULT 0,"
+        " battle_type INTEGER,"
         " UNIQUE(event_type, schedule_index)"
         ");"
         "CREATE TABLE IF NOT EXISTS npc_shop_mapping ("
@@ -903,6 +905,12 @@ bool EnsureGameConfigDatabase(sqlite3** outDb, std::string& outPath, bool* outCr
 
     if (!HasColumn(db, "admins", "admin_level")) {
         ExecSql(db, "ALTER TABLE admins ADD COLUMN admin_level INTEGER NOT NULL DEFAULT 1;");
+    }
+
+    if (!HasColumn(db, "event_schedule", "battle_type")) {
+        // Heldenian schedule rows carry their battle type here (1 = battlefield,
+        // 2 = castle siege); NULL on crusade/apocalypse rows (#97).
+        ExecSql(db, "ALTER TABLE event_schedule ADD COLUMN battle_type INTEGER;");
     }
 
     // Faithful item-color restore: the original engine tints item sprites with
@@ -2789,184 +2797,73 @@ bool LoadCrusadeConfig(sqlite3* db, CGame* game)
     return true;
 }
 
-bool SaveScheduleConfig(sqlite3* db, const CGame* game)
-{
-    if (db == nullptr || game == nullptr) {
-        return false;
-    }
-
-    if (!BeginTransaction(db)) {
-        return false;
-    }
-
-    if (!ClearTable(db, "event_schedule")) {
-        RollbackTransaction(db);
-        return false;
-    }
-
-    sqlite3_stmt* stmt = nullptr;
-    const char* sql = "INSERT INTO event_schedule(event_type, schedule_index, day, start_hour, start_minute, end_hour, end_minute, is_active) "
-                      "VALUES(?, ?, ?, ?, ?, ?, ?, ?);";
-    if (sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) != SQLITE_OK) {
-        RollbackTransaction(db);
-        return false;
-    }
-
-    bool success = true;
-
-    // Save crusade schedules
-    for(int i = 0; i < hb::server::config::MaxSchedule && success; i++) {
-        if (game->m_crusade_war_schedule[i].day >= 0) {
-            sqlite3_reset(stmt);
-            sqlite3_clear_bindings(stmt);
-            bool ok = true;
-            ok &= PrepareAndBindText(stmt, 1, "crusade");
-            ok &= (sqlite3_bind_int(stmt, 2, i) == SQLITE_OK);
-            ok &= (sqlite3_bind_int(stmt, 3, game->m_crusade_war_schedule[i].day) == SQLITE_OK);
-            ok &= (sqlite3_bind_int(stmt, 4, game->m_crusade_war_schedule[i].hour) == SQLITE_OK);
-            ok &= (sqlite3_bind_int(stmt, 5, game->m_crusade_war_schedule[i].minute) == SQLITE_OK);
-            ok &= (sqlite3_bind_null(stmt, 6) == SQLITE_OK);  // end_hour
-            ok &= (sqlite3_bind_null(stmt, 7) == SQLITE_OK);  // end_minute
-            ok &= (sqlite3_bind_int(stmt, 8, 0) == SQLITE_OK);  // is_active
-            success = ok && (sqlite3_step(stmt) == SQLITE_DONE);
-        }
-    }
-
-    // Save apocalypse schedules (start and end times in one row)
-    for(int i = 0; i < hb::server::config::MaxApocalypse && success; i++) {
-        if (game->m_apocalypse_schedule_start[i].day >= 0) {
-            sqlite3_reset(stmt);
-            sqlite3_clear_bindings(stmt);
-            bool ok = true;
-            ok &= PrepareAndBindText(stmt, 1, "apocalypse");
-            ok &= (sqlite3_bind_int(stmt, 2, i) == SQLITE_OK);
-            ok &= (sqlite3_bind_int(stmt, 3, game->m_apocalypse_schedule_start[i].day) == SQLITE_OK);
-            ok &= (sqlite3_bind_int(stmt, 4, game->m_apocalypse_schedule_start[i].hour) == SQLITE_OK);
-            ok &= (sqlite3_bind_int(stmt, 5, game->m_apocalypse_schedule_start[i].minute) == SQLITE_OK);
-            // End time from the corresponding end schedule
-            if (game->m_apocalypse_schedule_end[i].day >= 0) {
-                ok &= (sqlite3_bind_int(stmt, 6, game->m_apocalypse_schedule_end[i].hour) == SQLITE_OK);
-                ok &= (sqlite3_bind_int(stmt, 7, game->m_apocalypse_schedule_end[i].minute) == SQLITE_OK);
-            } else {
-                ok &= (sqlite3_bind_null(stmt, 6) == SQLITE_OK);
-                ok &= (sqlite3_bind_null(stmt, 7) == SQLITE_OK);
-            }
-            ok &= (sqlite3_bind_int(stmt, 8, 0) == SQLITE_OK);  // is_active
-            success = ok && (sqlite3_step(stmt) == SQLITE_DONE);
-        }
-    }
-
-    // Save heldenian schedules (these have end times)
-    for(int i = 0; i < hb::server::config::MaxHeldenian && success; i++) {
-        if (game->m_heldenian_schedule[i].day >= 0) {
-            sqlite3_reset(stmt);
-            sqlite3_clear_bindings(stmt);
-            bool ok = true;
-            ok &= PrepareAndBindText(stmt, 1, "heldenian");
-            ok &= (sqlite3_bind_int(stmt, 2, i) == SQLITE_OK);
-            ok &= (sqlite3_bind_int(stmt, 3, game->m_heldenian_schedule[i].day) == SQLITE_OK);
-            ok &= (sqlite3_bind_int(stmt, 4, game->m_heldenian_schedule[i].start_hour) == SQLITE_OK);
-            ok &= (sqlite3_bind_int(stmt, 5, game->m_heldenian_schedule[i].start_minute) == SQLITE_OK);
-            ok &= (sqlite3_bind_int(stmt, 6, game->m_heldenian_schedule[i].end_hour) == SQLITE_OK);
-            ok &= (sqlite3_bind_int(stmt, 7, game->m_heldenian_schedule[i].end_minute) == SQLITE_OK);
-            ok &= (sqlite3_bind_int(stmt, 8, 0) == SQLITE_OK);  // is_active
-            success = ok && (sqlite3_step(stmt) == SQLITE_DONE);
-        }
-    }
-
-    sqlite3_finalize(stmt);
-
-    if (!success) {
-        RollbackTransaction(db);
-        return false;
-    }
-
-    if (!CommitTransaction(db)) {
-        RollbackTransaction(db);
-        return false;
-    }
-    return true;
-}
-
 bool LoadScheduleConfig(sqlite3* db, CGame* game)
 {
     if (db == nullptr || game == nullptr) {
         return false;
     }
 
-    // initialize all schedules to -1
-    for(int i = 0; i < hb::server::config::MaxSchedule; i++) {
-        game->m_crusade_war_schedule[i].day = -1;
-        game->m_crusade_war_schedule[i].hour = -1;
-        game->m_crusade_war_schedule[i].minute = -1;
-    }
-    for(int i = 0; i < hb::server::config::MaxApocalypse; i++) {
-        game->m_apocalypse_schedule_start[i].day = -1;
-        game->m_apocalypse_schedule_start[i].hour = -1;
-        game->m_apocalypse_schedule_start[i].minute = -1;
-        game->m_apocalypse_schedule_end[i].day = -1;
-        game->m_apocalypse_schedule_end[i].hour = -1;
-        game->m_apocalypse_schedule_end[i].minute = -1;
-    }
-    for(int i = 0; i < hb::server::config::MaxHeldenian; i++) {
-        game->m_heldenian_schedule[i].day = -1;
-        game->m_heldenian_schedule[i].start_hour = -1;
-        game->m_heldenian_schedule[i].start_minute = -1;
-        game->m_heldenian_schedule[i].end_hour = -1;
-        game->m_heldenian_schedule[i].end_minute = -1;
-    }
+    game->m_event_schedule.clear();
 
-    // Load all events from unified table
     sqlite3_stmt* stmt = nullptr;
-    const char* sql = "SELECT event_type, schedule_index, day, start_hour, start_minute, end_hour, end_minute, is_active "
+    const char* sql = "SELECT event_type, day, start_hour, start_minute, end_hour, end_minute, is_active, battle_type "
                       "FROM event_schedule ORDER BY event_type, schedule_index;";
     if (sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) != SQLITE_OK) {
         return false;
     }
 
+    int activeRows = 0;
     while (sqlite3_step(stmt) == SQLITE_ROW) {
         const char* eventType = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 0));
         if (eventType == nullptr) continue;
 
-        int idx = sqlite3_column_int(stmt, 1);
-        int day = sqlite3_column_int(stmt, 2);
-        int startHour = sqlite3_column_int(stmt, 3);
-        int startMinute = sqlite3_column_int(stmt, 4);
-        int endHour = sqlite3_column_type(stmt, 5) != SQLITE_NULL ? sqlite3_column_int(stmt, 5) : -1;
-        int endMinute = sqlite3_column_type(stmt, 6) != SQLITE_NULL ? sqlite3_column_int(stmt, 6) : -1;
-        // is_active at column 7 - can be used for state tracking
+        event_schedule_row row{};
+        int eventIdx = -1;
+        for (int i = 0; i < scheduled_event::count; i++) {
+            if (strcmp(eventType, scheduled_event::names[i]) == 0) {
+                eventIdx = i;
+                break;
+            }
+        }
+        if (eventIdx < 0) {
+            hb::logger::warn("event_schedule: unknown event_type '{}' - row skipped", eventType);
+            continue;
+        }
+        row.event = static_cast<scheduled_event::type>(eventIdx);
 
-        if (strcmp(eventType, "crusade") == 0) {
-            if (idx >= 0 && idx < hb::server::config::MaxSchedule) {
-                game->m_crusade_war_schedule[idx].day = day;
-                game->m_crusade_war_schedule[idx].hour = startHour;
-                game->m_crusade_war_schedule[idx].minute = startMinute;
-            }
+        row.day = sqlite3_column_int(stmt, 1);
+        row.start_hour = sqlite3_column_int(stmt, 2);
+        row.start_minute = sqlite3_column_int(stmt, 3);
+        row.end_hour = sqlite3_column_type(stmt, 4) != SQLITE_NULL ? sqlite3_column_int(stmt, 4) : -1;
+        row.end_minute = sqlite3_column_type(stmt, 5) != SQLITE_NULL ? sqlite3_column_int(stmt, 5) : -1;
+        row.is_active = sqlite3_column_int(stmt, 6) != 0;
+        row.battle_type = sqlite3_column_type(stmt, 7) != SQLITE_NULL ? sqlite3_column_int(stmt, 7) : 0;
+
+        // A malformed time can never match the clock; drop the row loudly
+        // instead of carrying a schedule that silently does nothing. An end is
+        // either fully absent (both columns NULL) or a valid time — one NULL
+        // column alone is a half-specified end, rejected with the rest.
+        const auto validTime = [](int hour, int minute) {
+            return hour >= 0 && hour <= 23 && minute >= 0 && minute <= 59;
+        };
+        const bool endValid = (row.end_hour == -1 && row.end_minute == -1) ||
+            validTime(row.end_hour, row.end_minute);
+        if (row.day < 0 || row.day > 6 ||
+            !validTime(row.start_hour, row.start_minute) || !endValid) {
+            hb::logger::warn("event_schedule: {} row has out-of-range day/time - row skipped", eventType);
+            continue;
         }
-        else if (strcmp(eventType, "apocalypse") == 0) {
-            if (idx >= 0 && idx < hb::server::config::MaxApocalypse) {
-                // start time
-                game->m_apocalypse_schedule_start[idx].day = day;
-                game->m_apocalypse_schedule_start[idx].hour = startHour;
-                game->m_apocalypse_schedule_start[idx].minute = startMinute;
-                // End time (same day as start)
-                game->m_apocalypse_schedule_end[idx].day = day;
-                game->m_apocalypse_schedule_end[idx].hour = endHour;
-                game->m_apocalypse_schedule_end[idx].minute = endMinute;
-            }
+        if (row.event == scheduled_event::heldenian && !heldenian_battle::is_valid(row.battle_type)) {
+            hb::logger::warn("event_schedule: heldenian row needs battle_type 1 (battlefield) or 2 (castle siege) - row skipped");
+            continue;
         }
-        else if (strcmp(eventType, "heldenian") == 0) {
-            if (idx >= 0 && idx < hb::server::config::MaxHeldenian) {
-                game->m_heldenian_schedule[idx].day = day;
-                game->m_heldenian_schedule[idx].start_hour = startHour;
-                game->m_heldenian_schedule[idx].start_minute = startMinute;
-                game->m_heldenian_schedule[idx].end_hour = endHour;
-                game->m_heldenian_schedule[idx].end_minute = endMinute;
-            }
-        }
+
+        if (row.is_active) activeRows++;
+        game->m_event_schedule.push_back(row);
     }
     sqlite3_finalize(stmt);
 
+    hb::logger::log("Event schedule: {} rows loaded, {} active", game->m_event_schedule.size(), activeRows);
     return true;
 }
 

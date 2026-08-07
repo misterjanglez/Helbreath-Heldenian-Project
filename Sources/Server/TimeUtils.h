@@ -16,6 +16,14 @@ struct local_time
 			std::chrono::system_clock::now()));
 	}
 
+	// The calendar day as one comparable int (yyyymmdd). Shared by every
+	// "which day is it" key — the ledger's flow day, the event scheduler's
+	// once-per-day guard — so the encodings cannot drift apart.
+	int date_key() const
+	{
+		return year * 10000 + month * 100 + day;
+	}
+
 	// A stored timestamp, in the reader's own timezone. The Provenance Ledger
 	// keeps unix seconds and its Biographies are read by a person deciding what
 	// happened to somebody's item, so the hour that matters is theirs.

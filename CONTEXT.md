@@ -194,3 +194,20 @@ _Note_: an item minted and never placed may legally go anywhere (creation venues
 
 **Game DB**:
 The single consolidated account/character store (`game.db`) replacing the per-account `accounts/*.db` files: `UNIQUE` character names, one persistent WAL connection, atomic multi-account transactions (Exchange, Trading Post custody). `gamedata.db`, `MapInfo.db`, and `itemledger.db` remain separate.
+
+### War Events (crusade, heldenian, apocalypse)
+
+**War event**:
+One of the three server-wide wars — Crusade, Heldenian, Apocalypse. At most one runs at a time (the mutual-exclusion rule, enforced by the start funnels in `WarManager`).
+
+**Event schedule**:
+The `event_schedule` table in `gamedata.db` — one row per scheduled start (and, for heldenian/apocalypse, end) with a day-of-week, times, an `is_active` switch, and for heldenian rows a Battle type. The event scheduler (5 s tick in `WarManager`, #97) drives wars from active rows; inactive rows are loaded but never fire.
+
+**Battle type**:
+Which Heldenian is fought: `1` battlefield (btfield towers) or `2` castle siege (hrampart gates). Named in `EventSchedule.h` (`heldenian_battle`).
+
+**Once-per-day guard**:
+The scheduler starts each event at most once per calendar day (yyyymmdd stamp, not day-of-week — a long-running server must not block next week's same weekday). GM `/begin*` commands bypass the schedule and the guard by design; a GM war neither consumes nor is blocked by the day's scheduled one.
+
+**Scheduled end**:
+A row's end time ends its event (heldenian/apocalypse) whenever that event is running at that minute, regardless of who started it. Crusade has no clock end — it ends through its own war flow or `/endcrusade`.

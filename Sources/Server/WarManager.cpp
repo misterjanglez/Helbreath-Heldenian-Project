@@ -40,40 +40,85 @@ using namespace hb::server::skill;
 extern char G_cTxt[512];
 extern char G_cData50000[50000];
 
-void WarManager::crusade_war_starter()
+// Drives the three war events from the event_schedule rows loaded at boot
+// (5 s cadence, the original CrusadeWarStarter's). Ends run before starts so
+// a row scheduled back-to-back against another event's end can start inside
+// the same minute. Starts fire on an exact day/hour/minute match, at most
+// once per event per calendar day (a day-of-week stamp would block the same
+// weekday next week — the original could afford that only because it was
+// rebooted daily), and never while another war event runs: the same
+// mutual-exclusion rule the GM /begin* commands enforce. The GM commands
+// bypass the schedule and the day guard by calling the start/end functions
+// directly.
+// True while any of the three war events runs. Every start funnel
+// (start_crusade_mode / start_heldenian_mode / start_apocalypse_mode) checks
+// it itself, so no caller can stack wars by skipping a courtesy pre-check.
+bool WarManager::war_event_active() const
 {
-	hb::time::local_time SysTime{};
-	
-
-	if (m_game->m_is_crusade_mode) return;
-	if (m_game->m_is_crusade_war_starter == false) return;
-
-	SysTime = hb::time::local_time::now();
-
-	for(int i = 0; i < MaxSchedule; i++)
-		if ((m_game->m_crusade_war_schedule[i].day == SysTime.day_of_week) &&
-			(m_game->m_crusade_war_schedule[i].hour == SysTime.hour) &&
-			(m_game->m_crusade_war_schedule[i].minute == SysTime.minute)) {
-			hb::logger::log("Automated crusade initiating");
-			global_start_crusade_mode();
-			return;
-		}
+	return m_game->m_is_crusade_mode || m_game->m_is_heldenian_mode || m_game->m_is_apocalypse_mode;
 }
 
-void WarManager::global_start_crusade_mode()
+void WarManager::event_scheduler()
 {
-	uint32_t crusade_guid;
-	hb::time::local_time SysTime{};
+	const hb::time::local_time now = hb::time::local_time::now();
+	const int today = now.date_key();
 
-	SysTime = hb::time::local_time::now();
-	if (m_game->m_latest_crusade_day_of_week != -1) {
-		if (m_game->m_latest_crusade_day_of_week == SysTime.day_of_week) return;
+	for (const event_schedule_row& row : m_game->m_event_schedule) {
+		if (!row.is_active || row.day != now.day_of_week) continue;
+		if (row.end_hour != now.hour || row.end_minute != now.minute) continue;
+		// The mode dropping is what stops the end from re-firing within its
+		// minute; a war a GM restarts inside that minute is ended again.
+		switch (row.event) {
+		case scheduled_event::heldenian:
+			if (m_game->m_is_heldenian_mode) {
+				hb::logger::log<log_channel::events>("Automated heldenian concluded");
+				global_end_heldenian_mode();
+			}
+			break;
+		case scheduled_event::apocalypse:
+			if (m_game->m_is_apocalypse_mode) {
+				hb::logger::log<log_channel::events>("Automated apocalypse concluded");
+				global_end_apocalypse_mode();
+			}
+			break;
+		default:
+			break; // a crusade ends through its own war flow, never the clock
+		}
 	}
-	else m_game->m_latest_crusade_day_of_week = SysTime.day_of_week;
 
-	crusade_guid = GameClock::GetTimeMS();
+	for (const event_schedule_row& row : m_game->m_event_schedule) {
+		if (!row.is_active || row.day != now.day_of_week) continue;
+		if (row.start_hour != now.hour || row.start_minute != now.minute) continue;
+		if (m_last_event_start_date[row.event] == today) continue;
+		// A start blocked here does not stamp the day, so a later row for the
+		// same event may still fire once the running war is over.
+		if (war_event_active()) continue;
 
-	local_start_crusade_mode(crusade_guid);
+		switch (row.event) {
+		case scheduled_event::crusade:
+			hb::logger::log<log_channel::events>("Automated crusade initiating");
+			start_crusade_mode();
+			break;
+		case scheduled_event::heldenian:
+			hb::logger::log<log_channel::events>("Automated heldenian initiating (type {})", row.battle_type);
+			start_heldenian_mode(row.battle_type);
+			break;
+		case scheduled_event::apocalypse:
+			hb::logger::log<log_channel::events>("Automated apocalypse initiating");
+			start_apocalypse_mode();
+			break;
+		default:
+			break;
+		}
+		m_last_event_start_date[row.event] = today;
+	}
+}
+
+// Starts a crusade under a fresh war guid.
+void WarManager::start_crusade_mode()
+{
+	if (war_event_active()) return;
+	local_start_crusade_mode(GameClock::GetTimeMS());
 }
 
 void WarManager::local_start_crusade_mode(uint32_t crusade_guid)
@@ -1255,15 +1300,6 @@ void WarManager::request_set_guild_construct_loc_handler(int, int, int, int, con
 	// Guild construct loc system removed
 }
 
-void WarManager::set_heldenian_mode()
-{
-	hb::time::local_time SysTime{};
-
-	SysTime = hb::time::local_time::now();
-	m_game->m_heldenian_start_hour = SysTime.hour;
-	m_game->m_heldenian_start_minute = SysTime.minute;
-}
-
 void WarManager::global_start_heldenian_mode()
 {
 	uint32_t time = GameClock::GetTimeMS();
@@ -1451,12 +1487,12 @@ void WarManager::local_start_heldenian_mode(short v1, short v2, uint32_t heldeni
 	m_game->m_heldenian_initiated = true;
 	m_game->m_is_heldenian_mode = true;
 
-	// The GM start opens the battle immediately, so follow the prep notice with the
+	// Every start opens the battle immediately, so follow the prep notice with the
 	// battle-live one — the same HeldenianTeleport/HeldenianStart pairing the login
 	// paths send. Without it, clients keep showing "casting is forbidden until real
 	// battle" for a battle the server already considers live. The real prep window
-	// (initiated=false between the T-300 notice and the start) arrives with the
-	// event scheduler (#97).
+	// (initiated=false between the T-300 notice and the start) is future work (#115):
+	// the client and the combat gate already understand the split state.
 	for (int i = 0; i < MaxClients; i++)
 		if ((m_game->m_client_list[i] != 0) && (m_game->m_client_list[i]->m_is_init_complete)) {
 			m_game->send_notify_msg(0, i, Notify::HeldenianStart, 0, 0, 0, 0);
@@ -1582,32 +1618,16 @@ void WarManager::create_heldenian_guid(uint32_t heldenian_guid, int winner_side)
 	if (file != 0) fclose(file);
 }
 
-void WarManager::manual_start_heldenian_mode(int heldenian_type)
+// Starts a heldenian of the given battle type (heldenian_battle::type).
+void WarManager::start_heldenian_mode(int heldenian_type)
 {
-	hb::time::local_time SysTime{};
+	if (war_event_active()) return;
 
-	if (m_game->m_is_heldenian_mode) return;
-	if (m_game->m_is_apocalypse_mode) return;
-	if (m_game->m_is_crusade_mode) return;
-
-	if ((heldenian_type == 1) || (heldenian_type == 2)) {
+	if (heldenian_battle::is_valid(heldenian_type)) {
 		m_game->m_heldenian_mode_type = static_cast<char>(heldenian_type);
 	}
 
-	SysTime = hb::time::local_time::now();
-	m_game->m_heldenian_start_hour = SysTime.hour;
-	m_game->m_heldenian_start_minute = SysTime.minute;
-
-	m_game->m_heldenian_running = true;
 	global_start_heldenian_mode();
-}
-
-void WarManager::manual_end_heldenian_mode()
-{
-	if (m_game->m_is_heldenian_mode == false) return;
-
-	global_end_heldenian_mode();
-	m_game->m_heldenian_running = false;
 }
 
 void WarManager::remove_heldenian_npc(int npc_h)
@@ -1982,24 +2002,10 @@ void WarManager::remove_occupy_flags(int map_index)
 		}
 }
 
-void WarManager::apocalypse_ender()
+void WarManager::start_apocalypse_mode()
 {
-	hb::time::local_time SysTime{};
-	
-
-	if (m_game->m_is_apocalypse_mode == false) return;
-	if (m_game->m_is_apocalypse_starter == false) return;
-
-	SysTime = hb::time::local_time::now();
-
-	for(int i = 0; i < MaxApocalypse; i++)
-		if ((m_game->m_apocalypse_schedule_end[i].day == SysTime.day_of_week) &&
-			(m_game->m_apocalypse_schedule_end[i].hour == SysTime.hour) &&
-			(m_game->m_apocalypse_schedule_end[i].minute == SysTime.minute)) {
-			hb::logger::log("Automated apocalypse concluded");
-			global_end_apocalypse_mode();
-			return;
-		}
+	if (war_event_active()) return;
+	local_start_apocalypse(GameClock::GetTimeMS());
 }
 
 void WarManager::global_end_apocalypse_mode()

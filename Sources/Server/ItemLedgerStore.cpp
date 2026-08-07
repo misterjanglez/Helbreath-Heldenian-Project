@@ -573,7 +573,7 @@ namespace hb::server
 		}
 
 		const hb::time::local_time local = hb::time::local_time::now();
-		m_flow_day = local.year * 10000 + local.month * 100 + local.day;
+		m_flow_day = local.date_key();
 		m_flow_day_at = now;
 		return m_flow_day;
 	}

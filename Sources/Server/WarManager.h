@@ -1,6 +1,7 @@
 #pragma once
 #include <cstddef>
 #include <cstdint>
+#include "EventSchedule.h"
 
 class CGame;
 
@@ -16,10 +17,20 @@ public:
 	void set_game(CGame* game) { m_game = game; }
 
 	// ========================================================================
+	// Event Scheduler
+	// ========================================================================
+	// 5 s tick from CGame::on_timer: starts (and, where the row carries an end
+	// time, ends) the three war events from the event_schedule table (#97).
+	void event_scheduler();
+
+	// True while any of the three war events runs. The mutual-exclusion
+	// predicate every start path shares.
+	bool war_event_active() const;
+
+	// ========================================================================
 	// Crusade System
 	// ========================================================================
-	void crusade_war_starter();
-	void global_start_crusade_mode();
+	void start_crusade_mode();
 	void local_start_crusade_mode(uint32_t guild_guid);
 	void local_end_crusade_mode(int winner_side);
 	void manual_end_crusade_mode(int winner_side);
@@ -61,15 +72,13 @@ public:
 	// ========================================================================
 	// Heldenian Battle System
 	// ========================================================================
-	void set_heldenian_mode();
 	void global_start_heldenian_mode();
 	void local_start_heldenian_mode(short v1, short v2, uint32_t heldenian_guid);
 	void global_end_heldenian_mode();
 	void local_end_heldenian_mode();
 	bool update_heldenian_status();
 	void create_heldenian_guid(uint32_t heldenian_guid, int winner_side);
-	void manual_start_heldenian_mode(int heldenian_type);
-	void manual_end_heldenian_mode();
+	void start_heldenian_mode(int heldenian_type);
 	void remove_heldenian_npc(int npc_h);
 	void set_heldenian_gate_arch(int map_index, short gate_x, short gate_y, bool sealed);
 	void unseal_heldenian_gate_for_npc(int npc_h);
@@ -87,7 +96,7 @@ public:
 	// ========================================================================
 	// Apocalypse System
 	// ========================================================================
-	void apocalypse_ender();
+	void start_apocalypse_mode();
 	void global_end_apocalypse_mode();
 	void local_end_apocalypse();
 	void local_start_apocalypse(uint32_t apocalypse_guid);
@@ -140,6 +149,12 @@ private:
 	void open_apocalypse_gate(int map_index);
 	void spawn_apocalypse_boss(int map_index);
 	void reset_apocalypse_map_state();
+
+	// Calendar date (yyyymmdd) each event last auto-started, indexed by
+	// scheduled_event::type (-1 = never). The scheduler's once-per-day guard;
+	// GM starts never stamp it, so a manual war does not consume the day's
+	// scheduled one.
+	int m_last_event_start_date[hb::server::config::scheduled_event::count] = { -1, -1, -1 };
 
 	CGame* m_game = nullptr;
 };
