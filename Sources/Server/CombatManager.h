@@ -72,6 +72,10 @@ public:
 private:
 	CGame* m_game = nullptr;
 
+	// The heldenian prep-window combat gate (#115), shared by the physical path
+	// and both spell-damage paths so the condition cannot drift between sites.
+	bool heldenian_prep_blocks(short attacker_h) const;
+
 	// Item Tiers Marquee weapon exotics on a landed hit (spec §5): Sunder and
 	// Bleed roll their proc chance, the two drains are deterministic. Players
 	// and NPCs are both legal victims; only a player can be the attacker,

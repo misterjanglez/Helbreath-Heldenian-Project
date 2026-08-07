@@ -33,6 +33,7 @@ set(SERVER_SOURCES
     CmdCoverageCheck.cpp
     CmdGameDbCheck.cpp
     CmdGiveItem.cpp
+    CmdGuildDbCheck.cpp
     CheckTally.cpp
     CmdHelp.cpp
     CmdItemHistory.cpp
@@ -91,6 +92,7 @@ set(SERVER_SOURCES
     GameConfigSqliteStore.cpp
     ServerConfig.cpp
     GuildManager.cpp
+    GuildSqliteStore.cpp
     ItemBiography.cpp
     ItemLedgerStore.cpp
     ItemReconciliation.cpp

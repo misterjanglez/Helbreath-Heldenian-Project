@@ -2,6 +2,7 @@
 #include <cstddef>
 #include <cstdint>
 #include "EventSchedule.h"
+#include "TimeUtils.h"
 
 class CGame;
 
@@ -72,12 +73,17 @@ public:
 	// ========================================================================
 	// Heldenian Battle System
 	// ========================================================================
-	void global_start_heldenian_mode();
 	void local_start_heldenian_mode(short v1, short v2, uint32_t heldenian_guid);
+	// Opens combat on a war standing in its prep window (#115).
+	void open_heldenian_battle();
 	void global_end_heldenian_mode();
 	void local_end_heldenian_mode();
 	bool update_heldenian_status();
 	void create_heldenian_guid(uint32_t heldenian_guid, int winner_side);
+	// Prep entry only; battle opens via open_heldenian_battle.
+	void start_heldenian_prep(int heldenian_type);
+	// Prep entry and battle open in one call (GM /beginheldenian; the
+	// scheduler's blocked/missed-prep fallback).
 	void start_heldenian_mode(int heldenian_type);
 	void remove_heldenian_npc(int npc_h);
 	void set_heldenian_gate_arch(int map_index, short gate_x, short gate_y, bool sealed);
@@ -143,6 +149,10 @@ private:
 	static constexpr tp_list_entry btfield_spawn[2] = { { "btfield", 68, 225 }, { "btfield", 202, 70 } };
 	int build_cityhall_tp_list(int client_h, tp_list_entry* entries);
 	void send_teleport_list(int client_h, uint32_t msg_id, const tp_list_entry* entries, int count);
+
+	// The two-stage scheduled heldenian (#115): prep entry 5 minutes ahead of
+	// the row, battle open at the row's own minute.
+	void run_scheduled_heldenian(const hb::server::config::event_schedule_row& row, const hb::time::local_time& now, int today);
 
 	void check_apocalypse_map_cleared(int map_index);
 	void apocalypse_gate_travel_tick();

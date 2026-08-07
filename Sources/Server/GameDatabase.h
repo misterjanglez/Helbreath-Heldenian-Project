@@ -58,7 +58,11 @@ namespace hb::server
 		// WAL, synchronous=NORMAL, foreign keys on, a busy timeout. Does not
 		// touch the schema — see EnsureGameDatabase() in AccountSqliteStore.h,
 		// which is what callers other than the prover should use.
-		bool open(const std::string& path);
+		//
+		// `label` names this connection in every log line the class emits, so a
+		// second instance on another file (the guild store's guilds.db, #120)
+		// reports as itself rather than as the Game DB.
+		bool open(const std::string& path, const char* label = "GAMEDB");
 
 		// Finalize every cached statement and close. Idempotent. An open
 		// transaction is rolled back rather than silently committed: reaching
@@ -146,6 +150,7 @@ namespace hb::server
 
 		sqlite3* m_db = nullptr;
 		std::string m_path;
+		std::string m_label = "GAMEDB";
 
 		// Keyed by the SQL text rather than the pointer: some call sites build
 		// their statement with std::format, and a pointer key would compile a

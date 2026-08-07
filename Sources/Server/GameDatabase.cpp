@@ -48,11 +48,11 @@ namespace
 		return (found != instances.end()) ? found->second : nullptr;
 	}
 
-	bool exec_sql(sqlite3* db, const char* sql)
+	bool exec_sql(sqlite3* db, const char* sql, const char* label = "GAMEDB")
 	{
 		char* err = nullptr;
 		if (sqlite3_exec(db, sql, nullptr, nullptr, &err) != SQLITE_OK) {
-			hb::logger::error("[GAMEDB] SQLite exec failed ({}): {}", sql, err ? err : "unknown");
+			hb::logger::error("[{}] SQLite exec failed ({}): {}", label, sql, err ? err : "unknown");
 			sqlite3_free(err);
 			return false;
 		}
@@ -85,14 +85,15 @@ namespace hb::server
 		close();
 	}
 
-	bool game_database::open(const std::string& path)
+	bool game_database::open(const std::string& path, const char* label)
 	{
 		if (m_db != nullptr) {
 			return true;
 		}
+		m_label = label;
 
 		if (sqlite3_open(path.c_str(), &m_db) != SQLITE_OK) {
-			hb::logger::error("[GAMEDB] sqlite3_open failed for {}: {}", path,
+			hb::logger::error("[{}] sqlite3_open failed for {}: {}", m_label, path,
 				m_db ? sqlite3_errmsg(m_db) : "unknown");
 			if (m_db != nullptr) {
 				sqlite3_close(m_db);
@@ -109,7 +110,7 @@ namespace hb::server
 			return false;
 		}
 
-		hb::logger::log("[GAMEDB] {} open (WAL, synchronous=NORMAL)", path);
+		hb::logger::log("[{}] {} open (WAL, synchronous=NORMAL)", m_label, path);
 		return true;
 	}
 
@@ -121,7 +122,7 @@ namespace hb::server
 		// set every open. The ON DELETE CASCADE chains from `characters` down to
 		// every per-character table are what make DeleteCharacterData one
 		// statement instead of eight — without this pragma they are decoration.
-		if (!exec_sql(m_db, "PRAGMA foreign_keys = ON;")) {
+		if (!exec_sql(m_db, "PRAGMA foreign_keys = ON;", m_label.c_str())) {
 			return false;
 		}
 
@@ -131,16 +132,16 @@ namespace hb::server
 		// atomicity to mean anything. synchronous=NORMAL is the matching half —
 		// snapshot saves already tolerate losing the window since the last save,
 		// so an fsync per commit buys durability the design does not claim.
-		if (!exec_sql(m_db, "PRAGMA journal_mode = WAL;")
-			|| !exec_sql(m_db, "PRAGMA synchronous = NORMAL;")) {
+		if (!exec_sql(m_db, "PRAGMA journal_mode = WAL;", m_label.c_str())
+			|| !exec_sql(m_db, "PRAGMA synchronous = NORMAL;", m_label.c_str())) {
 			return false;
 		}
 
 		const std::string mode = read_pragma(m_db, "PRAGMA journal_mode;");
 		if (mode != "wal") {
-			hb::logger::error("[GAMEDB] journal_mode is '{}', not WAL - cross-account "
+			hb::logger::error("[{}] journal_mode is '{}', not WAL - cross-account "
 				"transactions and live external readers both depend on it",
-				mode.empty() ? "unknown" : mode);
+				m_label, mode.empty() ? "unknown" : mode);
 			return false;
 		}
 
@@ -157,10 +158,10 @@ namespace hb::server
 		// Rolling back is the honest outcome: committing a sweep that never
 		// reached its own commit would persist whatever half of it had run.
 		if (m_txn_depth > 0) {
-			hb::logger::warn("[GAMEDB] closing with {} transaction scope(s) still open - "
-				"rolling back", m_txn_depth);
+			hb::logger::warn("[{}] closing with {} transaction scope(s) still open - "
+				"rolling back", m_label, m_txn_depth);
 			m_txn_depth = 0;
-			exec_sql(m_db, "ROLLBACK;");
+			exec_sql(m_db, "ROLLBACK;", m_label.c_str());
 		}
 
 		// Cached statements hold a reference on the connection; sqlite3_close
@@ -176,7 +177,7 @@ namespace hb::server
 		database_registry().erase(m_db);
 
 		if (sqlite3_close(m_db) != SQLITE_OK) {
-			hb::logger::error("[GAMEDB] sqlite3_close failed: {}", sqlite3_errmsg(m_db));
+			hb::logger::error("[{}] sqlite3_close failed: {}", m_label, sqlite3_errmsg(m_db));
 		}
 		m_db = nullptr;
 	}
@@ -201,7 +202,7 @@ namespace hb::server
 		// PREPARE_PERSISTENT: these statements are cached for the life of the
 		// process, which is exactly the case the flag exists to tell SQLite about.
 		if (sqlite3_prepare_v3(m_db, sql, -1, SQLITE_PREPARE_PERSISTENT, &stmt, nullptr) != SQLITE_OK) {
-			hb::logger::error("[GAMEDB] prepare failed: {} | SQL: {}", sqlite3_errmsg(m_db), sql);
+			hb::logger::error("[{}] prepare failed: {} | SQL: {}", m_label, sqlite3_errmsg(m_db), sql);
 			return nullptr;
 		}
 
@@ -216,7 +217,7 @@ namespace hb::server
 		}
 
 		if (m_txn_depth == 0) {
-			if (!exec_sql(m_db, "BEGIN;")) {
+			if (!exec_sql(m_db, "BEGIN;", m_label.c_str())) {
 				return false;
 			}
 			m_txn_depth = 1;
@@ -226,7 +227,7 @@ namespace hb::server
 		// Inside an existing transaction: a SAVEPOINT, so that failing here can
 		// be undone without taking the enclosing scope down with it.
 		const std::string sql = std::format("SAVEPOINT sp_{};", ++m_savepoint_seq);
-		if (!exec_sql(m_db, sql.c_str())) {
+		if (!exec_sql(m_db, sql.c_str(), m_label.c_str())) {
 			--m_savepoint_seq;
 			return false;
 		}
@@ -242,14 +243,14 @@ namespace hb::server
 
 		if (m_txn_depth == 1) {
 			m_txn_depth = 0;
-			return exec_sql(m_db, "COMMIT;");
+			return exec_sql(m_db, "COMMIT;", m_label.c_str());
 		}
 
 		// RELEASE folds the savepoint's work into the enclosing scope; nothing
 		// is durable until the outermost COMMIT.
 		const std::string sql = std::format("RELEASE sp_{};", m_savepoint_seq--);
 		--m_txn_depth;
-		return exec_sql(m_db, sql.c_str());
+		return exec_sql(m_db, sql.c_str(), m_label.c_str());
 	}
 
 	bool game_database::rollback()
@@ -260,7 +261,7 @@ namespace hb::server
 
 		if (m_txn_depth == 1) {
 			m_txn_depth = 0;
-			return exec_sql(m_db, "ROLLBACK;");
+			return exec_sql(m_db, "ROLLBACK;", m_label.c_str());
 		}
 
 		// ROLLBACK TO rewinds the savepoint but leaves it on the stack, so the
@@ -270,8 +271,8 @@ namespace hb::server
 		--m_txn_depth;
 		const std::string undo = std::format("ROLLBACK TO sp_{};", id);
 		const std::string pop = std::format("RELEASE sp_{};", id);
-		const bool ok = exec_sql(m_db, undo.c_str());
-		return exec_sql(m_db, pop.c_str()) && ok;
+		const bool ok = exec_sql(m_db, undo.c_str(), m_label.c_str());
+		return exec_sql(m_db, pop.c_str(), m_label.c_str()) && ok;
 	}
 
 	game_database& game_db()

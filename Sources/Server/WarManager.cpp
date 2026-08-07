@@ -49,7 +49,9 @@ extern char G_cData50000[50000];
 // rebooted daily), and never while another war event runs: the same
 // mutual-exclusion rule the GM /begin* commands enforce. The GM commands
 // bypass the schedule and the day guard by calling the start/end functions
-// directly.
+// directly. A heldenian row runs its start in two stages — the prep window
+// five minutes ahead, the battle at the row's minute (#115) — in
+// run_scheduled_heldenian below.
 // True while any of the three war events runs. Every start funnel
 // (start_crusade_mode / start_heldenian_mode / start_apocalypse_mode) checks
 // it itself, so no caller can stack wars by skipping a courtesy pre-check.
@@ -87,7 +89,14 @@ void WarManager::event_scheduler()
 	}
 
 	for (const event_schedule_row& row : m_game->m_event_schedule) {
-		if (!row.is_active || row.day != now.day_of_week) continue;
+		if (!row.is_active) continue;
+
+		if (row.event == scheduled_event::heldenian) {
+			run_scheduled_heldenian(row, now, today);
+			continue;
+		}
+
+		if (row.day != now.day_of_week) continue;
 		if (row.start_hour != now.hour || row.start_minute != now.minute) continue;
 		if (m_last_event_start_date[row.event] == today) continue;
 		// A start blocked here does not stamp the day, so a later row for the
@@ -99,10 +108,6 @@ void WarManager::event_scheduler()
 			hb::logger::log<log_channel::events>("Automated crusade initiating");
 			start_crusade_mode();
 			break;
-		case scheduled_event::heldenian:
-			hb::logger::log<log_channel::events>("Automated heldenian initiating (type {})", row.battle_type);
-			start_heldenian_mode(row.battle_type);
-			break;
 		case scheduled_event::apocalypse:
 			hb::logger::log<log_channel::events>("Automated apocalypse initiating");
 			start_apocalypse_mode();
@@ -112,6 +117,56 @@ void WarManager::event_scheduler()
 		}
 		m_last_event_start_date[row.event] = today;
 	}
+}
+
+static constexpr int week_minute(int day, int hour, int minute)
+{
+	return (day * 24 + hour) * 60 + minute;
+}
+
+// Retail opened a heldenian in two stages, and the split state is what the
+// combat gates and the login/map-enter notices already encode: prep = mode on,
+// initiated off (teleport available, war maps open, no fighting); battle =
+// initiated on. This runs a schedule row through those stages (#115). The GM
+// /beginheldenian keeps the immediate single-stage start.
+void WarManager::run_scheduled_heldenian(const event_schedule_row& row, const hb::time::local_time& now, int today)
+{
+	// The prep notice leads the battle by five minutes; comparing minutes-of-
+	// the-week keeps the arithmetic right across hour and day boundaries (a
+	// Sunday 00:02 war preps at Saturday 23:57).
+	constexpr int prep_lead_minutes = 5;
+	constexpr int week_minutes = 7 * 24 * 60;
+	const int now_wmin = week_minute(now.day_of_week, now.hour, now.minute);
+	const int battle_wmin = week_minute(row.day, row.start_hour, row.start_minute);
+	const int prep_wmin = (battle_wmin - prep_lead_minutes + week_minutes) % week_minutes;
+
+	const bool at_prep = (now_wmin == prep_wmin);
+	const bool at_battle = (now_wmin == battle_wmin);
+	if (!at_prep && !at_battle) return;
+
+	if (at_battle && m_game->heldenian_prep_active()) {
+		// The initiated flag flipping true is what stops the open from
+		// re-firing within its minute.
+		hb::logger::log<log_channel::events>("Automated heldenian battle opening");
+		open_heldenian_battle();
+		return;
+	}
+
+	// One guarded start per calendar day, never over another war: the prep
+	// entry at its lead minute, or — when the prep was blocked (another war
+	// still running) or missed (boot inside the window) — the war battle-live
+	// at its scheduled minute.
+	if (m_last_event_start_date[scheduled_event::heldenian] == today) return;
+	if (war_event_active()) return;
+	if (at_prep) {
+		hb::logger::log<log_channel::events>("Automated heldenian prep window opening (type {})", row.battle_type);
+		start_heldenian_prep(row.battle_type);
+	}
+	else {
+		hb::logger::log<log_channel::events>("Automated heldenian initiating without prep (type {})", row.battle_type);
+		start_heldenian_mode(row.battle_type);
+	}
+	m_last_event_start_date[scheduled_event::heldenian] = today;
 }
 
 // Starts a crusade under a fresh war guid.
@@ -1300,13 +1355,6 @@ void WarManager::request_set_guild_construct_loc_handler(int, int, int, int, con
 	// Guild construct loc system removed
 }
 
-void WarManager::global_start_heldenian_mode()
-{
-	uint32_t time = GameClock::GetTimeMS();
-	local_start_heldenian_mode(m_game->m_heldenian_mode_type, m_game->m_last_heldenian_winner, time);
-
-}
-
 void WarManager::local_start_heldenian_mode(short v1, short v2, uint32_t heldenian_guid)
 {
 	int x, z, naming_value;
@@ -1484,22 +1532,31 @@ void WarManager::local_start_heldenian_mode(short v1, short v2, uint32_t heldeni
 			}
 		}
 	}
-	m_game->m_heldenian_initiated = true;
+	// Prep entry only: the war window is open (teleport notice above, structures
+	// up, combat gates closed) and the battle is not. open_heldenian_battle flips
+	// initiated and sends the battle-live notice — immediately for the GM path,
+	// at the scheduled minute for the event scheduler (#115).
+	m_game->m_heldenian_initiated = false;
 	m_game->m_is_heldenian_mode = true;
 
-	// Every start opens the battle immediately, so follow the prep notice with the
-	// battle-live one — the same HeldenianTeleport/HeldenianStart pairing the login
-	// paths send. Without it, clients keep showing "casting is forbidden until real
-	// battle" for a battle the server already considers live. The real prep window
-	// (initiated=false between the T-300 notice and the start) is future work (#115):
-	// the client and the combat gate already understand the split state.
+	hb::logger::log<log_channel::events>("Heldenian war window opened (prep)");
+	m_game->m_heldenian_start_time = static_cast<uint32_t>(time(0));
+}
+
+void WarManager::open_heldenian_battle()
+{
+	if (m_game->heldenian_prep_active() == false) return;
+	m_game->m_heldenian_initiated = true;
+
+	// The same HeldenianTeleport/HeldenianStart pairing the login paths send:
+	// without the broadcast, clients keep showing "casting is forbidden until
+	// real battle" for a battle the server considers live.
 	for (int i = 0; i < MaxClients; i++)
 		if ((m_game->m_client_list[i] != 0) && (m_game->m_client_list[i]->m_is_init_complete)) {
 			m_game->send_notify_msg(0, i, Notify::HeldenianStart, 0, 0, 0, 0);
 		}
 
-	hb::logger::log<log_channel::events>("Heldenian started");
-	m_game->m_heldenian_start_time = static_cast<uint32_t>(time(0));
+	hb::logger::log<log_channel::events>("Heldenian battle opened");
 }
 
 void WarManager::global_end_heldenian_mode()
@@ -1516,7 +1573,11 @@ void WarManager::local_end_heldenian_mode()
 {
 	if (m_game->m_is_heldenian_mode == false) return;
 	m_game->m_is_heldenian_mode = false;
-	m_game->m_heldenian_initiated = true;
+	// The original latched initiated TRUE here, so after the first war every
+	// fresh login got the "real battle has been started" top message and the
+	// firebow's fire-field suppression stayed engaged until reboot — jank a
+	// daily-rebooted server never showed (#115). The flag clears with the mode.
+	m_game->m_heldenian_initiated = false;
 
 	m_game->m_heldenian_finish_time = static_cast<uint32_t>(time(0));
 	if (m_game->m_heldenian_mode_type == 1) {
@@ -1618,8 +1679,9 @@ void WarManager::create_heldenian_guid(uint32_t heldenian_guid, int winner_side)
 	if (file != 0) fclose(file);
 }
 
-// Starts a heldenian of the given battle type (heldenian_battle::type).
-void WarManager::start_heldenian_mode(int heldenian_type)
+// heldenian_type is a heldenian_battle::type; an invalid value keeps the
+// standing mode type.
+void WarManager::start_heldenian_prep(int heldenian_type)
 {
 	if (war_event_active()) return;
 
@@ -1627,7 +1689,13 @@ void WarManager::start_heldenian_mode(int heldenian_type)
 		m_game->m_heldenian_mode_type = static_cast<char>(heldenian_type);
 	}
 
-	global_start_heldenian_mode();
+	local_start_heldenian_mode(m_game->m_heldenian_mode_type, m_game->m_last_heldenian_winner, GameClock::GetTimeMS());
+}
+
+void WarManager::start_heldenian_mode(int heldenian_type)
+{
+	start_heldenian_prep(heldenian_type);
+	open_heldenian_battle();
 }
 
 void WarManager::remove_heldenian_npc(int npc_h)
@@ -2755,6 +2823,9 @@ bool WarManager::set_occupy_flag(char map_index, int dX, int dY, int side, int e
 		else if (m_game->m_heldenian_mode_type == 2) {
 			// Castle siege: an attacker plants their own flag inside the winning zone to take
 			// the castle; the previous winner defends and wins by holding until the war ends.
+			// The plant ends the war, so it needs the battle open — not the prep
+			// window, where combat is gated and the war must not be decidable (#115).
+			if (m_game->m_heldenian_initiated == false) return false;
 			if (m_game->m_godh_map_index == -1) return false;
 			if ((client_h <= 0) || (m_game->m_client_list[client_h] == 0)) return false;
 

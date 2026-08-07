@@ -7,6 +7,7 @@
 #include "TimeUtils.h"
 #include <filesystem>
 #include <iostream>
+#include <limits>
 #include "LoginServer.h"
 #include "EntityManager.h"
 #include "FishingManager.h"
@@ -33,6 +34,7 @@
 #include "CraftingManager.h"
 #include "QuestManager.h"
 #include "GuildManager.h"
+#include "GuildSqliteStore.h"
 #include "DelayEventManager.h"
 #include "DynamicObjectManager.h"
 #include "LootManager.h"
@@ -321,6 +323,7 @@ CGame::CGame()
 	m_trading_post_manager = std::make_unique<hb::server::trading_post_manager>();
 	m_trading_post_manager->set_game(this);
 	m_item_ledger_store = std::make_unique<hb::server::item_ledger_store>();
+	m_guild_store = std::make_unique<hb::server::guild_sqlite_store>();
 	m_regen_manager->set_game(this);
 
 	for(int i = 0; i < hb::shared::limits::MaxMagicType; i++)
@@ -1305,6 +1308,25 @@ bool CGame::init()
 	}
 	m_item_manager->resume_serials_from(m_item_ledger_store->recovered_high_water());
 
+	// Open the guild store (guilds.db, #120) and run its fail-fast sweep —
+	// TierConfig discipline: a world whose guild rows contradict their own
+	// invariants does not boot, because every later guild feature (#121+)
+	// assumes what the sweep asserts. A stale schema stamp was already refused
+	// inside open(); fresh start, no migrations.
+	hb::logger::log("Opening guild store ({})", hb::server::default_guilds_db_path);
+	if (!m_guild_store->open(hb::server::default_guilds_db_path)) {
+		hb::logger::error("Cannot start server: {} unavailable", hb::server::default_guilds_db_path);
+		return false;
+	}
+	if (const auto guild_errors = m_guild_store->validate(); !guild_errors.empty()) {
+		for (const auto& guild_error : guild_errors) {
+			hb::logger::error("guild validator: {}", guild_error);
+		}
+		hb::logger::error("Cannot start server: guild store failed validation ({} error(s))",
+			guild_errors.size());
+		return false;
+	}
+
 	// Load map configurations (display names, no-attack areas, static NPCs) from mapinfo.db
 	// Must be after NPC configs are loaded from gamedata.db (spawn_map_npcs needs m_npc_config_list)
 	{
@@ -2269,9 +2291,9 @@ void CGame::request_init_data_handler(int client_h, char* data, char key, size_t
 		m_client_list[client_h]->m_var = 2;
 		if (m_is_heldenian_mode) {
 			send_notify_msg(0, client_h, Notify::Crusade, 0, 0, 0, 0);
-			if (m_heldenian_initiated == false) {
-				send_notify_msg(0, client_h, Notify::HeldenianStart, 0, 0, 0, 0);
-			}
+			// The war-phase notices go out below for prep and battle alike. The
+			// original sent HeldenianStart HERE when initiated was FALSE —
+			// announcing "real battle" to exactly the relogs during prep (#115).
 			send_notify_msg(0, client_h, Notify::ConstructionPoint, m_client_list[client_h]->m_construction_point, m_client_list[client_h]->m_war_contribution, 0, 0);
 			m_war_manager->update_heldenian_status();
 		}
@@ -4323,9 +4345,10 @@ void CGame::check_client_response_time()
 				}
 
 				if (m_client_list[i] == 0) break;
-				//if ( (m_map_list[m_client_list[i]->m_map_index]->m_upper_level_limit != 0) &&
-				//	 (m_client_list[i]->m_level > m_map_list[m_client_list[i]->m_map_index]->m_upper_level_limit) ) {
-				if ((m_map_list[m_client_list[i]->m_map_index]->m_upper_level_limit != 0) &&
+				// Admins may legitimately exceed every level rule (#116) —
+				// exempt from both sweeps below.
+				if ((m_client_list[i]->m_admin_level == 0) &&
+					(m_map_list[m_client_list[i]->m_map_index]->m_upper_level_limit != 0) &&
 					(m_client_list[i]->m_level > m_map_list[m_client_list[i]->m_map_index]->m_upper_level_limit)) {
 					send_notify_msg(0, i, Notify::ToBeRecalled, 0, 0, 0, 0);
 					if (m_client_list[i]->m_side == 1) {
@@ -4337,7 +4360,8 @@ void CGame::check_client_response_time()
 				}
 
 				if (m_client_list[i] == 0) break;
-				if ((strcmp(m_client_list[i]->m_location, "elvine") != 0) &&
+				if ((m_client_list[i]->m_admin_level == 0) &&
+					(strcmp(m_client_list[i]->m_location, "elvine") != 0) &&
 					(strcmp(m_client_list[i]->m_location, "elvhunter") != 0) &&
 					(strcmp(m_client_list[i]->m_location, "arehunter") != 0) &&
 					(strcmp(m_client_list[i]->m_location, "aresden") != 0) &&
@@ -4397,7 +4421,10 @@ void CGame::check_client_response_time()
 				}
 
 				if (m_client_list[i] == 0) break;
-				if ((strcmp(m_map_list[m_client_list[i]->m_map_index]->m_name, "middleland") == 0)
+				// Admin travellers may stand in middleland (#116) — same
+				// exemption family as the level sweeps above.
+				if ((m_client_list[i]->m_admin_level == 0)
+					&& (strcmp(m_map_list[m_client_list[i]->m_map_index]->m_name, "middleland") == 0)
 					&& (strcmp(m_client_list[i]->m_location, "NONE") == 0)) {
 					send_notify_msg(0, i, Notify::ToBeRecalled, 0, 0, 0, 0);
 					request_teleport_handler(i, "0   ");
@@ -4522,6 +4549,16 @@ bool CGame::load_player_data_from_db(int client_h)
 	m_client_list[client_h]->m_mp = state.mp;
 	m_client_list[client_h]->m_sp = state.sp;
 	m_client_list[client_h]->m_level = state.level;
+	// A saved level above this client's ceiling loads clamped, not kicked: the
+	// legitimate case is an admins-table row removed after the character rose
+	// past the player cap (#116) — left alone, every login would die to
+	// check_character_data's level check on the first sweep.
+	if (m_client_list[client_h]->m_level > level_cap_for(client_h))
+	{
+		hb::logger::warn("Character '{}' loads at level {} above its cap {} — clamped",
+			m_client_list[client_h]->m_char_name, m_client_list[client_h]->m_level, level_cap_for(client_h));
+		m_client_list[client_h]->m_level = level_cap_for(client_h);
+	}
 	m_client_list[client_h]->m_rating = state.rating;
 	m_client_list[client_h]->m_str = state.str;
 	m_client_list[client_h]->m_int = state.intl;
@@ -6601,11 +6638,14 @@ void CGame::client_common_handler(int client_h, char* data)
 		}
 		case 7: // Set level
 		{
-			int target_level = std::clamp(static_cast<int>(v2), 1, m_max_level);
+			// Admins may exceed the player cap and stay travellers (#116);
+			// everyone else keeps the town rules below.
+			const bool is_admin = (m_client_list[client_h]->m_admin_level > 0);
+			int target_level = std::clamp(static_cast<int>(v2), 1, level_cap_for(client_h));
 
 			// Traveller anti-hack kicks players at level >= 20 if not in a faction city.
 			// Teleport them to their faction city first, or clamp if no faction.
-			if (target_level >= 20)
+			if (!is_admin && target_level >= 20)
 			{
 				bool is_traveller =
 					(strcmp(m_client_list[client_h]->m_location, "elvine") != 0) &&
@@ -9539,6 +9579,13 @@ void CGame::quit()
 
 	if (m_notice_data != 0) delete m_notice_data;
 
+	// After every client is gone, like the Game DB below: guild rows are
+	// written on membership changes, and #121's login/logout hydration will
+	// run through the same cached statements.
+	if (m_guild_store != nullptr) {
+		m_guild_store->close();
+	}
+
 	// Last, and after every client is gone: the Game DB holds the cached
 	// statements those saves were running through, and closing it while one is
 	// still live would leave the connection open with a SQLITE_BUSY nobody reads.
@@ -9926,6 +9973,9 @@ bool CGame::check_limited_user(int client_h)
 {
 	if (m_client_list[client_h] == 0) return false;
 
+	// An admin traveller above level 19 is a supported state (#116), not a leak.
+	if (m_client_list[client_h]->m_admin_level > 0) return false;
+
 	// Safety net — if a traveler somehow reached level 20+, clamp exp
 	if (memcmp(m_client_list[client_h]->m_location, "NONE", 4) == 0
 		&& m_client_list[client_h]->m_level >= 20)
@@ -9991,11 +10041,16 @@ int CGame::calc_max_load(int client_h)
 {
 	if (m_client_list[client_h] == 0) return 0;
 
-	return hb::shared::calc::max_load(m_formula_engine,
+	// 64-bit with saturation: formula result times the stone unit passes
+	// INT_MAX around (str + angelic + level) > 429 — a level-376 admin (#116)
+	// wrapped negative and every pickup was refused; a maxed mortal with high
+	// angelic str sits within a few percent of the same cliff.
+	const int64_t units = static_cast<int64_t>(hb::shared::calc::max_load(m_formula_engine,
 		hb::shared::calc::str{(double)m_client_list[client_h]->effective_str()},
 		hb::shared::calc::angelic_str{(double)m_client_list[client_h]->m_angelic_str},
-		hb::shared::calc::level{(double)m_client_list[client_h]->m_level})
+		hb::shared::calc::level{(double)m_client_list[client_h]->m_level}))
 		* hb::shared::balance::weight_units_per_stone;
+	return static_cast<int>(std::min<int64_t>(units, std::numeric_limits<int>::max()));
 }
 
 void CGame::request_full_object_data(int client_h, char* data)
@@ -14014,9 +14069,15 @@ void CGame::StormBringer(int client_h, short dX, short dY)
 	}
 }*/
 
+int CGame::level_cap_for(int client_h) const
+{
+	if (m_client_list[client_h] == 0) return m_max_level;
+	return (m_client_list[client_h]->m_admin_level > 0) ? hb::shared::limits::AdminMaxLevel : m_max_level;
+}
+
 bool CGame::check_character_data(int client_h)
 {
-	
+
 
 	if ((m_client_list[client_h]->m_str > CharPointLimit) || (m_client_list[client_h]->m_vit > CharPointLimit) || (m_client_list[client_h]->m_dex > CharPointLimit) ||
 		(m_client_list[client_h]->m_mag > CharPointLimit) || (m_client_list[client_h]->m_int > CharPointLimit) || (m_client_list[client_h]->m_charisma > CharPointLimit)) {
@@ -14031,7 +14092,7 @@ bool CGame::check_character_data(int client_h)
 		}
 	}
 
-	if ((m_client_list[client_h]->m_level > m_max_level) ) {
+	if (m_client_list[client_h]->m_level > level_cap_for(client_h)) {
 		try
 		{
 			hb::logger::warn<log_channel::security>("Packet Editing: ({}) Player: ({}) level above max server level.", m_client_list[client_h]->m_ip_address, m_client_list[client_h]->m_char_name);
@@ -14561,6 +14622,9 @@ void CGame::enforce_max_level(int new_max)
 		if (m_client_list[i] == nullptr) continue;
 		if (!m_client_list[i]->m_is_init_complete) continue;
 		if (m_client_list[i]->m_level <= new_max) continue;
+		// An admin above the shrinking player cap is legal (#116) — the stat
+		// wipe below must not hit them.
+		if (m_client_list[i]->m_admin_level > 0) continue;
 
 		m_client_list[i]->m_level = new_max;
 		m_client_list[i]->m_str = base;

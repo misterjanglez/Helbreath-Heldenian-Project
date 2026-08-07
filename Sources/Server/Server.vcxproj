@@ -171,6 +171,7 @@
     <ClInclude Include="CraftingManager.h" />
     <ClInclude Include="QuestManager.h" />
     <ClInclude Include="GuildManager.h" />
+    <ClInclude Include="GuildSqliteStore.h" />
     <ClInclude Include="DelayEventManager.h" />
     <ClInclude Include="DynamicObjectManager.h" />
     <ClInclude Include="LootManager.h" />
@@ -231,6 +232,7 @@
     <ClInclude Include="DropModel.h" />
     <ClInclude Include="CmdShowChat.h" />
     <ClInclude Include="CmdGiveItem.h" />
+    <ClInclude Include="CmdGuildDbCheck.h" />
     <ClInclude Include="CheckTally.h" />
     <ClInclude Include="CmdAtomicCheck.h" />
     <ClInclude Include="CmdCoverageCheck.h" />
@@ -357,6 +359,7 @@
     <ClCompile Include="CraftingManager.cpp" />
     <ClCompile Include="QuestManager.cpp" />
     <ClCompile Include="GuildManager.cpp" />
+    <ClCompile Include="GuildSqliteStore.cpp" />
     <ClCompile Include="DelayEventManager.cpp" />
     <ClCompile Include="DropModel.cpp" />
     <ClCompile Include="DynamicObjectManager.cpp" />
@@ -399,6 +402,7 @@
     <ClCompile Include="CmdDropOdds.cpp" />
     <ClCompile Include="CmdShowChat.cpp" />
     <ClCompile Include="CmdGiveItem.cpp" />
+    <ClCompile Include="CmdGuildDbCheck.cpp" />
     <ClCompile Include="CheckTally.cpp" />
     <ClCompile Include="CmdAtomicCheck.cpp" />
     <ClCompile Include="CmdCoverageCheck.cpp" />

@@ -23,6 +23,7 @@ namespace hb::shared::net { class IOServicePool; }
 namespace hb::server { class trading_post_store; }
 namespace hb::server { class trading_post_manager; }
 namespace hb::server { class item_ledger_store; }
+namespace hb::server { class guild_sqlite_store; }
 extern hb::shared::net::IOServicePool* G_pIOPool;
 extern bool G_bRunning;
 
@@ -276,6 +277,10 @@ public:
 
 
 	bool check_character_data(int client_h);
+	// The level ceiling this client may hold: admins-table accounts get the
+	// legacy GM ceiling (AdminMaxLevel), everyone else the configured player
+	// cap (#116).
+	int level_cap_for(int client_h) const;
 	//bool _bDecodeNpcItemConfigFileContents(char * data, size_t msg_size);
 	void global_update_configs(char config_type);
 	void local_update_configs(char config_type);
@@ -600,6 +605,7 @@ public:
 	std::unique_ptr<hb::server::trading_post_store> m_trading_post_store; // Trading Post escrow (tradingpost.db)
 	std::unique_ptr<hb::server::trading_post_manager> m_trading_post_manager; // Trading Post request handlers
 	std::unique_ptr<hb::server::item_ledger_store> m_item_ledger_store; // Provenance Ledger (itemledger.db)
+	std::unique_ptr<hb::server::guild_sqlite_store> m_guild_store; // Guild world-state (guilds.db, #120)
 
 	// Pending ground-item notes, oldest first (#79). A deque because the sweep
 	// only ever drains the front while placements only ever append to the back,
@@ -914,6 +920,10 @@ public:
 	uint32_t m_heldenian_guid, m_heldenian_start_time, m_heldenian_finish_time;
 	bool m_received_item_list;
 	bool m_heldenian_initiated;
+
+	// The heldenian prep window (#115): war window open, battle not yet live —
+	// teleport available, war maps enterable, combat gated.
+	bool heldenian_prep_active() const { return m_is_heldenian_mode && (m_heldenian_initiated == false); }
 
 private:
 

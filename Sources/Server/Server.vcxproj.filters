@@ -81,6 +81,9 @@
     <ClInclude Include="CmdGiveItem.h">
       <Filter>Console\Commands</Filter>
     </ClInclude>
+    <ClInclude Include="CmdGuildDbCheck.h">
+      <Filter>Console\Commands</Filter>
+    </ClInclude>
     <ClInclude Include="CmdHelp.h">
       <Filter>Console\Commands</Filter>
     </ClInclude>
@@ -127,6 +130,9 @@
       <Filter>World</Filter>
     </ClInclude>
     <ClInclude Include="GuildManager.h">
+      <Filter>World</Filter>
+    </ClInclude>
+    <ClInclude Include="GuildSqliteStore.h">
       <Filter>World</Filter>
     </ClInclude>
     <ClInclude Include="DelayEventManager.h">
@@ -525,6 +531,9 @@
     <ClCompile Include="CmdGiveItem.cpp">
       <Filter>Console\Commands</Filter>
     </ClCompile>
+    <ClCompile Include="CmdGuildDbCheck.cpp">
+      <Filter>Console\Commands</Filter>
+    </ClCompile>
     <ClCompile Include="CmdHelp.cpp">
       <Filter>Console\Commands</Filter>
     </ClCompile>
@@ -565,6 +574,9 @@
       <Filter>World</Filter>
     </ClCompile>
     <ClCompile Include="GuildManager.cpp">
+      <Filter>World</Filter>
+    </ClCompile>
+    <ClCompile Include="GuildSqliteStore.cpp">
       <Filter>World</Filter>
     </ClCompile>
     <ClCompile Include="DelayEventManager.cpp">

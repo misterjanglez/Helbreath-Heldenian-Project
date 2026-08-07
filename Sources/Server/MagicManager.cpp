@@ -283,7 +283,16 @@ void MagicManager::player_magic_handler(int client_h, int dX, int dY, short type
 	}
 
 	// Only block offensive magic in no-attack zones; allow friendly spells (healing, buffs, teleport, create, etc.)
-	if ((m_game->m_map_list[m_game->m_client_list[client_h]->m_map_index]->m_is_attack_enabled == false)
+	// The heldenian prep window casts the same shadow on the war maps ("magic
+	// casting is forbidden until real battle"): offensive casts are rejected
+	// until the battle opens, utility magic works — the building rule, which is
+	// how retail players remember it (#115). The original wrote this gate here
+	// too (the dead var_874 line this replaces); its damage would have been
+	// zeroed by effect_damage_spot anyway, but rejecting the cast also stops
+	// field spells from laying live fire/ice dynamic objects during staging.
+	if (((m_game->m_map_list[m_game->m_client_list[client_h]->m_map_index]->m_is_attack_enabled == false)
+		|| (m_game->heldenian_prep_active()
+			&& m_game->m_map_list[m_game->m_client_list[client_h]->m_map_index]->m_is_heldenian_map))
 		&& type != 14)
 	{
 
@@ -309,8 +318,6 @@ void MagicManager::player_magic_handler(int client_h, int dX, int dY, short type
 			return;
 		}
 	}
-	//if ((var_874 ) && (m_game->m_map_list[m_game->m_client_list[client_h]->m_map_index]->m_is_heldenian_map ) && (m_game->m_magic_config_list[type]->m_type != 8)) return;
-
 	if ((m_game->m_client_list[client_h]->m_status.inhibition_casting) && (item_effect != true)) {
 		m_game->send_event_to_near_client_type_a(client_h, hb::shared::owner_class::Player, MsgId::EventMotion, Type::Damage, Sentinel::MagicFailed, -1, 0);
 		return;

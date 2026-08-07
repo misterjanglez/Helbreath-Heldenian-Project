@@ -20,6 +20,9 @@ namespace hb::shared::limits
 	constexpr int MaxSkillType         = 60;
 	constexpr int MaxNpcConfigs        = 200;
 	constexpr int PlayerMaxLevel       = 180;
+	// Admin-only level ceiling (#116); the legacy servers' flat-file GM
+	// characters (CrazyAdmin et al.) carried 376 with no town.
+	constexpr int AdminMaxLevel        = 376;
 	constexpr int MaxItems             = 50;
 	constexpr int MaxBankItems         = 1000;
 	constexpr int MaxBuildItems        = 300;

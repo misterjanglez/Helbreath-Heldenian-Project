@@ -335,6 +335,18 @@ void CombatManager::client_killed_handler(int client_h, int attacker_h, char att
 	}
 }
 
+// True while the heldenian prep window holds combat dead for this player
+// attacker: war window open, battle not yet live, attacker standing on a war
+// map (#115). The war-mode flags go first so the everyday case is one or two
+// L1-hot bool tests, not a map-pointer chase.
+bool CombatManager::heldenian_prep_blocks(short attacker_h) const
+{
+	if (m_game->heldenian_prep_active() == false) return false;
+	if (m_game->m_client_list[attacker_h] == 0) return false;
+	const class CMap* map = m_game->m_map_list[m_game->m_client_list[attacker_h]->m_map_index];
+	return (map != 0) && map->m_is_heldenian_map;
+}
+
 void CombatManager::effect_damage_spot(short attacker_h, char attacker_type, short target_h, char target_type, short v1, short v2, short v3, bool exp, int attr)
 {
 	int party_id, damage, side_condition, index, remain_life, temp, max_super_attack, rep_damage;
@@ -353,9 +365,7 @@ void CombatManager::effect_damage_spot(short attacker_h, char attacker_type, sho
 	// Prep-phase gate ("magic casting is forbidden until real battle"): spell damage on the
 	// war maps is dead until the battle opens. The original tested initiated == TRUE here,
 	// which silenced every player-cast spell for the whole battle instead.
-	if ((attacker_type == hb::shared::owner_class::Player) && (m_game->m_map_list[m_game->m_client_list[attacker_h]->m_map_index] != 0) &&
-		(m_game->m_map_list[m_game->m_client_list[attacker_h]->m_map_index]->m_is_heldenian_map == 1) &&
-		(m_game->m_is_heldenian_mode) && (m_game->m_heldenian_initiated == false)) return;
+	if ((attacker_type == hb::shared::owner_class::Player) && heldenian_prep_blocks(attacker_h)) return;
 
 	time = GameClock::GetTimeMS();
 	damage = m_game->dice(v1, v2) + v3;
@@ -873,6 +883,11 @@ void CombatManager::effect_damage_spot_damage_move(short attacker_h, char attack
 
 	if (attacker_type == hb::shared::owner_class::Npc)
 		if (m_game->m_npc_list[attacker_h] == 0) return;
+
+	// Prep-phase gate, same as effect_damage_spot: player spell damage on the war
+	// maps is dead until the battle opens. The original gated this path too; the
+	// gate was lost in porting (#115).
+	if ((attacker_type == hb::shared::owner_class::Player) && heldenian_prep_blocks(attacker_h)) return;
 
 	time = GameClock::GetTimeMS();
 	tgt_x = 0;
@@ -2422,7 +2437,12 @@ uint32_t CombatManager::calculate_attack_effect(short target_h, char target_type
 
 		if (m_game->m_client_list[attacker_h] == 0) return 0;
 		if ((m_game->m_map_list[m_game->m_client_list[attacker_h]->m_map_index]->m_is_attack_enabled == false)) return 0;
-		if ((m_game->m_map_list[m_game->m_client_list[attacker_h]->m_map_index] == 0) && (m_game->m_map_list[m_game->m_client_list[attacker_h]->m_map_index]->m_is_heldenian_map) && (m_game->m_is_heldenian_mode)) return 0;
+		// Prep-phase gate, physical path: no attacks on the war maps until the battle
+		// opens — the staging window would otherwise let attackers take down the
+		// castle gates before combat exists, and prep kills would count into the
+		// battlefield death tie-break. The original wrote this guard with map == NULL
+		// as its first term, so it never fired (#115).
+		if (heldenian_prep_blocks(attacker_h)) return 0;
 		if ((m_game->m_is_crusade_mode == false) && (m_game->m_client_list[attacker_h]->m_is_player_civil) && (target_type == hb::shared::owner_class::Player)) return 0;
 
 		if (m_game->m_client_list[attacker_h]->m_status.invisibility) {
