@@ -97,6 +97,8 @@ set(SERVER_SOURCES
     GuildManager.cpp
     GuildProgressionConfig.cpp
     GuildSqliteStore.cpp
+    Handlers/NetworkMessages_Guild.cpp
+    Handlers/PacketHandlerRegistry.cpp
     ItemBiography.cpp
     ItemLedgerStore.cpp
     ItemReconciliation.cpp
@@ -133,6 +135,14 @@ hb_guard_source_list(
     LIST  SERVER_SOURCES
     DIR   ${CMAKE_CURRENT_SOURCE_DIR}
     LABEL "Server sources"
+)
+
+# The top-level guard does not recurse (the build output directories live
+# here), so the Handlers/ packet-family files get their own sweep.
+hb_guard_source_list(
+    LIST  SERVER_SOURCES
+    DIR   ${CMAKE_CURRENT_SOURCE_DIR}/Handlers
+    LABEL "Server handler sources"
 )
 
 # ---------------------------------------------------------------------------

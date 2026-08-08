@@ -174,6 +174,8 @@
     <ClInclude Include="GuildManager.h" />
     <ClInclude Include="GuildProgressionConfig.h" />
     <ClInclude Include="GuildSqliteStore.h" />
+    <ClInclude Include="Handlers\NetworkMessages.h" />
+    <ClInclude Include="Handlers\PacketHandlerRegistry.h" />
     <ClInclude Include="DelayEventManager.h" />
     <ClInclude Include="DynamicObjectManager.h" />
     <ClInclude Include="LootManager.h" />
@@ -366,6 +368,8 @@
     <ClCompile Include="GuildManager.cpp" />
     <ClCompile Include="GuildProgressionConfig.cpp" />
     <ClCompile Include="GuildSqliteStore.cpp" />
+    <ClCompile Include="Handlers\NetworkMessages_Guild.cpp" />
+    <ClCompile Include="Handlers\PacketHandlerRegistry.cpp" />
     <ClCompile Include="DelayEventManager.cpp" />
     <ClCompile Include="DropModel.cpp" />
     <ClCompile Include="DynamicObjectManager.cpp" />

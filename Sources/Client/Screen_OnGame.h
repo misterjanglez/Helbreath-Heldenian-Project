@@ -55,6 +55,7 @@ public:
     fishing_manager& get_fishing_manager() { return m_fishing_manager; }
     crafting_manager& get_crafting_manager() { return m_crafting_manager; }
     quest_manager& get_quest_manager() { return m_quest_manager; }
+    guild_manager& get_guild_manager() { return m_guild_manager; }
     CPlayerRenderer& get_player_renderer() { return m_player_renderer; }
     CNpcRenderer& get_npc_renderer() { return m_npc_renderer; }
     floating_text_manager& get_floating_text() { return m_floating_text; }

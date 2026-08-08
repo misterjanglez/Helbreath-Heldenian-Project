@@ -4,6 +4,7 @@
 #include "Item/ItemAttributeData.h"
 #include "Item/ModifierIds.h"
 #include "NetConstants.h"
+#include "Game/GuildDefs.h"
 
 #include <cstddef>
 #include <cstdint>
@@ -730,12 +731,18 @@ namespace net {
 		int16_t price;
 	};
 
+	// To the killer. The name and guild fields describe the VICTIM — the
+	// original's 48-byte notify carried them so the kill line could say whose
+	// guildsman fell; the guild fields returned with #123 (the field kept its
+	// historical "killer_" name until then).
 	struct HB_PACKED PacketNotifyEnemyKillReward {
 		PacketHeader header;
 		uint32_t exp;
 		uint32_t kill_count;
-		char killer_name[hb::shared::limits::CharNameLen];
+		char victim_name[hb::shared::limits::CharNameLen];
 		int16_t war_contribution;
+		char victim_guild[hb::shared::guild::max_guild_name_length + 1];
+		int8_t victim_guild_rank;
 	};
 
 	struct HB_PACKED PacketNotifyPKcaptured {

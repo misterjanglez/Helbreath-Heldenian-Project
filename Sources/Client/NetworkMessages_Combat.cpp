@@ -163,7 +163,13 @@ namespace NetworkMessageHandlers {
 
 		exp = pkt->exp;
 		enemy_kill_count = static_cast<int>(pkt->kill_count);
-		std::string name(pkt->killer_name, strnlen(pkt->killer_name, sizeof(pkt->killer_name)));
+		std::string name(pkt->victim_name, strnlen(pkt->victim_name, sizeof(pkt->victim_name)));
+		// The victim's guild line returned with #123 — fold it into the kill
+		// message the way the original's 48-byte notify displayed it.
+		const std::string victim_guild(pkt->victim_guild,
+			strnlen(pkt->victim_guild, sizeof(pkt->victim_guild)));
+		if (!victim_guild.empty())
+			name = std::format("{} ({})", name, victim_guild);
 		war_contribution = pkt->war_contribution;
 
 		if (war_contribution > game->m_player->m_war_contribution && game->m_game_msg_list[21])

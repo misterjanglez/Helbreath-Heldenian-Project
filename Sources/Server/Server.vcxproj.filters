@@ -138,6 +138,12 @@
     <ClInclude Include="GuildManager.h">
       <Filter>World</Filter>
     </ClInclude>
+    <ClInclude Include="Handlers\PacketHandlerRegistry.h">
+      <Filter>Networking</Filter>
+    </ClInclude>
+    <ClInclude Include="Handlers\NetworkMessages.h">
+      <Filter>Networking</Filter>
+    </ClInclude>
     <ClInclude Include="GuildProgressionConfig.h">
       <Filter>World</Filter>
     </ClInclude>
@@ -593,6 +599,12 @@
     </ClCompile>
     <ClCompile Include="GuildManager.cpp">
       <Filter>World</Filter>
+    </ClCompile>
+    <ClCompile Include="Handlers\PacketHandlerRegistry.cpp">
+      <Filter>Networking</Filter>
+    </ClCompile>
+    <ClCompile Include="Handlers\NetworkMessages_Guild.cpp">
+      <Filter>Networking</Filter>
     </ClCompile>
     <ClCompile Include="GuildProgressionConfig.cpp">
       <Filter>World</Filter>

@@ -7,34 +7,34 @@ namespace hb::version
 namespace compatibility
 {
 constexpr int major = 0;
-constexpr int minor = 10;
+constexpr int minor = 11;
 constexpr int patch = 0;
 constexpr int build_number = 0;
 constexpr const char* stage = "alpha";
-constexpr const char* display_version = "0.10-alpha";
-constexpr const char* full_version = "0.10.0-alpha+build.0";
+constexpr const char* display_version = "0.11-alpha";
+constexpr const char* full_version = "0.11.0-alpha+build.0";
 } // namespace compatibility
 
 namespace server
 {
 constexpr int major = 0;
-constexpr int minor = 42;
+constexpr int minor = 43;
 constexpr int patch = 0;
 constexpr int build_number = 327;
 constexpr const char* stage = "alpha";
-constexpr const char* display_version = "0.42-alpha";
-constexpr const char* full_version = "0.42.0-alpha+build.327";
+constexpr const char* display_version = "0.43-alpha";
+constexpr const char* full_version = "0.43.0-alpha+build.327";
 } // namespace server
 
 namespace client
 {
 constexpr int major = 0;
-constexpr int minor = 15;
-constexpr int patch = 3;
+constexpr int minor = 16;
+constexpr int patch = 0;
 constexpr int build_number = 435;
 constexpr const char* stage = "alpha";
-constexpr const char* display_version = "0.15.3-alpha";
-constexpr const char* full_version = "0.15.3-alpha+build.435";
+constexpr const char* display_version = "0.16-alpha";
+constexpr const char* full_version = "0.16.0-alpha+build.435";
 } // namespace client
 
 namespace launcher
@@ -48,6 +48,6 @@ constexpr const char* display_version = "0.1-alpha";
 constexpr const char* full_version = "0.1.0-alpha+build.58";
 } // namespace launcher
 
-constexpr const char* build_timestamp = "2026-08-07T16:37:58";
+constexpr const char* build_timestamp = "2026-08-07T18:16:29";
 
 } // namespace hb::version

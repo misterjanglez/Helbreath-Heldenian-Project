@@ -37,6 +37,7 @@ extern bool G_bRunning;
 #include "Packet/PacketMap.h"
 #include "Packet/PacketModifierCatalog.h"
 #include "Packet/PacketNotify.h"
+#include "Packet/PacketResponse.h"
 #include "ServerMessages.h"
 #include "Misc.h"
 #include "NetworkMsg.h"
@@ -55,6 +56,7 @@ extern bool G_bRunning;
 #include "TeleportLoc.h"
 #include "GlobalDef.h"
 #include "TempNpcItem.h"
+#include "Handlers/PacketHandlerRegistry.h"
 #include "PartyManager.h"
 #include "IOServicePool.h"
 #include "ConcurrentMsgQueue.h"
@@ -470,6 +472,16 @@ public:
 	int get_npc_config_id_by_name(const char * npc_name) const;
 	void send_notify_msg(int from_h, int to_h, uint16_t msg_type, uint32_t v1, uint64_t v2, uint32_t v3, const char * string, uint32_t v4 = 0, uint32_t v5 = 0, uint32_t v6 = 0, uint32_t v7 = 0, uint32_t v8 = 0, uint32_t v9 = 0, const char * string2 = 0);
 
+	// The typed send path (Phase 1, plan §5): the caller builds a complete
+	// packed packet — header stamped — and this ships it. New code sends
+	// through here exclusively; send_notify_msg's switch grows no new arms.
+	template <typename PacketT>
+	void send_packet(int client_h, const PacketT& pkt)
+	{
+		send_packet_bytes(client_h, &pkt, sizeof(PacketT));
+	}
+	void send_packet_bytes(int client_h, const void* data, size_t size);
+
 	// The Notify::DerivedStats payload for one client, with the header left
 	// blank for the sender to stamp.
 	//
@@ -616,6 +628,11 @@ public:
 	// manager pointers, and an index living there would be silently emptied
 	// the way the ItemManager Serial allocator once was.
 	std::unique_ptr<hb::server::guild_manager> m_guild_manager;
+
+	// The inbound packet-family seam (Phase 1, #123): msg_process consults this
+	// before declaring a client message unknown. Families register in the
+	// constructor; a plain member so it can never outlive or predate the game.
+	hb::server::packet_handler_registry m_packet_handlers;
 
 	// Pending ground-item notes, oldest first (#79). A deque because the sweep
 	// only ever drains the front while placements only ever append to the back,

@@ -30,12 +30,13 @@
 //     definition in no bucket yet — decide_request pays it once per
 //     approved join.)
 //
-// Interim discipline (epic #119): #121 lands before the wire family, so no
-// entry point here sends a guild notify — send_notify_msg grows no arms, and
-// state changes announce themselves in guild.log only. The existing arms the
-// ceremonies already ride (Notify::Exp after the Kennedy penalty, the item
-// notifies inside ticket consumption and the disband payout) are unchanged
-// wire surface. #123 layers the notify family on top of these same returns.
+// Since #123 the engine also owns the guild notify family (PacketGuild.h):
+// every mutation broadcasts its event to the online bucket through the typed
+// send path, and refresh_client/clear_client re-sync the subject's own state
+// (PacketNotifyGuildSelf) — send_notify_msg still grows no arms. The wire
+// handlers (Handlers/NetworkMessages_Guild.cpp) send only request/response
+// envelopes; events stay here so chat commands, admin surfaces and the
+// inactivity sweep announce exactly like wire requests.
 //
 // Time is stamped here (hb::time::unix_now) and passed down; the store never
 // reads a clock (#120's determinism rule).
@@ -58,6 +59,8 @@
 
 #include "Game/GuildDefs.h"
 
+namespace hb::net { struct PacketGuildSelfState; }
+
 class CGame;
 class CClient;
 
@@ -67,54 +70,12 @@ namespace hb::server
 	struct guild_level_row;
 	struct guild_record;
 
-	// Why an entry point refused (or didn't). One name per gate so the prover
-	// asserts the exact rung of the ladder and guild.log explains itself;
-	// wire code (#123) maps these to player-facing text once it exists.
-	namespace guild_result
-	{
-		enum guild_result : int
-		{
-			ok = 0,
-			no_client,              // bad handle / not in the world yet
-			crusade_active,         // create, disband, secession: not during crusade
-			already_in_guild,
-			not_in_guild,
-			bad_name,               // charset/length rules (GuildDefs.h)
-			name_taken,             // case-insensitive collision
-			name_mismatch,          // disband: typed confirmation != guild name
-			level_too_low,          // create: level < guild_create_min_level
-			charisma_too_low,       // create gate, and transfer's incoming master
-			not_citizen,            // location "NONE" / no side
-			not_in_own_town,        // create: standing outside the home town
-			wrong_side,             // join: applicant's side != guild's side
-			no_ticket,              // items 88/89: the ceremony's price is missing
-			request_pending,        // an identical request is already queued
-			unknown_guild,
-			unknown_request,        // no such request, or not this approver's guild
-			no_permission,          // the required guild_permission bit is absent
-			not_master,             // transfer/disband: hardcoded master-only
-			master_cannot_leave,    // the master transfers or disbands, never exits
-			target_not_found,       // named member not in the actor's guild
-			target_is_master,       // kick/promote/demote aimed at the master
-			target_not_below_rank,  // kick: target must rank strictly below actor
-			target_offline,         // transfer: incoming master must be online
-			bad_rank,               // promote/demote outside guildsman<->officer
-			store_error,            // the store refused; details in guild.log
-			donations_disabled,     // the donations_enabled switch is off (#122)
-			amount_too_small,       // below the lane's configured minimum, or not positive
-			insufficient_funds,     // the actor's own balance is short of the amount
-			guild_full,             // member cap f(Guild Level) reached (join approval)
-			officers_at_capacity,   // officer cap f(Guild Level) reached (promote)
-			bad_title,              // not a guild_title kind
-			already_titled,         // the claimant already holds a Title (one per member)
-			no_title_slot,          // every slot of that kind at this Guild Level is held
-			no_title,               // drop/strip aimed at someone holding nothing
-			treasury_short,         // withdraw larger than the wallet
-		};
-	}
-
-	// The result's name, for log lines and the prover ("ok", "no_ticket", ...).
-	const char* guild_result_name(int result);
+	// Why an entry point refused (or didn't) — one name per gate. The
+	// vocabulary moved to GuildDefs.h with #123 (the action envelope carries
+	// it to the client); aliased so engine callers keep their
+	// hb::server::guild_result spelling.
+	namespace guild_result = hb::shared::guild::guild_result;
+	using hb::shared::guild::guild_result_name;
 
 	class guild_manager
 	{
@@ -253,8 +214,22 @@ namespace hb::server
 		// (the universal stat floor applies regardless).
 		int min_charisma(int client_h) const;
 
-	private:
+		// The open store, or nullptr — the one availability rule, shared with
+		// the wire handlers' read-only queries (#123) so no second copy of it
+		// can drift.
 		guild_sqlite_store* store() const;
+
+		// The rank title every send site speaks through (#123): the ADR 0006
+		// defaults today; the configurable-rank editor reads per-guild rows
+		// through this same door tomorrow, so no send site needs finding then.
+		const char* rank_title_for(int64_t guild_guid, int rank) const;
+
+		// The own-guild snapshot from the hydrated cache — the ONE body under
+		// the char-init contents and the GuildSelf re-sync.
+		void fill_self_state(int client_h,
+			hb::net::PacketGuildSelfState& out) const;
+
+	private:
 
 		// The acting-player lookup: refuses clients that are not fully in the
 		// world, which is the right gate for every ceremony entry point.
@@ -308,6 +283,36 @@ namespace hb::server
 		// burn write differ.
 		enum class donation_lane { gold, enemy_kills, contribution };
 		int donate(int client_h, donation_lane lane, int64_t amount);
+
+		// --- The #123 notify layer ---------------------------------------
+		// Events are sent from the mutations themselves — never from the wire
+		// handlers — so a chat command, an admin surface and the inactivity
+		// sweep announce exactly like a wire request does.
+		//
+		// The one PacketNotifyGuildSelf send site: every path that changes a
+		// client's own cached guild state funnels through refresh_client or
+		// clear_client, so those two call this and no mutation can forget to
+		// re-sync its subject. Quiet before m_is_init_complete — the login
+		// snapshot rides the char-init contents instead. (One deliberate
+		// exception: donate's level-up walk writes m_guild_level directly and
+		// announces with the GuildLevelUp broadcast instead of N Selfs.)
+		void send_self_state(int client_h) const;
+
+		// One queued-request notice to every online member holding the
+		// request kind's deciding permission bit.
+		void notify_request_queued(int64_t guild_guid, int kind,
+			const char* applicant) const;
+
+		// The three event shapes more than one mutation announces, so a new
+		// site is one call, not a re-transcribed build-and-broadcast block.
+		// Departures take a pre-captured audience (the mutation empties the
+		// bucket underfoot); the other two read the live bucket.
+		void broadcast_member_left(const std::vector<int>& audience,
+			const char* member, int reason) const;
+		void broadcast_rank_change(int64_t guild_guid, const char* member,
+			int new_rank) const;
+		void broadcast_title_change(int64_t guild_guid, const char* member,
+			int kind, bool held, int reason) const;
 
 		// Consume one ticket through item_deplete_handler — the shared
 		// consuming-action path, so the ledger and the client-side erase

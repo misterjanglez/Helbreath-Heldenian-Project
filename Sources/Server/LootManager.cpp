@@ -18,6 +18,27 @@ namespace sock = hb::shared::net::socket;
 
 extern char G_cTxt[512];
 
+void LootManager::send_enemy_kill_reward(int attacker_h, int victim_h)
+{
+	if (victim_h < 0 || victim_h >= MaxClients) return;
+	CClient* attacker = m_game->m_client_list[attacker_h];
+	CClient* victim = m_game->m_client_list[victim_h];
+	if (attacker == nullptr || victim == nullptr) return;
+
+	// The name and guild fields describe the victim — the original's 48-byte
+	// shape, with the guild line the gut removed restored from the hydrated
+	// guild cache (#123).
+	auto pkt = hb::net::make_notify<hb::net::PacketNotifyEnemyKillReward>(
+		Notify::EnemyKillReward);
+	pkt.exp = static_cast<uint32_t>(attacker->m_exp);
+	pkt.kill_count = static_cast<uint32_t>(attacker->m_enemy_kill_count);
+	hb::net::fill_wire_name(pkt.victim_name, victim->m_char_name);
+	pkt.war_contribution = static_cast<int16_t>(attacker->m_war_contribution);
+	hb::net::fill_wire_name(pkt.victim_guild, victim->m_guild_name);
+	pkt.victim_guild_rank = static_cast<int8_t>(victim->m_guild_rank);
+	m_game->send_packet(attacker_h, pkt);
+}
+
 void LootManager::apply_pk_penalty(short attacker_h, short victum_h)
 {
 	uint32_t v1, v2;
@@ -149,7 +170,7 @@ void LootManager::enemy_kill_reward_handler(int attacker_h, int client_h)
 		if (m_game->m_client_list[attacker_h]->m_reward_gold < 0)
 			m_game->m_client_list[attacker_h]->m_reward_gold = 0;
 
-		m_game->send_notify_msg(0, attacker_h, Notify::EnemyKillReward, client_h, 0, 0, 0);
+		send_enemy_kill_reward(attacker_h, client_h);
 		return;
 	}
 
@@ -210,7 +231,7 @@ void LootManager::enemy_kill_reward_handler(int attacker_h, int client_h)
 			}
 		}
 
-		m_game->send_notify_msg(0, attacker_h, Notify::EnemyKillReward, client_h, 0, 0, 0);
+		send_enemy_kill_reward(attacker_h, client_h);
 
 		if (m_game->check_limited_user(attacker_h) == false) {
 			m_game->send_notify_msg(0, attacker_h, Notify::Exp, 0, 0, 0, 0);

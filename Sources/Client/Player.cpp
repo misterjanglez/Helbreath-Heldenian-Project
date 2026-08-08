@@ -1,9 +1,20 @@
 ﻿#include "Player.h"
 #include "Item/Item.h"
+#include "Packet/PacketHelpers.h"
 
 CPlayer::CPlayer()
 {
     reset();
+}
+
+void CPlayer::set_guild_snapshot(const hb::net::PacketGuildSelfState& state)
+{
+    m_guild_name = hb::net::wire_string(state.guild_name);
+    m_guild_rank = state.rank;
+    m_guild_rank_title = hb::net::wire_string(state.rank_title);
+    m_guild_level = state.level;
+    m_guild_permission_mask = state.permission_mask;
+    m_guild_title = state.title;
 }
 
 CPlayer::~CPlayer()
@@ -110,6 +121,14 @@ void CPlayer::reset()
     m_construction_point = 0;
     m_construct_loc_x = -1;
     m_construct_loc_y = -1;
+
+    // GUILD
+    m_guild_name.clear();
+    m_guild_rank_title.clear();
+    m_guild_rank = hb::shared::guild::guild_rank::none;
+    m_guild_level = 0;
+    m_guild_permission_mask = 0;
+    m_guild_title = 0;
 
     // INVENTORY
     for (auto& item : m_item_list) item.reset();

@@ -24,6 +24,11 @@ namespace NetworkMessageHandlers {
 	void HandleTpListingDetail(CGame* game, char* data);
 	void HandleTpActionResult(CGame* game, char* data);
 	void HandleServerConfigUpdate(CGame* game, char* data);
+	// Guild (#123)
+	void HandleGuildActionResult(CGame* game, char* data);
+	void HandleGuildRoster(CGame* game, char* data, uint32_t msg_size);
+	void HandleGuildQueue(CGame* game, char* data, uint32_t msg_size);
+	void HandleGuildInfo(CGame* game, char* data);
 }
 
 bool Screen_OnGame::on_game_msg(uint32_t msg_id, uint16_t msg_type, char* data, uint32_t msg_size)
@@ -113,6 +118,23 @@ bool Screen_OnGame::on_game_msg(uint32_t msg_id, uint16_t msg_type, char* data, 
 
 	case MsgId::ResponseTpActionResult:
 		NetworkMessageHandlers::HandleTpActionResult(m_game, data);
+		return true;
+
+	// Guild (#123) — the action envelope and the three panel answers.
+	case MsgId::ResponseGuildAction:
+		NetworkMessageHandlers::HandleGuildActionResult(m_game, data);
+		return true;
+
+	case MsgId::ResponseGuildRoster:
+		NetworkMessageHandlers::HandleGuildRoster(m_game, data, msg_size);
+		return true;
+
+	case MsgId::ResponseGuildQueue:
+		NetworkMessageHandlers::HandleGuildQueue(m_game, data, msg_size);
+		return true;
+
+	case MsgId::ResponseGuildInfo:
+		NetworkMessageHandlers::HandleGuildInfo(m_game, data);
 		return true;
 	}
 

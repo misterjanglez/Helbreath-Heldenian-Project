@@ -24,3 +24,4 @@
 #include "PacketPartyOp.h"
 #include "PacketChat.h"
 #include "PacketCrusade.h"
+#include "PacketGuild.h"

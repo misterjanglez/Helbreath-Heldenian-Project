@@ -214,6 +214,7 @@ void Screen_OnGame::on_initialize()
     register_hotkeys();
 
     m_guild_manager.set_game(m_game);
+    m_guild_manager.reset();
     m_fishing_manager.set_game(m_game);
     m_crafting_manager.set_game(m_game);
     m_quest_manager.set_game(m_game);

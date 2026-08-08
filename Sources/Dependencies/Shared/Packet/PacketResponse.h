@@ -5,6 +5,7 @@
 #include "NetConstants.h"
 #include "Appearance.h"
 #include "PlayerStatusData.h"
+#include "PacketGuild.h"
 
 #include <cstdint>
 
@@ -164,6 +165,9 @@ namespace net {
 		int32_t rating;
 		int32_t hp;
 		uint8_t discount;
+		// Own-guild snapshot (#123; the gut removed the original trio) — the
+		// same struct PacketNotifyGuildSelf re-syncs mid-session.
+		PacketGuildSelfState guild;
 	};
 	HB_PACK_END
 }

@@ -1997,3 +1997,20 @@
 #define TP_EMPTY_MY_LISTINGS        "You have no active Listings."
 #define TP_EMPTY_MY_OFFERS          "You have no active Offers."
 
+
+// --- Guild wire events (#123) — the notify family's event lines. The
+// dialog-facing strings (#124) stay in the DRAW_DIALOGBOX_GUILDMENU block.
+#define NOTIFYMSG_GUILD_JOINED          "{} has joined the guild."
+#define NOTIFYMSG_GUILD_LEFT            "{} has left the guild."
+#define NOTIFYMSG_GUILD_KICKED          "{} has been expelled from the guild."
+#define NOTIFYMSG_GUILD_DISBANDED       "The guild {} has been disbanded."
+#define NOTIFYMSG_GUILD_RANK_CHANGED    "{} is now {}."
+#define NOTIFYMSG_GUILD_TITLE_CLAIMED   "{} now holds the {} title."
+#define NOTIFYMSG_GUILD_TITLE_RELEASED  "{} no longer holds the {} title."
+#define NOTIFYMSG_GUILD_LEVEL_UP        "Your guild has reached level {}!"
+#define NOTIFYMSG_GUILD_APPLY_JOIN      "{} has applied to join the guild."
+#define NOTIFYMSG_GUILD_APPLY_LEAVE     "{} has requested to leave the guild."
+#define NOTIFYMSG_GUILD_REQ_APPROVED    "Your request to {} was approved."
+#define NOTIFYMSG_GUILD_REQ_REJECTED    "Your request to {} was declined."
+#define NOTIFYMSG_GUILD_REQUEST_FILED   "Your request has been submitted."
+#define NOTIFYMSG_GUILD_ACTION_FAILED   "Guild action failed: {}"

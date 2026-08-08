@@ -125,6 +125,18 @@ namespace NetworkMessageHandlers {
 	void HandleHeldenianCount(CGame* game, char* data);
 	void HandleHeldenianRecall(CGame* game, char* data);
 
+	// Guild (#123)
+	void HandleGuildNameAnswer(CGame* game, char* data);
+	void HandleGuildSelf(CGame* game, char* data);
+	void HandleGuildJoined(CGame* game, char* data);
+	void HandleGuildLeft(CGame* game, char* data);
+	void HandleGuildDisbanded(CGame* game, char* data);
+	void HandleGuildRankChanged(CGame* game, char* data);
+	void HandleGuildTitleChanged(CGame* game, char* data);
+	void HandleGuildLevelUp(CGame* game, char* data);
+	void HandleGuildRequestQueued(CGame* game, char* data);
+	void HandleGuildRequestDecided(CGame* game, char* data);
+
 
 	void HandleCrashHandler(CGame* game, char* data);
 	void HandleIpAccountInfo(CGame* game, char* data);
@@ -370,6 +382,18 @@ bool NetworkMessageManager::process_message(uint32_t msg_id, char* data, uint32_
 		case Notify::HeldenianVictory: NetworkMessageHandlers::HandleHeldenianVictory(m_game, data); return true;
 		case Notify::HeldenianCount: NetworkMessageHandlers::HandleHeldenianCount(m_game, data); return true;
 		case Notify::Unknown0BE8: NetworkMessageHandlers::HandleHeldenianRecall(m_game, data); return true;
+
+		// Guild (#123)
+		case Notify::GuildNameAnswer: NetworkMessageHandlers::HandleGuildNameAnswer(m_game, data); return true;
+		case Notify::GuildSelf: NetworkMessageHandlers::HandleGuildSelf(m_game, data); return true;
+		case Notify::GuildJoined: NetworkMessageHandlers::HandleGuildJoined(m_game, data); return true;
+		case Notify::GuildLeft: NetworkMessageHandlers::HandleGuildLeft(m_game, data); return true;
+		case Notify::GuildDisbanded: NetworkMessageHandlers::HandleGuildDisbanded(m_game, data); return true;
+		case Notify::GuildRankChanged: NetworkMessageHandlers::HandleGuildRankChanged(m_game, data); return true;
+		case Notify::GuildTitleChanged: NetworkMessageHandlers::HandleGuildTitleChanged(m_game, data); return true;
+		case Notify::GuildLevelUp: NetworkMessageHandlers::HandleGuildLevelUp(m_game, data); return true;
+		case Notify::GuildRequestQueued: NetworkMessageHandlers::HandleGuildRequestQueued(m_game, data); return true;
+		case Notify::GuildRequestDecided: NetworkMessageHandlers::HandleGuildRequestDecided(m_game, data); return true;
 
 		// Slates
 		case Notify::SlateCreateSuccess: NetworkMessageHandlers::HandleSlateCreateSuccess(m_game, data); return true;

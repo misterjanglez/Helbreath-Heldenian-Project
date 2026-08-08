@@ -35,6 +35,7 @@
 #include "QuestManager.h"
 #include "GuildManager.h"
 #include "GuildSqliteStore.h"
+#include "Handlers/NetworkMessages.h"
 #include "DelayEventManager.h"
 #include "DynamicObjectManager.h"
 #include "LootManager.h"
@@ -324,6 +325,10 @@ CGame::CGame()
 	m_guild_store = std::make_unique<hb::server::guild_sqlite_store>();
 	m_guild_manager = std::make_unique<hb::server::guild_manager>(this);
 	m_regen_manager->set_game(this);
+
+	// The Phase-1 packet-family roster (Handlers/NetworkMessages.h): one
+	// registration call per domain file, msg_process's switch grows no arms.
+	hb::server::register_guild_packet_handlers(m_packet_handlers);
 
 	for(int i = 0; i < hb::shared::limits::MaxMagicType; i++)
 		m_magic_config_list[i] = 0;
@@ -2164,6 +2169,7 @@ void CGame::request_init_data_handler(int client_h, char* data, char key, size_t
 	init_header->rating = m_client_list[client_h]->m_rating;
 	init_header->hp = m_client_list[client_h]->m_hp;
 	init_header->discount = m_war_manager->heldenian_shop_discount(client_h);
+	m_guild_manager->fill_self_state(client_h, init_header->guild);
 
 	size = compose_init_map_data(m_client_list[client_h]->m_x - hb::shared::view::CenterX, m_client_list[client_h]->m_y - hb::shared::view::CenterY, client_h, initMapData);
 	writer.AppendBytes(initMapData, static_cast<std::size_t>(size));
@@ -6252,6 +6258,11 @@ void CGame::msg_process()
 			break;
 
 			default:
+				// The Phase-1 family seam: registered families (guild, #123 on)
+				// live in Handlers/ domain files, not in new arms above.
+				if (m_packet_handlers.dispatch(*this, client_h, header->msg_id, data, msg_size))
+					break;
+
 				if (m_client_list[client_h] != 0)  // Snoopy: Anti-crash check !
 				{
 					std::snprintf(G_cTxt, sizeof(G_cTxt), "Unknown message received: (0x%.8X) PC(%s) - (Delayed). \tIP(%s)"
@@ -7410,6 +7421,17 @@ hb::net::PacketNotifyDerivedStats CGame::build_derived_stats(const CClient& who)
 
 	return pkt;
 }
+
+void CGame::send_packet_bytes(int client_h, const void* data, size_t size)
+{
+	if (client_h < 0 || client_h >= MaxClients) return;
+	if (m_client_list[client_h] == nullptr) return;
+	// send_msg takes a mutable pointer but only reads from it; every notify
+	// arm below feeds it the same reinterpret_cast of a local packet.
+	m_client_list[client_h]->m_socket->send_msg(
+		const_cast<char*>(static_cast<const char*>(data)), size);
+}
+
 
 void CGame::send_notify_msg(int from_h, int to_h, uint16_t msg_type, uint32_t v1, uint64_t v2, uint32_t v3, const char* string, uint32_t v4, uint32_t v5, uint32_t v6, uint32_t v7, uint32_t v8, uint32_t v9, const char* string2)
 {
@@ -8633,18 +8655,9 @@ void CGame::send_notify_msg(int from_h, int to_h, uint16_t msg_type, uint32_t v1
 		break;
 	}
 
-	case Notify::EnemyKillReward:
-	{
-		hb::net::PacketNotifyEnemyKillReward pkt{};
-		pkt.header.msg_id = MsgId::Notify;
-		pkt.header.msg_type = msg_type;
-		pkt.exp = static_cast<uint32_t>(m_client_list[to_h]->m_exp);
-		pkt.kill_count = static_cast<uint32_t>(m_client_list[to_h]->m_enemy_kill_count);
-		memcpy(pkt.killer_name, m_client_list[v1]->m_char_name, sizeof(pkt.killer_name));
-		pkt.war_contribution = static_cast<int16_t>(m_client_list[to_h]->m_war_contribution);
-		ret = m_client_list[to_h]->m_socket->send_msg(reinterpret_cast<char*>(&pkt), sizeof(pkt));
-	}
-	break;
+	// Notify::EnemyKillReward left this switch with #123: it carries the
+	// victim's guild line now, and sends through send_enemy_kill_reward on
+	// the typed path (the Phase-1 pilot migration).
 
 	case Notify::PkCaptured:
 	{
@@ -9439,6 +9452,7 @@ void CGame::request_teleport_handler(int client_h, const char* data, const char*
 	init_header->rating = m_client_list[client_h]->m_rating;
 	init_header->hp = m_client_list[client_h]->m_hp;
 	init_header->discount = m_war_manager->heldenian_shop_discount(client_h);
+	m_guild_manager->fill_self_state(client_h, init_header->guild);
 
 	size = compose_init_map_data(m_client_list[client_h]->m_x - hb::shared::view::CenterX, m_client_list[client_h]->m_y - hb::shared::view::CenterY, client_h, initMapData);
 	writer.AppendBytes(initMapData, static_cast<std::size_t>(size));
@@ -12338,6 +12352,7 @@ bool CGame::gm_teleport_to(int client_h, const char* dest_map, short dest_x, sho
 	init_header->rating = m_client_list[client_h]->m_rating;
 	init_header->hp = m_client_list[client_h]->m_hp;
 	init_header->discount = m_war_manager->heldenian_shop_discount(client_h);
+	m_guild_manager->fill_self_state(client_h, init_header->guild);
 
 	int size = compose_init_map_data(m_client_list[client_h]->m_x - hb::shared::view::CenterX, m_client_list[client_h]->m_y - hb::shared::view::CenterY, client_h, initMapData);
 	writer.AppendBytes(initMapData, static_cast<std::size_t>(size));

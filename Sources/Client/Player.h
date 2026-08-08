@@ -11,7 +11,9 @@
 #include "ActionID.h"
 #include "DirectionHelpers.h"
 #include "BalanceConstants.h"
+#include "Game/GuildDefs.h"
 #include "Item/ModifierIds.h"
+#include "Packet/PacketGuild.h"
 
 class CItem;
 
@@ -191,6 +193,20 @@ public:
     // CRUSADE/WAR
     int m_crusade_duty, m_war_contribution, m_construction_point;
     int m_construct_loc_x, m_construct_loc_y;
+
+    // GUILD (#123) — server-authoritative own-guild snapshot: seeded by the
+    // char-init contents, re-synced by Notify::GuildSelf — both through
+    // set_guild_snapshot, so the field list lives in one place. Empty name =
+    // unguilded (rank none, everything else zero; guild level additionally
+    // tracks Notify::GuildLevelUp between snapshots).
+    std::string m_guild_name;
+    std::string m_guild_rank_title;
+    int m_guild_rank = hb::shared::guild::guild_rank::none;
+    int m_guild_level = 0;
+    uint32_t m_guild_permission_mask = 0;
+    int m_guild_title = 0;
+    void set_guild_snapshot(const hb::net::PacketGuildSelfState& state);
+    bool in_guild() const { return !m_guild_name.empty(); }
 
     // INVENTORY
     std::array<std::unique_ptr<CItem>, hb::shared::limits::MaxItems> m_item_list;

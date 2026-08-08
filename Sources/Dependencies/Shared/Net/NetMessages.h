@@ -95,6 +95,35 @@ namespace MsgId
 		RequestTpDelist                         = 0x0FA31608,
 		ResponseTpActionResult                  = 0x0FA31609,
 		RequestTpMyBoard                        = 0x0FA3160A,   // my Listings / my Offers (reuses ResponseTpBoardPage)
+		// Guild — request/response families (#123, see PacketGuild.h). Typed
+		// requests on their own ids, no CommonType arms; server events ride
+		// the Notify channel below.
+		RequestGuildCreate                      = 0x0FA31700,
+		RequestGuildDisband                     = 0x0FA31701,
+		RequestGuildJoin                        = 0x0FA31702,
+		RequestGuildLeave                       = 0x0FA31703,
+		RequestGuildSelfExit                    = 0x0FA31704,
+		RequestGuildDecide                      = 0x0FA31705,
+		RequestGuildKick                        = 0x0FA31706,
+		RequestGuildPromote                     = 0x0FA31707,
+		RequestGuildDemote                      = 0x0FA31708,
+		RequestGuildTransfer                    = 0x0FA31709,
+		RequestGuildDonate                      = 0x0FA3170A,
+		RequestGuildTreasury                    = 0x0FA3170B,
+		RequestGuildTitleClaim                  = 0x0FA3170C,
+		RequestGuildTitleDrop                   = 0x0FA3170D,
+		RequestGuildTitleStrip                  = 0x0FA3170E,
+		RequestGuildRoster                      = 0x0FA3170F,
+		RequestGuildQueue                       = 0x0FA31710,
+		RequestGuildInfo                        = 0x0FA31711,
+		RequestGuildName                        = 0x0FA31712,
+		// Reserved for the master-initiated invite flow (Appendix A's ask):
+		// allocated so it costs no future Compatibility bump, no v1 handler.
+		RequestGuildInvite                      = 0x0FA31713,
+		ResponseGuildAction                     = 0x0FA31720,
+		ResponseGuildRoster                     = 0x0FA31721,
+		ResponseGuildQueue                      = 0x0FA31722,
+		ResponseGuildInfo                       = 0x0FA31723,
 	};
 }
 
@@ -316,6 +345,8 @@ namespace Notify
 		ItemAttributeChange                     = 0x0BA3,
 		GizonItemUpgradeLeft                    = 0x0BA4,
 		GizoneItemChange                        = 0x0BA5,
+		// The lazy name-cache answer, restored on the original 3.82 id (#123).
+		GuildNameAnswer                         = 0x0BA6,
 		ForceRecallTime                         = 0x0BA7,
 		ItemUpgradeFail                         = 0x0BA8,
 		ChangePlayMode                          = 0x0BA9,
@@ -327,6 +358,20 @@ namespace Notify
 		SettingFailed                           = 0x0BB4,
 		StateChangeSuccess                      = 0x0BB5,
 		StateChangeFailed                       = 0x0BB6,
+		// Guild events (#123, PacketGuild.h): sent by the engine at the
+		// mutation itself, so wire requests, chat commands and the Title
+		// inactivity sweep all announce identically. 0x0BBF is this block's
+		// last free slot — 0x0BC0 is taken (a client-side ItemAttributeChange
+		// alias); the next guild notify goes elsewhere.
+		GuildJoined                             = 0x0BB7,
+		GuildLeft                               = 0x0BB8,
+		GuildDisbanded                          = 0x0BB9,
+		GuildRankChanged                        = 0x0BBA,
+		GuildTitleChanged                       = 0x0BBB,
+		GuildLevelUp                            = 0x0BBC,
+		GuildRequestQueued                      = 0x0BBD,
+		GuildSelf                               = 0x0BBE,
+		GuildRequestDecided                     = 0x0BBF,
 		SlateCreateSuccess                      = 0x0BC1,
 		SlateCreateFail                         = 0x0BC2,
 		NoRecall                                = 0x0BD1,

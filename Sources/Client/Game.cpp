@@ -6446,6 +6446,10 @@ void CGame::init_data_response_handler(char* packet_data)
 	m_player->m_hp = pkt->hp;
 	m_discount = static_cast<char>(pkt->discount);
 
+	// Own-guild snapshot (#123): the char-init half of what Notify::GuildSelf
+	// re-syncs mid-session.
+	m_player->set_guild_snapshot(pkt->guild);
+
 	const char* cursor = reinterpret_cast<const char*>(packet_data) + sizeof(hb::net::PacketResponseInitDataHeader);
 
 	{

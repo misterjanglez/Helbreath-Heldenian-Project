@@ -8,6 +8,7 @@
 
 #include "GuildManager.h"
 
+#include <cstdio>
 #include <cstring>
 
 #include "Client.h"
@@ -16,6 +17,8 @@
 #include "ItemManager.h"
 #include "Log.h"
 #include "Map.h"
+#include "Packet/PacketGuild.h"
+#include "Packet/PacketHelpers.h"
 #include "ServerLogChannels.h"
 #include "StringCompat.h"
 #include "TimeUtils.h"
@@ -23,60 +26,32 @@
 using namespace hb::shared::guild;
 using namespace hb::shared::net;
 using hb::log_channel;
+using hb::net::fill_wire_name;
+using hb::net::make_notify;
 namespace ItemLogAction = hb::server::net::ItemLogAction;
 
 namespace hb::server
 {
-
-const char* guild_result_name(int result)
-{
-	switch (result)
-	{
-	case guild_result::ok:                     return "ok";
-	case guild_result::no_client:              return "no_client";
-	case guild_result::crusade_active:         return "crusade_active";
-	case guild_result::already_in_guild:       return "already_in_guild";
-	case guild_result::not_in_guild:           return "not_in_guild";
-	case guild_result::bad_name:               return "bad_name";
-	case guild_result::name_taken:             return "name_taken";
-	case guild_result::name_mismatch:          return "name_mismatch";
-	case guild_result::level_too_low:          return "level_too_low";
-	case guild_result::charisma_too_low:       return "charisma_too_low";
-	case guild_result::not_citizen:            return "not_citizen";
-	case guild_result::not_in_own_town:        return "not_in_own_town";
-	case guild_result::wrong_side:             return "wrong_side";
-	case guild_result::no_ticket:              return "no_ticket";
-	case guild_result::request_pending:        return "request_pending";
-	case guild_result::unknown_guild:          return "unknown_guild";
-	case guild_result::unknown_request:        return "unknown_request";
-	case guild_result::no_permission:          return "no_permission";
-	case guild_result::not_master:             return "not_master";
-	case guild_result::master_cannot_leave:    return "master_cannot_leave";
-	case guild_result::target_not_found:       return "target_not_found";
-	case guild_result::target_is_master:       return "target_is_master";
-	case guild_result::target_not_below_rank:  return "target_not_below_rank";
-	case guild_result::target_offline:         return "target_offline";
-	case guild_result::bad_rank:               return "bad_rank";
-	case guild_result::store_error:            return "store_error";
-	case guild_result::donations_disabled:     return "donations_disabled";
-	case guild_result::amount_too_small:       return "amount_too_small";
-	case guild_result::insufficient_funds:     return "insufficient_funds";
-	case guild_result::guild_full:             return "guild_full";
-	case guild_result::officers_at_capacity:   return "officers_at_capacity";
-	case guild_result::bad_title:              return "bad_title";
-	case guild_result::already_titled:         return "already_titled";
-	case guild_result::no_title_slot:          return "no_title_slot";
-	case guild_result::no_title:               return "no_title";
-	case guild_result::treasury_short:         return "treasury_short";
-	default:                                   return "unknown";
-	}
-}
 
 namespace
 {
 	// The empty answer online_members gives for a guild with nobody on —
 	// file-scope so the hit path pays no function-local-static init guard.
 	const std::vector<int> no_members;
+
+	// One event to a bucket of handles. Callers that mutate the bucket
+	// underfoot (kick, leave, disband) pass a copy taken before the mutation
+	// so the departing member still hears the event they star in.
+	template <typename PacketT>
+	void broadcast(CGame* game, const std::vector<int>& handles,
+		const PacketT& pkt)
+	{
+		for (int handle : handles)
+		{
+			game->send_packet(handle, pkt);
+		}
+	}
+
 
 	// The §3.1.2 climb: from the guild's current level, take each next curve
 	// row whose three cumulative thresholds the post-donation totals ALL
@@ -298,11 +273,14 @@ int guild_manager::disband_guild(int client_h, const char* typed_name)
 			remainder, client->m_char_name);
 	}
 
-	// The "broadcast": every online member is cleared inline, off the index
-	// instead of the original's 2000-slot name scan. The bucket is copied
-	// because clear_client edits it underfoot. #123 gives this loop its wire
-	// shape; until then the log line is the announcement.
+	// The broadcast: every online member hears the event and is then cleared
+	// inline, off the index instead of the original's 2000-slot name scan.
+	// The bucket is copied because clear_client edits it underfoot.
 	const std::vector<int> online = online_members(guid);
+	auto gone = make_notify<hb::net::PacketNotifyGuildDisbanded>(
+		Notify::GuildDisbanded);
+	fill_wire_name(gone.guild_name, client->m_guild_name);
+	broadcast(m_game, online, gone);
 	for (int member_h : online)
 	{
 		clear_client(member_h);
@@ -372,6 +350,7 @@ int guild_manager::file_join_request(int client_h, const char* guild_name,
 	// now. The original burned it on hand-over before any decision too; what
 	// it never gets to do here is burn on a refused ceremony.
 	consume_ticket(client_h, slot);
+	notify_request_queued(guild.guid, guild_request::join, client->m_char_name);
 	hb::logger::log<log_channel::guild>(
 		"join-file: '{}' applied to '{}' (guid {}, request {})",
 		client->m_char_name, guild.name, guild.guid, out_request_id);
@@ -422,6 +401,7 @@ int guild_manager::file_leave_request(int client_h, int64_t& out_request_id)
 		return refuse("leave-file", *client, guild_result::store_error);
 	}
 	consume_ticket(client_h, slot);
+	notify_request_queued(guid, guild_request::leave, client->m_char_name);
 	hb::logger::log<log_channel::guild>(
 		"leave-file: '{}' filed secession from guild {} (request {})",
 		client->m_char_name, guid, out_request_id);
@@ -452,20 +432,31 @@ int guild_manager::decide_request(int approver_h, int64_t request_id, bool appro
 		// the queue's contents are not probeable across guild lines.
 		return refuse("decide", *approver, guild_result::unknown_request);
 	}
-	const uint32_t needed_bit = (request.kind == guild_request::join)
-		? guild_permission::approve_join
-		: guild_permission::approve_leave;
-	if (!has_permission(approver_h, needed_bit))
+	if (!has_permission(approver_h, deciding_bit_for(request.kind)))
 	{
 		return refuse("decide", *approver, guild_result::no_permission);
 	}
 
 	const char* verb = (request.kind == guild_request::join) ? "join" : "leave";
+
+	// The applicant's outcome notice (online only — the queue itself is the
+	// offline-proof half of the ceremony). Built up front while the approver's
+	// cached guild name is at hand; sent after the store call succeeds.
+	auto decided = make_notify<hb::net::PacketNotifyGuildRequestDecided>(
+		Notify::GuildRequestDecided);
+	decided.kind = static_cast<uint8_t>(request.kind);
+	fill_wire_name(decided.guild_name, approver->m_guild_name);
+
 	if (!approve)
 	{
 		if (!db->delete_request(request_id))
 		{
 			return refuse("decide", *approver, guild_result::store_error);
+		}
+		const int applicant_h = m_game->find_client_by_name(request.char_name.c_str());
+		if (applicant_h > 0)
+		{
+			m_game->send_packet(applicant_h, decided);
 		}
 		hb::logger::log<log_channel::guild>(
 			"decide: '{}' rejected {} request {} from '{}' (guild {})",
@@ -473,6 +464,7 @@ int guild_manager::decide_request(int approver_h, int64_t request_id, bool appro
 			request.guild_guid);
 		return guild_result::ok;
 	}
+	decided.approved = 1;
 
 	if (request.kind == guild_request::join)
 	{
@@ -498,18 +490,39 @@ int guild_manager::decide_request(int approver_h, int64_t request_id, bool appro
 		// character had out) inside its own transaction. The joiner is in no
 		// index bucket yet, so this is the engine's one name scan; a miss
 		// returns 0, which refresh_client ignores like any dead handle.
-		refresh_client(m_game->find_client_by_name(request.char_name.c_str()));
+		const int joiner_h = m_game->find_client_by_name(request.char_name.c_str());
+		refresh_client(joiner_h);
+		// After the refresh the joiner sits in the bucket, so the joined event
+		// reaches the whole guild — new member included.
+		auto joined = make_notify<hb::net::PacketNotifyGuildJoined>(
+			Notify::GuildJoined);
+		fill_wire_name(joined.member, request.char_name.c_str());
+		broadcast(m_game, online_members(request.guild_guid), joined);
+		if (joiner_h > 0)
+		{
+			m_game->send_packet(joiner_h, decided);
+		}
 	}
 	else
 	{
+		// Copied before the removal so the departing member still hears the
+		// event they star in.
+		const std::vector<int> online = online_members(request.guild_guid);
 		if (!db->remove_member(request.char_name.c_str()))
 		{
 			return refuse("decide", *approver, guild_result::store_error);
 		}
+		const int leaver_h = find_online_member(request.guild_guid,
+			request.char_name.c_str());
 		// remove_member retired the leave request with the member row; a -1
 		// (offline) falls out of clear_client the same way.
-		clear_client(find_online_member(request.guild_guid,
-			request.char_name.c_str()));
+		clear_client(leaver_h);
+		broadcast_member_left(online, request.char_name.c_str(),
+			guild_leave_reason::left);
+		if (leaver_h >= 0)
+		{
+			m_game->send_packet(leaver_h, decided);
+		}
 	}
 	hb::logger::log<log_channel::guild>(
 		"decide: '{}' approved {} request {} from '{}' (guild {})",
@@ -552,6 +565,8 @@ int guild_manager::kennedy_self_exit(int client_h)
 		return refuse("kennedy-exit", *client, guild_result::no_ticket);
 	}
 	const int64_t guid = client->m_guild_guid;
+	// Copied before the removal so the departing member still hears the event.
+	const std::vector<int> online = online_members(guid);
 	// §3.1.1: an Officer may self-exit, demoted to Guildsman on the way out —
 	// the original's "rank 12 only" door, widened by one auto-demote step.
 	if (client->m_guild_rank == guild_rank::officer)
@@ -567,6 +582,8 @@ int guild_manager::kennedy_self_exit(int client_h)
 		return refuse("kennedy-exit", *client, guild_result::store_error);
 	}
 	consume_ticket(client_h, slot);
+	broadcast_member_left(online, client->m_char_name,
+		guild_leave_reason::self_exit);
 
 	// The −300, clamped before subtracting: m_exp is unsigned, and the
 	// original's post-subtraction "< 0" clamp is the wrap this avoids. No
@@ -629,6 +646,8 @@ int guild_manager::kick_member(int actor_h, const char* target_name)
 	{
 		return refuse("kick", *actor, guild_result::target_not_below_rank);
 	}
+	// Copied before the removal so the kicked member still hears the event.
+	const std::vector<int> online = online_members(actor->m_guild_guid);
 	if (!db->remove_member(target.char_name.c_str()))
 	{
 		return refuse("kick", *actor, guild_result::store_error);
@@ -641,6 +660,8 @@ int guild_manager::kick_member(int actor_h, const char* target_name)
 	{
 		clear_client(target_h);
 	}
+	broadcast_member_left(online, target.char_name.c_str(),
+		guild_leave_reason::kicked);
 	hb::logger::log<log_channel::guild>(
 		"kick: '{}' removed '{}' from guild {} ({})",
 		actor->m_char_name, target.char_name, actor->m_guild_guid,
@@ -728,6 +749,9 @@ int guild_manager::move_rank(int actor_h, const char* target_name,
 			if ((new_mask & guild_permission::commander_eligible) == 0)
 			{
 				db->release_title(target.char_name.c_str());
+				broadcast_title_change(actor->m_guild_guid,
+					target.char_name.c_str(), guild_title::commander, false,
+					guild_title_change::released_rank);
 				hb::logger::log<log_channel::guild>(
 					"title-release: '{}' lost commander (guild {}, rank moved"
 					" below eligibility)", target.char_name, actor->m_guild_guid);
@@ -737,6 +761,7 @@ int guild_manager::move_rank(int actor_h, const char* target_name,
 	// An offline target's cache and mask catch up at their next hydration.
 	refresh_client(find_online_member(actor->m_guild_guid,
 		target.char_name.c_str()));
+	broadcast_rank_change(actor->m_guild_guid, target.char_name.c_str(), to_rank);
 	hb::logger::log<log_channel::guild>(
 		"{}: '{}' moved '{}' to rank {} (guild {})",
 		verb, actor->m_char_name, target.char_name, to_rank,
@@ -803,6 +828,11 @@ int guild_manager::transfer_mastership(int master_h, const char* new_master_name
 	// is an Officer now, the incoming one holds the master mask.
 	refresh_client(master_h);
 	refresh_client(incoming_h);
+	// Two rank events, so roster views move both rows without a special case.
+	broadcast_rank_change(master->m_guild_guid, master->m_char_name,
+		guild_rank::officer);
+	broadcast_rank_change(master->m_guild_guid, incoming.char_name.c_str(),
+		guild_rank::guildmaster);
 	hb::logger::log<log_channel::guild>(
 		"transfer: '{}' handed guild {} to '{}' (old master now officer)",
 		master->m_char_name, master->m_guild_guid, incoming.char_name);
@@ -948,7 +978,10 @@ int guild_manager::donate(int client_h, donation_lane lane, int64_t amount)
 	{
 		// Every online member's cached level follows in one bucket walk; the
 		// grants (caps, slots, repair discount) read the cache or the store,
-		// so nothing else must be told. #123 gives this its wire shape.
+		// so nothing else must be told beyond the event itself.
+		auto level_up = make_notify<hb::net::PacketNotifyGuildLevelUp>(
+			Notify::GuildLevelUp);
+		level_up.new_level = static_cast<uint16_t>(new_level);
 		for (int member_h : online_members(guild.guid))
 		{
 			CClient* member = client_raw(member_h);
@@ -956,6 +989,7 @@ int guild_manager::donate(int client_h, donation_lane lane, int64_t amount)
 			{
 				member->m_guild_level = new_level;
 			}
+			m_game->send_packet(member_h, level_up);
 		}
 		hb::logger::log<log_channel::guild>(
 			"level-up: guild {} '{}' reached level {}",
@@ -1029,6 +1063,8 @@ int guild_manager::claim_title(int client_h, int kind)
 		return refuse("title-claim", *client, guild_result::store_error);
 	}
 	refresh_client(client_h);
+	broadcast_title_change(guild.guid, client->m_char_name, kind, true,
+		guild_title_change::claimed);
 	hb::logger::log<log_channel::guild>(
 		"title-claim: '{}' took {} ({}/{} held, guild {} '{}')",
 		client->m_char_name, guild_title_name(kind), held_of_kind + 1,
@@ -1062,6 +1098,8 @@ int guild_manager::drop_title(int client_h)
 		return refuse("title-drop", *client, guild_result::store_error);
 	}
 	refresh_client(client_h);
+	broadcast_title_change(held.guild_guid, client->m_char_name, held.kind,
+		false, guild_title_change::dropped);
 	hb::logger::log<log_channel::guild>(
 		"title-drop: '{}' released {} (guild {})",
 		client->m_char_name, guild_title_name(held.kind), held.guild_guid);
@@ -1107,6 +1145,8 @@ int guild_manager::strip_title(int actor_h, const char* target_name)
 	// drops the Title now, an offline one's at next hydration.
 	refresh_client(find_online_member(actor->m_guild_guid,
 		target.char_name.c_str()));
+	broadcast_title_change(actor->m_guild_guid, target.char_name.c_str(),
+		held.kind, false, guild_title_change::stripped);
 	hb::logger::log<log_channel::guild>(
 		"title-strip: '{}' took {} from '{}' (guild {})",
 		actor->m_char_name, guild_title_name(held.kind), target.char_name,
@@ -1167,6 +1207,9 @@ void guild_manager::tick_titles(uint32_t now_ms)
 			{
 				refresh_client(holder_h);
 			}
+			broadcast_title_change(title.guild_guid,
+				title.holder_name.c_str(), title.kind, false,
+				guild_title_change::released_idle);
 			hb::logger::log<log_channel::guild>(
 				"title-release: '{}' lost {} (guild {}, inactive)",
 				title.holder_name, guild_title_name(title.kind),
@@ -1320,6 +1363,97 @@ int guild_manager::min_charisma(int client_h) const
 }
 
 //----------------------------------------------------------------------
+// The #123 notify layer
+//----------------------------------------------------------------------
+
+const char* guild_manager::rank_title_for(int64_t, int rank) const
+{
+	// The ADR 0006 defaults; the configurable-rank editor will read the
+	// per-guild rows here (the guid parameter is its seat at the table).
+	// default_rank_title(none) is "" — the unguilded need no special case.
+	return default_rank_title(rank);
+}
+
+void guild_manager::fill_self_state(int client_h,
+	hb::net::PacketGuildSelfState& out) const
+{
+	out = {};
+	const CClient* client = client_raw(client_h);
+	if (client == nullptr)
+	{
+		return;
+	}
+	fill_wire_name(out.guild_name, client->m_guild_name);
+	out.rank = static_cast<int8_t>(client->m_guild_rank);
+	fill_wire_name(out.rank_title,
+		rank_title_for(client->m_guild_guid, client->m_guild_rank));
+	out.level = static_cast<uint16_t>(client->m_guild_level);
+	out.permission_mask = client->m_guild_permission_mask;
+	out.title = static_cast<uint8_t>(client->m_guild_title);
+}
+
+void guild_manager::send_self_state(int client_h) const
+{
+	CClient* client = client_raw(client_h);
+	if (client == nullptr || client->m_is_init_complete == false)
+	{
+		return;
+	}
+	auto pkt = make_notify<hb::net::PacketNotifyGuildSelf>(Notify::GuildSelf);
+	fill_self_state(client_h, pkt.state);
+	m_game->send_packet(client_h, pkt);
+}
+
+void guild_manager::notify_request_queued(int64_t guild_guid, int kind,
+	const char* applicant) const
+{
+	auto pkt = make_notify<hb::net::PacketNotifyGuildRequestQueued>(
+		Notify::GuildRequestQueued);
+	pkt.kind = static_cast<uint8_t>(kind);
+	fill_wire_name(pkt.applicant, applicant);
+	const uint32_t deciding_bit = deciding_bit_for(kind);
+	for (int handle : online_members(guild_guid))
+	{
+		if (has_permission(handle, deciding_bit))
+		{
+			m_game->send_packet(handle, pkt);
+		}
+	}
+}
+
+void guild_manager::broadcast_member_left(const std::vector<int>& audience,
+	const char* member, int reason) const
+{
+	auto left = make_notify<hb::net::PacketNotifyGuildLeft>(Notify::GuildLeft);
+	fill_wire_name(left.member, member);
+	left.reason = static_cast<uint8_t>(reason);
+	broadcast(m_game, audience, left);
+}
+
+void guild_manager::broadcast_rank_change(int64_t guild_guid,
+	const char* member, int new_rank) const
+{
+	auto moved = make_notify<hb::net::PacketNotifyGuildRankChanged>(
+		Notify::GuildRankChanged);
+	fill_wire_name(moved.member, member);
+	moved.new_rank = static_cast<int8_t>(new_rank);
+	fill_wire_name(moved.rank_title, rank_title_for(guild_guid, new_rank));
+	broadcast(m_game, online_members(guild_guid), moved);
+}
+
+void guild_manager::broadcast_title_change(int64_t guild_guid,
+	const char* member, int kind, bool held, int reason) const
+{
+	auto changed = make_notify<hb::net::PacketNotifyGuildTitleChanged>(
+		Notify::GuildTitleChanged);
+	fill_wire_name(changed.member, member);
+	changed.kind = static_cast<uint8_t>(kind);
+	changed.held = held ? 1 : 0;
+	changed.reason = static_cast<uint8_t>(reason);
+	broadcast(m_game, online_members(guild_guid), changed);
+}
+
+//----------------------------------------------------------------------
 // Internals
 //----------------------------------------------------------------------
 
@@ -1364,6 +1498,7 @@ void guild_manager::refresh_client(int client_h)
 	// on_logout carries the same cached guid but is absent from the index,
 	// and index_add already refuses duplicates.
 	index_add(guild.guid, client_h);
+	send_self_state(client_h);
 }
 
 void guild_manager::clear_client(int client_h)
@@ -1383,6 +1518,7 @@ void guild_manager::clear_client(int client_h)
 	client->m_guild_permission_mask = 0;
 	client->m_guild_level = 0;
 	client->m_guild_title = 0;
+	send_self_state(client_h);
 }
 
 void guild_manager::index_add(int64_t guild_guid, int client_h)
