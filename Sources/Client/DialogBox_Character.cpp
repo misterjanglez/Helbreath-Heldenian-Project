@@ -644,24 +644,7 @@ void DialogBox_Character::draw_pane_lines(int x, int y, int w,
 	}
 
 	const bool scrollable = max_scroll > 0;
-	const bool on_top = m_game->get_dialog_box_manager().get_top_id() == DialogBoxId::CharacterInfo;
-
-	if (scrollable && on_top)
-	{
-		if (const int wheel = hb::shared::input::get_mouse_wheel_delta(); wheel != 0)
-			m_pane_scroll += wheel > 0 ? -1 : 1;
-
-		// Dragging maps the cursor's position in the track straight onto the
-		// scroll range, so the thumb follows the pointer rather than accumulating
-		// deltas — the same thing the list dialogs do.
-		if (hb::shared::input::is_mouse_button_down(hb::shared::input::MouseButton::Left)
-			&& mouse_in(theme::grab_area(pane_scroll_bar)))
-		{
-			const int offset = hb::shared::input::get_mouse_y() - (m_y + pane_top);
-			m_pane_scroll = (offset * max_scroll + pane_content_h / 2) / pane_content_h;
-		}
-	}
-	m_pane_scroll = std::clamp(m_pane_scroll, 0, max_scroll);
+	handle_vscroll(pane_scroll_bar, max_scroll, m_pane_scroll);
 
 	int row = y;
 	for (std::size_t i = static_cast<std::size_t>(m_pane_scroll); i < lines.size(); i++)
@@ -755,6 +738,21 @@ void DialogBox_Character::on_draw()
 	}
 	put_aligned_string(sX, sX + column_w, sY + 69, statusBuf.c_str(), GameColors::UILabel);
 
+	// Guild identity (#124): the original appended "(Guild Guildmaster)" to
+	// the citizenship line; a 20-char guild name walks that off the panel, so
+	// it sits on its own row — with the held Title, whose v1 display surfaces
+	// are exactly this dialog and the roster (§3.1.1).
+	if (player().in_guild())
+	{
+		std::string guild_line = std::format(UI_GUILD_OVERHEAD_LINE,
+			player().m_guild_name, player().m_guild_rank_title);
+		if (player().m_guild_title != 0)
+			guild_line += std::format(" — {}",
+				hb::shared::guild::guild_title_display_name(player().m_guild_title));
+		put_aligned_string(sX, sX + column_w, sY + 84, guild_line.c_str(),
+			GameColors::UILabel);
+	}
+
 	// Calculate max stats. Gear attributes feed these exactly as they do in
 	// CGame::get_max_hp / get_max_mp / get_max_sp / calc_max_load — the client
 	// re-derives the same formulas, so it has to read the same inputs or the
@@ -833,9 +831,10 @@ void DialogBox_Character::on_draw()
 		draw_female_character(sX, sY, mouse_x, mouse_y, equip_poi_status, collison);
 	}
 
-	// draw buttons (Quest, Party, LevelUp)
+	// draw buttons (Quest, Party, Guild, LevelUp)
 	draw_button(sX, sY, btn_quest, UI_BTN_QUEST);
 	draw_button(sX, sY, btn_party, UI_BTN_PARTY);
+	draw_button(sX, sY, btn_guild, UI_BTN_GUILD);
 	draw_button(sX, sY, btn_levelup, UI_CHARACTER_BTN_LEVELUP);
 }
 
@@ -933,6 +932,13 @@ bool DialogBox_Character::on_click()
 	// Party button
 	if (mouse_in(btn_party)) {
 		enable_dialog_box(DialogBoxId::Party, 0, 0, 0);
+		disable_this_dialog();
+		audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
+		return true;
+	}
+	// Guild button (#124)
+	if (mouse_in(btn_guild)) {
+		enable_dialog_box(DialogBoxId::GuildMenu, 0, 0, 0);
 		disable_this_dialog();
 		audio_manager::get().play_game_sound(sound_type::effect, 14, 5);
 		return true;

@@ -5,7 +5,10 @@
 #include "GameFonts.h"
 #include "TextLibExt.h"
 #include "IInput.h"
+#include "TextInputManager.h"
 #include "UITheme.h"
+
+#include <algorithm>
 
 IDialogBox::IDialogBox(DialogBoxId::Type id, CGame* game)
 	: m_game(game)
@@ -30,6 +33,53 @@ void IDialogBox::draw_button(int sX, int sY, const ui_rect& r, const char* capti
 {
 	hb::client::ui_theme::button(sX + r.x, sY + r.y, r.w, r.h, caption,
 	                             enabled && mouse_in(r), enabled);
+}
+
+void IDialogBox::handle_vscroll(const ui_rect& bar, int max_scroll, int& scroll)
+{
+	if (max_scroll > 0 && m_manager->get_top_id() == m_id)
+	{
+		if (const int wheel = hb::shared::input::get_mouse_wheel_delta(); wheel != 0)
+			scroll += wheel > 0 ? -1 : 1;
+
+		// Dragging maps the cursor's position in the track straight onto the
+		// scroll range, so the thumb follows the pointer rather than
+		// accumulating deltas.
+		if (hb::shared::input::is_mouse_button_down(hb::shared::input::MouseButton::Left)
+			&& mouse_in(hb::client::ui_theme::grab_area(bar)))
+		{
+			const int offset = hb::shared::input::get_mouse_y() - (m_y + bar.y);
+			scroll = (offset * max_scroll + bar.h / 2) / bar.h;
+		}
+	}
+	scroll = std::clamp(scroll, 0, max_scroll);
+}
+
+void IDialogBox::bind_text_input(int x, int y, unsigned char max_len,
+	std::string& buffer, std::string_view filter, bool hidden)
+{
+	if (m_manager->get_top_id() != m_id)
+		return;
+	auto& input = text_input_manager::get();
+	// Re-anchor only a binding this dialog holds — an active input we never
+	// bound (the chat line) is someone else's and stays untouched.
+	if (input.is_active() && m_bound_input_x != -1
+		&& (x != m_bound_input_x || y != m_bound_input_y))
+		input.end_input();
+	if (!input.is_active())
+	{
+		input.start_input(x, y, max_len, buffer, hidden, filter);
+		m_bound_input_x = x;
+		m_bound_input_y = y;
+	}
+}
+
+void IDialogBox::unbind_text_input()
+{
+	if (m_bound_input_x != -1 && text_input_manager::get().is_active())
+		text_input_manager::get().end_input();
+	m_bound_input_x = -1;
+	m_bound_input_y = -1;
 }
 
 void IDialogBox::put_string(int iX, int iY, const char* string, const hb::shared::render::Color& color)

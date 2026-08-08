@@ -25,6 +25,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <format>
 
 
 
@@ -1178,7 +1179,50 @@ void Screen_OnGame::draw_object_name(short screen_x, short screen_y, const char*
 
 	hb::shared::text::draw_text(GameFont::Default, screen_x, screen_y, text.c_str(), hb::shared::text::TextStyle::with_shadow(GameColors::UIWhite));
 
-	if (object_id == m_game->m_player->m_player_object_id)
+	// The guild line (#124): "(GuildName RankTitle)" under the name, resolved
+	// through the lazy cache for everyone — own included, so the §3.1.2
+	// gold-name flag has one source (the GuildSelf handler invalidates the
+	// own entry to keep it honest; CPlayer state fills the frames before the
+	// answer lands). The line itself is formatted once per answer, not per
+	// frame — this runs for every visible player. During crusade a hostile's
+	// name is anonymized to an object id and the guild line stays suppressed
+	// with it — the original's rule, kept because a guild line under a
+	// number would undo the anonymization; friendlies and the own line keep
+	// theirs. An illusioned viewer sees "?????" and no guild line either
+	// (the original leaked it).
+	const bool own_line = object_id == m_game->m_player->m_player_object_id;
+	if (m_ilusion_owner_h == 0
+		&& (own_line || m_is_crusade_mode == false || !IsHostile(relationship)))
+	{
+		std::string_view guild_line;
+		std::string own_fallback;
+		bool gold_name = false;
+		if (const auto* entry = m_guild_manager.lookup(name, object_id,
+				m_game->m_cur_time); entry != nullptr)
+		{
+			guild_line = entry->overhead_line;
+			gold_name = entry->at_max_level != 0;
+		}
+		else if (own_line && m_game->m_player->in_guild())
+		{
+			own_fallback = std::format(UI_GUILD_OVERHEAD_LINE,
+				m_game->m_player->m_guild_name,
+				m_game->m_player->m_guild_rank_title);
+			guild_line = own_fallback;
+		}
+		if (!guild_line.empty())
+		{
+			const auto guild_color = gold_name
+				? hb::shared::render::Color(255, 215, 0)
+				: GameColors::InfoGrayLight;
+			hb::shared::text::draw_text(GameFont::Default, screen_x,
+				screen_y + 14, guild_line.data(),
+				hb::shared::text::TextStyle::with_shadow(guild_color));
+			y_offset = 14;
+		}
+	}
+
+	if (own_line)
 	{
 		if (m_game->m_player->m_pk_count != 0)
 		{

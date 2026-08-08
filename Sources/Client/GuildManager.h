@@ -23,6 +23,7 @@
 #pragma once
 
 #include <cstdint>
+#include <string>
 #include <vector>
 
 #include "GameConstants.h"
@@ -47,6 +48,10 @@ public:
 		char char_name[hb::shared::limits::CharNameLen]{};
 		char guild_name[hb::net::kGuildNameWireLen]{};
 		char rank_title[hb::net::kGuildRankTitleWireLen]{};
+		// The "(GuildName RankTitle)" overhead text, formatted once when the
+		// answer lands — the render path draws it every frame for every
+		// visible player, and re-formatting an invariant there is pure churn.
+		std::string overhead_line;
 		int8_t rank = hb::shared::guild::guild_rank::none;
 		uint8_t at_max_level = 0;
 		bool answered = false;   // false while the request is in flight
@@ -90,6 +95,22 @@ public:
 	uint16_t queue_total() const { return m_queue_total; }
 	const hb::net::PacketResponseGuildInfo& info() const { return m_info; }
 	bool info_valid() const { return m_info_valid; }
+	// Bumped on every info answer (and on drop) so a panel can cache what it
+	// derives from one answer and rebuild only when the next one lands.
+	uint32_t info_version() const { return m_info_version; }
+
+	// --- Staleness (the notify handlers' side of panel freshness) --------
+	// Handlers say WHAT changed; an open dialog re-requests from on_update
+	// when its answer is stale (its on_enable requests unconditionally, so a
+	// closed dialog just lets the flag sit). The send_*_request calls clear
+	// the matching flag — mirroring how the name cache pairs invalidate()
+	// with the render path's lazy re-ask.
+	void mark_roster_stale() { m_roster_stale = true; }
+	void mark_queue_stale() { m_queue_stale = true; }
+	void mark_info_stale() { m_info_stale = true; }
+	bool roster_stale() const { return m_roster_stale; }
+	bool queue_stale() const { return m_queue_stale; }
+	bool info_stale() const { return m_info_stale; }
 
 	void on_roster_response(const char* data, uint32_t msg_size);
 	void on_queue_response(const char* data, uint32_t msg_size);
@@ -106,6 +127,10 @@ public:
 		m_queue_total = 0;
 		m_info = {};
 		m_info_valid = false;
+		m_info_version++;
+		m_roster_stale = false;
+		m_queue_stale = false;
+		m_info_stale = false;
 	}
 
 	// --- Request senders (one per wire pair; #124 calls these) ----------
@@ -147,4 +172,8 @@ private:
 	uint16_t m_queue_total = 0;
 	hb::net::PacketResponseGuildInfo m_info{};
 	bool m_info_valid = false;
+	uint32_t m_info_version = 0;
+	bool m_roster_stale = false;
+	bool m_queue_stale = false;
+	bool m_info_stale = false;
 };

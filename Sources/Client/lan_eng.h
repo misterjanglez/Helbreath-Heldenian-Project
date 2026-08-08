@@ -2014,3 +2014,120 @@
 #define NOTIFYMSG_GUILD_REQ_REJECTED    "Your request to {} was declined."
 #define NOTIFYMSG_GUILD_REQUEST_FILED   "Your request has been submitted."
 #define NOTIFYMSG_GUILD_ACTION_FAILED   "Guild action failed: {}"
+
+// --- Guild UI suite (#124). The pre-gut DRAW_DIALOGBOX_GUILDMENU/_OPERATION
+// strings above are reused verbatim where the flow survived (create prose,
+// ticket prose, disband prose); everything below is for the surfaces the
+// §3.1.1 redesign added — roster, requests queue, Donations, Treasury,
+// Titles — plus the player-facing refusal lines HandleGuildActionResult maps
+// guild_result codes onto.
+#define UI_TITLE_GUILD_ROSTER       "Guild Roster"
+#define UI_TITLE_GUILD_REQUESTS     "Guild Requests"
+
+#define UI_BTN_GUILD        "Guild"
+#define UI_BTN_APPROVE      "Approve"
+#define UI_BTN_DONATE       "Donate"
+#define UI_BTN_DEPOSIT      "Deposit"
+#define UI_BTN_WITHDRAW     "Withdraw"
+#define UI_BTN_REFRESH      "Refresh"
+#define UI_BTN_CLAIM        "Claim"
+#define UI_BTN_DROP         "Drop"
+#define UI_BTN_KICK         "Kick"
+#define UI_BTN_PROMOTE      "Promote"
+#define UI_BTN_DEMOTE       "Demote"
+#define UI_BTN_STRIP        "Strip Title"
+#define UI_BTN_TRANSFER     "Transfer"
+#define UI_BTN_BACK         "Back"
+
+// The player-facing guild identity line — the overhead render and the
+// character dialog share it, so their punctuation cannot drift.
+#define UI_GUILD_OVERHEAD_LINE      "({} {})"
+
+// Guild menu (hub) links and panels.
+#define UI_GUILD_NO_GUILD           "You are not in a guild."
+#define UI_GUILD_LEVEL_RANK         "Level {} — {}"
+#define UI_GUILD_LINK_APPLY         "Apply to a guild"
+#define UI_GUILD_LINK_ROSTER        "Guild roster"
+#define UI_GUILD_LINK_REQUESTS      "Pending requests"
+#define UI_GUILD_LINK_DONATE        "Donate to the guild"
+#define UI_GUILD_LINK_TREASURY      "Guild treasury"
+#define UI_GUILD_LINK_LEAVE         "File a leave request"
+#define UI_GUILD_LINK_SELF_EXIT     "Leave via the Officer (-300 exp)"
+#define UI_GUILD_APPLY_PROMPT       "Enter the guild name to apply to."
+#define UI_GUILD_APPLY_HINT1        "Filing consumes a Guild Admission Ticket."
+#define UI_GUILD_APPLY_HINT2        "Your request waits until an approver decides."
+#define UI_GUILD_NAME_RULES         "Letters, digits, space, _ and - only."
+#define UI_GUILD_DISBAND_RETYPE     "Retype the guild name to confirm."
+#define UI_GUILD_LEAVE_PROMPT       "File a request to leave the guild?"
+#define UI_GUILD_LEAVE_HINT1        "Filing consumes a Guild Secession Ticket."
+#define UI_GUILD_LEAVE_HINT2        "An approver decides your request."
+#define UI_GUILD_SELF_EXIT_PROMPT   "Leave the guild immediately?"
+#define UI_GUILD_SELF_EXIT_HINT1    "The Guildhall Officer charges 300 experience"
+#define UI_GUILD_SELF_EXIT_HINT2    "points for a dismissal without approval."
+
+// Donate / Treasury panels.
+#define UI_GUILD_DONATE_DISABLED    "Donations are currently disabled."
+#define UI_GUILD_DONATE_BURN_HINT   "Donations are burned and cannot be recovered."
+#define UI_GUILD_LANE_GOLD          "Gold"
+#define UI_GUILD_LANE_EK            "Enemy kills"
+#define UI_GUILD_LANE_CONTRIB       "Contribution"
+#define UI_GUILD_AMOUNT             "Amount"
+#define UI_GUILD_NEXT_LEVEL_AT      "Next level requires (lifetime):"
+#define UI_GUILD_AT_MAX_LEVEL       "The guild is at the highest level."
+#define UI_GUILD_TREASURY_BALANCE   "Treasury balance"
+#define UI_GUILD_TREASURY_HINT      "Withdrawals are recorded in the guild log."
+
+// Roster.
+#define UI_GUILD_COL_MEMBER         "Member"
+#define UI_GUILD_COL_RANK           "Rank"
+#define UI_GUILD_COL_TITLE          "Title"
+#define UI_GUILD_COL_DONATED        "Donated"
+#define UI_GUILD_COL_STATUS         "Status"
+#define UI_GUILD_ONLINE             "Online"
+#define UI_GUILD_OFFLINE            "Offline"
+#define UI_GUILD_MEMBERS_OF         "Members {} / {}"
+#define UI_GUILD_NAME_LEVEL         "{} — Level {}"
+#define UI_GUILD_TITLE_SLOTS        "{} ({}/{})"
+#define UI_GUILD_CONFIRM_KICK       "Kick {} from the guild?"
+#define UI_GUILD_CONFIRM_TRANSFER   "Transfer mastership to {}? This cannot be undone."
+#define UI_GUILD_ROSTER_EMPTY       "No roster received yet."
+
+// Requests queue.
+#define UI_GUILD_QUEUE_EMPTY        "No pending requests."
+#define UI_GUILD_QUEUE_MORE         "{} more not shown."
+#define UI_GUILD_KIND_JOIN          "Join"
+#define UI_GUILD_KIND_LEAVE         "Leave"
+
+// guild_result refusal lines (fallback for unmapped codes is
+// NOTIFYMSG_GUILD_ACTION_FAILED with the code's name).
+#define UI_GUILD_R_CRUSADE          "You cannot do that during a crusade."
+#define UI_GUILD_R_ALREADY_IN       "You already belong to a guild."
+#define UI_GUILD_R_NOT_IN           UI_GUILD_NO_GUILD
+#define UI_GUILD_R_BAD_NAME         "That guild name is not allowed."
+#define UI_GUILD_R_NAME_MISMATCH    "The name you typed does not match."
+#define UI_GUILD_R_LEVEL            "You must be at least level {}."
+#define UI_GUILD_R_CHARISMA         "You need at least {} charisma."
+#define UI_GUILD_R_NOT_CITIZEN      "Only citizens may do that."
+#define UI_GUILD_R_NOT_OWN_TOWN     "You must be standing in your own town."
+#define UI_GUILD_R_WRONG_SIDE       "That guild serves the other side."
+#define UI_GUILD_R_NO_TICKET        "You need the required guild ticket."
+#define UI_GUILD_R_PENDING          "You already have a request waiting."
+#define UI_GUILD_R_UNKNOWN_GUILD    "No guild by that name."
+#define UI_GUILD_R_UNKNOWN_REQUEST  "That request is no longer there."
+#define UI_GUILD_R_NO_PERMISSION    "You do not have permission for that."
+#define UI_GUILD_R_NOT_MASTER       "Only the Guildmaster may do that."
+#define UI_GUILD_R_MASTER_LEAVE     "The Guildmaster must transfer leadership or disband."
+#define UI_GUILD_R_TARGET_MISSING   "That member could not be found."
+#define UI_GUILD_R_TARGET_MASTER    "That cannot target the Guildmaster."
+#define UI_GUILD_R_TARGET_RANK      "You may only do that to members below your rank."
+#define UI_GUILD_R_TARGET_OFFLINE   "That member must be online."
+#define UI_GUILD_R_BAD_RANK         "That rank change is not possible."
+#define UI_GUILD_R_DONATE_OFF       UI_GUILD_DONATE_DISABLED
+#define UI_GUILD_R_AMOUNT_SMALL     "That amount is below the minimum."
+#define UI_GUILD_R_NO_FUNDS         "You do not have that much."
+#define UI_GUILD_R_GUILD_FULL       "The guild is full."
+#define UI_GUILD_R_OFFICERS_FULL    "No more Officers at this Guild Level."
+#define UI_GUILD_R_ALREADY_TITLED   "You already hold a Title."
+#define UI_GUILD_R_NO_TITLE_SLOT    "Every slot for that Title is taken."
+#define UI_GUILD_R_NO_TITLE         "No Title is held there."
+#define UI_GUILD_R_TREASURY_SHORT   "The treasury does not hold that much."

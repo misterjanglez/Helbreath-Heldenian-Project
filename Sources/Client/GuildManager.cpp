@@ -7,9 +7,11 @@
 #include "GuildManager.h"
 
 #include <cstring>
+#include <format>
 
 #include "Game.h"
 #include "Packet/PacketHelpers.h"
+#include "lan_eng.h"
 
 using namespace hb::shared::net;
 using hb::net::fill_wire_name;
@@ -110,6 +112,9 @@ void guild_manager::on_name_answer(const hb::net::PacketNotifyGuildName& pkt)
 	entry.rank = pkt.rank;
 	entry.at_max_level = pkt.at_max_level;
 	entry.answered = true;
+	entry.overhead_line = entry.guild_name[0] != '\0'
+		? std::format(UI_GUILD_OVERHEAD_LINE, entry.guild_name, entry.rank_title)
+		: std::string{};
 }
 
 //----------------------------------------------------------------------
@@ -178,6 +183,7 @@ void guild_manager::on_info_response(const hb::net::PacketResponseGuildInfo& pkt
 	m_info.guild_name[sizeof(m_info.guild_name) - 1] = '\0';
 	m_info.master_name[sizeof(m_info.master_name) - 1] = '\0';
 	m_info_valid = true;
+	m_info_version++;
 }
 
 //----------------------------------------------------------------------
@@ -299,6 +305,7 @@ void guild_manager::send_title_drop()
 
 void guild_manager::send_roster_request()
 {
+	m_roster_stale = false;
 	hb::net::PacketRequestGuildRoster pkt{};
 	pkt.header.msg_id = MsgId::RequestGuildRoster;
 	m_game->send_game_packet(pkt);
@@ -306,6 +313,7 @@ void guild_manager::send_roster_request()
 
 void guild_manager::send_queue_request()
 {
+	m_queue_stale = false;
 	hb::net::PacketRequestGuildQueue pkt{};
 	pkt.header.msg_id = MsgId::RequestGuildQueue;
 	m_game->send_game_packet(pkt);
@@ -313,6 +321,7 @@ void guild_manager::send_queue_request()
 
 void guild_manager::send_info_request()
 {
+	m_info_stale = false;
 	hb::net::PacketRequestGuildInfo pkt{};
 	pkt.header.msg_id = MsgId::RequestGuildInfo;
 	m_game->send_game_packet(pkt);

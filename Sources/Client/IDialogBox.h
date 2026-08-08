@@ -4,6 +4,8 @@
 #include "CommonTypes.h"
 #include "GameConstants.h"   // ui_layout button slots, shared by every dialog
 #include <cstdint>
+#include <string>
+#include <string_view>
 
 // ui_rect (dialog-relative hit-test rect) comes in with CommonTypes.h.
 
@@ -68,6 +70,23 @@ protected:
 	// hit-tested a rect that only happened to line up with it.
 	void draw_button(int sX, int sY, const ui_rect& r, const char* caption, bool enabled = true);
 
+	// Wheel + track-drag input for a vertical list, applied only while this
+	// dialog is on top: `bar` is the dialog-relative scrollbar rect (its h is
+	// the track), `max_scroll` the highest first-visible index; `scroll` is
+	// updated and clamped in place. Drawing the thumb stays with the caller
+	// (ui_theme::scrollbar) — how much is visible differs per dialog, where a
+	// drag lands does not.
+	void handle_vscroll(const ui_rect& bar, int max_scroll, int& scroll);
+
+	// The text_input_manager lifecycle for a dialog-owned field, called every
+	// frame the field should be live: starts the input when this dialog is on
+	// top and nothing else holds it, and re-anchors it when the dialog has
+	// been dragged. Pair with unbind_text_input on mode exit / disable.
+	// (x, y) are SCREEN coordinates of the text baseline.
+	void bind_text_input(int x, int y, unsigned char max_len, std::string& buffer,
+		std::string_view filter = {}, bool hidden = false);
+	void unbind_text_input();
+
 	// Helper methods - delegate to CGame
 	void draw_new_dialog_box(char type, int sX, int sY, int frame, bool is_no_color_key = false, bool is_trans = false);
 	void put_string(int iX, int iY, const char* string, const hb::shared::render::Color& color);
@@ -103,4 +122,6 @@ protected:
 private:
 	DialogBoxManager* m_manager = nullptr;
 	bool m_enabled = false;
+	// Where bind_text_input last anchored the field; -1 = not bound.
+	int m_bound_input_x = -1, m_bound_input_y = -1;
 };

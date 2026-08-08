@@ -30,6 +30,7 @@
 #include "DialogBox_SellList.h"
 #include "DialogBox_GuildMenu.h"
 #include "DialogBox_GuildOperation.h"
+#include "DialogBox_GuildRoster.h"
 #include "DialogBox_Bank.h"
 #include "DialogBox_Exchange.h"
 #include "DialogBox_Party.h"
@@ -98,6 +99,7 @@ void DialogBoxManager::initialize_dialog_boxes()
 	register_dialog_box(std::make_unique<DialogBox_SellList>(&m_game));
 	register_dialog_box(std::make_unique<DialogBox_GuildMenu>(&m_game));
 	register_dialog_box(std::make_unique<DialogBox_GuildOperation>(&m_game));
+	register_dialog_box(std::make_unique<DialogBox_GuildRoster>(&m_game));
 	register_dialog_box(std::make_unique<DialogBox_Bank>(&m_game));
 	register_dialog_box(std::make_unique<DialogBox_Exchange>(&m_game));
 	register_dialog_box(std::make_unique<DialogBox_Party>(&m_game));

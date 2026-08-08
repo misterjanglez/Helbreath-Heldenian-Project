@@ -47,6 +47,7 @@ namespace DialogBoxId
 		Slates = 40,
 		ConfirmExchange = 41,
 		ChangeStatsMajestic = 42,
+		GuildRoster = 43,
 		StatusOverlay = 49,
 		Resurrect = 50,
 		CommandHallMenu = 51,

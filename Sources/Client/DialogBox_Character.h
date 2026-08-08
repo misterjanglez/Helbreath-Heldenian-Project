@@ -212,7 +212,11 @@ private:
 	char find_equip_item_at_point(short mouse_x, short mouse_y, short sX, short sY,
 		const char* equip_poi_status) const;
 
-	static constexpr ui_rect btn_quest{16, 424, 90, 21};
-	static constexpr ui_rect btn_party{115, 424, 90, 21};
-	static constexpr ui_rect btn_levelup{214, 424, 90, 21};
+	// Four footer buttons since the Guild one joined (#124): even 68px slots
+	// with the theme's 8px gap, spanning the same 16..312 band the three
+	// 90px ones did.
+	static constexpr ui_rect btn_quest{16, 424, 68, 21};
+	static constexpr ui_rect btn_party{92, 424, 68, 21};
+	static constexpr ui_rect btn_guild{168, 424, 68, 21};
+	static constexpr ui_rect btn_levelup{244, 424, 68, 21};
 };

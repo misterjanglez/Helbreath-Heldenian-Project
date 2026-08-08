@@ -38,7 +38,14 @@
 // It lives here rather than in IDialogBox.h so that UITheme can state the
 // geometry of the chrome it draws: a widget's face and its clickable area then
 // come from one rect instead of two sets of hand-measured numbers that drift.
-struct ui_rect { int x, y, w, h; };
+struct ui_rect
+{
+	int x, y, w, h;
+
+	// The same slot at another row — list dialogs place one button rect per
+	// visible row, so the y varies while the geometry stays put.
+	constexpr ui_rect at_y(int ny) const { return { x, ny, w, h }; }
+};
 
 // ============================================================================
 // Memory Operations

@@ -216,6 +216,9 @@
     <ClInclude Include="DialogBox_GuildOperation.h">
       <Filter>DialogBox</Filter>
     </ClInclude>
+    <ClInclude Include="DialogBox_GuildRoster.h">
+      <Filter>DialogBox</Filter>
+    </ClInclude>
     <ClInclude Include="DialogBox_Help.h">
       <Filter>DialogBox</Filter>
     </ClInclude>
@@ -818,6 +821,9 @@
       <Filter>DialogBox</Filter>
     </ClCompile>
     <ClCompile Include="DialogBox_GuildOperation.cpp">
+      <Filter>DialogBox</Filter>
+    </ClCompile>
+    <ClCompile Include="DialogBox_GuildRoster.cpp">
       <Filter>DialogBox</Filter>
     </ClCompile>
     <ClCompile Include="DialogBox_Help.cpp">

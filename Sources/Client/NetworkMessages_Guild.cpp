@@ -32,6 +32,70 @@ namespace
 		auto* screen = game->get_active_screen_as<Screen_OnGame>();
 		return screen != nullptr ? &screen->get_guild_manager() : nullptr;
 	}
+
+	// Handlers say WHAT changed by marking the cached answer stale; whether
+	// anyone re-requests is the dialogs' business (on_update when open and
+	// stale, on_enable unconditionally) — panel refresh policy stays out of
+	// the network layer, the same inversion the name cache's invalidate()
+	// already practices. Membership and Title notifies reach every online
+	// member; the queue has no broadcast, so only the filing notify and the
+	// acting approver's decide envelope mark it — co-approvers keep the
+	// Refresh button.
+	void mark_membership_stale(CGame* game, bool with_info)
+	{
+		if (guild_manager* manager = screen_guild_manager(game))
+		{
+			manager->mark_roster_stale();
+			if (with_info)
+				manager->mark_info_stale();
+		}
+	}
+
+	// The player-facing line for a refused action (#124); unmapped codes
+	// fall back to the raw name so a new server gate is never invisible.
+	std::string guild_result_text(int result)
+	{
+		switch (result)
+		{
+		case guild_result::crusade_active:        return UI_GUILD_R_CRUSADE;
+		case guild_result::already_in_guild:      return UI_GUILD_R_ALREADY_IN;
+		case guild_result::not_in_guild:          return UI_GUILD_R_NOT_IN;
+		case guild_result::bad_name:              return UI_GUILD_R_BAD_NAME;
+		case guild_result::name_taken:            return DRAW_DIALOGBOX_GUILDMENU23;
+		case guild_result::name_mismatch:         return UI_GUILD_R_NAME_MISMATCH;
+		case guild_result::level_too_low:
+			return std::format(UI_GUILD_R_LEVEL, guild_create_min_level);
+		case guild_result::charisma_too_low:
+			return std::format(UI_GUILD_R_CHARISMA, guild_create_min_charisma);
+		case guild_result::not_citizen:           return UI_GUILD_R_NOT_CITIZEN;
+		case guild_result::not_in_own_town:       return UI_GUILD_R_NOT_OWN_TOWN;
+		case guild_result::wrong_side:            return UI_GUILD_R_WRONG_SIDE;
+		case guild_result::no_ticket:             return UI_GUILD_R_NO_TICKET;
+		case guild_result::request_pending:       return UI_GUILD_R_PENDING;
+		case guild_result::unknown_guild:         return UI_GUILD_R_UNKNOWN_GUILD;
+		case guild_result::unknown_request:       return UI_GUILD_R_UNKNOWN_REQUEST;
+		case guild_result::no_permission:         return UI_GUILD_R_NO_PERMISSION;
+		case guild_result::not_master:            return UI_GUILD_R_NOT_MASTER;
+		case guild_result::master_cannot_leave:   return UI_GUILD_R_MASTER_LEAVE;
+		case guild_result::target_not_found:      return UI_GUILD_R_TARGET_MISSING;
+		case guild_result::target_is_master:      return UI_GUILD_R_TARGET_MASTER;
+		case guild_result::target_not_below_rank: return UI_GUILD_R_TARGET_RANK;
+		case guild_result::target_offline:        return UI_GUILD_R_TARGET_OFFLINE;
+		case guild_result::bad_rank:              return UI_GUILD_R_BAD_RANK;
+		case guild_result::donations_disabled:    return UI_GUILD_R_DONATE_OFF;
+		case guild_result::amount_too_small:      return UI_GUILD_R_AMOUNT_SMALL;
+		case guild_result::insufficient_funds:    return UI_GUILD_R_NO_FUNDS;
+		case guild_result::guild_full:            return UI_GUILD_R_GUILD_FULL;
+		case guild_result::officers_at_capacity:  return UI_GUILD_R_OFFICERS_FULL;
+		case guild_result::already_titled:        return UI_GUILD_R_ALREADY_TITLED;
+		case guild_result::no_title_slot:         return UI_GUILD_R_NO_TITLE_SLOT;
+		case guild_result::no_title:              return UI_GUILD_R_NO_TITLE;
+		case guild_result::treasury_short:        return UI_GUILD_R_TREASURY_SHORT;
+		default:
+			return std::format(NOTIFYMSG_GUILD_ACTION_FAILED,
+				guild_result_name(result));
+		}
+	}
 }
 
 namespace NetworkMessageHandlers {
@@ -75,6 +139,7 @@ void HandleGuildJoined(CGame* game, char* data)
 		manager->invalidate(member.c_str());
 	game->add_event_list(
 		std::format(NOTIFYMSG_GUILD_JOINED, member).c_str(), 10);
+	mark_membership_stale(game, true);
 }
 
 void HandleGuildLeft(CGame* game, char* data)
@@ -89,6 +154,7 @@ void HandleGuildLeft(CGame* game, char* data)
 		? NOTIFYMSG_GUILD_KICKED : NOTIFYMSG_GUILD_LEFT;
 	game->add_event_list(std::vformat(line,
 		std::make_format_args(member)).c_str(), 10);
+	mark_membership_stale(game, true);
 }
 
 void HandleGuildDisbanded(CGame* game, char* data)
@@ -113,6 +179,7 @@ void HandleGuildRankChanged(CGame* game, char* data)
 		manager->invalidate(member.c_str());
 	game->add_event_list(
 		std::format(NOTIFYMSG_GUILD_RANK_CHANGED, member, title).c_str(), 10);
+	mark_membership_stale(game, false);
 }
 
 void HandleGuildTitleChanged(CGame* game, char* data)
@@ -128,6 +195,7 @@ void HandleGuildTitleChanged(CGame* game, char* data)
 	else
 		game->add_event_list(
 			std::format(NOTIFYMSG_GUILD_TITLE_RELEASED, member, title).c_str(), 10);
+	mark_membership_stale(game, false);
 }
 
 void HandleGuildLevelUp(CGame* game, char* data)
@@ -140,6 +208,8 @@ void HandleGuildLevelUp(CGame* game, char* data)
 		std::format(NOTIFYMSG_GUILD_LEVEL_UP, pkt->new_level);
 	game->add_event_list(line.c_str(), 10);
 	game->set_top_msg(line.c_str(), 5);
+	// Caps, slot counts and next-level thresholds all just moved.
+	mark_membership_stale(game, true);
 }
 
 void HandleGuildRequestQueued(CGame* game, char* data)
@@ -153,6 +223,10 @@ void HandleGuildRequestQueued(CGame* game, char* data)
 		? NOTIFYMSG_GUILD_APPLY_JOIN : NOTIFYMSG_GUILD_APPLY_LEAVE;
 	game->add_event_list(std::vformat(line,
 		std::make_format_args(applicant)).c_str(), 10);
+	// This notify reaches exactly the approvers; one with the queue open
+	// sees the new row arrive without touching Refresh.
+	if (guild_manager* manager = screen_guild_manager(game))
+		manager->mark_queue_stale();
 }
 
 void HandleGuildRequestDecided(CGame* game, char* data)
@@ -175,17 +249,32 @@ void HandleGuildActionResult(CGame* game, char* data)
 
 	if (pkt->result != guild_result::ok)
 	{
-		game->add_event_list(std::format(NOTIFYMSG_GUILD_ACTION_FAILED,
-			guild_result_name(pkt->result)).c_str(), 10);
+		game->add_event_list(guild_result_text(pkt->result).c_str(), 10);
 		return;
 	}
 	// Filing is the one ok with no matching event notify to speak for it.
-	// Panel refresh policy is the #124 dialogs' business (re-request on open
-	// / on this envelope), not a which-actions-dirty-what list here.
 	if (pkt->action == guild_wire_action::join
 		|| pkt->action == guild_wire_action::leave)
 	{
 		game->add_event_list(NOTIFYMSG_GUILD_REQUEST_FILED, 10);
+	}
+	// The two answer families without a broadcast: the queue (only the
+	// acting approver knows it shrank — an approved join's roster/info churn
+	// arrives as the GuildJoined/GuildLeft broadcast, so decide marks only
+	// the queue) and the info counters the Donate / Treasury panels show
+	// (burns and deposits move them for the actor right now).
+	guild_manager* manager = screen_guild_manager(game);
+	if (manager == nullptr)
+		return;
+	if (pkt->action == guild_wire_action::decide)
+	{
+		manager->mark_queue_stale();
+	}
+	else if (pkt->action == guild_wire_action::donate
+		|| pkt->action == guild_wire_action::treasury_deposit
+		|| pkt->action == guild_wire_action::treasury_withdraw)
+	{
+		manager->mark_info_stale();
 	}
 }
 

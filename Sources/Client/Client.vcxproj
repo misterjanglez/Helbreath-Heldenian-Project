@@ -252,6 +252,7 @@
     <ClInclude Include="DialogBox_SellList.h" />
     <ClInclude Include="DialogBox_GuildMenu.h" />
     <ClInclude Include="DialogBox_GuildOperation.h" />
+    <ClInclude Include="DialogBox_GuildRoster.h" />
     <ClInclude Include="DialogBox_Bank.h" />
     <ClInclude Include="DialogBox_Exchange.h" />
     <ClInclude Include="DialogBox_Party.h" />
@@ -461,6 +462,7 @@
     <ClCompile Include="DialogBox_SellList.cpp" />
     <ClCompile Include="DialogBox_GuildMenu.cpp" />
     <ClCompile Include="DialogBox_GuildOperation.cpp" />
+    <ClCompile Include="DialogBox_GuildRoster.cpp" />
     <ClCompile Include="DialogBox_Bank.cpp" />
     <ClCompile Include="DialogBox_Exchange.cpp" />
     <ClCompile Include="DialogBox_Party.cpp" />

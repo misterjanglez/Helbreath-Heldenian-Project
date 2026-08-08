@@ -17,8 +17,11 @@ constexpr std::string_view email_allowed_chars =
 	R"(abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789@.)";
 constexpr std::string_view character_name_allowed_chars =
 	R"(abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-)";
+// Must admit exactly what hb::shared::guild::is_valid_guild_name_char accepts
+// (GuildDefs.h) — a looser filter here lets a player type a name the server
+// refuses as bad_name.
 constexpr std::string_view guild_name_allowed_chars =
-	R"(abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 _-!@#$%^&*)";
+	R"(abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 _-)";
 constexpr std::string_view digits_only = "0123456789";
 
 // Draws a text_input control: text (masked if hidden), cursor, selection highlight.
